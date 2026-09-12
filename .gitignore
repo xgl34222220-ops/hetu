@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.gradle/
+local.properties
+android-app/build/
+out/
+*.keystore
+*.jks
+*.idsig
+# Generated from module/ by tools/package.py
+android-app/app/src/main/assets/bichen-module.zip
+android-app/app/src/main/assets/module-info.json
+android-app/app/src/main/assets/rules/
+android-app/app/src/main/assets/sources.tsv
+android-app/app/src/main/assets/THIRD_PARTY_NOTICES.md
