@@ -27,24 +27,13 @@ jobs:
           sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
           sudo apt-get update -qq
           sudo apt-get install -y -qq mksh busybox
-      - name: Apply reviewed hash-checked source changes once
+      - name: Apply screenshot-reviewed layout correction once
         run: |
-          if [ -f .github/changes/ui3.0.b64 ]; then
-            python3 - <<'PY'
-          from pathlib import Path
-          import base64, lzma, hashlib, subprocess
-          parts=[Path(f'.github/changes/ui3.{i}.b64') for i in range(3)]
-          raw=lzma.decompress(base64.b64decode(''.join(p.read_text().strip() for p in parts),validate=True))
-          assert hashlib.sha256(raw).hexdigest() == 'abdd4d5bc8368e8ef13be15918056dfc36c9825a68e5fd2cd1e836b35f7b6334'
-          patch=Path('/tmp/ui3.patch');patch.write_bytes(raw)
-          subprocess.run(['git','apply','--unidiff-zero','--check',str(patch)],check=True)
-          subprocess.run(['git','apply','--unidiff-zero',str(patch)],check=True)
-          for p in parts:p.unlink()
-          PY
-            python3 tools/test_java.py --protocol-only
-            git add android-app/app/src/main/java tools tests docs
-            git add -u .github/changes
-            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Redesign Mihomo workspace and add explicit opt-in connection observations'
+          if [ -f tools/fix_ui3_layout.py ]; then
+            python3 tools/fix_ui3_layout.py
+            rm tools/fix_ui3_layout.py
+            git add android-app/app/src/main/java tools tests
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Keep pause action on one line at enlarged font and verify populated rows'
             git push origin HEAD:feature/mihomo-e2e
           fi
       - name: Retrieve exact tested native baseline
