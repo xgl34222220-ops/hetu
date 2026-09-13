@@ -22,4 +22,4 @@ for theme in ('light','dark'):
  (out/f'{theme}-results.txt').write_text(p.stdout+p.stderr);print(p.stdout)
  assert 'BICHEN_WORKSPACE_PASS' in p.stdout and 'BICHEN_WORKSPACE_FAIL' not in p.stdout
 run('adb','pull','/data/user/0/io.github.xgl34222220.bichen.preview/files',out/'screenshots',timeout=30)
-assert len(list((out/'screenshots').glob('workspace-*.png')))==8
+assert len(list((out/'screenshots').glob('workspace-*.png')))==12

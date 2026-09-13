@@ -24,6 +24,7 @@ public final class Workspace extends Instrumentation {
     private String texts(){StringBuilder s=new StringBuilder();main(()->collect(a.getWindow().getDecorView(),s));return s.toString();}
     private void collect(View v,StringBuilder s){if(v instanceof TextView)s.append(((TextView)v).getText()).append('\n');if(v instanceof ViewGroup){ViewGroup g=(ViewGroup)v;for(int i=0;i<g.getChildCount();i++)collect(g.getChildAt(i),s);}}
     private void screenshot(String name)throws Exception{Bitmap b=getUiAutomation().takeScreenshot();check(b!=null,"screenshot available "+name);try(OutputStream o=new FileOutputStream(new File(c.getFilesDir(),"workspace-"+theme+"-"+name+".png"))){b.compress(Bitmap.CompressFormat.PNG,100,o);}}
+    private void checkPause(View v){if(v instanceof TextView && "暂停刷新".contentEquals(((TextView)v).getText()))check(((TextView)v).getLineCount()==1,"pause action fits enlarged font on one line");if(v instanceof ViewGroup){ViewGroup g=(ViewGroup)v;for(int i=0;i<g.getChildCount();i++)checkPause(g.getChildAt(i));}}
     private void waitIdle()throws Exception{for(int i=0;i<120;i++){final boolean[] busy={true};main(()->{try{busy[0]=(Boolean)field("busy");}catch(Exception e){throw new RuntimeException(e);}});if(!busy[0])return;SystemClock.sleep(100);}throw new AssertionError("operation never completed");}
     @Override public void onStart(){Bundle result=new Bundle();try{
         c=getTargetContext();String pkg=c.getPackageName();c.getSharedPreferences("bichen",0).edit().putString("appearance",theme).commit();
@@ -31,17 +32,17 @@ public final class Workspace extends Instrumentation {
         check(!a.isFinishing(),"new proxy workspace opens "+theme);
         for(int n=0;n<4;n++){page(n);check(texts().contains(new String[]{"代理概览","策略与节点","连接活动","代理设置"}[n]),"page heading "+n);final int selected=n;
             main(()->{try{ViewGroup nav=(ViewGroup)field("nav");check(nav.getChildCount()==4,"four workspace tabs");for(int i=0;i<4;i++){View v=nav.getChildAt(i);check(v.isSelected()==(i==selected),"selected state "+i);check(v.getHeight()>=48*c.getResources().getDisplayMetrics().density,"navigation touch height "+i);ViewGroup g=(ViewGroup)v;View icon=g.getChildAt(0),label=g.getChildAt(2);check(Math.abs((icon.getLeft()+icon.getRight())-(label.getLeft()+label.getRight()))<=2,"icon label centers "+i);check(label.getBottom()<=g.getHeight(),"label fits 1.3 font "+i);} }catch(Exception e){throw new RuntimeException(e);}});
-            screenshot("page-"+n);
+            if(n==2)main(()->checkPause(a.getWindow().getDecorView()));screenshot("page-"+n);
         }
         // Synthetic group data exercises search/rendering only, not a pretend connection.
         JSONObject proxies=new JSONObject().put("日本组",new JSONObject().put("type","Selector").put("now","Tokyo A").put("all",new JSONArray().put("Tokyo A").put("Tokyo B"))).put("自动",new JSONObject().put("type","URLTest").put("now","US").put("all",new JSONArray().put("US")));
-        page(1);main(()->{try{setField("proxies",proxies);call(a,"renderRows",new Class<?>[0]);}catch(Exception e){throw new RuntimeException(e);}});check(texts().contains("Tokyo A")&&texts().contains("自动测速"),"fixture: selected member and automatic type visible");
+        page(1);main(()->{try{setField("proxies",proxies);call(a,"renderRows",new Class<?>[0]);}catch(Exception e){throw new RuntimeException(e);}});check(texts().contains("Tokyo A")&&texts().contains("自动测速"),"fixture: selected member and automatic type visible");screenshot("fixture-nodes");
         main(()->{try{((EditText)field("search")).setText("Tokyo");}catch(Exception e){throw new RuntimeException(e);}});check(((ListView)field("list")).getCount()==1,"fixture: member search filters groups");
         page(2);main(()->{try{setField("frozen",true);}catch(Exception e){throw new RuntimeException(e);}});
         JSONObject snap=new JSONObject().put("connections",new JSONArray().put(new JSONObject().put("id","sample-1").put("metadata",new JSONObject().put("host","fixture.example.test").put("network","tcp")).put("rule","Match").put("chains",new JSONArray().put("PROXY"))));
         main(()->{try{setField("traffic",snap);call(a,"renderRows",new Class<?>[0]);}catch(Exception e){throw new RuntimeException(e);}});
         Object before=field("list");main(()->{try{call(a,"renderRows",new Class<?>[0]);}catch(Exception e){throw new RuntimeException(e);}});check(before==field("list"),"fixture: refresh reuses ListView instead of rebuilding page");
-        check(texts().contains("fixture.example.test"),"fixture: connection metadata visible");
+        check(texts().contains("fixture.example.test"),"fixture: connection metadata visible");screenshot("fixture-connections");
         main(()->{try{((EditText)field("search")).setText("no-such-domain");}catch(Exception e){throw new RuntimeException(e);}});check(((ListView)field("list")).getCount()==0&&texts().contains("没有匹配项"),"fixture: search empty state is not no-traffic state");
         Class<?> recordType=Class.forName(pkg+".ProxyRecords",true,c.getClassLoader());Method get=recordType.getDeclaredMethod("get",Context.class);get.setAccessible(true);Object records=get.invoke(null,c);
         call(records,"clear",new Class<?>[0]);call(records,"setEnabled",new Class<?>[]{boolean.class},false);long t=(Long)call(records,"ticket",new Class<?>[0]);
