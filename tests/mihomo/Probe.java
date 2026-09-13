@@ -12,7 +12,7 @@ public final class Probe extends Instrumentation {
  }
  private void check(boolean pass,String what){if(!pass)throw new AssertionError(what);log.append("PASS ").append(what).append('\n');}
  @Override public void onStart(){Bundle b=new Bundle();try{
-  if("stopped".equals(mode)){boolean routed=false;try{routed=get("198.51.100.7",18080,false).contains("BICHEN_PROXY_E2E");}catch(Exception expected){}check(!routed,"reserved-IP request no longer travels through proxy after stop");check(get("10.0.2.2",19089,false).contains("BICHEN_HEALTH"),"normal local networking restored after stop");}
+  if("stopped".equals(mode)||"bypass".equals(mode)){boolean routed=false;try{routed=get("198.51.100.7",18080,false).contains("BICHEN_PROXY_E2E");}catch(Exception expected){}check(!routed,"bypass".equals(mode)?"excluded UID does not travel through running proxy":"reserved-IP request no longer travels through proxy after stop");check(get("10.0.2.2",19089,false).contains("BICHEN_HEALTH"),"bypass".equals(mode)?"excluded UID reaches direct local server while VPN is active":"normal local networking restored after stop");}
   else{
    check(get("198.51.100.7",18080,true).contains("BICHEN_PROXY_E2E"),"TCP from independent UID traverses Android TUN and imported SOCKS proxy");
    check(get("allowed.bichen.test",18080,true).contains("BICHEN_PROXY_E2E"),"system DNS and hostname request traverse Mihomo path");

@@ -50,6 +50,11 @@ final class ProxyStore {
    if(current.has("yaml"))next.put("previousYaml",current.getString("yaml")).put("previousSubscription",current.optString("subscription","")).put("previousSavedAt",current.optLong("savedAt"));write(next);return true;
   }
  }
+ static final class UpdateRequest {
+  final String revision,address;
+  UpdateRequest(String revision,String address){this.revision=revision;this.address=address;}
+ }
+ UpdateRequest updateRequest(String input)throws Exception{synchronized(LOCK){JSONObject d=document();return new UpdateRequest(revision(d),input==null||input.isEmpty()?d.optString("subscription",""):input);}}
  String subscription()throws Exception{synchronized(LOCK){return document().optString("subscription","");}}
  void restore()throws Exception{synchronized(LOCK){if(MihomoVpnService.engaged)throw new IOException("请先停止代理");JSONObject d=document();if(!d.has("previousYaml"))throw new IOException("没有上一份配置");JSONObject next=new JSONObject().put("yaml",d.getString("previousYaml")).put("subscription",d.optString("previousSubscription","")).put("previousYaml",d.getString("yaml")).put("previousSubscription",d.optString("subscription","")).put("savedAt",d.optLong("previousSavedAt")).put("previousSavedAt",d.optLong("savedAt")).put("checkedAt",System.currentTimeMillis());write(next);}}
  private void write(JSONObject document)throws IOException{

@@ -7,12 +7,25 @@ import android.content.pm.ServiceInfo;
 import org.json.*;
 import java.io.IOException;
 import java.util.concurrent.*;
+import java.util.*;
+import android.content.pm.PackageManager;
 /** Full IP tunnel. No Root firewall/Box changes; opt-in linkage only to our own hosts. */
 public final class MihomoVpnService extends VpnService {
  public static volatile boolean engaged,running;
  public static volatile long generation,startedAt;
+ static volatile ProxyAppPolicy activePolicy;
+ public static volatile String networkLabel="等待网络恢复",activeRuleRevision="";
+ public static volatile int activeRuleCount;
+ public static volatile boolean networkValidated;
+ private final ProxyNetworkState networkState=new ProxyNetworkState();
+ static boolean pendingSettings(SharedPreferences p,String self){ProxyAppPolicy a=activePolicy;return running&&a!=null&&(a.differs(p.getBoolean("proxyFilter",true),p.getStringSet("bypassApps",Collections.emptySet()),self)||(a.filterEnabled&&!activeRuleRevision.equals(RuleStore.publishedRevision())));}
+ static String settingsSummary(SharedPreferences p,String self){
+  ProxyAppPolicy a=activePolicy;int draft=p.getStringSet("bypassApps",Collections.emptySet()).size();
+  if(!running||a==null)return "已保存 "+draft+" 个应用放行 · 下次连接生效";
+  return "本次已放行 "+a.applied.size()+" 个 · "+(a.filterEnabled?"过滤 "+activeRuleCount+" 个域名":"辟尘过滤关闭")+(a.missing.isEmpty()?"":"\n"+a.missing.size()+" 个应用未安装或当前不可见，未计入已放行")+(pendingSettings(p,self)?"\n存在未生效更改，请停止后重新连接":"");
+ }
  private ProxyObservations observations;
- private final Runnable observe=new Runnable(){public void run(){if(owner!=MihomoVpnService.this||!running||stopping||destroyed)return;final long session=generation;final long epoch=observations.epoch();submit(()->{try{if(prefs.getBoolean("proxyHistory",false)&&running&&generation==session){JSONObject snap=MihomoNative.call("connections").getJSONObject("data");if(running&&!stopping&&generation==session)observations.capture(snap,epoch);}}catch(Exception e){prefs.edit().putString("proxyHistoryError","连接观察暂时失败，未补造记录").apply();}finally{if(running&&!stopping&&generation==session)ui.postDelayed(this,2000);}});}};
+ private final Runnable observe=new Runnable(){public void run(){if(owner!=MihomoVpnService.this||!running||stopping||destroyed)return;final long session=generation;final long epoch=observations.epoch();submit(()->{try{if(prefs.getBoolean("proxyHistory",false)&&running&&generation==session){JSONObject snap=MihomoNative.call("connections").getJSONObject("data");if(running&&!stopping&&generation==session){observations.capture(snap,epoch);if(prefs.contains("proxyHistoryError"))prefs.edit().remove("proxyHistoryError").apply();}}}catch(Exception e){prefs.edit().putString("proxyHistoryError","连接观察暂时失败，未补造记录").apply();}finally{if(running&&!stopping&&generation==session)ui.postDelayed(this,2000);}});}};
  public static volatile String state="未启动",failure="";
  private static volatile MihomoVpnService owner;
  private final ExecutorService worker=Executors.newSingleThreadExecutor();
@@ -27,14 +40,15 @@ public final class MihomoVpnService extends VpnService {
    if(owner!=null&&owner!=this){stopSelf(startId);return START_NOT_STICKY;}owner=this;engaged=true;state="正在停止并检查恢复";foreground();requestStop();return START_NOT_STICKY;
   }
   if(engaged||destroyed)return START_NOT_STICKY;
-  owner=this;engaged=true;stopping=false;failure="";generation++;startedAt=0;state="正在校验配置";foreground();
+  owner=this;engaged=true;stopping=false;failure="";generation++;startedAt=0;activePolicy=null;activeRuleCount=0;activeRuleRevision="";networkValidated=false;networkLabel="等待网络恢复";state="正在校验配置";foreground();
   prefs.edit().putBoolean("proxyWanted",true).putString("engineOwner","mihomo").apply();ui.postDelayed(startupDeadline,60000);
   submit(()->{try{startCore();}catch(Exception|LinkageError e){failure=e.getMessage()==null?"内核启动失败":e.getMessage();finishStop();}});return START_NOT_STICKY;
  }
  private void submit(Runnable r){try{worker.execute(r);}catch(RejectedExecutionException ignored){}}
- private void requestStop(){stopping=true;running=false;ui.removeCallbacks(observe);state="正在停止";prefs.edit().putBoolean("proxyWanted",false).apply();ui.removeCallbacks(startupDeadline);submit(this::finishStop);}
+ private void requestStop(){if(owner!=this)return;stopping=true;running=false;ui.removeCallbacks(observe);state="正在停止";prefs.edit().putBoolean("proxyWanted",false).apply();ui.removeCallbacks(startupDeadline);submit(this::finishStop);}
  private void startCore()throws Exception{
   if(DnsVpnService.running||prefs.getBoolean("vpnWanted",false)||prefs.getBoolean("vpnRestoreHosts",false))throw new IOException("请先停止旧应用保护并完成模块恢复");
+  final ProxyAppPolicy requested=new ProxyAppPolicy(prefs.getBoolean("proxyFilter",true),new HashSet<>(prefs.getStringSet("bypassApps",Collections.emptySet())),null,getPackageName());
   ProxyStore store=new ProxyStore(this);String yaml=store.yaml();MihomoNative.call(new JSONObject().put("action","inspect").put("yaml",yaml));
   if(stopping||destroyed){finishStop();return;}RuleStore rules=new RuleStore(this);rules.reload();
   if(prefs.getBoolean("proxyManageHosts",false)){
@@ -45,17 +59,49 @@ public final class MihomoVpnService extends VpnService {
   }
   if(stopping||destroyed){finishStop();return;}if(VpnService.prepare(this)!=null)throw new IOException("需要在 App 内确认 VPN 授权");state="正在连接 Mihomo";foreground();
   Builder b=new Builder().setSession("辟尘 · 代理与去广告").setMtu(1500).addAddress("172.29.0.1",30).addAddress("fdfe:dcba:9876::1",126).addRoute("0.0.0.0",0).addRoute("::",0).addDnsServer("172.29.0.2").setBlocking(false);
-  b.addDisallowedApplication(getPackageName());b.setConfigureIntent(PendingIntent.getActivity(this,401,new Intent(this,ProxyActivity.class),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE));
+  b.addDisallowedApplication(getPackageName());
+  Set<String> accepted=new HashSet<>();
+  for(String pkg:requested.requested){try{b.addDisallowedApplication(pkg);accepted.add(pkg);}catch(PackageManager.NameNotFoundException absent){/* Preserve selection for reinstall; do not count as applied. */}}
+  final ProxyAppPolicy applied=new ProxyAppPolicy(requested.filterEnabled,requested.requested,accepted,getPackageName());
+  final RuleStore.EffectiveRules effective=rules.effectiveRules();
+  b.setConfigureIntent(PendingIntent.getActivity(this,401,new Intent(this,ProxyActivity.class),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE));
   descriptor=b.establish();if(descriptor==null)throw new IOException("系统没有建立 VPN 接口");
-  MihomoNative.call(new JSONObject().put("action","start").put("home",store.home().getAbsolutePath()).put("yaml",yaml).put("fd",descriptor.getFd()).put("filter",prefs.getBoolean("proxyFilter",true)).put("domains",new JSONArray(rules.effectiveDomains())));
-  if(stopping||destroyed){finishStop();return;}running=true;startedAt=SystemClock.elapsedRealtime();ui.post(observe);ui.removeCallbacks(startupDeadline);state=prefs.getBoolean("proxyFilter",true)?"代理与去广告运行中":"代理运行中 · 辟尘过滤关闭";prefs.edit().remove("proxyError").apply();manager=getSystemService(ConnectivityManager.class);
-  callback=new ConnectivityManager.NetworkCallback(){
-   @Override public void onCapabilitiesChanged(Network n,NetworkCapabilities c){if(running&&c.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)&&c.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)){physical=n;setUnderlyingNetworks(new Network[]{n});}}
-   @Override public void onLost(Network n){if(running&&n.equals(physical)){physical=null;setUnderlyingNetworks(new Network[0]);state="等待网络恢复";foreground();}}
-   @Override public void onAvailable(Network n){if(running){state=prefs.getBoolean("proxyFilter",true)?"代理与去广告运行中":"代理运行中";foreground();}}
-  };if(manager!=null)manager.registerDefaultNetworkCallback(callback);foreground();
+  MihomoNative.call(new JSONObject().put("action","start").put("home",store.home().getAbsolutePath()).put("yaml",yaml).put("fd",descriptor.getFd()).put("filter",applied.filterEnabled).put("domains",new JSONArray(applied.filterEnabled?effective.domains:Collections.<String>emptyList())));
+  if(stopping||destroyed){finishStop();return;}
+  activePolicy=applied;activeRuleRevision=effective.revision;activeRuleCount=applied.filterEnabled?effective.domains.size():0;
+  running=true;startedAt=SystemClock.elapsedRealtime();ui.post(observe);ui.removeCallbacks(startupDeadline);
+  state="内核已启动 · 等待网络确认";prefs.edit().remove("proxyError").apply();foreground();
+  final long session=generation;ui.post(()->watchNetwork(session));
  }
- private void foreground(){if(destroyed)return;
+ private boolean currentSession(long session){return owner==this&&running&&!stopping&&!destroyed&&generation==session;}
+ private void watchNetwork(final long session){
+  if(!currentSession(session))return;
+  manager=getSystemService(ConnectivityManager.class);
+  if(manager==null){networkLabel="无法确认网络状态";state=networkLabel;foreground();return;}
+  callback=new ConnectivityManager.NetworkCallback(){
+   @Override public void onAvailable(Network n){if(currentSession(session)){networkState.available(n);reportNetwork(session,false);}}
+   @Override public void onCapabilitiesChanged(Network n,NetworkCapabilities c){
+    if(currentSession(session)&&networkState.capabilities(n,c.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN),c.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET),c.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED),c.hasCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL)))reportNetwork(session,true);
+   }
+   @Override public void onBlockedStatusChanged(Network n,boolean blocked){if(currentSession(session)&&networkState.blocked(n,blocked))reportNetwork(session,true);}
+   @Override public void onLost(Network n){if(currentSession(session)&&networkState.lost(n))reportNetwork(session,true);}
+  };
+  try{manager.registerDefaultNetworkCallback(callback,ui);}catch(RuntimeException error){callback=null;networkLabel="网络状态监听失败";state=networkLabel;foreground();}
+ }
+ private void reportNetwork(long session,boolean updateUnderlying){
+  if(!currentSession(session))return;
+  ProxyNetworkState.State net=networkState.state();networkValidated=net==ProxyNetworkState.State.READY;networkLabel=ProxyNetworkState.label(net);
+  if(updateUnderlying){
+   physical=(Network)networkState.underlying();
+   try{if(!setUnderlyingNetworks(physical==null?new Network[0]:new Network[]{physical})){networkValidated=false;networkLabel="底层网络关联未确认";}}
+   catch(RuntimeException error){networkValidated=false;networkLabel="底层网络关联失败";}
+  }
+  ProxyAppPolicy a=activePolicy;
+  String next=networkLabel+" · "+(a!=null&&a.filterEnabled?"代理与域名过滤已加载":"仅代理已加载");
+  if(!next.equals(state)){state=next;foreground();}
+ }
+
+ private void foreground(){if(destroyed||owner!=this)return;
   NotificationManager nm=getSystemService(NotificationManager.class);nm.createNotificationChannel(new NotificationChannel("proxy_core","Mihomo 代理",NotificationManager.IMPORTANCE_LOW));
   PendingIntent open=PendingIntent.getActivity(this,402,new Intent(this,ProxyActivity.class),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
   PendingIntent stop=PendingIntent.getService(this,403,new Intent(this,MihomoVpnService.class).setAction("STOP"),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
@@ -63,7 +109,7 @@ public final class MihomoVpnService extends VpnService {
   if(Build.VERSION.SDK_INT>=34)startForeground(401,n,ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);else startForeground(401,n);
  }
  private void finishStop(){if(owner!=this)return;
-  running=false;stopping=true;startedAt=0;ui.removeCallbacks(observe);ui.removeCallbacks(startupDeadline);try{MihomoNative.call("stop");}catch(Exception|LinkageError ignored){}closeDescriptor();
+  running=false;stopping=true;startedAt=0;networkValidated=false;networkLabel="未运行";activePolicy=null;activeRuleCount=0;activeRuleRevision="";ui.removeCallbacks(observe);ui.removeCallbacks(startupDeadline);try{MihomoNative.call("stop");}catch(Exception|LinkageError ignored){}closeDescriptor();
   if(manager!=null&&callback!=null){try{manager.unregisterNetworkCallback(callback);}catch(RuntimeException ignored){}callback=null;}
   if(prefs.getBoolean("proxyRestoreHosts",false)){try{
    JSONObject s=RootBridge.status(this);if(!s.optBoolean("ok")||s.optBoolean("pendingReboot"))throw new IOException("原模块恢复状态待确认");

@@ -91,6 +91,13 @@ public final class RuleStore {
             }
         }
     }
+    /** Domain list and revision are captured from the same immutable generation. */
+    static final class EffectiveRules {
+        final String revision; final java.util.List<String> domains;
+        EffectiveRules(String revision, java.util.List<String> domains) { this.revision=revision; this.domains=java.util.Collections.unmodifiableList(domains); }
+    }
+    EffectiveRules effectiveRules() { Snapshot s=live; return new EffectiveRules(s==null?"":s.generation,s==null?new java.util.ArrayList<>():new java.util.ArrayList<>(s.effective)); }
+    static String publishedRevision() { Snapshot s=live; return s==null?"":s.generation; }
     public java.util.List<String> effectiveDomains() { Snapshot s=live; return s==null?java.util.Collections.emptyList():new java.util.ArrayList<>(s.effective); }
     public int count() { Snapshot s=live; return s==null?0:s.effective.size(); }
     /** No I/O; changes only after a complete snapshot has been published. */

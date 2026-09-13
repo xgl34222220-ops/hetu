@@ -64,13 +64,16 @@ def signal(name):run('adb','shell','touch',DIR+name)
 def probe(mode,suffix):
  p=run('adb','shell','am','instrument','-w','-e','mode',mode,'bichen.proxyprobe/.Probe',capture_output=True,text=True,timeout=60);(O/(suffix+'-probe.txt')).write_text(p.stdout+p.stderr);print(p.stdout);assert 'BICHEN_MIHOMO_PROBE_PASS' in p.stdout and 'BICHEN_MIHOMO_PROBE_FAIL' not in p.stdout
 try:
- wait_for('vpn-ready');probe('path','first');signal('path-done');wait_for('vpn-stopped');probe('stopped','stopped');signal('stop-probe-done');wait_for('vpn-restarted');probe('path','restart');signal('restart-probe-done');control.wait(timeout=40);control_output.close()
+ wait_for('vpn-ready');probe('path','first');signal('path-done');wait_for('vpn-stopped');probe('stopped','stopped');signal('stop-probe-done');wait_for('vpn-restarted');probe('path','restart');signal('restart-probe-done')
+ wait_for('bypass-ready');before=len(received);probe('bypass','bypass');assert len(received)==before, 'excluded UID still reached SOCKS fixture';signal('bypass-done')
+ wait_for('bypass-draft-ready');before=len(received);probe('bypass','bypass-draft');assert len(received)==before, 'saved list incorrectly changed live VPN policy';signal('bypass-draft-done')
+ wait_for('reincluded-ready');probe('path','reincluded');signal('reincluded-done');control.wait(timeout=40);control_output.close()
  text=(O/'control-results.txt').read_text();print(text);assert 'BICHEN_MIHOMO_CONTROL_PASS' in text and 'CONTROL_FAIL' not in text
  assert any(x['host']=='198.51.100.7' for x in received), 'proxy did not receive real TUN request'
  assert any(x['host']=='allowed.bichen.test' for x in received), 'DNS domain mapping not observed'
  assert not any(x['host']=='ads.bichen.test' for x in received), 'blocked domain reached upstream proxy'
  (O/'fixture-connections.json').write_text(json.dumps(received,indent=2))
- print('BICHEN_MIHOMO_E2E_PASS: real TUN, SOCKS routing, DNS, ad rejection, stop, restart; independent UID')
+ print('BICHEN_MIHOMO_E2E_PASS: real TUN, SOCKS routing, DNS, ad rejection, stop, restart, app bypass, pending settings, reinclude; independent UID')
 finally:
  if control.poll() is None:control.terminate()
  control_output.close()

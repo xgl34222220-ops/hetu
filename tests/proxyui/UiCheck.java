@@ -32,6 +32,13 @@ public final class UiCheck extends Instrumentation {
   invoke(store,"restore",new Class<?>[0]);check(yaml.equals(invoke(store,"yaml",new Class<?>[0])),"identical update preserves previous rollback target");
   try{invoke(store,"saveIfUnchanged",new Class<?>[]{String.class,String.class,String.class},updated,"",second);throw new AssertionError("stale commit accepted");}catch(InvocationTargetException expected){check(yaml.equals(invoke(store,"yaml",new Class<?>[0])),"stale download cannot replace newly changed configuration");}
   JSONObject info=(JSONObject)invoke(store,"info",new Class<?>[0]);check(!info.toString().contains("DO_NOT_DISPLAY")&&!info.has("yaml"),"configuration UI metadata excludes credentials and source text");check(info.optBoolean("hasPrevious"),"rollback remains available");
+  Object request=invoke(store,"updateRequest",new Class<?>[]{String.class},"");
+  check(field(request,"revision").equals(invoke(store,"revision",new Class<?>[0])),"subscription request captures configuration revision");
+  check(field(request,"address").equals("https://fixture.invalid/?secret=DO_NOT_DISPLAY"),"subscription request captures stored address from same document");
+  invoke(store,"save",new Class<?>[]{String.class,String.class},updated,"https://fixture.invalid/new-secret");
+  check(field(request,"address").equals("https://fixture.invalid/?secret=DO_NOT_DISPLAY"),"download snapshot remains unchanged after new import");
+  try{invoke(store,"saveIfUnchanged",new Class<?>[]{String.class,String.class,String.class},yaml,field(request,"address"),field(request,"revision"));throw new AssertionError("stale subscription replaced imported config");}catch(InvocationTargetException expected){check(updated.equals(invoke(store,"yaml",new Class<?>[0])),"old subscription snapshot cannot overwrite new import");}
+  Object explicit=invoke(store,"updateRequest",new Class<?>[]{String.class},"https://fixture.invalid/explicit");check(field(explicit,"address").equals("https://fixture.invalid/explicit"),"explicit subscription address is preserved");
   Object obs=create("ProxyObservations");invoke(obs,"clear",new Class<?>[0]);invoke(obs,"setEnabled",new Class<?>[]{boolean.class},false);
   JSONObject m=new JSONObject().put("host","observed.fixture.test").put("destinationIP","198.51.100.1").put("destinationPort",443).put("network","tcp");JSONObject entry=new JSONObject().put("id","fixture-1").put("metadata",m).put("download",1234).put("rule","Match").put("chains",new JSONArray().put("SELECT")).put("password","MUST_NOT_SAVE");JSONObject snap=new JSONObject().put("connections",new JSONArray().put(entry));
   long epoch=(Long)invoke(obs,"epoch",new Class<?>[0]);invoke(obs,"capture",new Class<?>[]{JSONObject.class,long.class},snap,epoch);check(rows(obs).length()==0,"observations default off saves nothing");
@@ -45,8 +52,13 @@ public final class UiCheck extends Instrumentation {
    for(int i=0;i<150&&(Boolean)field(a,"busy");i++)SystemClock.sleep(100);check(!(Boolean)field(a,"busy"),mode+": initialization completes");
    Object theme=field(a,"u");check(((Boolean)field(theme,"dark"))==mode.equals("dark"),mode+": proxy theme follows shared appearance");
    String[] titles={"代理与去广告","选择节点","连接活动","代理配置"};for(int p=0;p<4;p++){page(p);check(strings().contains(titles[p]),mode+": section opens "+titles[p]);check(!strings().contains("DO_NOT_DISPLAY"),mode+": secrets not rendered");shot(mode+"-"+p);}
+   page(0);check(strings().contains("当前生效设置"),mode+": overview separates effective runtime settings");
+   page(3);check(strings().contains("应用放行"),mode+": configuration exposes VPN bypass entry");
    page(0);LinearLayout nav=(LinearLayout)field(a,"nav");runOnMainSync(()->{for(int n=0;n<4;n++){ViewGroup item=(ViewGroup)nav.getChildAt(n);TextView label=(TextView)item.getChildAt(2);check(label.getBottom()<=item.getHeight(),mode+": 1.3x navigation label fits "+n);check(item.getHeight()>=48*c.getResources().getDisplayMetrics().density,mode+": navigation target >=48dp "+n);}});
    runOnMainSync(a::finish);waitForIdleSync();SystemClock.sleep(300);
+   a=startActivitySync(new Intent(c,Class.forName(c.getPackageName()+".MainActivity",true,c.getClassLoader())).putExtra("proxyApps",true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));waitForIdleSync();SystemClock.sleep(500);
+   check(((Integer)field(a,"tab"))==1,mode+": proxy app picker opens correct existing page");check(strings().contains("返回代理页"),mode+": picker does not offer starting the other VPN");
+   check(!prefs.getBoolean("vpnWanted",false),mode+": opening picker does not start DNS VPN");shot(mode+"-apps");runOnMainSync(a::finish);waitForIdleSync();SystemClock.sleep(300);
   }
   invoke(obs,"clear",new Class<?>[0]);((android.database.sqlite.SQLiteOpenHelper)obs).close();prefs.edit().putString("appearance","system").putBoolean("proxyHistory",false).commit();
   b.putString("stream",output+"BICHEN_PROXY_UI_PASS checks="+checks+"\nStorage fixtures and actual UI only; not actual external app traffic.\n");finish(Activity.RESULT_OK,b);
