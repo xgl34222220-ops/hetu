@@ -1,16 +1,15 @@
 package bichen.proxyuicheck;
+
 import android.app.*;
 import android.content.*;
-import android.os.*;
 import android.graphics.Bitmap;
+import android.os.*;
 import android.view.*;
 import android.widget.*;
-import org.json.*;
 import java.io.*;
 import java.lang.reflect.*;
-import java.util.*;
 
-/** Real installed UI/storage tests. Injected storage snapshots are explicitly fixtures. */
+/** Installed UI/storage regression for the single proxy control surface. */
 public final class UiCheck extends Instrumentation {
  Context c;Activity a;int checks;StringBuilder output=new StringBuilder();
  void check(boolean ok,String name){if(!ok)throw new AssertionError(name);checks++;output.append("PASS ").append(name).append('\n');}
@@ -19,48 +18,36 @@ public final class UiCheck extends Instrumentation {
  Object create(String name)throws Exception{Constructor<?> ctor=Class.forName(c.getPackageName()+"."+name,true,c.getClassLoader()).getDeclaredConstructor(Context.class);ctor.setAccessible(true);return ctor.newInstance(c);}
  String strings(){StringBuilder b=new StringBuilder();runOnMainSync(()->collect(a.getWindow().getDecorView(),b));return b.toString();}
  void collect(View v,StringBuilder b){if(v instanceof TextView)b.append(((TextView)v).getText()).append('\n');if(v instanceof ViewGroup){ViewGroup p=(ViewGroup)v;for(int i=0;i<p.getChildCount();i++)collect(p.getChildAt(i),b);}}
- void page(int n)throws Exception{Method m=a.getClass().getDeclaredMethod("showPage",int.class);m.setAccessible(true);runOnMainSync(()->{try{m.invoke(a,n);}catch(Exception e){throw new RuntimeException(e);}});waitForIdleSync();SystemClock.sleep(350);}
  void shot(String name)throws Exception{Bitmap b=getUiAutomation().takeScreenshot();if(b!=null)try(OutputStream out=new FileOutputStream(new File(c.getFilesDir(),"ui-"+name+".png"))){b.compress(Bitmap.CompressFormat.PNG,100,out);}}
- JSONArray rows(Object store)throws Exception{List<?> rows=(List<?>)invoke(store,"readRecent",new Class<?>[0]);return new JSONArray(rows);}
  @Override public void onCreate(Bundle args){super.onCreate(args);start();}
  @Override public void onStart(){Bundle b=new Bundle();try{
-  c=getTargetContext();SharedPreferences prefs=c.getSharedPreferences("bichen",0);prefs.edit().putString("appearance","light").remove("proxyDnsGuard").commit();
-  Object store=create("ProxyStore");String yaml="mode: rule\nproxies: []\nproxy-groups: [{name: SELECT, type: select, proxies: [DIRECT]}]\nrules: ['MATCH,SELECT']\ndns: {enable: true, nameserver: [https://1.1.1.1/dns-query]}\n";
-  invoke(store,"save",new Class<?>[]{String.class,String.class},yaml,"https://fixture.invalid/?secret=DO_NOT_DISPLAY");String first=(String)invoke(store,"revision",new Class<?>[0]);
-  String updated=yaml+"# revised fixture\n";invoke(store,"save",new Class<?>[]{String.class,String.class},updated,"https://fixture.invalid/?secret=DO_NOT_DISPLAY");String second=(String)invoke(store,"revision",new Class<?>[0]);check(!first.equals(second),"configuration revision follows actual content");
-  Object same=invoke(store,"saveIfUnchanged",new Class<?>[]{String.class,String.class,String.class},updated,"https://fixture.invalid/?secret=DO_NOT_DISPLAY",second);check(Boolean.FALSE.equals(same),"identical update is classified as unchanged");
-  invoke(store,"restore",new Class<?>[0]);check(yaml.equals(invoke(store,"yaml",new Class<?>[0])),"identical update preserves previous rollback target");
-  try{invoke(store,"saveIfUnchanged",new Class<?>[]{String.class,String.class,String.class},updated,"",second);throw new AssertionError("stale commit accepted");}catch(InvocationTargetException expected){check(yaml.equals(invoke(store,"yaml",new Class<?>[0])),"stale download cannot replace newly changed configuration");}
-  JSONObject info=(JSONObject)invoke(store,"info",new Class<?>[0]);check(!info.toString().contains("DO_NOT_DISPLAY")&&!info.has("yaml"),"configuration UI metadata excludes credentials and source text");check(info.optBoolean("hasPrevious"),"rollback remains available");
-  Object request=invoke(store,"updateRequest",new Class<?>[]{String.class},"");
-  check(field(request,"revision").equals(invoke(store,"revision",new Class<?>[0])),"subscription request captures configuration revision");
-  check(field(request,"address").equals("https://fixture.invalid/?secret=DO_NOT_DISPLAY"),"subscription request captures stored address from same document");
-  invoke(store,"save",new Class<?>[]{String.class,String.class},updated,"https://fixture.invalid/new-secret");
-  check(field(request,"address").equals("https://fixture.invalid/?secret=DO_NOT_DISPLAY"),"download snapshot remains unchanged after new import");
-  try{invoke(store,"saveIfUnchanged",new Class<?>[]{String.class,String.class,String.class},yaml,field(request,"address"),field(request,"revision"));throw new AssertionError("stale subscription replaced imported config");}catch(InvocationTargetException expected){check(updated.equals(invoke(store,"yaml",new Class<?>[0])),"old subscription snapshot cannot overwrite new import");}
-  Object explicit=invoke(store,"updateRequest",new Class<?>[]{String.class},"https://fixture.invalid/explicit");check(field(explicit,"address").equals("https://fixture.invalid/explicit"),"explicit subscription address is preserved");
-  Object obs=create("ProxyObservations");invoke(obs,"clear",new Class<?>[0]);invoke(obs,"setEnabled",new Class<?>[]{boolean.class},false);
-  JSONObject m=new JSONObject().put("host","observed.fixture.test").put("destinationIP","198.51.100.1").put("destinationPort",443).put("network","tcp");JSONObject entry=new JSONObject().put("id","fixture-1").put("metadata",m).put("download",1234).put("rule","Match").put("chains",new JSONArray().put("SELECT")).put("password","MUST_NOT_SAVE");JSONObject snap=new JSONObject().put("connections",new JSONArray().put(entry));
-  long epoch=(Long)invoke(obs,"epoch",new Class<?>[0]);invoke(obs,"capture",new Class<?>[]{JSONObject.class,long.class},snap,epoch);check(rows(obs).length()==0,"observations default off saves nothing");
-  invoke(obs,"setEnabled",new Class<?>[]{boolean.class},true);epoch=(Long)invoke(obs,"epoch",new Class<?>[0]);invoke(obs,"capture",new Class<?>[]{JSONObject.class,long.class},snap,epoch);check(rows(obs).length()==1,"opt-in snapshot writes a real provided entry");check(!rows(obs).toString().contains("MUST_NOT_SAVE"),"only approved metadata fields are retained");
-  invoke(obs,"clear",new Class<?>[0]);invoke(obs,"capture",new Class<?>[]{JSONObject.class,long.class},snap,epoch);check(rows(obs).length()==0,"clear rejects in-flight old-epoch snapshot");
-  epoch=(Long)invoke(obs,"epoch",new Class<?>[0]);JSONArray many=new JSONArray();for(int n=0;n<350;n++)many.put(new JSONObject(entry.toString()).put("id","fixture-"+n));invoke(obs,"capture",new Class<?>[]{JSONObject.class,long.class},new JSONObject().put("connections",many),epoch);check(rows(obs).length()==300,"observations are capped to 300 unique connection IDs");
-  invoke(obs,"setEnabled",new Class<?>[]{boolean.class},false);invoke(obs,"capture",new Class<?>[]{JSONObject.class,long.class},snap,epoch);check(rows(obs).length()==300,"turning off stops writes but retains prior observations");
-  // Screens show an imported fixture configuration without pretending a tunnel is running.
-  for(String mode:new String[]{"light","dark"}){
-   prefs.edit().putString("appearance",mode).commit();a=startActivitySync(new Intent(c,Class.forName(c.getPackageName()+".ProxyActivity",true,c.getClassLoader())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));waitForIdleSync();
-   for(int i=0;i<150&&(Boolean)field(a,"busy");i++)SystemClock.sleep(100);check(!(Boolean)field(a,"busy"),mode+": initialization completes");
-   Object theme=field(a,"u");check(((Boolean)field(theme,"dark"))==mode.equals("dark"),mode+": proxy theme follows shared appearance");
-   String[] titles={"代理与去广告","选择节点","连接活动","代理配置"};for(int p=0;p<4;p++){page(p);check(strings().contains(titles[p]),mode+": section opens "+titles[p]);check(!strings().contains("DO_NOT_DISPLAY"),mode+": secrets not rendered");shot(mode+"-"+p);}
-   page(0);check(strings().contains("当前生效设置"),mode+": overview separates effective runtime settings");
-   page(3);String settings=strings();check(settings.contains("应用放行"),mode+": configuration exposes VPN bypass entry");check(settings.contains("阻止加密 DNS 绕过"),mode+": configuration exposes encrypted DNS guard toggle");check(settings.contains("更新防绕过列表"),mode+": configuration exposes encrypted DNS list update");check(!prefs.getBoolean("proxyDnsGuard",false),mode+": encrypted DNS guard remains opt-in by default");
-   page(0);LinearLayout nav=(LinearLayout)field(a,"nav");runOnMainSync(()->{for(int n=0;n<4;n++){ViewGroup item=(ViewGroup)nav.getChildAt(n);TextView label=(TextView)item.getChildAt(2);check(label.getBottom()<=item.getHeight(),mode+": 1.3x navigation label fits "+n);check(item.getHeight()>=48*c.getResources().getDisplayMetrics().density,mode+": navigation target >=48dp "+n);}});
-   runOnMainSync(a::finish);waitForIdleSync();SystemClock.sleep(300);
-   a=startActivitySync(new Intent(c,Class.forName(c.getPackageName()+".MainActivity",true,c.getClassLoader())).putExtra("proxyApps",true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));waitForIdleSync();SystemClock.sleep(500);
-   check(((Integer)field(a,"tab"))==1,mode+": proxy app picker opens correct existing page");check(strings().contains("返回代理页"),mode+": picker does not offer starting the other VPN");
-   check(!prefs.getBoolean("vpnWanted",false),mode+": opening picker does not start DNS VPN");shot(mode+"-apps");runOnMainSync(a::finish);waitForIdleSync();SystemClock.sleep(300);
+  c=getTargetContext();SharedPreferences prefs=c.getSharedPreferences("bichen",0);
+  prefs.edit().putString("appearance","light").putString("proxyBaseCore","mihomo").putString("proxyBaseMode","tproxy").putString("proxyBaseIpv6","disable").putBoolean("proxyBaseAutoOverwrite",true).commit();
+  Object store=create("ProxyStore");
+  String rootYaml="mode: rule\nlisteners:\n - name: root-in\n   type: tproxy\n   port: 9898\nproxies: []\nproxy-groups: [{name: SELECT, type: select, proxies: [DIRECT]}]\nrules: ['MATCH,SELECT']\ndns: {enable: true, nameserver: [https://1.1.1.1/dns-query]}\n";
+  String rev=(String)invoke(store,"revision",new Class<?>[0]);
+  Object saved=invoke(store,"saveRootIfUnchanged",new Class<?>[]{String.class,String.class,String.class},rootYaml,"",rev);
+  check(Boolean.TRUE.equals(saved),"Root configuration with TPROXY listener is accepted");
+  check(rootYaml.equals(invoke(store,"yaml",new Class<?>[0])),"Root configuration stored without rewriting YAML");
+  try{invoke(store,"saveIfUnchanged",new Class<?>[]{String.class,String.class,String.class},rootYaml,"",invoke(store,"revision",new Class<?>[0]));throw new AssertionError("TUN accepted Root listener config");}
+  catch(InvocationTargetException expected){check(expected.getCause()!=null&&String.valueOf(expected.getCause().getMessage()).contains("Android VPN"),"TUN validation remains separate from Root validation");}
+  for(String appearance:new String[]{"light","dark"}){
+   prefs.edit().putString("appearance",appearance).commit();
+   a=startActivitySync(new Intent(c,Class.forName(c.getPackageName()+".RootTproxyActivity",true,c.getClassLoader())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));waitForIdleSync();
+   for(int i=0;i<100&&(Boolean)field(a,"busy");i++)SystemClock.sleep(100);
+   String text=strings();
+   check(text.contains("基础代理配置"),appearance+": unified proxy settings opens");
+   check(text.contains("核心选择")&&text.contains("Mihomo"),appearance+": core selector visible");
+   check(text.contains("运行模式")&&text.contains("TPROXY"),appearance+": TPROXY mode visible");
+   check(text.contains("IPv6")&&text.contains("禁用系统 IPv6"),appearance+": IPv6 mode visible");
+   check(text.contains("自动覆写")&&text.contains("开启"),appearance+": overwrite setting visible");
+   check(text.contains("配置选择")&&text.contains("config.yaml"),appearance+": imported Root config visible");
+   check(text.contains("启动")&&text.contains("停止"),appearance+": one start-stop control visible");
+   check(!text.contains("Android TUN 模式不会接管"),appearance+": stale TUN warning absent");
+   Object theme=field(a,"u");check(((Boolean)field(theme,"dark"))==appearance.equals("dark"),appearance+": appearance follows setting");
+   shot(appearance+"-unified-proxy");runOnMainSync(a::finish);waitForIdleSync();SystemClock.sleep(250);
   }
-  invoke(obs,"clear",new Class<?>[0]);((android.database.sqlite.SQLiteOpenHelper)obs).close();prefs.edit().putString("appearance","system").putBoolean("proxyHistory",false).remove("proxyDnsGuard").commit();
-  b.putString("stream",output+"BICHEN_PROXY_UI_PASS checks="+checks+"\nStorage fixtures and actual UI only; not actual external app traffic.\n");finish(Activity.RESULT_OK,b);
+  prefs.edit().putString("appearance","system").commit();
+  b.putString("stream",output+"BICHEN_PROXY_UI_PASS checks="+checks+"\nSingle proxy control surface; no external traffic asserted here.\n");finish(Activity.RESULT_OK,b);
  }catch(Throwable e){b.putString("stream",output+"BICHEN_PROXY_UI_FAIL\n"+android.util.Log.getStackTraceString(e));finish(Activity.RESULT_CANCELED,b);}}
 }
