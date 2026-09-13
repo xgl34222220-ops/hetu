@@ -4,6 +4,7 @@ import (
  "context"
  "encoding/json"
  "errors"
+ "fmt"
  "io"
  "net"
  "net/netip"
@@ -81,6 +82,32 @@ func dnsGuardExemptions(dns map[string]any)([]string,bool){
  for _,key:=range []string{"nameserver","fallback","default-nameserver","proxy-server-nameserver","direct-nameserver","nameserver-policy"}{if v,ok:=dns[key];ok{eachString(v,add)}}
  out:=make([]string,0,len(seen));for h:=range seen{out=append(out,h)};return out,uses853
 }
+func mergePortStrings(value any,required ...string)([]string,error){
+ seen:=map[string]struct{}{};out:=make([]string,0)
+ add:=func(s string){s=strings.TrimSpace(s);if s==""{return};if _,ok:=seen[s];ok{return};seen[s]=struct{}{};out=append(out,s)}
+ switch v:=value.(type){case nil:case string:add(v);case []string:for _,s:=range v{add(s)};case []any:for _,x:=range v{switch p:=x.(type){case string:add(p);case int:add(fmt.Sprint(p));case int64:add(fmt.Sprint(p));case uint64:add(fmt.Sprint(p));default:return nil,errors.New("sniffer 端口格式无效")}};default:return nil,errors.New("sniffer 端口格式无效")}
+ for _,s:=range required{add(s)};return out,nil
+}
+func ensureSniffProtocol(sniff map[string]any,name string,required ...string)error{
+ key:="";for existing:=range sniff{if strings.EqualFold(existing,name){key=existing;break}}
+ existed:=key!="";if !existed{key=name}
+ var cfg map[string]any
+ if existed{var ok bool;cfg,ok=sniff[key].(map[string]any);if !ok{return errors.New("sniffer "+name+" 配置格式无效")}}else{cfg=map[string]any{}}
+ ports,err:=mergePortStrings(cfg["ports"],required...);if err!=nil{return err};cfg["ports"]=ports
+ if !existed{cfg["override-destination"]=false}
+ sniff[key]=cfg;return nil
+}
+func enableDnsGuardSniffer(m map[string]any)error{
+ raw,exists:=m["sniffer"];var s map[string]any
+ if exists{var ok bool;s,ok=raw.(map[string]any);if !ok{return errors.New("sniffer 配置格式无效")}}else{s=map[string]any{}}
+ s["enable"]=true;s["force-dns-mapping"]=true;s["parse-pure-ip"]=true
+ if !exists{s["override-destination"]=false}
+ var sniff map[string]any
+ if rawSniff,ok:=s["sniff"];ok{var valid bool;sniff,valid=rawSniff.(map[string]any);if !valid{return errors.New("sniffer.sniff 配置格式无效")}}else{sniff=map[string]any{}}
+ if err:=ensureSniffProtocol(sniff,"TLS","443","853");err!=nil{return err}
+ if err:=ensureSniffProtocol(sniff,"QUIC","443","853");err!=nil{return err}
+ s["sniff"]=sniff;m["sniffer"]=s;return nil
+}
 // Decode a private runtime copy. The original YAML is never overwritten.
 func prepare(r request)([]byte,error){
  if len(r.YAML)==0||len(r.YAML)>4<<20{return nil,errors.New("配置为空或超过 4 MiB")}
@@ -98,6 +125,7 @@ func prepare(r request)([]byte,error){
  if dns==nil{dns=map[string]any{"enable":true,"enhanced-mode":"fake-ip","fake-ip-range":"198.18.0.1/16","nameserver":[]string{"https://1.1.1.1/dns-query"},"proxy-server-nameserver":[]string{"https://1.1.1.1/dns-query"}}}
  if on,exists:=dns["enable"];exists&&on==false{return nil,errors.New("当前配置关闭 DNS；本轮 VPN 需要启用 DNS，不会静默更改你的选择")}
  dns["enable"]=true;dns["listen"]="";m["dns"]=dns
+ if r.DnsGuard{if err:=enableDnsGuardSniffer(m);err!=nil{return nil,err}}
  if r.Filter||r.DnsGuard{
   if len(r.Domains)+len(r.SuffixDomains)>500000||len(r.AllowDomains)>50000||len(r.DohDomains)>50000{return nil,errors.New("去广告规则、白名单或 DNS 防绕过规则过多")}
   exact,err:=checkedDomains(r.Domains,"去广告规则");if err!=nil{return nil,err}
