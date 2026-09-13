@@ -35,10 +35,21 @@ type request struct {
  Home string `json:"home"`
  YAML string `json:"yaml"`
  Domains []string `json:"domains"`
+ SuffixDomains []string `json:"suffixDomains"`
+ AllowDomains []string `json:"allowDomains"`
  Filter bool `json:"filter"`
  FD int `json:"fd"`
  Group string `json:"group"`
  Name string `json:"name"`
+}
+func validDomain(domain string)bool{return len(domain)>0&&len(domain)<=253&&strings.Contains(domain,".")&&!strings.ContainsAny(domain,",\r\n /:")}
+func checkedDomains(values []string,kind string)([]string,error){
+ out:=make([]string,0,len(values));seen:=make(map[string]struct{},len(values))
+ for _,domain:=range values{
+  if !validDomain(domain){return nil,errors.New(kind+"包含无效域名")}
+  if _,ok:=seen[domain];ok{continue};seen[domain]=struct{}{};out=append(out,domain)
+ }
+ return out,nil
 }
 // Decode a private runtime copy. The original YAML is never overwritten.
 func prepare(r request)([]byte,error){
@@ -57,17 +68,26 @@ func prepare(r request)([]byte,error){
  if dns==nil{dns=map[string]any{"enable":true,"enhanced-mode":"fake-ip","fake-ip-range":"198.18.0.1/16","nameserver":[]string{"https://1.1.1.1/dns-query"},"proxy-server-nameserver":[]string{"https://1.1.1.1/dns-query"}}}
  if on,exists:=dns["enable"];exists&&on==false{return nil,errors.New("当前配置关闭 DNS；本轮 VPN 需要启用 DNS，不会静默更改你的选择")}
  dns["enable"]=true;dns["listen"]="";m["dns"]=dns
- if r.Filter&&len(r.Domains)>0{
-  if len(r.Domains)>500000{return nil,errors.New("去广告规则过多")}
-  providers,_:=m["rule-providers"].(map[string]any);if providers==nil{providers=map[string]any{}}
-  if _,exists:=providers[filterName];exists{return nil,errors.New("配置占用了辟尘内部规则名称")}
-  payload:=make([]string,0,len(r.Domains))
-  for _,domain:=range r.Domains{if len(domain)>253||!strings.Contains(domain,".")||strings.ContainsAny(domain,",\r\n /:"){return nil,errors.New("去广告规则包含无效域名")};payload=append(payload,"DOMAIN,"+domain)}
-  // Exact whitelist has already been subtracted by RuleStore. Never inject
-  // DIRECT for whitelist entries: ad exemptions must retain proxy routing.
-  providers[filterName]=map[string]any{"type":"inline","behavior":"classical","payload":payload};m["rule-providers"]=providers
+ if r.Filter{
+  if len(r.Domains)+len(r.SuffixDomains)>500000||len(r.AllowDomains)>50000{return nil,errors.New("去广告规则或白名单过多")}
+  exact,err:=checkedDomains(r.Domains,"去广告规则");if err!=nil{return nil,err}
+  suffix,err:=checkedDomains(r.SuffixDomains,"子域拦截规则");if err!=nil{return nil,err}
+  allow,err:=checkedDomains(r.AllowDomains,"白名单");if err!=nil{return nil,err}
   original,ok:=m["rules"].([]any);if !ok{return nil,errors.New("配置缺少 rules 分流列表")}
-  m["rules"]=append([]any{"RULE-SET,"+filterName+",REJECT"},original...)
+  prefix:=make([]any,0,len(allow)+1)
+  // PASS skips only Bichen's blocking branch and lets the user's original rules decide
+  // the route. Never turn an ad exception into forced DIRECT traffic.
+  for _,domain:=range allow{prefix=append(prefix,"DOMAIN,"+domain+",PASS")}
+  if len(exact)+len(suffix)>0{
+   providers,_:=m["rule-providers"].(map[string]any);if providers==nil{providers=map[string]any{}}
+   if _,exists:=providers[filterName];exists{return nil,errors.New("配置占用了辟尘内部规则名称")}
+   payload:=make([]string,0,len(exact)+len(suffix))
+   for _,domain:=range exact{payload=append(payload,"DOMAIN,"+domain)}
+   for _,domain:=range suffix{payload=append(payload,"DOMAIN-SUFFIX,"+domain)}
+   providers[filterName]=map[string]any{"type":"inline","behavior":"classical","payload":payload};m["rule-providers"]=providers
+   prefix=append(prefix,"RULE-SET,"+filterName+",REJECT")
+  }
+  m["rules"]=append(prefix,original...)
  }
  return yaml.Marshal(m)
 }
@@ -88,7 +108,7 @@ func execute(r request)(any,error){
    options:=LC.Tun{Enable:true,Device:"bichen",Stack:C.TunGvisor,MTU:1500,FileDescriptor:fd,DNSHijack:[]string{"any:53","tcp://any:53"},Inet4Address:[]netip.Prefix{netip.MustParsePrefix("172.29.0.1/30")},Inet6Address:[]netip.Prefix{netip.MustParsePrefix("fdfe:dcba:9876::1/126")}}
    t,err:=sing_tun.New(options,tunnel.Tunnel);if err!=nil{executor.Shutdown();return nil,errors.New("Mihomo 创建 Android TUN 失败；未报告启动成功")};tunCloser=t
   }
-  started=true;return map[string]any{"running":true,"revision":coreRevision,"filterDomains":len(r.Domains)},nil
+  started=true;return map[string]any{"running":true,"revision":coreRevision,"filterDomains":len(r.Domains)+len(r.SuffixDomains)},nil
  case "stop":
   started=false;if tunCloser!=nil{_ = tunCloser.Close();tunCloser=nil}
   statistic.DefaultManager.Range(func(t statistic.Tracker)bool{_ = t.Close();return true});executor.Shutdown();return map[string]any{"running":false},nil
