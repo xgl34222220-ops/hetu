@@ -19,10 +19,13 @@ public final class ProxyAppPolicyTest {
   check(immutable,"published requested set immutable");
   immutable=false;try{p.applied.add("new.app");}catch(UnsupportedOperationException expected){immutable=true;}
   check(immutable,"published applied set immutable");
-  for(String bad:new String[]{"", "com.bad/name", "com.bad\nname", "com.bad name", ".bad", "bad.", "bad..app"}){
+  for(String bad:new String[]{"", "com.bad/name", "com.bad\nname", "com.bad name", ".bad", "bad.", "bad..app", "9bad.app", "com.9bad"}){
    boolean rejected=false;try{new ProxyAppPolicy(true,Collections.singleton(bad),null,"my.app");}catch(IllegalArgumentException expected){rejected=true;}
    check(rejected,"invalid package rejected: "+bad.replace('\n','?'));
   }
+  HashSet<String> huge=new HashSet<>();for(int i=0;i<2001;i++)huge.add("com.example.app"+i);
+  boolean capped=false;try{new ProxyAppPolicy(true,huge,null,"my.app");}catch(IllegalArgumentException expected){capped=true;}
+  check(capped,"oversized bypass preference is rejected before VPN setup");
   check(p.differs(true,Collections.singleton("bad app"),"my.app"),"malformed external preference is visibly pending");
   check(new ProxyAppPolicy(false,null,null,"my.app").applied.isEmpty(),"empty defaults bypass no third party app");
   System.out.println("ProxyAppPolicyTest passed: "+checks);
