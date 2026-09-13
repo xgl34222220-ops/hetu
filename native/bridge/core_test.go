@@ -50,6 +50,15 @@ func TestDnsGuardMergesExistingSniffer(t *testing.T){
  C.SetHomeDir(t.TempDir());if _,e=config.Parse(b);e!=nil{t.Fatal(e)}
 }
 
+func TestDnsGuardMigratesLegacySniffer(t *testing.T){
+ s:=strings.Replace(sample,"rules: [MATCH,SELECT]","rules: ['MATCH,SELECT']",1)+"sniffer:\n  enable: true\n  override-destination: true\n  sniffing: [http, tls]\n  port-whitelist: [80, 8443]\n"
+ b,e:=prepare(request{YAML:s,DnsGuard:true,DohDomains:[]string{"dns.google"}});if e!=nil{t.Fatal(e)};m:=parsed(t,b);sniffer:=object(t,m["sniffer"],"sniffer");sniff:=object(t,sniffer["sniff"],"sniffer.sniff")
+ httpRaw,ok:=fold(sniff,"HTTP");if !ok{t.Fatal("legacy HTTP sniffer was lost")};http:=object(t,httpRaw,"sniffer.HTTP");for _,p:=range []string{"80","8443"}{if !hasPort(http["ports"],p){t.Fatalf("legacy HTTP port %s was lost",p)}};if v,ok:=http["override-destination"].(bool);!ok||!v{t.Fatal("legacy HTTP override choice was lost")}
+ tlsRaw,ok:=fold(sniff,"TLS");if !ok{t.Fatal("legacy TLS sniffer was lost")};tls:=object(t,tlsRaw,"sniffer.TLS");for _,p:=range []string{"80","8443","443","853"}{if !hasPort(tls["ports"],p){t.Fatalf("legacy/new TLS port %s missing: %v",p,tls["ports"])}};if v,ok:=tls["override-destination"].(bool);!ok||!v{t.Fatal("legacy TLS override choice was changed")}
+ quicRaw,ok:=fold(sniff,"QUIC");if !ok{t.Fatal("guard QUIC sniffer missing")};quic:=object(t,quicRaw,"sniffer.QUIC");if v,ok:=quic["override-destination"].(bool);!ok||v{t.Fatal("new guard QUIC sniffer should not rewrite destination")}
+ C.SetHomeDir(t.TempDir());if _,e=config.Parse(b);e!=nil{t.Fatal(e)}
+}
+
 func TestGuardOffDoesNotInjectSniffer(t *testing.T){
  s:=strings.Replace(sample,"rules: [MATCH,SELECT]","rules: ['MATCH,SELECT']",1);b,e:=prepare(request{YAML:s,Filter:true,Domains:[]string{"ads.example.test"}});if e!=nil{t.Fatal(e)};m:=parsed(t,b);if _,ok:=m["sniffer"];ok{t.Fatal("guard-off runtime unexpectedly injected sniffer")};C.SetHomeDir(t.TempDir());if _,e=config.Parse(b);e!=nil{t.Fatal(e)}
 }
