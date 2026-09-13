@@ -24,17 +24,19 @@ public final class Control extends Instrumentation {
  @Override public void onStart(){Bundle b=new Bundle();try{
   c=getTargetContext();dir=c.getFilesDir();String pkg=c.getPackageName();ClassLoader cl=c.getClassLoader();service=Class.forName(pkg+".MihomoVpnService",true,cl);bridge=Class.forName(pkg+".MihomoNative",true,cl);
   check(core("version").getJSONObject("data").getString("revision").equals("ac017cdd246ce8bd547653d927e7bf77d7ee73d5"),"installed native library loads exact pinned Mihomo");
-  c.getSharedPreferences("bichen",0).edit().putBoolean("vpnWanted",false).putBoolean("vpnRestoreHosts",false).putBoolean("proxyManageHosts",false).putBoolean("proxyFilter",true).commit();
+  c.getSharedPreferences("bichen",0).edit().putBoolean("vpnWanted",false).putBoolean("vpnRestoreHosts",false).putBoolean("proxyManageHosts",false).putBoolean("proxyFilter",true).putBoolean("source_hagezi",true).putStringSet("user_allow",Collections.singleton("safe.0.0-02.net")).commit();
   Class<?> history=Class.forName(pkg+".ProxyObservations",true,cl);Constructor<?> hc=history.getDeclaredConstructor(Context.class);hc.setAccessible(true);Object seen=hc.newInstance(c);method(seen,"clear",new Class<?>[0]);method(seen,"setEnabled",new Class<?>[]{boolean.class},true);
   String yaml="mode: rule\nproxies:\n - name: SENTINEL\n   type: socks5\n   server: 10.0.2.2\n   port: 19088\nproxy-groups:\n - name: SELECT\n   type: select\n   proxies: [SENTINEL]\nrules:\n - MATCH,SELECT\ndns:\n enable: true\n enhanced-mode: fake-ip\n fake-ip-range: 198.18.0.1/16\n nameserver: [127.0.0.1:19553]\n nameserver-policy:\n  stun.fixture.test: [rcode://name_error]\n";
   Class<?> store=Class.forName(pkg+".ProxyStore",true,cl);Constructor<?> constructor=store.getDeclaredConstructor(Context.class);constructor.setAccessible(true);Object cfg=constructor.newInstance(c);Method save=store.getDeclaredMethod("save",String.class,String.class);save.setAccessible(true);save.invoke(cfg,yaml,"https://fixture.invalid/non-secret");Method read=store.getDeclaredMethod("yaml");read.setAccessible(true);check(read.invoke(cfg).equals(yaml),"private import preserves original YAML exactly");
   try{save.invoke(cfg,"proxies: []\nmode: global","");throw new AssertionError("global unexpectedly accepted");}catch(InvocationTargetException expected){check(read.invoke(cfg).equals(yaml),"failed import keeps last original YAML");}
   Class<?> rs=Class.forName(pkg+".RuleStore",true,cl);Object rules=rs.getConstructor(Context.class).newInstance(c);rs.getMethod("reload").invoke(rules);rs.getMethod("changeDomain",String.class,boolean.class,boolean.class,boolean.class).invoke(rules,"ads.bichen.test",false,true,false);
+  check(((List<?>)rs.getMethod("userList",boolean.class).invoke(rules,true)).contains("safe.0.0-02.net"),"fixture whitelist is present before Mihomo projection");
   Activity a=startActivitySync(new Intent(c,Class.forName(pkg+".ProxyActivity",true,cl)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));waitForIdleSync();check(!a.isFinishing(),"actual proxy page opens");
   startServiceAndWait();
   SharedPreferences prefs=c.getSharedPreferences("bichen",0);Set<String> bypass=new HashSet<>(Arrays.asList("bichen.proxyprobe","bichen.nonexistent.fixture"));
   check(!pending(),"fresh session has no unapplied settings");
   check(Boolean.TRUE.equals(policy("filterEnabled"))&&((Set<?>)policy("applied")).isEmpty(),"actual session snapshots enabled filter and empty bypass list");
+  check(service.getField("activeRuleCount").getInt(null)>1000,"HaGeZi suffix projection is loaded into the live session");
   prefs.edit().putBoolean("proxyFilter",false).putStringSet("bypassApps",bypass).commit();
   check(pending(),"editing active filter and app list reports unapplied changes");
   check(Boolean.TRUE.equals(policy("filterEnabled"))&&((Set<?>)policy("applied")).isEmpty(),"saved edits do not pretend to change running VPN policy");
