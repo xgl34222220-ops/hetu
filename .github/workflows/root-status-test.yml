@@ -1,0 +1,44 @@
+name: Bichen Root status test4
+on:
+  push:
+    branches: ['fix/root-status-test4']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  hotfix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - name: Install build and shell tools
+        run: |
+          sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq mksh busybox
+      - name: Execute actual Root process runner tests
+        run: python3 tests/root_process_test.py
+      - name: Compile preview and run all regressions
+        run: python3 tools/build_preview.py
+      - name: Upload unsigned handoff for retained local signing key
+        uses: actions/upload-artifact@v4
+        with:
+          name: Bichen-0.3.0-test.4-signing-handoff
+          path: |
+            out/preview/Bichen-0.3.0-test.4-unsigned.apk
+            out/preview/Bichen-0.3.0-test.4-source.zip
+            out/preview/Bichen-0.3.0-beta.1-module.zip
+            out/preview/apksigner.jar
+            out/preview/build-info.json
+            out/preview/apk-badging.txt
+            out/preview/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14

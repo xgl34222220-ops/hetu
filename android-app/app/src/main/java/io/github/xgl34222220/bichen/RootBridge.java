@@ -42,7 +42,7 @@ public final class RootBridge {
 
     public static Result run(Context context, long timeoutMs, String... args) {
         requireWorkerThread();
-        StringBuilder command = new StringBuilder(quote(CLI));
+        StringBuilder command = new StringBuilder("exec ").append(quote(CLI));
         if (args != null) {
             for (String arg : args) command.append(' ').append(quote(arg));
         }
@@ -67,7 +67,7 @@ public final class RootBridge {
                 + "printf '%s%s%s%s\\n' '" + PRESENT + "' \"$bc_disabled\" \"$bc_removed\" \"$bc_pending\"\n"
                 + "if [ ! -f " + quote(CLI) + " ]; then "
                 + "printf '%s\\n' '{\"ok\":false,\"message\":\"模块目录存在，但去广告引擎缺失；请重新安装完整模块\"}'; exit 127; fi\n"
-                + quote(CLI) + " status";
+                + "exec " + quote(CLI) + " status";
         Result result = rootShell(context, command, DEFAULT_TIMEOUT_MS);
         String raw = result.output.trim();
         boolean installed = raw.startsWith(PRESENT);
@@ -106,7 +106,16 @@ public final class RootBridge {
         put(response, "exitCode", result.code);
         if (result.code != 0 || !response.optBoolean("ok", false)) {
             put(response, "ok", false);
-            String detail = response.optString("message", raw);
+            // Preserve full evidence in details, not as a page-sized error card.
+            put(response, "details", result.output);
+            String detail = response.optString("message", "");
+            if (result.code == 124) {
+                detail = installed ? "模块已安装，但 Root 状态读取超时；这不是模块包刷写失败。"
+                        : "Root 状态读取超时，暂时无法确认安装状态。";
+            } else if (detail.isEmpty() || detail.startsWith("{")) {
+                detail = "Root 状态读取未正常完成，请查看诊断详情。";
+            }
+            if (detail.length() > 160) detail = detail.substring(0, 160) + "…";
             put(response, "error", "无法读取模块状态（退出码 " + result.code + "）：" + detail);
         }
         return response;
@@ -150,24 +159,11 @@ public final class RootBridge {
         OutputReader reader = null;
         Thread readerThread = null;
         try {
-            // The Root-side watchdog also cleans children when destroying su cannot reach UID 0.
-            // /proc children traversal is best effort; a local deadline always bounds the App call.
-            long seconds = Math.max(1L, (timeoutMs - 1_000L) / 1_000L);
-            String script = "bc_kill_tree() {\n"
-                    + "  for bc_subpid in $(cat /proc/\"$1\"/task/\"$1\"/children 2>/dev/null); do bc_kill_tree \"$bc_subpid\" \"$2\"; done\n"
-                    + "  kill -\"$2\" \"$1\" 2>/dev/null || :\n}\n"
-                    + "bc_command_pid=0; bc_watch_pid=0; exec 3>&1\n"
-                    + "bc_stop() { [ \"$bc_command_pid\" -eq 0 ] || bc_kill_tree \"$bc_command_pid\" TERM; "
-                    + "[ \"$bc_watch_pid\" -eq 0 ] || bc_kill_tree \"$bc_watch_pid\" TERM; exit 143; }\n"
-                    + "trap bc_stop HUP INT TERM\n"
-                    + "(\n" + command + "\n) &\nbc_command_pid=$!\n"
-                    + "( sleep " + seconds + " 3>&-; printf '\\n%s\\n' '__BICHEN_TIMEOUT__' >&3; bc_kill_tree \"$bc_command_pid\" TERM; "
-                    + "sleep 1 3>&-; bc_kill_tree \"$bc_command_pid\" KILL ) </dev/null >/dev/null 2>&1 &\n"
-                    + "bc_watch_pid=$!\n"
-                    + "wait \"$bc_command_pid\"; bc_result=$?\n"
-                    + "bc_kill_tree \"$bc_watch_pid\" TERM\n"
-                    + "wait \"$bc_watch_pid\" 2>/dev/null || :\n"
-                    + "exit \"$bc_result\"\n";
+            // Run the command in the foreground under the framework's native timeout.
+            // The old mksh/background watchdog could hold su/its pipe open after JSON
+            // was printed, making a completed status query look like a 30s timeout.
+            long seconds = Math.max(1L, (timeoutMs - 2_000L) / 1_000L);
+            String script = RootShellCommand.build(command, seconds);
             process = new ProcessBuilder("su", "-c", script).redirectErrorStream(true).start();
             process.getOutputStream().close();
             reader = new OutputReader(process.getInputStream());
@@ -187,17 +183,13 @@ public final class RootBridge {
             if (readerThread.isAlive()) {
                 process.destroyForcibly();
                 String partial = reader.text();
-                if (partial.contains("__BICHEN_TIMEOUT__") || SystemClock.elapsedRealtime() >= deadline) {
-                    return new Result(124, partial.replace("__BICHEN_TIMEOUT__", "Root 操作达到执行时限")
+                if (SystemClock.elapsedRealtime() >= deadline) {
+                    return new Result(124, partial
                             + "\n操作超时，已请求终止进程；请检查模块实际状态。");
                 }
                 return new Result(125, partial + "\n命令输出流未关闭，无法确认完整结果。");
             }
             String output = reader.text();
-            if (output.contains("__BICHEN_TIMEOUT__")) {
-                return new Result(124, output.replace("__BICHEN_TIMEOUT__",
-                        "Root 操作达到执行时限，已请求终止子进程；请检查模块实际状态。"));
-            }
             if (reader.overflow) {
                 return new Result(125, output + "\n命令输出超过 32 MiB，结果已截断，未作为成功处理。");
             }
