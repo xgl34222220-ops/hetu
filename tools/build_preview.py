@@ -20,8 +20,8 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 BASE = 'io.github.xgl34222220.bichen'
 PREVIEW = BASE + '.preview'
-VERSION = '0.3.0-test.3'
-CODE = 303
+VERSION = '0.3.0-test.4'
+CODE = 304
 
 def run(*args: str | Path, cwd: Path) -> None:
     subprocess.run([str(a) for a in args], cwd=cwd, check=True)
@@ -53,6 +53,8 @@ def main() -> None:
                 text = text.replace('"辟尘"', '"辟尘·测试"')
                 text = text.replace('"少一点打扰，多一点清净"', '"测试版 · 请先停止旧版保护与自动更新"')
             path.write_text(text)
+        process_test = stage / 'tests/root_process_test.py'
+        process_test.write_text(process_test.read_text().replace(BASE, PREVIEW))
         test_script = stage / 'tools/test_java.py'
         test_script.write_text(test_script.read_text().replace(BASE, PREVIEW))
         builder = stage / 'tools/build_app.py'
@@ -81,7 +83,7 @@ def main() -> None:
             assert info['version'] == '0.3.0-beta.1'
             assert info['sha256'] == '2a830195fca8fa3558f42c696aa02441b136069719157cc1c8abf81d903cd413'
             dex = apk.read('classes.dex')
-            for name in ('DnsResponseFilter', 'NetworkEpoch', 'RuleUpdateGate', 'RuleProfiles'):
+            for name in ('DnsResponseFilter', 'NetworkEpoch', 'RuleUpdateGate', 'RuleProfiles', 'RootShellCommand', 'ModuleArchive'):
                 assert f'Lio/github/xgl34222220/bichen/preview/{name};'.encode() in dex
         (out / 'Bichen-0.3.0-beta.1-module.zip').write_bytes(module)
         shutil.copyfile(tools / 'lib/apksigner.jar', out / 'apksigner.jar')
