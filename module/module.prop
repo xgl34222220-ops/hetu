@@ -1,0 +1,6 @@
+id=bichen
+name=辟尘
+version=0.3.0-beta.1
+versionCode=301
+author=xgl34222220-ops
+description=系统无损 hosts 广告域名拦截。支持 Magisk、KernelSU/ReSukiSU、APatch；App 内置安装包，离线启动、规则导出与批量名单导入、整批订阅更新及回滚。可选 HaGeZi Light、完整配置原子导入与规则健康检查。Beta 测试版。

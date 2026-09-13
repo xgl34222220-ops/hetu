@@ -1,0 +1,30 @@
+Bichen 0.3.0-beta.1 / versionCode 301
+Build date: 2026-09-13 UTC
+
+PASS: Android API 35 native Java compilation; minSdk 26, targetSdk 35.
+PASS: D8 dex, APK v2/v3 signatures, ZIP alignment.
+PASS: 17 isolated Linux module regression tests.
+PASS: 97 DNS protocol assertions and 100000 malformed-packet inputs.
+PASS: 30 DNS cache assertions and 25000 malformed-response inputs.
+PASS: 22 DNS HTTPS transport assertions, including fake-connection cancellation.
+PASS: 63 rule parser checks across 4 sources / 43286 source entries;
+      combined snapshots above 8 MiB, 32 MiB limit and cancellation/deadline checks.
+PASS: APK embedded module equals standalone module ZIP byte-for-byte;
+      root module.prop, version, entries, CRC and SHA-256 checked.
+PASS: Installation artifact certificate retains the 0.2.0-alpha.2 identity.
+
+App certificate SHA-256:
+35ce73c392ad7dd94a1e0c60dd4d89958d4e878cef7f865ceb2e3f91b26cab46
+Can update the previously delivered 0.2.0-alpha.2 App.
+The original uploaded 0.1.0-alpha.3 App has a different signing identity.
+Private signing material is excluded from Git and public archives.
+
+Android emulator attempt: official Android 35 x86_64 image + software CPU;
+ADB online, but package/Activity services unavailable within the startup budget.
+System screenshot black. No APK install, UI, root-mount or VPN runtime pass claimed.
+
+NOT TESTED: actual root-manager installation; Android VPN establishment/per-app
+exclusions; UI rendering and SAF lifecycle on a phone; HyperOS / Android 16;
+physical network changes, reboot stability, battery use and advertising coverage.
+Mock HTTPS tests do not establish real service availability or Android cancellation.
+CI results are reported by the workflow for the exact GitHub commit.

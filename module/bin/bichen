@@ -1,0 +1,571 @@
+#!/system/bin/sh
+# 辟尘 transactional, offline-first root hosts engine. JSON only on stdout.
+umask 077
+export LC_ALL=C
+MODDIR=$(CDPATH= cd -- "${0%/*}/.." 2>/dev/null && pwd) || exit 1
+VERSION=0.3.0-beta.1
+CAPABILITIES='["check-domain","import-batch","export-config","export-domains","import-user-lists","import-settings","health","preflight"]'
+TEST=0
+if [ -n "${BICHEN_TEST_ROOT:-}" ]; then
+  # Deliberately isolated host harness. Refuse production devices and dangerous roots.
+  case "$BICHEN_TEST_ROOT" in /tmp/*|/workspace/*) ;; *) printf '%s\n' '{"ok":false,"message":"测试目录必须在 /tmp 或 /workspace 下"}'; exit 1;; esac
+  if command -v getprop >/dev/null 2>&1; then printf '%s\n' '{"ok":false,"message":"Android 设备不允许测试模式"}'; exit 1; fi
+  BICHEN_TEST_ROOT=$(readlink -m -- "$BICHEN_TEST_ROOT") || exit 1
+  case "$BICHEN_TEST_ROOT" in /tmp/*|/workspace/*) ;; *) printf '%s\n' '{"ok":false,"message":"测试目录解析后超出允许范围"}'; exit 1;; esac
+  for TEST_PATH in state state/generations system system/etc system/etc/hosts modules mounted base.hosts; do
+    RESOLVED_TEST_PATH=$(readlink -m -- "$BICHEN_TEST_ROOT/$TEST_PATH") || exit 1
+    case "$RESOLVED_TEST_PATH" in "$BICHEN_TEST_ROOT"/*) ;; *) printf '%s\n' '{"ok":false,"message":"测试目录包含越界符号链接"}'; exit 1;; esac
+  done
+  TEST=1
+  STATE="$BICHEN_TEST_ROOT/state"
+  TARGET="$BICHEN_TEST_ROOT/system/etc/hosts"
+  MODULES="$BICHEN_TEST_ROOT/modules"
+else
+  if [ "$(id -u)" != 0 ]; then
+    printf '%s\n' '{"ok":false,"message":"此操作需要 Root 权限，请在 Root 管理器中授权辟尘"}'; exit 1
+  fi
+  # Use the installed framework's applets, including when su exports no framework env.
+  . "$MODDIR/bin/runtime.sh" || exit 1
+  if ! bichen_runtime; then
+    printf '%s\n' '{"ok":false,"message":"未找到当前 Root 框架自带的 BusyBox，请检查模块或 Root 管理器安装"}'; exit 1
+  fi
+  if [ "${BICHEN_ASH:-0}" != 1 ]; then
+    export ASH_STANDALONE=1 BICHEN_ASH=1
+    exec "$BB" ash "$0" "$@"
+  fi
+  # Root profiles can create private mount namespaces. Re-enter init once, then
+  # verify again; a denied setns must fail instead of reporting a private mount.
+  if [ "${1:-status}" != install ] && [ "${1:-status}" != preflight ]; then
+    SELF_NS=$(readlink /proc/self/ns/mnt 2>/dev/null)
+    INIT_NS=$(readlink /proc/1/ns/mnt 2>/dev/null)
+    if [ -z "$SELF_NS" ] || [ "$SELF_NS" != "$INIT_NS" ]; then
+      if [ "${BICHEN_NSENTER:-0}" = 1 ]; then
+        printf '%s\n' '{"ok":false,"message":"无法进入 init 全局挂载命名空间，请检查 Root 授权配置"}'; exit 1
+      fi
+      export BICHEN_NSENTER=1
+      exec "$BB" nsenter -t 1 -m -- "$BB" ash "$0" "$@"
+    fi
+  fi
+  STATE=/data/adb/bichen
+  TARGET=/system/etc/hosts
+  MODULES=/data/adb/modules
+fi
+TXDIR=
+LOCKED=0
+quote() { printf '%s' "$1" | awk 'BEGIN{printf "\"";for(i=1;i<32;i++)ctrl[sprintf("%c",i)]=i} {if(NR>1)printf "\\n";for(i=1;i<=length($0);i++){c=substr($0,i,1);if(c=="\\")printf "\\\\";else if(c=="\"")printf "\\\"";else if(c in ctrl)printf "\\u%04x",ctrl[c];else printf "%s",c}} END{printf "\""}'; }
+fail() { printf '{"ok":false,"message":'; quote "$1"; printf '}\n'; exit 1; }
+success() { printf '{"ok":true,"message":'; quote "$1"; printf '}\n'; }
+cleanup() {
+  # A pending generation can still be bind mounted after interruption/failed recovery.
+  # Keep it until recovery succeeds; deleting it would hide ownership in mountinfo.
+  [ -z "$TXDIR" ] || [ -f "$STATE/pending" ] || rm -rf "$TXDIR"
+}
+trap cleanup EXIT
+trap 'exit 130' INT TERM HUP
+valid_id() { case "$1" in adaway|china|tracking|hagezi) return 0;; *) return 1;; esac; }
+valid_gen() { case "$1" in g.*) case "$1" in *[!A-Za-z0-9._-]*) return 1;; *) return 0;; esac;; *) return 1;; esac; }
+generation() { GEN=$(cat "$STATE/current" 2>/dev/null); valid_gen "$GEN" && [ -d "$STATE/generations/$GEN" ]; }
+get_parent() { PARENT=$(cat "$STATE/generations/$GEN/parent" 2>/dev/null); valid_gen "$PARENT" && [ -d "$STATE/generations/$PARENT" ]; }
+count_lines() { if [ -f "$1" ]; then awk 'END{print NR+0}' "$1"; else printf 0; fi; }
+log() {
+  [ -d "$STATE" ] || return 0
+  printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" >> "$STATE/operations.log"
+  if [ "$(wc -c < "$STATE/operations.log")" -gt 65536 ]; then tail -n 150 "$STATE/operations.log" > "$STATE/log.next" && mv -f "$STATE/log.next" "$STATE/operations.log"; fi
+}
+lock() {
+  [ -d "$STATE" ] || fail "规则数据未初始化，请重新安装模块"
+  exec 9>"$STATE/lock" || fail "无法打开操作锁"
+  # Early boot is blocking in Magisk/KSU; let the late service restore if busy.
+  ATTEMPTS=12; [ "${COMMAND:-}" != boot ] || ATTEMPTS=1
+  N=0
+  until flock -n 9; do N=$((N+1)); [ "$N" -lt "$ATTEMPTS" ] || fail "另一项操作正在进行，请稍后重试"; sleep 1; done
+  LOCKED=1
+}
+namespace_ok() {
+  [ "$TEST" = 1 ] && return 0
+  [ "$(id -u)" = 0 ] || return 1
+  SELF_NS=$(readlink /proc/self/ns/mnt 2>/dev/null)
+  INIT_NS=$(readlink /proc/1/ns/mnt 2>/dev/null)
+  [ -n "$SELF_NS" ] && [ "$SELF_NS" = "$INIT_NS" ]
+}
+mount_rows() {
+  [ "$TEST" = 1 ] && return 0
+  awk -v t="$TARGET" '$5==t {print}' /proc/1/mountinfo 2>/dev/null
+}
+own_count() {
+  if [ "$TEST" = 1 ]; then [ -f "$BICHEN_TEST_ROOT/mounted" ] && printf 1 || printf 0
+  else mount_rows | awk '$4 ~ /\/bichen\/generations\/g\.[A-Za-z0-9._-]+\/hosts$/ {n++} END{print n+0}'; fi
+}
+foreign_mount() {
+  if [ "$TEST" = 1 ]; then [ -f "$BICHEN_TEST_ROOT/foreign-mount" ]; return; fi
+  mount_rows | awk '$4 !~ /\/bichen\/generations\/g\.[A-Za-z0-9._-]+\/hosts$/ {n++} END{exit !(n>0)}'
+}
+conflict_lines() {
+  [ -d "$MODULES" ] || return 0
+  for D in "$MODULES"/*; do
+    [ -d "$D" ] || continue
+    [ "${D##*/}" != bichen ] || continue
+    [ ! -e "$D/disable" ] && [ ! -e "$D/remove" ] || continue
+    case "${D##*/}" in bindhosts|hosts|systemless_hosts) printf '%s\n' "${D##*/}";; *) [ ! -f "$D/system/etc/hosts" ] || printf '%s\n' "${D##*/}";; esac
+  done
+}
+observed() {
+  EXPECT="$1"
+  namespace_ok || return 1
+  [ "$(own_count)" = 1 ] || return 1
+  if [ "$TEST" = 1 ]; then [ "$(cat "$BICHEN_TEST_ROOT/mounted" 2>/dev/null)" = "$EXPECT" ] && cmp -s "$TARGET" "$EXPECT"
+  # Immutable generation + read-only bind: inode identity is enough for status.
+  # Full snapshot hashes are checked before mounting and again by diagnose.
+  else [ "$(stat -c '%d:%i' "$TARGET" 2>/dev/null)" = "$(stat -c '%d:%i' "$EXPECT" 2>/dev/null)" ]; fi
+}
+unmount_own() {
+  OWN=$(own_count)
+  [ "$OWN" -le 1 ] || return 1
+  [ "$OWN" = 1 ] || return 0
+  # If a foreign layer covers ours, never pop that layer on pause/uninstall.
+  foreign_mount && return 1
+  if [ "$TEST" = 1 ]; then
+    cp "$BICHEN_TEST_ROOT/base.hosts" "$TARGET" || return 1
+    rm -f "$BICHEN_TEST_ROOT/mounted"
+  else umount "$TARGET" >/dev/null 2>&1 || return 1; fi
+  [ "$(own_count)" = 0 ]
+}
+mount_generation() {
+  MG="$1"
+  MD="$STATE/generations/$MG"
+  [ -f "$MD/hosts" ] || return 1
+  WANT=$(cat "$MD/enabled" 2>/dev/null)
+  [ "$WANT" = 0 ] || [ "$WANT" = 1 ] || return 1
+  namespace_ok || return 1
+  if [ "$WANT" = 1 ] && observed "$MD/hosts"; then return 0; fi
+  if [ "$WANT" = 1 ]; then
+    [ -z "$(conflict_lines)" ] || return 1
+    foreign_mount && return 1
+  fi
+  unmount_own || return 1
+  [ "$WANT" = 1 ] || return 0
+  if [ "$TEST" = 1 ]; then
+    [ "${BICHEN_TEST_FAIL_MOUNT:-0}" != 1 ] || return 1
+    cp "$MD/hosts" "$TARGET" || return 1
+    printf '%s\n' "$MD/hosts" > "$BICHEN_TEST_ROOT/mounted"
+  else
+    [ -f "$TARGET" ] || return 1
+    mount -o bind "$MD/hosts" "$TARGET" >/dev/null 2>&1 || return 1
+    # Do not remount the backing /data filesystem; MS_REMOUNT must include bind.
+    if ! mount -o remount,bind,ro "$MD/hosts" "$TARGET" >/dev/null 2>&1; then unmount_own; return 1; fi
+  fi
+  observed "$MD/hosts"
+}
+restore_old() {
+  # A failed new mount may already have removed the previous mount.
+  SAVED_FAIL=${BICHEN_TEST_FAIL_MOUNT:-0}
+  BICHEN_TEST_FAIL_MOUNT=0
+  mount_generation "$OLDGEN"
+  RESTORED=$?
+  BICHEN_TEST_FAIL_MOUNT=$SAVED_FAIL
+  return "$RESTORED"
+}
+parse_source() {
+  PF="$1"; PO="$2"
+  [ -f "$PF" ] && [ -r "$PF" ] || return 1
+  SZ=$(stat -Lc '%s' "$PF" 2>/dev/null) || return 1
+  case "$SZ" in ''|*[!0-9]*) return 1;; esac
+  [ "$SZ" -gt 0 ] && [ "$SZ" -le 8388608 ] || return 1
+  # Parse a bounded private snapshot, not a mutable App cache file.
+  head -c 8388609 "$PF" > "$PO.input" || return 1
+  SZ=$(wc -c < "$PO.input")
+  [ "$SZ" -gt 0 ] && [ "$SZ" -le 8388608 ] || return 1
+  awk -f "$MODDIR/bin/parse-domains.awk" "$PO.input" > "$PO.unsorted" || { rm -f "$PO.unsorted" "$PO.input"; return 1; }
+  sort -u "$PO.unsorted" > "$PO" || return 1
+  rm -f "$PO.unsorted" "$PO.input"
+  [ -s "$PO" ]
+}
+parse_user_list() {
+  # Empty lists intentionally clear user overrides; subscriptions may not be empty.
+  [ -f "$1" ] && [ -r "$1" ] || return 1
+  if [ ! -s "$1" ]; then : > "$2"; return; fi
+  parse_source "$1" "$2"
+}
+domain_arg() {
+  [ -n "$1" ] && [ "${#1}" -le 254 ] || return 1
+  DOMAIN=$(printf '%s\n' "$1" | awk 'function v(s,n,a,i){if(length(s)>253 || s !~ /^[a-z0-9.-]+$/ || s !~ /\./)return 0;n=split(s,a,".");for(i=1;i<=n;i++)if(length(a[i])<1||length(a[i])>63||a[i]!~/^[a-z0-9]/||a[i]!~/[a-z0-9]$/)return 0;return a[n]~/[a-z]/} {d=tolower($0);sub(/\.$/,"",d);if(NR!=1||!v(d)||d=="localhost.localdomain")exit 1;print d} END{if(NR!=1)exit 1}') || return 1
+  [ -n "$DOMAIN" ]
+}
+valid_import_batch() {
+  [ "$#" -ge 2 ] && [ "$#" -le 8 ] && [ "$(( $# % 2 ))" = 0 ] || return 1
+  SEEN=' '
+  while [ "$#" -gt 0 ]; do
+    valid_id "$1" || return 1
+    case "$SEEN" in *" $1 "*) return 1;; esac
+    case "$2" in /*) ;; *) return 1;; esac
+    SEEN="$SEEN$1 "
+    shift 2
+  done
+}
+valid_settings() {
+  [ "$#" = 5 ] || [ "$#" = 6 ] || return 1
+  case "$1" in /*) ;; *) return 1;; esac
+  case "$2" in /*) ;; *) return 1;; esac
+  shift 2
+  for FLAG in "$@"; do case "$FLAG" in 0|1) ;; *) return 1;; esac; done
+}
+# Installation-only package validation. Do not parse rule lists or run network
+# requests during Android startup. Frameworks extract module.prop before this
+# script runs, so errors before this message must be diagnosed by the manager.
+package_valid() {
+  for PF in module.prop sources.tsv skip_mount bin/bichen bin/runtime.sh bin/boot-runner.sh bin/parse-domains.awk rules/adaway.txt rules/china.txt rules/tracking.txt rules/hagezi.txt rules/checksums.sha256; do
+    [ -f "$MODDIR/$PF" ] && [ ! -L "$MODDIR/$PF" ] || return 1
+  done
+  awk -F= '$1=="id"{id++;if($2!="bichen")bad=1} $1=="version"{v++;if($2!="0.3.0-beta.1")bad=1} $1=="versionCode"{c++;if($2!="301")bad=1} /\r/{bad=1} END{exit !(id==1&&v==1&&c==1&&!bad)}' "$MODDIR/module.prop" || return 1
+  awk -F '\t' 'NF!=4 || $2!~/^[01]$/ || $4!~/^https:\/\// || seen[$1]++ {bad=1} $1!="adaway"&&$1!="china"&&$1!="tracking"&&$1!="hagezi"{bad=1} END{exit !(NR==4&&!bad)}' "$MODDIR/sources.tsv" || return 1
+  awk 'NF!=2 || length($1)!=64 || $1!~/^[a-f0-9]+$/ || ($2!="adaway.txt"&&$2!="china.txt"&&$2!="tracking.txt"&&$2!="hagezi.txt") || seen[$2]++ {bad=1} END{exit !(NR==4&&!bad)}' "$MODDIR/rules/checksums.sha256" || return 1
+  (cd "$MODDIR/rules" && sha256sum -c checksums.sha256 >/dev/null 2>&1)
+}
+prepare_hosts() {
+  chmod 0644 "$1" || return 1
+  if [ "$TEST" = 0 ]; then
+    chown 0:0 "$1" || return 1
+    chcon u:object_r:system_file:s0 "$1" || return 1
+  fi
+}
+compile() {
+  C="$1"
+  : > "$C/combined" || return 1
+  while IFS="$(printf '\t')" read -r ID DEFAULT NAME URL; do
+    valid_id "$ID" || return 1
+    ON=$(cat "$C/source-$ID.enabled" 2>/dev/null)
+    [ "$ON" = 0 ] || [ "$ON" = 1 ] || return 1
+    [ "$ON" = 0 ] || cat "$C/source-$ID.domains" >> "$C/combined" || return 1
+  done < "$MODDIR/sources.tsv"
+  cat "$C/block" >> "$C/combined" || return 1
+  sort -u "$C/combined" > "$C/combined.sorted" || return 1
+  awk 'FILENAME==ARGV[1]{a[$0]=1;next} !($0 in a)&&length($0){print}' "$C/allow" "$C/combined.sorted" > "$C/domains" || return 1
+  [ "$(count_lines "$C/domains")" -le 500000 ] || return 1
+  { printf '127.0.0.1 localhost\n::1 localhost ip6-localhost ip6-loopback\n'; awk '{print "0.0.0.0 " $0; print ":: " $0}' "$C/domains"; } > "$C/hosts" || return 1
+  prepare_hosts "$C/hosts" || return 1
+  date +%s > "$C/updatedAt"
+  rm -f "$C/combined" "$C/combined.sorted"
+}
+snapshot_valid() {
+  SV="$1"
+  [ ! -L "$SV" ] || return 1
+  [ -f "$SV/hosts" ] && [ -f "$SV/domains" ] && [ -f "$SV/allow" ] && [ -f "$SV/block" ] || return 1
+  [ -f "$SV/manifest.sha256" ] && [ ! -L "$SV/manifest.sha256" ] || return 1
+  SV_SCHEMA=$(cat "$SV/schema" 2>/dev/null)
+  case "$SV_SCHEMA" in 1|2) ;; *) return 1;; esac
+  case "$(cat "$SV/enabled" 2>/dev/null)" in 0|1) ;; *) return 1;; esac
+  [ "$(wc -c < "$SV/hosts")" -le 80000000 ] || return 1
+  # A truncated manifest must not silently omit hosts/configuration from checks.
+  SV_FILES='hosts domains allow block enabled schema source-adaway.domains source-adaway.enabled source-china.domains source-china.enabled source-tracking.domains source-tracking.enabled updatedAt parent'
+  SV_COUNT=14
+  if [ "$SV_SCHEMA" = 2 ]; then SV_FILES="$SV_FILES source-hagezi.domains source-hagezi.enabled"; SV_COUNT=16; fi
+  awk -v files="$SV_FILES" -v total="$SV_COUNT" 'BEGIN {split(files, names, " "); for(i in names) required[names[i]]=1}
+    NF!=2 || length($1)!=64 || $1!~/^[a-f0-9]+$/ || !($2 in required) || seen[$2]++ {bad=1}
+    END {if(bad || NR!=total) exit 1}' "$SV/manifest.sha256" || return 1
+  for SF in $SV_FILES manifest.sha256; do
+    [ -f "$SV/$SF" ] && [ ! -L "$SV/$SF" ] || return 1
+  done
+  # Hash verification protects boot restore from interrupted / altered state.
+  (cd "$SV" && sha256sum -c manifest.sha256 >/dev/null 2>&1)
+}
+seal() { (cd "$1" && sha256sum hosts domains allow block enabled schema source-*.domains source-*.enabled updatedAt parent > manifest.sha256); }
+upgrade_snapshot() {
+  # This only writes a private copied transaction; published schema-1 snapshots
+  # and the user's previous useful backup remain untouched and verifiable.
+  US="$1"
+  if [ "$(cat "$US/schema")" = 1 ]; then
+    parse_source "$MODDIR/rules/hagezi.txt" "$US/source-hagezi.domains" || return 1
+    printf '0\n' > "$US/source-hagezi.enabled" || return 1
+    printf '2\n' > "$US/schema" || return 1
+  fi
+}
+same_rule_config() {
+  for CF in allow block source-adaway.domains source-adaway.enabled source-china.domains source-china.enabled source-tracking.domains source-tracking.enabled source-hagezi.domains source-hagezi.enabled; do
+    cmp -s "$1/$CF" "$2/$CF" || return 1
+  done
+}
+pointer() { printf '%s\n' "$1" > "$STATE/current.next" && mv -f "$STATE/current.next" "$STATE/current"; }
+prune() {
+  KEEP_PARENT=$(cat "$STATE/generations/$GEN/parent" 2>/dev/null)
+  for GD in "$STATE/generations"/g.*; do
+    [ -d "$GD" ] || continue
+    [ "${GD##*/}" = "$GEN" ] || [ "${GD##*/}" = "$KEEP_PARENT" ] || rm -rf "$GD"
+  done
+}
+recover_pending() {
+  [ -f "$STATE/pending" ] || return 0
+  snapshot_valid "$STATE/generations/$GEN" || fail "检测到中断事务，当前规则校验失败，请重新安装模块"
+  mount_generation "$GEN" || fail "上次操作中断且挂载恢复失败；请检查冲突模块并重启"
+  rm -f "$STATE/pending"
+  log "已恢复上次中断事务的已提交规则"
+}
+new_transaction() {
+  generation || fail "没有可用规则，请重新安装模块"
+  snapshot_valid "$STATE/generations/$GEN" || fail "当前规则完整性校验失败"
+  recover_pending
+  OLDGEN=$GEN
+  TXDIR=$(mktemp -d "$STATE/generations/g.XXXXXXXX") || fail "无法创建规则事务"
+  cp -R "$STATE/generations/$GEN/." "$TXDIR/" || fail "无法复制当前规则"
+  upgrade_snapshot "$TXDIR" || fail "升级规则结构失败；已保留原配置"
+  printf '%s\n' "$OLDGEN" > "$TXDIR/parent"
+}
+commit_transaction() {
+  # Pause/resume, a manual reapply, and duplicate edits must not consume the last
+  # useful rules backup. Rollback can therefore still fix an update after pausing.
+  if same_rule_config "$TXDIR" "$STATE/generations/$OLDGEN"; then
+    cp "$STATE/generations/$OLDGEN/parent" "$TXDIR/parent" || fail "无法保留规则备份"
+    # A copied inode inherits /data's label even when its contents are unchanged.
+    prepare_hosts "$TXDIR/hosts" || fail "无法设置 hosts 权限或 SELinux 上下文"
+  else
+    compile "$TXDIR" || fail "规则构建失败，已保留原有配置"
+  fi
+  seal "$TXDIR" || fail "规则校验信息生成失败"
+  NEWGEN=${TXDIR##*/}
+  printf '%s\n%s\n' "$OLDGEN" "$NEWGEN" > "$STATE/pending" || fail "无法记录操作事务"
+  if ! mount_generation "$NEWGEN"; then
+    if restore_old; then rm -f "$STATE/pending"; log "操作失败，已恢复原有规则和挂载"; fail "应用失败，原有配置已恢复；请检查全局命名空间、冲突模块及挂载权限"
+    else log "操作失败且挂载未能恢复，需排查或重启"; fail "应用失败；原有配置已保留，但挂载恢复失败，请排查冲突或重启"; fi
+  fi
+  if ! pointer "$NEWGEN"; then
+    if restore_old; then rm -f "$STATE/pending"; fi
+    fail "无法提交配置，已尝试恢复原有挂载"
+  fi
+  TXDIR=
+  GEN=$NEWGEN
+  rm -f "$STATE/pending"
+  prune
+  log "$ACTION"
+  success "$ACTION"
+}
+json_array() { printf '['; SEP=; while IFS= read -r L; do [ -n "$L" ] || continue; printf '%s' "$SEP"; quote "$L"; SEP=,; done; printf ']'; }
+# Domain parser admits ASCII only, so this streaming encoder avoids one process
+# per domain when exporting large rule sets for the App's per-application mode.
+domain_array() { awk 'BEGIN{printf "["} NF{printf "%s\"%s\"", sep, $0;sep=","} END{printf "]"}' "$1"; }
+export_config() {
+  snapshot_valid "$C" || fail "当前规则完整性校验失败"
+  ON=false; [ "$(cat "$C/enabled")" != 1 ] || ON=true
+  printf '{"ok":true,"schema":1,"version":"%s","configRevision":"%s","enabled":%s,"allow":' "$VERSION" "$GEN" "$ON"
+  domain_array "$C/allow"; printf ',"block":'; domain_array "$C/block"
+  printf ',"sources":['; SEP=
+  while IFS="$(printf '\t')" read -r ID DEFAULT NAME URL; do
+    ON=false; [ "$(cat "$C/source-$ID.enabled")" != 1 ] || ON=true
+    printf '%s{"id":"%s","enabled":%s}' "$SEP" "$ID" "$ON"; SEP=,
+  done < "$MODDIR/sources.tsv"
+  printf ']}\n'
+}
+health_check() {
+  H_ID=$1; H_TITLE=$2; H_PASSED=$3; H_DETAIL=$4
+  [ "$H_PASSED" = true ] || H_HEALTHY=false
+  printf '%s{"id":"%s","title":' "$H_SEP" "$H_ID"; quote "$H_TITLE"
+  printf ',"passed":%s,"detail":' "$H_PASSED"; quote "$H_DETAIL"; printf '}'
+  H_SEP=,
+}
+health() {
+  H_HEALTHY=true; H_SEP=
+  printf '{"ok":true,"version":"%s","configRevision":"%s","checks":[' "$VERSION" "$GEN"
+  H_OK=false; snapshot_valid "$C" && H_OK=true
+  health_check snapshot '规则快照完整性' "$H_OK" '校验全部规则和配置 SHA-256；不会修改现有配置'
+  H_OK=false; namespace_ok && H_OK=true
+  health_check namespace '全局挂载命名空间' "$H_OK" '模块操作必须使用 init 全局命名空间'
+  H_ON=$(cat "$C/enabled" 2>/dev/null); H_OK=false
+  if [ "$H_ON" = 1 ]; then
+    observed "$C/hosts" && H_OK=true
+    health_check mount '拦截规则实际挂载' "$H_OK" '启用时必须匹配已提交规则；挂载通过不等于所有应用采用系统 hosts'
+  else
+    [ "$H_ON" = 0 ] && [ "$(own_count)" = 0 ] && H_OK=true
+    health_check mount '暂停状态实际生效' "$H_OK" '暂停时必须已经移除辟尘自身挂载；重启后仍保持暂停'
+  fi
+  H_OK=true; H_CONFLICT=$(conflict_lines)
+  [ -z "$H_CONFLICT" ] || H_OK=false
+  foreign_mount && H_OK=false
+  health_check conflicts '其他 hosts 模块冲突' "$H_OK" '仅检查冲突，不卸载或修改其他模块'
+  H_OK=true; [ ! -f "$STATE/pending" ] || H_OK=false
+  health_check transaction '规则事务完成状态' "$H_OK" '中断事务可通过重新应用恢复；失败时保留已提交规则'
+  H_OK=false; package_valid && H_OK=true
+  health_check catalog '内置模块与离线快照' "$H_OK" '检查必要文件、版本、订阅来源和内置规则哈希；用户在线更新规则单独校验'
+  printf '],"healthy":%s,"warnings":' "$H_HEALTHY"
+  { [ "$TEST" != 1 ] || printf '%s\n' 'Linux 隔离测试：未验证 Android BusyBox、SELinux 或实际挂载'; printf '%s\n' 'hosts 仅精确匹配独立域名，不处理广告占位、同域内容、App 自带 DoH 或直连 IP'; } | json_array
+  printf '}\n'
+}
+status() {
+  if ! generation; then printf '{"ok":true,"version":"%s","engine":"hosts","capabilities":%s,"enabled":false,"mounted":false,"ruleCount":0,"hostsBytes":0,"storageBytes":0,"updatedAt":0,"allowCount":0,"blockCount":0,"conflicts":[],"sources":[],"hasBackup":false,"warnings":["规则未初始化"]}\n' "$VERSION" "$CAPABILITIES"; return; fi
+  C="$STATE/generations/$GEN"
+  ENABLED=false; [ "$(cat "$C/enabled")" != 1 ] || ENABLED=true
+  MOUNTED=false; observed "$C/hosts" && MOUNTED=true
+  BACKUP=false; get_parent && BACKUP=true
+  UPDATED=$(cat "$C/updatedAt" 2>/dev/null); case "$UPDATED" in ''|*[!0-9]*) UPDATED=0;; esac
+  HOST_BYTES=$(wc -c < "$C/hosts")
+  STORAGE_KIB=$(du -sk "$STATE" 2>/dev/null | awk '{print $1}')
+  case "$STORAGE_KIB" in ''|*[!0-9]*) STORAGE_KIB=0;; esac
+  printf '{"ok":true,"version":"%s","engine":"hosts","configRevision":"%s","capabilities":%s,"enabled":%s,"mounted":%s,"ruleCount":%s,"hostsBytes":%s,"storageBytes":%s,"updatedAt":%s,"allowCount":%s,"blockCount":%s,"hasBackup":%s,"conflicts":' "$VERSION" "$GEN" "$CAPABILITIES" "$ENABLED" "$MOUNTED" "$(count_lines "$C/domains")" "$HOST_BYTES" "$((STORAGE_KIB * 1024))" "$UPDATED" "$(count_lines "$C/allow")" "$(count_lines "$C/block")" "$BACKUP"
+  { conflict_lines; foreign_mount && printf '%s\n' '检测到其他 hosts 挂载'; } | json_array
+  printf ',"sources":['; SEP=
+  while IFS="$(printf '\t')" read -r ID DEFAULT NAME URL; do
+    ON=false; [ "$(cat "$C/source-$ID.enabled")" != 1 ] || ON=true
+    printf '%s{"id":"%s","enabled":%s,"count":%s,"name":' "$SEP" "$ID" "$ON" "$(count_lines "$C/source-$ID.domains")"; quote "$NAME"; printf ',"url":'; quote "$URL"; printf '}'; SEP=,
+  done < "$MODDIR/sources.tsv"
+  printf '],"warnings":'
+  { [ "$TEST" != 1 ] || printf '%s\n' 'Linux 隔离测试：挂载为模拟结果，不代表 Android 真机'; namespace_ok || printf '%s\n' '未处于 init 全局挂载命名空间，请使用 su --mount-master'; [ ! -f "$STATE/pending" ] || printf '%s\n' '上次事务中断，需要重新应用或重启'; [ "$ENABLED" != true ] || [ "$MOUNTED" = true ] || printf '%s\n' '规则已启用但未验证生效'; } | json_array
+  printf '}\n'
+}
+check_domain() {
+  # This is a read-only lookup in committed configuration, never a traffic count
+  # or DNS probe. Keep rule membership separate from actual activation/mount.
+  snapshot_valid "$C" || fail "当前规则完整性校验失败"
+  ALLOWED=false; grep -Fxq -- "$DOMAIN" "$C/allow" && ALLOWED=true
+  CUSTOM_BLOCKED=false; grep -Fxq -- "$DOMAIN" "$C/block" && CUSTOM_BLOCKED=true
+  BLOCKED=false; grep -Fxq -- "$DOMAIN" "$C/domains" && BLOCKED=true
+  ENABLED=false; [ "$(cat "$C/enabled")" != 1 ] || ENABLED=true
+  MOUNTED=false; observed "$C/hosts" && MOUNTED=true
+  printf '{"ok":true,"domain":'; quote "$DOMAIN"
+  printf ',"allowed":%s,"customBlocked":%s,"blocked":%s,"enabled":%s,"mounted":%s,"matches":[' "$ALLOWED" "$CUSTOM_BLOCKED" "$BLOCKED" "$ENABLED" "$MOUNTED"
+  SEP=
+  while IFS="$(printf '\t')" read -r ID DEFAULT NAME URL; do
+    grep -Fxq -- "$DOMAIN" "$C/source-$ID.domains" || continue
+    ON=false; [ "$(cat "$C/source-$ID.enabled")" != 1 ] || ON=true
+    printf '%s{"id":"%s","name":' "$SEP" "$ID"; quote "$NAME"
+    printf ',"enabled":%s}' "$ON"; SEP=,
+  done < "$MODDIR/sources.tsv"
+  printf ']}\n'
+}
+install_state() {
+  [ "${BICHEN_INSTALL:-0}" = 1 ] || [ "$TEST" = 1 ] || fail "install 仅用于 Root 管理器安装流程"
+  package_valid || fail "模块必要文件或离线快照校验失败，请重新导出 App 内置模块 ZIP；不要刷入源码包或 APK"
+  mkdir -p "$STATE/generations" || fail "无法创建模块数据目录"
+  chmod 0700 "$STATE" "$STATE/generations"
+  lock
+  if generation; then
+    snapshot_valid "$STATE/generations/$GEN" || fail "已有配置校验失败，未覆盖用户数据"
+    if [ "$(cat "$STATE/generations/$GEN/schema")" = 1 ]; then
+      # Installing must not change live mounts. Schema upgrade leaves hosts,
+      # timestamps, user choices and the previous rollback pointer identical.
+      TXDIR=$(mktemp -d "$STATE/generations/g.XXXXXXXX") || fail "无法创建升级事务"
+      cp -R "$STATE/generations/$GEN/." "$TXDIR/" || fail "无法备份升级前配置"
+      upgrade_snapshot "$TXDIR" && prepare_hosts "$TXDIR/hosts" && seal "$TXDIR" || fail "规则结构升级失败，原配置已保留"
+      pointer "${TXDIR##*/}" || fail "无法提交规则结构升级"
+      TXDIR=
+      log "规则结构升级完成；保留已有名单、订阅开关、暂停状态和上一份备份；新增 HaGeZi 默认关闭"
+    fi
+    success "已有规则及暂停状态已保留，重启后检查挂载"; return
+  fi
+  [ ! -e "$STATE/current" ] || fail "已有规则指针无效，未初始化或覆盖用户配置；请保留数据并导出诊断"
+  if [ "$TEST" = 1 ]; then
+    mkdir -p "${TARGET%/*}" "$MODULES" || fail "测试目录初始化失败"
+    printf '127.0.0.1 localhost\n::1 localhost\n' > "$BICHEN_TEST_ROOT/base.hosts"
+    cp "$BICHEN_TEST_ROOT/base.hosts" "$TARGET"
+  fi
+  TXDIR=$(mktemp -d "$STATE/generations/g.XXXXXXXX") || fail "无法创建初始规则"
+  printf '1\n' > "$TXDIR/enabled"; printf '2\n' > "$TXDIR/schema"; : > "$TXDIR/allow"; : > "$TXDIR/block"; : > "$TXDIR/parent"
+  while IFS="$(printf '\t')" read -r ID DEFAULT NAME URL; do
+    valid_id "$ID" || fail "内置订阅配置无效"
+    parse_source "$MODDIR/rules/$ID.txt" "$TXDIR/source-$ID.domains" || fail "内置规则无效或超过 8 MiB"
+    printf '%s\n' "$DEFAULT" > "$TXDIR/source-$ID.enabled"
+  done < "$MODDIR/sources.tsv"
+  compile "$TXDIR" && seal "$TXDIR" || fail "初始化规则构建失败"
+  pointer "${TXDIR##*/}" || fail "初始配置保存失败"
+  TXDIR=
+  log "模块初始化完成；等待重启或手动应用"
+  success "离线规则初始化完成，重启后检查实际挂载"
+}
+
+COMMAND=${1:-status}
+[ "$#" -eq 0 ] || shift
+[ "$TEST" = 1 ] || [ "$(id -u)" = 0 ] || fail "此操作需要 Root 权限"
+case "$COMMAND" in
+  preflight)
+    [ "$#" = 0 ] || fail "参数数量错误"
+    package_valid || fail "模块必要文件或离线快照校验失败；请用 App 内置模块导出，勿选择源码 ZIP 或 APK"
+    printf '{"ok":true,"version":"%s","message":"模块必要文件、版本、订阅来源和离线快照校验通过"}\n' "$VERSION"; exit;;
+  install) [ "$#" = 0 ] || fail "参数数量错误"; install_state; exit;;
+  status) [ "$#" = 0 ] || fail "参数数量错误"; [ ! -d "$STATE" ] || lock; status; exit;;
+esac
+lock
+generation || fail "没有可用规则，请重新安装模块"
+C="$STATE/generations/$GEN"
+case "$COMMAND" in
+  health) [ "$#" = 0 ] || fail "参数数量错误"; health; exit;;
+  check-domain)
+    [ "$#" = 1 ] && domain_arg "$1" || fail "请输入精确域名，不含协议、路径、空格或通配符"
+    check_domain; exit;;
+  list-allow|list-block)
+    [ "$#" = 0 ] || fail "参数数量错误"; snapshot_valid "$C" || fail "当前规则完整性校验失败"; printf '{"ok":true,"domains":'; domain_array "$C/${COMMAND#list-}"; printf '}\n'; exit;;
+  export-config)
+    [ "$#" = 0 ] || fail "参数数量错误"; export_config; exit;;
+  export-domains)
+    [ "$#" = 0 ] || fail "参数数量错误"; snapshot_valid "$C" || fail "当前规则完整性校验失败"
+    printf '{"ok":true,"configRevision":"%s","domains":' "$GEN"; domain_array "$C/domains"; printf '}\n'; exit;;
+  logs)
+    [ "$#" = 0 ] || fail "参数数量错误"; printf '{"ok":true,"lines":'; tail -n 100 "$STATE/operations.log" 2>/dev/null | json_array; printf '}\n'; exit;;
+  diagnose)
+    [ "$#" = 0 ] || fail "参数数量错误"; printf '{"ok":true,"message":"运行环境与规则诊断","lines":'
+    { printf '模块版本：%s\n' "$VERSION"; printf 'Root 框架：%s\n' "${BICHEN_FRAMEWORK:-host-test}"; printf 'BusyBox：%s\n' "${BB:-host-test}"; printf '规则存储：%s\n' "$STATE"; printf '目标文件：%s\n' "$TARGET"; printf '启用状态：%s\n' "$(cat "$C/enabled")"; namespace_ok && printf '全局命名空间：通过\n' || printf '全局命名空间：未通过（请用 su --mount-master）\n'; snapshot_valid "$C" && printf '规则完整性：通过\n' || printf '规则完整性：失败\n'; observed "$C/hosts" && printf '实际挂载及内容：匹配已提交规则\n' || printf '实际挂载及内容：未确认生效（暂停时属正常）\n'; printf '辟尘 hosts 挂载层数：%s\n' "$(own_count)"; conflict_lines | while IFS= read -r CL; do printf '冲突模块：%s\n' "$CL"; done; foreign_mount && printf '冲突：目标存在其他 hosts 挂载\n'; [ ! -f "$STATE/pending" ] || printf '存在未完成事务，请重新应用或重启\n'; printf 'DNS 解析：本次未执行联网解析测试；挂载匹配不代表所有 App 都采用系统 hosts\n'; printf '支持范围：独立广告域名；不能按 App 放行，无法精准分离同域广告\n'; printf '私人 DNS / App 自带 DoH / 代理远端解析的实际行为需单独验证\n'; [ "$TEST" != 1 ] || printf '当前是 Linux 隔离测试，未执行 Android mount 或 SELinux 验证\n'; } | json_array
+    printf '}\n'; exit;;
+  boot|boot-check)
+    [ "$#" = 0 ] || fail "参数数量错误"
+    snapshot_valid "$C" || { log "启动失败：规则完整性校验失败"; fail "已保存规则完整性校验失败，未挂载"; }
+    # post-fs-data runs before Magic Mount. A later parent-directory overlay can
+    # cover that early bind; perform exactly one late restore, without polling.
+    mount_generation "$GEN" || { log "启动挂载失败：检查冲突、命名空间或 SELinux"; fail "启动挂载失败"; }
+    rm -f "$STATE/pending"; prune
+    if [ "$COMMAND" = boot-check ]; then log "启动复查完成：已验证保存的启用或暂停状态"; else log "启动恢复完成"; fi
+    success "已恢复保存的启用或暂停状态"; exit;;
+  uninstall)
+    [ "$#" = 0 ] || fail "参数数量错误"; namespace_ok || fail "卸载需全局命名空间"; unmount_own || fail "卸载挂载失败，重启后恢复"; log "模块已卸载，用户配置保留以便重装"; success "模块挂载已卸载"; exit;;
+esac
+namespace_ok || fail "操作需要 init 全局挂载命名空间，请使用 su --mount-master"
+case "$COMMAND" in
+  apply|enable|pause|rollback) [ "$#" = 0 ] || fail "参数数量错误";;
+  set-source) [ "$#" = 2 ] && valid_id "$1" || fail "订阅 ID 或参数无效"; case "$2" in 0|1) ;; *) fail "订阅开关必须为 0 或 1";; esac;;
+  import-source) [ "$#" = 2 ] && valid_id "$1" || fail "订阅 ID 或参数无效"; case "$2" in /*) ;; *) fail "导入文件必须是绝对路径";; esac;;
+  import-batch) valid_import_batch "$@" || fail "批量导入需 1 至 4 对不重复的订阅 ID 与绝对文件路径";;
+  import-user-lists) [ "$#" = 2 ] || fail "需要白名单和黑名单两个文件路径"; case "$1" in /*) ;; *) fail "白名单文件必须是绝对路径";; esac; case "$2" in /*) ;; *) fail "黑名单文件必须是绝对路径";; esac;;
+  import-settings) valid_settings "$@" || fail "需要白名单、黑名单绝对路径，以及 adaway/china/tracking 的 0 或 1 开关；可附加 hagezi 开关";;
+  add-allow|remove-allow|add-block|remove-block) [ "$#" = 1 ] && domain_arg "$1" || fail "请输入精确域名，不含协议、路径、空格或通配符";;
+  *) fail "未知命令";;
+esac
+# Reapply does no parsing, copying, generation churn or rule-update timestamp change.
+if [ "$COMMAND" = apply ]; then
+  snapshot_valid "$C" || fail "当前规则完整性校验失败"
+  recover_pending
+  mount_generation "$GEN" || fail "重新应用失败，请检查冲突模块及全局挂载权限"
+  log "已验证并重新应用当前规则"; success "已验证并重新应用当前规则"; exit
+fi
+new_transaction
+case "$COMMAND" in
+  apply) ACTION="已重新构建并应用规则";;
+  enable) printf '1\n' > "$TXDIR/enabled"; ACTION="已开启广告域名拦截";;
+  pause) printf '0\n' > "$TXDIR/enabled"; ACTION="已暂停拦截，重启后仍保持暂停";;
+  rollback)
+    get_parent || fail "没有可回滚的规则快照"
+    snapshot_valid "$STATE/generations/$PARENT" || fail "上一版规则校验失败"
+    CHOICE=$(cat "$TXDIR/enabled")
+    cp -R "$STATE/generations/$PARENT/." "$TXDIR/" || fail "无法恢复上一版规则"
+    upgrade_snapshot "$TXDIR" || fail "上一版规则结构升级失败"
+    printf '%s\n' "$OLDGEN" > "$TXDIR/parent"; printf '%s\n' "$CHOICE" > "$TXDIR/enabled"
+    ACTION="已恢复上一版规则，当前启用或暂停状态保持不变";;
+  set-source) printf '%s\n' "$2" > "$TXDIR/source-$1.enabled"; ACTION="已更新订阅开关并应用规则";;
+  import-source) parse_source "$2" "$TXDIR/source-$1.domains" || fail "导入失败：规则为空、超过 8 MiB 或包含不支持的格式"; ACTION="已导入订阅并应用规则";;
+  import-batch)
+    while [ "$#" -gt 0 ]; do
+      parse_source "$2" "$TXDIR/source-$1.domains" || fail "批量导入失败：$1 规则为空、超过 8 MiB 或包含不支持的格式；全部订阅保持原配置"
+      shift 2
+    done
+    ACTION="已整批更新订阅并应用规则";;
+  import-user-lists)
+    parse_user_list "$1" "$TXDIR/allow" && parse_user_list "$2" "$TXDIR/block" || fail "名单导入失败：文件不存在、超过 8 MiB 或格式无效；原有名单保持不变"
+    ACTION="已整批导入白名单与黑名单并应用规则";;
+  import-settings)
+    parse_user_list "$1" "$TXDIR/allow" && parse_user_list "$2" "$TXDIR/block" || fail "配置导入失败：名单文件缺失、超过 8 MiB 或格式无效；原配置保持不变"
+    printf '%s\n' "$3" > "$TXDIR/source-adaway.enabled" || fail "无法保存订阅开关"
+    printf '%s\n' "$4" > "$TXDIR/source-china.enabled" || fail "无法保存订阅开关"
+    printf '%s\n' "$5" > "$TXDIR/source-tracking.enabled" || fail "无法保存订阅开关"
+    if [ "$#" = 6 ]; then printf '%s\n' "$6" > "$TXDIR/source-hagezi.enabled" || fail "无法保存扩展订阅开关"; fi
+    ACTION="已原子导入名单与订阅开关，当前启用或暂停状态保持不变";;
+  add-allow|add-block)
+    LIST=${COMMAND#add-}; printf '%s\n' "$DOMAIN" >> "$TXDIR/$LIST"; sort -u "$TXDIR/$LIST" > "$TXDIR/$LIST.next" && mv -f "$TXDIR/$LIST.next" "$TXDIR/$LIST" || fail "无法保存域名"
+    ACTION="已添加域名并应用规则";;
+  remove-allow|remove-block)
+    LIST=${COMMAND#remove-}; awk -v d="$DOMAIN" '$0!=d' "$TXDIR/$LIST" > "$TXDIR/$LIST.next" && mv -f "$TXDIR/$LIST.next" "$TXDIR/$LIST" || fail "无法移除域名"
+    ACTION="已移除域名并应用规则";;
+esac
+commit_transaction
