@@ -78,9 +78,11 @@ try:
  text=(O/'control-results.txt').read_text();print(text);assert 'BICHEN_MIHOMO_CONTROL_PASS' in text and 'CONTROL_FAIL' not in text
  assert any(x['host']=='198.51.100.7' for x in received), 'proxy did not receive real TUN request'
  assert any(x['host']=='allowed.bichen.test' for x in received), 'DNS domain mapping not observed'
- assert not any(x['host']=='ads.bichen.test' for x in received), 'blocked domain reached upstream proxy'
+ assert any(x['host']=='safe.0.0-02.net' for x in received), 'PASS whitelist did not preserve original proxy routing'
+ assert not any(x['host']=='ads.bichen.test' for x in received), 'exact blocked domain reached upstream proxy'
+ assert not any(x['host']=='child.0.0-02.net' for x in received), 'suffix-blocked child domain reached upstream proxy'
  (O/'fixture-connections.json').write_text(json.dumps(received,indent=2))
- print('BICHEN_MIHOMO_E2E_PASS: real TUN, SOCKS routing, DNS, ad rejection, stop, restart, app bypass, pending settings, reinclude; independent UID')
+ print('BICHEN_MIHOMO_E2E_PASS: real TUN, SOCKS routing, DNS, exact and suffix ad rejection, PASS whitelist routing, stop, restart, app bypass, pending settings, reinclude; independent UID')
 finally:
  if control.poll() is None:control.terminate()
  control_output.close()
