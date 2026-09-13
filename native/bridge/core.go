@@ -26,6 +26,7 @@ import (
 )
 const coreRevision="ac017cdd246ce8bd547653d927e7bf77d7ee73d5"
 const filterName="__bichen_exact_filter"
+const filterSubRule="__bichen_filter_branch"
 var mu sync.Mutex
 var tunCloser io.Closer
 var started bool
@@ -74,10 +75,6 @@ func prepare(r request)([]byte,error){
   suffix,err:=checkedDomains(r.SuffixDomains,"子域拦截规则");if err!=nil{return nil,err}
   allow,err:=checkedDomains(r.AllowDomains,"白名单");if err!=nil{return nil,err}
   original,ok:=m["rules"].([]any);if !ok{return nil,errors.New("配置缺少 rules 分流列表")}
-  prefix:=make([]any,0,len(allow)+1)
-  // PASS skips only Bichen's blocking branch and lets the user's original rules decide
-  // the route. Never turn an ad exception into forced DIRECT traffic.
-  for _,domain:=range allow{prefix=append(prefix,"DOMAIN,"+domain+",PASS")}
   if len(exact)+len(suffix)>0{
    providers,_:=m["rule-providers"].(map[string]any);if providers==nil{providers=map[string]any{}}
    if _,exists:=providers[filterName];exists{return nil,errors.New("配置占用了辟尘内部规则名称")}
@@ -85,9 +82,20 @@ func prepare(r request)([]byte,error){
    for _,domain:=range exact{payload=append(payload,"DOMAIN,"+domain)}
    for _,domain:=range suffix{payload=append(payload,"DOMAIN-SUFFIX,"+domain)}
    providers[filterName]=map[string]any{"type":"inline","behavior":"classical","payload":payload};m["rule-providers"]=providers
-   prefix=append(prefix,"RULE-SET,"+filterName+",REJECT")
+
+   subRules,_:=m["sub-rules"].(map[string]any);if subRules==nil{subRules=map[string]any{}}
+   if _,exists:=subRules[filterSubRule];exists{return nil,errors.New("配置占用了辟尘内部子规则名称")}
+   branch:=make([]any,0,len(allow)+1)
+   // PASS inside SUB-RULE exits Bichen's branch and resumes the user's main rules.
+   // Putting PASS directly before REJECT would merely continue to REJECT and fail
+   // to implement an exception for a broader DOMAIN-SUFFIX rule.
+   for _,domain:=range allow{branch=append(branch,"DOMAIN,"+domain+",PASS")}
+   branch=append(branch,"RULE-SET,"+filterName+",REJECT")
+   subRules[filterSubRule]=branch;m["sub-rules"]=subRules
+   // Android TUN traffic handled here is TCP or UDP. The condition therefore
+   // enters only Bichen's isolated filter branch without changing original rules.
+   m["rules"]=append([]any{"SUB-RULE,(OR,((NETWORK,TCP),(NETWORK,UDP))),"+filterSubRule},original...)
   }
-  m["rules"]=append(prefix,original...)
  }
  return yaml.Marshal(m)
 }
