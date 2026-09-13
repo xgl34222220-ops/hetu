@@ -11,7 +11,8 @@ public final class Probe extends Instrumentation {
  private String get(String host,int port,boolean hold,int timeout)throws Exception{
   try(Socket s=new Socket()){s.connect(new InetSocketAddress(host,port),timeout);s.setSoTimeout(timeout);s.getOutputStream().write(("GET /bichen-e2e HTTP/1.0\r\nHost: "+host+"\r\n\r\n").getBytes("US-ASCII"));byte[] bytes=new byte[2048];int n=s.getInputStream().read(bytes);String value=n<0?"":new String(bytes,0,n,"US-ASCII");if(hold)Thread.sleep(2200);return value;}
  }
- private boolean blocked(String host)throws Exception{try{return !get(host,18080,false).contains("BICHEN_PROXY_E2E");}catch(IOException expected){return true;}}
+ private boolean blocked(String host,int port)throws Exception{try{return !get(host,port,false).contains("BICHEN_PROXY_E2E");}catch(IOException expected){return true;}}
+ private boolean blocked(String host)throws Exception{return blocked(host,18080);}
  private boolean waitForDirectNetwork()throws InterruptedException{
   long deadline=android.os.SystemClock.elapsedRealtime()+6000;
   do{
@@ -29,6 +30,8 @@ public final class Probe extends Instrumentation {
    check(blocked("ads.bichen.test"),"exact ad domain rejected while ordinary proxy traffic succeeds");
    check(blocked("child.0.0-02.net"),"HaGeZi parent domain blocks an unseen child through DOMAIN-SUFFIX");
    check(get("safe.0.0-02.net",18080,true).contains("BICHEN_PROXY_E2E"),"exact whitelist PASS bypasses suffix rejection and preserves original proxy route");
+   check(blocked("doh.360.cn"),"encrypted DNS resolver domain is rejected by optional anti-bypass guard");
+   check(blocked("allowed.bichen.test",853),"TCP 853 is rejected by optional DoT/DoQ anti-bypass guard");
   }
   b.putString("stream",log+"BICHEN_MIHOMO_PROBE_PASS "+mode+"\n");finish(Activity.RESULT_OK,b);
  }catch(Throwable e){b.putString("stream",log+"BICHEN_MIHOMO_PROBE_FAIL\n"+android.util.Log.getStackTraceString(e));finish(Activity.RESULT_CANCELED,b);}}
