@@ -76,7 +76,10 @@ public final class Smoke extends Instrumentation {
         RequestLogs.run(this, activity, log);
         // Fixtures exercise production rendering, not a pretend Root framework.
         JSONObject paused=new JSONObject().put("ok",true).put("installed",true).put("enabled",false).put("mounted",false).put("ruleCount",7081);
-        setStatus(paused);check(screen().contains("模块保护已暂停"),"fixture: installed paused module not called uninstalled");
+        // Deterministically queue a structural refresh, then explicitly render its state.
+        // The full render must consume the flag; a later counter event must not rebuild.
+        runOnMainSync(()->{try{field("homeRefreshNeeded").setBoolean(activity,true);}catch(Exception e){throw new RuntimeException(e);}});
+        setStatus(paused);check(!(Boolean)get("homeRefreshNeeded"),"explicit home render consumes prior structural refresh flag");check(screen().contains("模块保护已暂停"),"fixture: installed paused module not called uninstalled");
         Object scroll=get("scroll");target.getSharedPreferences("bichen",0).edit().putLong("blocked",431).apply();SystemClock.sleep(450);waitForIdleSync();
         check(scroll==get("scroll"),"counter event updates existing home instead of rebuilding it");
         setStatus(new JSONObject(paused.toString()).put("ok",false).put("enabled",true).put("mounted",true));
