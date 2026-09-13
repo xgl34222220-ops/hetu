@@ -14,7 +14,11 @@ public final class MihomoStartupConfigTest {
   check(source.contains("tproxy-port: 1234")&&source.contains("stack: gvisor")&&source.contains("type: ebpf")&&source.contains("global-client-fingerprint: chrome"),"source text remains unchanged");
   MihomoStartupConfig.Result r=MihomoStartupConfig.generate(source,p(ProxyRuntimeProfile.Mode.REDIRECT,true));check(r.redirectPort==9797&&r.tproxyPort==0,"Redirect ports generated");check(r.yaml.contains("redir-port: 9797")&&r.yaml.contains("tproxy-port: 0"),"Redirect startup values written");check(!r.yaml.contains("listeners:"),"Redirect startup also excludes source transparent listeners");
   MihomoStartupConfig.Result e=MihomoStartupConfig.generate(source,p(ProxyRuntimeProfile.Mode.ENHANCE,true));check(e.redirectPort==9797&&e.tproxyPort==9898,"Enhance has redirect and TPROXY ports");check(!e.yaml.contains("type: ebpf"),"Enhance startup excludes eBPF listener");
-  MihomoStartupConfig.Result raw=MihomoStartupConfig.generate(source,p(ProxyRuntimeProfile.Mode.TPROXY,false));check(raw.yaml.equals(source)&&raw.tproxyPort==1234&&raw.redirectPort==2345,"overwrite off preserves user-managed startup config exactly");
+  MihomoStartupConfig.Result raw=MihomoStartupConfig.generate(source,p(ProxyRuntimeProfile.Mode.TPROXY,false));
+  check(raw.tproxyPort==1234&&raw.redirectPort==0,"overwrite off preserves selected TPROXY port but keeps mode authoritative");
+  check(raw.yaml.contains("tproxy-port: 1234")&&raw.yaml.contains("redir-port: 0"),"overwrite off still writes a coherent TPROXY runtime copy");
+  check(!raw.yaml.contains("listeners:")&&!raw.yaml.contains("type: ebpf")&&!raw.yaml.contains("global-client-fingerprint:")&&!raw.yaml.contains("stack: gvisor"),"overwrite off still isolates conflicting runtime features");
+  check(source.contains("type: ebpf")&&source.contains("global-client-fingerprint: chrome"),"overwrite off still leaves source file untouched");
   String flow="mode: rule\nlisteners: [{name: e, type: ebpf, port: 9898}]\nrules: ['MATCH,DIRECT']\n";
   MihomoStartupConfig.Result flowResult=MihomoStartupConfig.generate(flow,p(ProxyRuntimeProfile.Mode.TPROXY,true));check(!flowResult.yaml.contains("listeners:")&&!flowResult.yaml.contains("type: ebpf"),"flow-style listeners removed from startup copy");
   String indentless="mode: rule\nlisteners:\n- name: e\n  type: ebpf\n  port: 9898\nrules: ['MATCH,DIRECT']\n";
