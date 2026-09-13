@@ -9,10 +9,14 @@ public final class ProxyRuntimeProfileTest {
         check(tproxy.dnsHijack&&tproxy.appFilter&&tproxy.sharedNetwork,"Mihomo TPROXY exposes network controls");
         ProxyRuntimeProfile.Capability redirect=ProxyRuntimeProfile.capability(ProxyRuntimeProfile.Core.MIHOMO,ProxyRuntimeProfile.Mode.REDIRECT);
         check(redirect.available&&redirect.tcp&&!redirect.udp,"Redirect is TCP transparent proxy only");
+        ProxyRuntimeProfile.Capability enhance=ProxyRuntimeProfile.capability(ProxyRuntimeProfile.Core.MIHOMO,ProxyRuntimeProfile.Mode.ENHANCE);
+        check(enhance.available&&enhance.tcp&&enhance.udp,"Enhance exposes TCP and UDP only after real backend wiring");
         ProxyRuntimeProfile.Capability ebpfOfficial=ProxyRuntimeProfile.capability(ProxyRuntimeProfile.Core.MIHOMO,ProxyRuntimeProfile.Mode.EBPF);
         check(!ebpfOfficial.available,"official Mihomo does not falsely claim eBPF support");
         ProxyRuntimeProfile.Capability ebpfSmart=ProxyRuntimeProfile.capability(ProxyRuntimeProfile.Core.MIHOMO_SMART,ProxyRuntimeProfile.Mode.EBPF);
-        check(ebpfSmart.available,"compatible Mihomo Smart can expose eBPF");
+        check(!ebpfSmart.available,"Mihomo Smart eBPF remains hidden until the compatible eBPF runtime is actually wired");
+        ProxyRuntimeProfile.Capability mixed=ProxyRuntimeProfile.capability(ProxyRuntimeProfile.Core.MIHOMO,ProxyRuntimeProfile.Mode.MIXED);
+        check(!mixed.available,"Mixed remains hidden until Root TUN plus Redirect is actually wired");
         ProxyRuntimeProfile.Capability tunXray=ProxyRuntimeProfile.capability(ProxyRuntimeProfile.Core.XRAY,ProxyRuntimeProfile.Mode.TUN);
         check(!tunXray.available,"Xray TUN auto-overwrite is not falsely enabled");
         check(ProxyRuntimeProfile.Core.SING_BOX.extensions.contains("jsonc")&&ProxyRuntimeProfile.Core.SING_BOX.extensions.contains("yaml"),"Sing-Box accepts documented formats");
