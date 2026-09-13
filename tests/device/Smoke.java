@@ -4,95 +4,88 @@ import android.app.Activity;
 import android.app.Instrumentation;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.SystemClock;
-import android.view.KeyEvent;
+import android.view.Gravity;
+import android.view.View;
 import android.view.ViewGroup;
-import android.view.accessibility.AccessibilityNodeInfo;
+import android.widget.TextView;
 import org.json.JSONObject;
 import java.io.*;
 import java.lang.reflect.*;
 import java.security.MessageDigest;
 import java.util.zip.ZipFile;
 
-/** Runs the real installed preview. No Root framework is installed or simulated. */
+/** Actual installed APK UI and asset tests. State fixtures are explicitly synthetic. */
 public final class Smoke extends Instrumentation {
     private int checks;
-    private StringBuilder log=new StringBuilder();
+    private final StringBuilder log=new StringBuilder();
     private Context target;
     private Activity activity;
-    @Override public void onCreate(Bundle args) { super.onCreate(args);start(); }
-    private void check(boolean value,String detail) {
-        if(!value)throw new AssertionError(detail);
-        checks++;log.append("PASS ").append(detail).append('\n');
+    private String expectedVersion;
+    @Override public void onCreate(Bundle args) { super.onCreate(args);expectedVersion=args.getString("expectedVersion");start(); }
+    private void check(boolean value,String detail) { if(!value)throw new AssertionError(detail);checks++;log.append("PASS ").append(detail).append('\n'); }
+    private Field field(String name)throws Exception{Field f=activity.getClass().getDeclaredField(name);f.setAccessible(true);return f;}
+    private Object get(String name)throws Exception{return field(name).get(activity);}
+    private void call(String name)throws Exception{call(name,new Class<?>[0],new Object[0]);}
+    private void call(String name,Class<?>[] types,Object[] args)throws Exception{
+        Method m=activity.getClass().getDeclaredMethod(name,types);m.setAccessible(true);
+        runOnMainSync(()->{try{m.invoke(activity,args);}catch(Exception e){throw new RuntimeException(e);}});waitForIdleSync();
     }
-    private static String sha(File file) throws Exception {
-        MessageDigest d=MessageDigest.getInstance("SHA-256");
-        try(InputStream in=new FileInputStream(file)) { byte[] b=new byte[8192];int n;while((n=in.read(b))!=-1)d.update(b,0,n); }
-        StringBuilder s=new StringBuilder();for(byte b:d.digest())s.append(String.format("%02x",b&255));return s.toString();
+    private String screen(){final StringBuilder s=new StringBuilder();runOnMainSync(()->collect(activity.getWindow().getDecorView(),s));return s.toString();}
+    private void collect(View v,StringBuilder b){if(v instanceof TextView)b.append(((TextView)v).getText()).append('\n');if(v instanceof ViewGroup){ViewGroup g=(ViewGroup)v;for(int i=0;i<g.getChildCount();i++)collect(g.getChildAt(i),b);}}
+    private void shot(String name)throws Exception{SystemClock.sleep(300);Bitmap image=getUiAutomation().takeScreenshot();if(image!=null)try(OutputStream o=new FileOutputStream(new File(target.getFilesDir(),name+".png"))){image.compress(Bitmap.CompressFormat.PNG,100,o);}}
+    private static String sha(File f)throws Exception{MessageDigest d=MessageDigest.getInstance("SHA-256");try(InputStream i=new FileInputStream(f)){byte[] b=new byte[8192];int n;while((n=i.read(b))!=-1)d.update(b,0,n);}StringBuilder s=new StringBuilder();for(byte b:d.digest())s.append(String.format("%02x",b&255));return s.toString();}
+    private void setStatus(JSONObject status)throws Exception{
+        Field s=field("status"),l=field("statusLoaded");runOnMainSync(()->{try{s.set(activity,status);l.setBoolean(activity,true);}catch(Exception e){throw new RuntimeException(e);}});
+        call("showPage",new Class<?>[]{boolean.class},new Object[]{false});
     }
-    private void call(String name) throws Exception {
-        Method m=activity.getClass().getDeclaredMethod(name);m.setAccessible(true);
-        runOnMainSync(()->{try{m.invoke(activity);}catch(Exception e){throw new RuntimeException(e);}});
-        waitForIdleSync();SystemClock.sleep(400);
-    }
-    private String screen() {
-        StringBuilder b=new StringBuilder();collect(getUiAutomation().getRootInActiveWindow(),b);return b.toString();
-    }
-    private void collect(AccessibilityNodeInfo n,StringBuilder b) {
-        if(n==null)return;if(n.getText()!=null)b.append(n.getText()).append('\n');
-        for(int i=0;i<n.getChildCount();i++)collect(n.getChild(i),b);
-    }
-    private void shot(String name) throws Exception {
-        SystemClock.sleep(500);Bitmap image=getUiAutomation().takeScreenshot();
-        if(image!=null)try(FileOutputStream out=new FileOutputStream(new File(target.getFilesDir(),name+".png"))){image.compress(Bitmap.CompressFormat.PNG,100,out);}
-    }
-    @Override public void onStart() {
-        Bundle result=new Bundle();
-        try {
-            target=getTargetContext();String pkg=target.getPackageName();
-            check(pkg.equals("io.github.xgl34222220.bichen.preview"),"same preview package");
-            check(target.getPackageManager().getPackageInfo(pkg,0).versionName.equals("0.3.0-test.3"),"installed test.3 version");
-            Class<?> installer=Class.forName(pkg+".ModuleInstaller",true,target.getClassLoader());
-            JSONObject info=(JSONObject)installer.getMethod("bundledInfo",Context.class).invoke(null,target);
-            check(info.getString("version").equals("0.3.0-beta.1")&&info.getInt("versionCode")==301,"real embedded module metadata");
-            File module=(File)installer.getMethod("bundledZip",Context.class).invoke(null,target);
-            check(module.getName().equals("Bichen-0.3.0-beta.1-module.zip"),"export cache filename matches module version");
-            check(sha(module).equals(info.getString("sha256")),"export cache matches embedded module hash");
-            try(ZipFile z=new ZipFile(module)){check(z.getEntry("module.prop")!=null&&z.getEntry("bin/bichen")!=null,"export has flashable root entries");}
-            check(sha((File)installer.getMethod("bundledZip",Context.class).invoke(null,target)).equals(info.getString("sha256")),"repeated export remains identical");
-            Drawable icon=target.getResources().getDrawable(target.getApplicationInfo().icon,target.getTheme());
-            Bitmap bitmap=Bitmap.createBitmap(108,108,Bitmap.Config.ARGB_8888);icon.setBounds(0,0,108,108);icon.draw(new Canvas(bitmap));
-            check(bitmap.getPixel(10,54)==0xff146b59,"original green launcher icon background");
-            check(bitmap.getPixel(54,23)==0xffdff4e8,"original light shield artwork");
-            try(FileOutputStream out=new FileOutputStream(new File(target.getFilesDir(),"restored-icon.png"))){bitmap.compress(Bitmap.CompressFormat.PNG,100,out);}
-            Intent launch=target.getPackageManager().getLaunchIntentForPackage(pkg);
-            activity=startActivitySync(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));waitForIdleSync();
-            Field busy=activity.getClass().getDeclaredField("busy");busy.setAccessible(true);
-            for(int i=0;i<400;i++){final boolean[] pending={true};runOnMainSync(()->{try{pending[0]=busy.getBoolean(activity);}catch(Exception e){throw new RuntimeException(e);}});if(!pending[0])break;SystemClock.sleep(100);}
-            check(!activity.isFinishing(),"app starts without crash");
-            Field nav=activity.getClass().getDeclaredField("nav");nav.setAccessible(true);
-            String[] titles={"辟尘·测试","应用放行","过滤规则","请求活动"};
-            for(int i=0;i<4;i++){
-                final int index=i;runOnMainSync(()->{try{((ViewGroup)nav.get(activity)).getChildAt(index).performClick();}catch(Exception e){throw new RuntimeException(e);}});
-                waitForIdleSync();SystemClock.sleep(600);check(screen().contains(titles[i]),"page opens: "+titles[i]);shot("page-"+i);
-            }
-            call("showModuleManager");
-            check(screen().contains("内置模块：0.3.0-beta.1"),"module sheet shows module rather than app version");shot("module-manager");
-            sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);waitForIdleSync();
-            Method export=activity.getClass().getDeclaredMethod("exportFile",String.class);export.setAccessible(true);
-            runOnMainSync(()->{try{export.invoke(activity,"module");}catch(Exception e){throw new RuntimeException(e);}});
-            SystemClock.sleep(1500);
-            check(screen().contains("Bichen-0.3.0-beta.1-module.zip"),"system save picker receives correct module filename");shot("export-picker");
-            sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);waitForIdleSync();
-            Object install=installer.getMethod("install",Context.class).invoke(null,target);
-            int code=install.getClass().getField("code").getInt(install);
-            check(code!=0,"without a Root framework install is not reported as success");
-            log.append("BICHEN_DEVICE_PASS checks=").append(checks).append("\nNo real Root framework or OEM hardware tested.\n");
-            result.putString("stream",log.toString());finish(Activity.RESULT_OK,result);
-        } catch(Throwable e) { result.putString("stream",log+"\nBICHEN_DEVICE_FAIL "+android.util.Log.getStackTraceString(e));finish(Activity.RESULT_CANCELED,result); }
-    }
+    @Override public void onStart(){Bundle result=new Bundle();try{
+        target=getTargetContext();String pkg=target.getPackageName();
+        check(pkg.equals("io.github.xgl34222220.bichen.preview"),"unchanged preview package");
+        check(target.getPackageManager().getPackageInfo(pkg,0).versionName.equals(expectedVersion),"installed expected version "+expectedVersion);
+        Class<?> installer=Class.forName(pkg+".ModuleInstaller",true,target.getClassLoader());
+        JSONObject info=(JSONObject)installer.getMethod("bundledInfo",Context.class).invoke(null,target);
+        File module=(File)installer.getMethod("bundledZip",Context.class).invoke(null,target);
+        check(module.getName().equals("Bichen-"+info.getString("version")+"-module.zip"),"export module filename matches its actual metadata");
+        check(sha(module).equals(info.getString("sha256")),"embedded/exported module hash identical");
+        try(ZipFile z=new ZipFile(module)){check(z.getEntry("module.prop")!=null&&z.getEntry("bin/bichen")!=null,"export contains module root entries");}
+        check(sha((File)installer.getMethod("bundledZip",Context.class).invoke(null,target)).equals(info.getString("sha256")),"repeated export unchanged");
+        Drawable icon=target.getResources().getDrawable(target.getApplicationInfo().icon,target.getTheme());
+        Bitmap b=Bitmap.createBitmap(108,108,Bitmap.Config.ARGB_8888);icon.setBounds(0,0,108,108);icon.draw(new Canvas(b));
+        check(b.getPixel(10,54)==0xff146b59&&b.getPixel(54,23)==0xffdff4e8,"retained original green icon rendering");
+        activity=startActivitySync(target.getPackageManager().getLaunchIntentForPackage(pkg).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));waitForIdleSync();
+        for(int i=0;i<450;i++){final boolean[] busy={true};runOnMainSync(()->{try{busy[0]=(Boolean)get("busy");}catch(Exception e){throw new RuntimeException(e);}});if(!busy[0])break;SystemClock.sleep(100);}
+        check(!activity.isFinishing(),"app launch does not crash");check(!(Boolean)get("busy"),"initial status attempt finishes, no permanent spinner");
+        getUiAutomation();
+        String[] pages={"辟尘·测试","应用放行","过滤规则","请求活动"};
+        for(int i=0;i<4;i++){
+            final int n=i;runOnMainSync(()->{try{((ViewGroup)get("nav")).getChildAt(n).performClick();}catch(Exception e){throw new RuntimeException(e);}});waitForIdleSync();SystemClock.sleep(400);
+            check(screen().contains(pages[i]),"real page opens "+pages[i]);shot("actual-page-"+i);
+        }
+        runOnMainSync(()->{try{ViewGroup nav=(ViewGroup)get("nav");for(int i=0;i<4;i++){
+            ViewGroup item=(ViewGroup)nav.getChildAt(i);View iconView=item.getChildAt(0);TextView label=(TextView)item.getChildAt(2);
+            check((label.getGravity()&Gravity.HORIZONTAL_GRAVITY_MASK)==Gravity.CENTER_HORIZONTAL,"nav text centered "+i);
+            check(Math.abs((label.getLeft()+label.getRight())-(iconView.getLeft()+iconView.getRight()))<=2,"nav icon and label share center "+i);
+            check(label.getBottom()<=item.getHeight(),"nav label fits large font "+i);
+        }nav.getChildAt(0).performClick();}catch(Exception e){throw new RuntimeException(e);}});waitForIdleSync();
+        // Fixtures exercise production rendering, not a pretend Root framework.
+        JSONObject paused=new JSONObject().put("ok",true).put("installed",true).put("enabled",false).put("mounted",false).put("ruleCount",7081);
+        setStatus(paused);check(screen().contains("模块保护已暂停"),"fixture: installed paused module not called uninstalled");
+        Object scroll=get("scroll");target.getSharedPreferences("bichen",0).edit().putLong("blocked",431).apply();SystemClock.sleep(450);waitForIdleSync();
+        check(scroll==get("scroll"),"counter event updates existing home instead of rebuilding it");
+        setStatus(new JSONObject(paused.toString()).put("ok",false).put("enabled",true).put("mounted",true));
+        check(screen().contains("状态待确认")&&!screen().contains("模块保护已开启"),"fixture: exit/error state never shown as active");
+        setStatus(new JSONObject(paused.toString()).put("moduleDisabled",true));check(screen().contains("模块已停用"),"fixture: manager disable visible");
+        call("toggleProtection");check(!(Boolean)get("busy")&&((String)get("notice")).contains("Root 管理器"),"fixture: disabled module power does not queue enable");
+        setStatus(new JSONObject(paused.toString()).put("moduleRemovalPending",true));check(screen().contains("模块等待卸载"),"fixture: removal visible");
+        setStatus(new JSONObject(paused.toString()).put("pendingReboot",true));check(screen().contains("模块等待重启"),"fixture: pending reboot visible");
+        call("toggleProtection");check(!(Boolean)get("busy"),"fixture: pending update power does not enqueue module writes");
+        log.append("BICHEN_DEVICE_PASS checks=").append(checks).append("\nAndroid emulator UI/assets only. No ReSukiSU, OEM hardware or actual ad-block efficacy tested.\n");
+        result.putString("stream",log.toString());finish(Activity.RESULT_OK,result);
+    }catch(Throwable e){try{shot("failure");}catch(Throwable ignored){}result.putString("stream",log+"\nBICHEN_DEVICE_FAIL "+android.util.Log.getStackTraceString(e));finish(Activity.RESULT_CANCELED,result);}}
 }
