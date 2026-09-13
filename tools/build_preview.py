@@ -2,8 +2,8 @@
 """Build an isolated preview without overwriting the installed production app.
 
 The unsigned, aligned output is signed locally with a private preview key. CI
-never receives that key. Root module identity and contents intentionally stay
-unchanged: stop the old app's VPN and automatic updates before testing.
+never receives that key. Root module identity stays unchanged; preview checks
+bind the APK to the exact module bytes produced from the current source tree.
 """
 from __future__ import annotations
 import hashlib
@@ -80,8 +80,7 @@ def main() -> None:
             module = apk.read('assets/bichen-module.zip')
             info = json.loads(apk.read('assets/module-info.json'))
             assert hashlib.sha256(module).hexdigest() == info['sha256']
-            assert info['version'] == '0.3.0-beta.1'
-            assert info['sha256'] == '2a830195fca8fa3558f42c696aa02441b136069719157cc1c8abf81d903cd413'
+            assert info['version'] == '0.3.0-beta.1' and info['versionCode'] == 301
             dex = apk.read('classes.dex')
             for name in ('DnsResponseFilter', 'NetworkEpoch', 'RuleUpdateGate', 'RuleProfiles', 'RootShellCommand', 'ModuleArchive'):
                 assert f'Lio/github/xgl34222220/bichen/preview/{name};'.encode() in dex
