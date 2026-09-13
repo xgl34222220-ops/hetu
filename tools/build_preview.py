@@ -20,8 +20,8 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 BASE = 'io.github.xgl34222220.bichen'
 PREVIEW = BASE + '.preview'
-VERSION = '0.3.0-test.5'
-CODE = 305
+VERSION = '0.3.0-test.6'
+CODE = 306
 
 def run(*args: str | Path, cwd: Path) -> None:
     subprocess.run([str(a) for a in args], cwd=cwd, check=True)

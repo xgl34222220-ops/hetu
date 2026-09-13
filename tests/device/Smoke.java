@@ -73,6 +73,7 @@ public final class Smoke extends Instrumentation {
             check(Math.abs((label.getLeft()+label.getRight())-(iconView.getLeft()+iconView.getRight()))<=2,"nav icon and label share center "+i);
             check(label.getBottom()<=item.getHeight(),"nav label fits large font "+i);
         }nav.getChildAt(0).performClick();}catch(Exception e){throw new RuntimeException(e);}});waitForIdleSync();
+        RequestLogs.run(this, activity, log);
         // Fixtures exercise production rendering, not a pretend Root framework.
         JSONObject paused=new JSONObject().put("ok",true).put("installed",true).put("enabled",false).put("mounted",false).put("ruleCount",7081);
         setStatus(paused);check(screen().contains("模块保护已暂停"),"fixture: installed paused module not called uninstalled");

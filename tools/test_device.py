@@ -17,7 +17,7 @@ sign(ROOT/('out/preview/Bichen-'+version+'-unsigned.apk'),OUT/'device-app.apk')
 manifest=OUT/'AndroidManifest.xml'
 manifest.write_text('''<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="bichen.devicecheck"><uses-sdk android:minSdkVersion="26" android:targetSdkVersion="35"/><application android:label="Bichen device checks" android:debuggable="true"/><instrumentation android:name="bichen.devicecheck.Smoke" android:targetPackage="io.github.xgl34222220.bichen.preview" android:functionalTest="true"/></manifest>''')
 classes=OUT/'classes';classes.mkdir(exist_ok=True)
-run('javac','-source','8','-target','8','-encoding','UTF-8','-bootclasspath',str(JAR)+os.pathsep+str(TOOLS/'core-lambda-stubs.jar'),'-d',classes,ROOT/'tests/device/Smoke.java')
+run('javac','-source','8','-target','8','-encoding','UTF-8','-bootclasspath',str(JAR)+os.pathsep+str(TOOLS/'core-lambda-stubs.jar'),'-d',classes,*sorted((ROOT/'tests/device').glob('*.java')))
 with zipfile.ZipFile(OUT/'classes.jar','w') as z:
  for p in classes.rglob('*.class'):z.write(p,p.relative_to(classes).as_posix())
 dex=OUT/'dex';dex.mkdir(exist_ok=True)

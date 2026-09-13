@@ -45,21 +45,26 @@ public final class MainActivity extends Activity {
     private String bundledModuleVersion="";
     private TextView homeRuleMetric, homeSecondaryMetric;
     private boolean refreshAfterReturn;
+    private boolean liveRefreshScheduled;
+    private TextView requestLogHint;
     private int vpnMonitorSequence;
     private String queuedDocumentUri="", queuedDocumentKind="", queuedDocumentText="";
     private int queuedDocumentRequest=0;
     private final SharedPreferences.OnSharedPreferenceChangeListener preferenceListener=(p,key)->{
-        if("dnsNetworkState".equals(key)||"dnsNetworkReportError".equals(key)||"dailyUpdateRunning".equals(key)||"dailyUpdateError".equals(key)||"dailyUpdateLastSuccess".equals(key)||"dnsLogs".equals(key)||"activeBypassApps".equals(key)||"vpnError".equals(key)||"vpnWanted".equals(key)||"blocked".equals(key)||"queries".equals(key)||"errors".equals(key)) {
+        if("requestLogs".equals(key)||"dnsLogError".equals(key)||"dnsLogNotice".equals(key)||"dnsNetworkState".equals(key)||"dnsNetworkReportError".equals(key)||"dailyUpdateRunning".equals(key)||"dailyUpdateError".equals(key)||"dailyUpdateLastSuccess".equals(key)||"dnsLogs".equals(key)||"activeBypassApps".equals(key)||"vpnError".equals(key)||"vpnWanted".equals(key)||"blocked".equals(key)||"queries".equals(key)||"errors".equals(key)) {
             if(!"dnsLogs".equals(key)&&!"queries".equals(key)&&!"blocked".equals(key)&&!"errors".equals(key))homeRefreshNeeded=true;
-            ui.removeCallbacks(this.refreshLive); ui.postDelayed(this.refreshLive,180);
+            scheduleLiveRefresh();
         }
     };
     private final Runnable refreshLive=()->{
+        liveRefreshScheduled=false;
         if(destroyed)return;
         if(homeRefreshNeeded&&tab==0)showPage(true);else if(tab==0)updateHomeMetrics();homeRefreshNeeded=false;
         if(tab==1)updatePending();
         if(tab==3&&logAdapter!=null){logAdapter.refresh();if(queryMetric!=null)queryMetric.setText(format(prefs.getLong("queries",0)));if(blockMetric!=null)blockMetric.setText(format(prefs.getLong("blocked",0)));if(errorMetric!=null)errorMetric.setText(format(prefs.getLong("errors",0)));}
     };
+    // Schedule once from the first event; later packets cannot postpone the refresh.
+    private void scheduleLiveRefresh(){if(!destroyed&&!liveRefreshScheduled){liveRefreshScheduled=true;ui.postDelayed(refreshLive,180);}}
     private interface Job { String run() throws Exception; }
     private interface Flag { void changed(boolean on); }
     private static final class AppEntry {
@@ -75,7 +80,7 @@ public final class MainActivity extends Activity {
         loadStatus();
     }
     @Override public void onSaveInstanceState(Bundle b){super.onSaveInstanceState(b);b.putInt("tab",tab);b.putString("appSearch",appSearch);b.putString("logSearch",logSearch);b.putBoolean("systemApps",systemApps);b.putBoolean("selectedOnly",selectedOnly);b.putString("pendingExport",pendingExport);b.putString("exportText",exportText);b.putString("queuedDocumentUri",queuedDocumentUri);b.putString("queuedDocumentKind",queuedDocumentKind);b.putString("queuedDocumentText",queuedDocumentText);b.putInt("queuedDocumentRequest",queuedDocumentRequest);}
-    @Override public void onResume(){super.onResume();if(prefs!=null){if(useDark()!=dark){recreate();return;}String e=prefs.getString("vpnError","");if(!e.isEmpty()){notice=e;updateBanner();}ui.post(refreshLive);if(refreshAfterReturn&&statusLoaded&&!busy&&status.optBoolean("rootGranted",false)){refreshAfterReturn=false;loadStatus();}}}
+    @Override public void onResume(){super.onResume();if(prefs!=null){if(useDark()!=dark){recreate();return;}String e=prefs.getString("vpnError","");if(!e.isEmpty()){notice=e;updateBanner();}scheduleLiveRefresh();if(refreshAfterReturn&&statusLoaded&&!busy&&status.optBoolean("rootGranted",false)){refreshAfterReturn=false;loadStatus();}}}
     @Override public void onStop(){refreshAfterReturn=true;super.onStop();}
     @Override public void onDestroy(){destroyed=true;prefs.unregisterOnSharedPreferenceChangeListener(preferenceListener);ui.removeCallbacksAndMessages(null);worker.shutdown();super.onDestroy();}
     private boolean useDark(){String mode=prefs.getString("appearance","system");return mode.equals("dark")||(mode.equals("system")&&(getResources().getConfiguration().uiMode&Configuration.UI_MODE_NIGHT_MASK)==Configuration.UI_MODE_NIGHT_YES);}
@@ -110,7 +115,7 @@ public final class MainActivity extends Activity {
         setContentView(shell);updateBanner();renderNav();
     }
     private void renderNav(){nav.removeAllViews();String[] labels={"保护","应用","规则","活动"},icons={"shield","apps","rules","activity"};for(int n=0;n<4;n++){final int selected=n;LinearLayout item=column();item.setGravity(Gravity.CENTER);item.setBackground(tappable(n==tab?SOFT:Color.TRANSPARENT,22));item.addView(new IconView(this,icons[n],n==tab?ACCENT:MUTED),new LinearLayout.LayoutParams(dp(22),dp(22)));gap(item,5);TextView label=text(labels[n],11,n==tab?ACCENT:MUTED,n==tab);label.setGravity(Gravity.CENTER);label.setSingleLine(true);item.addView(label,new LinearLayout.LayoutParams(-1,-2));item.setContentDescription(labels[n]);item.setSelected(n==tab);item.setOnClickListener(v->{if(tab==selected)return;((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(content.getWindowToken(),0);tab=selected;showPage(false);renderNav();});nav.addView(item,new LinearLayout.LayoutParams(0,-1,1));}}
-    private void showPage(boolean preserve){if(destroyed)return;int oldY=preserve&&scroll!=null?scroll.getScrollY():0;content.removeAllViews();scroll=null;appAdapter=null;logAdapter=null;logList=null;appsPending=null;appsApply=null;homeRuleMetric=null;homeSecondaryMetric=null;heading.setText(new String[]{"辟尘","应用放行","过滤规则","请求活动"}[tab]);subtitle.setText(new String[]{"少一点打扰，多一点清净","把选择权交还给你","来源、例外与每一次变化","保护发生了什么，一眼看清"}[tab]);
+    private void showPage(boolean preserve){if(destroyed)return;int oldY=preserve&&scroll!=null?scroll.getScrollY():0;content.removeAllViews();scroll=null;appAdapter=null;logAdapter=null;logList=null;appsPending=null;appsApply=null;homeRuleMetric=null;homeSecondaryMetric=null;requestLogHint=null;heading.setText(new String[]{"辟尘","应用放行","过滤规则","请求活动"}[tab]);subtitle.setText(new String[]{"少一点打扰，多一点清净","把选择权交还给你","来源、例外与每一次变化","保护发生了什么，一眼看清"}[tab]);
         if(tab==1){applicationPage();return;}if(tab==3){activityPage();return;}
         scroll=new ScrollView(this);scroll.setClipToPadding(false);scroll.setFillViewport(true);scroll.setVerticalScrollBarEnabled(false);body=column();body.setPadding(dp(19),dp(3),dp(19),dp(10));scroll.addView(body);content.addView(scroll,new FrameLayout.LayoutParams(-1,-1));if(tab==0)home();else rulePage();if(preserve){ScrollView s=scroll;s.post(()->s.scrollTo(0,oldY));}
     }
@@ -202,16 +207,42 @@ public final class MainActivity extends Activity {
     private String domainReport(String domain)throws Exception{RootBridge.Result r=RootBridge.run(this,"check-domain",domain);checked(r);JSONObject j=new JSONObject(r.output);StringBuilder b=new StringBuilder(domain).append("\n\n").append(j.optBoolean("allowed")?"白名单优先放行":j.optBoolean("blocked")?"命中当前有效拦截规则":"未命中当前有效规则");JSONArray matches=j.optJSONArray("matches");if(matches!=null&&matches.length()>0){b.append("\n\n命中来源");for(int n=0;n<matches.length();n++){JSONObject m=matches.getJSONObject(n);b.append("\n• ").append(m.optString("name",m.optString("id"))).append(m.optBoolean("enabled")?"":"（已停用）");}}return b.append("\n\n").append(vpn()?"当前为应用保护，以实际 DNS 请求为准":j.optBoolean("mounted")?"hosts 已验证挂载":"hosts 尚未验证生效").toString();}
     private void showList(boolean allow){if(rules==null)return;List<String> list=rules.userList(allow);LinearLayout c=column();c.addView(text(allow?"域名白名单":"域名黑名单",22,TEXT,true));gap(c,9);c.addView(text("点击域名可移除。"+(allow?"白名单始终优先放行。":"只有确切域名匹配时拦截。"),12,MUTED,false));final Dialog d=sheet(c);EditText search=input("搜索域名");c.addView(search);LinearLayout items=column();c.addView(items);java.util.function.Consumer<String> filter=q->{items.removeAllViews();int n=0;for(String domain:list){if(!domain.contains(q.toLowerCase(Locale.ROOT)))continue;if(n++>=80)break;TextView line=text(domain,13,TEXT,false);line.setPadding(dp(8),dp(15),dp(8),dp(15));line.setBackground(tappable(Color.TRANSPARENT,10));line.setOnClickListener(v->new AlertDialog.Builder(this).setTitle("移除此域名？").setMessage(domain).setNegativeButton("取消",null).setPositiveButton("移除",(x,y)->{d.dismiss();changeDomain(domain,allow,false);}).show());items.addView(line);}if(n==0)items.addView(text("暂无匹配域名",13,MUTED,false));if(n>80)items.addView(text("请搜索以定位其余域名",12,MUTED,false));};watch(search,filter);filter.accept("");}
     private void showBackup(){LinearLayout c=column();c.addView(text("名单备份",22,TEXT,true));gap(c,10);c.addView(text("导入或导出域名名单、订阅选择和应用放行名单，不包含请求记录。",12,MUTED,false));final Dialog d=sheet(c);actionRow(c,"download","导出名单 JSON","保存到你选择的位置",()->{d.dismiss();exportFile("settings");});actionRow(c,"rules","导入名单 JSON","恢复先前保存的名单",()->{d.dismiss();Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("application/json");i.addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(i,IMPORT);});}
+    private String requestLogContext(){
+        String state=!vpn()?(prefs.getBoolean("vpnWanted",false)?"应用保护尚未启动完成":installed()?"当前没有运行应用保护；hosts 模块不产生 DNS 请求日志":"应用保护未运行；这里只显示历史 DNS 请求"):
+                prefs.getBoolean("requestLogs",false)?"正在记录经过辟尘的 DNS · 最近 100 条，仅本机保存":"应用保护运行中，但请求记录开关已关闭";
+        String error=prefs.getString("dnsLogError","");String note=prefs.getString("dnsLogNotice","");
+        return state+(error.isEmpty()?note.isEmpty()?"":"\n"+note:"\n"+error);
+    }
+    private String requestLogEmpty(){
+        if(!logSearch.trim().isEmpty())return "没有匹配的请求\n清除搜索内容后查看全部记录";
+        if(!prefs.getString("dnsLogError","").isEmpty())return prefs.getString("dnsLogError","")+"\n点击“无记录排查”查看详情";
+        if(!vpn())return (prefs.getBoolean("vpnWanted",false)?"等待应用保护启动":installed()?"hosts 模块不产生请求记录":"应用保护尚未开启")+
+                "\n仅打开记录开关不会切换保护方式\n点击“无记录排查”查看可用方式";
+        if(!prefs.getBoolean("requestLogs",false))return "请求记录开关已关闭\n打开上方开关，仅从现在开始记录";
+        return "尚未收到经过辟尘的 DNS 查询\n缓存、应用放行或其他解析通道可能使列表为空\n点击“无记录排查”查看详情";
+    }
+    private void showRequestLogHelp(){
+        LinearLayout c=column();c.addView(text("为什么没有请求记录",22,TEXT,true));gap(c,10);
+        c.addView(text(requestLogContext(),13,ACCENT,true));gap(c,10);
+        c.addView(text("这里不是打开软件的历史，也不是所有网络连接记录。只有经过辟尘应用保护的 DNS 查询，且记录开关已开启时，才会保存。hosts 模块本身不记录这些查询；记录为空不等于广告拦截无效。",12,MUTED,false));
+        gap(c,10);c.addView(text("系统缓存、已放行的应用、应用自带加密 DNS、私人 DNS 或代理远端解析，都可能不经过这里。不会为了显示记录而关闭你的私人 DNS、截取页面内容或补造数据。",12,MUTED,false));
+        final Dialog d=sheet(c);
+        if(!prefs.getBoolean("requestLogs",false))addButton(c,"开启本地请求记录",true,()->{DnsVpnService.setRequestLogging(this,true);d.dismiss();if(tab==3)showPage(false);});
+        if(!vpn()&&!prefs.getBoolean("vpnWanted",false))actionRow(c,"apps","开启应用保护以记录","会使用系统 VPN 槽位；需另行确认，不会直接切换",()->{d.dismiss();prepareVpn();});
+        if(!logSearch.trim().isEmpty())actionRow(c,"search","清除搜索过滤","查看全部已有请求",()->{logSearch="";d.dismiss();showPage(false);});
+        actionRow(c,"settings","查看 DNS 设置","检查应用保护的上游设置",()->{d.dismiss();showDnsSettings();});
+        if(installed())actionRow(c,"clock","查看模块操作日志","安装、规则更新与挂载日志，不是逐应用请求",()->{d.dismiss();work("读取模块日志",()->checked(RootBridge.run(this,"logs")),()->{});});
+    }
     private void activityPage(){
-        LinearLayout page=column();page.setPadding(dp(19),dp(3),dp(19),0);content.addView(page,new FrameLayout.LayoutParams(-1,-1));LinearLayout stats=card(page);stats.setPadding(dp(17),dp(16),dp(17),dp(16));LinearLayout metrics=row();queryMetric=metric(metrics,format(prefs.getLong("queries",0)),"DNS 请求");blockMetric=metric(metrics,format(prefs.getLong("blocked",0)),"已拦截");errorMetric=metric(metrics,format(prefs.getLong("errors",0)),"解析错误");stats.addView(metrics);gap(stats,13);divider(stats);toggle(stats,"记录最近 100 条 DNS 请求",prefs.getBoolean("requestLogs",false),on->{DnsVpnService.setRequestLogging(this,on);if(logAdapter!=null)logAdapter.refresh();});stats.addView(text(vpn()?"只记录本机域名，不记录网页内容。请求无法可靠归属到具体应用。":"以下为历史应用保护数据；模块模式不能统计真实请求。",11,MUTED,false));
+        LinearLayout page=column();page.setPadding(dp(19),dp(3),dp(19),0);content.addView(page,new FrameLayout.LayoutParams(-1,-1));LinearLayout stats=card(page);stats.setPadding(dp(17),dp(16),dp(17),dp(16));LinearLayout metrics=row();queryMetric=metric(metrics,format(prefs.getLong("queries",0)),"DNS 请求");blockMetric=metric(metrics,format(prefs.getLong("blocked",0)),"已拦截");errorMetric=metric(metrics,format(prefs.getLong("errors",0)),"解析错误");stats.addView(metrics);gap(stats,13);divider(stats);toggle(stats,"记录最近 100 条 DNS 请求",prefs.getBoolean("requestLogs",false),on->{DnsVpnService.setRequestLogging(this,on);if(logAdapter!=null)logAdapter.refresh();});requestLogHint=text(requestLogContext(),11,MUTED,false);stats.addView(requestLogHint);
         EditText search=input("搜索请求域名");search.setText(logSearch);page.addView(search);watch(search,s->{logSearch=s;if(logAdapter!=null)logAdapter.refresh();});
-        LinearLayout actions=row();TextView tip=text("最近请求 · 点击域名可放行",11,MUTED,false);actions.addView(tip,new LinearLayout.LayoutParams(0,dp(36),1));TextView clear=text("清空",12,ACCENT,true);clear.setPadding(dp(13),dp(11),0,dp(11));clear.setOnClickListener(v->new AlertDialog.Builder(this).setTitle("清空请求记录？").setMessage("仅清除本机最近域名记录，累计统计保留。").setNegativeButton("取消",null).setPositiveButton("清空",(d,n)->{DnsVpnService.clearRequestLogs(this);if(logAdapter!=null)logAdapter.refresh();}).show());actions.addView(clear);page.addView(actions);
+        LinearLayout actions=row();TextView tip=text("最近请求 · 点击域名可放行",11,MUTED,false);actions.addView(tip,new LinearLayout.LayoutParams(0,dp(36),1));TextView clear=text("清空",12,ACCENT,true);clear.setPadding(dp(13),dp(11),0,dp(11));clear.setOnClickListener(v->new AlertDialog.Builder(this).setTitle("清空请求记录？").setMessage("仅清除本机最近域名记录，累计统计保留。").setNegativeButton("取消",null).setPositiveButton("清空",(d,n)->{DnsVpnService.clearRequestLogs(this);if(logAdapter!=null)logAdapter.refresh();}).show());TextView help=text("无记录排查",12,ACCENT,true);help.setPadding(dp(8),dp(11),dp(8),dp(11));help.setOnClickListener(v->showRequestLogHelp());actions.addView(help);actions.addView(clear);page.addView(actions);
         FrameLayout holder=new FrameLayout(this);holder.setBackground(background(SURFACE,22));TextView empty=text("",13,MUTED,false);empty.setGravity(Gravity.CENTER);pad(empty,23);holder.addView(empty,new FrameLayout.LayoutParams(-1,-1));logList=new ListView(this);logList.setDivider(new ColorDrawable(LINE));logList.setDividerHeight(dp(1));logList.setPadding(dp(15),0,dp(15),0);logList.setVerticalScrollBarEnabled(false);logList.setEmptyView(empty);holder.addView(logList,new FrameLayout.LayoutParams(-1,-1));page.addView(holder,new LinearLayout.LayoutParams(-1,0,1));logAdapter=new LogAdapter(empty);logList.setAdapter(logAdapter);logList.setOnItemClickListener((p,v,n,id)->showDomainAction(logAdapter.shown.get(n)));logAdapter.refresh();
     }
     private final class LogAdapter extends BaseAdapter {
         final ArrayList<JSONObject> shown=new ArrayList<>();final TextView empty;
         LogAdapter(TextView e){empty=e;}
-        void refresh(){int position=logList==null?0:logList.getFirstVisiblePosition();int offset=logList==null||logList.getChildCount()==0?0:logList.getChildAt(0).getTop();shown.clear();try{JSONArray logs=new JSONArray(prefs.getString("dnsLogs","[]"));String q=logSearch.toLowerCase(Locale.ROOT).trim();for(int n=logs.length()-1;n>=0;n--){JSONObject entry=logs.optJSONObject(n);if(entry!=null&&(entry.optString("domain")+" "+entry.optString("matchedDomain")).toLowerCase(Locale.ROOT).contains(q))shown.add(entry);}}catch(Exception ignored){}empty.setText(!logSearch.trim().isEmpty()?"没有匹配的请求":prefs.getBoolean("requestLogs",false)?"还没有请求记录\n开启应用保护并使用应用后，会在这里显示":"请求记录未开启\n打开上方开关后，记录仅保存在本机");notifyDataSetChanged();if(logList!=null&&position>0)logList.setSelectionFromTop(position,offset);}
+        void refresh(){int position=logList==null?0:logList.getFirstVisiblePosition();int offset=logList==null||logList.getChildCount()==0?0:logList.getChildAt(0).getTop();shown.clear();boolean readFailed=false;try{JSONArray logs=new JSONArray(prefs.getString("dnsLogs","[]"));String q=logSearch.toLowerCase(Locale.ROOT).trim();for(int n=logs.length()-1;n>=0;n--){JSONObject entry=logs.optJSONObject(n);if(entry!=null&&(entry.optString("domain")+" "+entry.optString("matchedDomain")).toLowerCase(Locale.ROOT).contains(q))shown.add(entry);}}catch(Exception invalid){readFailed=true;}empty.setText(readFailed?"本地请求记录损坏\n开启记录后，下一条真实查询将重建记录":requestLogEmpty());if(requestLogHint!=null)requestLogHint.setText(requestLogContext());notifyDataSetChanged();if(logList!=null&&position>0)logList.setSelectionFromTop(position,offset);}
         public int getCount(){return shown.size();}public Object getItem(int n){return shown.get(n);}public long getItemId(int n){return n;}
         public View getView(int n,View convert,ViewGroup parent){LogHolder h;if(convert==null){h=new LogHolder();LinearLayout r=column();r.setPadding(0,dp(15),0,dp(15));LinearLayout top=row();h.domain=text("",13,TEXT,true);h.domain.setSingleLine(true);h.domain.setEllipsize(TextUtils.TruncateAt.MIDDLE);top.addView(h.domain,new LinearLayout.LayoutParams(0,-2,1));h.result=text("",10,ACCENT,true);h.result.setPadding(dp(8),dp(5),dp(8),dp(5));LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(-2,-2);rp.leftMargin=dp(10);top.addView(h.result,rp);r.addView(top);gap(r,7);h.time=text("",10,MUTED,false);r.addView(h.time);r.setTag(h);convert=r;}else h=(LogHolder)convert.getTag();JSONObject entry=shown.get(n);String result=entry.optString("result");h.domain.setText(entry.optString("domain","未知域名"));h.result.setText(outcome(result));boolean blocked=result.equals("blocked")||result.equals("blocked_cname"),error=isDnsError(result);h.result.setTextColor(blocked||error?ERROR:ACCENT);h.result.setBackground(background(blocked||error?(dark?0xff3d3028:0xfff7eae1):SOFT,9));h.time.setText(dateTime(entry.optLong("time"))+(entry.optString("matchedDomain").isEmpty()?"":" · 目标 "+entry.optString("matchedDomain")));return convert;}
     }

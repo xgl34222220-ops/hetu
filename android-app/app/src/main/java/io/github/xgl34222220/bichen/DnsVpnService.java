@@ -281,7 +281,7 @@ public final class DnsVpnService extends VpnService {
     }
 
     public static void clearRequestLogs(Context context) {
-        synchronized (LOGS_LOCK) { context.getSharedPreferences("bichen", Context.MODE_PRIVATE).edit().putString("dnsLogs", "[]").apply(); }
+        synchronized (LOGS_LOCK) { context.getSharedPreferences("bichen", Context.MODE_PRIVATE).edit().putString("dnsLogs", "[]").remove("dnsLogError").remove("dnsLogNotice").apply(); }
     }
     public static void setRequestLogging(Context context, boolean enabled) {
         synchronized (LOGS_LOCK) { context.getSharedPreferences("bichen", Context.MODE_PRIVATE).edit().putBoolean("requestLogs", enabled).apply(); }
@@ -527,11 +527,24 @@ public final class DnsVpnService extends VpnService {
         synchronized (LOGS_LOCK) {
             try {
                 if (!prefs.getBoolean("requestLogs", false)) return;
-                JSONArray previous = new JSONArray(prefs.getString("dnsLogs", "[]")), next = new JSONArray();
-                for (int i = Math.max(0, previous.length() - 99); i < previous.length(); i++) next.put(previous.get(i));
+                JSONArray previous;
+                boolean repaired = false;
+                try { previous = new JSONArray(prefs.getString("dnsLogs", "[]")); }
+                catch (org.json.JSONException invalid) { previous = new JSONArray(); repaired = true; }
+                JSONArray next = new JSONArray();
+                for (int i = Math.max(0, previous.length() - 99); i < previous.length(); i++) {
+                    JSONObject entry = previous.optJSONObject(i);
+                    if (entry != null && !entry.optString("domain").isEmpty() && !entry.optString("result").isEmpty()) next.put(entry);
+                    else repaired = true;
+                }
                 next.put(new JSONObject().put("time", System.currentTimeMillis()).put("domain", domain).put("result", outcome).put("matchedDomain", matchedDomain));
-                prefs.edit().putString("dnsLogs", next.toString()).apply();
-            } catch (Exception ignored) { }
+                SharedPreferences.Editor edit = prefs.edit().putString("dnsLogs", next.toString()).remove("dnsLogError");
+                if (repaired) edit.putString("dnsLogNotice", "旧请求记录损坏，已重建记录；丢失内容不会补造");
+                edit.apply();
+            } catch (Exception failure) {
+                // Do not silently stop logging forever. No domain or payload is included.
+                prefs.edit().putString("dnsLogError", "请求记录写入失败：" + failure.getClass().getSimpleName()).apply();
+            }
         }
     }
 
