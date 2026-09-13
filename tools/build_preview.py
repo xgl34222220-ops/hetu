@@ -19,8 +19,8 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 BASE = 'io.github.xgl34222220.bichen'
 PREVIEW = BASE + '.preview'
-VERSION = '0.4.0-test.9'
-CODE = 409
+VERSION = '0.4.0-test.10'
+CODE = 410
 
 def run(*args: str | Path, cwd: Path) -> None:
     subprocess.run([str(a) for a in args], cwd=cwd, check=True)
@@ -63,6 +63,10 @@ def main() -> None:
             assert required in basic_text
         for required in ('ProxyCoreStore','ProxyConfigLibrary','ProxyRuntimeProfile','RootProxyManager','root.prepare','root.start(p,this::postStage)'):
             assert required in basic_text
+        startup = main_dir / 'java/io/github/xgl34222220/bichen/MihomoStartupConfig.java'
+        startup_text = startup.read_text()
+        assert 'removeTopLevelKey(yaml,"listeners")' in startup_text
+        assert 'removeTopLevelScalar(yaml,"global-client-fingerprint")' in startup_text
         for source_name in ('ProxyCoreStore.java','ProxyConfigLibrary.java','ProxyRuntimeProfile.java','RootProxyManager.java'):
             assert (main_dir / 'java/io/github/xgl34222220/bichen' / source_name).is_file()
 
