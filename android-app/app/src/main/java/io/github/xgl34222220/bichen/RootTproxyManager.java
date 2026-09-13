@@ -64,16 +64,18 @@ final class RootTproxyManager {
         throw new IOException("配置里没有找到 TPROXY 监听端口；需要 tproxy-port 或 listeners 中 type: tproxy + port");
     }
 
-    JSONObject preflight(String yaml) throws Exception {
+    JSONObject preflight(String yaml) throws Exception { return preflight(yaml, "enable"); }
+    JSONObject preflight(String yaml, String ipv6Mode) throws Exception {
         int port = detectPort(yaml);
         installRuntimeFiles(yaml, false);
-        return runJson("preflight", String.valueOf(port));
+        return runJson("preflight", String.valueOf(port), normalizeIpv6Mode(ipv6Mode));
     }
 
-    JSONObject start(String yaml) throws Exception {
+    JSONObject start(String yaml) throws Exception { return start(yaml, "enable"); }
+    JSONObject start(String yaml, String ipv6Mode) throws Exception {
         int port = detectPort(yaml);
         installRuntimeFiles(yaml, true);
-        JSONObject result = runJson("start", BIN, CONFIG, String.valueOf(port));
+        JSONObject result = runJson("start", BIN, CONFIG, String.valueOf(port), normalizeIpv6Mode(ipv6Mode));
         if (!result.optBoolean("ok")) throw new IOException(result.optString("message", "Root TPROXY 启动失败"));
         return result;
     }
@@ -134,6 +136,11 @@ final class RootTproxyManager {
             output.getFD().sync();
         }
         if (!out.setReadable(true, true) || !out.setExecutable(true, true)) throw new IOException("无法设置临时运行文件权限");
+    }
+
+    private static String normalizeIpv6Mode(String mode) throws IOException {
+        if ("enable".equals(mode) || "bypass".equals(mode) || "disable".equals(mode)) return mode;
+        throw new IOException("IPv6 模式无效");
     }
 
     private static int checkedPort(String raw) throws IOException {
