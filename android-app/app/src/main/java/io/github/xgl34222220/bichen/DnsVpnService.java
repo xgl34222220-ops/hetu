@@ -216,6 +216,8 @@ public final class DnsVpnService extends VpnService {
                 if (cached != null) {
                     // A user can edit rules while the reader is between these operations.
                     if (replyBlockedIfNeeded(query, token)) continue;
+                    try { if (replyAliasBlockedIfNeeded(query, cached, token)) continue; }
+                    catch (IOException invalid) { cache.clear(); replyFailure(query, token, "invalid_response"); continue; }
                     cacheHits.incrementAndGet(); record(query.domain, "cached");
                     writePacket(DnsPacket.responsePacket(query, cached), token);
                     continue;
@@ -272,6 +274,7 @@ public final class DnsVpnService extends VpnService {
             }
             if (!active(token)) return;
             if (replyBlockedIfNeeded(query, token)) return;
+            if (replyAliasBlockedIfNeeded(query, answer, token)) return;
             if (fallback) fallbackCount.incrementAndGet();
             long elapsed = Math.max(1, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
             // Exponential moving average (1/8 weight); cached/block decisions are excluded.
@@ -298,6 +301,16 @@ public final class DnsVpnService extends VpnService {
         if (query.queryClass != 1 || !rules.isBlocked(query.domain)) return false;
         if (active(token)) {
             blocked.incrementAndGet(); record(query.domain, "blocked");
+            writePacket(DnsPacket.responsePacket(query, DnsPacket.error(query, 3)), token);
+        }
+        return true;
+    }
+
+    private boolean replyAliasBlockedIfNeeded(DnsPacket.Query query, byte[] answer, int token) throws IOException {
+        String target = rules.blockedAlias(query, answer, prefs.getBoolean("cnameProtection", false));
+        if (target == null) return false;
+        if (active(token)) {
+            blocked.incrementAndGet(); record(query.domain, "blocked_cname", target);
             writePacket(DnsPacket.responsePacket(query, DnsPacket.error(query, 3)), token);
         }
         return true;
@@ -387,14 +400,16 @@ public final class DnsVpnService extends VpnService {
         }
     }
 
-    private void record(String domain, String outcome) {
+    private void record(String domain, String outcome) { record(domain, outcome, ""); }
+
+    private void record(String domain, String outcome, String matchedDomain) {
         if (!prefs.getBoolean("requestLogs", false)) return;
         synchronized (logsLock) {
             try {
                 if (!prefs.getBoolean("requestLogs", false)) return;
                 JSONArray previous = new JSONArray(prefs.getString("dnsLogs", "[]")), next = new JSONArray();
                 for (int i = Math.max(0, previous.length() - 99); i < previous.length(); i++) next.put(previous.get(i));
-                next.put(new JSONObject().put("time", System.currentTimeMillis()).put("domain", domain).put("result", outcome));
+                next.put(new JSONObject().put("time", System.currentTimeMillis()).put("domain", domain).put("result", outcome).put("matchedDomain", matchedDomain));
                 prefs.edit().putString("dnsLogs", next.toString()).apply();
             } catch (Exception ignored) { }
         }

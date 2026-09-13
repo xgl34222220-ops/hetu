@@ -229,6 +229,33 @@ public final class RuleStore {
             }
         }
     }
+    public String profileTitle() {
+        Snapshot snapshot=live;
+        return snapshot==null?"加载中":RuleProfiles.title(RuleProfiles.identify(snapshot.enabled));
+    }
+    public void setProfile(String id,boolean moduleInstalled) throws Exception {
+        Map<String,Boolean> flags=RuleProfiles.flags(id); // Reject before any mutation.
+        synchronized(LOCK) {
+            reload(); verifyLocalTarget(moduleInstalled);
+            // Read the latest authoritative lists before applying a preset. Reuse the
+            // existing single-generation import, not four individually committed toggles.
+            if(moduleInstalled) syncModule(null);
+            JSONObject config=exportSettings();
+            JSONArray sources=new JSONArray();
+            for(Map.Entry<String,Boolean> entry:flags.entrySet())
+                sources.put(new JSONObject().put("id",entry.getKey()).put("enabled",entry.getValue()));
+            config.put("sources",sources);
+            config.remove("vpn_bypass_packages"); // Never overwrite an in-flight app selection.
+            importSettings(config,moduleInstalled);
+        }
+    }
+    public String blockedAlias(DnsPacket.Query query,byte[] response,boolean enabled) throws IOException {
+        Snapshot snapshot=live;
+        if(snapshot==null) return null;
+        // One immutable snapshot for both exceptions and blocked targets.
+        return DnsResponseFilter.blockedAlias(query,response,enabled,
+                snapshot.allow::contains,snapshot.effective::contains);
+    }
     public void changeDomain(String raw,boolean allow,boolean add,boolean moduleInstalled) throws Exception {
         String domain=normalize(raw); if(domain==null) throw new IllegalArgumentException("请输入有效域名或 HTTP(S) 网址，不支持 IP 或通配符");
         synchronized(LOCK) {

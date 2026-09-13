@@ -4,6 +4,10 @@ Android 去广告管理 App，内置同版本 hosts 模块，支持本地 DNS VP
 
 [下载 App](https://github.com/xgl34222220-ops/pichen/raw/refs/heads/main/downloads/Bichen-0.3.0-beta.1.apk) · [下载模块 ZIP](https://github.com/xgl34222220-ops/pichen/raw/refs/heads/main/downloads/Bichen-0.3.0-beta.1-module.zip) · [文件校验](downloads/SHA256SUMS.txt)
 
+## 当前开发分支的未发布改进
+
+本分支增加可选 CNAME 别名链检查、轻量/均衡/加强档位和可追溯的别名拦截活动，详见 [实现与验收](docs/IMPROVEMENTS-2026-09-13.md)。**上面的已签名下载仍是原 0.3.0-beta.1，不包含这些新代码**；本分支没有冒充覆盖升级包或正式 Release。原模块内容不变。
+
 ## 这一版改进
 
 - 保护、应用、规则、活动四页重新设计，支持浅色与深色；应用列表搜索，改动与当前生效名单分开显示。
