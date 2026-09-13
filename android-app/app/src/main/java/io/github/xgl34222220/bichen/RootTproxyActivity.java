@@ -53,7 +53,7 @@ public final class RootTproxyActivity extends Activity {
         stateValue=u.text("● 正在读取",20,u.text,true);hero.addView(stateValue);
         u.gap(hero,7);stateMeta=u.text("Mihomo · TPROXY",12,u.muted,false);hero.addView(stateMeta);
         u.gap(hero,15);actionButton=u.button("启动代理",true,this::toggleService);hero.addView(actionButton,new LinearLayout.LayoutParams(-1,u.dp(52)));
-        u.gap(hero,10);feedback=u.text("",12,u.muted,false);feedback.setPadding(u.dp(12),u.dp(10),u.dp(12),u.dp(10));feedback.setBackground(u.bg(u.soft,14));feedback.setVisibility(View.GONE);hero.addView(feedback);
+        u.gap(hero,10);feedback=u.text("",12,u.muted,false);feedback.setPadding(u.dp(12),u.dp(10),u.dp(12),u.dp(10));feedback.setBackground(u.bg(u.soft,14));feedback.setMaxLines(5);feedback.setEllipsize(TextUtils.TruncateAt.END);feedback.setVisibility(View.GONE);hero.addView(feedback);
 
         section(body,"基础");
         LinearLayout basic=u.card(body);basic.setPadding(u.dp(17),u.dp(4),u.dp(17),u.dp(4));
@@ -69,7 +69,7 @@ public final class RootTproxyActivity extends Activity {
 
         section(body,"工具");
         LinearLayout tools=u.card(body);tools.setPadding(u.dp(17),u.dp(4),u.dp(17),u.dp(4));
-        coreStatus=settingRow(tools,"核心管理","",this::manageCore);separator(tools);u.action(tools,"document","最终启动配置","查看自动覆写后的实际启动内容",this::showStartupConfig);separator(tools);u.action(tools,"pulse","运行日志","查看 Mihomo 与 Root 规则错误",this::showRootLog);
+        coreStatus=settingRow(tools,"核心管理","",this::manageCore);separator(tools);u.action(tools,"document","最终启动配置","查看自动覆写后的实际启动内容",this::showStartupConfig);separator(tools);u.action(tools,"pulse","运行日志","查看 Mihomo、Root 与最近启动错误",this::showRootLog);
         setContentView(shell);
     }
 
@@ -104,10 +104,11 @@ public final class RootTproxyActivity extends Activity {
         setBusyState(true,"检查配置与 Root 环境…");
         worker.execute(()->{
             try{
-                JSONObject result=root.start(p,this::postStage);prefs.edit().putBoolean("rootProxyWanted",true).putString("rootProxyMode",p.mode.id).apply();
+                JSONObject result=root.start(p,this::postStage);prefs.edit().putBoolean("rootProxyWanted",true).putString("rootProxyMode",p.mode.id).remove("rootProxyLastError").apply();
                 final String text=result.optString("message","Root 代理已启动");ui.post(()->{if(!destroyed)finishBusy(true,text+" · "+p.summary());});
-            }catch(Exception e){
-                String diag=root.diagnostics();String msg="启动失败："+safe(e);if(!TextUtils.isEmpty(diag))msg+="\n\n诊断："+diag;final String out=msg;
+            }catch(Throwable e){
+                String diag=root.diagnostics();String detail="启动失败："+full(e);if(!TextUtils.isEmpty(diag))detail+="\n\n诊断："+diag;prefs.edit().putString("rootProxyLastError",detail).apply();
+                final String out="启动失败："+safe(e)+"\n点击“运行日志”查看完整详情";
                 ui.post(()->{if(!destroyed)finishBusy(false,out);});
             }
         });
@@ -115,19 +116,19 @@ public final class RootTproxyActivity extends Activity {
 
     private void stopSelectedMode(){
         if(busy)return;ProxyRuntimeProfile p=profile();
-        if(p.mode==ProxyRuntimeProfile.Mode.TUN){setBusyState(false,"正在停止 Android TUN…");try{startService(new Intent(this,MihomoVpnService.class).setAction("STOP"));ui.postDelayed(()->{if(!destroyed)finishBusy(false,"TUN 已停止");},450);}catch(Exception e){finishBusy(running,"停止失败："+safe(e));}return;}
-        setBusyState(false,"正在清理 Root 透明代理规则…");worker.execute(()->{try{String text=root.stop(this::postStage).optString("message","Root 代理已停止");prefs.edit().putBoolean("rootProxyWanted",false).remove("rootProxyMode").apply();ui.post(()->{if(!destroyed)finishBusy(false,text);});}catch(Exception e){final String msg="停止失败："+safe(e);ui.post(()->{if(!destroyed)finishBusy(running,msg);});}});
+        if(p.mode==ProxyRuntimeProfile.Mode.TUN){setBusyState(false,"正在停止 Android TUN…");try{startService(new Intent(this,MihomoVpnService.class).setAction("STOP"));ui.postDelayed(()->{if(!destroyed)finishBusy(false,"TUN 已停止");},450);}catch(Throwable e){finishBusy(running,"停止失败："+safe(e));}return;}
+        setBusyState(false,"正在清理 Root 透明代理规则…");worker.execute(()->{try{String text=root.stop(this::postStage).optString("message","Root 代理已停止");prefs.edit().putBoolean("rootProxyWanted",false).remove("rootProxyMode").apply();ui.post(()->{if(!destroyed)finishBusy(false,text);});}catch(Throwable e){final String msg="停止失败："+safe(e);ui.post(()->{if(!destroyed)finishBusy(running,msg);});}});
     }
 
     private void prepareTun(ProxyRuntimeProfile p){
-        setBusyState(true,"检查 TUN 配置…");worker.execute(()->{try{ProxyConfigLibrary.Entry selected=configs.selected(p.core);String source=configs.read(selected);String revision=tunStore.revision();tunStore.saveIfUnchanged(source,"",revision);ui.post(()->{if(destroyed)return;Intent permission=VpnService.prepare(this);if(permission==null)launchTun();else startActivityForResult(permission,REQ_TUN);});}catch(Exception e){final String msg="TUN 配置失败："+safe(e);ui.post(()->{if(!destroyed)finishBusy(false,msg);});}});
+        setBusyState(true,"检查 TUN 配置…");worker.execute(()->{try{ProxyConfigLibrary.Entry selected=configs.selected(p.core);String source=configs.read(selected);String revision=tunStore.revision();tunStore.saveIfUnchanged(source,"",revision);ui.post(()->{if(destroyed)return;Intent permission=VpnService.prepare(this);if(permission==null)launchTun();else startActivityForResult(permission,REQ_TUN);});}catch(Throwable e){final String msg="TUN 配置失败："+safe(e);ui.post(()->{if(!destroyed)finishBusy(false,msg);});}});
     }
-    private void launchTun(){try{showFeedback("启动 Android TUN…");startForegroundService(new Intent(this,MihomoVpnService.class).setAction("START"));ui.postDelayed(()->{if(destroyed)return;running=MihomoVpnService.running;finishBusy(running,running?"Mihomo TUN 已启动":"TUN 启动请求已发送，等待系统服务状态");},700);}catch(Exception e){finishBusy(false,"TUN 未启动："+safe(e));}}
+    private void launchTun(){try{showFeedback("启动 Android TUN…");startForegroundService(new Intent(this,MihomoVpnService.class).setAction("START"));ui.postDelayed(()->{if(destroyed)return;running=MihomoVpnService.running;finishBusy(running,running?"Mihomo TUN 已启动":"TUN 启动请求已发送，等待系统服务状态");},700);}catch(Throwable e){finishBusy(false,"TUN 未启动："+safe(e));}}
 
     private void chooseCore(){ProxyRuntimeProfile.Core[] values=ProxyRuntimeProfile.Core.values();String[] labels=new String[values.length];int selected=0;for(int i=0;i<values.length;i++){labels[i]=values[i].label+(cores.installed(values[i])?" · 已安装":values[i]==ProxyRuntimeProfile.Core.MIHOMO?" · 内置":" · 未安装");if(values[i]==profile().core)selected=i;}new AlertDialog.Builder(this).setTitle("核心").setSingleChoiceItems(labels,selected,(d,w)->{prefs.edit().putString("proxyBaseCore",values[w].id).apply();d.dismiss();refresh();if(values[w]!=ProxyRuntimeProfile.Core.MIHOMO&&!cores.installed(values[w]))showFeedback(values[w].label+" 尚未安装核心");}).setNegativeButton("取消",null).show();}
     private void chooseMode(){ProxyRuntimeProfile.Core core=profile().core;ProxyRuntimeProfile.Mode[] values=ProxyRuntimeProfile.Mode.values();String[] labels=new String[values.length];int selected=0;for(int i=0;i<values.length;i++){ProxyRuntimeProfile.Capability c=ProxyRuntimeProfile.capability(core,values[i]);labels[i]=values[i].label+(c.available?"":" · 未接通");if(values[i]==profile().mode)selected=i;}new AlertDialog.Builder(this).setTitle("运行模式").setSingleChoiceItems(labels,selected,(d,w)->{ProxyRuntimeProfile.Capability c=ProxyRuntimeProfile.capability(core,values[w]);if(!c.available){showFeedback(c.reason);d.dismiss();return;}prefs.edit().putString("proxyBaseMode",values[w].id).apply();d.dismiss();refresh();}).setNegativeButton("取消",null).show();}
     private void chooseIpv6(){ProxyRuntimeProfile.Ipv6[] values=ProxyRuntimeProfile.Ipv6.values();String[] labels={"启用 IPv6","IPv6 不进核心","禁用系统 IPv6"};int selected=profile().ipv6.ordinal();new AlertDialog.Builder(this).setTitle("IPv6").setSingleChoiceItems(labels,selected,(d,w)->{prefs.edit().putString("proxyBaseIpv6",values[w].id).apply();d.dismiss();refresh();}).setNegativeButton("取消",null).show();}
-    private void chooseOverwrite(){boolean now=prefs.getBoolean("proxyBaseAutoOverwrite",true);prefs.edit().putBoolean("proxyBaseAutoOverwrite",!now).apply();refresh();showFeedback(!now?"自动覆写已开启：源配置保持不变":"自动覆写已关闭：端口和入站由源配置自行维护");}
+    private void chooseOverwrite(){boolean now=prefs.getBoolean("proxyBaseAutoOverwrite",true);prefs.edit().putBoolean("proxyBaseAutoOverwrite",!now).apply();refresh();showFeedback(!now?"自动覆写已开启：运行副本会按当前模式清理冲突入站，源配置保持不变":"自动覆写已关闭：端口和入站完全由源配置自行维护");}
 
     private void chooseConfig(){ProxyRuntimeProfile.Core core=profile().core;List<ProxyConfigLibrary.Entry> list=configs.list(core);String[] items=new String[list.size()+1];items[0]="＋ 导入新配置";ProxyConfigLibrary.Entry current=configs.selected(core);for(int i=0;i<list.size();i++)items[i+1]=(current!=null&&current.name.equals(list.get(i).name)?"✓ ":"")+list.get(i).name;new AlertDialog.Builder(this).setTitle(core.label+" 配置").setItems(items,(d,w)->{if(w==0){importConfig();return;}try{configs.select(core,list.get(w-1).name);refresh();showFeedback("已选择："+list.get(w-1).name);}catch(Exception e){showFeedback(safe(e));}}).setNegativeButton("取消",null).show();}
     private void importConfig(){Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(i,PICK_CONFIG);}
@@ -135,7 +136,7 @@ public final class RootTproxyActivity extends Activity {
     private void manageCore(){ProxyRuntimeProfile.Core core=profile().core;String state=cores.installed(core)?cores.summary(core):(core==ProxyRuntimeProfile.Core.MIHOMO?"使用 APK 内置 Mihomo；可导入自定义核心覆盖":"尚未安装");new AlertDialog.Builder(this).setTitle(core.label+" 核心").setMessage(state).setItems(new String[]{"导入 / 覆盖核心文件","删除已导入核心"},(d,w)->{if(w==0){Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("application/octet-stream").addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(i,PICK_CORE);}else task(()->{cores.remove(core);return"已删除自定义 "+core.label+" 核心";},this::refresh);}).setNegativeButton("取消",null).show();}
 
     private void showStartupConfig(){ProxyRuntimeProfile p=profile();if(p.mode==ProxyRuntimeProfile.Mode.TUN){new AlertDialog.Builder(this).setTitle("最终启动配置").setMessage("Android TUN 使用私有运行副本；源配置不会写回。Root TUN 接入后会统一使用 startup-config。").setPositiveButton("关闭",null).show();return;}task(()->{RootProxyManager.Prepared prepared=root.prepare(p);final String text=prepared.startup;ui.post(()->new AlertDialog.Builder(this).setTitle("最终启动配置 · "+p.summary()).setMessage(text.length()>12000?text.substring(0,12000)+"\n…已截断":text).setPositiveButton("关闭",null).show());return"启动配置已重新生成";},null);}
-    private void showRootLog(){task(()->{RootBridge.Result r=RootBridge.rootShell(this,"tail -n 200 /data/adb/bichen/proxy/run/core.log 2>/dev/null || true",10_000L);String text=r.output.trim();ui.post(()->new AlertDialog.Builder(this).setTitle("运行日志").setMessage(text.isEmpty()?"暂无日志":text).setPositiveButton("关闭",null).show());return null;},null);}
+    private void showRootLog(){task(()->{RootBridge.Result r=RootBridge.rootShell(this,"tail -n 200 /data/adb/bichen/proxy/run/core.log 2>/dev/null || true",10_000L);String live=r.output.trim();String saved=prefs.getString("rootProxyLastError","");StringBuilder text=new StringBuilder();if(!TextUtils.isEmpty(saved))text.append("最近一次启动错误\n").append(saved);if(!TextUtils.isEmpty(live)){if(text.length()>0)text.append("\n\n");text.append("Mihomo 运行日志\n").append(live);}String shown=text.length()==0?"暂无日志":text.toString();ui.post(()->new AlertDialog.Builder(this).setTitle("运行日志").setMessage(shown.length()>16000?shown.substring(shown.length()-16000):shown).setPositiveButton("关闭",null).show());return null;},null);}
 
     private void refresh(){
         if(destroyed)return;ProxyRuntimeProfile p=profile();coreValue.setText(p.core.label);modeValue.setText(p.mode.label);ipv6Value.setText(ipv6Label(p.ipv6));overwriteValue.setText(p.autoOverwrite?"开启":"关闭");ProxyConfigLibrary.Entry selected=configs.selected(p.core);configValue.setText(selected==null?"尚未选择":selected.name);coreStatus.setText(cores.installed(p.core)?cores.summary(p.core):(p.core==ProxyRuntimeProfile.Core.MIHOMO?"内置可用":"未安装"));stateMeta.setText(p.summary());
@@ -144,9 +145,10 @@ public final class RootTproxyActivity extends Activity {
         worker.execute(()->{try{JSONObject s=root.status();boolean live=s.optBoolean("running",false);ui.post(()->{if(!destroyed&&!busy){running=live;finishBusy(live,"");}});}catch(Exception e){String msg="状态检查失败："+safe(e);ui.post(()->{if(!destroyed&&!busy){running=false;finishBusy(false,msg);}});}});
     }
 
-    private void task(Work work,Runnable success){if(busy||destroyed)return;busy=true;actionButton.setEnabled(false);actionButton.setAlpha(.62f);showFeedback("处理中…");worker.execute(()->{String result=null;Exception failure=null;try{result=work.run();}catch(Exception e){failure=e;}final String text=result;final Exception error=failure;ui.post(()->{busy=false;if(destroyed)return;actionButton.setEnabled(true);actionButton.setAlpha(1f);actionButton.setText(running?"停止代理":"启动代理");if(error!=null)showFeedback(safe(error));else{if(!TextUtils.isEmpty(text))showFeedback(text);if(success!=null)success.run();}});});}
+    private void task(Work work,Runnable success){if(busy||destroyed)return;busy=true;actionButton.setEnabled(false);actionButton.setAlpha(.62f);showFeedback("处理中…");worker.execute(()->{String result=null;Throwable failure=null;try{result=work.run();}catch(Throwable e){failure=e;}final String text=result;final Throwable error=failure;ui.post(()->{busy=false;if(destroyed)return;actionButton.setEnabled(true);actionButton.setAlpha(1f);actionButton.setText(running?"停止代理":"启动代理");if(error!=null)showFeedback(safe(error));else{if(!TextUtils.isEmpty(text))showFeedback(text);if(success!=null)success.run();}});});}
     private void showFeedback(String text){if(feedback==null)return;feedback.setText(text);feedback.setVisibility(TextUtils.isEmpty(text)?View.GONE:View.VISIBLE);}
-    private String safe(Throwable e){String s=e.getMessage();if(TextUtils.isEmpty(s))s=e.getClass().getSimpleName();return s.length()>700?s.substring(0,700)+"…":s;}
+    private String full(Throwable e){String s=e.getMessage();if(TextUtils.isEmpty(s))s=e.toString();return s;}
+    private String safe(Throwable e){String s=full(e).replace('\n',' ').replace('\r',' ');return s.length()>260?s.substring(0,260)+"…":s;}
     private String displayName(Uri uri){String name=null;try(Cursor c=getContentResolver().query(uri,new String[]{OpenableColumns.DISPLAY_NAME},null,null,null)){if(c!=null&&c.moveToFirst())name=c.getString(0);}catch(Exception ignored){}if(TextUtils.isEmpty(name))name=uri.getLastPathSegment();return TextUtils.isEmpty(name)?"config.yaml":name;}
 
     @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==REQ_TUN){if(result==RESULT_OK)launchTun();else finishBusy(false,"VPN 未授权，未启动 TUN");return;}if(result!=RESULT_OK||data==null||data.getData()==null)return;Uri uri=data.getData();if(request==PICK_CONFIG){String name=displayName(uri);ProxyRuntimeProfile.Core core=profile().core;task(()->{try(InputStream in=getContentResolver().openInputStream(uri)){configs.importConfig(core,name,in);}return"已导入并选择："+name;},this::refresh);}else if(request==PICK_CORE){ProxyRuntimeProfile.Core core=profile().core;task(()->{try(InputStream in=getContentResolver().openInputStream(uri)){cores.importCore(core,in);}return"已导入 "+core.label+" 核心";},this::refresh);}}
