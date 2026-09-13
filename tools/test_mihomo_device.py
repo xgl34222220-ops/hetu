@@ -81,8 +81,10 @@ try:
  assert any(x['host']=='safe.0.0-02.net' for x in received), 'PASS whitelist did not preserve original proxy routing'
  assert not any(x['host']=='ads.bichen.test' for x in received), 'exact blocked domain reached upstream proxy'
  assert not any(x['host']=='child.0.0-02.net' for x in received), 'suffix-blocked child domain reached upstream proxy'
+ assert not any(x['host']=='doh.360.cn' for x in received), 'DoH guard domain reached upstream proxy'
+ assert not any(x['port']==853 for x in received), 'TCP 853 escaped encrypted DNS guard'
  (O/'fixture-connections.json').write_text(json.dumps(received,indent=2))
- print('BICHEN_MIHOMO_E2E_PASS: real TUN, SOCKS routing, DNS, exact and suffix ad rejection, PASS whitelist routing, stop, restart, app bypass, pending settings, reinclude; independent UID')
+ print('BICHEN_MIHOMO_E2E_PASS: real TUN, SOCKS routing, DNS, exact/suffix ad rejection, PASS whitelist routing, encrypted DNS domain/853 guard, stop, restart, app bypass, pending settings, reinclude; independent UID')
 finally:
  if control.poll() is None:control.terminate()
  control_output.close()
