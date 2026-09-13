@@ -5,7 +5,8 @@ import os
 import subprocess
 from build_app import ROOT, LOCAL_TOOLS, BUILD, sdk_paths, java_tool
 
-PROTOCOL_TESTS = ('DnsPacketTest', 'DnsCacheTest', 'DnsUpstreamTest', 'DnsResponseFilterTest', 'RuleProfilesTest', 'NetworkEpochTest', 'RuleUpdateGateTest', 'ModuleArchiveTest', 'ProtectionStateTest', 'ProxyNetworkStateTest', 'ProxyAppPolicyTest', 'DomainRuleProjectionTest', 'ProxyRuntimeProfileTest')
+PROTOCOL_TESTS = ('DnsPacketTest', 'DnsCacheTest', 'DnsUpstreamTest', 'DnsResponseFilterTest', 'RuleProfilesTest', 'NetworkEpochTest', 'RuleUpdateGateTest', 'ModuleArchiveTest', 'ProtectionStateTest', 'ProxyNetworkStateTest', 'ProxyAppPolicyTest', 'DomainRuleProjectionTest')
+ANDROID_HOST_TESTS = ('ProxyRuntimeProfileTest', 'MihomoStartupConfigTest')
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -13,20 +14,23 @@ def main():
     args = parser.parse_args()
     dest = BUILD / ('protocol-tests' if args.protocol_only else 'host-tests')
     dest.mkdir(parents=True, exist_ok=True)
-    sources = [ROOT / 'tests' / (name + '.java') for name in PROTOCOL_TESTS]
+    names = list(PROTOCOL_TESTS)
+    sources = [ROOT / 'tests' / (name + '.java') for name in names]
     if args.protocol_only:
         package = ROOT / 'android-app/app/src/main/java/io/github/xgl34222220/bichen'
-        sources += [package / (name + '.java') for name in ('DnsPacket', 'DnsCache', 'DnsUpstream', 'DnsResponseFilter', 'RuleProfiles', 'NetworkEpoch', 'RuleUpdateGate', 'ModuleArchive', 'ProtectionState', 'ProxyNetworkState', 'ProxyAppPolicy', 'DomainRuleProjection', 'ProxyRuntimeProfile')]
+        sources += [package / (name + '.java') for name in ('DnsPacket', 'DnsCache', 'DnsUpstream', 'DnsResponseFilter', 'RuleProfiles', 'NetworkEpoch', 'RuleUpdateGate', 'ModuleArchive', 'ProtectionState', 'ProxyNetworkState', 'ProxyAppPolicy', 'DomainRuleProjection')]
         cp = str(dest)
     else:
         _, android = sdk_paths()
         cp = str(BUILD / 'classes') + os.pathsep + str(android)
+        names += list(ANDROID_HOST_TESTS)
+        sources += [ROOT / 'tests' / (name + '.java') for name in ANDROID_HOST_TESTS]
         sources.append(ROOT / 'tests/rule_parser_test.java')
     javac, java = java_tool('javac'), java_tool('java')
     command = [javac] if javac else [java, '-jar', str(LOCAL_TOOLS / 'ecj.jar')]
     subprocess.run(command + ['-source', '8', '-target', '8', '-encoding', 'UTF-8', '-cp', cp, '-d', str(dest)] + list(map(str, sources)), check=True)
     runtime = str(dest) + os.pathsep + cp
-    for name in PROTOCOL_TESTS:
+    for name in names:
         subprocess.run([java, '-cp', runtime, 'io.github.xgl34222220.bichen.' + name], check=True)
     if not args.protocol_only:
         subprocess.run([java, '-cp', runtime, 'io.github.xgl34222220.bichen.RuleStoreParserTest'] + [str(ROOT / ('module/rules/' + s + '.txt')) for s in ['adaway', 'china', 'tracking', 'hagezi']], check=True)
