@@ -42,6 +42,10 @@ public final class Smoke extends Instrumentation {
     private String screen() {
         StringBuilder b=new StringBuilder();collect(getUiAutomation().getRootInActiveWindow(),b);return b.toString();
     }
+    private boolean screenContains(String text) {
+        for (int i=0;i<40;i++) { if(screen().contains(text))return true; SystemClock.sleep(100); }
+        log.append("ACTIVE_WINDOW\n").append(screen()).append("END_WINDOW\n");return false;
+    }
     private void collect(AccessibilityNodeInfo n,StringBuilder b) {
         if(n==null)return;if(n.getText()!=null)b.append(n.getText()).append('\n');
         for(int i=0;i<n.getChildCount();i++)collect(n.getChild(i),b);
@@ -53,6 +57,7 @@ public final class Smoke extends Instrumentation {
     @Override public void onStart() {
         Bundle result=new Bundle();
         try {
+            getUiAutomation();SystemClock.sleep(500);
             target=getTargetContext();String pkg=target.getPackageName();
             check(pkg.equals("io.github.xgl34222220.bichen.preview"),"same preview package");
             check(target.getPackageManager().getPackageInfo(pkg,0).versionName.equals("0.3.0-test.3"),"installed test.3 version");
@@ -78,21 +83,21 @@ public final class Smoke extends Instrumentation {
             String[] titles={"辟尘·测试","应用放行","过滤规则","请求活动"};
             for(int i=0;i<4;i++){
                 final int index=i;runOnMainSync(()->{try{((ViewGroup)nav.get(activity)).getChildAt(index).performClick();}catch(Exception e){throw new RuntimeException(e);}});
-                waitForIdleSync();SystemClock.sleep(600);check(screen().contains(titles[i]),"page opens: "+titles[i]);shot("page-"+i);
+                waitForIdleSync();SystemClock.sleep(600);shot("page-"+i);check(screenContains(titles[i]),"page opens: "+titles[i]);
             }
             call("showModuleManager");
-            check(screen().contains("内置模块：0.3.0-beta.1"),"module sheet shows module rather than app version");shot("module-manager");
+            shot("module-manager");check(screenContains("内置模块：0.3.0-beta.1"),"module sheet shows module rather than app version");
             sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);waitForIdleSync();
             Method export=activity.getClass().getDeclaredMethod("exportFile",String.class);export.setAccessible(true);
             runOnMainSync(()->{try{export.invoke(activity,"module");}catch(Exception e){throw new RuntimeException(e);}});
             SystemClock.sleep(1500);
-            check(screen().contains("Bichen-0.3.0-beta.1-module.zip"),"system save picker receives correct module filename");shot("export-picker");
+            shot("export-picker");check(screenContains("Bichen-0.3.0-beta.1-module.zip"),"system save picker receives correct module filename");
             sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);waitForIdleSync();
             Object install=installer.getMethod("install",Context.class).invoke(null,target);
             int code=install.getClass().getField("code").getInt(install);
             check(code!=0,"without a Root framework install is not reported as success");
             log.append("BICHEN_DEVICE_PASS checks=").append(checks).append("\nNo real Root framework or OEM hardware tested.\n");
             result.putString("stream",log.toString());finish(Activity.RESULT_OK,result);
-        } catch(Throwable e) { result.putString("stream",log+"\nBICHEN_DEVICE_FAIL "+android.util.Log.getStackTraceString(e));finish(Activity.RESULT_CANCELED,result); }
+        } catch(Throwable e) { try{shot("failure");log.append("FAILURE_WINDOW\n").append(screen());}catch(Throwable ignored){} result.putString("stream",log+"\nBICHEN_DEVICE_FAIL "+android.util.Log.getStackTraceString(e));finish(Activity.RESULT_CANCELED,result); }
     }
 }
