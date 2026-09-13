@@ -41,7 +41,8 @@ final class RootProxyManager {
         ProxyConfigLibrary.Entry selected=configs.selected(profile.core);
         if(selected==null)throw new IOException("请先为 "+profile.core.label+" 选择配置文件");
         String source=configs.read(selected);
-        MihomoNative.call(new JSONObject().put("action","inspect-root").put("yaml",source));
+        if(source==null||source.trim().isEmpty())throw new IOException("源配置为空");
+        if(source.getBytes(StandardCharsets.UTF_8).length>4*1024*1024)throw new IOException("配置超过 4 MiB");
         MihomoStartupConfig.Result generated=MihomoStartupConfig.generate(source,profile);
         writeStartupCopy(generated.yaml);
         return new Prepared(profile,selected,generated.yaml,generated.tproxyPort,generated.redirectPort);
@@ -59,6 +60,8 @@ final class RootProxyManager {
         Prepared p=prepare(profile);
         stage(progress,"部署 Root 核心与启动配置…");
         installRuntimeFiles(p,true);
+        stage(progress,"用 Mihomo 校验最终启动配置…");
+        validateRuntimeConfig();
         stage(progress,"检查 Root、iptables 与透明代理能力…");
         JSONObject pre=runJson("preflight",profile.mode.id,String.valueOf(p.tproxyPort),String.valueOf(p.redirectPort),profile.ipv6.id);
         if(!pre.optBoolean("ok"))throw new IOException(pre.optString("message","Root 代理预检失败"));
@@ -102,6 +105,16 @@ final class RootProxyManager {
         File target=startupFile(),dir=target.getParentFile();if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("无法创建启动状态目录");File tmp=new File(dir,"startup-config.new");
         try(FileOutputStream out=new FileOutputStream(tmp,false)){out.write(text.getBytes(StandardCharsets.UTF_8));out.getFD().sync();}
         try{Files.move(tmp.toPath(),target.toPath(),StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);}catch(Exception e){if(!tmp.renameTo(target)){tmp.delete();throw new IOException("无法保存最终启动配置");}}
+    }
+
+    private void validateRuntimeConfig()throws Exception{
+        RootBridge.requireWorkerThread();
+        String command="mkdir -p "+RootBridge.quote(ROOT+"/run")+" && "+RootBridge.quote(BIN)+" -t -d "+RootBridge.quote(ROOT+"/run")+" -f "+RootBridge.quote(CONFIG);
+        RootBridge.Result result=RootBridge.rootShell(context,command,30_000L);
+        if(result.ok())return;
+        String detail=result.output==null?"":result.output.trim().replace('\n',' ');
+        if(detail.length()>600)detail=detail.substring(detail.length()-600);
+        throw new IOException("Mihomo 最终启动配置校验失败"+(detail.isEmpty()?"":"："+detail));
     }
 
     private JSONObject runJsonAllowMissing(String action,JSONObject missing)throws Exception{
