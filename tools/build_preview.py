@@ -19,8 +19,8 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 BASE = 'io.github.xgl34222220.bichen'
 PREVIEW = BASE + '.preview'
-VERSION = '0.4.0-test.7'
-CODE = 407
+VERSION = '0.4.0-test.8'
+CODE = 408
 
 def run(*args: str | Path, cwd: Path) -> None:
     subprocess.run([str(a) for a in args], cwd=cwd, check=True)
@@ -59,9 +59,9 @@ def main() -> None:
         assert 'showPage(' not in proxy_text
         basic = main_dir / 'java/io/github/xgl34222220/bichen/RootTproxyActivity.java'
         basic_text = basic.read_text()
-        for required in ('基础代理配置','核心选择','运行模式','IPv6','自动覆写','配置选择','Mihomo','TPROXY','TUN'):
+        for required in ('基础代理配置','核心','运行模式','IPv6','自动覆写','当前配置','启动代理','Mihomo','TPROXY','TUN'):
             assert required in basic_text
-        for required in ('ProxyCoreStore','ProxyConfigLibrary','ProxyRuntimeProfile','RootProxyManager','root.prepare'):
+        for required in ('ProxyCoreStore','ProxyConfigLibrary','ProxyRuntimeProfile','RootProxyManager','root.prepare','root.start(p,this::postStage)'):
             assert required in basic_text
         for source_name in ('ProxyCoreStore.java','ProxyConfigLibrary.java','ProxyRuntimeProfile.java','RootProxyManager.java'):
             assert (main_dir / 'java/io/github/xgl34222220/bichen' / source_name).is_file()
@@ -99,7 +99,7 @@ def main() -> None:
             dex = apk.read('classes.dex')
             for name in ('DnsResponseFilter','NetworkEpoch','RuleUpdateGate','RuleProfiles','RootShellCommand','ModuleArchive','RootTproxyActivity','RootProxyManager','ProxyRuntimeProfile','ProxyCoreStore','ProxyConfigLibrary'):
                 assert f'Lio/github/xgl34222220/bichen/preview/{name};'.encode() in dex
-            for text in ('基础代理配置','运行模式','TPROXY','Redirect','Enhance','配置选择','核心管理','查看启动配置'):
+            for text in ('基础代理配置','运行模式','TPROXY','Redirect','Enhance','当前配置','核心管理','最终启动配置','启动代理','正在启动'):
                 assert text.encode('utf-8') in dex
         (out / 'Bichen-0.3.0-beta.1-module.zip').write_bytes(module)
         shutil.copyfile(tools / 'lib/apksigner.jar', out / 'apksigner.jar')
