@@ -17,21 +17,21 @@ jobs:
       - name: Apply checked runtime fixes and commit actual source
         run: |
           if [ -f .github/changes/runtime-test4.patch.xz ]; then
-            test "$(git rev-parse HEAD^)" = '3a1e6f830ccb47147688c716e9c0da128631990a'
+            test "$(git rev-parse HEAD^)" = '15184c55c1898da7e2018ce7ceb2e69c7ca50987'
             python3 - <<'PYCODE'
           from pathlib import Path
           import hashlib, lzma, subprocess
           packed=Path('.github/changes/runtime-test4.patch.xz').read_bytes()
-          assert hashlib.sha256(packed).hexdigest()=='918d74ce8a080a451464f50f91c6d97290b9d7b12d983f8ae43a3dfb71bdaf0a'
+          assert hashlib.sha256(packed).hexdigest()=='794c57ae84a55e8ee6549b618b8ed180912bd44639478e940b05391614332df4'
           patch=lzma.decompress(packed)
-          assert hashlib.sha256(patch).hexdigest()=='6a12bb8024e31e3346dfa8de234fa3d0a3f30bbc4466c41ef626a8e303b88727'
+          assert hashlib.sha256(patch).hexdigest()=='9fbed1fb649cbed5830a04c3312e19e605851c7f693d101b7209e601a159db8f'
           path=Path('/tmp/bichen-runtime.patch');path.write_bytes(patch)
           subprocess.run(['git','apply','--unidiff-zero','--check',str(path)],check=True)
           subprocess.run(['git','apply','--unidiff-zero',str(path)],check=True)
           PYCODE
             rm .github/changes/runtime-test4.patch.xz
             git add -A
-            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Wire Mihomo app bypass, effective settings and validated network status; verify real routing'
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Consume rendered home refresh flag and deterministically retain the no-rebuild regression'
             git push origin HEAD:feature/mihomo-ui
           fi
           test -z "$(git diff 7e6e3c82223875dc79023fb512ec8ebd82995ef7 HEAD -- native/bridge)"
