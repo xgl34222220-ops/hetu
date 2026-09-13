@@ -50,7 +50,7 @@ public final class ProxyActivity extends Activity {
   new AlertDialog.Builder(this).setTitle("启动代理与去广告？").setMessage("这将使用系统 VPN 槽位，可能替换其他 VPN。请先停止 Box 等 Root 透明代理，避免重复接管。原 TPROXY/eBPF 文件不变。本轮不提供跨引擎无缝切换或零泄漏保证。")
    .setNegativeButton("取消",null).setPositiveButton("启动",(d,n)->{Intent permission=VpnService.prepare(this);if(permission!=null)startActivityForResult(permission,902);else launch();}).show();
  }
- private void launch(){startForegroundService(new Intent(this,MihomoVpnService.class).setAction("START"));ui.postDelayed(this::refreshState,250);}
+ private void launch(){try{startForegroundService(new Intent(this,MihomoVpnService.class).setAction("START"));ui.postDelayed(this::refreshState,250);}catch(RuntimeException e){coreInfo.setText("系统拒绝启动前台 VPN 服务，请保持页面打开后重试");}}
  @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==902){if(result==RESULT_OK)launch();else toast("未授权 VPN，配置没有改变");}else if(request==901&&result==RESULT_OK&&data!=null){task(()->{String yaml=ProxyStore.read(getContentResolver().openInputStream(data.getData()));store.save(yaml,"");return "已导入原始 YAML，未上传或覆盖原文件";});}}
  private void refreshState(){if(closed)return;status.setText(MihomoVpnService.state);power.setText(MihomoVpnService.engaged?"停止":"连接");summary.setText(MihomoVpnService.engaged?"当前使用完整 IP 隧道，旧 DNS VPN 不同时运行":store.exists()?"已保存配置；未连接时不代理手机流量":"尚未导入配置");if(!busy&&MihomoVpnService.running)loadConnections();}
  private void loadGroups(){if(!MihomoVpnService.running){toast("请先连接");return;}task(()->{JSONObject proxies=MihomoNative.call("proxies").getJSONObject("data");ui.post(()->renderGroups(proxies));return "已读取内核策略组；点击组选择节点";});}

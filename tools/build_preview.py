@@ -20,8 +20,8 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 BASE = 'io.github.xgl34222220.bichen'
 PREVIEW = BASE + '.preview'
-VERSION = '0.3.0-test.6'
-CODE = 306
+VERSION = '0.4.0-test.1'
+CODE = 401
 
 def run(*args: str | Path, cwd: Path) -> None:
     subprocess.run([str(a) for a in args], cwd=cwd, check=True)
@@ -35,7 +35,7 @@ def main() -> None:
     revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     with tempfile.TemporaryDirectory(prefix='bichen-preview-') as temp:
         stage = Path(temp) / 'Bichen'
-        shutil.copytree(ROOT, stage, ignore=shutil.ignore_patterns('.git', 'out', 'downloads', 'build', '__pycache__', '*.keystore', '*.jks', '*.p12', '*.idsig'))
+        shutil.copytree(ROOT, stage, ignore=shutil.ignore_patterns('.git', '.upstream', 'out', 'downloads', 'build', '__pycache__', '*.keystore', '*.jks', '*.p12', '*.idsig'))
         main_dir = stage / 'android-app/app/src/main'
         manifest = main_dir / 'AndroidManifest.xml'
         value = manifest.read_text()
@@ -99,7 +99,7 @@ def main() -> None:
                 rel = path.relative_to(stage)
                 if not path.is_file() or any(p in {'out', 'build', '.git', '__pycache__', 'downloads'} for p in rel.parts):
                     continue
-                if path.suffix in {'.keystore', '.jks', '.p12', '.pyc', '.ttf', '.otf'}:
+                if path.suffix in {'.keystore', '.jks', '.p12', '.pyc', '.ttf', '.otf', '.so'}:
                     continue
                 z.write(path, str(Path('Bichen') / rel))
         files = [unsigned, out / 'Bichen-0.3.0-beta.1-module.zip', source, out / 'apksigner.jar', out / 'build-info.json', out / 'apk-badging.txt']

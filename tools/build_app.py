@@ -152,6 +152,9 @@ def main() -> None:
     with zipfile.ZipFile(BUILD / "unsigned.apk", "a", zipfile.ZIP_DEFLATED) as apk:
         for file in sorted((BUILD / "dex").glob("*.dex")):
             apk.write(file, file.name)
+    with zipfile.ZipFile(BUILD / "unsigned.apk", "a", zipfile.ZIP_DEFLATED) as apk:
+        for file in sorted((MAIN / "jniLibs").rglob("*.so")):
+            apk.write(file, "lib/" + file.relative_to(MAIN / "jniLibs").as_posix())
     run([tools / "zipalign", "-f", "-p", "4", BUILD / "unsigned.apk", BUILD / "aligned.apk"])
     keystore, alias, env = sign_key()
     run([

@@ -11,6 +11,7 @@ public final class BootReceiver extends BroadcastReceiver {
     @Override public void onReceive(Context context, Intent intent) {
         if (!Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) return;
         SharedPreferences prefs = context.getSharedPreferences("bichen", Context.MODE_PRIVATE);
+        if ("mihomo".equals(prefs.getString("engineOwner", ""))) return;
         boolean restart = prefs.getBoolean("autoStartVpn", false) && prefs.getBoolean("vpnWanted", false)
                 && VpnService.prepare(context) == null;
         if (!restart && !prefs.getBoolean("vpnRestoreHosts", false)) return;

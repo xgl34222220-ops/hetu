@@ -91,6 +91,7 @@ public final class RuleStore {
             }
         }
     }
+    public java.util.List<String> effectiveDomains() { Snapshot s=live; return s==null?java.util.Collections.emptyList():new java.util.ArrayList<>(s.effective); }
     public int count() { Snapshot s=live; return s==null?0:s.effective.size(); }
     /** No I/O; changes only after a complete snapshot has been published. */
     public String currentRevision() { Snapshot s=live; return s==null?"":s.generation; }

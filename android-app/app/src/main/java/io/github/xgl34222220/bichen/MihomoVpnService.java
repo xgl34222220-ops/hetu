@@ -39,7 +39,7 @@ public final class MihomoVpnService extends VpnService {
   b.addDisallowedApplication(getPackageName());b.setConfigureIntent(PendingIntent.getActivity(this,401,new Intent(this,ProxyActivity.class),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE));
   descriptor=b.establish();if(descriptor==null)throw new IOException("系统没有建立 VPN 接口");
   MihomoNative.call(new JSONObject().put("action","start").put("home",store.home().getAbsolutePath()).put("yaml",yaml).put("fd",descriptor.getFd()).put("filter",prefs.getBoolean("proxyFilter",true)).put("domains",new JSONArray(rules.effectiveDomains())));
-  if(stopping){finishStop();return;}running=true;state="代理与去广告运行中";prefs.edit().remove("proxyError").apply();manager=getSystemService(ConnectivityManager.class);
+  if(stopping){finishStop();return;}running=true;state=prefs.getBoolean("proxyFilter",true)?"代理与去广告运行中":"代理运行中（辟尘过滤关闭）";prefs.edit().remove("proxyError").apply();manager=getSystemService(ConnectivityManager.class);
   callback=new ConnectivityManager.NetworkCallback(){
    @Override public void onAvailable(Network n){if(running){setUnderlyingNetworks(new Network[]{n});state="代理运行中";foreground();}}
    @Override public void onLost(Network n){if(running){setUnderlyingNetworks(new Network[0]);state="等待网络恢复";foreground();}}
