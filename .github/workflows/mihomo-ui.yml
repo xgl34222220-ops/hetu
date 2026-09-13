@@ -14,23 +14,24 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Apply checked UI changes and commit actual source
+      - name: Apply checked runtime fixes and commit actual source
         run: |
-          if [ -f .github/changes/ui-test3.part0 ]; then
-            python3 - <<'PY'
+          if [ -f .github/changes/runtime-test4.patch.xz ]; then
+            test "$(git rev-parse HEAD^)" = '3a1e6f830ccb47147688c716e9c0da128631990a'
+            python3 - <<'PYCODE'
           from pathlib import Path
           import hashlib, lzma, subprocess
-          packed=b''.join(Path(f'.github/changes/ui-test3.part{i}').read_bytes() for i in range(4))
-          assert hashlib.sha256(packed).hexdigest()=='935c92bcf2dc8271d8aefd51c39c8613be96deba3dd9ed8d59d0b6f92b5f0401'
+          packed=Path('.github/changes/runtime-test4.patch.xz').read_bytes()
+          assert hashlib.sha256(packed).hexdigest()=='918d74ce8a080a451464f50f91c6d97290b9d7b12d983f8ae43a3dfb71bdaf0a'
           patch=lzma.decompress(packed)
-          assert hashlib.sha256(patch).hexdigest()=='6c284029387bfad98913fd59267d04fb5f0282a101034326180d0615b177f3bd'
-          path=Path('/tmp/bichen-ui.patch');path.write_bytes(patch)
-          subprocess.run(['git','apply','--check',str(path)],check=True)
-          subprocess.run(['git','apply',str(path)],check=True)
-          PY
-            rm .github/changes/ui-test3.part*
+          assert hashlib.sha256(patch).hexdigest()=='6a12bb8024e31e3346dfa8de234fa3d0a3f30bbc4466c41ef626a8e303b88727'
+          path=Path('/tmp/bichen-runtime.patch');path.write_bytes(patch)
+          subprocess.run(['git','apply','--unidiff-zero','--check',str(path)],check=True)
+          subprocess.run(['git','apply','--unidiff-zero',str(path)],check=True)
+          PYCODE
+            rm .github/changes/runtime-test4.patch.xz
             git add -A
-            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Unify Mihomo UI, add searchable nodes and bounded opt-in connection observations'
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Wire Mihomo app bypass, effective settings and validated network status; verify real routing'
             git push origin HEAD:feature/mihomo-ui
           fi
           test -z "$(git diff 7e6e3c82223875dc79023fb512ec8ebd82995ef7 HEAD -- native/bridge)"
@@ -71,7 +72,10 @@ jobs:
                       dest=root/name;dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(z.read(name))
           PY
       - name: Build preview and run existing regressions
-        run: python3 tools/build_preview.py
+        run: |
+          mkdir -p out/preview
+          set -o pipefail
+          python3 tools/build_preview.py 2>&1 | tee out/preview/build.log
       - name: Enable emulator acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -97,12 +101,13 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: INTERNAL-Bichen-ui-test3-unsigned
+          name: INTERNAL-Bichen-runtime-test4-unsigned
           path: |
             out/preview/*-unsigned.apk
             out/preview/*-source.zip
             out/preview/*-module.zip
             out/preview/apksigner.jar
+            out/preview/build.log
             out/preview/build-info.json
             out/preview/apk-badging.txt
             out/device/device-results.txt
