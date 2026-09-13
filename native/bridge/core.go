@@ -5,7 +5,9 @@ import (
  "encoding/json"
  "errors"
  "io"
+ "net"
  "net/netip"
+ "net/url"
  "os"
  "path/filepath"
  "strings"
@@ -26,6 +28,7 @@ import (
 )
 const coreRevision="ac017cdd246ce8bd547653d927e7bf77d7ee73d5"
 const filterName="__bichen_exact_filter"
+const dnsGuardName="__bichen_dns_guard"
 const filterSubRule="__bichen_filter_branch"
 var mu sync.Mutex
 var tunCloser io.Closer
@@ -38,7 +41,9 @@ type request struct {
  Domains []string `json:"domains"`
  SuffixDomains []string `json:"suffixDomains"`
  AllowDomains []string `json:"allowDomains"`
+ DohDomains []string `json:"dohDomains"`
  Filter bool `json:"filter"`
+ DnsGuard bool `json:"dnsGuard"`
  FD int `json:"fd"`
  Group string `json:"group"`
  Name string `json:"name"`
@@ -47,10 +52,34 @@ func validDomain(domain string)bool{return len(domain)>0&&len(domain)<=253&&stri
 func checkedDomains(values []string,kind string)([]string,error){
  out:=make([]string,0,len(values));seen:=make(map[string]struct{},len(values))
  for _,domain:=range values{
+  domain=strings.ToLower(strings.TrimSuffix(strings.TrimSpace(domain),"."))
   if !validDomain(domain){return nil,errors.New(kind+"包含无效域名")}
   if _,ok:=seen[domain];ok{continue};seen[domain]=struct{}{};out=append(out,domain)
  }
  return out,nil
+}
+func endpointHost(value string)string{
+ value=strings.TrimSpace(value);if value==""||strings.HasPrefix(value,"rcode://"){return ""}
+ if i:=strings.Index(value,"#");i>=0{value=value[:i]}
+ if u,err:=url.Parse(value);err==nil&&u.Hostname()!=""{h:=strings.ToLower(strings.TrimSuffix(u.Hostname(),"."));if validDomain(h){return h};return ""}
+ host:=value
+ if h,_,err:=net.SplitHostPort(host);err==nil{host=h}else if strings.Count(host,":")==1{if i:=strings.LastIndex(host,":");i>0{host=host[:i]}}
+ host=strings.ToLower(strings.Trim(strings.TrimSuffix(host,"."),"[]"));if validDomain(host){return host};return ""
+}
+func endpointUses853(value string)bool{
+ value=strings.TrimSpace(value);if value==""||strings.HasPrefix(value,"rcode://"){return false}
+ if i:=strings.Index(value,"#");i>=0{value=value[:i]}
+ if u,err:=url.Parse(value);err==nil&&u.Host!=""{return u.Port()=="853"||u.Scheme=="tls"||u.Scheme=="quic"}
+ _,port,err:=net.SplitHostPort(value);return err==nil&&port=="853"
+}
+func eachString(value any,fn func(string)){
+ switch v:=value.(type){case string:fn(v);case []string:for _,s:=range v{fn(s)};case []any:for _,x:=range v{eachString(x,fn)};case map[string]any:for _,x:=range v{eachString(x,fn)}}
+}
+func dnsGuardExemptions(dns map[string]any)([]string,bool){
+ seen:=map[string]struct{}{};uses853:=false
+ add:=func(s string){if endpointUses853(s){uses853=true};if h:=endpointHost(s);h!=""{seen[h]=struct{}{}}}
+ for _,key:=range []string{"nameserver","fallback","default-nameserver","proxy-server-nameserver","direct-nameserver","nameserver-policy"}{if v,ok:=dns[key];ok{eachString(v,add)}}
+ out:=make([]string,0,len(seen));for h:=range seen{out=append(out,h)};return out,uses853
 }
 // Decode a private runtime copy. The original YAML is never overwritten.
 func prepare(r request)([]byte,error){
@@ -69,31 +98,38 @@ func prepare(r request)([]byte,error){
  if dns==nil{dns=map[string]any{"enable":true,"enhanced-mode":"fake-ip","fake-ip-range":"198.18.0.1/16","nameserver":[]string{"https://1.1.1.1/dns-query"},"proxy-server-nameserver":[]string{"https://1.1.1.1/dns-query"}}}
  if on,exists:=dns["enable"];exists&&on==false{return nil,errors.New("当前配置关闭 DNS；本轮 VPN 需要启用 DNS，不会静默更改你的选择")}
  dns["enable"]=true;dns["listen"]="";m["dns"]=dns
- if r.Filter{
-  if len(r.Domains)+len(r.SuffixDomains)>500000||len(r.AllowDomains)>50000{return nil,errors.New("去广告规则或白名单过多")}
+ if r.Filter||r.DnsGuard{
+  if len(r.Domains)+len(r.SuffixDomains)>500000||len(r.AllowDomains)>50000||len(r.DohDomains)>50000{return nil,errors.New("去广告规则、白名单或 DNS 防绕过规则过多")}
   exact,err:=checkedDomains(r.Domains,"去广告规则");if err!=nil{return nil,err}
   suffix,err:=checkedDomains(r.SuffixDomains,"子域拦截规则");if err!=nil{return nil,err}
   allow,err:=checkedDomains(r.AllowDomains,"白名单");if err!=nil{return nil,err}
+  doh,err:=checkedDomains(r.DohDomains,"加密 DNS 防绕过规则");if err!=nil{return nil,err}
   original,ok:=m["rules"].([]any);if !ok{return nil,errors.New("配置缺少 rules 分流列表")}
-  if len(exact)+len(suffix)>0{
-   providers,_:=m["rule-providers"].(map[string]any);if providers==nil{providers=map[string]any{}}
+  providers,_:=m["rule-providers"].(map[string]any);if providers==nil{providers=map[string]any{}}
+  branch:=make([]any,0,len(allow)+len(doh)+4)
+  // PASS inside SUB-RULE exits Bichen's branch and resumes the user's main rules.
+  for _,domain:=range allow{branch=append(branch,"DOMAIN,"+domain+",PASS")}
+  if r.DnsGuard{
+   exempt,uses853:=dnsGuardExemptions(dns);for _,domain:=range exempt{branch=append(branch,"DOMAIN,"+domain+",PASS")}
+   if len(doh)>0{
+    if _,exists:=providers[dnsGuardName];exists{return nil,errors.New("配置占用了辟尘 DNS 防绕过内部规则名称")}
+    payload:=make([]string,0,len(doh));for _,domain:=range doh{payload=append(payload,"DOMAIN-SUFFIX,"+domain)}
+    providers[dnsGuardName]=map[string]any{"type":"inline","behavior":"classical","payload":payload};branch=append(branch,"RULE-SET,"+dnsGuardName+",REJECT")
+   }
+   // Respect an explicitly imported DoT/DoQ resolver instead of breaking it.
+   // Otherwise block both TCP and UDP 853 after domain-based DoH protection.
+   if !uses853{branch=append(branch,"DST-PORT,853,REJECT")}
+  }
+  if r.Filter&&len(exact)+len(suffix)>0{
    if _,exists:=providers[filterName];exists{return nil,errors.New("配置占用了辟尘内部规则名称")}
-   payload:=make([]string,0,len(exact)+len(suffix))
-   for _,domain:=range exact{payload=append(payload,"DOMAIN,"+domain)}
-   for _,domain:=range suffix{payload=append(payload,"DOMAIN-SUFFIX,"+domain)}
-   providers[filterName]=map[string]any{"type":"inline","behavior":"classical","payload":payload};m["rule-providers"]=providers
-
+   payload:=make([]string,0,len(exact)+len(suffix));for _,domain:=range exact{payload=append(payload,"DOMAIN,"+domain)};for _,domain:=range suffix{payload=append(payload,"DOMAIN-SUFFIX,"+domain)}
+   providers[filterName]=map[string]any{"type":"inline","behavior":"classical","payload":payload};branch=append(branch,"RULE-SET,"+filterName+",REJECT")
+  }
+  if len(branch)>0{
+   m["rule-providers"]=providers
    subRules,_:=m["sub-rules"].(map[string]any);if subRules==nil{subRules=map[string]any{}}
    if _,exists:=subRules[filterSubRule];exists{return nil,errors.New("配置占用了辟尘内部子规则名称")}
-   branch:=make([]any,0,len(allow)+1)
-   // PASS inside SUB-RULE exits Bichen's branch and resumes the user's main rules.
-   // Putting PASS directly before REJECT would merely continue to REJECT and fail
-   // to implement an exception for a broader DOMAIN-SUFFIX rule.
-   for _,domain:=range allow{branch=append(branch,"DOMAIN,"+domain+",PASS")}
-   branch=append(branch,"RULE-SET,"+filterName+",REJECT")
    subRules[filterSubRule]=branch;m["sub-rules"]=subRules
-   // Android TUN traffic handled here is TCP or UDP. The condition therefore
-   // enters only Bichen's isolated filter branch without changing original rules.
    m["rules"]=append([]any{"SUB-RULE,(OR,((NETWORK,TCP),(NETWORK,UDP))),"+filterSubRule},original...)
   }
  }
@@ -116,7 +152,7 @@ func execute(r request)(any,error){
    options:=LC.Tun{Enable:true,Device:"bichen",Stack:C.TunGvisor,MTU:1500,FileDescriptor:fd,DNSHijack:[]string{"any:53","tcp://any:53"},Inet4Address:[]netip.Prefix{netip.MustParsePrefix("172.29.0.1/30")},Inet6Address:[]netip.Prefix{netip.MustParsePrefix("fdfe:dcba:9876::1/126")}}
    t,err:=sing_tun.New(options,tunnel.Tunnel);if err!=nil{executor.Shutdown();return nil,errors.New("Mihomo 创建 Android TUN 失败；未报告启动成功")};tunCloser=t
   }
-  started=true;return map[string]any{"running":true,"revision":coreRevision,"filterDomains":len(r.Domains)+len(r.SuffixDomains)},nil
+  started=true;return map[string]any{"running":true,"revision":coreRevision,"filterDomains":len(r.Domains)+len(r.SuffixDomains),"dnsGuard":r.DnsGuard,"dnsGuardDomains":len(r.DohDomains)},nil
  case "stop":
   started=false;if tunCloser!=nil{_ = tunCloser.Close();tunCloser=nil}
   statistic.DefaultManager.Range(func(t statistic.Tracker)bool{_ = t.Close();return true});executor.Shutdown();return map[string]any{"running":false},nil
