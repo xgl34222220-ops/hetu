@@ -8,7 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 
-/** BoxProxy-style Root control plane for the modes that are actually wired. */
+/** BoxProxy-style Root control plane for modes that are actually wired. */
 final class RootProxyManager {
     private static final String ROOT="/data/adb/bichen/proxy";
     private static final String BIN=ROOT+"/bin/core";
@@ -17,6 +17,8 @@ final class RootProxyManager {
     private final Context context;
     private final ProxyCoreStore cores;
     private final ProxyConfigLibrary configs;
+
+    interface Progress { void onStage(String text); }
 
     static final class Prepared {
         final ProxyRuntimeProfile profile;
@@ -27,6 +29,8 @@ final class RootProxyManager {
     }
 
     RootProxyManager(Context c){context=c.getApplicationContext();cores=new ProxyCoreStore(context);configs=new ProxyConfigLibrary(context);}
+
+    private static void stage(Progress progress,String text){if(progress!=null)progress.onStage(text);}
 
     Prepared prepare(ProxyRuntimeProfile profile)throws Exception{
         RootBridge.requireWorkerThread();
@@ -48,18 +52,46 @@ final class RootProxyManager {
         return runJson("preflight",p.profile.mode.id,String.valueOf(p.tproxyPort),String.valueOf(p.redirectPort),p.profile.ipv6.id);
     }
 
-    JSONObject start(ProxyRuntimeProfile profile)throws Exception{
+    JSONObject start(ProxyRuntimeProfile profile)throws Exception{return start(profile,null);}
+
+    JSONObject start(ProxyRuntimeProfile profile,Progress progress)throws Exception{
+        stage(progress,"检查配置文件…");
         Prepared p=prepare(profile);
+        stage(progress,"部署 Root 核心与启动配置…");
         installRuntimeFiles(p,true);
+        stage(progress,"检查 Root、iptables 与透明代理能力…");
         JSONObject pre=runJson("preflight",profile.mode.id,String.valueOf(p.tproxyPort),String.valueOf(p.redirectPort),profile.ipv6.id);
         if(!pre.optBoolean("ok"))throw new IOException(pre.optString("message","Root 代理预检失败"));
+        stage(progress,"启动 Mihomo 与透明代理规则…");
         JSONObject result=runJson("start",BIN,CONFIG,profile.mode.id,String.valueOf(p.tproxyPort),String.valueOf(p.redirectPort),profile.ipv6.id);
         if(!result.optBoolean("ok"))throw new IOException(result.optString("message","Root 代理启动失败"));
+        stage(progress,"确认核心运行状态…");
+        JSONObject state=status();
+        if(!state.optBoolean("running",false)){
+            String detail=diagnostics();
+            throw new IOException("启动命令已返回，但核心未保持运行"+(detail.isEmpty()?"":"："+detail));
+        }
         return result.put("sourceConfig",p.source.name).put("core",profile.core.id).put("mode",profile.mode.id);
     }
 
-    JSONObject stop()throws Exception{return runJsonAllowMissing("stop",new JSONObject().put("ok",true).put("running",false).put("state","idle").put("message","Root 代理未运行"));}
+    JSONObject stop()throws Exception{return stop(null);}
+    JSONObject stop(Progress progress)throws Exception{
+        stage(progress,"停止核心并清理透明代理规则…");
+        JSONObject result=runJsonAllowMissing("stop",new JSONObject().put("ok",true).put("running",false).put("state","idle").put("message","Root 代理未运行"));
+        stage(progress,"确认网络规则已恢复…");
+        return result;
+    }
     JSONObject status()throws Exception{return runJsonAllowMissing("status",new JSONObject().put("ok",true).put("running",false).put("state","idle").put("message","尚未启动"));}
+
+    String diagnostics(){
+        try{
+            RootBridge.requireWorkerThread();
+            String command="echo '--- root ---'; id; echo '--- runtime ---'; ls -l "+RootBridge.quote(ROOT)+" "+RootBridge.quote(ROOT+"/bin")+" "+RootBridge.quote(ROOT+"/run")+" 2>&1; echo '--- log ---'; tail -n 35 "+RootBridge.quote(ROOT+"/run/core.log")+" 2>&1 || true";
+            RootBridge.Result r=RootBridge.rootShell(context,command,10_000L);
+            String text=r.output.trim().replace('\n',' ');
+            return text.length()>520?text.substring(text.length()-520):text;
+        }catch(Exception ignored){return"";}
+    }
 
     String startupConfig()throws IOException{
         File f=startupFile();if(!f.isFile())throw new IOException("尚未生成启动配置");byte[] bytes=Files.readAllBytes(f.toPath());return new String(bytes,StandardCharsets.UTF_8);
