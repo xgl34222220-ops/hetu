@@ -3,6 +3,9 @@ on:
   push:
     branches: ['feature/mihomo-e2e']
   workflow_dispatch:
+concurrency:
+  group: mihomo-e2e-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -42,18 +45,19 @@ jobs:
           log-accepted-android-sdk-licenses: false
       - name: SDK tools
         run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;28.2.13676358'
-      - name: Build pinned Mihomo and gVisor
+      - name: Build pinned Mihomo with CMFA userspace Android and gVisor
         run: |
           cp -r native/bridge .upstream/bichenbridge
           cd .upstream
-          go test -tags with_gvisor -v ./bichenbridge
+          go test -tags 'with_gvisor,cmfa' -v ./bichenbridge
           NDK="$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin"
           OUT=../android-app/app/src/main/jniLibs
           mkdir -p "$OUT/arm64-v8a" "$OUT/x86_64" ../android-app/app/src/main/assets/licenses
-          CGO_ENABLED=1 GOOS=android GOARCH=arm64 CC="$NDK/aarch64-linux-android26-clang" go build -tags with_gvisor -trimpath -buildmode=c-shared -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' -o "$OUT/arm64-v8a/libbichen_core.so" ./bichenbridge
-          CGO_ENABLED=1 GOOS=android GOARCH=amd64 CC="$NDK/x86_64-linux-android26-clang" go build -tags with_gvisor -trimpath -buildmode=c-shared -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' -o "$OUT/x86_64/libbichen_core.so" ./bichenbridge
+          CGO_ENABLED=1 GOOS=android GOARCH=arm64 CC="$NDK/aarch64-linux-android26-clang" go build -tags 'with_gvisor,cmfa' -trimpath -buildmode=c-shared -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' -o "$OUT/arm64-v8a/libbichen_core.so" ./bichenbridge
+          CGO_ENABLED=1 GOOS=android GOARCH=amd64 CC="$NDK/x86_64-linux-android26-clang" go build -tags 'with_gvisor,cmfa' -trimpath -buildmode=c-shared -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' -o "$OUT/x86_64/libbichen_core.so" ./bichenbridge
           cp LICENSE ../android-app/app/src/main/assets/licenses/mihomo-GPL3.txt
           printf '%s\n' ac017cdd246ce8bd547653d927e7bf77d7ee73d5 > ../android-app/app/src/main/assets/licenses/mihomo-revision.txt
+          printf '%s\n' 'with_gvisor,cmfa' > ../android-app/app/src/main/assets/licenses/mihomo-build-tags.txt
       - name: Build APK and existing regressions
         run: python3 tools/build_preview.py
       - name: Emulator acceleration
