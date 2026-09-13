@@ -24,7 +24,7 @@ public final class Control extends Instrumentation {
  @Override public void onStart(){Bundle b=new Bundle();try{
   c=getTargetContext();dir=c.getFilesDir();String pkg=c.getPackageName();ClassLoader cl=c.getClassLoader();service=Class.forName(pkg+".MihomoVpnService",true,cl);bridge=Class.forName(pkg+".MihomoNative",true,cl);
   check(core("version").getJSONObject("data").getString("revision").equals("ac017cdd246ce8bd547653d927e7bf77d7ee73d5"),"installed native library loads exact pinned Mihomo");
-  c.getSharedPreferences("bichen",0).edit().putBoolean("vpnWanted",false).putBoolean("vpnRestoreHosts",false).putBoolean("proxyManageHosts",false).putBoolean("proxyFilter",true).putBoolean("source_hagezi",true).putStringSet("user_allow",Collections.singleton("safe.0.0-02.net")).commit();
+  c.getSharedPreferences("bichen",0).edit().putBoolean("vpnWanted",false).putBoolean("vpnRestoreHosts",false).putBoolean("proxyManageHosts",false).putBoolean("proxyFilter",true).putBoolean("proxyDnsGuard",true).putBoolean("source_hagezi",true).putStringSet("user_allow",Collections.singleton("safe.0.0-02.net")).commit();
   Class<?> history=Class.forName(pkg+".ProxyObservations",true,cl);Constructor<?> hc=history.getDeclaredConstructor(Context.class);hc.setAccessible(true);Object seen=hc.newInstance(c);method(seen,"clear",new Class<?>[0]);method(seen,"setEnabled",new Class<?>[]{boolean.class},true);
   String yaml="mode: rule\nproxies:\n - name: SENTINEL\n   type: socks5\n   server: 10.0.2.2\n   port: 19088\nproxy-groups:\n - name: SELECT\n   type: select\n   proxies: [SENTINEL]\nrules:\n - MATCH,SELECT\ndns:\n enable: true\n enhanced-mode: fake-ip\n fake-ip-range: 198.18.0.1/16\n nameserver: [127.0.0.1:19553]\n nameserver-policy:\n  stun.fixture.test: [rcode://name_error]\n";
   Class<?> store=Class.forName(pkg+".ProxyStore",true,cl);Constructor<?> constructor=store.getDeclaredConstructor(Context.class);constructor.setAccessible(true);Object cfg=constructor.newInstance(c);Method save=store.getDeclaredMethod("save",String.class,String.class);save.setAccessible(true);save.invoke(cfg,yaml,"https://fixture.invalid/non-secret");Method read=store.getDeclaredMethod("yaml");read.setAccessible(true);check(read.invoke(cfg).equals(yaml),"private import preserves original YAML exactly");
@@ -37,6 +37,8 @@ public final class Control extends Instrumentation {
   check(!pending(),"fresh session has no unapplied settings");
   check(Boolean.TRUE.equals(policy("filterEnabled"))&&((Set<?>)policy("applied")).isEmpty(),"actual session snapshots enabled filter and empty bypass list");
   check(service.getField("activeRuleCount").getInt(null)>1000,"HaGeZi suffix projection is loaded into the live session");
+  check(service.getField("activeDnsGuard").getBoolean(null),"encrypted DNS guard is part of the live VPN session");
+  prefs.edit().putBoolean("proxyDnsGuard",false).commit();check(pending(),"editing DNS guard reports unapplied changes");prefs.edit().putBoolean("proxyDnsGuard",true).commit();check(!pending(),"reverting DNS guard removes reconnect warning");
   prefs.edit().putBoolean("proxyFilter",false).putStringSet("bypassApps",bypass).commit();
   check(pending(),"editing active filter and app list reports unapplied changes");
   check(Boolean.TRUE.equals(policy("filterEnabled"))&&((Set<?>)policy("applied")).isEmpty(),"saved edits do not pretend to change running VPN policy");
@@ -50,7 +52,7 @@ public final class Control extends Instrumentation {
   List<?> captured=observations(seen);check(captured.toString().contains("allowed.bichen.test"),"service sampler retains actual independent-UID domain connection");check(!captured.toString().contains("ads.bichen.test"),"rejected requests are not fabricated into active-connection observations");
   stopServiceAndWait();int retained=observations(seen).size();check(retained>0,"sampled observations remain after proxy stops");method(seen,"setEnabled",new Class<?>[]{boolean.class},false);
   mark("vpn-stopped","stopped");await("stop-probe-done");
-  startServiceAndWait();check(!pending(),"restart actually loads revised rule snapshot");mark("vpn-restarted","running");await("restart-probe-done");stopServiceAndWait();check(observations(seen).size()==retained,"disabling observations prevents writes during next real traffic session");
+  startServiceAndWait();check(!pending(),"restart actually loads revised rule snapshot");check(service.getField("activeDnsGuard").getBoolean(null),"restart retains encrypted DNS guard");mark("vpn-restarted","running");await("restart-probe-done");stopServiceAndWait();check(observations(seen).size()==retained,"disabling observations prevents writes during next real traffic session");
   prefs.edit().putStringSet("bypassApps",bypass).commit();startServiceAndWait();
   check(((Set<?>)policy("applied")).equals(Collections.singleton("bichen.proxyprobe")),"installed selected app is actually excluded by VPN Builder");
   check(((Set<?>)policy("missing")).equals(Collections.singleton("bichen.nonexistent.fixture")),"missing package is not counted as an applied exclusion");check(!pending(),"uninstalled selection alone does not cause endless reconnect warning");
@@ -59,7 +61,7 @@ public final class Control extends Instrumentation {
   mark("bypass-draft-ready","running");await("bypass-draft-done");
   stopServiceAndWait();startServiceAndWait();check(((Set<?>)policy("applied")).isEmpty()&&!pending(),"reconnect applies removal of bypass");
   mark("reincluded-ready","running");await("reincluded-done");stopServiceAndWait();
-  check(active()==null&&service.getField("activeRuleCount").getInt(null)==0,"stop clears stale effective policy and rule counters");
+  check(active()==null&&service.getField("activeRuleCount").getInt(null)==0&&!service.getField("activeDnsGuard").getBoolean(null),"stop clears stale effective policy, guard and rule counters");
   ((android.database.sqlite.SQLiteOpenHelper)seen).close();
   mark("proxy-checks.txt",result.toString());b.putString("stream",result+"BICHEN_MIHOMO_CONTROL_PASS checks="+checks+"\nNo OEM/Root framework or commercial subscription was tested.\n");finish(Activity.RESULT_OK,b);
  }catch(Throwable e){try{mark("control-error.txt",android.util.Log.getStackTraceString(e));}catch(Throwable ignored){}b.putString("stream",result+"BICHEN_MIHOMO_CONTROL_FAIL\n"+android.util.Log.getStackTraceString(e));finish(Activity.RESULT_CANCELED,b);}}
