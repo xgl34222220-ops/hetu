@@ -18,21 +18,21 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Apply verified repair and commit actual source
+      - name: Apply verified repair and commit source only
         run: |
-          test "$(git rev-parse HEAD^)" = "f1c474ab4124afe687f552eaac7909923a265a64"
+          test "$(git rev-parse HEAD^)" = "2b4dc06b0d6c693fd9eb961af355489f20f10111"
           python3 - <<'PY'
           import lzma, hashlib, subprocess
           from pathlib import Path
           raw=lzma.decompress(Path('.github/changes/test3-repair.patch.xz').read_bytes())
           assert hashlib.sha256(raw).hexdigest() == 'ebe3b2877a7232865500b7b4e0e089541f4e0f1df7e1ee8a14b6b2f3ab19388f'
           patch=Path('/tmp/test3-repair.patch');patch.write_bytes(raw)
-          subprocess.run(['git','apply','--unidiff-zero','--check',str(patch)],check=True)
-          subprocess.run(['git','apply','--unidiff-zero',str(patch)],check=True)
+          subprocess.run(['git','apply','--unidiff-zero','--exclude=.github/workflows/*','--check',str(patch)],check=True)
+          subprocess.run(['git','apply','--unidiff-zero','--exclude=.github/workflows/*',str(patch)],check=True)
           PY
           python3 tools/test_java.py --protocol-only
           python3 -m unittest discover -s tests -p '*test.py' -v
-          rm .github/changes/test3-repair.patch.xz .github/workflows/repair-test3.yml
+          rm .github/changes/test3-repair.patch.xz
           git add -A
           git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Restore original APK icon and validate module handoff before install/export'
           git push origin HEAD:improve/cname-profiles-20260913
@@ -61,6 +61,7 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: python3 tools/test_device.py
       - name: Upload private-signing handoff and device evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: Bichen-test3-repaired-handoff
