@@ -17,6 +17,7 @@ import javax.net.ssl.HttpsURLConnection;
 /** Exact-domain rules. DNS readers only see a complete, immutable snapshot. */
 public final class RuleStore {
     private static final Object LOCK = new Object();
+    private static final RuleUpdateGate UPDATE_GATE = new RuleUpdateGate();
     private static final int MAX_SOURCE_BYTES = 8 * 1024 * 1024;
     private static final int MAX_COMBINED_BYTES = 32 * 1024 * 1024;
     private static final int MAX_DOMAINS = 500000;
@@ -100,6 +101,7 @@ public final class RuleStore {
             return new JSONObject().put("loaded",s!=null).put("effectiveCount",s==null?0:s.effective.size())
                 .put("allowCount",s==null?0:s.allow.size()).put("blockCount",s==null?0:s.block.size())
                 .put("updatedAt",s==null?0:s.updatedAt).put("lastRuleUpdate",prefs.getLong("last_rule_update",0))
+                .put("lastRuleCheck",prefs.getLong("last_rule_check",0))
                 .put("fromModule",s!=null&&s.fromModule).put("source",s==null?"unloaded":s.fromModule?"module":"local")
                 .put("revision",s==null?"":s.generation).put("moduleRevision",s==null?"":s.revision)
                 .put("needsModuleSync",prefs.getBoolean("rules_need_module_sync",false))
@@ -176,11 +178,16 @@ public final class RuleStore {
     }
 
     /** Download every enabled subscription before changing the active generation. */
-    public void updateRules(boolean moduleInstalled) throws Exception {
-        synchronized(LOCK) {
-            checkInterrupted();
-            reload(); verifyLocalTarget(moduleInstalled);if(moduleInstalled) syncModule(null);
-            Snapshot before=live;
+    public boolean updateRules(boolean moduleInstalled) throws Exception {
+        try(RuleUpdateGate.Lease update=UPDATE_GATE.begin()) {
+            final Snapshot before;
+            synchronized(LOCK) {
+                checkInterrupted();
+                reload(); verifyLocalTarget(moduleInstalled);if(moduleInstalled) syncModule(null);
+                before=live;
+            }
+            // Network and parsing run outside LOCK. Domain edits, mode switching
+            // and rollback must not wait for a 180-second subscription download.
             Map<String,Set<String>> next=new LinkedHashMap<>(before.sourceRules);
             File staging=new File(context.getCacheDir(),"rules-download-"+UUID.randomUUID());
             if(!staging.mkdirs()) throw new IOException("无法建立规则下载目录");
@@ -207,14 +214,26 @@ public final class RuleStore {
                 }
                 if(args.size()==1) throw new IOException("请先启用至少一个订阅源");
                 Snapshot candidate=compose("",false,before.allow,before.block,before.enabled,next,null);
-                checkInterrupted();
-                if(moduleInstalled) {
-                    markModulePending();
-                    rootJson(args.toArray(new String[0]));
-                    try { syncModule(next); }
-                    catch(Exception e) { throw new IOException("模块已更新，但应用同步失败；请重新同步模块："+e.getMessage(),e); }
-                } else commit(candidate);
-                prefs.edit().putLong("last_rule_update",System.currentTimeMillis()).apply();
+                synchronized(LOCK) {
+                    checkInterrupted();
+                    reload(); verifyLocalTarget(moduleInstalled);
+                    if(moduleInstalled) syncModule(null); // Also detect external module edits.
+                    update.verify(before.generation,live.generation);
+                    if(!moduleInstalled && !before.fromModule && next.equals(before.sourceRules)) {
+                        // No-op checks must not evict a useful rollback snapshot or DNS cache.
+                        prefs.edit().putLong("last_rule_check",System.currentTimeMillis()).apply();
+                        return false;
+                    }
+                    if(moduleInstalled) {
+                        markModulePending();
+                        rootJson(args.toArray(new String[0]));
+                        try { syncModule(next); }
+                        catch(Exception e) { throw new IOException("模块已更新，但应用同步失败；请重新同步模块："+e.getMessage(),e); }
+                    } else commit(candidate);
+                    long now=System.currentTimeMillis();
+                    prefs.edit().putLong("last_rule_update",now).putLong("last_rule_check",now).apply();
+                    return true;
+                }
             } finally { deleteTree(staging); }
         }
     }
