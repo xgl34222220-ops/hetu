@@ -1,0 +1,100 @@
+name: Mihomo APK independent UID VPN acceptance
+on:
+  push:
+    branches: ['feature/mihomo-e2e']
+  workflow_dispatch:
+concurrency:
+  group: mihomo-e2e-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Commit reviewed integration refinements
+        run: |
+          if [ -f tools/prepare_mihomo_e2e.py ]; then
+            python3 tools/prepare_mihomo_e2e.py
+            rm tools/prepare_mihomo_e2e.py
+            git add android-app tools
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Prepare test.2 atomic proxy configuration and recovery controls'
+            git push origin HEAD:feature/mihomo-e2e
+          fi
+      - uses: actions/checkout@v4
+        with:
+          repository: MetaCubeX/mihomo
+          ref: ac017cdd246ce8bd547653d927e7bf77d7ee73d5
+          path: .upstream
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache-dependency-path: .upstream/go.sum
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          log-accepted-android-sdk-licenses: false
+      - name: SDK tools
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;28.2.13676358'
+      - name: Build pinned Mihomo with CMFA userspace Android and gVisor
+        run: |
+          cp -r native/bridge .upstream/bichenbridge
+          cd .upstream
+          go test -tags 'with_gvisor,cmfa' -v ./bichenbridge
+          NDK="$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          OUT=../android-app/app/src/main/jniLibs
+          mkdir -p "$OUT/arm64-v8a" "$OUT/x86_64" ../android-app/app/src/main/assets/licenses
+          CGO_ENABLED=1 GOOS=android GOARCH=arm64 CC="$NDK/aarch64-linux-android26-clang" go build -tags 'with_gvisor,cmfa' -trimpath -buildmode=c-shared -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' -o "$OUT/arm64-v8a/libbichen_core.so" ./bichenbridge
+          CGO_ENABLED=1 GOOS=android GOARCH=amd64 CC="$NDK/x86_64-linux-android26-clang" go build -tags 'with_gvisor,cmfa' -trimpath -buildmode=c-shared -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' -o "$OUT/x86_64/libbichen_core.so" ./bichenbridge
+          cp LICENSE ../android-app/app/src/main/assets/licenses/mihomo-GPL3.txt
+          printf '%s\n' ac017cdd246ce8bd547653d927e7bf77d7ee73d5 > ../android-app/app/src/main/assets/licenses/mihomo-revision.txt
+          printf '%s\n' 'with_gvisor,cmfa' > ../android-app/app/src/main/assets/licenses/mihomo-build-tags.txt
+      - name: Build APK and existing regressions
+        run: python3 tools/build_preview.py
+      - name: Emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Installed APK, real native service, separate UID traffic
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-boot-timeout: 360
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-metrics -camera-back none
+          script: |
+            adb shell input keyevent KEYCODE_WAKEUP
+            adb shell wm dismiss-keyguard
+            python3 tools/test_device.py
+            python3 tools/test_mihomo_device.py
+      - name: Preserve unsigned install candidate and test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: INTERNAL-Mihomo-e2e-unsigned
+          path: |
+            out/preview/*-unsigned.apk
+            out/preview/*-source.zip
+            out/preview/apksigner.jar
+            out/preview/build-info.json
+            out/preview/apk-badging.txt
+            out/device/device-results.txt
+            out/device/screenshots/*.png
+            out/mihomo/*.txt
+            out/mihomo/*.json
+            out/mihomo/*.png
+          if-no-files-found: error
+          retention-days: 14
