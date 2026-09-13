@@ -1,0 +1,32 @@
+name: Build pinned Mihomo Android bridge
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: MetaCubeX/mihomo
+          ref: ac017cdd246ce8bd547653d927e7bf77d7ee73d5
+          path: .upstream
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.1'
+          cache-dependency-path: .upstream/go.sum
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager 'ndk;28.2.13676358'
+      - name: Build required gVisor and Android application variant
+        run: bash tools/build_mihomo.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bichen-native-internal
+          path: |
+            android-app/app/src/main/jniLibs/**/*.so
+            android-app/app/src/main/assets/MIHOMO-LICENSE
+            android-app/app/src/main/assets/mihomo-*.txt
+          retention-days: 14

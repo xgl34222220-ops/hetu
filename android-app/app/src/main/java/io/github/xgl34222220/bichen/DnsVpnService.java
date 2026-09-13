@@ -95,6 +95,7 @@ public final class DnsVpnService extends VpnService {
     }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
+        if(MihomoVpnService.engaged){stopSelf(startId);return START_NOT_STICKY;}
         latestStartId = startId;
         String action = intent == null ? (prefs.getBoolean("vpnWanted", false) ? ACTION_START : ACTION_STOP) : intent.getAction();
         int command = ACTION_RELOAD.equals(action) ? commandSequence.get() : commandSequence.incrementAndGet();
