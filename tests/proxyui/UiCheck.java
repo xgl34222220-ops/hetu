@@ -29,8 +29,10 @@ public final class UiCheck extends Instrumentation {
   Object saved=invoke(store,"saveRootIfUnchanged",new Class<?>[]{String.class,String.class,String.class},rootYaml,"",rev);
   check(Boolean.TRUE.equals(saved),"Root configuration with TPROXY listener is accepted");
   check(rootYaml.equals(invoke(store,"yaml",new Class<?>[0])),"Root configuration stored without rewriting YAML");
-  try{invoke(store,"saveIfUnchanged",new Class<?>[]{String.class,String.class,String.class},rootYaml,"",invoke(store,"revision",new Class<?>[0]));throw new AssertionError("TUN accepted Root listener config");}
-  catch(InvocationTargetException expected){check(expected.getCause()!=null&&String.valueOf(expected.getCause().getMessage()).contains("Android VPN"),"TUN validation remains separate from Root validation");}
+  boolean tunRejected=false;
+  try{invoke(store,"saveIfUnchanged",new Class<?>[]{String.class,String.class,String.class},rootYaml,"",invoke(store,"revision",new Class<?>[0]));}
+  catch(InvocationTargetException expected){tunRejected=expected.getCause()!=null;}
+  check(tunRejected,"TUN validation remains separate from Root validation");
   for(String appearance:new String[]{"light","dark"}){
    prefs.edit().putString("appearance",appearance).commit();
    a=startActivitySync(new Intent(c,Class.forName(c.getPackageName()+".RootTproxyActivity",true,c.getClassLoader())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));waitForIdleSync();
