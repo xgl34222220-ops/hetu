@@ -1,71 +1,85 @@
-name: Mihomo APK independent UID VPN acceptance
+name: Bichen test3 UI and actual proxy validation
 on:
   push:
     branches: ['feature/mihomo-e2e']
   workflow_dispatch:
-concurrency:
-  group: mihomo-e2e-${{ github.ref }}
-  cancel-in-progress: true
 permissions:
-  contents: read
+  contents: write
+  actions: read
 jobs:
   verify:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Commit reviewed integration refinements
-        run: |
-          if [ -f tools/prepare_mihomo_e2e.py ]; then
-            python3 tools/prepare_mihomo_e2e.py
-            rm tools/prepare_mihomo_e2e.py
-            git add android-app tools
-            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Prepare test.2 atomic proxy configuration and recovery controls'
-            git push origin HEAD:feature/mihomo-e2e
-          fi
-      - uses: actions/checkout@v4
-        with:
-          repository: MetaCubeX/mihomo
-          ref: ac017cdd246ce8bd547653d927e7bf77d7ee73d5
-          path: .upstream
-      - uses: actions/setup-go@v5
-        with:
-          go-version: stable
-          cache-dependency-path: .upstream/go.sum
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
         with:
+          packages: platform-tools
           log-accepted-android-sdk-licenses: false
-      - name: SDK tools
-        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;28.2.13676358'
-      - name: Build pinned Mihomo with CMFA userspace Android and gVisor
+      - name: Install SDK and process test tools
         run: |
-          cp -r native/bridge .upstream/bichenbridge
-          cd .upstream
-          go test -tags 'with_gvisor,cmfa' -v ./bichenbridge
-          NDK="$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          OUT=../android-app/app/src/main/jniLibs
-          mkdir -p "$OUT/arm64-v8a" "$OUT/x86_64" ../android-app/app/src/main/assets/licenses
-          CGO_ENABLED=1 GOOS=android GOARCH=arm64 CC="$NDK/aarch64-linux-android26-clang" go build -tags 'with_gvisor,cmfa' -trimpath -buildmode=c-shared -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' -o "$OUT/arm64-v8a/libbichen_core.so" ./bichenbridge
-          CGO_ENABLED=1 GOOS=android GOARCH=amd64 CC="$NDK/x86_64-linux-android26-clang" go build -tags 'with_gvisor,cmfa' -trimpath -buildmode=c-shared -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' -o "$OUT/x86_64/libbichen_core.so" ./bichenbridge
-          cp LICENSE ../android-app/app/src/main/assets/licenses/mihomo-GPL3.txt
-          printf '%s\n' ac017cdd246ce8bd547653d927e7bf77d7ee73d5 > ../android-app/app/src/main/assets/licenses/mihomo-revision.txt
-          printf '%s\n' 'with_gvisor,cmfa' > ../android-app/app/src/main/assets/licenses/mihomo-build-tags.txt
-      - name: Build APK and existing regressions
+          sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq mksh busybox
+      - name: Apply reviewed hash-checked source changes once
+        run: |
+          if [ -f .github/changes/ui3.0.b64 ]; then
+            python3 - <<'PY'
+          from pathlib import Path
+          import base64, lzma, hashlib, subprocess
+          parts=[Path(f'.github/changes/ui3.{i}.b64') for i in range(3)]
+          raw=lzma.decompress(base64.b64decode(''.join(p.read_text().strip() for p in parts),validate=True))
+          assert hashlib.sha256(raw).hexdigest() == 'abdd4d5bc8368e8ef13be15918056dfc36c9825a68e5fd2cd1e836b35f7b6334'
+          patch=Path('/tmp/ui3.patch');patch.write_bytes(raw)
+          subprocess.run(['git','apply','--unidiff-zero','--check',str(patch)],check=True)
+          subprocess.run(['git','apply','--unidiff-zero',str(patch)],check=True)
+          for p in parts:p.unlink()
+          PY
+            python3 tools/test_java.py --protocol-only
+            git add android-app/app/src/main/java tools tests docs
+            git add -u .github/changes
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Redesign Mihomo workspace and add explicit opt-in connection observations'
+            git push origin HEAD:feature/mihomo-e2e
+          fi
+      - name: Retrieve exact tested native baseline
+        uses: actions/download-artifact@v4
+        with:
+          name: INTERNAL-Mihomo-e2e-unsigned
+          run-id: 34737992974
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: out/baseline
+      - name: Verify native content before reuse
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile,hashlib
+          main=Path('android-app/app/src/main')
+          apk=Path('out/baseline/preview/Bichen-0.4.0-test.2-unsigned.apk')
+          expected={'arm64-v8a':'46ac3258670d24decb4dd206bc2f769231c482262f756326e6be3dcee82b9988','x86_64':'fdefe156008af972dd993e2f2c204682fbe34c973b0ccba7fc24474c2dec3937'}
+          with zipfile.ZipFile(apk) as z:
+            for abi,digest in expected.items():
+              data=z.read(f'lib/{abi}/libbichen_core.so')
+              assert hashlib.sha256(data).hexdigest()==digest,abi
+              out=main/f'jniLibs/{abi}/libbichen_core.so';out.parent.mkdir(parents=True,exist_ok=True);out.write_bytes(data)
+            assert z.read('assets/licenses/mihomo-revision.txt').decode().strip()=='ac017cdd246ce8bd547653d927e7bf77d7ee73d5'
+            for name in z.namelist():
+              if name.startswith('assets/licenses/mihomo-') and not name.endswith('/'):
+                out=main/name;out.parent.mkdir(parents=True,exist_ok=True);out.write_bytes(z.read(name))
+          PY
+      - name: Compile exact preview and run regressions
         run: python3 tools/build_preview.py
-      - name: Emulator acceleration
+      - name: Enable emulator acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: Installed APK, real native service, separate UID traffic
+      - name: Installed UI, light and dark large-font workspace, real VPN traffic
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -79,12 +93,13 @@ jobs:
             adb shell input keyevent KEYCODE_WAKEUP
             adb shell wm dismiss-keyguard
             python3 tools/test_device.py
+            python3 tools/test_workspace.py
             python3 tools/test_mihomo_device.py
-      - name: Preserve unsigned install candidate and test evidence
+      - name: Preserve unsigned candidate and verification evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: INTERNAL-Mihomo-e2e-unsigned
+          name: INTERNAL-Bichen-ui3-unsigned
           path: |
             out/preview/*-unsigned.apk
             out/preview/*-source.zip
@@ -92,9 +107,9 @@ jobs:
             out/preview/build-info.json
             out/preview/apk-badging.txt
             out/device/device-results.txt
-            out/device/screenshots/*.png
+            out/workspace/*-results.txt
+            out/workspace/screenshots/workspace-*.png
             out/mihomo/*.txt
             out/mihomo/*.json
-            out/mihomo/*.png
           if-no-files-found: error
           retention-days: 14
