@@ -19,8 +19,8 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 BASE = 'io.github.xgl34222220.bichen'
 PREVIEW = BASE + '.preview'
-VERSION = '0.4.0-test.6'
-CODE = 406
+VERSION = '0.4.0-test.7'
+CODE = 407
 
 def run(*args: str | Path, cwd: Path) -> None:
     subprocess.run([str(a) for a in args], cwd=cwd, check=True)
@@ -61,7 +61,6 @@ def main() -> None:
         basic_text = basic.read_text()
         for required in ('基础代理配置','核心选择','运行模式','IPv6','自动覆写','配置选择','Mihomo','TPROXY','TUN'):
             assert required in basic_text
-        # Architecture assertions replace the old single-config saveRootIfUnchanged gate.
         for required in ('ProxyCoreStore','ProxyConfigLibrary','ProxyRuntimeProfile','RootProxyManager','root.prepare'):
             assert required in basic_text
         for source_name in ('ProxyCoreStore.java','ProxyConfigLibrary.java','ProxyRuntimeProfile.java','RootProxyManager.java'):
