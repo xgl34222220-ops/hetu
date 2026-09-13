@@ -28,15 +28,30 @@ final class ProxyStore {
   }
  }
  String yaml()throws Exception{synchronized(LOCK){String value=document().optString("yaml","");if(value.isEmpty())throw new IOException("请先导入 YAML 配置");return value;}}
- void save(String yaml,String subscription)throws Exception{
+ String revision()throws Exception{synchronized(LOCK){return revision(document());}}
+ private static String revision(JSONObject d)throws Exception{
+  if(!d.has("yaml"))return "";
+  java.security.MessageDigest md=java.security.MessageDigest.getInstance("SHA-256");
+  md.update(d.optString("yaml").getBytes(StandardCharsets.UTF_8));md.update((byte)0);md.update(d.optString("subscription").getBytes(StandardCharsets.UTF_8));
+  StringBuilder hex=new StringBuilder();for(byte v:md.digest())hex.append(String.format(java.util.Locale.ROOT,"%02x",v&255));return hex.toString();
+ }
+ JSONObject info()throws Exception{synchronized(LOCK){JSONObject d=document();String rev=revision(d);return new JSONObject().put("exists",d.has("yaml")).put("subscription",!d.optString("subscription").isEmpty()).put("revision",rev.isEmpty()?"":rev.substring(0,12)).put("hasPrevious",d.has("previousYaml")).put("checkedAt",d.optLong("checkedAt")).put("savedAt",d.optLong("savedAt"));}}
+ void save(String yaml,String subscription)throws Exception{saveIfUnchanged(yaml,subscription,null);}
+ boolean saveIfUnchanged(String yaml,String subscription,String expectedRevision)throws Exception{
+  if(MihomoVpnService.engaged)throw new IOException("请先停止代理，再修改配置");
   if(yaml.getBytes(StandardCharsets.UTF_8).length>LIMIT)throw new IOException("配置超过 4 MiB");
   MihomoNative.call(new JSONObject().put("action","inspect").put("yaml",yaml));
-  synchronized(LOCK){if(MihomoVpnService.engaged)throw new IOException("代理运行中，不替换配置；请先停止");JSONObject current=document();JSONObject next=new JSONObject().put("yaml",yaml).put("subscription",subscription==null?"":subscription);
-   if(current.has("yaml"))next.put("previousYaml",current.getString("yaml")).put("previousSubscription",current.optString("subscription",""));write(next);
+  synchronized(LOCK){
+   if(MihomoVpnService.engaged)throw new IOException("代理运行中，不替换配置；请先停止");JSONObject current=document();
+   if(expectedRevision!=null&&!expectedRevision.equals(revision(current)))throw new IOException("下载期间配置已被修改，本次旧结果未覆盖新配置");
+   String address=subscription==null?"":subscription;long now=System.currentTimeMillis();
+   if(yaml.equals(current.optString("yaml"))&&address.equals(current.optString("subscription"))){current.put("checkedAt",now);write(current);return false;}
+   JSONObject next=new JSONObject().put("yaml",yaml).put("subscription",address).put("checkedAt",now).put("savedAt",now);
+   if(current.has("yaml"))next.put("previousYaml",current.getString("yaml")).put("previousSubscription",current.optString("subscription","")).put("previousSavedAt",current.optLong("savedAt"));write(next);return true;
   }
  }
  String subscription()throws Exception{synchronized(LOCK){return document().optString("subscription","");}}
- void restore()throws Exception{synchronized(LOCK){if(MihomoVpnService.engaged)throw new IOException("请先停止代理");JSONObject d=document();if(!d.has("previousYaml"))throw new IOException("没有上一份配置");JSONObject next=new JSONObject().put("yaml",d.getString("previousYaml")).put("subscription",d.optString("previousSubscription","")).put("previousYaml",d.getString("yaml")).put("previousSubscription",d.optString("subscription",""));write(next);}}
+ void restore()throws Exception{synchronized(LOCK){if(MihomoVpnService.engaged)throw new IOException("请先停止代理");JSONObject d=document();if(!d.has("previousYaml"))throw new IOException("没有上一份配置");JSONObject next=new JSONObject().put("yaml",d.getString("previousYaml")).put("subscription",d.optString("previousSubscription","")).put("previousYaml",d.getString("yaml")).put("previousSubscription",d.optString("subscription","")).put("savedAt",d.optLong("previousSavedAt")).put("previousSavedAt",d.optLong("savedAt")).put("checkedAt",System.currentTimeMillis());write(next);}}
  private void write(JSONObject document)throws IOException{
   if(!root.isDirectory()&&!root.mkdirs())throw new IOException("无法建立配置私有目录");AtomicFile f=file();FileOutputStream out=null;
   try{out=f.startWrite();out.write(document.toString().getBytes(StandardCharsets.UTF_8));f.finishWrite(out);}catch(IOException e){if(out!=null)f.failWrite(out);throw e;}

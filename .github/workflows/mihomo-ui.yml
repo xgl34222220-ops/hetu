@@ -1,0 +1,116 @@
+name: Bichen Mihomo UI and traffic verification
+on:
+  push:
+    branches: ['feature/mihomo-ui']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply checked UI changes and commit actual source
+        run: |
+          if [ -f .github/changes/ui-test3.part0 ]; then
+            python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, lzma, subprocess
+          packed=b''.join(Path(f'.github/changes/ui-test3.part{i}').read_bytes() for i in range(4))
+          assert hashlib.sha256(packed).hexdigest()=='935c92bcf2dc8271d8aefd51c39c8613be96deba3dd9ed8d59d0b6f92b5f0401'
+          patch=lzma.decompress(packed)
+          assert hashlib.sha256(patch).hexdigest()=='6c284029387bfad98913fd59267d04fb5f0282a101034326180d0615b177f3bd'
+          path=Path('/tmp/bichen-ui.patch');path.write_bytes(patch)
+          subprocess.run(['git','apply','--check',str(path)],check=True)
+          subprocess.run(['git','apply',str(path)],check=True)
+          PY
+            rm .github/changes/ui-test3.part*
+            git add -A
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Unify Mihomo UI, add searchable nodes and bounded opt-in connection observations'
+            git push origin HEAD:feature/mihomo-ui
+          fi
+          test -z "$(git diff 7e6e3c82223875dc79023fb512ec8ebd82995ef7 HEAD -- native/bridge)"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - name: Install build tools
+        run: |
+          sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq mksh busybox
+      - uses: actions/download-artifact@v4
+        with:
+          name: INTERNAL-Mihomo-e2e-unsigned
+          run-id: 34737992974
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: out/baseline
+      - name: Reuse identical verified native libraries without changing the core
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,zipfile
+          path=Path('out/baseline/preview/Bichen-0.4.0-test.2-unsigned.apk')
+          assert hashlib.sha256(path.read_bytes()).hexdigest()=='4ac7d86c3615954d8f804fed116a8e315471259646c9965c820992b79ff63137'
+          expected={'arm64-v8a':'46ac3258670d24decb4dd206bc2f769231c482262f756326e6be3dcee82b9988','x86_64':'fdefe156008af972dd993e2f2c204682fbe34c973b0ccba7fc24474c2dec3937'}
+          root=Path('android-app/app/src/main')
+          with zipfile.ZipFile(path) as z:
+              for abi,h in expected.items():
+                  data=z.read(f'lib/{abi}/libbichen_core.so');assert hashlib.sha256(data).hexdigest()==h
+                  dest=root/'jniLibs'/abi/'libbichen_core.so';dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(data)
+              for name in z.namelist():
+                  if name.startswith('assets/licenses/mihomo-') or name.startswith('assets/mihomo-') or name=='assets/MIHOMO-LICENSE':
+                      dest=root/name;dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(z.read(name))
+          PY
+      - name: Build preview and run existing regressions
+        run: python3 tools/build_preview.py
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Verify light and dark UI, storage and real independent-UID VPN traffic
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-boot-timeout: 360
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-metrics -camera-back none
+          script: |
+            adb shell input keyevent KEYCODE_WAKEUP
+            adb shell wm dismiss-keyguard
+            python3 tools/test_device.py
+            python3 tools/test_proxy_ui.py
+            python3 tools/test_mihomo_device.py
+      - name: Preserve unsigned build and verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: INTERNAL-Bichen-ui-test3-unsigned
+          path: |
+            out/preview/*-unsigned.apk
+            out/preview/*-source.zip
+            out/preview/*-module.zip
+            out/preview/apksigner.jar
+            out/preview/build-info.json
+            out/preview/apk-badging.txt
+            out/device/device-results.txt
+            out/device/screenshots/*.png
+            out/proxyui/results.txt
+            out/proxyui/screenshots/ui-*.png
+            out/mihomo/*.txt
+            out/mihomo/*.json
+            out/mihomo/*.png
+          if-no-files-found: error
+          retention-days: 14
