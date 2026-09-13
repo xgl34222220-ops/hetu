@@ -1,7 +1,6 @@
 package io.github.xgl34222220.bichen;
 
 import java.io.IOException;
-import java.util.*;
 import java.util.regex.*;
 
 /** Builds a private Mihomo startup copy. The selected source config is never edited. */
@@ -24,9 +23,15 @@ final class MihomoStartupConfig {
         if(!profile.autoOverwrite)return new Result(source,detectScalarPort(source,"tproxy-port"),detectScalarPort(source,"redir-port"));
 
         String yaml=normalize(source);
+        // Transparent-proxy mode is selected by Bichen. Never feed source listeners for
+        // another runtime (eBPF/TUN/redirect/etc.) into the selected Mihomo process.
+        // The source file stays byte-for-byte unchanged; only this private startup copy is sanitized.
+        yaml=removeTopLevelKey(yaml,"listeners");
+        yaml=removeTopLevelScalar(yaml,"global-client-fingerprint");
         yaml=removeTopLevelScalar(yaml,"tproxy-port");
         yaml=removeTopLevelScalar(yaml,"redir-port");
         yaml=removeTopLevelBlock(yaml,"tun");
+
         int tp=0,rp=0;
         StringBuilder override=new StringBuilder();
         override.append("\n# --- Bichen generated startup override; source file is unchanged ---\n");
@@ -64,12 +69,43 @@ final class MihomoStartupConfig {
     }
 
     private static String normalize(String s){return s.replace("\r\n","\n").replace('\r','\n');}
+
     private static String removeTopLevelScalar(String source,String key){
         StringBuilder out=new StringBuilder();String[] lines=source.split("\n",-1);Pattern p=Pattern.compile("^"+Pattern.quote(key)+"\\s*:");for(String line:lines){if(indent(line)==0&&p.matcher(line).find())continue;out.append(line).append('\n');}return trimOne(out.toString());
     }
+
+    /** Removes a complete top-level mapping value, including block/indentless sequences or flow values. */
+    private static String removeTopLevelKey(String source,String key){
+        String[] lines=source.split("\n",-1);StringBuilder out=new StringBuilder();boolean skipping=false;
+        Pattern start=Pattern.compile("^"+Pattern.quote(key)+"\\s*:(.*)$");
+        Pattern nextKey=Pattern.compile("^[A-Za-z0-9_.-]+\\s*:");
+        for(String line:lines){
+            int ind=indent(line);String t=line.trim();
+            if(!skipping&&ind==0){
+                Matcher m=start.matcher(line);
+                if(m.find()){
+                    String rest=m.group(1).trim();
+                    // Inline/flow value lives entirely on this line. Block values continue below.
+                    skipping=rest.isEmpty()||rest.startsWith("#");
+                    continue;
+                }
+            }
+            if(skipping){
+                if(t.isEmpty())continue;
+                if(ind>0)continue;
+                if(t.startsWith("-"))continue; // valid YAML indentless sequence item
+                if(t.startsWith("#")){out.append(line).append('\n');continue;}
+                if(nextKey.matcher(line).find())skipping=false;
+                else continue;
+            }
+            out.append(line).append('\n');
+        }
+        return trimOne(out.toString());
+    }
+
     private static String removeTopLevelBlock(String source,String key){
         String[] lines=source.split("\n",-1);StringBuilder out=new StringBuilder();boolean skipping=false;Pattern start=Pattern.compile("^"+Pattern.quote(key)+"\\s*:\\s*(?:#.*)?$");
-        for(String line:lines){int ind=indent(line);String t=line.trim();if(!skipping&&ind==0&&start.matcher(line).find()){skipping=true;continue;}if(skipping){if(t.isEmpty()||t.startsWith("#"))continue;if(ind>0)continue;skipping=false;}out.append(line).append('\n');}
+        for(String line:lines){int ind=indent(line);String t=line.trim();if(!skipping&&ind==0&&start.matcher(line).find()){skipping=true;continue;}if(skipping){if(t.isEmpty())continue;if(ind>0)continue;if(t.startsWith("#")){out.append(line).append('\n');continue;}skipping=false;}out.append(line).append('\n');}
         return trimOne(out.toString());
     }
     private static int indent(String s){int n=0;while(n<s.length()&&(s.charAt(n)==' '||s.charAt(n)=='\t'))n++;return n;}
