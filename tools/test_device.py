@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Install built preview on a CI emulator, then test actual UI and synthetic state fixtures."""
-import os, subprocess, zipfile, json
+import os, subprocess, zipfile, json, time
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/'out/device'; OUT.mkdir(parents=True,exist_ok=True)
@@ -32,6 +32,20 @@ run('adb','shell','settings','put','system','system_locales','zh-CN')
 run('adb','shell','settings','put','system','font_scale','1.3')
 proc=run('adb','shell','am','instrument','-w','-e','expectedVersion',version,'bichen.devicecheck/.Smoke',capture_output=True,text=True,timeout=150)
 (OUT/'device-results.txt').write_text(proc.stdout+'\n'+proc.stderr);print(proc.stdout)
-run('adb','root');run('adb','wait-for-device')
-run('adb','pull','/data/user/0/io.github.xgl34222220.bichen.preview/files',OUT/'screenshots')
 assert 'BICHEN_DEVICE_PASS' in proc.stdout and 'BICHEN_DEVICE_FAIL' not in proc.stdout
+# adb root restarts adbd and can return "closed" before the new daemon connects.
+# This is only the disposable CI emulator, after app tests have finished. Check
+# actual UID instead of treating a closed transport as a test/application failure.
+restart=subprocess.run(['adb','root'],capture_output=True,text=True,timeout=15)
+print(restart.stdout+restart.stderr)
+run('adb','wait-for-device',timeout=30)
+root_ready=False
+for attempt in range(20):
+ uid=subprocess.run(['adb','shell','id','-u'],capture_output=True,text=True,timeout=5)
+ if uid.returncode==0 and uid.stdout.strip()=='0':
+  root_ready=True;break
+ time.sleep(0.25)
+assert root_ready, 'CI emulator did not allow screenshot collection; UI result saved separately'
+run('adb','pull','/data/user/0/io.github.xgl34222220.bichen.preview/files',OUT/'screenshots',timeout=30)
+shots=list((OUT/'screenshots').glob('actual-page-*.png'))
+assert len(shots)==4, 'Expected four actual-page screenshots'
