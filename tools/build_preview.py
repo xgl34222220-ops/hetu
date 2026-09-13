@@ -40,6 +40,9 @@ def main() -> None:
         manifest = main_dir / 'AndroidManifest.xml'
         value = manifest.read_text()
         assert f'package="{BASE}"' in value
+        # A preview must still expose exactly one launcher. Internal proxy/settings
+        # activities must never become a second desktop icon again.
+        assert value.count('android.intent.category.LAUNCHER') == 1
         value = value.replace(f'package="{BASE}"', f'package="{PREVIEW}"')
         value = value.replace('android:label="辟尘"', 'android:label="辟尘·测试"')
         value = re.sub(r'android:versionCode="[^"]+"', f'android:versionCode="{CODE}"', value)
@@ -53,6 +56,17 @@ def main() -> None:
                 text = text.replace('"辟尘"', '"辟尘·测试"')
                 text = text.replace('"少一点打扰，多一点清净"', '"测试版 · 请先停止旧版保护与自动更新"')
             path.write_text(text)
+        # Keep the complete four-tab proxy console. Basic proxy settings are an
+        # internal configuration page, never a replacement launcher/activity.
+        proxy = main_dir / 'java/io/github/xgl34222220/bichen/ProxyActivity.java'
+        proxy_text = proxy.read_text()
+        if '"基础代理配置","核心 · 运行模式 · IPv6 · 自动覆写"' not in proxy_text:
+            anchor = 'LinearLayout c=u.card(body);configLabel=u.text(configTitle(),19,u.text,true);c.addView(configLabel);u.gap(c,8);c.addView(u.text(configDetail(),12,u.muted,false));'
+            assert anchor in proxy_text
+            proxy_text = proxy_text.replace(anchor, anchor + '\n        u.action(c,"settings","基础代理配置","核心 · 运行模式 · IPv6 · 自动覆写",()->startActivity(new Intent(this,RootTproxyActivity.class)));', 1)
+        proxy_text = proxy_text.replace('"内核 "+coreVersion+" · Android VPN"', '"Mihomo · TUN / Root TPROXY"')
+        proxy_text = proxy_text.replace('本轮为 Android VPN，Root TPROXY / 特殊 eBPF 未接通。', 'TUN 使用 Android 系统 VPN；Root TPROXY 已接入“基础代理配置”。eBPF / Redirect / Mixed / Enhance 当前仍未接通运行后端。')
+        proxy.write_text(proxy_text)
         process_test = stage / 'tests/root_process_test.py'
         process_test.write_text(process_test.read_text().replace(BASE, PREVIEW))
         test_script = stage / 'tools/test_java.py'
@@ -74,6 +88,8 @@ def main() -> None:
         assert f"package: name='{PREVIEW}'" in badging
         assert f"versionName='{VERSION}'" in badging and f"versionCode='{CODE}'" in badging
         assert f"launchable-activity: name='{PREVIEW}.MainActivity'" in badging
+        # AAPT must expose only the main app as a launcher.
+        assert badging.count('launchable-activity:') == 1
         (out / 'apk-badging.txt').write_text(badging)
         with zipfile.ZipFile(unsigned) as apk:
             assert apk.testzip() is None
@@ -82,8 +98,9 @@ def main() -> None:
             assert hashlib.sha256(module).hexdigest() == info['sha256']
             assert info['version'] == '0.3.0-beta.1' and info['versionCode'] == 301
             dex = apk.read('classes.dex')
-            for name in ('DnsResponseFilter', 'NetworkEpoch', 'RuleUpdateGate', 'RuleProfiles', 'RootShellCommand', 'ModuleArchive'):
+            for name in ('DnsResponseFilter', 'NetworkEpoch', 'RuleUpdateGate', 'RuleProfiles', 'RootShellCommand', 'ModuleArchive', 'RootTproxyActivity', 'RootTproxyManager'):
                 assert f'Lio/github/xgl34222220/bichen/preview/{name};'.encode() in dex
+            assert '基础代理配置'.encode('utf-8') in dex
         (out / 'Bichen-0.3.0-beta.1-module.zip').write_bytes(module)
         shutil.copyfile(tools / 'lib/apksigner.jar', out / 'apksigner.jar')
         meta = {'sourceCommit': revision, 'versionName': VERSION, 'versionCode': CODE, 'packageName': PREVIEW,
