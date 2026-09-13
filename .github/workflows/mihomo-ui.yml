@@ -1,7 +1,7 @@
 name: Bichen Mihomo UI and traffic verification
 on:
   push:
-    branches: ['feature/mihomo-ui', 'feature/mihomo-filter-hardening', 'feature/root-tproxy']
+    branches: ['feature/mihomo-ui', 'feature/mihomo-filter-hardening', 'feature/root-tproxy', 'feature/boxproxy-architecture']
   workflow_dispatch:
 concurrency:
   group: bichen-mihomo-${{ github.workflow }}-${{ github.ref }}
@@ -81,16 +81,16 @@ jobs:
             adb shell wm dismiss-keyguard
             python3 tools/test_device.py
             python3 tools/test_proxy_ui.py
-            if [ "${{ github.ref_name }}" != "feature/root-tproxy" ]; then
+            if [ "${{ github.ref_name }}" = "feature/mihomo-ui" ] || [ "${{ github.ref_name }}" = "feature/mihomo-filter-hardening" ]; then
               python3 tools/test_mihomo_device.py
             else
-              echo 'Root TPROXY requires a rooted kernel/iptables environment; Android TUN traffic E2E is covered on feature/mihomo-ui.'
+              echo 'Root proxy architecture requires rooted kernel/iptables validation on a real device; Android TUN E2E remains covered on feature/mihomo-ui.'
             fi
       - name: Preserve unsigned build and verification evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: INTERNAL-Bichen-root-tproxy-unsigned
+          name: INTERNAL-Bichen-proxy-architecture-unsigned
           path: |
             out/preview/*-unsigned.apk
             out/preview/*-source.zip
