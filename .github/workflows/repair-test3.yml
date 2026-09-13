@@ -1,0 +1,76 @@
+name: Repair Bichen test3 and check Android installation
+on:
+  push:
+    branches: ['improve/cname-profiles-20260913']
+    paths: ['.github/workflows/repair-test3.yml', '.github/changes/test3-repair.patch.xz']
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: improve/cname-profiles-20260913
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Apply verified repair and commit actual source
+        run: |
+          test "$(git rev-parse HEAD^)" = "f1c474ab4124afe687f552eaac7909923a265a64"
+          python3 - <<'PY'
+          import lzma, hashlib, subprocess
+          from pathlib import Path
+          raw=lzma.decompress(Path('.github/changes/test3-repair.patch.xz').read_bytes())
+          assert hashlib.sha256(raw).hexdigest() == 'ebe3b2877a7232865500b7b4e0e089541f4e0f1df7e1ee8a14b6b2f3ab19388f'
+          patch=Path('/tmp/test3-repair.patch');patch.write_bytes(raw)
+          subprocess.run(['git','apply','--unidiff-zero','--check',str(patch)],check=True)
+          subprocess.run(['git','apply','--unidiff-zero',str(patch)],check=True)
+          PY
+          python3 tools/test_java.py --protocol-only
+          python3 -m unittest discover -s tests -p '*test.py' -v
+          rm .github/changes/test3-repair.patch.xz .github/workflows/repair-test3.yml
+          git add -A
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Restore original APK icon and validate module handoff before install/export'
+          git push origin HEAD:improve/cname-profiles-20260913
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - name: Install build SDK
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Build exact test3 code and run protocol and module tests
+        run: python3 tools/build_preview.py
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install APK and test real Android UI, icon and module export
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-boot-timeout: 360
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: python3 tools/test_device.py
+      - name: Upload private-signing handoff and device evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: Bichen-test3-repaired-handoff
+          path: |
+            out/preview/Bichen-0.3.0-test.3-unsigned.apk
+            out/preview/Bichen-0.3.0-beta.1-module.zip
+            out/preview/apksigner.jar
+            out/preview/build-info.json
+            out/preview/apk-badging.txt
+            out/device/device-results.txt
+            out/device/screenshots/*.png
+          if-no-files-found: error
+          retention-days: 14
