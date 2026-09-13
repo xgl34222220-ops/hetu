@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""New real Android interface/storage checks; reuse the CI-only test certificate."""
+"""Real Android proxy interface/storage/action checks; reuse the CI-only certificate."""
 import os,subprocess,zipfile
 from pathlib import Path
 r=Path(__file__).resolve().parents[1];o=r/'out/proxyui';o.mkdir(parents=True,exist_ok=True)
@@ -16,9 +16,13 @@ with zipfile.ZipFile(o/'unsigned.apk','a') as z:
  for p in dex.glob('*.dex'):z.write(p,p.name)
 run(t/'zipalign','-f','4',o/'unsigned.apk',o/'aligned.apk')
 run(t/'apksigner','sign','--ks',key,'--ks-key-alias','test','--ks-pass','pass:android','--key-pass','pass:android','--v4-signing-enabled','false','--out',o/'test.apk',o/'aligned.apk')
-run('adb','install','-r',o/'test.apk');run('adb','shell','am','force-stop','io.github.xgl34222220.bichen.preview')
-p=run('adb','shell','am','instrument','-w','bichen.proxyuicheck/.UiCheck',capture_output=True,text=True,timeout=180)
-(o/'results.txt').write_text(p.stdout+p.stderr);print(p.stdout)
-# prior test_device already restarted disposable emulator adbd as root.
-run('adb','pull','/data/user/0/io.github.xgl34222220.bichen.preview/files',o/'screenshots',timeout=30)
+run('adb','install','-r',o/'test.apk');run('adb','shell','am','force-stop','io.github.xgl34222220.bichen.preview');run('adb','logcat','-c')
+try:
+ p=run('adb','shell','am','instrument','-w','bichen.proxyuicheck/.UiCheck',capture_output=True,text=True,timeout=180)
+ (o/'results.txt').write_text(p.stdout+p.stderr);print(p.stdout)
+finally:
+ log=subprocess.run(['adb','logcat','-d','-t','1800'],capture_output=True,text=True)
+ (o/'android-logcat.txt').write_text(log.stdout+log.stderr)
+ # prior test_device already restarted disposable emulator adbd as root.
+ subprocess.run(['adb','pull','/data/user/0/io.github.xgl34222220.bichen.preview/files',str(o/'screenshots')],capture_output=True,text=True,timeout=30)
 assert 'BICHEN_PROXY_UI_PASS' in p.stdout and 'BICHEN_PROXY_UI_FAIL' not in p.stdout
