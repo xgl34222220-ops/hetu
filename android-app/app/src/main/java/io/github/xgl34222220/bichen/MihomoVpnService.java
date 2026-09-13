@@ -82,7 +82,8 @@ public final class MihomoVpnService extends VpnService {
   b.setConfigureIntent(PendingIntent.getActivity(this,401,new Intent(this,ProxyActivity.class),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE));
   descriptor=b.establish();if(descriptor==null)throw new IOException("系统没有建立 VPN 接口");
   JSONObject start=new JSONObject().put("action","start").put("home",store.home().getAbsolutePath()).put("yaml",yaml).put("fd",descriptor.getFd()).put("filter",applied.filterEnabled).put("dnsGuard",dnsGuardEnabled);
-  if(applied.filterEnabled)start.put("domains",new JSONArray(projected.exact)).put("suffixDomains",new JSONArray(projected.suffix)).put("allowDomains",new JSONArray(projected.allow));
+  if(applied.filterEnabled)start.put("domains",new JSONArray(projected.exact)).put("suffixDomains",new JSONArray(projected.suffix));
+  if(applied.filterEnabled||dnsGuardEnabled)start.put("allowDomains",new JSONArray(projected.allow));
   if(dnsGuardEnabled)start.put("dohDomains",new JSONArray(dohDomains));
   MihomoNative.call(start);
   if(stopping||destroyed){finishStop();return;}
