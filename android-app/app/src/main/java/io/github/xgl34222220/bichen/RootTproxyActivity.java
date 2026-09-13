@@ -134,7 +134,7 @@ public final class RootTproxyActivity extends Activity {
     private void showMessage(String text){if(message==null)return;message.setText(text);message.setVisibility(TextUtils.isEmpty(text)?View.GONE:View.VISIBLE);}
     private String safe(Exception e){String text=e.getMessage();if(TextUtils.isEmpty(text))return"代理操作失败，请刷新状态";return text.length()>500?text.substring(0,500)+"…":text;}
 
-    @Override protected void onActivityResult(int requestCode,int resultCode,Intent data){super.onActivityResult(requestCode,resultCode,data);if(requestCode==REQ_TUN){if(resultCode==RESULT_OK)launchTun();else showMessage("VPN 未授权，未启动 TUN");return;}if(requestCode==PICK_YAML&&resultCode==RESULT_OK&&data!=null&&data.getData()!=null){task(()->{String yaml=ProxyStore.read(getContentResolver().openInputStream(data.getData()));String revision=store.revision();store.saveIfUnchanged(yaml,"",revision);ui.post(this::refresh);return"配置已导入";});}}
+    @Override protected void onActivityResult(int requestCode,int resultCode,Intent data){super.onActivityResult(requestCode,resultCode,data);if(requestCode==REQ_TUN){if(resultCode==RESULT_OK)launchTun();else showMessage("VPN 未授权，未启动 TUN");return;}if(requestCode==PICK_YAML&&resultCode==RESULT_OK&&data!=null&&data.getData()!=null){task(()->{String yaml=ProxyStore.read(getContentResolver().openInputStream(data.getData()));String revision=store.revision();store.saveRootIfUnchanged(yaml,"",revision);ui.post(this::refresh);return"配置已导入";});}}
     @Override public void onResume(){super.onResume();if(prefs!=null)refresh();}
     @Override public void onDestroy(){destroyed=true;worker.shutdownNow();super.onDestroy();}
 }
