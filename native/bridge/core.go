@@ -88,6 +88,19 @@ func mergePortStrings(value any,required ...string)([]string,error){
  switch v:=value.(type){case nil:case string:add(v);case []string:for _,s:=range v{add(s)};case []any:for _,x:=range v{switch p:=x.(type){case string:add(p);case int:add(fmt.Sprint(p));case int64:add(fmt.Sprint(p));case uint64:add(fmt.Sprint(p));default:return nil,errors.New("sniffer 端口格式无效")}};default:return nil,errors.New("sniffer 端口格式无效")}
  for _,s:=range required{add(s)};return out,nil
 }
+func stringList(value any,kind string)([]string,error){
+ out:=make([]string,0)
+ switch v:=value.(type){case nil:return out,nil;case string:out=append(out,v);case []string:out=append(out,v...);case []any:for _,x:=range v{s,ok:=x.(string);if !ok{return nil,errors.New(kind+"格式无效")};out=append(out,s)};default:return nil,errors.New(kind+"格式无效")}
+ return out,nil
+}
+func migrateLegacySniffer(s map[string]any,sniff map[string]any)error{
+ if len(sniff)>0{return nil}
+ names,err:=stringList(s["sniffing"],"sniffer.sniffing");if err!=nil{return err};if len(names)==0{return nil}
+ ports,err:=mergePortStrings(s["port-whitelist"]);if err!=nil{return err}
+ override:=false;if raw,ok:=s["override-destination"];ok{var valid bool;override,valid=raw.(bool);if !valid{return errors.New("sniffer.override-destination 格式无效")}}
+ for _,name:=range names{name=strings.ToUpper(strings.TrimSpace(name));if name==""{continue};if _,exists:=sniff[name];!exists{sniff[name]=map[string]any{"ports":append([]string(nil),ports...),"override-destination":override}}}
+ return nil
+}
 func ensureSniffProtocol(sniff map[string]any,name string,required ...string)error{
  key:="";for existing:=range sniff{if strings.EqualFold(existing,name){key=existing;break}}
  existed:=key!="";if !existed{key=name}
@@ -104,6 +117,7 @@ func enableDnsGuardSniffer(m map[string]any)error{
  if !exists{s["override-destination"]=false}
  var sniff map[string]any
  if rawSniff,ok:=s["sniff"];ok{var valid bool;sniff,valid=rawSniff.(map[string]any);if !valid{return errors.New("sniffer.sniff 配置格式无效")}}else{sniff=map[string]any{}}
+ if err:=migrateLegacySniffer(s,sniff);err!=nil{return err}
  if err:=ensureSniffProtocol(sniff,"TLS","443","853");err!=nil{return err}
  if err:=ensureSniffProtocol(sniff,"QUIC","443","853");err!=nil{return err}
  s["sniff"]=sniff;m["sniffer"]=s;return nil
