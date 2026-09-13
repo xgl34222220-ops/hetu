@@ -3,6 +3,8 @@ import android.app.*;
 import android.os.Bundle;
 import java.net.*;
 import java.io.*;
+import java.util.*;
+import javax.net.ssl.*;
 /** Independent app UID, not excluded by Bichen's VPN. No public network target. */
 public final class Probe extends Instrumentation {
  private String mode;private StringBuilder log=new StringBuilder();
@@ -13,6 +15,17 @@ public final class Probe extends Instrumentation {
  }
  private boolean blocked(String host,int port)throws Exception{try{return !get(host,port,false).contains("BICHEN_PROXY_E2E");}catch(IOException expected){return true;}}
  private boolean blocked(String host)throws Exception{return blocked(host,18080);}
+ private void pureIpTlsSniAttempt()throws Exception{
+  try{
+   SSLSocketFactory factory=(SSLSocketFactory)SSLSocketFactory.getDefault();
+   try(SSLSocket socket=(SSLSocket)factory.createSocket()){
+    socket.connect(new InetSocketAddress("198.51.100.7",443),4000);socket.setSoTimeout(4000);
+    SSLParameters params=socket.getSSLParameters();params.setServerNames(Collections.singletonList(new SNIHostName("doh.360.cn")));socket.setSSLParameters(params);
+    try{socket.startHandshake();}catch(IOException expected){/* REJECT or the non-TLS fixture both end the probe; host-side evidence distinguishes them. */}
+   }
+  }catch(IOException expected){/* A guard rejection may fail before the TLS handshake begins. */}
+  check(true,"pure-IP TLS ClientHello with DoH SNI completed for host-side leak verification");
+ }
  private boolean waitForDirectNetwork()throws InterruptedException{
   long deadline=android.os.SystemClock.elapsedRealtime()+6000;
   do{
@@ -32,6 +45,7 @@ public final class Probe extends Instrumentation {
    check(get("safe.0.0-02.net",18080,true).contains("BICHEN_PROXY_E2E"),"exact whitelist PASS bypasses suffix rejection and preserves original proxy route");
    check(blocked("doh.360.cn"),"encrypted DNS resolver domain is rejected by optional anti-bypass guard");
    check(blocked("allowed.bichen.test",853),"TCP 853 is rejected by optional DoT/DoQ anti-bypass guard");
+   pureIpTlsSniAttempt();
   }
   b.putString("stream",log+"BICHEN_MIHOMO_PROBE_PASS "+mode+"\n");finish(Activity.RESULT_OK,b);
  }catch(Throwable e){b.putString("stream",log+"BICHEN_MIHOMO_PROBE_FAIL\n"+android.util.Log.getStackTraceString(e));finish(Activity.RESULT_CANCELED,b);}}
