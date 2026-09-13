@@ -5,7 +5,7 @@ import android.net.*;
 import android.os.*;
 import android.content.pm.ServiceInfo;
 import org.json.*;
-import java.io.IOException;
+import java.io.*;
 import java.util.concurrent.*;
 import java.util.*;
 import android.content.pm.PackageManager;
@@ -22,7 +22,7 @@ public final class MihomoVpnService extends VpnService {
  static String settingsSummary(SharedPreferences p,String self){
   ProxyAppPolicy a=activePolicy;int draft=p.getStringSet("bypassApps",Collections.emptySet()).size();
   if(!running||a==null)return "已保存 "+draft+" 个应用放行 · 下次连接生效";
-  return "本次已放行 "+a.applied.size()+" 个 · "+(a.filterEnabled?"过滤 "+activeRuleCount+" 个域名":"辟尘过滤关闭")+(a.missing.isEmpty()?"":"\n"+a.missing.size()+" 个应用未安装或当前不可见，未计入已放行")+(pendingSettings(p,self)?"\n存在未生效更改，请停止后重新连接":"");
+  return "本次已放行 "+a.applied.size()+" 个 · "+(a.filterEnabled?"过滤 "+activeRuleCount+" 个域名规则":"辟尘过滤关闭")+(a.missing.isEmpty()?"":"\n"+a.missing.size()+" 个应用未安装或当前不可见，未计入已放行")+(pendingSettings(p,self)?"\n存在未生效更改，请停止后重新连接":"");
  }
  private ProxyObservations observations;
  private final Runnable observe=new Runnable(){public void run(){if(owner!=MihomoVpnService.this||!running||stopping||destroyed)return;final long session=generation;final long epoch=observations.epoch();submit(()->{try{if(prefs.getBoolean("proxyHistory",false)&&running&&generation==session){JSONObject snap=MihomoNative.call("connections").getJSONObject("data");if(running&&!stopping&&generation==session){observations.capture(snap,epoch);if(prefs.contains("proxyHistoryError"))prefs.edit().remove("proxyHistoryError").apply();}}}catch(Exception e){prefs.edit().putString("proxyHistoryError","连接观察暂时失败，未补造记录").apply();}finally{if(running&&!stopping&&generation==session)ui.postDelayed(this,2000);}});}};
@@ -70,11 +70,18 @@ public final class MihomoVpnService extends VpnService {
   }catch(PackageManager.NameNotFoundException absent){/* Preserve selection for reinstall; do not count as applied. */}}
   final ProxyAppPolicy applied=new ProxyAppPolicy(requested.filterEnabled,requested.requested,accepted,getPackageName());
   final RuleStore.EffectiveRules effective=rules.effectiveRules();
+  Set<String> suffixCandidates=Collections.emptySet();
+  if(applied.filterEnabled&&prefs.getBoolean("source_hagezi",false)){
+   try(InputStream in=getAssets().open("rules/hagezi.txt")){suffixCandidates=RuleStore.parseRules(in,false);}
+  }
+  final DomainRuleProjection projected=DomainRuleProjection.build(effective.domains,suffixCandidates,rules.userList(true));
   b.setConfigureIntent(PendingIntent.getActivity(this,401,new Intent(this,ProxyActivity.class),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE));
   descriptor=b.establish();if(descriptor==null)throw new IOException("系统没有建立 VPN 接口");
-  MihomoNative.call(new JSONObject().put("action","start").put("home",store.home().getAbsolutePath()).put("yaml",yaml).put("fd",descriptor.getFd()).put("filter",applied.filterEnabled).put("domains",new JSONArray(applied.filterEnabled?effective.domains:Collections.<String>emptyList())));
+  JSONObject start=new JSONObject().put("action","start").put("home",store.home().getAbsolutePath()).put("yaml",yaml).put("fd",descriptor.getFd()).put("filter",applied.filterEnabled);
+  if(applied.filterEnabled)start.put("domains",new JSONArray(projected.exact)).put("suffixDomains",new JSONArray(projected.suffix)).put("allowDomains",new JSONArray(projected.allow));
+  MihomoNative.call(start);
   if(stopping||destroyed){finishStop();return;}
-  activePolicy=applied;activeRuleRevision=effective.revision;activeRuleCount=applied.filterEnabled?effective.domains.size():0;
+  activePolicy=applied;activeRuleRevision=effective.revision;activeRuleCount=applied.filterEnabled?projected.blockedCount():0;
   running=true;startedAt=SystemClock.elapsedRealtime();ui.post(observe);ui.removeCallbacks(startupDeadline);
   state="内核已启动 · 等待网络确认";prefs.edit().remove("proxyError").apply();foreground();
   final long session=generation;ui.post(()->watchNetwork(session));
