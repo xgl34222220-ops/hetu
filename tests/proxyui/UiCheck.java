@@ -24,7 +24,7 @@ public final class UiCheck extends Instrumentation {
  JSONArray rows(Object store)throws Exception{List<?> rows=(List<?>)invoke(store,"readRecent",new Class<?>[0]);return new JSONArray(rows);}
  @Override public void onCreate(Bundle args){super.onCreate(args);start();}
  @Override public void onStart(){Bundle b=new Bundle();try{
-  c=getTargetContext();SharedPreferences prefs=c.getSharedPreferences("bichen",0);prefs.edit().putString("appearance","light").commit();
+  c=getTargetContext();SharedPreferences prefs=c.getSharedPreferences("bichen",0);prefs.edit().putString("appearance","light").remove("proxyDnsGuard").commit();
   Object store=create("ProxyStore");String yaml="mode: rule\nproxies: []\nproxy-groups: [{name: SELECT, type: select, proxies: [DIRECT]}]\nrules: ['MATCH,SELECT']\ndns: {enable: true, nameserver: [https://1.1.1.1/dns-query]}\n";
   invoke(store,"save",new Class<?>[]{String.class,String.class},yaml,"https://fixture.invalid/?secret=DO_NOT_DISPLAY");String first=(String)invoke(store,"revision",new Class<?>[0]);
   String updated=yaml+"# revised fixture\n";invoke(store,"save",new Class<?>[]{String.class,String.class},updated,"https://fixture.invalid/?secret=DO_NOT_DISPLAY");String second=(String)invoke(store,"revision",new Class<?>[0]);check(!first.equals(second),"configuration revision follows actual content");
@@ -53,14 +53,14 @@ public final class UiCheck extends Instrumentation {
    Object theme=field(a,"u");check(((Boolean)field(theme,"dark"))==mode.equals("dark"),mode+": proxy theme follows shared appearance");
    String[] titles={"代理与去广告","选择节点","连接活动","代理配置"};for(int p=0;p<4;p++){page(p);check(strings().contains(titles[p]),mode+": section opens "+titles[p]);check(!strings().contains("DO_NOT_DISPLAY"),mode+": secrets not rendered");shot(mode+"-"+p);}
    page(0);check(strings().contains("当前生效设置"),mode+": overview separates effective runtime settings");
-   page(3);check(strings().contains("应用放行"),mode+": configuration exposes VPN bypass entry");
+   page(3);String settings=strings();check(settings.contains("应用放行"),mode+": configuration exposes VPN bypass entry");check(settings.contains("阻止加密 DNS 绕过"),mode+": configuration exposes encrypted DNS guard toggle");check(settings.contains("更新防绕过列表"),mode+": configuration exposes encrypted DNS list update");check(!prefs.getBoolean("proxyDnsGuard",false),mode+": encrypted DNS guard remains opt-in by default");
    page(0);LinearLayout nav=(LinearLayout)field(a,"nav");runOnMainSync(()->{for(int n=0;n<4;n++){ViewGroup item=(ViewGroup)nav.getChildAt(n);TextView label=(TextView)item.getChildAt(2);check(label.getBottom()<=item.getHeight(),mode+": 1.3x navigation label fits "+n);check(item.getHeight()>=48*c.getResources().getDisplayMetrics().density,mode+": navigation target >=48dp "+n);}});
    runOnMainSync(a::finish);waitForIdleSync();SystemClock.sleep(300);
    a=startActivitySync(new Intent(c,Class.forName(c.getPackageName()+".MainActivity",true,c.getClassLoader())).putExtra("proxyApps",true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));waitForIdleSync();SystemClock.sleep(500);
    check(((Integer)field(a,"tab"))==1,mode+": proxy app picker opens correct existing page");check(strings().contains("返回代理页"),mode+": picker does not offer starting the other VPN");
    check(!prefs.getBoolean("vpnWanted",false),mode+": opening picker does not start DNS VPN");shot(mode+"-apps");runOnMainSync(a::finish);waitForIdleSync();SystemClock.sleep(300);
   }
-  invoke(obs,"clear",new Class<?>[0]);((android.database.sqlite.SQLiteOpenHelper)obs).close();prefs.edit().putString("appearance","system").putBoolean("proxyHistory",false).commit();
+  invoke(obs,"clear",new Class<?>[0]);((android.database.sqlite.SQLiteOpenHelper)obs).close();prefs.edit().putString("appearance","system").putBoolean("proxyHistory",false).remove("proxyDnsGuard").commit();
   b.putString("stream",output+"BICHEN_PROXY_UI_PASS checks="+checks+"\nStorage fixtures and actual UI only; not actual external app traffic.\n");finish(Activity.RESULT_OK,b);
  }catch(Throwable e){b.putString("stream",output+"BICHEN_PROXY_UI_FAIL\n"+android.util.Log.getStackTraceString(e));finish(Activity.RESULT_CANCELED,b);}}
 }
