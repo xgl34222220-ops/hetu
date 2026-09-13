@@ -1,76 +1,54 @@
 name: Bichen Mihomo UI and traffic verification
 on:
   push:
-    branches: ['feature/mihomo-ui']
+    branches: ['feature/mihomo-ui', 'feature/mihomo-filter-hardening']
   workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
   actions: read
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Apply checked runtime fixes and commit actual source
-        run: |
-          if [ -f .github/changes/runtime-test4.patch.xz ]; then
-            test "$(git rev-parse HEAD^)" = '15184c55c1898da7e2018ce7ceb2e69c7ca50987'
-            python3 - <<'PYCODE'
-          from pathlib import Path
-          import hashlib, lzma, subprocess
-          packed=Path('.github/changes/runtime-test4.patch.xz').read_bytes()
-          assert hashlib.sha256(packed).hexdigest()=='794c57ae84a55e8ee6549b618b8ed180912bd44639478e940b05391614332df4'
-          patch=lzma.decompress(packed)
-          assert hashlib.sha256(patch).hexdigest()=='9fbed1fb649cbed5830a04c3312e19e605851c7f693d101b7209e601a159db8f'
-          path=Path('/tmp/bichen-runtime.patch');path.write_bytes(patch)
-          subprocess.run(['git','apply','--unidiff-zero','--check',str(path)],check=True)
-          subprocess.run(['git','apply','--unidiff-zero',str(path)],check=True)
-          PYCODE
-            rm .github/changes/runtime-test4.patch.xz
-            git add -A
-            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Consume rendered home refresh flag and deterministically retain the no-rebuild regression'
-            git push origin HEAD:feature/mihomo-ui
-          fi
-          test -z "$(git diff 7e6e3c82223875dc79023fb512ec8ebd82995ef7 HEAD -- native/bridge)"
+      - uses: actions/checkout@v4
+        with:
+          repository: MetaCubeX/mihomo
+          ref: ac017cdd246ce8bd547653d927e7bf77d7ee73d5
+          path: .upstream
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache-dependency-path: .upstream/go.sum
       - uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
           log-accepted-android-sdk-licenses: false
       - name: Install build tools
         run: |
-          sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+          sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;28.2.13676358'
           sudo apt-get update -qq
           sudo apt-get install -y -qq mksh busybox
-      - uses: actions/download-artifact@v4
-        with:
-          name: INTERNAL-Mihomo-e2e-unsigned
-          run-id: 34737992974
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path: out/baseline
-      - name: Reuse identical verified native libraries without changing the core
+      - name: Build and test current pinned Mihomo bridge
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import hashlib,zipfile
-          path=Path('out/baseline/preview/Bichen-0.4.0-test.2-unsigned.apk')
-          assert hashlib.sha256(path.read_bytes()).hexdigest()=='4ac7d86c3615954d8f804fed116a8e315471259646c9965c820992b79ff63137'
-          expected={'arm64-v8a':'46ac3258670d24decb4dd206bc2f769231c482262f756326e6be3dcee82b9988','x86_64':'fdefe156008af972dd993e2f2c204682fbe34c973b0ccba7fc24474c2dec3937'}
-          root=Path('android-app/app/src/main')
-          with zipfile.ZipFile(path) as z:
-              for abi,h in expected.items():
-                  data=z.read(f'lib/{abi}/libbichen_core.so');assert hashlib.sha256(data).hexdigest()==h
-                  dest=root/'jniLibs'/abi/'libbichen_core.so';dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(data)
-              for name in z.namelist():
-                  if name.startswith('assets/licenses/mihomo-') or name.startswith('assets/mihomo-') or name=='assets/MIHOMO-LICENSE':
-                      dest=root/name;dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(z.read(name))
-          PY
+          cp -r native/bridge .upstream/bichenbridge
+          cd .upstream
+          go test -tags with_gvisor -v ./bichenbridge
+          NDK="$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          mkdir -p ../android-app/app/src/main/jniLibs/arm64-v8a ../android-app/app/src/main/jniLibs/x86_64
+          CGO_ENABLED=1 GOOS=android GOARCH=arm64 CC="$NDK/aarch64-linux-android26-clang" go build -tags with_gvisor -trimpath -buildmode=c-shared -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' -o ../android-app/app/src/main/jniLibs/arm64-v8a/libbichen_core.so ./bichenbridge
+          CGO_ENABLED=1 GOOS=android GOARCH=amd64 CC="$NDK/x86_64-linux-android26-clang" go build -tags with_gvisor -trimpath -buildmode=c-shared -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' -o ../android-app/app/src/main/jniLibs/x86_64/libbichen_core.so ./bichenbridge
+          mkdir -p ../android-app/app/src/main/assets
+          cp LICENSE ../android-app/app/src/main/assets/MIHOMO-LICENSE
+          git rev-parse HEAD > ../android-app/app/src/main/assets/mihomo-revision.txt
+          sha256sum ../android-app/app/src/main/jniLibs/*/libbichen_core.so
       - name: Build preview and run existing regressions
         run: |
           mkdir -p out/preview
@@ -101,7 +79,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: INTERNAL-Bichen-runtime-test4-unsigned
+          name: INTERNAL-Bichen-filter-hardening-unsigned
           path: |
             out/preview/*-unsigned.apk
             out/preview/*-source.zip
