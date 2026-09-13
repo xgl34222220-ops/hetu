@@ -58,8 +58,8 @@ final class RootProxyManager {
         return result.put("sourceConfig",p.source.name).put("core",profile.core.id).put("mode",profile.mode.id);
     }
 
-    JSONObject stop()throws Exception{return runJson("stop");}
-    JSONObject status()throws Exception{return runJson("status");}
+    JSONObject stop()throws Exception{return runJsonAllowMissing("stop",new JSONObject().put("ok",true).put("running",false).put("state","idle").put("message","Root 代理未运行"));}
+    JSONObject status()throws Exception{return runJsonAllowMissing("status",new JSONObject().put("ok",true).put("running",false).put("state","idle").put("message","尚未启动"));}
 
     String startupConfig()throws IOException{
         File f=startupFile();if(!f.isFile())throw new IOException("尚未生成启动配置");byte[] bytes=Files.readAllBytes(f.toPath());return new String(bytes,StandardCharsets.UTF_8);
@@ -70,6 +70,16 @@ final class RootProxyManager {
         File target=startupFile(),dir=target.getParentFile();if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("无法创建启动状态目录");File tmp=new File(dir,"startup-config.new");
         try(FileOutputStream out=new FileOutputStream(tmp,false)){out.write(text.getBytes(StandardCharsets.UTF_8));out.getFD().sync();}
         try{Files.move(tmp.toPath(),target.toPath(),StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);}catch(Exception e){if(!tmp.renameTo(target)){tmp.delete();throw new IOException("无法保存最终启动配置");}}
+    }
+
+    private JSONObject runJsonAllowMissing(String action,JSONObject missing)throws Exception{
+        RootBridge.requireWorkerThread();
+        String command="if [ -x "+RootBridge.quote(SCRIPT)+" ]; then exec "+RootBridge.quote(SCRIPT)+" "+RootBridge.quote(action)+"; else printf '%s\\n' "+RootBridge.quote(missing.toString())+"; fi";
+        RootBridge.Result result=RootBridge.rootShell(context,command,15_000L);
+        JSONObject json;
+        try{json=RootBridge.parseObject(result.output.trim());}catch(Exception malformed){throw new IOException(result.output.isEmpty()?"Root 授权或状态查询不可用":result.output);}
+        if(result.code!=0)throw new IOException(json.optString("message","Root 状态查询失败，退出码 "+result.code));
+        return json;
     }
 
     private JSONObject runJson(String...args)throws Exception{
