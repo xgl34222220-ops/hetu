@@ -1,0 +1,99 @@
+name: Verify integrated Mihomo VPN preview
+on:
+  push:
+    branches: ['feature/mihomo-vpn']
+    paths: ['android-app/**', 'tools/**', 'tests/proxy/**', '.github/workflows/mihomo-preview.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - name: Install Android and regression tools
+        run: |
+          sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq mksh busybox
+      - uses: actions/download-artifact@v4
+        with:
+          name: bichen-native-internal
+          run-id: 34736768013
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: out/native
+      - name: Check pinned native artifacts before packaging
+        run: |
+          test "$(cat out/native/core-revision.txt)" = ac017cdd246ce8bd547653d927e7bf77d7ee73d5
+          echo 'ac766234a9297cd49f103dbcc173a43cd1527c5d6b3d44f6306283a56f833067  out/native/arm64-v8a/libbichen_core.so' | sha256sum -c -
+          echo 'ecd2668dc00db7ebc1a7cefa50a43578d8ef8b3450b243577c93b5c248380c41  out/native/x86_64/libbichen_core.so' | sha256sum -c -
+          for abi in arm64-v8a x86_64; do
+            mkdir -p "android-app/app/src/main/jniLibs/$abi"
+            cp "out/native/$abi/libbichen_core.so" "android-app/app/src/main/jniLibs/$abi/"
+          done
+          mkdir -p android-app/app/src/main/assets
+          cp out/native/MIHOMO-LICENSE android-app/app/src/main/assets/MIHOMO-LICENSE
+          cp out/native/core-revision.txt android-app/app/src/main/assets/mihomo-revision.txt
+      - name: Apply readable integration once and retain source
+        run: |
+          if [ -f tools/integrate_proxy.py ]; then
+            python3 tools/integrate_proxy.py
+            rm tools/integrate_proxy.py
+            git add tools android-app/app/src/main/java android-app/app/src/main/AndroidManifest.xml
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Wire Mihomo configuration UI and full Android VPN service into preview'
+            git push origin HEAD:feature/mihomo-vpn
+          fi
+      - name: Compile and verify actual preview
+        run: python3 tools/build_preview.py
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Run existing UI checks and independent UID proxy test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-boot-timeout: 360
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: |
+            adb shell input keyevent KEYCODE_WAKEUP
+            adb shell wm dismiss-keyguard
+            python3 tools/test_device.py
+            python3 tools/test_proxy_device.py
+      - name: Preserve private-signing handoff and test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: INTERNAL-mihomo-preview-unsigned-not-flashable
+          path: |
+            out/preview/*-unsigned.apk
+            out/preview/*-source.zip
+            out/preview/*-module.zip
+            out/preview/apksigner.jar
+            out/preview/build-info.json
+            out/preview/apk-badging.txt
+            out/device/device-results.txt
+            out/device/screenshots/*.png
+            out/proxy-device/result.txt
+            out/proxy-device/proxy-received.txt
+            out/proxy-device/emulator-logcat.txt
+            out/proxy-device/mihomo-screen.png
+          if-no-files-found: error
+          retention-days: 14
