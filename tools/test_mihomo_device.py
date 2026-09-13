@@ -69,7 +69,7 @@ def wait_for(name):
  raise AssertionError('timeout waiting for '+name)
 def signal(name):run('adb','shell','touch',DIR+name)
 def probe(mode,suffix):
- p=run('adb','shell','am','instrument','-w','-e','mode',mode,'bichen.proxyprobe/.Probe',capture_output=True,text=True,timeout=60);(O/(suffix+'-probe.txt')).write_text(p.stdout+p.stderr);print(p.stdout);assert 'BICHEN_MIHOMO_PROBE_PASS' in p.stdout and 'BICHEN_MIHOMO_PROBE_FAIL' not in p.stdout
+ p=run('adb','shell','am','instrument','-w','-e','mode',mode,'bichen.proxyprobe/.Probe',capture_output=True,text=True,timeout=75);(O/(suffix+'-probe.txt')).write_text(p.stdout+p.stderr);print(p.stdout);assert 'BICHEN_MIHOMO_PROBE_PASS' in p.stdout and 'BICHEN_MIHOMO_PROBE_FAIL' not in p.stdout
 try:
  wait_for('vpn-ready');probe('path','first');signal('path-done');wait_for('vpn-stopped');probe('stopped','stopped');signal('stop-probe-done');wait_for('vpn-restarted');probe('path','restart');signal('restart-probe-done')
  wait_for('bypass-ready');before=received_count();probe('bypass','bypass');assert_no_probe_leak(before,'bypass');signal('bypass-done')
@@ -83,8 +83,9 @@ try:
  assert not any(x['host']=='child.0.0-02.net' for x in received), 'suffix-blocked child domain reached upstream proxy'
  assert not any(x['host']=='doh.360.cn' for x in received), 'DoH guard domain reached upstream proxy'
  assert not any(x['port']==853 for x in received), 'TCP 853 escaped encrypted DNS guard'
+ assert not any(x['host']=='198.51.100.7' and x['port']==443 for x in received), 'pure-IP TLS SNI DoH attempt escaped sniffer guard'
  (O/'fixture-connections.json').write_text(json.dumps(received,indent=2))
- print('BICHEN_MIHOMO_E2E_PASS: real TUN, SOCKS routing, DNS, exact/suffix ad rejection, PASS whitelist routing, encrypted DNS domain/853 guard, stop, restart, app bypass, pending settings, reinclude; independent UID')
+ print('BICHEN_MIHOMO_E2E_PASS: real TUN, SOCKS routing, DNS, exact/suffix ad rejection, PASS whitelist routing, encrypted DNS domain/853 guard, pure-IP TLS SNI guard, stop, restart, app bypass, pending settings, reinclude; independent UID')
 finally:
  if control.poll() is None:control.terminate()
  control_output.close()
