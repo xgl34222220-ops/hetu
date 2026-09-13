@@ -31,7 +31,7 @@ public final class MihomoVpnService extends VpnService {
  private final ExecutorService worker=Executors.newSingleThreadExecutor();
  private final Handler ui=new Handler(Looper.getMainLooper());
  private volatile boolean stopping,destroyed;private volatile ParcelFileDescriptor descriptor;
- private SharedPreferences prefs;private ConnectivityManager manager;private ConnectivityManager.NetworkCallback callback;private volatile Network physical;
+ private SharedPreferences prefs;private volatile ConnectivityManager manager;private volatile ConnectivityManager.NetworkCallback callback;private volatile Network physical;
  private final Runnable startupDeadline=()->{if(owner==this&&engaged&&!running&&!stopping){failure="启动超过 60 秒，正在关闭内核；未报告连接成功";requestStop();}};
  @Override public void onCreate(){super.onCreate();prefs=getSharedPreferences("bichen",0);observations=new ProxyObservations(this);}
  @Override public int onStartCommand(Intent intent,int flags,int startId){
@@ -78,7 +78,8 @@ public final class MihomoVpnService extends VpnService {
   if(!currentSession(session))return;
   manager=getSystemService(ConnectivityManager.class);
   if(manager==null){networkLabel="无法确认网络状态";state=networkLabel;foreground();return;}
-  callback=new ConnectivityManager.NetworkCallback(){
+  final ConnectivityManager cm=manager;
+  final ConnectivityManager.NetworkCallback watch=new ConnectivityManager.NetworkCallback(){
    @Override public void onAvailable(Network n){if(currentSession(session)){networkState.available(n);reportNetwork(session,false);}}
    @Override public void onCapabilitiesChanged(Network n,NetworkCapabilities c){
     if(currentSession(session)&&networkState.capabilities(n,c.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN),c.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET),c.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED),c.hasCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL)))reportNetwork(session,true);
@@ -86,7 +87,16 @@ public final class MihomoVpnService extends VpnService {
    @Override public void onBlockedStatusChanged(Network n,boolean blocked){if(currentSession(session)&&networkState.blocked(n,blocked))reportNetwork(session,true);}
    @Override public void onLost(Network n){if(currentSession(session)&&networkState.lost(n))reportNetwork(session,true);}
   };
-  try{manager.registerDefaultNetworkCallback(callback,ui);}catch(RuntimeException error){callback=null;networkLabel="网络状态监听失败";state=networkLabel;foreground();}
+  callback=watch;
+  try{
+   cm.registerDefaultNetworkCallback(watch,ui);
+   // Stop may race registration on the worker; always unregister our exact callback.
+   if(!currentSession(session)){try{cm.unregisterNetworkCallback(watch);}catch(RuntimeException ignored){}if(callback==watch)callback=null;}
+  }catch(RuntimeException error){
+   try{cm.unregisterNetworkCallback(watch);}catch(RuntimeException ignored){}
+   if(callback==watch)callback=null;
+   if(currentSession(session)){networkLabel="网络状态监听失败";state=networkLabel;foreground();}
+  }
  }
  private void reportNetwork(long session,boolean updateUnderlying){
   if(!currentSession(session))return;
@@ -110,7 +120,8 @@ public final class MihomoVpnService extends VpnService {
  }
  private void finishStop(){if(owner!=this)return;
   running=false;stopping=true;startedAt=0;networkValidated=false;networkLabel="未运行";activePolicy=null;activeRuleCount=0;activeRuleRevision="";ui.removeCallbacks(observe);ui.removeCallbacks(startupDeadline);try{MihomoNative.call("stop");}catch(Exception|LinkageError ignored){}closeDescriptor();
-  if(manager!=null&&callback!=null){try{manager.unregisterNetworkCallback(callback);}catch(RuntimeException ignored){}callback=null;}
+  ConnectivityManager cm=manager;ConnectivityManager.NetworkCallback watch=callback;callback=null;
+  if(cm!=null&&watch!=null){try{cm.unregisterNetworkCallback(watch);}catch(RuntimeException ignored){}}
   if(prefs.getBoolean("proxyRestoreHosts",false)){try{
    JSONObject s=RootBridge.status(this);if(!s.optBoolean("ok")||s.optBoolean("pendingReboot"))throw new IOException("原模块恢复状态待确认");
    if(s.optBoolean("installed")&&!s.optBoolean("moduleDisabled")&&!s.optBoolean("moduleRemovalPending")){RootBridge.Result r=RootBridge.run(this,"enable");if(!r.ok())throw new IOException("原模块恢复失败");}
