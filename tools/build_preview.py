@@ -19,8 +19,8 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 BASE = 'io.github.xgl34222220.bichen'
 PREVIEW = BASE + '.preview'
-VERSION = '0.4.0-test.10'
-CODE = 410
+VERSION = '0.4.0-test.11'
+CODE = 411
 
 def run(*args: str | Path, cwd: Path) -> None:
     subprocess.run([str(a) for a in args], cwd=cwd, check=True)
@@ -67,6 +67,8 @@ def main() -> None:
         startup_text = startup.read_text()
         assert 'removeTopLevelKey(yaml,"listeners")' in startup_text
         assert 'removeTopLevelScalar(yaml,"global-client-fingerprint")' in startup_text
+        assert 'if(!profile.autoOverwrite)return' not in startup_text
+        assert 'sourceTp=detectScalarPort(source,"tproxy-port")' in startup_text
         for source_name in ('ProxyCoreStore.java','ProxyConfigLibrary.java','ProxyRuntimeProfile.java','RootProxyManager.java'):
             assert (main_dir / 'java/io/github/xgl34222220/bichen' / source_name).is_file()
 
