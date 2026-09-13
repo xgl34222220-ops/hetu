@@ -36,5 +36,28 @@ final class ProxyUi {
     LinearLayout action(LinearLayout parent,String icon,String title,String subtitle,Runnable action){LinearLayout r=row();r.setMinimumHeight(dp(61));r.setPadding(0,dp(9),0,dp(9));r.setBackground(touch(Color.TRANSPARENT,14));FrameLayout well=new FrameLayout(a);well.setBackground(bg(soft,13));well.addView(new IconView(a,icon,accent),new FrameLayout.LayoutParams(dp(20),dp(20),Gravity.CENTER));r.addView(well,new LinearLayout.LayoutParams(dp(38),dp(38)));LinearLayout labels=col();labels.setPadding(dp(11),0,dp(7),0);labels.addView(text(title,14,text,true));if(subtitle!=null&&!subtitle.isEmpty()){gap(labels,4);labels.addView(text(subtitle,11.5f,muted,false));}r.addView(labels,new LinearLayout.LayoutParams(0,-2,1));r.addView(new IconView(a,"chevron",muted),new LinearLayout.LayoutParams(dp(16),dp(16)));r.setOnClickListener(v->action.run());parent.addView(r,new LinearLayout.LayoutParams(-1,-2));return r;}
     EditText search(String hint,String initial){EditText e=new EditText(a);e.setSingleLine(true);e.setTextSize(14);e.setTextColor(text);e.setHintTextColor(muted);e.setHint(hint);e.setText(initial);e.setPadding(dp(15),dp(10),dp(15),dp(10));e.setMinHeight(dp(48));e.setBackground(bg(surface,17));e.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);return e;}
     TextView chip(String value,boolean selected,Runnable action){TextView t=button(value,false,action);t.setTextSize(12);t.setBackground(touch(selected?soft:Color.TRANSPARENT,15));t.setTextColor(selected?accent:muted);t.setSelected(selected);return t;}
-    void window(LinearLayout shell){shell.setBackgroundColor(bg);a.getWindow().setStatusBarColor(Color.TRANSPARENT);a.getWindow().setNavigationBarColor(Color.TRANSPARENT);if(Build.VERSION.SDK_INT>=30){a.getWindow().setDecorFitsSystemWindows(false);a.getWindow().getInsetsController().setSystemBarsAppearance(dark?0:WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS|WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS|WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);}else a.getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE|View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN|View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION|(dark?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR));shell.setOnApplyWindowInsetsListener((v,i)->{if(Build.VERSION.SDK_INT>=30){android.graphics.Insets b=i.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout());android.graphics.Insets k=i.getInsets(WindowInsets.Type.ime());v.setPadding(b.left,b.top,b.right,Math.max(b.bottom,k.bottom));}else v.setPadding(i.getSystemWindowInsetLeft(),i.getSystemWindowInsetTop(),i.getSystemWindowInsetRight(),i.getSystemWindowInsetBottom());return i;});}
+    void window(LinearLayout shell){
+        shell.setBackgroundColor(bg);
+        final Window w=a.getWindow();
+        w.setStatusBarColor(Color.TRANSPARENT);w.setNavigationBarColor(Color.TRANSPARENT);
+        if(Build.VERSION.SDK_INT>=30){
+            w.setDecorFitsSystemWindows(false);
+            final View decor=w.getDecorView();
+            decor.post(()->{
+                WindowInsetsController controller=decor.getWindowInsetsController();
+                if(controller!=null){
+                    int appearance=dark?0:WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS|WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
+                    int mask=WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS|WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
+                    controller.setSystemBarsAppearance(appearance,mask);
+                }
+            });
+        }else{
+            w.getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE|View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN|View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION|(dark?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR));
+        }
+        shell.setOnApplyWindowInsetsListener((v,i)->{
+            if(Build.VERSION.SDK_INT>=30){android.graphics.Insets b=i.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout());android.graphics.Insets k=i.getInsets(WindowInsets.Type.ime());v.setPadding(b.left,b.top,b.right,Math.max(b.bottom,k.bottom));}
+            else v.setPadding(i.getSystemWindowInsetLeft(),i.getSystemWindowInsetTop(),i.getSystemWindowInsetRight(),i.getSystemWindowInsetBottom());
+            return i;
+        });
+    }
 }
