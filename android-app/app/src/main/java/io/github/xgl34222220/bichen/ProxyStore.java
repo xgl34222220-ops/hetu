@@ -37,10 +37,12 @@ final class ProxyStore {
  }
  JSONObject info()throws Exception{synchronized(LOCK){JSONObject d=document();String rev=revision(d);return new JSONObject().put("exists",d.has("yaml")).put("subscription",!d.optString("subscription").isEmpty()).put("revision",rev.isEmpty()?"":rev.substring(0,12)).put("hasPrevious",d.has("previousYaml")).put("checkedAt",d.optLong("checkedAt")).put("savedAt",d.optLong("savedAt"));}}
  void save(String yaml,String subscription)throws Exception{saveIfUnchanged(yaml,subscription,null);}
- boolean saveIfUnchanged(String yaml,String subscription,String expectedRevision)throws Exception{
+ boolean saveIfUnchanged(String yaml,String subscription,String expectedRevision)throws Exception{return saveChecked(yaml,subscription,expectedRevision,false);}
+ boolean saveRootIfUnchanged(String yaml,String subscription,String expectedRevision)throws Exception{return saveChecked(yaml,subscription,expectedRevision,true);}
+ private boolean saveChecked(String yaml,String subscription,String expectedRevision,boolean rootMode)throws Exception{
   if(MihomoVpnService.engaged)throw new IOException("请先停止代理，再修改配置");
   if(yaml.getBytes(StandardCharsets.UTF_8).length>LIMIT)throw new IOException("配置超过 4 MiB");
-  MihomoNative.call(new JSONObject().put("action","inspect").put("yaml",yaml));
+  MihomoNative.call(new JSONObject().put("action",rootMode?"inspect-root":"inspect").put("yaml",yaml));
   synchronized(LOCK){
    if(MihomoVpnService.engaged)throw new IOException("代理运行中，不替换配置；请先停止");JSONObject current=document();
    if(expectedRevision!=null&&!expectedRevision.equals(revision(current)))throw new IOException("下载期间配置已被修改，本次旧结果未覆盖新配置");
