@@ -61,7 +61,13 @@ public final class MihomoVpnService extends VpnService {
   Builder b=new Builder().setSession("辟尘 · 代理与去广告").setMtu(1500).addAddress("172.29.0.1",30).addAddress("fdfe:dcba:9876::1",126).addRoute("0.0.0.0",0).addRoute("::",0).addDnsServer("172.29.0.2").setBlocking(false);
   b.addDisallowedApplication(getPackageName());
   Set<String> accepted=new HashSet<>();
-  for(String pkg:requested.requested){try{b.addDisallowedApplication(pkg);accepted.add(pkg);}catch(PackageManager.NameNotFoundException absent){/* Preserve selection for reinstall; do not count as applied. */}}
+  for(String pkg:requested.requested){try{
+   // Builder.verifyApp may accept a null binder result on some framework versions.
+   // Check the public PackageManager API and current-user installation explicitly.
+   android.content.pm.ApplicationInfo app=getPackageManager().getApplicationInfo(pkg,0);
+   if(app==null||(app.flags&android.content.pm.ApplicationInfo.FLAG_INSTALLED)==0)throw new PackageManager.NameNotFoundException(pkg);
+   b.addDisallowedApplication(pkg);accepted.add(pkg);
+  }catch(PackageManager.NameNotFoundException absent){/* Preserve selection for reinstall; do not count as applied. */}}
   final ProxyAppPolicy applied=new ProxyAppPolicy(requested.filterEnabled,requested.requested,accepted,getPackageName());
   final RuleStore.EffectiveRules effective=rules.effectiveRules();
   b.setConfigureIntent(PendingIntent.getActivity(this,401,new Intent(this,ProxyActivity.class),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE));
