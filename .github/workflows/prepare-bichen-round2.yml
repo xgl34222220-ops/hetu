@@ -1,0 +1,77 @@
+name: Prepare Bichen network recovery
+on:
+  push:
+    branches: ['improve/cname-profiles-20260913']
+    paths: ['.github/workflows/prepare-bichen-round2.yml', '.github/changes/bichen-round2.delta.xz']
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: github.repository == 'xgl34222220-ops/pichen'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: improve/cname-profiles-20260913
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Verify and apply data-only source delta
+        run: |
+          test "$(git rev-parse HEAD^)" = "95880c3f0a698ba3217c3f1d45e42246989edcaa"
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, json, lzma
+          digest = lambda data: hashlib.sha256(data).hexdigest()
+          raw = lzma.decompress(Path('.github/changes/bichen-round2.delta.xz').read_bytes())
+          assert digest(raw) == '25af80de79efb06fba56a72cc37071848009a209626c4d4a812d716f03c710cb'
+          entries = json.loads(raw)
+          java = 'android-app/app/src/main/java/io/github/xgl34222220/bichen/'
+          allowed = {'README.md', 'tools/test_java.py', 'docs/NETWORK-RECOVERY-2026-09-13.md',
+                     'tests/NetworkEpochTest.java', 'tests/RuleUpdateGateTest.java'}
+          allowed.update(java + name + '.java' for name in ('DnsVpnService', 'MainActivity', 'NetworkEpoch', 'RuleStore', 'RuleUpdateGate'))
+          assert len(entries) == len(allowed) and {e['path'] for e in entries} == allowed
+          ready = []
+          for entry in entries:
+              path = Path(entry['path'])
+              assert not path.is_symlink()
+              if entry['before'] is None:
+                  assert not path.exists(), path
+                  old = ''
+              else:
+                  data = path.read_bytes()
+                  assert digest(data) == entry['before'], path
+                  old = data.decode('utf-8')
+              last = 0
+              for start, end, text in entry['edits']:
+                  assert last <= start <= end <= len(old) and isinstance(text, str), path
+                  last = end
+              new = old
+              for start, end, text in reversed(entry['edits']):
+                  new = new[:start] + text + new[end:]
+              data = new.encode('utf-8')
+              assert digest(data) == entry['after'], path
+              ready.append((path, data))
+          for path, data in ready:
+              path.parent.mkdir(parents=True, exist_ok=True)
+              path.write_bytes(data)
+          PY
+          rm .github/changes/bichen-round2.delta.xz .github/workflows/prepare-bichen-round2.yml
+      - name: Build and test final source before commit
+        run: |
+          python3 tools/package.py --build-app
+          python3 tools/test_java.py
+          python3 -m unittest discover -s tests -p '*test.py' -v
+          python3 tools/verify_downloads.py
+          git diff --check
+      - name: Commit verified source on existing PR branch
+        run: |
+          git add -A
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Recover DNS across network changes and avoid locking configuration during rule downloads'
+          git push origin HEAD:improve/cname-profiles-20260913
