@@ -22,6 +22,12 @@ public final class IconView extends View {
         float unit = Math.min(getWidth(), getHeight()) / 24f;
         canvas.translate((getWidth()-24*unit)/2, (getHeight()-24*unit)/2); canvas.scale(unit,unit);
         switch (kind) {
+            case "back": line(canvas,15,5,8,12);line(canvas,8,12,15,19);break;
+            case "globe": canvas.drawCircle(12,12,9,paint);canvas.drawOval(new RectF(8,3,16,21),paint);line(canvas,3,12,21,12);break;
+            case "upload": line(canvas,12,21,12,5);line(canvas,6,11,12,5);line(canvas,12,5,18,11);break;
+            case "folder": {Path p=new Path();p.moveTo(3,7);p.lineTo(3,4);p.lineTo(10,4);p.lineTo(13,7);p.lineTo(21,7);p.lineTo(21,20);p.lineTo(3,20);p.close();canvas.drawPath(p,paint);break;}
+            case "server": canvas.drawRoundRect(new RectF(3,3,21,10),2,2,paint);canvas.drawRoundRect(new RectF(3,14,21,21),2,2,paint);line(canvas,7,6.5f,7.1f,6.5f);line(canvas,7,17.5f,7.1f,17.5f);line(canvas,12,6.5f,17,6.5f);line(canvas,12,17.5f,17,17.5f);break;
+            case "more": canvas.drawPoint(5,12,paint);canvas.drawPoint(12,12,paint);canvas.drawPoint(19,12,paint);break;
             case "shield": { Path p=new Path();p.moveTo(12,2.8f);p.lineTo(20,6);p.lineTo(20,11);p.cubicTo(20,16.2f,16.4f,20,12,21.5f);p.cubicTo(7.6f,20,4,16.2f,4,11);p.lineTo(4,6);p.close();canvas.drawPath(p,paint);line(canvas,8.5f,12,11,14.5f);line(canvas,11,14.5f,16,9.5f);break; }
             case "apps": for(int y=0;y<2;y++)for(int x=0;x<2;x++)canvas.drawRoundRect(new RectF(3+x*11,3+y*11,10+x*11,10+y*11),2,2,paint);break;
             case "rules": line(canvas,4,6,20,6);line(canvas,4,12,20,12);line(canvas,4,18,20,18);dot(canvas,8,6);dot(canvas,16,12);dot(canvas,10,18);break;

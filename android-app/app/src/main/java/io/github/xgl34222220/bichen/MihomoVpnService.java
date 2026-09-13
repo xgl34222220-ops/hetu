@@ -10,6 +10,9 @@ import java.util.concurrent.*;
 /** Full IP tunnel. No Root firewall/Box changes; opt-in linkage only to our own hosts. */
 public final class MihomoVpnService extends VpnService {
  public static volatile boolean engaged,running;
+ public static volatile long generation,startedAt;
+ private ProxyObservations observations;
+ private final Runnable observe=new Runnable(){public void run(){if(owner!=MihomoVpnService.this||!running||stopping||destroyed)return;final long session=generation;final long epoch=observations.epoch();submit(()->{try{if(prefs.getBoolean("proxyHistory",false)&&running&&generation==session){JSONObject snap=MihomoNative.call("connections").getJSONObject("data");if(running&&!stopping&&generation==session)observations.capture(snap,epoch);}}catch(Exception e){prefs.edit().putString("proxyHistoryError","连接观察暂时失败，未补造记录").apply();}finally{if(running&&!stopping&&generation==session)ui.postDelayed(this,2000);}});}};
  public static volatile String state="未启动",failure="";
  private static volatile MihomoVpnService owner;
  private final ExecutorService worker=Executors.newSingleThreadExecutor();
@@ -17,19 +20,19 @@ public final class MihomoVpnService extends VpnService {
  private volatile boolean stopping,destroyed;private volatile ParcelFileDescriptor descriptor;
  private SharedPreferences prefs;private ConnectivityManager manager;private ConnectivityManager.NetworkCallback callback;private volatile Network physical;
  private final Runnable startupDeadline=()->{if(owner==this&&engaged&&!running&&!stopping){failure="启动超过 60 秒，正在关闭内核；未报告连接成功";requestStop();}};
- @Override public void onCreate(){super.onCreate();prefs=getSharedPreferences("bichen",0);}
+ @Override public void onCreate(){super.onCreate();prefs=getSharedPreferences("bichen",0);observations=new ProxyObservations(this);}
  @Override public int onStartCommand(Intent intent,int flags,int startId){
   String action=intent==null?"STOP":intent.getAction();
   if("STOP".equals(action)||"RESTORE".equals(action)){
    if(owner!=null&&owner!=this){stopSelf(startId);return START_NOT_STICKY;}owner=this;engaged=true;state="正在停止并检查恢复";foreground();requestStop();return START_NOT_STICKY;
   }
   if(engaged||destroyed)return START_NOT_STICKY;
-  owner=this;engaged=true;stopping=false;failure="";state="正在校验配置";foreground();
+  owner=this;engaged=true;stopping=false;failure="";generation++;startedAt=0;state="正在校验配置";foreground();
   prefs.edit().putBoolean("proxyWanted",true).putString("engineOwner","mihomo").apply();ui.postDelayed(startupDeadline,60000);
   submit(()->{try{startCore();}catch(Exception|LinkageError e){failure=e.getMessage()==null?"内核启动失败":e.getMessage();finishStop();}});return START_NOT_STICKY;
  }
  private void submit(Runnable r){try{worker.execute(r);}catch(RejectedExecutionException ignored){}}
- private void requestStop(){stopping=true;running=false;state="正在停止";prefs.edit().putBoolean("proxyWanted",false).apply();ui.removeCallbacks(startupDeadline);submit(this::finishStop);}
+ private void requestStop(){stopping=true;running=false;ui.removeCallbacks(observe);state="正在停止";prefs.edit().putBoolean("proxyWanted",false).apply();ui.removeCallbacks(startupDeadline);submit(this::finishStop);}
  private void startCore()throws Exception{
   if(DnsVpnService.running||prefs.getBoolean("vpnWanted",false)||prefs.getBoolean("vpnRestoreHosts",false))throw new IOException("请先停止旧应用保护并完成模块恢复");
   ProxyStore store=new ProxyStore(this);String yaml=store.yaml();MihomoNative.call(new JSONObject().put("action","inspect").put("yaml",yaml));
@@ -45,7 +48,7 @@ public final class MihomoVpnService extends VpnService {
   b.addDisallowedApplication(getPackageName());b.setConfigureIntent(PendingIntent.getActivity(this,401,new Intent(this,ProxyActivity.class),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE));
   descriptor=b.establish();if(descriptor==null)throw new IOException("系统没有建立 VPN 接口");
   MihomoNative.call(new JSONObject().put("action","start").put("home",store.home().getAbsolutePath()).put("yaml",yaml).put("fd",descriptor.getFd()).put("filter",prefs.getBoolean("proxyFilter",true)).put("domains",new JSONArray(rules.effectiveDomains())));
-  if(stopping||destroyed){finishStop();return;}running=true;ui.removeCallbacks(startupDeadline);state=prefs.getBoolean("proxyFilter",true)?"代理与去广告运行中":"代理运行中 · 辟尘过滤关闭";prefs.edit().remove("proxyError").apply();manager=getSystemService(ConnectivityManager.class);
+  if(stopping||destroyed){finishStop();return;}running=true;startedAt=SystemClock.elapsedRealtime();ui.post(observe);ui.removeCallbacks(startupDeadline);state=prefs.getBoolean("proxyFilter",true)?"代理与去广告运行中":"代理运行中 · 辟尘过滤关闭";prefs.edit().remove("proxyError").apply();manager=getSystemService(ConnectivityManager.class);
   callback=new ConnectivityManager.NetworkCallback(){
    @Override public void onCapabilitiesChanged(Network n,NetworkCapabilities c){if(running&&c.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)&&c.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)){physical=n;setUnderlyingNetworks(new Network[]{n});}}
    @Override public void onLost(Network n){if(running&&n.equals(physical)){physical=null;setUnderlyingNetworks(new Network[0]);state="等待网络恢复";foreground();}}
@@ -60,7 +63,7 @@ public final class MihomoVpnService extends VpnService {
   if(Build.VERSION.SDK_INT>=34)startForeground(401,n,ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);else startForeground(401,n);
  }
  private void finishStop(){if(owner!=this)return;
-  running=false;stopping=true;ui.removeCallbacks(startupDeadline);try{MihomoNative.call("stop");}catch(Exception|LinkageError ignored){}closeDescriptor();
+  running=false;stopping=true;startedAt=0;ui.removeCallbacks(observe);ui.removeCallbacks(startupDeadline);try{MihomoNative.call("stop");}catch(Exception|LinkageError ignored){}closeDescriptor();
   if(manager!=null&&callback!=null){try{manager.unregisterNetworkCallback(callback);}catch(RuntimeException ignored){}callback=null;}
   if(prefs.getBoolean("proxyRestoreHosts",false)){try{
    JSONObject s=RootBridge.status(this);if(!s.optBoolean("ok")||s.optBoolean("pendingReboot"))throw new IOException("原模块恢复状态待确认");
@@ -71,5 +74,5 @@ public final class MihomoVpnService extends VpnService {
  }
  private void closeDescriptor(){ParcelFileDescriptor p=descriptor;descriptor=null;if(p!=null)try{p.close();}catch(IOException ignored){}}
  @Override public void onRevoke(){requestStop();}
- @Override public void onDestroy(){destroyed=true;stopping=true;ui.removeCallbacksAndMessages(null);if(owner==this)submit(this::finishStop);worker.shutdown();super.onDestroy();}
+ @Override public void onDestroy(){destroyed=true;stopping=true;ui.removeCallbacksAndMessages(null);if(owner==this)submit(this::finishStop);submit(observations::close);worker.shutdown();super.onDestroy();}
 }
