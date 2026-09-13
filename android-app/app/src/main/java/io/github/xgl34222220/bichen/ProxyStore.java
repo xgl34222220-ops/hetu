@@ -35,6 +35,7 @@ final class ProxyStore {
    if(current.has("yaml"))next.put("previousYaml",current.getString("yaml")).put("previousSubscription",current.optString("subscription",""));write(next);
   }
  }
+ JSONObject summary()throws Exception{synchronized(LOCK){JSONObject d=document();String yaml=d.optString("yaml","");return new JSONObject().put("exists",!yaml.isEmpty()).put("kind",d.optString("subscription","").isEmpty()?"本地 YAML":"HTTPS 订阅").put("bytes",yaml.getBytes(StandardCharsets.UTF_8).length).put("modified",new File(root,"config.json").lastModified());}}
  String subscription()throws Exception{synchronized(LOCK){return document().optString("subscription","");}}
  void restore()throws Exception{synchronized(LOCK){if(MihomoVpnService.engaged)throw new IOException("请先停止代理");JSONObject d=document();if(!d.has("previousYaml"))throw new IOException("没有上一份配置");JSONObject next=new JSONObject().put("yaml",d.getString("previousYaml")).put("subscription",d.optString("previousSubscription","")).put("previousYaml",d.getString("yaml")).put("previousSubscription",d.optString("subscription",""));write(next);}}
  private void write(JSONObject document)throws IOException{

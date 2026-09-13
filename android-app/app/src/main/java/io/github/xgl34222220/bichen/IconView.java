@@ -22,6 +22,8 @@ public final class IconView extends View {
         float unit = Math.min(getWidth(), getHeight()) / 24f;
         canvas.translate((getWidth()-24*unit)/2, (getHeight()-24*unit)/2); canvas.scale(unit,unit);
         switch (kind) {
+            case "back": line(canvas,19,12,5,12);line(canvas,5,12,11,6);line(canvas,5,12,11,18);break;
+            case "nodes": canvas.drawCircle(6,6,2.5f,paint);canvas.drawCircle(18,6,2.5f,paint);canvas.drawCircle(12,18,2.5f,paint);line(canvas,8.5f,6,15.5f,6);line(canvas,7,8.5f,11,15.5f);line(canvas,17,8.5f,13,15.5f);break;
             case "shield": { Path p=new Path();p.moveTo(12,2.8f);p.lineTo(20,6);p.lineTo(20,11);p.cubicTo(20,16.2f,16.4f,20,12,21.5f);p.cubicTo(7.6f,20,4,16.2f,4,11);p.lineTo(4,6);p.close();canvas.drawPath(p,paint);line(canvas,8.5f,12,11,14.5f);line(canvas,11,14.5f,16,9.5f);break; }
             case "apps": for(int y=0;y<2;y++)for(int x=0;x<2;x++)canvas.drawRoundRect(new RectF(3+x*11,3+y*11,10+x*11,10+y*11),2,2,paint);break;
             case "rules": line(canvas,4,6,20,6);line(canvas,4,12,20,12);line(canvas,4,18,20,18);dot(canvas,8,6);dot(canvas,16,12);dot(canvas,10,18);break;

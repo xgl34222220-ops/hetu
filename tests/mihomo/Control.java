@@ -24,10 +24,12 @@ public final class Control extends Instrumentation {
   try{save.invoke(cfg,"proxies: []\nmode: global","");throw new AssertionError("global unexpectedly accepted");}catch(InvocationTargetException expected){check(read.invoke(cfg).equals(yaml),"failed import keeps last original YAML");}
   Class<?> rs=Class.forName(pkg+".RuleStore",true,cl);Object rules=rs.getConstructor(Context.class).newInstance(c);rs.getMethod("reload").invoke(rules);rs.getMethod("changeDomain",String.class,boolean.class,boolean.class,boolean.class).invoke(rules,"ads.bichen.test",false,true,false);
   Activity a=startActivitySync(new Intent(c,Class.forName(pkg+".ProxyActivity",true,cl)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));waitForIdleSync();check(!a.isFinishing(),"actual proxy page opens");
+  Class<?> rt=Class.forName(pkg+".ProxyRecords",true,cl);Method rg=rt.getDeclaredMethod("get",Context.class);rg.setAccessible(true);Object observations=rg.invoke(null,c);Method enable=rt.getDeclaredMethod("setEnabled",boolean.class);enable.setAccessible(true);enable.invoke(observations,true);Method observed=rt.getDeclaredMethod("snapshot");observed.setAccessible(true);
   startServiceAndWait();check(core("proxies").getJSONObject("data").has("SELECT"),"actual core exposes imported group");
   JSONObject select=new JSONObject().put("action","select").put("group","SELECT").put("name","SENTINEL");bridge.getMethod("call",JSONObject.class).invoke(null,select);check(core("proxies").getJSONObject("data").getJSONObject("SELECT").getString("now").equals("SENTINEL"),"node selection changes actual core");
   mark("vpn-ready","ready");await("path-done");check(new File(dir,"live-connections.json").isFile(),"real independent-UID traffic appears in core connections");
-  stopServiceAndWait();mark("vpn-stopped","stopped");await("stop-probe-done");
+  JSONArray seen=(JSONArray)observed.invoke(observations);check(seen.toString().contains("allowed.bichen.test"),"actual independent-UID traffic retained by service sampler");
+  stopServiceAndWait();check(((JSONArray)observed.invoke(observations)).length()>0,"observed connections remain after VPN stops");mark("vpn-stopped","stopped");await("stop-probe-done");
   startServiceAndWait();mark("vpn-restarted","running");await("restart-probe-done");stopServiceAndWait();
   mark("proxy-checks.txt",result.toString());b.putString("stream",result+"BICHEN_MIHOMO_CONTROL_PASS checks="+checks+"\nNo OEM/Root framework or commercial subscription was tested.\n");finish(Activity.RESULT_OK,b);
  }catch(Throwable e){try{mark("control-error.txt",android.util.Log.getStackTraceString(e));}catch(Throwable ignored){}b.putString("stream",result+"BICHEN_MIHOMO_CONTROL_FAIL\n"+android.util.Log.getStackTraceString(e));finish(Activity.RESULT_CANCELED,b);}}

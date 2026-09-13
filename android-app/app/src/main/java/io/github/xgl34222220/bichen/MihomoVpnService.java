@@ -10,6 +10,9 @@ import java.util.concurrent.*;
 /** Full IP tunnel. No Root firewall/Box changes; opt-in linkage only to our own hosts. */
 public final class MihomoVpnService extends VpnService {
  public static volatile boolean engaged,running;
+ public static volatile long session;
+ private final ScheduledExecutorService recorder=Executors.newSingleThreadScheduledExecutor();
+ private ScheduledFuture<?> recording;
  public static volatile String state="未启动",failure="";
  private static volatile MihomoVpnService owner;
  private final ExecutorService worker=Executors.newSingleThreadExecutor();
@@ -24,7 +27,7 @@ public final class MihomoVpnService extends VpnService {
    if(owner!=null&&owner!=this){stopSelf(startId);return START_NOT_STICKY;}owner=this;engaged=true;state="正在停止并检查恢复";foreground();requestStop();return START_NOT_STICKY;
   }
   if(engaged||destroyed)return START_NOT_STICKY;
-  owner=this;engaged=true;stopping=false;failure="";state="正在校验配置";foreground();
+  owner=this;engaged=true;session=SystemClock.elapsedRealtimeNanos();stopping=false;failure="";state="正在校验配置";foreground();
   prefs.edit().putBoolean("proxyWanted",true).putString("engineOwner","mihomo").apply();ui.postDelayed(startupDeadline,60000);
   submit(()->{try{startCore();}catch(Exception|LinkageError e){failure=e.getMessage()==null?"内核启动失败":e.getMessage();finishStop();}});return START_NOT_STICKY;
  }
@@ -51,6 +54,7 @@ public final class MihomoVpnService extends VpnService {
    @Override public void onLost(Network n){if(running&&n.equals(physical)){physical=null;setUnderlyingNetworks(new Network[0]);state="等待网络恢复";foreground();}}
    @Override public void onAvailable(Network n){if(running){state=prefs.getBoolean("proxyFilter",true)?"代理与去广告运行中":"代理运行中";foreground();}}
   };if(manager!=null)manager.registerDefaultNetworkCallback(callback);foreground();
+  recording=recorder.scheduleWithFixedDelay(()->{if(owner!=this||!running||stopping)return;ProxyRecords logs=ProxyRecords.get(this);if(!logs.enabled())return;long token=logs.ticket();try{JSONObject snapshot=MihomoNative.call("connections").getJSONObject("data");if(owner==this&&running&&!stopping)logs.ingest(snapshot,token);}catch(Exception|LinkageError e){logs.reportFailure();}},0,2,TimeUnit.SECONDS);
  }
  private void foreground(){if(destroyed)return;
   NotificationManager nm=getSystemService(NotificationManager.class);nm.createNotificationChannel(new NotificationChannel("proxy_core","Mihomo 代理",NotificationManager.IMPORTANCE_LOW));
@@ -60,7 +64,7 @@ public final class MihomoVpnService extends VpnService {
   if(Build.VERSION.SDK_INT>=34)startForeground(401,n,ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);else startForeground(401,n);
  }
  private void finishStop(){if(owner!=this)return;
-  running=false;stopping=true;ui.removeCallbacks(startupDeadline);try{MihomoNative.call("stop");}catch(Exception|LinkageError ignored){}closeDescriptor();
+  running=false;stopping=true;if(recording!=null){recording.cancel(false);recording=null;}try{ProxyRecords.get(this).flush();}catch(IOException ignored){}ui.removeCallbacks(startupDeadline);try{MihomoNative.call("stop");}catch(Exception|LinkageError ignored){}closeDescriptor();
   if(manager!=null&&callback!=null){try{manager.unregisterNetworkCallback(callback);}catch(RuntimeException ignored){}callback=null;}
   if(prefs.getBoolean("proxyRestoreHosts",false)){try{
    JSONObject s=RootBridge.status(this);if(!s.optBoolean("ok")||s.optBoolean("pendingReboot"))throw new IOException("原模块恢复状态待确认");
@@ -71,5 +75,5 @@ public final class MihomoVpnService extends VpnService {
  }
  private void closeDescriptor(){ParcelFileDescriptor p=descriptor;descriptor=null;if(p!=null)try{p.close();}catch(IOException ignored){}}
  @Override public void onRevoke(){requestStop();}
- @Override public void onDestroy(){destroyed=true;stopping=true;ui.removeCallbacksAndMessages(null);if(owner==this)submit(this::finishStop);worker.shutdown();super.onDestroy();}
+ @Override public void onDestroy(){destroyed=true;stopping=true;ui.removeCallbacksAndMessages(null);if(owner==this)submit(this::finishStop);worker.shutdown();recorder.shutdown();super.onDestroy();}
 }
