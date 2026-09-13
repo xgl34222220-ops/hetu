@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Build an isolated preview without overwriting the installed production app.
 
-The preview has one launcher and one proxy control surface. Root TPROXY and
-Android TUN are selected and started from Basic Proxy Configuration.
+The preview has one launcher and one proxy control surface. Proxy cores,
+source configurations and generated startup configurations are independent.
 """
 from __future__ import annotations
 import hashlib
@@ -19,8 +19,8 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 BASE = 'io.github.xgl34222220.bichen'
 PREVIEW = BASE + '.preview'
-VERSION = '0.4.0-test.5'
-CODE = 405
+VERSION = '0.4.0-test.6'
+CODE = 406
 
 def run(*args: str | Path, cwd: Path) -> None:
     subprocess.run([str(a) for a in args], cwd=cwd, check=True)
@@ -61,7 +61,11 @@ def main() -> None:
         basic_text = basic.read_text()
         for required in ('基础代理配置','核心选择','运行模式','IPv6','自动覆写','配置选择','Mihomo','TPROXY','TUN'):
             assert required in basic_text
-        assert 'saveRootIfUnchanged' in basic_text
+        # Architecture assertions replace the old single-config saveRootIfUnchanged gate.
+        for required in ('ProxyCoreStore','ProxyConfigLibrary','ProxyRuntimeProfile','RootProxyManager','root.prepare'):
+            assert required in basic_text
+        for source_name in ('ProxyCoreStore.java','ProxyConfigLibrary.java','ProxyRuntimeProfile.java','RootProxyManager.java'):
+            assert (main_dir / 'java/io/github/xgl34222220/bichen' / source_name).is_file()
 
         process_test = stage / 'tests/root_process_test.py'
         process_test.write_text(process_test.read_text().replace(BASE, PREVIEW))
@@ -94,9 +98,9 @@ def main() -> None:
             assert hashlib.sha256(module).hexdigest() == info['sha256']
             assert info['version'] == '0.3.0-beta.1' and info['versionCode'] == 301
             dex = apk.read('classes.dex')
-            for name in ('DnsResponseFilter','NetworkEpoch','RuleUpdateGate','RuleProfiles','RootShellCommand','ModuleArchive','RootTproxyActivity','RootTproxyManager'):
+            for name in ('DnsResponseFilter','NetworkEpoch','RuleUpdateGate','RuleProfiles','RootShellCommand','ModuleArchive','RootTproxyActivity','RootProxyManager','ProxyRuntimeProfile','ProxyCoreStore','ProxyConfigLibrary'):
                 assert f'Lio/github/xgl34222220/bichen/preview/{name};'.encode() in dex
-            for text in ('基础代理配置','运行模式','TPROXY','配置选择'):
+            for text in ('基础代理配置','运行模式','TPROXY','Redirect','Enhance','配置选择','核心管理','查看启动配置'):
                 assert text.encode('utf-8') in dex
         (out / 'Bichen-0.3.0-beta.1-module.zip').write_bytes(module)
         shutil.copyfile(tools / 'lib/apksigner.jar', out / 'apksigner.jar')
