@@ -14,7 +14,8 @@ class Proxy(socketserver.StreamRequestHandler):
   if not line.startswith('CONNECT '):return
   self.wfile.write(b'HTTP/1.1 200 Connection Established\r\n\r\n');self.wfile.flush()
   while self.rfile.readline(8192).strip():pass
-  self.wfile.write(b'HTTP/1.1 200 OK\r\nContent-Length: 15\r\nConnection: close\r\n\r\nBICHEN_PROXY_OK');self.wfile.flush()
+  body=b'BICHEN_PROXY_OK'
+  self.wfile.write(b'HTTP/1.1 200 OK\r\nContent-Length: '+str(len(body)).encode()+b'\r\nConnection: close\r\n\r\n'+body);self.wfile.flush()
 class Server(socketserver.ThreadingTCPServer):allow_reuse_address=True;daemon_threads=True
 server=Server(('0.0.0.0',18081),Proxy);threading.Thread(target=server.serve_forever,daemon=True).start()
 key=O/'ci-only.keystore';run('keytool','-genkeypair','-keystore',key,'-storepass','android','-keypass','android','-alias','test','-keyalg','RSA','-validity','2','-dname','CN=Disposable Integration')
@@ -25,7 +26,7 @@ for kind,pkg,cls in [('test','bichen.proxytest','ProxySmoke'),('probe','bichen.p
  d=O/kind;d.mkdir(exist_ok=True);classes=d/'classes';classes.mkdir(exist_ok=True)
  app='<application android:debuggable="true" android:usesCleartextTraffic="true">'+('<activity android:name=".Probe" android:exported="true"/>' if kind=='probe' else '')+'</application>'
  instr='<instrumentation android:name="bichen.proxytest.ProxySmoke" android:targetPackage="io.github.xgl34222220.bichen.preview"/>' if kind=='test' else ''
- manifest=f'<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="{pkg}"><uses-sdk android:minSdkVersion="26" android:targetSdkVersion="35"/><uses-permission android:name="android.permission.INTERNET"/>{app}{instr}</manifest>'
+ manifest=f'<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="{pkg}"><uses-sdk android:minSdkVersion="26" android:targetSdkVersion="35"/><uses-permission android:name="android.permission.INTERNET"/><uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>{app}{instr}</manifest>'
  (d/'AndroidManifest.xml').write_text(manifest)
  run('javac','-source','8','-target','8','-encoding','UTF-8','-bootclasspath',str(J)+os.pathsep+str(T/'core-lambda-stubs.jar'),'-d',classes,R/f'tests/proxy/{cls}.java')
  with zipfile.ZipFile(d/'classes.jar','w') as z:
@@ -40,7 +41,7 @@ run('adb','shell','pm','grant','io.github.xgl34222220.bichen.preview','android.p
 p=run('adb','shell','am','instrument','-w','bichen.proxytest/.ProxySmoke',capture_output=True,text=True,timeout=180)
 (O/'result.txt').write_text(p.stdout+'\n'+p.stderr);(O/'proxy-received.txt').write_text('\n'.join(seen));print(p.stdout)
 server.shutdown()
-logs=run('adb','logcat','-d','-t','1500',capture_output=True,text=True)
+logs=run('adb','logcat','-d','-t','3000',capture_output=True,text=True)
 (O/'emulator-logcat.txt').write_text(logs.stdout)
 assert 'BICHEN_PROXY_PASS' in p.stdout and 'BICHEN_PROXY_FAIL' not in p.stdout
 assert sum('normal.integration.test:80' in line for line in seen)>=3, 'Ordinary traffic did not traverse all three TUN sessions'
