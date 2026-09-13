@@ -1,0 +1,44 @@
+name: Prepare Bichen improvements
+on:
+  push:
+    branches: ['improve/cname-profiles-20260913']
+    paths: ['.github/workflows/prepare-bichen-improvements.yml', '.github/changes/bichen-20260913.patch.xz']
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: github.repository == 'xgl34222220-ops/pichen'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: improve/cname-profiles-20260913
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify and apply reviewed patch
+        run: |
+          test "$(git rev-parse HEAD^)" = "ec92aca03b3ad053ac2f2752ad9dff697635b4b2"
+          python3 - <<'PY'
+          from pathlib import Path
+          import lzma, hashlib, subprocess
+          raw = lzma.decompress(Path('.github/changes/bichen-20260913.patch.xz').read_bytes())
+          assert hashlib.sha256(raw).hexdigest() == '80df54598f4be9ba50f58748a5c4d7a5088377ae5d2b469060a3f86e53af3729'
+          patch = Path('/tmp/bichen-improvements.patch')
+          patch.write_bytes(raw)
+          subprocess.run(['git', 'apply', '--unidiff-zero', '--check', str(patch)], check=True)
+          subprocess.run(['git', 'apply', '--unidiff-zero', str(patch)], check=True)
+          PY
+      - name: Test changes before commit
+        run: |
+          python3 tools/test_java.py --protocol-only
+          python3 -m unittest discover -s tests -p '*test.py' -v
+      - name: Commit source and remove one-time transport
+        run: |
+          rm .github/changes/bichen-20260913.patch.xz .github/workflows/prepare-bichen-improvements.yml
+          git add -A
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Add CNAME protection, atomic profiles and traceable block reasons'
+          git push origin HEAD:improve/cname-profiles-20260913
