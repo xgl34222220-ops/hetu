@@ -590,8 +590,13 @@ public final class DnsVpnService extends VpnService {
             if (before.optBoolean("ok", false) && !before.optBoolean("installed", true)) {
                 prefs.edit().putBoolean("vpnRestoreHosts", false).commit(); return null;
             }
-            if (before.optBoolean("moduleDisabled", false) || before.optBoolean("moduleRemovalPending", false))
-                return "模块已在 Root 管理器中停用或待卸载，原 hosts 未恢复";
+            if (before.optBoolean("moduleDisabled", false) || before.optBoolean("moduleRemovalPending", false)) {
+                if (!prefs.edit().putBoolean("vpnRestoreHosts", false).commit())
+                    return "模块已停用，无法保存取消恢复状态；未重新启用 hosts";
+                return "模块已在 Root 管理器中停用或待卸载，已取消自动恢复；未重新启用 hosts";
+            }
+            if (before.optBoolean("pendingReboot", false))
+                return "模块更新等待重启，原 hosts 恢复已暂停；请重启后检查状态";
             if (before.optBoolean("enabled", false) && before.optBoolean("mounted", false)) {
                 prefs.edit().putBoolean("vpnRestoreHosts", false).commit(); return null;
             }

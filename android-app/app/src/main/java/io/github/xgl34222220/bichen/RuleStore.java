@@ -160,13 +160,18 @@ public final class RuleStore {
         // Export calls are individually locked by the module. Match their revision to
         // avoid importing rules from a different generation during concurrent edits.
         for(int attempt=0;attempt<3;attempt++) {
-            config=rootJson("export-config"); domains=rootJson("export-domains");
+            config=rootJson("export-config");
+            // A generation is immutable. Recheck its compact config first; unchanged
+            // generations do not need a second su process or the complete domain list.
+            if(replacementSources==null && live.fromModule && config.getString("configRevision").equals(live.revision)) {
+                mirrorPrefs(live); clearModulePending(); return;
+            }
+            domains=rootJson("export-domains");
             if(config.getString("configRevision").equals(domains.getString("configRevision"))) break;
             config=null;
         }
         if(config==null) throw new IOException("模块规则正在变更，请稍后重新同步");
         String revision=config.getString("configRevision");
-        if(replacementSources==null && live.fromModule && revision.equals(live.revision)) { mirrorPrefs(live); clearModulePending();return; }
         Set<String> allow=domainArray(config.getJSONArray("allow")), block=domainArray(config.getJSONArray("block"));
         Map<String,Boolean> enabled=sourceFlags(config.getJSONArray("sources"),true);
         Set<String> effective=domainArray(domains.getJSONArray("domains"));
