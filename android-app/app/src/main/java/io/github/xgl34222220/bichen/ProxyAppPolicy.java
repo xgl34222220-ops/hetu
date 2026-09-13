@@ -3,10 +3,14 @@ package io.github.xgl34222220.bichen;
 import java.util.Collections;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.regex.Pattern;
 
 /** Immutable settings used to build ONE VPN session, never a live preferences view.
  * Bypassed apps leave the entire VPN (proxy AND DNS filtering), not just ads. */
 final class ProxyAppPolicy {
+    private static final int MAX_BYPASS_APPS = 2000;
+    private static final Pattern PACKAGE_NAME = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*");
+
     final boolean filterEnabled;
     final Set<String> requested;
     final Set<String> applied;
@@ -14,9 +18,11 @@ final class ProxyAppPolicy {
 
     ProxyAppPolicy(boolean filter, Set<String> selected, Set<String> accepted, String self) {
         filterEnabled = filter;
+        if (selected != null && selected.size() > MAX_BYPASS_APPS)
+            throw new IllegalArgumentException("应用放行名单超过 2000 项，请清理异常配置后重试");
         TreeSet<String> wanted = new TreeSet<>();
         if (selected != null) for (String pkg : selected) {
-            if (pkg == null || pkg.length() > 255 || !pkg.matches("[A-Za-z0-9_]+(?:\\.[A-Za-z0-9_]+)*"))
+            if (pkg == null || pkg.length() > 255 || !PACKAGE_NAME.matcher(pkg).matches())
                 throw new IllegalArgumentException("应用放行名单包含无效包名，请重新选择");
             if (!pkg.equals(self)) wanted.add(pkg);
         }
