@@ -23,7 +23,11 @@ public final class ProxyActivity extends Activity {
  private LinearLayout section(){LinearLayout c=new LinearLayout(this);c.setOrientation(1);c.setPadding(dp(18),dp(12),dp(18),dp(12));GradientDrawable bg=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{0xffffffff,0xffeef5ef});bg.setCornerRadius(dp(24));c.setBackground(bg);c.setElevation(dp(2));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.bottomMargin=dp(16);body.addView(c,p);return c;}
  private Button button(LinearLayout c,String title,Runnable action){Button b=new Button(this);b.setText(title);b.setAllCaps(false);b.setTextColor(0xff146b59);b.setOnClickListener(v->action.run());c.addView(b,new LinearLayout.LayoutParams(-1,-2));return b;}
  private void build(){
-  ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(0xfff4f7f3);body=new LinearLayout(this);body.setOrientation(1);body.setPadding(dp(20),dp(28),dp(20),dp(32));scroll.addView(body);setContentView(scroll);
+  ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(0xfff4f7f3);
+  scroll.setOnApplyWindowInsetsListener((v,insets)->{v.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());return insets.consumeSystemWindowInsets();});
+  getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+  body=new LinearLayout(this);body.setOrientation(1);body.setPadding(dp(20),dp(14),dp(20),dp(24));scroll.addView(body);setContentView(scroll);scroll.requestApplyInsets();
+  TextView back=text("‹ 返回辟尘",14,true);back.setMinHeight(dp(48));back.setGravity(Gravity.CENTER_VERTICAL);back.setOnClickListener(v->finish());body.addView(back,new LinearLayout.LayoutParams(-1,-2));
   body.addView(text("代理与去广告",28,true));body.addView(text("Mihomo 内核 · Android VPN",13,false));
   LinearLayout c=section();status=text("未启动",21,true);c.addView(status);summary=text("导入你自己的完整 Mihomo YAML 或兼容订阅；不提供节点。",13,false);c.addView(summary);
   power=button(c,"连接",()->{if(MihomoVpnService.engaged){startService(new Intent(this,MihomoVpnService.class).setAction("STOP"));return;}start();});coreInfo=text("正在加载内核…",12,false);c.addView(coreInfo);
