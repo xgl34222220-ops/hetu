@@ -5,15 +5,13 @@ on:
     paths: ['android-app/**', 'native/**', 'tools/**', 'tests/proxy/**', '.github/workflows/mihomo-preview.yml']
   workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
 jobs:
   preview:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - uses: actions/checkout@v4
         with:
           repository: MetaCubeX/mihomo
@@ -25,7 +23,7 @@ jobs:
           java-version: '17'
       - uses: actions/setup-go@v5
         with:
-          go-version: stable
+          go-version: '1.27.1'
           cache-dependency-path: .upstream/go.sum
       - uses: android-actions/setup-android@v3
         with:
@@ -36,31 +34,8 @@ jobs:
           sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;28.2.13676358'
           sudo apt-get update -qq
           sudo apt-get install -y -qq mksh busybox
-      - name: Apply checked integration and retain actual source
-        run: |
-          changed=0
-          for script in tools/integrate_proxy.py tools/finalize_proxy.py; do
-            if [ -f "$script" ]; then python3 "$script"; rm "$script"; changed=1; fi
-          done
-          if [ "$changed" = 1 ]; then
-            git add tools android-app/app/src/main/java android-app/app/src/main/AndroidManifest.xml
-            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Wire full Mihomo VPN and mode-aware interfaces from reviewed integration'
-            git push origin HEAD:feature/mihomo-vpn
-          fi
-      - name: Build exact native source with required Android stack
-        run: |
-          test "$(git -C .upstream rev-parse HEAD)" = ac017cdd246ce8bd547653d927e7bf77d7ee73d5
-          cp -r native/bridge .upstream/bichenbridge
-          NDK="$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          cd .upstream
-          go test -tags with_gvisor -v ./bichenbridge
-          mkdir -p ../android-app/app/src/main/jniLibs/arm64-v8a ../android-app/app/src/main/jniLibs/x86_64 ../android-app/app/src/main/assets
-          CGO_ENABLED=1 GOOS=android GOARCH=arm64 CC="$NDK/aarch64-linux-android26-clang" go build -tags with_gvisor -trimpath -buildmode=c-shared -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' -o ../android-app/app/src/main/jniLibs/arm64-v8a/libbichen_core.so ./bichenbridge
-          CGO_ENABLED=1 GOOS=android GOARCH=amd64 CC="$NDK/x86_64-linux-android26-clang" go build -tags with_gvisor -trimpath -buildmode=c-shared -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' -o ../android-app/app/src/main/jniLibs/x86_64/libbichen_core.so ./bichenbridge
-          cp LICENSE ../android-app/app/src/main/assets/MIHOMO-LICENSE
-          git rev-parse HEAD > ../android-app/app/src/main/assets/mihomo-revision.txt
-          go version > ../android-app/app/src/main/assets/mihomo-build.txt
-          printf '%s\n' 'tags=with_gvisor; ndk=28.2.13676358; androidApi=26; pageSize=16384' >> ../android-app/app/src/main/assets/mihomo-build.txt
+      - name: Build pinned core for an unprivileged Android app
+        run: bash tools/build_mihomo.sh
       - name: Compile and verify actual preview
         run: python3 tools/build_preview.py
       - name: Enable emulator acceleration
@@ -68,7 +43,7 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: Run existing UI checks and independent UID proxy test
+      - name: Run UI regression and separate UID positive-control traffic tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35

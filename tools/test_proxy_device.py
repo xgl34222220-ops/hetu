@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Controlled HTTP CONNECT proxy plus a separate Android UID end-to-end probe."""
+"""Controlled HTTP CONNECT proxy and separate Android UID traffic, with positive controls."""
 import os, subprocess, zipfile, json, socketserver, threading, time
 from pathlib import Path
 R=Path(__file__).resolve().parents[1];O=R/'out/proxy-device';O.mkdir(parents=True,exist_ok=True)
@@ -37,14 +37,14 @@ for kind,pkg,cls in [('test','bichen.proxytest','ProxySmoke'),('probe','bichen.p
  run(T/'zipalign','-f','4',d/'unsigned.apk',d/'aligned.apk');sign(d/'aligned.apk',d/'app.apk');run('adb','install','-r',d/'app.apk')
 run('adb','shell','appops','set','io.github.xgl34222220.bichen.preview','ACTIVATE_VPN','allow')
 run('adb','shell','pm','grant','io.github.xgl34222220.bichen.preview','android.permission.POST_NOTIFICATIONS')
-p=run('adb','shell','am','instrument','-w','bichen.proxytest/.ProxySmoke',capture_output=True,text=True,timeout=120)
+p=run('adb','shell','am','instrument','-w','bichen.proxytest/.ProxySmoke',capture_output=True,text=True,timeout=180)
 (O/'result.txt').write_text(p.stdout+'\n'+p.stderr);(O/'proxy-received.txt').write_text('\n'.join(seen));print(p.stdout)
 server.shutdown()
 logs=run('adb','logcat','-d','-t','1500',capture_output=True,text=True)
 (O/'emulator-logcat.txt').write_text(logs.stdout)
 assert 'BICHEN_PROXY_PASS' in p.stdout and 'BICHEN_PROXY_FAIL' not in p.stdout
-assert any('normal.integration.test:80' in line for line in seen),'No traffic reached configured proxy'
-assert not any('ads.integration.test' in line for line in seen),'Blocked domain reached proxy'
+assert sum('normal.integration.test:80' in line for line in seen)>=3, 'Ordinary traffic did not traverse all three TUN sessions'
+assert sum('ads.integration.test:80' in line for line in seen)>=2, 'Filter-off and whitelist traffic did not reach configured proxy'
 subprocess.run(['adb','root'],capture_output=True,timeout=15);run('adb','wait-for-device',timeout=30)
 for attempt in range(20):
  uid=subprocess.run(['adb','shell','id','-u'],capture_output=True,text=True,timeout=5)

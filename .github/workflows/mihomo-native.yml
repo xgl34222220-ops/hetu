@@ -1,15 +1,12 @@
 name: Build pinned Mihomo Android bridge
 on:
-  push:
-    branches: ['feature/mihomo-vpn']
-    paths: ['native/**', '.github/workflows/mihomo-native.yml']
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   native:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
@@ -19,27 +16,17 @@ jobs:
           path: .upstream
       - uses: actions/setup-go@v5
         with:
-          go-version: stable
+          go-version: '1.27.1'
           cache-dependency-path: .upstream/go.sum
       - uses: android-actions/setup-android@v3
       - run: sdkmanager 'ndk;28.2.13676358'
-      - name: Check actual gVisor support and runtime configuration
-        run: |
-          cp -r native/bridge .upstream/bichenbridge
-          cd .upstream
-          go test -tags with_gvisor -v ./bichenbridge
-      - name: Build ARM64 and emulator native libraries
-        run: |
-          NDK="$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          cd .upstream
-          mkdir -p ../out/native/arm64-v8a ../out/native/x86_64
-          CGO_ENABLED=1 GOOS=android GOARCH=arm64 CC="$NDK/aarch64-linux-android26-clang" go build -tags with_gvisor -trimpath -buildmode=c-shared -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' -o ../out/native/arm64-v8a/libbichen_core.so ./bichenbridge
-          CGO_ENABLED=1 GOOS=android GOARCH=amd64 CC="$NDK/x86_64-linux-android26-clang" go build -tags with_gvisor -trimpath -buildmode=c-shared -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' -o ../out/native/x86_64/libbichen_core.so ./bichenbridge
-          cp LICENSE ../out/native/MIHOMO-LICENSE
-          git rev-parse HEAD > ../out/native/core-revision.txt
-          find ../out/native -name '*.so' -exec sha256sum {} \; > ../out/native/SHA256SUMS.txt
+      - name: Build required gVisor and Android application variant
+        run: bash tools/build_mihomo.sh
       - uses: actions/upload-artifact@v4
         with:
           name: bichen-native-internal
-          path: out/native
+          path: |
+            android-app/app/src/main/jniLibs/**/*.so
+            android-app/app/src/main/assets/MIHOMO-LICENSE
+            android-app/app/src/main/assets/mihomo-*.txt
           retention-days: 14
