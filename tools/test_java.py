@@ -5,7 +5,7 @@ import os
 import subprocess
 from build_app import ROOT, LOCAL_TOOLS, BUILD, sdk_paths, java_tool
 
-PROTOCOL_TESTS = ('DnsPacketTest', 'DnsCacheTest', 'DnsUpstreamTest', 'DnsResponseFilterTest', 'RuleProfilesTest', 'NetworkEpochTest', 'RuleUpdateGateTest')
+PROTOCOL_TESTS = ('DnsPacketTest', 'DnsCacheTest', 'DnsUpstreamTest', 'DnsResponseFilterTest', 'RuleProfilesTest', 'NetworkEpochTest', 'RuleUpdateGateTest', 'ModuleArchiveTest')
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -16,7 +16,7 @@ def main():
     sources = [ROOT / 'tests' / (name + '.java') for name in PROTOCOL_TESTS]
     if args.protocol_only:
         package = ROOT / 'android-app/app/src/main/java/io/github/xgl34222220/bichen'
-        sources += [package / (name + '.java') for name in ('DnsPacket', 'DnsCache', 'DnsUpstream', 'DnsResponseFilter', 'RuleProfiles', 'NetworkEpoch', 'RuleUpdateGate')]
+        sources += [package / (name + '.java') for name in ('DnsPacket', 'DnsCache', 'DnsUpstream', 'DnsResponseFilter', 'RuleProfiles', 'NetworkEpoch', 'RuleUpdateGate', 'ModuleArchive')]
         cp = str(dest)
     else:
         _, android = sdk_paths()
