@@ -15,8 +15,10 @@ func TestRuntimeCopy(t *testing.T){
  if r.YAML!=s{t.Fatal("input changed")}
 }
 func TestDnsGuardWorksWithoutAdFilter(t *testing.T){
- s:=strings.Replace(sample,"rules: [MATCH,SELECT]","rules: ['MATCH,SELECT']",1);b,e:=prepare(request{YAML:s,DnsGuard:true,DohDomains:[]string{"dns.google"}});if e!=nil{t.Fatal(e)};text:=string(b)
+ s:=strings.Replace(sample,"rules: [MATCH,SELECT]","rules: ['MATCH,SELECT']",1);b,e:=prepare(request{YAML:s,DnsGuard:true,AllowDomains:[]string{"safe.dns.google"},DohDomains:[]string{"dns.google"}});if e!=nil{t.Fatal(e)};text:=string(b)
  if !strings.Contains(text,"RULE-SET,"+dnsGuardName+",REJECT")||strings.Contains(text,"RULE-SET,"+filterName+",REJECT"){t.Fatal("DNS guard must be independent of ad filter")}
+ if !strings.Contains(text,"DOMAIN,safe.dns.google,PASS"){t.Fatal("whitelist must remain active when ad filter is disabled")}
+ if strings.Index(text,"DOMAIN,safe.dns.google,PASS")>strings.Index(text,"RULE-SET,"+dnsGuardName+",REJECT"){t.Fatal("DNS guard whitelist must precede resolver rejection")}
  C.SetHomeDir(t.TempDir());if _,e=config.Parse(b);e!=nil{t.Fatal(e)}
 }
 func TestImportedDotIsNotBroken(t *testing.T){
