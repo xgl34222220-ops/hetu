@@ -20,12 +20,13 @@ final class MihomoStartupConfig {
             throw new IOException("当前启动配置生成器只支持 Mihomo / Mihomo Smart");
         ProxyRuntimeProfile.Capability capability=profile.capability();
         if(!capability.available)throw new IOException(capability.reason.isEmpty()?"当前核心不支持该运行模式":capability.reason);
-        if(!profile.autoOverwrite)return new Result(source,detectScalarPort(source,"tproxy-port"),detectScalarPort(source,"redir-port"));
 
+        // The selected runtime mode is authoritative even when optional auto-overwrite is off.
+        // Source YAML is never edited, but the private startup copy must not carry listeners/TUN
+        // for another runtime mode (for example eBPF listeners while TPROXY is selected).
+        int sourceTp=detectScalarPort(source,"tproxy-port");
+        int sourceRp=detectScalarPort(source,"redir-port");
         String yaml=normalize(source);
-        // Transparent-proxy mode is selected by Bichen. Never feed source listeners for
-        // another runtime (eBPF/TUN/redirect/etc.) into the selected Mihomo process.
-        // The source file stays byte-for-byte unchanged; only this private startup copy is sanitized.
         yaml=removeTopLevelKey(yaml,"listeners");
         yaml=removeTopLevelScalar(yaml,"global-client-fingerprint");
         yaml=removeTopLevelScalar(yaml,"tproxy-port");
@@ -34,22 +35,23 @@ final class MihomoStartupConfig {
 
         int tp=0,rp=0;
         StringBuilder override=new StringBuilder();
-        override.append("\n# --- Bichen generated startup override; source file is unchanged ---\n");
+        override.append("\n# --- Bichen runtime-mode isolation; source file is unchanged ---\n");
         switch(profile.mode){
             case TPROXY:
-                tp=TPROXY_PORT;
+                tp=profile.autoOverwrite||sourceTp==0?TPROXY_PORT:sourceTp;
                 override.append("tproxy-port: ").append(tp).append('\n');
                 override.append("redir-port: 0\n");
                 override.append("tun:\n  enable: false\n");
                 break;
             case REDIRECT:
-                rp=REDIRECT_PORT;
+                rp=profile.autoOverwrite||sourceRp==0?REDIRECT_PORT:sourceRp;
                 override.append("redir-port: ").append(rp).append('\n');
                 override.append("tproxy-port: 0\n");
                 override.append("tun:\n  enable: false\n");
                 break;
             case ENHANCE:
-                tp=TPROXY_PORT;rp=REDIRECT_PORT;
+                tp=profile.autoOverwrite||sourceTp==0?TPROXY_PORT:sourceTp;
+                rp=profile.autoOverwrite||sourceRp==0?REDIRECT_PORT:sourceRp;
                 override.append("redir-port: ").append(rp).append('\n');
                 override.append("tproxy-port: ").append(tp).append('\n');
                 override.append("tun:\n  enable: false\n");
@@ -60,7 +62,7 @@ final class MihomoStartupConfig {
             case EBPF:
                 throw new IOException("eBPF 必须使用兼容核心和 eBPF 入站，不能用普通 Mihomo 启动配置冒充");
         }
-        override.append("# --- end Bichen startup override ---\n");
+        override.append("# --- end Bichen runtime-mode isolation ---\n");
         return new Result(yaml+override,tp,rp);
     }
 
@@ -85,7 +87,6 @@ final class MihomoStartupConfig {
                 Matcher m=start.matcher(line);
                 if(m.find()){
                     String rest=m.group(1).trim();
-                    // Inline/flow value lives entirely on this line. Block values continue below.
                     skipping=rest.isEmpty()||rest.startsWith("#");
                     continue;
                 }
@@ -93,7 +94,7 @@ final class MihomoStartupConfig {
             if(skipping){
                 if(t.isEmpty())continue;
                 if(ind>0)continue;
-                if(t.startsWith("-"))continue; // valid YAML indentless sequence item
+                if(t.startsWith("-"))continue;
                 if(t.startsWith("#")){out.append(line).append('\n');continue;}
                 if(nextKey.matcher(line).find())skipping=false;
                 else continue;
