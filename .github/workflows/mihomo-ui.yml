@@ -81,11 +81,7 @@ jobs:
             adb shell wm dismiss-keyguard
             python3 tools/test_device.py
             python3 tools/test_proxy_ui.py
-            if [ "${{ github.ref_name }}" = "feature/mihomo-ui" ] || [ "${{ github.ref_name }}" = "feature/mihomo-filter-hardening" ]; then
-              python3 tools/test_mihomo_device.py
-            else
-              echo 'Root proxy architecture requires rooted kernel/iptables validation on a real device; Android TUN E2E remains covered on feature/mihomo-ui.'
-            fi
+            test "${{ github.ref_name }}" = "feature/mihomo-ui" -o "${{ github.ref_name }}" = "feature/mihomo-filter-hardening" && python3 tools/test_mihomo_device.py || echo 'Root proxy architecture requires rooted kernel/iptables validation on a real device; Android TUN E2E remains covered on feature/mihomo-ui.'
       - name: Preserve unsigned build and verification evidence
         if: always()
         uses: actions/upload-artifact@v4
