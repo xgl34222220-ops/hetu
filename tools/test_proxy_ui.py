@@ -17,12 +17,24 @@ with zipfile.ZipFile(o/'unsigned.apk','a') as z:
 run(t/'zipalign','-f','4',o/'unsigned.apk',o/'aligned.apk')
 run(t/'apksigner','sign','--ks',key,'--ks-key-alias','test','--ks-pass','pass:android','--key-pass','pass:android','--v4-signing-enabled','false','--out',o/'test.apk',o/'aligned.apk')
 run('adb','install','-r',o/'test.apk');run('adb','shell','am','force-stop','io.github.xgl34222220.bichen.preview');run('adb','logcat','-c')
+p=None
 try:
  p=run('adb','shell','am','instrument','-w','bichen.proxyuicheck/.UiCheck',capture_output=True,text=True,timeout=180)
  (o/'results.txt').write_text(p.stdout+p.stderr);print(p.stdout)
 finally:
  log=subprocess.run(['adb','logcat','-d','-t','1800'],capture_output=True,text=True)
- (o/'android-logcat.txt').write_text(log.stdout+log.stderr)
- # prior test_device already restarted disposable emulator adbd as root.
+ text=log.stdout+log.stderr
+ (o/'android-logcat.txt').write_text(text)
+ if p is None or 'BICHEN_PROXY_UI_PASS' not in p.stdout:
+  lines=text.splitlines();selected=[];grab=False;left=0
+  for line in lines:
+   if 'FATAL EXCEPTION' in line or 'AndroidRuntime' in line and 'FATAL' in line:
+    grab=True;left=45
+   if grab:
+    selected.append(line);left-=1
+    if left<=0:grab=False
+  print('\n===== PROXY UI CRASH LOGCAT =====')
+  print('\n'.join(selected[-140:]) if selected else '\n'.join(lines[-220:]))
+  print('===== END CRASH LOGCAT =====\n')
  subprocess.run(['adb','pull','/data/user/0/io.github.xgl34222220.bichen.preview/files',str(o/'screenshots')],capture_output=True,text=True,timeout=30)
-assert 'BICHEN_PROXY_UI_PASS' in p.stdout and 'BICHEN_PROXY_UI_FAIL' not in p.stdout
+assert p is not None and 'BICHEN_PROXY_UI_PASS' in p.stdout and 'BICHEN_PROXY_UI_FAIL' not in p.stdout
