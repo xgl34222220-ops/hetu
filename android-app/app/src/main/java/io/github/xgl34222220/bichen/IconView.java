@@ -17,6 +17,7 @@ public final class IconView extends View {
         paint.setStyle(Paint.Style.STROKE); paint.setStrokeCap(Paint.Cap.ROUND); paint.setStrokeJoin(Paint.Join.ROUND);
         setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
     }
+    void setColor(int color){ paint.setColor(color); invalidate(); }
     @Override protected void onDraw(Canvas canvas) {
         super.onDraw(canvas); canvas.save();
         float unit = Math.min(getWidth(), getHeight()) / 24f;
