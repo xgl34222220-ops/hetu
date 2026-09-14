@@ -3,14 +3,11 @@ package bichen.devicecheck;
 import android.app.Activity;
 import android.app.Instrumentation;
 import android.content.Context;
-import android.content.Intent;
-import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.SystemClock;
-import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
@@ -38,6 +35,8 @@ public final class Smoke extends Instrumentation {
     }
     private String screen(){final StringBuilder s=new StringBuilder();runOnMainSync(()->collect(activity.getWindow().getDecorView(),s));return s.toString();}
     private void collect(View v,StringBuilder b){if(v instanceof TextView)b.append(((TextView)v).getText()).append('\n');if(v instanceof ViewGroup){ViewGroup g=(ViewGroup)v;for(int i=0;i<g.getChildCount();i++)collect(g.getChildAt(i),b);}}
+    private View byDescription(View v,String wanted){CharSequence d=v.getContentDescription();if(d!=null&&wanted.contentEquals(d))return v;if(v instanceof ViewGroup){ViewGroup g=(ViewGroup)v;for(int i=0;i<g.getChildCount();i++){View found=byDescription(g.getChildAt(i),wanted);if(found!=null)return found;}}return null;}
+    private View findClassSuffix(View v,String suffix){if(v.getClass().getName().endsWith(suffix))return v;if(v instanceof ViewGroup){ViewGroup g=(ViewGroup)v;for(int i=0;i<g.getChildCount();i++){View found=findClassSuffix(g.getChildAt(i),suffix);if(found!=null)return found;}}return null;}
     private void shot(String name)throws Exception{SystemClock.sleep(300);Bitmap image=getUiAutomation().takeScreenshot();if(image!=null)try(OutputStream o=new FileOutputStream(new File(target.getFilesDir(),name+".png"))){image.compress(Bitmap.CompressFormat.PNG,100,o);}}
     private static String sha(File f)throws Exception{MessageDigest d=MessageDigest.getInstance("SHA-256");try(InputStream i=new FileInputStream(f)){byte[] b=new byte[8192];int n;while((n=i.read(b))!=-1)d.update(b,0,n);}StringBuilder s=new StringBuilder();for(byte b:d.digest())s.append(String.format("%02x",b&255));return s.toString();}
     private void setStatus(JSONObject status)throws Exception{
@@ -58,26 +57,21 @@ public final class Smoke extends Instrumentation {
         Drawable icon=target.getResources().getDrawable(target.getApplicationInfo().icon,target.getTheme());
         Bitmap b=Bitmap.createBitmap(108,108,Bitmap.Config.ARGB_8888);icon.setBounds(0,0,108,108);icon.draw(new Canvas(b));
         check(b.getPixel(10,54)==0xff146b59&&b.getPixel(54,23)==0xffdff4e8,"retained original green icon rendering");
-        activity=startActivitySync(target.getPackageManager().getLaunchIntentForPackage(pkg).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));waitForIdleSync();
+        activity=startActivitySync(target.getPackageManager().getLaunchIntentForPackage(pkg).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK));waitForIdleSync();
         for(int i=0;i<450;i++){final boolean[] busy={true};runOnMainSync(()->{try{busy[0]=(Boolean)get("busy");}catch(Exception e){throw new RuntimeException(e);}});if(!busy[0])break;SystemClock.sleep(100);}
         check(!activity.isFinishing(),"app launch does not crash");check(!(Boolean)get("busy"),"initial status attempt finishes, no permanent spinner");
         getUiAutomation();
         String[] pages={"辟尘·测试","应用放行","过滤规则","请求活动"};
+        String[] dockLabels={"首页","应用","规则","活动"};
+        final View[] dock={null};runOnMainSync(()->dock[0]=findClassSuffix(activity.getWindow().getDecorView(),"LuoShuDockView"));check(dock[0]!=null,"real floating LuoShu dock exists");
         for(int i=0;i<4;i++){
-            final int n=i;runOnMainSync(()->{try{((ViewGroup)get("nav")).getChildAt(n).performClick();}catch(Exception e){throw new RuntimeException(e);}});waitForIdleSync();SystemClock.sleep(400);
+            final int n=i;final View[] item={null};runOnMainSync(()->{item[0]=byDescription(activity.getWindow().getDecorView(),dockLabels[n]);if(item[0]!=null)item[0].performClick();});waitForIdleSync();SystemClock.sleep(400);
+            check(item[0]!=null&&item[0].getHeight()>0,"floating dock destination measurable "+dockLabels[i]);
             check(screen().contains(pages[i]),"real page opens "+pages[i]);shot("actual-page-"+i);
         }
-        runOnMainSync(()->{try{ViewGroup nav=(ViewGroup)get("nav");for(int i=0;i<4;i++){
-            ViewGroup item=(ViewGroup)nav.getChildAt(i);View iconView=item.getChildAt(0);TextView label=(TextView)item.getChildAt(2);
-            check((label.getGravity()&Gravity.HORIZONTAL_GRAVITY_MASK)==Gravity.CENTER_HORIZONTAL,"nav text centered "+i);
-            check(Math.abs((label.getLeft()+label.getRight())-(iconView.getLeft()+iconView.getRight()))<=2,"nav icon and label share center "+i);
-            check(label.getBottom()<=item.getHeight(),"nav label fits large font "+i);
-        }nav.getChildAt(0).performClick();}catch(Exception e){throw new RuntimeException(e);}});waitForIdleSync();
+        runOnMainSync(()->{View home=byDescription(activity.getWindow().getDecorView(),"首页");if(home!=null)home.performClick();});waitForIdleSync();
         RequestLogs.run(this, activity, log);
-        // Fixtures exercise production rendering, not a pretend Root framework.
         JSONObject paused=new JSONObject().put("ok",true).put("installed",true).put("enabled",false).put("mounted",false).put("ruleCount",7081);
-        // Deterministically queue a structural refresh, then explicitly render its state.
-        // The full render must consume the flag; a later counter event must not rebuild.
         runOnMainSync(()->{try{field("homeRefreshNeeded").setBoolean(activity,true);}catch(Exception e){throw new RuntimeException(e);}});
         setStatus(paused);check(!(Boolean)get("homeRefreshNeeded"),"explicit home render consumes prior structural refresh flag");check(screen().contains("模块保护已暂停"),"fixture: installed paused module not called uninstalled");
         Object scroll=get("scroll");target.getSharedPreferences("bichen",0).edit().putLong("blocked",431).apply();SystemClock.sleep(450);waitForIdleSync();
