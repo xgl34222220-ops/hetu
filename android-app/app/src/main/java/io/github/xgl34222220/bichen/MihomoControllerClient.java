@@ -9,7 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 /** Authenticated localhost-only Mihomo Clash API client for strategy, delay and connections UI.
- * Uses a loopback socket instead of HttpURLConnection so Android's cleartext policy remains
+ * Uses a loopback socket instead of Android's URL connection layer so cleartext policy remains
  * strict for every external host while the private 127.0.0.1 controller can still be reached.
  */
 final class MihomoControllerClient {
