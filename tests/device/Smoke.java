@@ -65,8 +65,10 @@ public final class Smoke extends Instrumentation {
         String[] dockLabels={"首页","应用","规则","活动"};
         final View[] dock={null};runOnMainSync(()->dock[0]=findClassSuffix(activity.getWindow().getDecorView(),"LuoShuDockView"));check(dock[0]!=null,"real floating LuoShu dock exists");
         for(int i=0;i<4;i++){
-            final int n=i;final View[] item={null};runOnMainSync(()->{item[0]=byDescription(activity.getWindow().getDecorView(),dockLabels[n]);if(item[0]!=null)item[0].performClick();});waitForIdleSync();SystemClock.sleep(400);
-            check(item[0]!=null&&item[0].getHeight()>0,"floating dock destination measurable "+dockLabels[i]);
+            final int n=i;final View[] item={null};final boolean[] measurable={false};
+            runOnMainSync(()->{item[0]=byDescription(activity.getWindow().getDecorView(),dockLabels[n]);measurable[0]=item[0]!=null&&item[0].getHeight()>0&&item[0].getWidth()>0;if(item[0]!=null)item[0].performClick();});
+            check(measurable[0],"floating dock destination measurable "+dockLabels[i]);
+            waitForIdleSync();SystemClock.sleep(400);
             check(screen().contains(pages[i]),"real page opens "+pages[i]);shot("actual-page-"+i);
         }
         runOnMainSync(()->{View home=byDescription(activity.getWindow().getDecorView(),"首页");if(home!=null)home.performClick();});waitForIdleSync();
