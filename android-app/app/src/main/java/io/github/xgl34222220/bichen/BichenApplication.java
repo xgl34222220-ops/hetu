@@ -13,14 +13,29 @@ import android.widget.*;
 import java.lang.reflect.*;
 import java.util.*;
 
-/** Shared LuoShu/BaiZe visual bridge for every legacy Java screen. */
+/** Shared LuoShu/BaiZe visual bridge for every Bichen screen. */
 public final class BichenApplication extends Application implements Application.ActivityLifecycleCallbacks {
     private final WeakHashMap<Activity,SkinSession> sessions=new WeakHashMap<>();
     @Override public void onCreate(){super.onCreate();registerActivityLifecycleCallbacks(this);}
-    @Override public void onActivityCreated(Activity a,Bundle b){if(a instanceof MainActivity){SkinSession s=new SkinSession(a);sessions.put(a,s);a.getWindow().getDecorView().post(s::install);}}
+    @Override public void onActivityCreated(Activity a,Bundle b){
+        if(a instanceof MainActivity){SkinSession s=new SkinSession(a);sessions.put(a,s);a.getWindow().getDecorView().post(s::install);}
+        else if(a instanceof ProxyActivity){a.getWindow().getDecorView().post(()->floatProxyDock(a));}
+    }
     @Override public void onActivityResumed(Activity a){SkinSession s=sessions.get(a);if(s!=null)s.request();}
     @Override public void onActivityDestroyed(Activity a){SkinSession s=sessions.remove(a);if(s!=null)s.dispose();}
     @Override public void onActivityStarted(Activity a){}@Override public void onActivityPaused(Activity a){}@Override public void onActivityStopped(Activity a){}@Override public void onActivitySaveInstanceState(Activity a,Bundle b){}
+
+    private static void floatProxyDock(Activity a){
+        try{
+            Field nf=ProxyActivity.class.getDeclaredField("nav");nf.setAccessible(true);Object no=nf.get(a);if(!(no instanceof LuoShuDockView))return;LuoShuDockView nav=(LuoShuDockView)no;ViewParent vp=nav.getParent();if(!(vp instanceof ViewGroup))return;((ViewGroup)vp).removeView(nav);
+            View hostView=a.findViewById(android.R.id.content);if(!(hostView instanceof FrameLayout))return;FrameLayout host=(FrameLayout)hostView;
+            FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(-1,dp(a,72),Gravity.BOTTOM);lp.leftMargin=dp(a,20);lp.rightMargin=dp(a,20);lp.bottomMargin=dp(a,12);host.addView(nav,lp);nav.setElevation(dp(a,18));
+            nav.setOnApplyWindowInsetsListener((v,insets)->{int bottom=Build.VERSION.SDK_INT>=30?insets.getInsets(WindowInsets.Type.navigationBars()).bottom:insets.getSystemWindowInsetBottom();ViewGroup.LayoutParams raw=v.getLayoutParams();if(raw instanceof FrameLayout.LayoutParams){FrameLayout.LayoutParams p=(FrameLayout.LayoutParams)raw;int wanted=dp(a,12)+bottom;if(p.bottomMargin!=wanted){p.bottomMargin=wanted;v.setLayoutParams(p);}}return insets;});nav.requestApplyInsets();
+            Field cf=ProxyActivity.class.getDeclaredField("content");cf.setAccessible(true);Object co=cf.get(a);if(co instanceof FrameLayout){FrameLayout content=(FrameLayout)co;content.setClipToPadding(false);content.setPadding(content.getPaddingLeft(),content.getPaddingTop(),content.getPaddingRight(),dp(a,92));}
+        }catch(Throwable ignored){}
+    }
+
+    private static int dp(Context c,float v){return Math.round(v*c.getResources().getDisplayMetrics().density);}
 
     private static final class SkinSession implements ViewTreeObserver.OnGlobalLayoutListener {
         final Activity a;final boolean dark;final int bg,surface,text,muted,accent,soft,danger,divider;
@@ -42,22 +57,18 @@ public final class BichenApplication extends Application implements Application.
         private void styleRoot(String field,RootStyle action){try{Field f=MainActivity.class.getDeclaredField(field);f.setAccessible(true);Object o=f.get(a);if(o instanceof View){View v=(View)o;if(!rootStyled.containsKey(v)){rootStyled.put(v,Boolean.TRUE);action.apply(v);}}}catch(Throwable ignored){}}
         private int currentTab(){try{Field f=MainActivity.class.getDeclaredField("tab");f.setAccessible(true);return f.getInt(a);}catch(Throwable e){return 0;}}
 
-        /**
-         * Keep the old navigation alive for behavior/tests, but make it optically invisible and place
-         * the same LuoShuDockView used by the proxy console above it. This avoids the old Material-like
-         * four cells while preserving every existing click callback.
-         */
         private void styleMainDock(){
             try{
                 Field f=MainActivity.class.getDeclaredField("nav");f.setAccessible(true);Object o=f.get(a);if(!(o instanceof LinearLayout))return;mainDock=(LinearLayout)o;
                 boolean newDock=mainDock!=lastDockGeometry;
                 if(newDock){
                     lastDockGeometry=mainDock;lastDockTab=-1;mainDock.setAlpha(0f);mainDock.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
+                    ViewGroup.LayoutParams old=mainDock.getLayoutParams();if(old instanceof LinearLayout.LayoutParams){LinearLayout.LayoutParams gone=(LinearLayout.LayoutParams)old;gone.height=0;gone.setMargins(0,0,0,0);mainDock.setLayoutParams(gone);}
                     if(overlayDock!=null&&overlayDock.getParent() instanceof ViewGroup)((ViewGroup)overlayDock.getParent()).removeView(overlayDock);
                     View hostView=a.findViewById(android.R.id.content);if(!(hostView instanceof FrameLayout))return;FrameLayout host=(FrameLayout)hostView;
                     overlayDock=new LuoShuDockView(a,new String[]{"首页","应用","规则","活动"},new String[]{"shield","apps","rules","activity"},currentTab(),accent,muted,surface,dark,index->{try{if(index<mainDock.getChildCount())mainDock.getChildAt(index).performClick();}catch(Throwable ignored){}});
                     FrameLayout.LayoutParams lp=new FrameLayout.LayoutParams(-1,dp(72),Gravity.BOTTOM);lp.leftMargin=dp(20);lp.rightMargin=dp(20);lp.bottomMargin=dp(12);host.addView(overlayDock,lp);
-                    overlayDock.setOnApplyWindowInsetsListener((v,insets)->{int bottom=0;if(Build.VERSION.SDK_INT>=30)bottom=insets.getInsets(WindowInsets.Type.navigationBars()).bottom;else bottom=insets.getSystemWindowInsetBottom();ViewGroup.LayoutParams raw=v.getLayoutParams();if(raw instanceof FrameLayout.LayoutParams){FrameLayout.LayoutParams p=(FrameLayout.LayoutParams)raw;int wanted=dp(12)+bottom;if(p.bottomMargin!=wanted){p.bottomMargin=wanted;v.setLayoutParams(p);}}return insets;});overlayDock.requestApplyInsets();
+                    overlayDock.setOnApplyWindowInsetsListener((v,insets)->{int bottom=Build.VERSION.SDK_INT>=30?insets.getInsets(WindowInsets.Type.navigationBars()).bottom:insets.getSystemWindowInsetBottom();ViewGroup.LayoutParams raw=v.getLayoutParams();if(raw instanceof FrameLayout.LayoutParams){FrameLayout.LayoutParams p=(FrameLayout.LayoutParams)raw;int wanted=dp(12)+bottom;if(p.bottomMargin!=wanted){p.bottomMargin=wanted;v.setLayoutParams(p);}}return insets;});overlayDock.requestApplyInsets();
                 }
             }catch(Throwable ignored){}
         }
@@ -68,13 +79,15 @@ public final class BichenApplication extends Application implements Application.
             if(v==a.getWindow().getDecorView())return;
             if(v instanceof ProgressBar){if(Build.VERSION.SDK_INT>=21)((ProgressBar)v).setIndeterminateTintList(ColorStateList.valueOf(accent));return;}
             if(v instanceof CompoundButton){CompoundButton b=(CompoundButton)v;if(Build.VERSION.SDK_INT>=21)b.setButtonTintList(new ColorStateList(new int[][]{new int[]{android.R.attr.state_checked},new int[]{}},new int[]{accent,muted}));}
-            if(v instanceof TextView){TextView t=(TextView)v;int c=t.getCurrentTextColor();if(isOldText(c))t.setTextColor(text);else if(isOldMuted(c))t.setTextColor(muted);else if(isOldAccent(c))t.setTextColor(accent);else if(isOldDanger(c))t.setTextColor(danger);if(v instanceof EditText){t.setBackground(new LuoShuSurfaceDrawable(surface,accent,dark?0x14ffffff:0x3affffff,dp(18),.015f,dark?.03f:.09f,false));t.setPadding(dp(16),dp(12),dp(16),dp(12));}else if(t.isClickable()&&Color.alpha(t.getCurrentTextColor())>0&&isNearlyWhite(t.getCurrentTextColor())){t.setBackground(round(accent,20));t.setMinHeight(dp(54));}CharSequence value=t.getText();if(value!=null&&value.length()>180&&!t.isTextSelectable()){t.setMaxLines(4);t.setEllipsize(TextUtils.TruncateAt.END);}return;}
+            if(v instanceof TextView){TextView t=(TextView)v;int c=t.getCurrentTextColor();if(isOldText(c))t.setTextColor(text);else if(isOldMuted(c))t.setTextColor(muted);else if(isOldAccent(c))t.setTextColor(accent);else if(isOldDanger(c))t.setTextColor(danger);if(v instanceof EditText){t.setBackground(new LuoShuSurfaceDrawable(surface,accent,dark?0x14ffffff:0x3affffff,dp(18),.015f,dark?.03f:.09f,false));t.setPadding(dp(16),dp(12),dp(16),dp(12));}else if(t.isClickable()&&Color.alpha(t.getCurrentTextColor())>0&&isNearlyWhite(t.getCurrentTextColor())){t.setBackground(round(accent,20));t.setMinHeight(dp(54));}CharSequence value=t.getText();if(value!=null&&value.length()>80&&!t.isTextSelectable()){t.setMaxLines(3);t.setEllipsize(TextUtils.TruncateAt.END);}return;}
             if(v instanceof IconView){IconView i=(IconView)v;String k=i.kind();i.setColor("chevron".equals(k)||"back".equals(k)||"close".equals(k)?muted:accent);return;}
-            if(v instanceof LinearLayout){LinearLayout l=(LinearLayout)v;if(l.getElevation()>.5f){boolean hero=containsIcon(l,"power");l.setBackground(new LuoShuSurfaceDrawable(hero?mix(surface,accent,dark?.13f:.10f):surface,accent,dark?0x16ffffff:0x3cffffff,dp(hero?30:24),hero?(dark?.09f:.12f):.018f,hero?(dark?.10f:.22f):(dark?.035f:.10f),false));l.setElevation(dp(hero?8:1));if(hero)l.setPadding(dp(20),dp(20),dp(20),dp(20));}}
+            if(v instanceof LinearLayout){LinearLayout l=(LinearLayout)v;if(l.getElevation()>.5f){boolean hero=containsIcon(l,"power"),warning=containsText(l,"需要处理"),proxy=containsText(l,"代理与去广告 · Mihomo");int radius=hero?30:warning?20:24;int base=warning?soft:hero?mix(surface,accent,dark?.13f:.10f):surface;l.setBackground(new LuoShuSurfaceDrawable(base,accent,dark?0x16ffffff:0x3cffffff,dp(radius),hero?(dark?.09f:.12f):.018f,hero?(dark?.10f:.22f):(dark?.035f:.10f),false));l.setElevation(dp(hero?8:warning?0:1));if(hero)l.setPadding(dp(20),dp(20),dp(20),dp(20));else if(warning||proxy)l.setPadding(dp(15),dp(13),dp(15),dp(13));if(warning)compactLongText(l,2);}}
             if(v instanceof FrameLayout&&v.getElevation()>.5f){v.setBackground(new LuoShuSurfaceDrawable(surface,accent,dark?0x16ffffff:0x42ffffff,dp(18),.025f,dark?.05f:.14f,false));}
             if(v instanceof ListView){ListView l=(ListView)v;l.setBackgroundColor(Color.TRANSPARENT);l.setClipToPadding(false);}
-            if(v instanceof ScrollView){ScrollView s=(ScrollView)v;s.setClipToPadding(false);}
+            if(v instanceof ScrollView){ScrollView s=(ScrollView)v;s.setClipToPadding(false);s.setPadding(s.getPaddingLeft(),s.getPaddingTop(),s.getPaddingRight(),Math.max(s.getPaddingBottom(),dp(102)));}
         }
+        private void compactLongText(View v,int lines){if(v instanceof TextView){TextView t=(TextView)v;CharSequence s=t.getText();if(s!=null&&s.length()>45){t.setMaxLines(lines);t.setEllipsize(TextUtils.TruncateAt.END);}}if(v instanceof ViewGroup){ViewGroup g=(ViewGroup)v;for(int i=0;i<g.getChildCount();i++)compactLongText(g.getChildAt(i),lines);}}
+        private boolean containsText(View v,String target){if(v instanceof TextView&&target.contentEquals(((TextView)v).getText()))return true;if(v instanceof ViewGroup){ViewGroup g=(ViewGroup)v;for(int i=0;i<g.getChildCount();i++)if(containsText(g.getChildAt(i),target))return true;}return false;}
         private boolean containsIcon(View v,String kind){if(v instanceof IconView)return kind.equals(((IconView)v).kind());if(v instanceof ViewGroup){ViewGroup g=(ViewGroup)v;for(int i=0;i<g.getChildCount();i++)if(containsIcon(g.getChildAt(i),kind))return true;}return false;}
         private boolean isOldText(int c){return c==0xff22342b||c==0xffe6eee8||c==0xff1e2b25||c==0xfff2f3f5;}
         private boolean isOldMuted(int c){return c==0xff5e7265||c==0xffaab9ae||c==0xff687078||c==0xffa5abb2;}
