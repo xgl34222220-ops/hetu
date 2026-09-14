@@ -18,6 +18,7 @@ public final class IconView extends View {
         setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
     }
     void setColor(int color){ paint.setColor(color); invalidate(); }
+    String kind(){ return kind; }
     @Override protected void onDraw(Canvas canvas) {
         super.onDraw(canvas); canvas.save();
         float unit = Math.min(getWidth(), getHeight()) / 24f;
