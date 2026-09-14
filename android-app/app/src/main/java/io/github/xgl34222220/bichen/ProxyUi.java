@@ -19,7 +19,6 @@ final class ProxyUi {
     ProxyUi(Activity activity){
         a=activity;dark=isDark(activity);
         int seed=resolveAccent(activity,dark);
-        // Same optical baseline as LuoShuTheme: F4F6FA, quiet cards, dynamic Monet accent.
         bg=dark?0xff111214:blend(0xfff4f6fa,seed,.07f);
         surface=dark?0xff1b1c20:blend(0xffffffff,seed,.018f);
         elevated=dark?blend(0xff1f2024,seed,.12f):blend(0xffffffff,seed,.13f);
@@ -53,7 +52,11 @@ final class ProxyUi {
     LinearLayout col(){LinearLayout c=new LinearLayout(a);c.setOrientation(LinearLayout.VERTICAL);return c;}
     LinearLayout row(){LinearLayout c=new LinearLayout(a);c.setGravity(Gravity.CENTER_VERTICAL);return c;}
     void gap(LinearLayout c,int h){c.addView(new View(a),new LinearLayout.LayoutParams(1,dp(h)));}
-    TextView text(String value,float size,int color,boolean bold){TextView t=new TextView(a);t.setText(value);t.setTextSize(size);t.setTextColor(color);t.setIncludeFontPadding(false);t.setLineSpacing(dp(1),1);t.setFontFeatureSettings("kern");t.setTypeface(Typeface.create("sans-serif",bold?Typeface.BOLD:Typeface.NORMAL));return t;}
+    TextView text(String value,float size,int color,boolean bold){
+        TextView t=new TextView(a);t.setText(value);t.setTextSize(size);t.setTextColor(color);t.setIncludeFontPadding(false);t.setLineSpacing(dp(1),1);t.setFontFeatureSettings("kern");t.setTypeface(Typeface.create("sans-serif",bold?Typeface.BOLD:Typeface.NORMAL));
+        if("功能架构按 BoxProxy，视觉统一洛书".equals(value))t.post(()->{ViewParent p=t.getParent();if(p instanceof View)((View)p).setVisibility(View.GONE);});
+        return t;
+    }
 
     LinearLayout card(LinearLayout parent){
         LinearLayout c=col();c.setPadding(dp(18),dp(16),dp(18),dp(16));c.setBackground(new LuoShuSurfaceDrawable(surface,accent,dark?0x14ffffff:0x36ffffff,dp(24),dark?.018f:.018f,dark?.035f:.11f,false));
