@@ -35,7 +35,7 @@ public final class BichenApplication extends Application implements Application.
         private void styleKnownRoots(){
             styleRoot("shell",v->v.setBackground(new LuoShuSurfaceDrawable(bg,accent,Color.TRANSPARENT,0,dark?.055f:.08f,0,true)));
             styleRoot("banner",v->{if(v instanceof LinearLayout)v.setBackground(new LuoShuSurfaceDrawable(soft,accent,dark?0x18ffffff:0x42ffffff,dp(18),.025f,dark?.04f:.13f,false));});
-            styleRoot("heading",v->{if(v instanceof TextView){TextView t=(TextView)v;t.setTextColor(text);t.setTextSize(34);t.setTypeface(Typeface.create("sans-serif",Typeface.BLACK));}});
+            styleRoot("heading",v->{if(v instanceof TextView){TextView t=(TextView)v;t.setTextColor(text);t.setTextSize(34);t.setTypeface(Typeface.create("sans-serif-black",Typeface.NORMAL));}});
             styleRoot("subtitle",v->{if(v instanceof TextView){TextView t=(TextView)v;t.setTextColor(muted);t.setTextSize(12);t.setLineSpacing(0,1);}});
         }
         private interface RootStyle{void apply(View v);}
