@@ -63,7 +63,7 @@ public final class BichenApplication extends Application implements Application.
                 boolean newDock=mainDock!=lastDockGeometry;
                 if(newDock){
                     lastDockGeometry=mainDock;lastDockTab=-1;mainDock.setAlpha(0f);mainDock.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
-                    ViewGroup.LayoutParams old=mainDock.getLayoutParams();if(old instanceof LinearLayout.LayoutParams){LinearLayout.LayoutParams gone=(LinearLayout.LayoutParams)old;gone.height=dp(54);gone.setMargins(0,0,0,0);mainDock.setLayoutParams(gone);}
+                    ViewGroup.LayoutParams old=mainDock.getLayoutParams();if(old instanceof LinearLayout.LayoutParams){LinearLayout.LayoutParams gone=(LinearLayout.LayoutParams)old;gone.height=0;gone.setMargins(0,0,0,0);mainDock.setLayoutParams(gone);}
                     if(overlayDock!=null&&overlayDock.getParent() instanceof ViewGroup)((ViewGroup)overlayDock.getParent()).removeView(overlayDock);
                     View hostView=a.findViewById(android.R.id.content);if(!(hostView instanceof FrameLayout))return;FrameLayout host=(FrameLayout)hostView;
                     overlayDock=new LuoShuDockView(a,new String[]{"首页","应用","规则","活动"},new String[]{"shield","apps","rules","activity"},currentTab(),accent,muted,surface,dark,index->{try{if(index<mainDock.getChildCount())mainDock.getChildAt(index).performClick();}catch(Throwable ignored){}});
