@@ -4,7 +4,7 @@ from __future__ import annotations
 import hashlib,json,os,re,shutil,subprocess,sys,tempfile,zipfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-BASE='io.github.xgl34222220.bichen';PREVIEW=BASE+'.preview';VERSION='0.4.0-test.17';CODE=417
+BASE='io.github.xgl34222220.bichen';PREVIEW=BASE+'.preview';VERSION='0.4.0-test.18';CODE=418
 
 def run(*args,cwd):subprocess.run([str(a) for a in args],cwd=cwd,check=True)
 def digest(path):return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -20,7 +20,7 @@ def main():
    if path.name=='MainActivity.java':text=text.replace('"辟尘"','"辟尘·测试"').replace('"少一点打扰，多一点清净"','"洛书视觉对齐测试 · 请停止旧版保护"')
    path.write_text(text)
   dock=(main_dir/'java/io/github/xgl34222220/bichen/LuoShuDockView.java').read_text();assert 'setCornerRadius(dp(31))' in dock and 'dp(23)' in dock and 'dp(60)' in dock and 'setElevation(dp(18))' in dock
-  skin=(main_dir/'java/io/github/xgl34222220/bichen/BichenApplication.java').read_text();assert 'LuoShuDockView' in skin and 'system_accent1_500' in skin and '0xfff4f6fa' in skin and 'MainActivity.class.getDeclaredField("nav")' in skin
+  skin=(main_dir/'java/io/github/xgl34222220/bichen/BichenApplication.java').read_text();assert 'styleMainDock' in skin and 'lastDockGeometry' in skin and 'system_accent1_500' in skin and '0xfff4f6fa' in skin and 'MainActivity.class.getDeclaredField("nav")' in skin
   controller=(main_dir/'java/io/github/xgl34222220/bichen/MihomoControllerClient.java').read_text();assert 'new Socket()' in controller and '127.0.0.1' in controller and 'HttpURLConnection' not in controller
   proxy=(main_dir/'java/io/github/xgl34222220/bichen/ProxyActivity.java').read_text()
   for required in ('"首页"','"面板"','"工具"','"设置"','当前策略','节点选择','全部测速','连接活动','MihomoControllerClient','controller.select','controller.delay','RootTproxyActivity.class','LuoShuDockView','panelReady','实时连接与流量'):assert required in proxy,required
