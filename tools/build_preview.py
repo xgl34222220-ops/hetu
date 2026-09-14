@@ -4,7 +4,7 @@ from __future__ import annotations
 import hashlib,json,os,re,shutil,subprocess,sys,tempfile,zipfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-BASE='io.github.xgl34222220.bichen';PREVIEW=BASE+'.preview';VERSION='0.4.0-test.14';CODE=414
+BASE='io.github.xgl34222220.bichen';PREVIEW=BASE+'.preview';VERSION='0.4.0-test.15';CODE=415
 
 def run(*args,cwd):subprocess.run([str(a) for a in args],cwd=cwd,check=True)
 def digest(path):return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -22,7 +22,8 @@ def main():
   proxy=(main_dir/'java/io/github/xgl34222220/bichen/ProxyActivity.java').read_text()
   for required in ('"首页"','"面板"','"工具"','"设置"','当前策略','节点选择','全部测速','连接活动','MihomoControllerClient','controller.select','controller.delay','RootTproxyActivity.class'):assert required in proxy,required
   basic=(main_dir/'java/io/github/xgl34222220/bichen/RootTproxyActivity.java').read_text()
-  for required in ('基础代理配置','核心选择','运行模式','IPv6','自动覆写','查看启动配置','配置选择','当前配置','启动代理','核心管理','运行日志'):assert required in basic,required
+  for required in ('基础代理配置','核心选择','运行模式','IPv6','自动覆写','查看启动配置','配置选择','尚无配置','renderConfigs'):assert required in basic,required
+  assert '启动代理' not in basic and '运行日志' not in basic and '核心管理' not in basic
   startup=(main_dir/'java/io/github/xgl34222220/bichen/MihomoStartupConfig.java').read_text();assert 'removeTopLevelKey(yaml,"listeners")' in startup;assert 'external-controller: 127.0.0.1:' in startup and 'CONTROLLER_PORT=19090' in startup
   manager=(main_dir/'java/io/github/xgl34222220/bichen/RootProxyManager.java').read_text();assert 'proxyControllerSecret' in manager and 'waitReady(3500)' in manager
   controller=(main_dir/'java/io/github/xgl34222220/bichen/MihomoControllerClient.java').read_text();assert 'boolean waitReady' in controller and 'return false;' in controller
