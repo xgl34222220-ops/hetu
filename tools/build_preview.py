@@ -4,7 +4,7 @@ from __future__ import annotations
 import hashlib,json,os,re,shutil,subprocess,sys,tempfile,zipfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-BASE='io.github.xgl34222220.bichen';PREVIEW=BASE+'.preview';VERSION='0.4.0-test.13';CODE=413
+BASE='io.github.xgl34222220.bichen';PREVIEW=BASE+'.preview';VERSION='0.4.0-test.14';CODE=414
 
 def run(*args,cwd):subprocess.run([str(a) for a in args],cwd=cwd,check=True)
 def digest(path):return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -25,6 +25,7 @@ def main():
   for required in ('基础代理配置','核心选择','运行模式','IPv6','自动覆写','查看启动配置','配置选择','当前配置','启动代理','核心管理','运行日志'):assert required in basic,required
   startup=(main_dir/'java/io/github/xgl34222220/bichen/MihomoStartupConfig.java').read_text();assert 'removeTopLevelKey(yaml,"listeners")' in startup;assert 'external-controller: 127.0.0.1:' in startup and 'CONTROLLER_PORT=19090' in startup
   manager=(main_dir/'java/io/github/xgl34222220/bichen/RootProxyManager.java').read_text();assert 'proxyControllerSecret' in manager and 'waitReady(3500)' in manager
+  controller=(main_dir/'java/io/github/xgl34222220/bichen/MihomoControllerClient.java').read_text();assert 'boolean waitReady' in controller and 'return false;' in controller
   for name in ('ProxyCoreStore.java','ProxyConfigLibrary.java','ProxyRuntimeProfile.java','RootProxyManager.java','MihomoControllerClient.java'):assert (main_dir/'java/io/github/xgl34222220/bichen'/name).is_file()
   assert (stage/'docs/BOXPROXY_PARITY.md').is_file()
   process_test=stage/'tests/root_process_test.py';process_test.write_text(process_test.read_text().replace(BASE,PREVIEW));test_script=stage/'tools/test_java.py';test_script.write_text(test_script.read_text().replace(BASE,PREVIEW))
