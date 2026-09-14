@@ -32,10 +32,19 @@ final class MihomoControllerClient {
         long d=v.optLong("delay",-1);if(d<0)throw new IOException("测速超时");return d;
     }
     void closeAll()throws Exception{request("DELETE","/connections",null);}
-    void waitReady(long timeoutMs)throws Exception{
-        long end=android.os.SystemClock.elapsedRealtime()+timeoutMs;Exception last=null;
-        do{try{version();return;}catch(Exception e){last=e;}android.os.SystemClock.sleep(120);}while(android.os.SystemClock.elapsedRealtime()<end);
-        throw new IOException("Mihomo 已启动，但策略控制接口尚未就绪",last);
+
+    /**
+     * The Clash API is a control/observability surface, not the transparent-proxy service itself.
+     * A slow provider/ruleset init may make the API appear a little after the core and iptables rules
+     * are already healthy. Returning false keeps the proxy running and lets the UI poll it later.
+     */
+    boolean waitReady(long timeoutMs){
+        long end=android.os.SystemClock.elapsedRealtime()+Math.max(0,timeoutMs);
+        do{
+            try{version();return true;}catch(Exception ignored){}
+            android.os.SystemClock.sleep(150);
+        }while(android.os.SystemClock.elapsedRealtime()<end);
+        return false;
     }
 
     private JSONObject request(String method,String path,JSONObject body)throws Exception{
