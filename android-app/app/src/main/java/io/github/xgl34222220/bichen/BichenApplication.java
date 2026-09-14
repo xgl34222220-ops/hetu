@@ -23,39 +23,45 @@ public final class BichenApplication extends Application implements Application.
 
     private static final class SkinSession implements ViewTreeObserver.OnGlobalLayoutListener {
         final Activity a;final boolean dark;final int bg,surface,text,muted,accent,soft,danger,divider;
-        final WeakHashMap<View,Boolean> styled=new WeakHashMap<>();boolean scheduled,disposed;LinearLayout mainDock;
+        final WeakHashMap<View,Boolean> styled=new WeakHashMap<>();
+        final WeakHashMap<View,Boolean> rootStyled=new WeakHashMap<>();
+        boolean scheduled,disposed;LinearLayout mainDock,lastDockGeometry;int lastDockTab=-1;
         SkinSession(Activity a){this.a=a;dark=ProxyUi.isDark(a);int dyn;if(Build.VERSION.SDK_INT>=31)dyn=a.getColor(dark?android.R.color.system_accent1_200:android.R.color.system_accent1_500);else dyn=dark?0xffa9bfff:0xff4f6fd8;bg=dark?0xff111214:0xfff4f6fa;surface=dark?0xff1b1c20:0xffffffff;text=dark?0xfff1f2f5:0xff16171b;muted=dark?0xffa8abb4:0xff70727c;accent=dyn;soft=mix(surface,accent,dark?.13f:.09f);danger=dark?0xffffb39d:0xffa64d3d;divider=dark?0x24ffffff:0x12000000;}
         void install(){if(disposed)return;Window w=a.getWindow();w.setStatusBarColor(Color.TRANSPARENT);w.setNavigationBarColor(Color.TRANSPARENT);if(Build.VERSION.SDK_INT>=30){w.setDecorFitsSystemWindows(false);View d=w.getDecorView();d.post(()->{WindowInsetsController c=d.getWindowInsetsController();if(c!=null){int appearance=dark?0:WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS|WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;c.setSystemBarsAppearance(appearance,WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS|WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);}});}a.getWindow().getDecorView().getViewTreeObserver().addOnGlobalLayoutListener(this);request();}
         void dispose(){disposed=true;View decor=a.getWindow().getDecorView();ViewTreeObserver o=decor.getViewTreeObserver();if(o.isAlive())o.removeOnGlobalLayoutListener(this);}
         @Override public void onGlobalLayout(){request();}
-        void request(){if(disposed||scheduled)return;scheduled=true;a.getWindow().getDecorView().post(()->{scheduled=false;if(disposed)return;styleKnownRoots();skin(a.getWindow().getDecorView());styleMainDock();});}
+        void request(){if(disposed||scheduled)return;scheduled=true;a.getWindow().getDecorView().postDelayed(()->{scheduled=false;if(disposed)return;styleKnownRoots();skin(a.getWindow().getDecorView());styleMainDock();},32);}
 
         private void styleKnownRoots(){
-            try{Field f=MainActivity.class.getDeclaredField("shell");f.setAccessible(true);Object o=f.get(a);if(o instanceof View)((View)o).setBackgroundColor(bg);}catch(Throwable ignored){}
-            try{Field f=MainActivity.class.getDeclaredField("banner");f.setAccessible(true);Object o=f.get(a);if(o instanceof LinearLayout)((LinearLayout)o).setBackground(round(soft,18));}catch(Throwable ignored){}
-            try{Field f=MainActivity.class.getDeclaredField("heading");f.setAccessible(true);Object o=f.get(a);if(o instanceof TextView){TextView t=(TextView)o;t.setTextColor(text);t.setTextSize(30);t.setTypeface(Typeface.create("sans-serif",Typeface.BOLD));}}catch(Throwable ignored){}
-            try{Field f=MainActivity.class.getDeclaredField("subtitle");f.setAccessible(true);Object o=f.get(a);if(o instanceof TextView){TextView t=(TextView)o;t.setTextColor(muted);t.setTextSize(12);}}catch(Throwable ignored){}
+            styleRoot("shell",v->v.setBackgroundColor(bg));
+            styleRoot("banner",v->{if(v instanceof LinearLayout)v.setBackground(round(soft,18));});
+            styleRoot("heading",v->{if(v instanceof TextView){TextView t=(TextView)v;t.setTextColor(text);t.setTextSize(30);t.setTypeface(Typeface.create("sans-serif",Typeface.BOLD));}});
+            styleRoot("subtitle",v->{if(v instanceof TextView){TextView t=(TextView)v;t.setTextColor(muted);t.setTextSize(12);}});
         }
+        private interface RootStyle{void apply(View v);}
+        private void styleRoot(String field,RootStyle action){try{Field f=MainActivity.class.getDeclaredField(field);f.setAccessible(true);Object o=f.get(a);if(o instanceof View){View v=(View)o;if(!rootStyled.containsKey(v)){rootStyled.put(v,Boolean.TRUE);action.apply(v);}}}catch(Throwable ignored){}}
         private int currentTab(){try{Field f=MainActivity.class.getDeclaredField("tab");f.setAccessible(true);return f.getInt(a);}catch(Throwable e){return 0;}}
-        /** MainActivity keeps its original LinearLayout so old behavior/tests remain real; the visible geometry is the same optical port as LuoShuDockView. */
+        /** MainActivity keeps its original navigation callbacks; geometry is applied once per dock instance. */
         private void styleMainDock(){
             try{
                 Field f=MainActivity.class.getDeclaredField("nav");f.setAccessible(true);Object o=f.get(a);if(!(o instanceof LinearLayout))return;mainDock=(LinearLayout)o;
-                ViewGroup.LayoutParams raw=mainDock.getLayoutParams();if(raw instanceof LinearLayout.LayoutParams){LinearLayout.LayoutParams lp=(LinearLayout.LayoutParams)raw;lp.height=dp(72);lp.setMargins(dp(20),dp(6),dp(20),dp(12));mainDock.setLayoutParams(lp);}
-                mainDock.setPadding(dp(6),dp(6),dp(6),dp(6));GradientDrawable shell=new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,new int[]{dark?0xff24272d:0xf9ffffff,dark?0xff1b1d22:0xf7fdfdff});shell.setCornerRadius(dp(31));shell.setStroke(Math.max(1,dp(.7f)),dark?0x1cffffff:0x70ffffff);mainDock.setBackground(shell);mainDock.setElevation(dp(18));
-                int selected=currentTab();
+                boolean newDock=mainDock!=lastDockGeometry;
+                if(newDock){
+                    lastDockGeometry=mainDock;lastDockTab=-1;
+                    ViewGroup.LayoutParams raw=mainDock.getLayoutParams();if(raw instanceof LinearLayout.LayoutParams){LinearLayout.LayoutParams lp=(LinearLayout.LayoutParams)raw;boolean changed=lp.height!=dp(72)||lp.leftMargin!=dp(20)||lp.rightMargin!=dp(20)||lp.topMargin!=dp(6)||lp.bottomMargin!=dp(12);if(changed){lp.height=dp(72);lp.setMargins(dp(20),dp(6),dp(20),dp(12));mainDock.setLayoutParams(lp);}}
+                    mainDock.setPadding(dp(6),dp(6),dp(6),dp(6));GradientDrawable shell=new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,new int[]{dark?0xff24272d:0xf9ffffff,dark?0xff1b1d22:0xf7fdfdff});shell.setCornerRadius(dp(31));shell.setStroke(Math.max(1,dp(.7f)),dark?0x1cffffff:0x70ffffff);mainDock.setBackground(shell);mainDock.setElevation(dp(18));
+                }
+                int selected=currentTab();if(!newDock&&selected==lastDockTab)return;lastDockTab=selected;
                 for(int i=0;i<mainDock.getChildCount();i++){
-                    View child=mainDock.getChildAt(i);if(!(child instanceof LinearLayout))continue;LinearLayout item=(LinearLayout)child;boolean on=i==selected;item.setGravity(Gravity.CENTER);item.setPadding(0,0,0,0);item.setBackground(round(on?withAlpha(accent,dark?0x38:0x28):Color.TRANSPARENT,23));item.setSelected(on);
+                    View child=mainDock.getChildAt(i);if(!(child instanceof LinearLayout))continue;LinearLayout item=(LinearLayout)child;boolean on=i==selected;item.setGravity(Gravity.CENTER);if(newDock)item.setPadding(0,0,0,0);item.setBackground(round(on?withAlpha(accent,dark?0x38:0x28):Color.TRANSPARENT,23));item.setSelected(on);
                     if(item.getChildCount()>0&&item.getChildAt(0) instanceof IconView)((IconView)item.getChildAt(0)).setColor(on?accent:muted);
-                    TextView label=findLastText(item);if(label!=null){label.setTextSize(12);label.setTextColor(on?accent:muted);label.setTypeface(Typeface.create("sans-serif",on?Typeface.BOLD:Typeface.NORMAL));label.setGravity(Gravity.CENTER);label.setSingleLine(true);}
+                    TextView label=findLastText(item);if(label!=null){label.setTextColor(on?accent:muted);label.setTypeface(Typeface.create("sans-serif",on?Typeface.BOLD:Typeface.NORMAL));if(newDock){label.setTextSize(12);label.setGravity(Gravity.CENTER);label.setSingleLine(true);}}
                 }
             }catch(Throwable ignored){}
         }
         private TextView findLastText(ViewGroup g){for(int i=g.getChildCount()-1;i>=0;i--){View v=g.getChildAt(i);if(v instanceof TextView)return(TextView)v;if(v instanceof ViewGroup){TextView t=findLastText((ViewGroup)v);if(t!=null)return t;}}return null;}
 
-        private void skin(View v){
-            if(v==null)return;if(!styled.containsKey(v)){styled.put(v,Boolean.TRUE);styleOne(v);}if(v instanceof ViewGroup){ViewGroup g=(ViewGroup)v;for(int i=0;i<g.getChildCount();i++)skin(g.getChildAt(i));}
-        }
+        private void skin(View v){if(v==null)return;if(!styled.containsKey(v)){styled.put(v,Boolean.TRUE);styleOne(v);}if(v instanceof ViewGroup){ViewGroup g=(ViewGroup)v;for(int i=0;i<g.getChildCount();i++)skin(g.getChildAt(i));}}
         private void styleOne(View v){
             if(v==a.getWindow().getDecorView()||v==mainDock)return;
             if(v instanceof ProgressBar){if(Build.VERSION.SDK_INT>=21)((ProgressBar)v).setIndeterminateTintList(ColorStateList.valueOf(accent));return;}
