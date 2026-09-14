@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Build isolated preview and assert the BoxProxy-parity Root proxy product hierarchy."""
+"""Build isolated preview and assert the BoxProxy backend + LuoShu UI product baseline."""
 from __future__ import annotations
 import hashlib,json,os,re,shutil,subprocess,sys,tempfile,zipfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-BASE='io.github.xgl34222220.bichen';PREVIEW=BASE+'.preview';VERSION='0.4.0-test.15';CODE=415
+BASE='io.github.xgl34222220.bichen';PREVIEW=BASE+'.preview';VERSION='0.4.0-test.16';CODE=416
 
 def run(*args,cwd):subprocess.run([str(a) for a in args],cwd=cwd,check=True)
 def digest(path):return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -17,10 +17,12 @@ def main():
   value=value.replace(f'package="{BASE}"',f'package="{PREVIEW}"').replace('android:label="辟尘"','android:label="辟尘·测试"');value=re.sub(r'android:versionCode="[^"]+"',f'android:versionCode="{CODE}"',value);value=re.sub(r'android:versionName="[^"]+"',f'android:versionName="{VERSION}"',value);manifest.write_text(value)
   for path in list((main_dir/'java').rglob('*.java'))+list((stage/'tests').glob('*.java')):
    text=path.read_text().replace(BASE,PREVIEW)
-   if path.name=='MainActivity.java':text=text.replace('"辟尘"','"辟尘·测试"').replace('"少一点打扰，多一点清净"','"BoxProxy 对齐测试 · 请停止旧版保护"')
+   if path.name=='MainActivity.java':text=text.replace('"辟尘"','"辟尘·测试"').replace('"少一点打扰，多一点清净"','"洛书视觉对齐测试 · 请停止旧版保护"')
    path.write_text(text)
   proxy=(main_dir/'java/io/github/xgl34222220/bichen/ProxyActivity.java').read_text()
-  for required in ('"首页"','"面板"','"工具"','"设置"','当前策略','节点选择','全部测速','连接活动','MihomoControllerClient','controller.select','controller.delay','RootTproxyActivity.class'):assert required in proxy,required
+  for required in ('"首页"','"面板"','"工具"','"设置"','当前策略','节点选择','全部测速','连接活动','MihomoControllerClient','controller.select','controller.delay','RootTproxyActivity.class','u.glassDock()','u.emphasizedCard(body)','u.enter(content)'):assert required in proxy,required
+  ui=(main_dir/'java/io/github/xgl34222220/bichen/ProxyUi.java').read_text()
+  for required in ('0xfff4f6fa','android.R.color.system_accent1_600','glassDock()','setCornerRadius(dp(31))','emphasizedCard','setElevation(dp(1))'):assert required in ui,required
   basic=(main_dir/'java/io/github/xgl34222220/bichen/RootTproxyActivity.java').read_text()
   for required in ('基础代理配置','核心选择','运行模式','IPv6','自动覆写','查看启动配置','配置选择','尚无配置','renderConfigs'):assert required in basic,required
   assert '启动代理' not in basic and '运行日志' not in basic and '核心管理' not in basic
@@ -38,7 +40,7 @@ def main():
    assert apk.testzip() is None;module=apk.read('assets/bichen-module.zip');info=json.loads(apk.read('assets/module-info.json'));assert hashlib.sha256(module).hexdigest()==info['sha256'];dex=apk.read('classes.dex')
    for name in ('ProxyActivity','RootTproxyActivity','RootProxyManager','ProxyRuntimeProfile','ProxyCoreStore','ProxyConfigLibrary','MihomoControllerClient'):assert f'Lio/github/xgl34222220/bichen/preview/{name};'.encode() in dex
    for text in ('首页','面板','工具','设置','基础代理配置','核心选择','运行模式','配置选择','策略组','全部测速','实时连接','TPROXY'):assert text.encode('utf-8') in dex
-  (out/'Bichen-0.3.0-beta.1-module.zip').write_bytes(module);shutil.copyfile(tools/'lib/apksigner.jar',out/'apksigner.jar');meta={'sourceCommit':revision,'versionName':VERSION,'versionCode':CODE,'packageName':PREVIEW,'moduleVersion':info['version'],'moduleSha256':info['sha256'],'unsignedApkSha256':digest(unsigned),'signingToolSha256':digest(out/'apksigner.jar'),'note':'Unsigned BoxProxy-parity preview; do not distribute as production.'};(out/'build-info.json').write_text(json.dumps(meta,ensure_ascii=False,indent=2)+'\n')
+  (out/'Bichen-0.3.0-beta.1-module.zip').write_bytes(module);shutil.copyfile(tools/'lib/apksigner.jar',out/'apksigner.jar');meta={'sourceCommit':revision,'versionName':VERSION,'versionCode':CODE,'packageName':PREVIEW,'moduleVersion':info['version'],'moduleSha256':info['sha256'],'unsignedApkSha256':digest(unsigned),'signingToolSha256':digest(out/'apksigner.jar'),'note':'Unsigned BoxProxy-backend + LuoShu-visual preview; do not distribute as production.'};(out/'build-info.json').write_text(json.dumps(meta,ensure_ascii=False,indent=2)+'\n')
   source=out/f'Bichen-{VERSION}-source.zip'
   with zipfile.ZipFile(source,'w',zipfile.ZIP_DEFLATED,compresslevel=9) as z:
    for path in sorted(stage.rglob('*')):
