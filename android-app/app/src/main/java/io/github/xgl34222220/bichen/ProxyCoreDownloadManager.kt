@@ -11,7 +11,6 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedInputStream
-import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -85,6 +84,13 @@ internal class ProxyCoreDownloadManager(context: Context) {
             "sing-box",
         ),
         Source(
+            ProxyRuntimeProfile.Core.SING_BOX_REF1ND,
+            "reF1nd/sing-box-releases",
+            "https://api.github.com/repos/reF1nd/sing-box-releases/releases/latest",
+            Archive.TAR_GZIP,
+            "sing-box",
+        ),
+        Source(
             ProxyRuntimeProfile.Core.XRAY,
             "XTLS/Xray-core",
             "https://api.github.com/repos/XTLS/Xray-core/releases/latest",
@@ -108,7 +114,7 @@ internal class ProxyCoreDownloadManager(context: Context) {
     )
 
     suspend fun statuses(forceNetwork: Boolean = true): List<ProxyCoreRemoteStatus> = withContext(Dispatchers.IO) {
-        val result = coroutineScope {
+        coroutineScope {
             ProxyRuntimeProfile.Core.values().map { core ->
                 async {
                     try {
@@ -121,7 +127,6 @@ internal class ProxyCoreDownloadManager(context: Context) {
                 }
             }.awaitAll()
         }
-        result
     }
 
     suspend fun status(core: ProxyRuntimeProfile.Core, network: Boolean = true): ProxyCoreRemoteStatus = withContext(Dispatchers.IO) {
@@ -145,7 +150,7 @@ internal class ProxyCoreDownloadManager(context: Context) {
             updateAvailable = update,
             canDownload = true,
             source = source.repo,
-            message = if (core == ProxyRuntimeProfile.Core.MIHOMO && !downloaded) "当前使用内置 Mihomo，可在线更新" else local.message,
+            message = if (core == ProxyRuntimeProfile.Core.MIHOMO && !downloaded) "当前使用 App 内置 Mihomo，可在线下载最新版覆盖；删除下载版会自动回退内置核心" else local.message,
         )
     }
 
@@ -200,7 +205,7 @@ internal class ProxyCoreDownloadManager(context: Context) {
             .remove("asset_${core.id}")
             .remove("updated_${core.id}")
             .apply()
-        localStatus(core, if (core == ProxyRuntimeProfile.Core.MIHOMO) "已恢复使用内置 Mihomo" else "已删除下载核心")
+        localStatus(core, if (core == ProxyRuntimeProfile.Core.MIHOMO) "已恢复使用 App 内置 Mihomo" else "已删除下载核心")
     }
 
     private fun localStatus(core: ProxyRuntimeProfile.Core, message: String = ""): ProxyCoreRemoteStatus {
@@ -208,7 +213,7 @@ internal class ProxyCoreDownloadManager(context: Context) {
         val downloaded = store.installed(core)
         val installed = when {
             downloaded -> installedVersion(core).ifBlank { "已下载" }
-            bundled -> "内置 ${BuildConfig.MIHOMO_REVISION.take(8)}"
+            bundled -> "App 内置版本"
             else -> "未安装"
         }
         val source = prefs.getString("source_${core.id}", "") ?: ""
@@ -276,7 +281,8 @@ internal class ProxyCoreDownloadManager(context: Context) {
                     else -> false
                 }
             }
-            ProxyRuntimeProfile.Core.SING_BOX -> {
+            ProxyRuntimeProfile.Core.SING_BOX,
+            ProxyRuntimeProfile.Core.SING_BOX_REF1ND -> {
                 name.contains("android-$abi") && name.endsWith(".tar.gz") && !name.contains("sfa")
             }
             ProxyRuntimeProfile.Core.XRAY -> {
@@ -298,7 +304,6 @@ internal class ProxyCoreDownloadManager(context: Context) {
                 }
             }
             ProxyRuntimeProfile.Core.HYSTERIA -> name == "hysteria-android-$abi"
-            ProxyRuntimeProfile.Core.SING_BOX_REF1ND -> false
         }
     }
 
@@ -406,7 +411,10 @@ internal class ProxyCoreDownloadManager(context: Context) {
                     if (bytes.size >= 4 && bytes[0] == 0x7f.toByte() && bytes[1] == 'E'.code.toByte()) fallback = bytes
                 }
             }
-            fallback?.let { FileOutputStream(out, false).use { stream -> stream.write(it); stream.fd.sync() }; return }
+            fallback?.let {
+                FileOutputStream(out, false).use { stream -> stream.write(it); stream.fd.sync() }
+                return
+            }
         }
         throw IOException("压缩包中没有找到 $executable")
     }
@@ -456,7 +464,13 @@ internal class ProxyCoreDownloadManager(context: Context) {
         if (!file.isFile || file.length() < 1024L) throw IOException("核心文件无效")
         FileInputStream(file).use { input ->
             val magic = ByteArray(4)
-            if (input.read(magic) != 4 || magic[0] != 0x7f.toByte() || magic[1] != 'E'.code.toByte() || magic[2] != 'L'.code.toByte() || magic[3] != 'F'.code.toByte()) {
+            if (
+                input.read(magic) != 4 ||
+                magic[0] != 0x7f.toByte() ||
+                magic[1] != 'E'.code.toByte() ||
+                magic[2] != 'L'.code.toByte() ||
+                magic[3] != 'F'.code.toByte()
+            ) {
                 throw IOException("下载内容不是 Android ELF 核心")
             }
         }
