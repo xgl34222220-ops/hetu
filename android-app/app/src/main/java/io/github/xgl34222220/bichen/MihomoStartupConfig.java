@@ -8,6 +8,8 @@ final class MihomoStartupConfig {
     static final int TPROXY_PORT=9898;
     static final int REDIRECT_PORT=9797;
     static final int CONTROLLER_PORT=19090;
+    static final String EXTERNAL_UI_DIR="ui";
+    static final String EXTERNAL_UI_URL="https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip";
 
     static final class Result {
         final String yaml;
@@ -40,6 +42,11 @@ final class MihomoStartupConfig {
         yaml=removeTopLevelScalar(yaml,"external-controller");
         yaml=removeTopLevelScalar(yaml,"external-controller-tls");
         yaml=removeTopLevelScalar(yaml,"secret");
+        // Bichen owns its loopback-only WebUI runtime, so a source profile cannot replace it
+        // with a remote/exposed path or dashboard URL. The source file itself remains untouched.
+        yaml=removeTopLevelScalar(yaml,"external-ui");
+        yaml=removeTopLevelScalar(yaml,"external-ui-name");
+        yaml=removeTopLevelScalar(yaml,"external-ui-url");
         // Android TPROXY connections need package/process metadata for the connection panel.
         // strict is Mihomo's normal process-matching mode; keep the user's source file untouched.
         yaml=removeTopLevelScalar(yaml,"find-process-mode");
@@ -76,6 +83,8 @@ final class MihomoStartupConfig {
         override.append("find-process-mode: strict\n");
         override.append("external-controller: 127.0.0.1:").append(CONTROLLER_PORT).append('\n');
         override.append("secret: '").append(controllerSecret.replace("'","''")).append("'\n");
+        override.append("external-ui: ").append(EXTERNAL_UI_DIR).append('\n');
+        override.append("external-ui-url: '").append(EXTERNAL_UI_URL).append("'\n");
         override.append("# --- end Bichen runtime-mode isolation ---\n");
         return new Result(yaml+override,tp,rp);
     }
