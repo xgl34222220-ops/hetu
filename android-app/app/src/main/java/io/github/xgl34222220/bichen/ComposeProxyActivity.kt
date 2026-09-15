@@ -101,7 +101,8 @@ private fun ProxyComposeApp(onBack: () -> Unit) {
                             scope.launch {
                                 progress = if (state.running) "正在停止…" else "正在启动…"
                                 runCatching {
-                                    if (state.running) controller.stop { progress = it } else controller.start { progress = it }
+                                    if (state.running) controller.stop { step -> uiProgress(scope, step) { progress = it } }
+                                    else controller.start { step -> uiProgress(scope, step) { progress = it } }
                                 }.onFailure { progress = it.message ?: "操作失败" }
                                 refresh++
                                 delay(250)
@@ -109,7 +110,7 @@ private fun ProxyComposeApp(onBack: () -> Unit) {
                             }
                         }, onPanel = { page = ProxyPage.Panel }, onSettings = { page = ProxyPage.Settings })
                         ProxyPage.Panel -> ProxyPanel(state, controller) { refresh++ }
-                        ProxyPage.Tools -> ProxyTools(state, controller)
+                        ProxyPage.Tools -> ProxyTools(state, controller, onPanel = { page = ProxyPage.Panel })
                         ProxyPage.Settings -> ProxySettings(state, controller) { refresh++ }
                     }
                 }
@@ -124,6 +125,10 @@ private fun ProxyComposeApp(onBack: () -> Unit) {
             modifier = Modifier.align(Alignment.BottomCenter),
         )
     }
+}
+
+private fun uiProgress(scope: kotlinx.coroutines.CoroutineScope, value: String, update: (String) -> Unit) {
+    scope.launch { update(value) }
 }
 
 @Composable
@@ -160,13 +165,14 @@ private fun ProxyHeader(kicker: String, title: String, subtitle: String, onBack:
 @Composable
 private fun ProxyHome(state: ProxyComposeState, progress: String, onBack: () -> Unit, onToggle: () -> Unit, onPanel: () -> Unit, onSettings: () -> Unit) {
     val tokens = LocalBichenTokens.current
+    val primary = MaterialTheme.colorScheme.primary
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp, 10.dp, 16.dp, 28.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { ProxyHeader("ROOT PROXY", "代理", "${state.core} · ${state.mode}", onBack = onBack) }
         item {
             val shape = RoundedCornerShape(30.dp)
             Card(Modifier.fillMaxWidth().shadow(8.dp, shape, clip = false), shape = shape, colors = CardDefaults.cardColors(containerColor = tokens.cardBackground)) {
                 Box(Modifier.fillMaxWidth().drawBehind {
-                    drawCircle(Brush.radialGradient(listOf(MaterialTheme.colorScheme.primary.copy(.18f), Color.Transparent), center = Offset(size.width, 0f), radius = size.width * .78f), radius = size.width * .78f, center = Offset(size.width, 0f))
+                    drawCircle(Brush.radialGradient(listOf(primary.copy(alpha = .18f), Color.Transparent), center = Offset(size.width, 0f), radius = size.width * .78f), radius = size.width * .78f, center = Offset(size.width, 0f))
                 }.padding(20.dp)) {
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -184,7 +190,7 @@ private fun ProxyHome(state: ProxyComposeState, progress: String, onBack: () -> 
                             ProxyMetric(state.connections.size.toString(), "连接", Modifier.weight(1f))
                         }
                         if (progress.isNotBlank()) {
-                            Spacer(Modifier.height(14.dp)); Text(progress, color = MaterialTheme.colorScheme.primary, fontSize = 12.sp)
+                            Spacer(Modifier.height(14.dp)); Text(progress, color = primary, fontSize = 12.sp)
                         }
                         Spacer(Modifier.height(18.dp))
                         Button(onClick = onToggle, Modifier.fillMaxWidth().height(54.dp), shape = RoundedCornerShape(20.dp)) {
@@ -211,6 +217,7 @@ private fun ProxyHome(state: ProxyComposeState, progress: String, onBack: () -> 
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ProxyPanel(state: ProxyComposeState, controller: ProxyComposeController, onRefresh: () -> Unit) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
@@ -297,7 +304,7 @@ private fun NodePicker(group: ProxyGroupUi, delays: Map<String, Long>, onDismiss
 }
 
 @Composable
-private fun ProxyTools(state: ProxyComposeState, controller: ProxyComposeController) {
+private fun ProxyTools(state: ProxyComposeState, controller: ProxyComposeController, onPanel: () -> Unit) {
     val scope = rememberCoroutineScope()
     var dialogTitle by remember { mutableStateOf("") }
     var dialogText by remember { mutableStateOf("") }
@@ -309,7 +316,7 @@ private fun ProxyTools(state: ProxyComposeState, controller: ProxyComposeControl
                 listOf(
                     Triple(Icons.Rounded.Description, "运行日志", "核心启动 · Root · 透明代理规则") to { scope.launch { dialogTitle = "运行日志"; dialogText = runCatching { controller.diagnostics() }.getOrElse { it.message ?: "读取失败" } } },
                     Triple(Icons.Rounded.Code, "最终启动配置", "实际交给核心的 startup-config") to { scope.launch { dialogTitle = "最终启动配置"; dialogText = runCatching { controller.startupConfig() }.getOrElse { it.message ?: "读取失败" } } },
-                    Triple(Icons.Rounded.Public, "策略组与节点", if (state.panelReady) "面板接口已连接" else "面板尚未就绪") to { },
+                    Triple(Icons.Rounded.Public, "策略组与节点", if (state.panelReady) "面板接口已连接" else "面板尚未就绪") to onPanel,
                 ),
             )
         }
