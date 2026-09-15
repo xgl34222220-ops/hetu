@@ -1,6 +1,5 @@
 package io.github.xgl34222220.bichen.ui
 
-import android.content.Intent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
@@ -14,9 +13,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.CloudSync
-import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -32,7 +28,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -41,8 +36,6 @@ import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import dev.chrisbanes.haze.materials.HazeMaterials
-import io.github.xgl34222220.bichen.ComposeProxyActivity
-import io.github.xgl34222220.bichen.ProxySubscriptionActivity
 import io.github.xgl34222220.bichen.ui.glass.liquidGlassLens
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.blur.blur
@@ -66,66 +59,6 @@ fun BichenGlassDock(
     backdrop: LayerBackdrop?,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
-    val labels = items.map { it.label }
-    val mainDock = labels == listOf("首页", "应用", "规则", "活动")
-    val proxyDock = labels == listOf("首页", "面板", "工具", "设置")
-    val renderItems = remember(items, mainDock, proxyDock) {
-        when {
-            mainDock -> listOf(
-                items[0],
-                DockItem("代理", Icons.Rounded.Public, .96f),
-                items[1],
-                items[2],
-                items[3],
-            )
-            proxyDock -> listOf(
-                items[0],
-                items[1],
-                DockItem("订阅", Icons.Rounded.CloudSync, .96f),
-                items[2],
-                items[3],
-            )
-            else -> items
-        }
-    }
-    val renderSelected = when {
-        mainDock -> when (selected) {
-            0 -> 0
-            1 -> 2
-            2 -> 3
-            3 -> 4
-            else -> 0
-        }
-        proxyDock -> when (selected) {
-            0 -> 0
-            1 -> 1
-            2 -> 3
-            3 -> 4
-            else -> 0
-        }
-        else -> selected
-    }
-    val handleSelect: (Int) -> Unit = { index ->
-        when {
-            mainDock && index == 1 -> context.startActivity(Intent(context, ComposeProxyActivity::class.java))
-            mainDock -> when (index) {
-                0 -> onSelect(0)
-                2 -> onSelect(1)
-                3 -> onSelect(2)
-                4 -> onSelect(3)
-            }
-            proxyDock && index == 2 -> context.startActivity(Intent(context, ProxySubscriptionActivity::class.java))
-            proxyDock -> when (index) {
-                0 -> onSelect(0)
-                1 -> onSelect(1)
-                3 -> onSelect(2)
-                4 -> onSelect(3)
-            }
-            else -> onSelect(index)
-        }
-    }
-
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -191,21 +124,15 @@ fun BichenGlassDock(
                 .border(.7.dp, if (dark) Color.White.copy(.11f) else Color.White.copy(.32f), shape),
         )
         DockLayout(
-            items = renderItems,
-            selected = renderSelected,
-            onSelect = handleSelect,
+            items = items,
+            selected = selected,
+            onSelect = onSelect,
             backdrop = surfaceBackdrop.takeIf { runtimeLiquid },
             dark = dark,
             modifier = Modifier.fillMaxSize().padding(6.dp),
         )
     }
 }
-
-@Composable
-private fun BoxWithConstraintsScope.DockLayout(
-    items: List<DockItem>, selected: Int, onSelect: (Int) -> Unit,
-    backdrop: LayerBackdrop?, dark: Boolean, modifier: Modifier,
-) {}
 
 @Composable
 private fun DockLayout(
