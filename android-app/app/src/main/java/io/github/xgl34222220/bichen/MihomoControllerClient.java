@@ -72,8 +72,6 @@ final class MihomoControllerClient {
         try{
             Exception last=null;
             ArrayList<String> urls=new ArrayList<>();
-            // When Mihomo/provider supplies a test URL, respect it exactly. Dashboard fallbacks are
-            // only for nodes whose running config has no test URL at all.
             if(preferredUrl!=null&&!preferredUrl.trim().isEmpty()){
                 urls.add(preferredUrl.trim());
             }else{
