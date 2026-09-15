@@ -9,14 +9,14 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.Semaphore;
 
-/** Authenticated localhost-only Mihomo Clash API client for strategy, delay, rules and connections UI. */
+/** Authenticated localhost-only Mihomo Clash API client for strategy, delay, providers, rules and connections UI. */
 final class MihomoControllerClient {
     private static final int PORT=MihomoStartupConfig.CONTROLLER_PORT;
-    private static final int LIMIT=4*1024*1024;
+    private static final int LIMIT=6*1024*1024;
     private static final Semaphore DELAY_SLOTS=new Semaphore(3,true);
-    private static final String[] DELAY_URLS={
-        "https://cp.cloudflare.com/generate_204",
-        "https://www.gstatic.com/generate_204"
+    private static final String[] DEFAULT_DELAY_URLS={
+        "https://www.gstatic.com/generate_204",
+        "https://cp.cloudflare.com/generate_204"
     };
     private final Context context;
     MihomoControllerClient(Context c){context=c.getApplicationContext();}
@@ -35,6 +35,7 @@ final class MihomoControllerClient {
     JSONObject connections()throws Exception{return request("GET","/connections",null);}
     JSONObject rules()throws Exception{return request("GET","/rules",null,12000);}
     JSONObject ruleProviders()throws Exception{return request("GET","/providers/rules",null,12000);}
+    JSONObject proxyProviders()throws Exception{return request("GET","/providers/proxies",null,12000);}
     JSONObject version()throws Exception{return request("GET","/version",null);}
 
     void select(String group,String node)throws Exception{
@@ -42,7 +43,15 @@ final class MihomoControllerClient {
     }
 
     void updateRuleProvider(String name)throws Exception{
-        request("PUT","/providers/rules/"+Uri.encode(name),null,20000);
+        request("PUT","/providers/rules/"+Uri.encode(name),null,30000);
+    }
+
+    void updateProxyProvider(String name)throws Exception{
+        request("PUT","/providers/proxies/"+Uri.encode(name),null,30000);
+    }
+
+    void healthCheckProxyProvider(String name)throws Exception{
+        request("GET","/providers/proxies/"+Uri.encode(name)+"/healthcheck",null,15000);
     }
 
     void closeConnection(String id)throws Exception{
@@ -50,17 +59,26 @@ final class MihomoControllerClient {
     }
 
     long delay(String node)throws Exception{
+        return delay(node,"","200-399");
+    }
+
+    long delay(String node,String preferredUrl,String expected)throws Exception{
         DELAY_SLOTS.acquire();
         try{
             Exception last=null;
-            for(String rawUrl:DELAY_URLS){
+            ArrayList<String> urls=new ArrayList<>();
+            if(preferredUrl!=null&&!preferredUrl.trim().isEmpty())urls.add(preferredUrl.trim());
+            for(String fallback:DEFAULT_DELAY_URLS)if(!urls.contains(fallback))urls.add(fallback);
+            String expectedRange=(expected==null||expected.trim().isEmpty())?"200-399":expected.trim();
+            for(String rawUrl:urls){
                 try{
                     String test=URLEncoder.encode(rawUrl,"UTF-8");
+                    String status=URLEncoder.encode(expectedRange,"UTF-8");
                     JSONObject v=request(
                         "GET",
-                        "/proxies/"+Uri.encode(node)+"/delay?timeout=8000&url="+test+"&expected=200-399",
+                        "/proxies/"+Uri.encode(node)+"/delay?timeout=10000&url="+test+"&expected="+status,
                         null,
-                        11000
+                        13000
                     );
                     long d=v.optLong("delay",-1);
                     if(d>0)return d;
@@ -75,15 +93,24 @@ final class MihomoControllerClient {
     }
 
     JSONObject groupDelay(String group)throws Exception{
+        return groupDelay(group,"","200-399");
+    }
+
+    JSONObject groupDelay(String group,String preferredUrl,String expected)throws Exception{
         Exception last=null;
-        for(String rawUrl:DELAY_URLS){
+        ArrayList<String> urls=new ArrayList<>();
+        if(preferredUrl!=null&&!preferredUrl.trim().isEmpty())urls.add(preferredUrl.trim());
+        for(String fallback:DEFAULT_DELAY_URLS)if(!urls.contains(fallback))urls.add(fallback);
+        String expectedRange=(expected==null||expected.trim().isEmpty())?"200-399":expected.trim();
+        for(String rawUrl:urls){
             try{
                 String test=URLEncoder.encode(rawUrl,"UTF-8");
+                String status=URLEncoder.encode(expectedRange,"UTF-8");
                 return request(
                     "GET",
-                    "/group/"+Uri.encode(group)+"/delay?timeout=8000&url="+test+"&expected=200-399",
+                    "/group/"+Uri.encode(group)+"/delay?timeout=10000&url="+test+"&expected="+status,
                     null,
-                    12000
+                    15000
                 );
             }catch(Exception e){last=e;}
         }
