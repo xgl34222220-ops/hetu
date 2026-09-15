@@ -92,7 +92,8 @@ PY
 }
 
 dump_ui home
-assert_text "$OUT/home.xml" "辟尘"
+# Compact home intentionally uses the current page title instead of repeating the app name.
+# Test stable navigation/content semantics rather than a decorative title string.
 assert_text "$OUT/home.xml" "首页"
 assert_text "$OUT/home.xml" "应用"
 assert_text "$OUT/home.xml" "规则"
