@@ -22,6 +22,7 @@ internal data class DashboardProviderUi(
     val total: Long,
     val expire: Long,
     val nodes: Set<String>,
+    val hasSubscriptionInfo: Boolean,
 ) {
     val used: Long get() = (upload + download).coerceAtLeast(0L)
     val remaining: Long get() = (total - used).coerceAtLeast(0L)
@@ -37,11 +38,6 @@ internal data class DashboardRuleSetUi(
     val updatedAt: String,
 )
 
-/**
- * Panel-specific data access.  It deliberately follows Mihomo's provider APIs rather than
- * inventing a dashboard-side test URL: provider health checks use the exact URL/expected-status
- * from the running configuration and therefore match MetaCubeXD/Zashboard behaviour.
- */
 internal class ProxyDashboardRepository(context: Context) {
     private val app = context.applicationContext
     private val api = MihomoControllerClient(app)
@@ -54,8 +50,9 @@ internal class ProxyDashboardRepository(context: Context) {
     suspend fun closeAll() = controller.closeAll()
     suspend fun ensureIcons(): Int = controller.ensureIcons()
 
+    /** Only real remote HTTP providers belong on the subscription page. */
     suspend fun providers(): List<DashboardProviderUi> = withContext(Dispatchers.IO) {
-        parseProviders(api.proxyProviders())
+        remoteProviders(api.proxyProviders())
     }
 
     suspend fun ruleSets(): List<DashboardRuleSetUi> = withContext(Dispatchers.IO) {
@@ -63,8 +60,8 @@ internal class ProxyDashboardRepository(context: Context) {
     }
 
     suspend fun refreshSubscriptions(): List<DashboardProviderUi> = withContext(Dispatchers.IO) {
-        val before = parseProviders(api.proxyProviders())
-        for (chunk in before.filter { it.vehicleType.equals("HTTP", true) }.chunked(3)) {
+        val before = remoteProviders(api.proxyProviders())
+        for (chunk in before.chunked(3)) {
             coroutineScope {
                 chunk.map { provider ->
                     async {
@@ -75,7 +72,7 @@ internal class ProxyDashboardRepository(context: Context) {
                 }.awaitAll()
             }
         }
-        parseProviders(api.proxyProviders())
+        remoteProviders(api.proxyProviders())
     }
 
     suspend fun refreshRuleSets(): List<DashboardRuleSetUi> = withContext(Dispatchers.IO) {
@@ -95,14 +92,13 @@ internal class ProxyDashboardRepository(context: Context) {
     }
 
     /**
-     * Global latency refresh uses provider health-checks first.  This is important: the provider
-     * already knows its configured test URL and expected status, so the UI no longer forces every
-     * node through one hard-coded URL (which was the reason some real devices showed all timeout).
+     * Remote providers are tested by Mihomo's own provider health check, so the configured
+     * testUrl/expectedStatus is used. Inline-only configs fall back to group-native tests.
      */
     suspend fun globalDelay(): Map<String, Long> = withContext(Dispatchers.IO) {
-        val providerList = parseProviders(api.proxyProviders())
+        val providerList = remoteProviders(api.proxyProviders())
         if (providerList.isNotEmpty()) {
-            for (chunk in providerList.chunked(3)) {
+            for (chunk in providerList.chunked(2)) {
                 coroutineScope {
                     chunk.map { provider ->
                         async {
@@ -115,16 +111,15 @@ internal class ProxyDashboardRepository(context: Context) {
             }
             val wanted = providerList.flatMapTo(LinkedHashSet()) { it.nodes }
             var result = LinkedHashMap<String, Long>()
-            repeat(6) { round ->
-                if (round > 0) delay(550)
+            repeat(10) { round ->
+                if (round > 0) delay(450)
                 result = delaysFromProxies(api.proxies(), wanted)
-                if (wanted.isNotEmpty() && result.values.count { it > 0L } >= (wanted.size * 3) / 4) return@withContext result
+                if (wanted.isNotEmpty() && result.values.count { it > 0L } >= (wanted.size * 4) / 5) return@withContext result
             }
-            for (name in wanted) if (name !in result) result[name] = -1L
+            // Do not turn unknown history into a fake "all timed out" result.
             return@withContext result
         }
 
-        // Configs without proxy-providers still get group-native tests.
         val raw = api.proxies()
         val result = LinkedHashMap<String, Long>()
         val groups = raw.keys().asSequence().mapNotNull { name ->
@@ -132,7 +127,10 @@ internal class ProxyDashboardRepository(context: Context) {
             val all = obj.optJSONArray("all") ?: return@mapNotNull null
             Triple(name, obj, all)
         }.sortedByDescending { it.third.length() }.toList()
-        for ((name, obj, _) in groups.take(8)) {
+        val covered = HashSet<String>()
+        for ((name, obj, all) in groups) {
+            val names = (0 until all.length()).map { all.optString(it) }.filter { it.isNotBlank() }
+            if (names.count { it !in covered } < 2 && result.isNotEmpty()) continue
             try {
                 val measured = api.groupDelay(name, obj.optString("testUrl", ""), obj.optString("expectedStatus", "200-399"))
                 val keys = measured.keys()
@@ -141,6 +139,7 @@ internal class ProxyDashboardRepository(context: Context) {
                     val value = measured.optLong(node, -1L)
                     if (value > 0L) result[node] = value
                 }
+                covered += names
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (_: Exception) { }
@@ -148,21 +147,20 @@ internal class ProxyDashboardRepository(context: Context) {
         result
     }
 
-    /** Test one visible node with its provider/group native URL. */
     suspend fun delay(node: String): Long = withContext(Dispatchers.IO) {
-        val provider = parseProviders(api.proxyProviders()).firstOrNull { node in it.nodes }
+        val provider = parseProviders(api.proxyProviders()).firstOrNull {
+            node in it.nodes && it.vehicleType.equals("HTTP", true)
+        }
         if (provider != null) {
             try {
                 return@withContext api.delay(node, provider.testUrl, provider.expectedStatus)
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (_: Exception) {
-                // Provider healthcheck is the authoritative fallback and updates node history.
                 try { api.healthCheckProxyProvider(provider.name) } catch (_: Exception) { }
-                repeat(5) {
-                    delay(450)
-                    val value = latestDelay(api.proxies().optJSONObject(node))
-                    if (value != null) return@withContext value
+                repeat(8) {
+                    delay(350)
+                    latestDelay(api.proxies().optJSONObject(node))?.let { return@withContext it }
                 }
             }
         }
@@ -176,6 +174,9 @@ internal class ProxyDashboardRepository(context: Context) {
         api.delay(node, group?.optString("testUrl", "") ?: "", group?.optString("expectedStatus", "200-399") ?: "200-399")
     }
 
+    private fun remoteProviders(root: JSONObject): List<DashboardProviderUi> =
+        parseProviders(root).filter { it.vehicleType.equals("HTTP", true) }
+
     private fun parseProviders(root: JSONObject): List<DashboardProviderUi> {
         val providers = root.optJSONObject("providers") ?: JSONObject()
         val out = ArrayList<DashboardProviderUi>()
@@ -186,8 +187,7 @@ internal class ProxyDashboardRepository(context: Context) {
             val nodes = LinkedHashSet<String>()
             val proxies = p.optJSONArray("proxies") ?: JSONArray()
             for (i in 0 until proxies.length()) {
-                val value = proxies.opt(i)
-                when (value) {
+                when (val value = proxies.opt(i)) {
                     is JSONObject -> value.optString("name").takeIf { it.isNotBlank() }?.let(nodes::add)
                     is String -> if (value.isNotBlank()) nodes += value
                 }
@@ -203,12 +203,13 @@ internal class ProxyDashboardRepository(context: Context) {
                 vehicleType = p.optString("vehicleType", p.optString("vehicle", "")),
                 testUrl = p.optString("testUrl", ""),
                 expectedStatus = p.optString("expectedStatus", "200-399").ifBlank { "200-399" },
-                updatedAt = p.optString("updatedAt", ""),
+                updatedAt = normalizeTimestamp(p.optString("updatedAt", "")),
                 upload = infoLong("Upload", "upload"),
                 download = infoLong("Download", "download"),
                 total = infoLong("Total", "total"),
                 expire = infoLong("Expire", "expire"),
                 nodes = nodes,
+                hasSubscriptionInfo = info != null,
             )
         }
         return out.sortedBy { it.name.lowercase() }
@@ -227,10 +228,15 @@ internal class ProxyDashboardRepository(context: Context) {
                 format = normalizeRuleFormat(p.optString("format", p.optString("ruleFormat", ""))),
                 vehicleType = p.optString("vehicleType", p.optString("vehicle", "")),
                 ruleCount = p.optInt("ruleCount", p.optInt("count", 0)),
-                updatedAt = p.optString("updatedAt", ""),
+                updatedAt = normalizeTimestamp(p.optString("updatedAt", "")),
             )
         }
         return out.sortedBy { it.name.lowercase() }
+    }
+
+    private fun normalizeTimestamp(raw: String): String {
+        val value = raw.trim()
+        return if (value.isBlank() || value.startsWith("0001-01-01") || value.startsWith("0000-")) "" else value
     }
 
     private fun normalizeRuleFormat(raw: String): String = when (raw.lowercase()) {
