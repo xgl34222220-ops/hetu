@@ -2,6 +2,7 @@ package io.github.xgl34222220.bichen
 
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.Inet4Address
@@ -73,13 +74,22 @@ internal class ProxyRuntimeInspector(context: Context) {
     }
 
     /**
-     * Mihomo intentionally does not download external-ui-url just because the directory is empty.
-     * The documented /upgrade/ui endpoint performs that update. Keep it loopback-only and only
-     * download when the user explicitly opens WebUI and the local index is missing.
+     * Opening WebUI is the explicit user action that allows us to install MetaCubeXD if needed.
+     * Merely finding index.html is not enough: interrupted upgrades can leave that file behind
+     * while _nuxt chunks are missing, which produces a completely blank WebView. Validate both the
+     * entry point and at least one JavaScript chunk, delete an incomplete dashboard, then let
+     * Mihomo's /upgrade/ui endpoint install a clean copy.
      */
     suspend fun ensureWebUi() = withContext(Dispatchers.IO) {
         if (webUiReady()) return@withContext
+
         val secret = controllerSecret()
+        if (secret.isBlank()) error("本机控制接口尚未初始化，请先启动代理核心")
+
+        val uiPath = "/data/adb/bichen/proxy/run/${MihomoStartupConfig.EXTERNAL_UI_DIR}"
+        val cleanup = RootBridge.rootShell(app, "rm -rf '$uiPath'", 5_000L)
+        if (!cleanup.ok()) error("无法清理损坏的 MetaCubeXD 文件")
+
         val socket = Socket()
         try {
             socket.connect(InetSocketAddress("127.0.0.1", MihomoStartupConfig.CONTROLLER_PORT), 3_000)
@@ -102,17 +112,20 @@ internal class ProxyRuntimeInspector(context: Context) {
         } finally {
             runCatching { socket.close() }
         }
-        if (!webUiReady()) error("WebUI 下载完成但入口文件不存在，请重启核心后重试")
+
+        repeat(12) { attempt ->
+            if (webUiReady()) return@withContext
+            if (attempt < 11) delay(250)
+        }
+        error("MetaCubeXD 下载完成但静态资源不完整，请检查网络后重试")
     }
 
     fun controllerSecret(): String = prefs.getString("proxyControllerSecret", "").orEmpty()
 
     private fun webUiReady(): Boolean {
-        val result = RootBridge.rootShell(
-            app,
-            "test -f /data/adb/bichen/proxy/run/${MihomoStartupConfig.EXTERNAL_UI_DIR}/index.html && echo READY || echo MISSING",
-            4_000L,
-        )
+        val uiPath = "/data/adb/bichen/proxy/run/${MihomoStartupConfig.EXTERNAL_UI_DIR}"
+        val command = "UI='$uiPath'; test -s \"${'$'}UI/index.html\" && find \"${'$'}UI/_nuxt\" -type f -name '*.js' -print -quit 2>/dev/null | grep -q . && echo READY || echo MISSING"
+        val result = RootBridge.rootShell(app, command, 4_000L)
         return result.ok() && result.output.contains("READY")
     }
 
