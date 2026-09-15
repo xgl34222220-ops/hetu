@@ -8,16 +8,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -69,11 +67,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/**
- * Proxy UI v3: LuoShu visual hierarchy with provider-native Mihomo behaviour.
- * The panel intentionally avoids large empty white tiles: compact tonal cards carry real data.
- */
-@OptIn(ExperimentalMaterial3Api::class)
+/** LuoShu visual hierarchy + provider-native Mihomo behaviour. */
 class ProxyDashboardActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -263,7 +257,7 @@ private fun DashboardHome(
             }
         }
         item {
-            Surface(shape = RoundedCornerShape(28.dp), color = scheme.surfaceContainer.copy(alpha = .78f), shadowElevation = 0.dp) {
+            Surface(shape = RoundedCornerShape(28.dp), color = scheme.surfaceContainer.copy(alpha = .70f), shadowElevation = 0.dp) {
                 Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(15.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         StatusPill(if (state.running) "运行中" else "已停止", if (state.running) tokens.success else tokens.warning)
@@ -281,9 +275,7 @@ private fun DashboardHome(
                         MetricCell(bytes(state.uploadTotal), "上传", Modifier.weight(1f))
                         MetricCell(if (state.panelReady) "在线" else "等待", "控制接口", Modifier.weight(1f))
                     }
-                    if (busy.isNotBlank() || notice.isNotBlank()) {
-                        Text(busy.ifBlank { notice }, color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
-                    }
+                    if (busy.isNotBlank() || notice.isNotBlank()) Text(busy.ifBlank { notice }, color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
                     Button(onClick = onToggle, enabled = busy.isBlank(), modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = RoundedCornerShape(17.dp)) {
                         Icon(if (state.running) Icons.Rounded.Stop else Icons.Rounded.PlayArrow, null, Modifier.size(19.dp))
                         Spacer(Modifier.width(7.dp))
@@ -297,7 +289,7 @@ private fun DashboardHome(
             }
         }
         item {
-            Surface(onClick = onPanel, shape = RoundedCornerShape(22.dp), color = scheme.surfaceContainerLow.copy(alpha = .76f)) {
+            Surface(onClick = onPanel, shape = RoundedCornerShape(22.dp), color = scheme.surfaceContainerLow.copy(alpha = .70f), shadowElevation = 0.dp) {
                 Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Surface(shape = RoundedCornerShape(13.dp), color = scheme.primary.copy(alpha = .10f), modifier = Modifier.size(44.dp)) {
                         Box(contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Public, null, tint = scheme.primary) }
@@ -384,15 +376,14 @@ private fun DashboardPanel(
         loadTabData()
     }
 
-    // If the core has no cached history yet, do one provider-native healthcheck automatically.
     LaunchedEffect(state.running, state.groups.size) {
         if (!state.running || initialLatencyLoaded || state.groups.isEmpty()) return@LaunchedEffect
-        val allNodes = state.groups.flatMap { it.nodes }.distinctBy { it.name }
-        val known = allNodes.count { nodeDelay(it) != null }
-        if (known * 5 < allNodes.size.coerceAtLeast(1)) {
-            initialLatencyLoaded = true
+        val nodes = state.groups.flatMap { it.nodes }.distinctBy { it.name }
+        val known = nodes.count { nodeDelay(it) != null }
+        initialLatencyLoaded = true
+        if (known * 5 < nodes.size.coerceAtLeast(1)) {
             runCatching { repo.globalDelay() }.getOrNull()?.let { delays.putAll(it) }
-        } else initialLatencyLoaded = true
+        }
     }
 
     val groups = remember(state.groups, delays, query, sort, selectedOverrides.toMap()) {
@@ -421,7 +412,7 @@ private fun DashboardPanel(
             DashTab.entries.forEach { item -> DashTabChip(item.title, tab == item) { tab = item } }
         }
         Spacer(Modifier.height(8.dp))
-        AnimatedVisibility(showSearch, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
+        if (showSearch) {
             OutlinedTextField(
                 query,
                 { query = it },
@@ -436,14 +427,10 @@ private fun DashboardPanel(
 
         PullToRefreshBox(
             isRefreshing = refreshing,
-            onRefresh = ::refreshCurrent,
+            onRefresh = { refreshCurrent() },
             modifier = Modifier.fillMaxSize(),
         ) {
-            AnimatedContent(
-                targetState = tab,
-                transitionSpec = { fadeIn() togetherWith fadeOut() },
-                label = "panel-tab",
-            ) { active ->
+            AnimatedContent(targetState = tab, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "panel-tab") { active ->
                 LazyColumn(
                     Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(top = 6.dp, bottom = 24.dp),
@@ -486,34 +473,40 @@ private fun DashboardPanel(
                                         if (row.size == 1) Spacer(Modifier.weight(1f))
                                     }
                                 }
-                                item("expand-$rowIndex") {
-                                    val target = row.firstOrNull { it.name == expanded }
-                                    AnimatedVisibility(target != null, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
-                                        if (target != null) NodeGrid(
-                                            group = target,
-                                            selected = selected(target),
-                                            delayOf = ::nodeDelay,
-                                            onSelect = { node ->
-                                                val old = selected(target)
-                                                selectedOverrides[target.name] = node.name
-                                                scope.launch {
-                                                    try { repo.select(target.name, node.name) }
-                                                    catch (_: Exception) { selectedOverrides[target.name] = old }
-                                                }
-                                            },
-                                            onDelay = { node ->
-                                                scope.launch {
-                                                    delays[node.name] = -2L
-                                                    delays[node.name] = runCatching { repo.delay(node.name) }.getOrDefault(-1L)
-                                                }
-                                            },
-                                        )
+                                val target = row.firstOrNull { it.name == expanded }
+                                if (target != null) {
+                                    item("expand-${target.name}") {
+                                        AnimatedContent(
+                                            targetState = target.name,
+                                            transitionSpec = { fadeIn() togetherWith fadeOut() },
+                                            label = "strategy-expand-$rowIndex",
+                                        ) {
+                                            NodeGrid(
+                                                group = target,
+                                                selected = selected(target),
+                                                delayOf = ::nodeDelay,
+                                                onSelect = { node ->
+                                                    val old = selected(target)
+                                                    selectedOverrides[target.name] = node.name
+                                                    scope.launch {
+                                                        try { repo.select(target.name, node.name) }
+                                                        catch (_: Exception) { selectedOverrides[target.name] = old }
+                                                    }
+                                                },
+                                                onDelay = { node ->
+                                                    scope.launch {
+                                                        delays[node.name] = -2L
+                                                        delays[node.name] = runCatching { repo.delay(node.name) }.getOrDefault(-1L)
+                                                    }
+                                                },
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
                         DashTab.Subscription -> {
-                            item { PullHint("下拉即可更新全部订阅；流量来自 subscription-userinfo") }
+                            item { PullHint("下拉更新全部订阅 · 流量来自 Subscription-Userinfo") }
                             if (providers.isEmpty()) item { EmptyPanel(if (state.running) "当前订阅未提供流量信息" else "代理尚未运行") }
                             items(providers, key = { it.name }) { provider -> SubscriptionTile(provider) }
                         }
@@ -561,7 +554,7 @@ private fun StrategyTile(
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) .968f else 1f, spring(stiffness = Spring.StiffnessMedium), label = "strategy-press")
-    val color by animateColorAsState(if (expanded) scheme.primaryContainer.copy(alpha = .60f) else scheme.surfaceContainerLow.copy(alpha = .82f), label = "strategy-color")
+    val color by animateColorAsState(if (expanded) scheme.primaryContainer.copy(alpha = .60f) else scheme.surfaceContainer.copy(alpha = .50f), label = "strategy-color")
     val arrow by animateFloatAsState(if (expanded) 180f else 0f, label = "strategy-arrow")
     Surface(
         modifier = modifier.height(96.dp).graphicsLayer { scaleX = scale; scaleY = scale }
@@ -625,7 +618,7 @@ private fun NodeTile(node: ProxyNodeUi, delay: Long?, selected: Boolean, modifie
         modifier = modifier.height(74.dp).graphicsLayer { scaleX = scale; scaleY = scale }
             .clickable(interactionSource = interaction, indication = null, onClick = onSelect),
         shape = RoundedCornerShape(17.dp),
-        color = if (selected) scheme.primaryContainer.copy(alpha = .66f) else scheme.surfaceContainerLow.copy(alpha = .74f),
+        color = if (selected) scheme.primaryContainer.copy(alpha = .66f) else scheme.surfaceContainer.copy(alpha = .42f),
         shadowElevation = 0.dp,
     ) {
         Column(Modifier.padding(horizontal = 11.dp, vertical = 9.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -676,7 +669,7 @@ private fun SubscriptionTile(provider: DashboardProviderUi) {
     Surface(
         onClick = { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) },
         shape = RoundedCornerShape(22.dp),
-        color = scheme.surfaceContainerLow.copy(alpha = .78f),
+        color = scheme.surfaceContainer.copy(alpha = .48f),
         shadowElevation = 0.dp,
     ) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
@@ -713,7 +706,7 @@ private fun SubscriptionTile(provider: DashboardProviderUi) {
 private fun RuleSetTile(provider: DashboardRuleSetUi) {
     val tokens = LocalBichenTokens.current
     val scheme = MaterialTheme.colorScheme
-    Surface(shape = RoundedCornerShape(20.dp), color = scheme.surfaceContainerLow.copy(alpha = .76f), shadowElevation = 0.dp) {
+    Surface(shape = RoundedCornerShape(20.dp), color = scheme.surfaceContainer.copy(alpha = .46f), shadowElevation = 0.dp) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -734,7 +727,7 @@ private fun RuleSetTile(provider: DashboardRuleSetUi) {
 private fun RuleTile(rule: ProxyRuleUi) {
     val tokens = LocalBichenTokens.current
     val scheme = MaterialTheme.colorScheme
-    Surface(shape = RoundedCornerShape(19.dp), color = scheme.surfaceContainerLow.copy(alpha = .74f), shadowElevation = 0.dp) {
+    Surface(shape = RoundedCornerShape(19.dp), color = scheme.surfaceContainer.copy(alpha = .44f), shadowElevation = 0.dp) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(rule.type, color = tokens.textPrimary, fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold)
@@ -750,7 +743,7 @@ private fun RuleTile(rule: ProxyRuleUi) {
 private fun ConnectionTile(connection: ProxyConnectionUi, onClose: () -> Unit) {
     val tokens = LocalBichenTokens.current
     val scheme = MaterialTheme.colorScheme
-    Surface(shape = RoundedCornerShape(20.dp), color = scheme.surfaceContainerLow.copy(alpha = .76f), shadowElevation = 0.dp) {
+    Surface(shape = RoundedCornerShape(20.dp), color = scheme.surfaceContainer.copy(alpha = .46f), shadowElevation = 0.dp) {
         Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
@@ -782,7 +775,7 @@ private fun RatePanel(title: String, value: String, up: Boolean, modifier: Modif
     val tokens = LocalBichenTokens.current
     val scheme = MaterialTheme.colorScheme
     val color = if (up) tokens.success else scheme.primary
-    Surface(modifier = modifier, shape = RoundedCornerShape(20.dp), color = scheme.surfaceContainerLow.copy(alpha = .76f), shadowElevation = 0.dp) {
+    Surface(modifier = modifier, shape = RoundedCornerShape(20.dp), color = scheme.surfaceContainer.copy(alpha = .46f), shadowElevation = 0.dp) {
         Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(title, color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
             Text(value, color = color, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
@@ -794,7 +787,7 @@ private fun RatePanel(title: String, value: String, up: Boolean, modifier: Modif
 private fun TrafficPanel(state: ProxyComposeState, samples: List<RateSample>) {
     val tokens = LocalBichenTokens.current
     val scheme = MaterialTheme.colorScheme
-    Surface(shape = RoundedCornerShape(22.dp), color = scheme.surfaceContainerLow.copy(alpha = .76f), shadowElevation = 0.dp) {
+    Surface(shape = RoundedCornerShape(22.dp), color = scheme.surfaceContainer.copy(alpha = .46f), shadowElevation = 0.dp) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row {
                 Text("总流量", color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall)
@@ -827,14 +820,12 @@ private fun TrafficPanel(state: ProxyComposeState, samples: List<RateSample>) {
 private fun DashboardTools(state: ProxyComposeState) {
     val context = LocalContext.current
     val tokens = LocalBichenTokens.current
-    val scheme = MaterialTheme.colorScheme
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item { SimpleTitle("工具") }
         item { ToolTile(Icons.Rounded.Storage, "内核管理", "Mihomo 可更新；其他核心按需联网下载") { context.startActivity(Intent(context, ProxyCoreActivity::class.java)) } }
         item { ToolTile(Icons.Rounded.CloudSync, "订阅与配置", "订阅、YAML、配置切换") { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) } }
         item { ToolTile(Icons.Rounded.Tune, "基础代理配置", "TPROXY 与 Root 参数") { context.startActivity(Intent(context, RootTproxyActivity::class.java)) } }
         item { Text("${state.core} · ${state.mode}", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall) }
-        item { Spacer(Modifier.height(1.dp).background(scheme.outlineVariant.copy(alpha = .2f))) }
     }
 }
 
@@ -845,7 +836,7 @@ private fun DashboardSettings(state: ProxyComposeState, controller: ProxyCompose
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item { SimpleTitle("设置") }
         item {
-            Surface(shape = RoundedCornerShape(20.dp), color = scheme.surfaceContainerLow.copy(alpha = .76f)) {
+            Surface(shape = RoundedCornerShape(20.dp), color = scheme.surfaceContainer.copy(alpha = .46f)) {
                 Column(Modifier.fillMaxWidth().padding(15.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                     Text("内核", color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall)
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -855,7 +846,7 @@ private fun DashboardSettings(state: ProxyComposeState, controller: ProxyCompose
             }
         }
         item {
-            Surface(shape = RoundedCornerShape(20.dp), color = scheme.surfaceContainerLow.copy(alpha = .76f)) {
+            Surface(shape = RoundedCornerShape(20.dp), color = scheme.surfaceContainer.copy(alpha = .46f)) {
                 Column(Modifier.fillMaxWidth().padding(15.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("当前运行", color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall)
                     Text("${state.core} · ${state.mode} · IPv6 ${state.ipv6}", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
@@ -873,7 +864,7 @@ private fun DashTabChip(text: String, selected: Boolean, onClick: () -> Unit) {
         onClick = onClick,
         shape = RoundedCornerShape(15.dp),
         color = if (selected) scheme.primaryContainer.copy(alpha = .58f) else Color.Transparent,
-        border = if (selected) null else androidx.compose.foundation.BorderStroke(1.dp, scheme.outlineVariant.copy(alpha = .72f)),
+        border = if (selected) null else BorderStroke(1.dp, scheme.outlineVariant.copy(alpha = .72f)),
     ) {
         Text(text, Modifier.padding(horizontal = 16.dp, vertical = 9.dp), color = if (selected) tokens.textPrimary else tokens.textSecondary, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium)
     }
@@ -890,7 +881,7 @@ private fun GroupIcon2(group: ProxyGroupUi, size: Int) {
 
 @Composable
 private fun HeaderCircle(icon: androidx.compose.ui.graphics.vector.ImageVector, description: String, onClick: () -> Unit) {
-    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = .82f), shadowElevation = 1.dp, modifier = Modifier.size(44.dp)) {
+    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = .52f), shadowElevation = 1.dp, modifier = Modifier.size(44.dp)) {
         IconButton(onClick = onClick) { Icon(icon, description, Modifier.size(21.dp)) }
     }
 }
@@ -907,10 +898,11 @@ private fun StatusPill(text: String, color: Color) {
 }
 
 @Composable
-private fun MetricCell(value: String, label: String, modifier: Modifier, valueColor: Color = LocalBichenTokens.current.textPrimary) {
+private fun MetricCell(value: String, label: String, modifier: Modifier, valueColor: Color? = null) {
+    val tokens = LocalBichenTokens.current
     Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(value, color = valueColor, fontSize = 16.sp, lineHeight = 21.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(label, color = LocalBichenTokens.current.textSecondary, style = MaterialTheme.typography.labelSmall)
+        Text(value, color = valueColor ?: tokens.textPrimary, fontSize = 16.sp, lineHeight = 21.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(label, color = tokens.textSecondary, style = MaterialTheme.typography.labelSmall)
     }
 }
 
@@ -939,7 +931,7 @@ private fun SimpleTitle(text: String) {
 private fun ToolTile(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
     val tokens = LocalBichenTokens.current
     val scheme = MaterialTheme.colorScheme
-    Surface(onClick = onClick, shape = RoundedCornerShape(19.dp), color = scheme.surfaceContainerLow.copy(alpha = .76f)) {
+    Surface(onClick = onClick, shape = RoundedCornerShape(19.dp), color = scheme.surfaceContainer.copy(alpha = .46f), shadowElevation = 0.dp) {
         Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
             Surface(shape = RoundedCornerShape(12.dp), color = scheme.primary.copy(alpha = .10f), modifier = Modifier.size(42.dp)) { Box(contentAlignment = Alignment.Center) { Icon(icon, null, tint = scheme.primary) } }
             Spacer(Modifier.width(12.dp))
