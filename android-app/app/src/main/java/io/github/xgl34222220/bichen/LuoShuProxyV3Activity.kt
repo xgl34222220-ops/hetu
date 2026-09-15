@@ -7,6 +7,13 @@ import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -26,7 +33,9 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -321,7 +330,7 @@ private fun V3Home(
                         Box(
                             Modifier.weight(1f).heightIn(min = 48.dp).clip(RoundedCornerShape(14.dp)).clickable(enabled = state.running, onClick = onTestAll),
                             contentAlignment = Alignment.CenterStart,
-                        ) { V3Metric(if (testingAll) "…" else avg, "延迟 · 点按测速", Modifier.fillMaxWidth()) }
+                        ) { V3LatencyMetric(avg, testingAll, Modifier.fillMaxWidth()) }
                     }
                     Button(onClick = onToggle, enabled = operation.isBlank(), modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp), shape = RoundedCornerShape(18.dp)) {
                         Icon(if (state.running) Icons.Rounded.Stop else Icons.Rounded.PlayArrow, null, Modifier.size(20.dp))
@@ -436,7 +445,18 @@ private fun V3Panel(
         scope.launch {
             try {
                 when (tab) {
-                    V3Tab.Nodes -> delays.putAll(repo.globalDelay())
+                    V3Tab.Nodes -> {
+                val nodeNames = state.groups.flatMap { it.nodes }
+                    .map { it.name }
+                    .filter { it.isNotBlank() }
+                    .distinct()
+                nodeNames.forEach { testing[it] = true }
+                try {
+                    delays.putAll(repo.globalDelay())
+                } finally {
+                    nodeNames.forEach { testing.remove(it) }
+                }
+            }
                     V3Tab.Subscriptions -> providers = repo.refreshSubscriptions()
                     V3Tab.RuleSets -> ruleSets = repo.refreshRuleSets()
                     V3Tab.Rules -> rules = repo.rules()
@@ -474,7 +494,7 @@ private fun V3Panel(
                 V3Tab.Nodes -> {
                     item {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            V3Heading("策略组", "点策略组展开节点", Modifier.weight(1f))
+                            V3Heading("策略组", if (refreshing) "正在测试全部节点…" else "点策略组展开节点", Modifier.weight(1f))
                             V3SmallAction(Icons.Rounded.Sort, if (sort == V3Sort.Config) "配置" else "延迟") { sort = if (sort == V3Sort.Config) V3Sort.Delay else V3Sort.Config }
                         }
                     }
@@ -671,17 +691,45 @@ private fun V3NodeCell(node: ProxyNodeUi, selected: Boolean, delay: Long?, testi
 private fun V3Delay(value: Long?, testing: Boolean, onClick: () -> Unit) {
     val t = LocalBichenTokens.current
     val scheme = MaterialTheme.colorScheme
-    val text = when { testing -> "…"; value == null -> "--"; value <= 0L -> "超时"; else -> "$value ms" }
+    val text = when { value == null -> "--"; value <= 0L -> "超时"; else -> "$value ms" }
     val color = when {
-        testing || value == null -> t.textSecondary
+        value == null -> t.textSecondary
         value <= 0L -> scheme.error
         value <= 250L -> t.success
         value <= 600L -> scheme.primary
         value <= 1000L -> t.warning
         else -> scheme.error
     }
-    Box(Modifier.heightIn(min = 44.dp).widthIn(min = 48.dp).clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
-        Text(text, color = color, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    val motion = rememberInfiniteTransition(label = "latency-motion")
+    val rotation by motion.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(animation = tween(820, easing = LinearEasing)),
+        label = "latency-spin",
+    )
+    val pulse by motion.animateFloat(
+        initialValue = .35f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(animation = tween(520), repeatMode = RepeatMode.Reverse),
+        label = "latency-pulse",
+    )
+    Box(
+        Modifier.heightIn(min = 48.dp).widthIn(min = 58.dp).clip(RoundedCornerShape(12.dp)).clickable(enabled = !testing, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Crossfade(targetState = testing, animationSpec = tween(140), label = "latency-state") { active ->
+            if (active) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Icon(Icons.Rounded.Refresh, "测速中", tint = scheme.primary, modifier = Modifier.size(13.dp).rotate(rotation))
+                    Text("测速中", color = scheme.primary, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                    Box(Modifier.size(4.dp).alpha(pulse).background(scheme.primary, CircleShape))
+                }
+            } else {
+                Crossfade(targetState = text, animationSpec = tween(120), label = "latency-result") { display ->
+                    Text(display, color = color, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                }
+            }
+        }
     }
 }
 
@@ -954,6 +1002,41 @@ private fun V3Metric(value: String, label: String, modifier: Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(value, color = t.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(label, color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun V3LatencyMetric(value: String, testing: Boolean, modifier: Modifier) {
+    val t = LocalBichenTokens.current
+    val scheme = MaterialTheme.colorScheme
+    val motion = rememberInfiniteTransition(label = "global-latency-motion")
+    val rotation by motion.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(animation = tween(900, easing = LinearEasing)),
+        label = "global-latency-spin",
+    )
+    val pulse by motion.animateFloat(
+        initialValue = .35f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(animation = tween(560), repeatMode = RepeatMode.Reverse),
+        label = "global-latency-pulse",
+    )
+    Column(modifier, verticalArrangement = Arrangement.Center) {
+        Crossfade(targetState = testing, animationSpec = tween(150), label = "global-latency-state") { active ->
+            if (active) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Icon(Icons.Rounded.Refresh, "正在测试全部节点", tint = scheme.primary, modifier = Modifier.size(15.dp).rotate(rotation))
+                    Text("测速中", color = scheme.primary, style = MaterialTheme.typography.titleSmall, maxLines = 1)
+                    Box(Modifier.size(5.dp).alpha(pulse).background(scheme.primary, CircleShape))
+                }
+            } else {
+                Crossfade(targetState = value, animationSpec = tween(140), label = "global-latency-result") { display ->
+                    Text(display, color = t.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
+        Text(if (testing) "正在测试全部节点" else "延迟 · 点按测速", color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
