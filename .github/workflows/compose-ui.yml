@@ -72,6 +72,7 @@ jobs:
           unzip -t "$APK" >/dev/null
           unzip -l "$APK" | tee compose-apk-files.txt
           grep -q "package: name='io.github.xgl34222220.bichen.preview'" compose-apk-badging.txt
+          grep -q "versionName='0.4.0-test.22-preview'" compose-apk-badging.txt
           grep -q "launchable-activity: name='io.github.xgl34222220.bichen.CompactMainActivity'" compose-apk-badging.txt
           grep -q 'assets/sources.tsv' compose-apk-files.txt
           grep -q 'assets/rules/adaway.txt' compose-apk-files.txt
@@ -98,7 +99,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: Bichen-0.4.0-test.21-compose
+          name: Bichen-0.4.0-test.22-compose
           path: |
             android-app/app/build/outputs/apk/debug/app-debug.apk
             compose-apk-badging.txt
