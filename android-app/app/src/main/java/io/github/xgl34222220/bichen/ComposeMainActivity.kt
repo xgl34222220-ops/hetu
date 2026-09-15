@@ -70,7 +70,6 @@ private enum class MainPage(val label: String) { Home("首页"), Apps("应用"),
 @Composable
 private fun BichenComposeApp(onThemeChanged: () -> Unit) {
     val context = LocalContext.current
-    val activity = context as Activity
     val controller = remember { BichenComposeController(context) }
     var page by rememberSaveable { mutableStateOf(MainPage.Home) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
@@ -103,7 +102,12 @@ private fun BichenComposeApp(onThemeChanged: () -> Unit) {
                         .graphicsLayerCompat(enter.value),
                 ) {
                     when (page) {
-                        MainPage.Home -> HomePage(controller, onSettings = { showSettings = true })
+                        MainPage.Home -> HomePage(
+                            controller = controller,
+                            onSettings = { showSettings = true },
+                            onApps = { page = MainPage.Apps },
+                            onRules = { page = MainPage.Rules },
+                        )
                         MainPage.Apps -> AppsPage(controller)
                         MainPage.Rules -> RulesPage(controller)
                         MainPage.Activity -> ActivityPage(controller)
@@ -197,7 +201,12 @@ private fun SectionTitle(kicker: String, title: String, subtitle: String) {
 }
 
 @Composable
-private fun HomePage(controller: BichenComposeController, onSettings: () -> Unit) {
+private fun HomePage(
+    controller: BichenComposeController,
+    onSettings: () -> Unit,
+    onApps: () -> Unit,
+    onRules: () -> Unit,
+) {
     var refresh by remember { mutableIntStateOf(0) }
     val snapshot by produceState(initialValue = HomeSnapshot(), refresh) {
         value = runCatching { controller.homeSnapshot() }.getOrElse { HomeSnapshot(message = it.message ?: "状态读取失败") }
@@ -210,6 +219,7 @@ private fun HomePage(controller: BichenComposeController, onSettings: () -> Unit
     }
     val active = if (controller.preferredVpnMode()) snapshot.vpnRunning else snapshot.moduleEnabled
     val tokens = LocalBichenTokens.current
+    val primary = MaterialTheme.colorScheme.primary
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -227,7 +237,7 @@ private fun HomePage(controller: BichenComposeController, onSettings: () -> Unit
                 Box(
                     Modifier.fillMaxWidth().drawBehind {
                         drawCircle(
-                            Brush.radialGradient(listOf(MaterialTheme.colorScheme.primary.copy(.18f), Color.Transparent), center = Offset(size.width, 0f), radius = size.width * .78f),
+                            Brush.radialGradient(listOf(primary.copy(alpha = .18f), Color.Transparent), center = Offset(size.width, 0f), radius = size.width * .78f),
                             radius = size.width * .78f, center = Offset(size.width, 0f),
                         )
                     }.padding(20.dp),
@@ -289,8 +299,8 @@ private fun HomePage(controller: BichenComposeController, onSettings: () -> Unit
                     ActionItem(Icons.Rounded.Public, "代理控制台", if (snapshot.proxyRunning) "当前代理正在运行" else "核心、模式、节点与连接") {
                         context.startActivity(Intent(context, ComposeProxyActivity::class.java))
                     },
-                    ActionItem(Icons.Rounded.Apps, "应用放行", "按应用决定是否绕过过滤") { },
-                    ActionItem(Icons.Rounded.Rule, "规则与订阅", "来源、例外、更新与回滚") { },
+                    ActionItem(Icons.Rounded.Apps, "应用放行", "按应用决定是否绕过过滤", onApps),
+                    ActionItem(Icons.Rounded.Rule, "规则与订阅", "来源、例外、更新与回滚", onRules),
                 ),
             )
         }
