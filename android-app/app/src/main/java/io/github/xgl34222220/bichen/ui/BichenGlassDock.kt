@@ -65,7 +65,7 @@ fun BichenGlassDock(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val mainDock = items.size == 4 && items.firstOrNull()?.label == "首页"
+    val mainDock = items.map { it.label } == listOf("首页", "应用", "规则", "活动")
     val renderItems = remember(items, mainDock) {
         if (mainDock) {
             listOf(
