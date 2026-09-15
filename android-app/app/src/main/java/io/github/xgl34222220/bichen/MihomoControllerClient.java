@@ -7,6 +7,7 @@ import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.Semaphore;
 
 /** Authenticated localhost-only Mihomo Clash API client for strategy, delay and connections UI.
  * Uses a loopback socket instead of Android's URL connection layer so cleartext policy remains
@@ -15,6 +16,11 @@ import java.util.*;
 final class MihomoControllerClient {
     private static final int PORT=MihomoStartupConfig.CONTROLLER_PORT;
     private static final int LIMIT=2*1024*1024;
+    private static final Semaphore DELAY_SLOTS=new Semaphore(3,true);
+    private static final String[] DELAY_URLS={
+        "https://cp.cloudflare.com/generate_204",
+        "https://www.gstatic.com/generate_204"
+    };
     private final Context context;
     MihomoControllerClient(Context c){context=c.getApplicationContext();}
 
@@ -32,11 +38,49 @@ final class MihomoControllerClient {
     JSONObject connections()throws Exception{return request("GET","/connections",null);}
     JSONObject version()throws Exception{return request("GET","/version",null);}
     void select(String group,String node)throws Exception{request("PUT","/proxies/"+Uri.encode(group),new JSONObject().put("name",node));}
+
     long delay(String node)throws Exception{
-        String test=URLEncoder.encode("https://www.gstatic.com/generate_204","UTF-8");
-        JSONObject v=request("GET","/proxies/"+Uri.encode(node)+"/delay?timeout=5000&url="+test,null);
-        long d=v.optLong("delay",-1);if(d<0)throw new IOException("测速超时");return d;
+        DELAY_SLOTS.acquire();
+        try{
+            Exception last=null;
+            for(String rawUrl:DELAY_URLS){
+                try{
+                    String test=URLEncoder.encode(rawUrl,"UTF-8");
+                    JSONObject v=request(
+                        "GET",
+                        "/proxies/"+Uri.encode(node)+"/delay?timeout=8000&url="+test+"&expected=200-399",
+                        null,
+                        11000
+                    );
+                    long d=v.optLong("delay",-1);
+                    if(d>0)return d;
+                    last=new IOException("测速未返回有效延迟");
+                }catch(Exception e){last=e;}
+            }
+            if(last!=null)throw last;
+            throw new IOException("测速超时");
+        }finally{
+            DELAY_SLOTS.release();
+        }
     }
+
+    JSONObject groupDelay(String group)throws Exception{
+        Exception last=null;
+        for(String rawUrl:DELAY_URLS){
+            try{
+                String test=URLEncoder.encode(rawUrl,"UTF-8");
+                return request(
+                    "GET",
+                    "/group/"+Uri.encode(group)+"/delay?timeout=8000&url="+test+"&expected=200-399",
+                    null,
+                    12000
+                );
+            }catch(Exception e){last=e;}
+        }
+        if(last!=null)throw last;
+        throw new IOException("策略组测速失败");
+    }
+
     void closeAll()throws Exception{request("DELETE","/connections",null);}
     boolean waitReady(long timeoutMs){
         long end=android.os.SystemClock.elapsedRealtime()+timeoutMs;
@@ -45,11 +89,15 @@ final class MihomoControllerClient {
     }
 
     private JSONObject request(String method,String path,JSONObject body)throws Exception{
+        return request(method,path,body,6500);
+    }
+
+    private JSONObject request(String method,String path,JSONObject body,int socketTimeoutMs)throws Exception{
         byte[] payload=body==null?new byte[0]:body.toString().getBytes(StandardCharsets.UTF_8);
         Socket socket=new Socket();
         try{
             socket.connect(new InetSocketAddress(InetAddress.getByName("127.0.0.1"),PORT),2200);
-            socket.setSoTimeout(6500);
+            socket.setSoTimeout(socketTimeoutMs);
             OutputStream raw=socket.getOutputStream();
             StringBuilder head=new StringBuilder();
             head.append(method).append(' ').append(path).append(" HTTP/1.1\r\n")
