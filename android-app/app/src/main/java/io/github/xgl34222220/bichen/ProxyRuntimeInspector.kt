@@ -5,7 +5,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.Inet4Address
+import java.net.InetSocketAddress
 import java.net.NetworkInterface
+import java.net.Socket
+import java.nio.charset.StandardCharsets
 
 internal data class ProxyRuntimeSnapshot(
     val running: Boolean = false,
@@ -21,6 +24,7 @@ internal data class ProxyRuntimeSnapshot(
 internal class ProxyRuntimeInspector(context: Context) {
     private val app = context.applicationContext
     private val api = MihomoControllerClient(app)
+    private val prefs = app.getSharedPreferences("bichen", Context.MODE_PRIVATE)
 
     suspend fun sample(): ProxyRuntimeSnapshot = withContext(Dispatchers.IO) {
         val command = """
@@ -66,6 +70,51 @@ internal class ProxyRuntimeInspector(context: Context) {
         val result = RootBridge.rootShell(app, command, 10_000L)
         val text = result.output.trim()
         if (text.isBlank()) "暂无运行日志" else text.takeLast(24_000)
+    }
+
+    /**
+     * Mihomo intentionally does not download external-ui-url just because the directory is empty.
+     * The documented /upgrade/ui endpoint performs that update. Keep it loopback-only and only
+     * download when the user explicitly opens WebUI and the local index is missing.
+     */
+    suspend fun ensureWebUi() = withContext(Dispatchers.IO) {
+        if (webUiReady()) return@withContext
+        val secret = controllerSecret()
+        val socket = Socket()
+        try {
+            socket.connect(InetSocketAddress("127.0.0.1", MihomoStartupConfig.CONTROLLER_PORT), 3_000)
+            socket.soTimeout = 90_000
+            val request = buildString {
+                append("POST /upgrade/ui HTTP/1.1\r\n")
+                append("Host: 127.0.0.1:").append(MihomoStartupConfig.CONTROLLER_PORT).append("\r\n")
+                append("Authorization: Bearer ").append(secret).append("\r\n")
+                append("Accept: application/json\r\n")
+                append("Content-Length: 0\r\n")
+                append("Connection: close\r\n\r\n")
+            }
+            socket.getOutputStream().use { output ->
+                output.write(request.toByteArray(StandardCharsets.US_ASCII))
+                output.flush()
+            }
+            val input = socket.getInputStream().bufferedReader(StandardCharsets.ISO_8859_1)
+            val status = input.readLine() ?: error("WebUI 更新没有返回 HTTP 状态")
+            val code = status.split(' ').getOrNull(1)?.toIntOrNull() ?: 0
+            if (code !in 200..299) error("WebUI 更新失败：HTTP $code")
+        } finally {
+            runCatching { socket.close() }
+        }
+        if (!webUiReady()) error("WebUI 下载完成但入口文件不存在，请重启核心后重试")
+    }
+
+    fun controllerSecret(): String = prefs.getString("proxyControllerSecret", "").orEmpty()
+
+    private fun webUiReady(): Boolean {
+        val result = RootBridge.rootShell(
+            app,
+            "test -f /data/adb/bichen/proxy/run/${MihomoStartupConfig.EXTERNAL_UI_DIR}/index.html && echo READY || echo MISSING",
+            4_000L,
+        )
+        return result.ok() && result.output.contains("READY")
     }
 
     private fun localIpv4Address(): String {
