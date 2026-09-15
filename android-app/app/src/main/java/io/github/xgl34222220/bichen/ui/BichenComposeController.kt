@@ -1,0 +1,220 @@
+package io.github.xgl34222220.bichen.ui
+
+import android.content.Context
+import android.content.Intent
+import android.content.pm.ApplicationInfo
+import android.net.VpnService
+import io.github.xgl34222220.bichen.DnsVpnService
+import io.github.xgl34222220.bichen.MihomoVpnService
+import io.github.xgl34222220.bichen.RootBridge
+import io.github.xgl34222220.bichen.RuleStore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
+import java.text.Collator
+import java.util.Locale
+
+internal data class HomeSnapshot(
+    val rootGranted: Boolean = false,
+    val installed: Boolean = false,
+    val moduleEnabled: Boolean = false,
+    val pendingReboot: Boolean = false,
+    val version: String = "—",
+    val ruleCount: Int = 0,
+    val allowCount: Int = 0,
+    val blockCount: Int = 0,
+    val blockedQueries: Long = 0,
+    val queries: Long = 0,
+    val errors: Long = 0,
+    val vpnRunning: Boolean = false,
+    val proxyRunning: Boolean = false,
+    val message: String = "",
+)
+
+internal data class AppItem(
+    val label: String,
+    val packageName: String,
+    val system: Boolean,
+)
+
+internal data class RuleSourceItem(
+    val id: String,
+    val name: String,
+    val url: String,
+    val enabled: Boolean,
+    val count: Int,
+)
+
+internal data class RulesSnapshot(
+    val count: Int = 0,
+    val allow: List<String> = emptyList(),
+    val block: List<String> = emptyList(),
+    val sources: List<RuleSourceItem> = emptyList(),
+    val profile: String = "加载中",
+)
+
+internal data class RequestItem(
+    val domain: String,
+    val reason: String,
+    val blocked: Boolean,
+    val time: String,
+)
+
+internal class BichenComposeController(private val context: Context) {
+    private val app = context.applicationContext
+    private val prefs = app.getSharedPreferences("bichen", Context.MODE_PRIVATE)
+
+    suspend fun homeSnapshot(): HomeSnapshot = withContext(Dispatchers.IO) {
+        val status = RootBridge.status(app)
+        val rules = RuleStore(app)
+        var ruleCount = 0
+        var allowCount = 0
+        var blockCount = 0
+        runCatching {
+            rules.reload()
+            val summary = rules.summary()
+            ruleCount = summary.optInt("effectiveCount")
+            allowCount = summary.optInt("allowCount")
+            blockCount = summary.optInt("blockCount")
+        }
+        HomeSnapshot(
+            rootGranted = status.optBoolean("rootGranted"),
+            installed = status.optBoolean("installed"),
+            moduleEnabled = status.optBoolean("enabled") && !status.optBoolean("moduleDisabled") && !status.optBoolean("moduleRemovalPending"),
+            pendingReboot = status.optBoolean("pendingReboot"),
+            version = status.optString("version", "—"),
+            ruleCount = if (status.optInt("ruleCount") > 0) status.optInt("ruleCount") else ruleCount,
+            allowCount = allowCount,
+            blockCount = blockCount,
+            blockedQueries = prefs.getLong("blocked", 0),
+            queries = prefs.getLong("queries", 0),
+            errors = prefs.getLong("errors", 0),
+            vpnRunning = DnsVpnService.running,
+            proxyRunning = MihomoVpnService.engaged || prefs.getBoolean("proxyWanted", false),
+            message = status.optString("error", status.optString("message", "")),
+        )
+    }
+
+    fun preferredVpnMode(): Boolean = prefs.getString("preferredMode", "module") == "vpn"
+
+    fun prepareVpn(): Intent? = VpnService.prepare(app)
+
+    fun startVpn() {
+        val intent = Intent(app, DnsVpnService::class.java).setAction(DnsVpnService.ACTION_START)
+        if (android.os.Build.VERSION.SDK_INT >= 26) app.startForegroundService(intent) else app.startService(intent)
+    }
+
+    fun stopVpn() {
+        val intent = Intent(app, DnsVpnService::class.java).setAction(DnsVpnService.ACTION_STOP)
+        app.startService(intent)
+    }
+
+    suspend fun toggleModuleProtection(currentlyEnabled: Boolean): String = withContext(Dispatchers.IO) {
+        val command = if (currentlyEnabled) "pause" else "resume"
+        val result = RootBridge.run(app, command)
+        if (!result.ok()) throw IllegalStateException(result.output.ifBlank { "模块操作失败" })
+        result.output.trim().ifBlank { if (currentlyEnabled) "模块保护已暂停" else "模块保护已恢复" }
+    }
+
+    suspend fun loadApps(): List<AppItem> = withContext(Dispatchers.IO) {
+        val pm = app.packageManager
+        val items = pm.getInstalledApplications(0).asSequence()
+            .filter { it.packageName != app.packageName }
+            .map {
+                AppItem(
+                    label = pm.getApplicationLabel(it).toString(),
+                    packageName = it.packageName,
+                    system = (it.flags and ApplicationInfo.FLAG_SYSTEM) != 0,
+                )
+            }.toMutableList()
+        val collator = Collator.getInstance(Locale.CHINA)
+        items.sortWith { a, b -> collator.compare(a.label, b.label) }
+        items
+    }
+
+    fun bypassApps(): Set<String> = prefs.getStringSet("bypassApps", emptySet())?.toSet() ?: emptySet()
+
+    fun setBypass(packageName: String, enabled: Boolean) {
+        val next = bypassApps().toMutableSet()
+        if (enabled) next.add(packageName) else next.remove(packageName)
+        prefs.edit().putStringSet("bypassApps", next).apply()
+    }
+
+    fun applyVpnBypass() {
+        if (DnsVpnService.running) {
+            val intent = Intent(app, DnsVpnService::class.java).setAction(DnsVpnService.ACTION_RESTART)
+            app.startService(intent)
+        }
+    }
+
+    suspend fun rulesSnapshot(): RulesSnapshot = withContext(Dispatchers.IO) {
+        val rules = RuleStore(app)
+        rules.reload()
+        val sources = rules.sources()
+        val list = ArrayList<RuleSourceItem>()
+        for (i in 0 until sources.length()) {
+            val o = sources.optJSONObject(i) ?: continue
+            list += RuleSourceItem(
+                id = o.optString("id"),
+                name = o.optString("name"),
+                url = o.optString("url"),
+                enabled = o.optBoolean("enabled"),
+                count = o.optInt("count"),
+            )
+        }
+        RulesSnapshot(
+            count = rules.count(),
+            allow = rules.userList(true),
+            block = rules.userList(false),
+            sources = list,
+            profile = rules.profileTitle(),
+        )
+    }
+
+    private suspend fun moduleInstalled(): Boolean = withContext(Dispatchers.IO) {
+        val s = RootBridge.status(app)
+        s.optBoolean("installed") && !s.optBoolean("pendingReboot")
+    }
+
+    suspend fun setRuleSource(id: String, enabled: Boolean) = withContext(Dispatchers.IO) {
+        val rules = RuleStore(app)
+        rules.reload()
+        rules.setSource(id, enabled, moduleInstalled())
+    }
+
+    suspend fun changeDomain(domain: String, allow: Boolean, add: Boolean) = withContext(Dispatchers.IO) {
+        val rules = RuleStore(app)
+        rules.reload()
+        rules.changeDomain(domain, allow, add, moduleInstalled())
+    }
+
+    suspend fun updateRules(): String = withContext(Dispatchers.IO) {
+        val rules = RuleStore(app)
+        rules.reload()
+        if (rules.updateRules(moduleInstalled())) "规则已更新" else "规则已校验，没有变化"
+    }
+
+    fun requestItems(): List<RequestItem> {
+        val raw = prefs.getString("dnsLogs", "[]") ?: "[]"
+        val array = runCatching { JSONArray(raw) }.getOrElse { JSONArray() }
+        val out = ArrayList<RequestItem>()
+        for (i in array.length() - 1 downTo 0) {
+            val o = array.optJSONObject(i) ?: continue
+            out += RequestItem(
+                domain = o.optString("domain", o.optString("name", "未知域名")),
+                reason = o.optString("reason", o.optString("result", "DNS 请求")),
+                blocked = o.optBoolean("blocked", false),
+                time = o.optString("time", o.optString("timestamp", "")),
+            )
+        }
+        return out
+    }
+
+    fun clearRequests() {
+        prefs.edit().putString("dnsLogs", "[]").remove("dnsLogError").remove("dnsLogNotice").apply()
+    }
+
+    fun appearance(): String = prefs.getString("appearance", "system") ?: "system"
+    fun setAppearance(value: String) { prefs.edit().putString("appearance", value).apply() }
+}
