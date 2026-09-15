@@ -59,7 +59,9 @@ class ComposeProxyActivity : ComponentActivity() {
 }
 
 private enum class ProxyPage { Home, Panel, Tools, Settings }
-private enum class PanelTab(val title: String) { Overview("概览"), Nodes("节点"), Subscription("订阅"), Connections("连接"), Rules("规则"), RuleSets("规则集") }
+private enum class PanelTab(val title: String) {
+    Overview("概览"), Nodes("节点"), Subscription("订阅"), Connections("连接"), Rules("规则"), RuleSets("规则集")
+}
 private enum class GroupSort { Config, Delay }
 
 @Composable
@@ -151,7 +153,12 @@ private fun ProxyApp(onBack: () -> Unit) {
 
     LaunchedEffect(revision) { loadState() }
     LaunchedEffect(Unit) {
-        try { controller.ensureIcons() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { }
+        try {
+            controller.ensureIcons()
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (_: Exception) {
+        }
         loadState()
         while (true) {
             delay(3000)
@@ -176,8 +183,12 @@ private fun ProxyApp(onBack: () -> Unit) {
                 .padding(bottom = 106.dp),
         ) {
             when (page) {
-                ProxyPage.Home -> ProxyHome(state, delays, notice, busyText, testing, onBack, ::refresh, ::toggle, ::restart, ::globalDelay) { page = ProxyPage.Panel }
-                ProxyPage.Panel -> ProxyPanel(state, controller, delays, notice, testing, ::refresh, ::globalDelay) { revision++ }
+                ProxyPage.Home -> ProxyHome(
+                    state, delays, notice, busyText, testing, onBack, ::refresh, ::toggle, ::restart, ::globalDelay,
+                ) { page = ProxyPage.Panel }
+                ProxyPage.Panel -> ProxyPanel(
+                    state, controller, delays, notice, testing, ::refresh, ::globalDelay,
+                ) { revision++ }
                 ProxyPage.Tools -> ProxyTools(state, controller, notice, testing, ::globalDelay, ::refresh)
                 ProxyPage.Settings -> ProxySettings(state, controller) { revision++ }
             }
@@ -217,12 +228,21 @@ private fun ProxyHome(
     ) {
         item { PageHeader("代理", "${state.core} · ${state.mode}", onBack, onRefresh) }
         item {
-            Surface(shape = RoundedCornerShape(30.dp), color = if (state.running) MaterialTheme.colorScheme.primaryContainer.copy(alpha = .48f) else tokens.cardBackground, shadowElevation = 2.dp) {
+            Surface(
+                shape = RoundedCornerShape(30.dp),
+                color = if (state.running) MaterialTheme.colorScheme.primaryContainer.copy(alpha = .48f) else tokens.cardBackground,
+                shadowElevation = 2.dp,
+            ) {
                 Column(Modifier.fillMaxWidth().padding(22.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         StatusPill(if (state.running) "运行中" else "已停止", if (state.running) tokens.success else tokens.warning)
                         Spacer(Modifier.weight(1f))
-                        Icon(if (state.running) Icons.Rounded.CheckCircle else Icons.Rounded.PauseCircle, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(50.dp))
+                        Icon(
+                            if (state.running) Icons.Rounded.CheckCircle else Icons.Rounded.PauseCircle,
+                            null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(50.dp),
+                        )
                     }
                     Text(state.config, color = tokens.textPrimary, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -230,12 +250,23 @@ private fun ProxyHome(
                         ProxyMetric(average, "全局延迟", Modifier.weight(1f))
                         ProxyMetric(state.connections.size.toString(), "连接", Modifier.weight(1f))
                     }
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        ProxyMetric(formatBytes(state.downloadTotal), "下载", Modifier.weight(1f))
+                        ProxyMetric(formatBytes(state.uploadTotal), "上传", Modifier.weight(1f))
+                        ProxyMetric(if (state.panelReady) "在线" else "等待", "控制接口", Modifier.weight(1f))
+                    }
                     if (notice.isNotBlank()) Text(notice, color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
                     if (busyText.isNotBlank()) Text(busyText, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = onRefresh, Modifier.weight(1f), shape = RoundedCornerShape(18.dp)) { Icon(Icons.Rounded.Refresh, null); Spacer(Modifier.width(5.dp)); Text("重载") }
-                        Button(onClick = onToggle, Modifier.weight(1f), shape = RoundedCornerShape(18.dp)) { Icon(if (state.running) Icons.Rounded.Stop else Icons.Rounded.PlayArrow, null); Spacer(Modifier.width(5.dp)); Text(if (state.running) "停止" else "启动") }
-                        OutlinedButton(onClick = onRestart, enabled = state.running, modifier = Modifier.weight(1f), shape = RoundedCornerShape(18.dp)) { Icon(Icons.Rounded.RestartAlt, null); Spacer(Modifier.width(5.dp)); Text("重启") }
+                        OutlinedButton(onClick = onRefresh, Modifier.weight(1f), shape = RoundedCornerShape(18.dp)) {
+                            Icon(Icons.Rounded.Refresh, null, Modifier.size(18.dp)); Spacer(Modifier.width(5.dp)); Text("重载")
+                        }
+                        Button(onClick = onToggle, Modifier.weight(1f), shape = RoundedCornerShape(18.dp)) {
+                            Icon(if (state.running) Icons.Rounded.Stop else Icons.Rounded.PlayArrow, null, Modifier.size(18.dp)); Spacer(Modifier.width(5.dp)); Text(if (state.running) "停止" else "启动")
+                        }
+                        OutlinedButton(onClick = onRestart, enabled = state.running, modifier = Modifier.weight(1f), shape = RoundedCornerShape(18.dp)) {
+                            Icon(Icons.Rounded.RestartAlt, null, Modifier.size(18.dp)); Spacer(Modifier.width(5.dp)); Text("重启")
+                        }
                     }
                 }
             }
@@ -243,14 +274,7 @@ private fun ProxyHome(
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 HomeActionCard(Icons.Rounded.Public, "面板", "策略组与连接", Modifier.weight(1f), onPanel)
-                HomeActionCard(Icons.Rounded.Speed, if (testing) "测速中" else "测速", "全部节点", Modifier.weight(1f), onGlobalDelay)
-            }
-        }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                StatusMetric("下载", formatBytes(state.downloadTotal), Modifier.weight(1f))
-                StatusMetric("上传", formatBytes(state.uploadTotal), Modifier.weight(1f))
-                StatusMetric("控制接口", if (state.panelReady) "在线" else "等待", Modifier.weight(1f))
+                HomeActionCard(Icons.Rounded.Speed, if (testing) "测速中" else "测速", "全部真实节点", Modifier.weight(1f), onGlobalDelay)
             }
         }
     }
@@ -280,13 +304,19 @@ private fun ProxyPanel(
 
     val ordered = remember(state.groups, delays, sort, hideUnavailable, search) {
         var list = state.groups.filter { group ->
-            search.isBlank() || group.name.contains(search, true) || group.now.contains(search, true)
+            search.isBlank() || group.name.contains(search, true) || group.now.contains(search, true) || group.nodes.any { it.name.contains(search, true) }
         }
         if (hideUnavailable) list = list.filter { group -> group.nodes.any { (delays[it.name] ?: 0L) >= 0L } }
         when (sort) {
             GroupSort.Config -> list.sortedWith(compareBy<ProxyGroupUi>({ videoGroupPriority(it.name) }, { it.name }))
             GroupSort.Delay -> list.sortedBy { group -> delaySortKey(delays[group.now]) }
         }
+    }
+    val visibleNodes = remember(state.groups, search) {
+        state.groups
+            .flatMap { it.nodes }
+            .distinctBy { it.name }
+            .filter { search.isBlank() || it.name.contains(search, true) || it.type.contains(search, true) }
     }
 
     LazyColumn(
@@ -313,8 +343,18 @@ private fun ProxyPanel(
                 }
             }
         }
-        if (showSearch) item("search") {
-            OutlinedTextField(search, { search = it }, Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text("搜索策略组或节点") }, leadingIcon = { Icon(Icons.Rounded.Search, null) }, shape = RoundedCornerShape(18.dp))
+        if (showSearch) {
+            item("search") {
+                OutlinedTextField(
+                    search,
+                    { search = it },
+                    Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    placeholder = { Text("搜索策略组、节点或协议") },
+                    leadingIcon = { Icon(Icons.Rounded.Search, null) },
+                    shape = RoundedCornerShape(18.dp),
+                )
+            }
         }
 
         when (tab) {
@@ -326,13 +366,15 @@ private fun ProxyPanel(
                             Spacer(Modifier.width(10.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(if (testing) "正在全局测速" else "全局测速延迟", color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall)
-                                Text(notice.ifBlank { "一次测试全部真实节点；策略卡片实时显示进度" }, color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(notice.ifBlank { "一次测试全部真实节点；策略卡片显示测速进度" }, color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                             TextButton(onClick = onGlobalDelay, enabled = state.running && !testing) { Text(if (testing) "测速中" else "开始") }
                         }
                     }
                 }
-                if (ordered.isEmpty()) item("empty") { EmptyCard(if (state.running) "没有可显示的策略组" else "代理尚未运行", "启动代理后读取 Mihomo 实时策略组。") }
+                if (ordered.isEmpty()) {
+                    item("empty") { EmptyCard(if (state.running) "没有可显示的策略组" else "代理尚未运行", "启动代理后读取 Mihomo 实时策略组。") }
+                }
                 ordered.chunked(2).forEachIndexed { rowIndex, row ->
                     item("group-row-$rowIndex") {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -352,20 +394,38 @@ private fun ProxyPanel(
                 }
             }
             PanelTab.Nodes -> {
-                val nodes = remember(state.groups, search) {
-                    state.groups.flatMap { it.nodes }.distinctBy { it.name }.filter { search.isBlank() || it.name.contains(search, true) }
-                }
-                nodes.chunked(2).forEachIndexed { index, row ->
+                visibleNodes.chunked(2).forEachIndexed { index, row ->
                     item("node-row-$index") {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            row.forEach { node -> NodeCard(node, selected = false, delay = delays[node.name], Modifier.weight(1f), onSelect = {}, onDelay = { activity.lifecycleScope.launch { delays[node.name] = try { controller.delay(node.name) } catch (_: Exception) { -1L } } }) }
+                            row.forEach { node ->
+                                NodeCard(
+                                    node,
+                                    selected = state.groups.any { it.now == node.name },
+                                    delay = delays[node.name],
+                                    modifier = Modifier.weight(1f),
+                                    onSelect = {},
+                                    onDelay = {
+                                        activity.lifecycleScope.launch {
+                                            delays[node.name] = try { controller.delay(node.name) } catch (_: Exception) { -1L }
+                                        }
+                                    },
+                                )
+                            }
                             if (row.size == 1) Spacer(Modifier.weight(1f))
                         }
                     }
                 }
             }
-            PanelTab.Subscription -> item("subscription") {
-                ActionGroup(listOf(ProxyActionItem(Icons.Rounded.CloudSync, "订阅管理", "添加、编辑、删除自己的订阅；私人订阅不内置") { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) }))
+            PanelTab.Subscription -> {
+                item("subscription") {
+                    ActionGroup(
+                        listOf(
+                            ProxyActionItem(Icons.Rounded.CloudSync, "订阅管理", "添加、编辑、删除自己的订阅；私人订阅不内置") {
+                                context.startActivity(Intent(context, ProxySubscriptionActivity::class.java))
+                            },
+                        ),
+                    )
+                }
             }
             PanelTab.Connections -> {
                 item("connection-stats") {
@@ -386,8 +446,16 @@ private fun ProxyPanel(
                     }
                 }
             }
-            PanelTab.Rules, PanelTab.RuleSets -> item("rules-link") {
-                ActionGroup(listOf(ProxyActionItem(Icons.Rounded.Rule, if (tab == PanelTab.Rules) "规则" else "规则集", "当前先读取配置中的真实规则；点此编辑当前 YAML") { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) }))
+            PanelTab.Rules, PanelTab.RuleSets -> {
+                item("rules-link") {
+                    ActionGroup(
+                        listOf(
+                            ProxyActionItem(Icons.Rounded.Rule, if (tab == PanelTab.Rules) "规则" else "规则集", "当前读取配置真实规则；点此编辑当前 YAML") {
+                                context.startActivity(Intent(context, ProxySubscriptionActivity::class.java))
+                            },
+                        ),
+                    )
+                }
             }
         }
     }
@@ -404,7 +472,7 @@ private fun ProxyPanel(
                         FilterChip(selected = sort == GroupSort.Delay, onClick = { sort = GroupSort.Delay }, label = { Text("按延迟排序") })
                     }
                     SettingSwitch("隐藏不可用节点", hideUnavailable) { hideUnavailable = it }
-                    Text("策略卡片采用双列布局；点策略组后在原位置下方展开双列节点卡片。图标只在本地没有缓存时下载。", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
+                    Text("策略组按视频采用双列卡片；点策略组后在原位置展开双列节点。icon 链接只有本地没有缓存时才下载。", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
                 }
             },
             confirmButton = { TextButton(onClick = { showSettings = false }) { Text("完成") } },
@@ -423,7 +491,13 @@ private fun ExpandedNodes(
     val tokens = LocalBichenTokens.current
     Surface(shape = RoundedCornerShape(24.dp), color = tokens.elevatedCardBackground.copy(alpha = .65f)) {
         Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(group.name, color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                MiniGroupIcon(group)
+                Spacer(Modifier.width(8.dp))
+                Text(group.name, color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.weight(1f))
+                Text("${group.nodes.size} 节点", color = tokens.textSecondary, style = MaterialTheme.typography.labelSmall)
+            }
             group.nodes.chunked(2).forEach { row ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     row.forEach { node ->
@@ -439,7 +513,9 @@ private fun ExpandedNodes(
                                 }
                             },
                             onDelay = {
-                                activity.lifecycleScope.launch { delays[node.name] = try { controller.delay(node.name) } catch (_: Exception) { -1L } }
+                                activity.lifecycleScope.launch {
+                                    delays[node.name] = try { controller.delay(node.name) } catch (_: Exception) { -1L }
+                                }
                             },
                         )
                     }
@@ -451,10 +527,21 @@ private fun ExpandedNodes(
 }
 
 @Composable
-private fun StrategyGroupCard(group: ProxyGroupUi, delays: Map<String, Long>, expanded: Boolean, modifier: Modifier, onClick: () -> Unit) {
+private fun StrategyGroupCard(
+    group: ProxyGroupUi,
+    delays: Map<String, Long>,
+    expanded: Boolean,
+    modifier: Modifier,
+    onClick: () -> Unit,
+) {
     val tokens = LocalBichenTokens.current
     val measured = group.nodes.count { delays.containsKey(it.name) }
-    Surface(modifier = modifier.clickable(onClick = onClick), shape = RoundedCornerShape(22.dp), color = if (expanded) MaterialTheme.colorScheme.primaryContainer.copy(alpha = .45f) else tokens.cardBackground, shadowElevation = 1.dp) {
+    Surface(
+        modifier = modifier.clickable(onClick = onClick),
+        shape = RoundedCornerShape(22.dp),
+        color = if (expanded) MaterialTheme.colorScheme.primaryContainer.copy(alpha = .45f) else tokens.cardBackground,
+        shadowElevation = 1.dp,
+    ) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 MiniGroupIcon(group)
@@ -471,9 +558,21 @@ private fun StrategyGroupCard(group: ProxyGroupUi, delays: Map<String, Long>, ex
 }
 
 @Composable
-private fun NodeCard(node: ProxyNodeUi, selected: Boolean, delay: Long?, modifier: Modifier, onSelect: () -> Unit, onDelay: () -> Unit) {
+private fun NodeCard(
+    node: ProxyNodeUi,
+    selected: Boolean,
+    delay: Long?,
+    modifier: Modifier,
+    onSelect: () -> Unit,
+    onDelay: () -> Unit,
+) {
     val tokens = LocalBichenTokens.current
-    Surface(modifier = modifier.clickable(onClick = onSelect), shape = RoundedCornerShape(20.dp), color = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = .62f) else tokens.cardBackground, shadowElevation = 1.dp) {
+    Surface(
+        modifier = modifier.clickable(onClick = onSelect),
+        shape = RoundedCornerShape(20.dp),
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = .62f) else tokens.cardBackground,
+        shadowElevation = 1.dp,
+    ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(node.name, Modifier.weight(1f), color = tokens.textPrimary, style = MaterialTheme.typography.bodyMedium, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -488,7 +587,9 @@ private fun NodeCard(node: ProxyNodeUi, selected: Boolean, delay: Long?, modifie
                 Spacer(Modifier.weight(1f))
                 DelayPill(delay)
             }
-            TextButton(onClick = onDelay, modifier = Modifier.align(Alignment.End).heightIn(min = 30.dp), contentPadding = PaddingValues(horizontal = 6.dp)) { Text("测速", fontSize = 11.sp) }
+            TextButton(onClick = onDelay, modifier = Modifier.align(Alignment.End).heightIn(min = 30.dp), contentPadding = PaddingValues(horizontal = 6.dp)) {
+                Text("测速", fontSize = 11.sp)
+            }
         }
     }
 }
@@ -498,8 +599,11 @@ private fun MiniGroupIcon(group: ProxyGroupUi) {
     val bitmap = remember(group.iconPath) { if (group.iconPath.isBlank()) null else BitmapFactory.decodeFile(group.iconPath) }
     Surface(shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.size(34.dp)) {
         Box(contentAlignment = Alignment.Center) {
-            if (bitmap != null) Image(bitmap.asImageBitmap(), null, Modifier.size(26.dp).clip(RoundedCornerShape(5.dp)), contentScale = ContentScale.Fit)
-            else Icon(Icons.Rounded.Public, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+            if (bitmap != null) {
+                Image(bitmap.asImageBitmap(), null, Modifier.size(26.dp).clip(RoundedCornerShape(5.dp)), contentScale = ContentScale.Fit)
+            } else {
+                Icon(Icons.Rounded.Public, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+            }
         }
     }
 }
@@ -520,13 +624,24 @@ private fun DelayPill(delay: Long?) {
 }
 
 @Composable
-private fun ProxyTools(state: ProxyComposeState, controller: ProxyComposeController, notice: String, testing: Boolean, onGlobalDelay: () -> Unit, onEnsureIcons: () -> Unit) {
+private fun ProxyTools(
+    state: ProxyComposeState,
+    controller: ProxyComposeController,
+    notice: String,
+    testing: Boolean,
+    onGlobalDelay: () -> Unit,
+    onEnsureIcons: () -> Unit,
+) {
     val context = LocalContext.current
     val activity = context as ComponentActivity
     var dialogTitle by remember { mutableStateOf("") }
     var dialogText by remember { mutableStateOf("") }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        item { PageHeader("工具", "运行、测速、日志与配置", null, null) }
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        item { PageHeader("工具", "运行、测速、日志、内核与配置", null, null) }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 StatusMetric("内存", formatBytes(state.memoryBytes), Modifier.weight(1f))
@@ -538,20 +653,38 @@ private fun ProxyTools(state: ProxyComposeState, controller: ProxyComposeControl
         item {
             ActionGroup(
                 listOf(
+                    ProxyActionItem(Icons.Rounded.Memory, "内核管理", "Mihomo 内置 · 其他内核按需下载 · 支持在线更新") {
+                        context.startActivity(Intent(context, ProxyCoreActivity::class.java))
+                    },
                     ProxyActionItem(Icons.Rounded.Speed, if (testing) "全局测速中" else "全局测速", "测试全部真实节点", onGlobalDelay),
-                    ProxyActionItem(Icons.Rounded.Image, "补齐策略图标", "只下载本地缺失图标，已缓存图标不重复下载", onEnsureIcons),
+                    ProxyActionItem(Icons.Rounded.Image, "补齐策略图标", "只下载本地缺失图标，已有缓存不重复下载", onEnsureIcons),
                     ProxyActionItem(Icons.Rounded.Description, "运行日志", "Root / Mihomo / TPROXY 诊断") {
-                        activity.lifecycleScope.launch { dialogTitle = "运行日志"; dialogText = try { controller.diagnostics() } catch (e: Exception) { e.message ?: "读取失败" } }
+                        activity.lifecycleScope.launch {
+                            dialogTitle = "运行日志"
+                            dialogText = try { controller.diagnostics() } catch (e: Exception) { e.message ?: "读取失败" }
+                        }
                     },
                     ProxyActionItem(Icons.Rounded.Code, "最终启动配置", "查看运行时实际 Mihomo YAML") {
-                        activity.lifecycleScope.launch { dialogTitle = "最终启动配置"; dialogText = try { controller.startupConfig() } catch (e: Exception) { e.message ?: "读取失败" } }
+                        activity.lifecycleScope.launch {
+                            dialogTitle = "最终启动配置"
+                            dialogText = try { controller.startupConfig() } catch (e: Exception) { e.message ?: "读取失败" }
+                        }
                     },
-                    ProxyActionItem(Icons.Rounded.CloudSync, "订阅与配置", "添加订阅 / 编辑 YAML") { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) },
+                    ProxyActionItem(Icons.Rounded.CloudSync, "订阅与配置", "添加订阅 / 编辑 YAML") {
+                        context.startActivity(Intent(context, ProxySubscriptionActivity::class.java))
+                    },
                 ),
             )
         }
     }
-    if (dialogTitle.isNotBlank()) AlertDialog(onDismissRequest = { dialogTitle = "" }, title = { Text(dialogTitle) }, text = { Text(dialogText.ifBlank { "暂无内容" }, style = MaterialTheme.typography.bodySmall) }, confirmButton = { TextButton(onClick = { dialogTitle = "" }) { Text("关闭") } })
+    if (dialogTitle.isNotBlank()) {
+        AlertDialog(
+            onDismissRequest = { dialogTitle = "" },
+            title = { Text(dialogTitle) },
+            text = { Text(dialogText.ifBlank { "暂无内容" }, style = MaterialTheme.typography.bodySmall) },
+            confirmButton = { TextButton(onClick = { dialogTitle = "" }) { Text("关闭") } },
+        )
+    }
 }
 
 @Composable
@@ -567,13 +700,22 @@ private fun ProxySettings(state: ProxyComposeState, controller: ProxyComposeCont
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             var name = "导入配置.yaml"
-            context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor -> if (cursor.moveToFirst()) name = cursor.getString(0) ?: name }
-            activity.lifecycleScope.launch { try { controller.importConfig(uri, name) } catch (_: Exception) { }; onChanged() }
+            context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) name = cursor.getString(0) ?: name
+            }
+            activity.lifecycleScope.launch {
+                try { controller.importConfig(uri, name) } catch (_: Exception) { }
+                onChanged()
+            }
         }
     }
 
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        item { PageHeader("设置", "基础代理配置", null, null) }
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        item { PageHeader("设置", "基础代理、内核与配置", null, null) }
         item {
             Surface(shape = RoundedCornerShape(24.dp), color = tokens.cardBackground) {
                 Column(Modifier.padding(horizontal = 17.dp)) {
@@ -590,20 +732,44 @@ private fun ProxySettings(state: ProxyComposeState, controller: ProxyComposeCont
         item {
             ActionGroup(
                 listOf(
-                    ProxyActionItem(Icons.Rounded.CloudSync, "订阅与 YAML 编辑", state.config) { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) },
+                    ProxyActionItem(Icons.Rounded.Memory, "内核下载与更新", "Mihomo 内置但仍可下载更新；其他内核不随包内置") {
+                        context.startActivity(Intent(context, ProxyCoreActivity::class.java))
+                    },
+                    ProxyActionItem(Icons.Rounded.CloudSync, "订阅与 YAML 编辑", state.config) {
+                        context.startActivity(Intent(context, ProxySubscriptionActivity::class.java))
+                    },
                     ProxyActionItem(Icons.Rounded.SwapHoriz, "切换已保存配置", "当前：${state.config}") { configMenu = true },
-                    ProxyActionItem(Icons.Rounded.Add, "导入配置", "支持 YAML / YML / JSON") { importLauncher.launch(arrayOf("application/yaml", "text/yaml", "text/plain", "application/json")) },
+                    ProxyActionItem(Icons.Rounded.Add, "导入配置", "支持 YAML / YML / JSON") {
+                        importLauncher.launch(arrayOf("application/yaml", "text/yaml", "text/plain", "application/json"))
+                    },
                 ),
             )
         }
     }
-    if (coreMenu) SelectDialog("核心选择", controller.cores(), state.core, { coreMenu = false }) { controller.setCore(it); coreMenu = false; onChanged() }
-    if (modeMenu) SelectDialog("运行模式", controller.modes(), state.mode, { modeMenu = false }) { controller.setMode(it); modeMenu = false; onChanged() }
-    if (ipv6Menu) SelectDialog("IPv6", controller.ipv6Modes(), state.ipv6, { ipv6Menu = false }) { controller.setIpv6(it); ipv6Menu = false; onChanged() }
-    if (configMenu) SelectDialog("配置选择", configs.map { it to it }, state.config, { configMenu = false }) { name -> activity.lifecycleScope.launch { try { controller.selectConfig(name) } catch (_: Exception) { }; configMenu = false; onChanged() } }
+    if (coreMenu) SelectDialog("核心选择", controller.cores(), state.core, { coreMenu = false }) {
+        controller.setCore(it); coreMenu = false; onChanged()
+    }
+    if (modeMenu) SelectDialog("运行模式", controller.modes(), state.mode, { modeMenu = false }) {
+        controller.setMode(it); modeMenu = false; onChanged()
+    }
+    if (ipv6Menu) SelectDialog("IPv6", controller.ipv6Modes(), state.ipv6, { ipv6Menu = false }) {
+        controller.setIpv6(it); ipv6Menu = false; onChanged()
+    }
+    if (configMenu) SelectDialog("配置选择", configs.map { it to it }, state.config, { configMenu = false }) { name ->
+        activity.lifecycleScope.launch {
+            try { controller.selectConfig(name) } catch (_: Exception) { }
+            configMenu = false
+            onChanged()
+        }
+    }
 }
 
-private data class ProxyActionItem(val icon: androidx.compose.ui.graphics.vector.ImageVector, val title: String, val subtitle: String, val action: () -> Unit)
+private data class ProxyActionItem(
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val title: String,
+    val subtitle: String,
+    val action: () -> Unit,
+)
 
 @Composable
 private fun ActionGroup(items: List<ProxyActionItem>) {
@@ -612,7 +778,9 @@ private fun ActionGroup(items: List<ProxyActionItem>) {
         Column(Modifier.padding(horizontal = 17.dp, vertical = 4.dp)) {
             items.forEachIndexed { index, item ->
                 Row(Modifier.fillMaxWidth().clickable(onClick = item.action).padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Surface(shape = RoundedCornerShape(14.dp), color = tokens.elevatedCardBackground, modifier = Modifier.size(44.dp)) { Box(contentAlignment = Alignment.Center) { Icon(item.icon, null, tint = MaterialTheme.colorScheme.primary) } }
+                    Surface(shape = RoundedCornerShape(14.dp), color = tokens.elevatedCardBackground, modifier = Modifier.size(44.dp)) {
+                        Box(contentAlignment = Alignment.Center) { Icon(item.icon, null, tint = MaterialTheme.colorScheme.primary) }
+                    }
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(item.title, color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall)
@@ -629,7 +797,11 @@ private fun ActionGroup(items: List<ProxyActionItem>) {
 @Composable
 private fun PageHeader(title: String, subtitle: String, onBack: (() -> Unit)?, onRefresh: (() -> Unit)?) {
     val tokens = LocalBichenTokens.current
-    Row(Modifier.fillMaxWidth().statusBarsPadding().padding(top = 12.dp, bottom = 7.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(
+        Modifier.fillMaxWidth().statusBarsPadding().padding(top = 12.dp, bottom = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         if (onBack != null) RoundIcon(Icons.AutoMirrored.Rounded.ArrowBack, "返回", onBack)
         Column(Modifier.weight(1f)) {
             Text(title, color = tokens.textPrimary, fontSize = 30.sp, fontWeight = FontWeight.Bold)
@@ -641,11 +813,19 @@ private fun PageHeader(title: String, subtitle: String, onBack: (() -> Unit)?, o
 
 @Composable
 private fun RoundIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, desc: String, onClick: () -> Unit) {
-    Surface(shape = CircleShape, color = LocalBichenTokens.current.cardBackground, shadowElevation = 1.dp, modifier = Modifier.size(44.dp)) { IconButton(onClick = onClick) { Icon(icon, desc, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp)) } }
+    Surface(shape = CircleShape, color = LocalBichenTokens.current.cardBackground, shadowElevation = 1.dp, modifier = Modifier.size(44.dp)) {
+        IconButton(onClick = onClick) { Icon(icon, desc, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp)) }
+    }
 }
 
 @Composable
-private fun HomeActionCard(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, subtitle: String, modifier: Modifier, onClick: () -> Unit) {
+private fun HomeActionCard(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String,
+    modifier: Modifier,
+    onClick: () -> Unit,
+) {
     val tokens = LocalBichenTokens.current
     Surface(modifier = modifier.clickable(onClick = onClick), shape = RoundedCornerShape(22.dp), color = tokens.cardBackground) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -704,8 +884,28 @@ private fun SettingSwitch(title: String, checked: Boolean, onChange: (Boolean) -
 }
 
 @Composable
-private fun SelectDialog(title: String, options: List<Pair<String, String>>, current: String, dismiss: () -> Unit, select: (String) -> Unit) {
-    AlertDialog(onDismissRequest = dismiss, title = { Text(title) }, text = { Column { options.forEach { (id, label) -> Row(Modifier.fillMaxWidth().clickable { select(id) }.padding(vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) { Text(label, Modifier.weight(1f)); if (id == current || label == current) Icon(Icons.Rounded.Check, null, tint = MaterialTheme.colorScheme.primary) } } } }, confirmButton = { TextButton(onClick = dismiss) { Text("关闭") } })
+private fun SelectDialog(
+    title: String,
+    options: List<Pair<String, String>>,
+    current: String,
+    dismiss: () -> Unit,
+    select: (String) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = dismiss,
+        title = { Text(title) },
+        text = {
+            Column {
+                options.forEach { (id, label) ->
+                    Row(Modifier.fillMaxWidth().clickable { select(id) }.padding(vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(label, Modifier.weight(1f))
+                        if (id == current || label == current) Icon(Icons.Rounded.Check, null, tint = MaterialTheme.colorScheme.primary)
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = dismiss) { Text("关闭") } },
+    )
 }
 
 @Composable
@@ -727,7 +927,10 @@ private fun prettyGroupType(type: String): String = when (type.lowercase()) {
 }
 
 private fun videoGroupPriority(name: String): Int {
-    val order = listOf("节点选择", "手动选择", "故障转移", "香港节点", "台湾节点", "日本节点", "新加坡节点", "韩国节点", "美国节点", "AI 稳定", "AI 平台", "YouTube", "Google", "TikTok", "Telegram", "GitHub", "Emby", "Netflix", "Spotify", "Windows", "Apple", "Game", "Download", "bilibili")
+    val order = listOf(
+        "节点选择", "手动选择", "故障转移", "香港节点", "台湾节点", "日本节点", "新加坡节点", "韩国节点", "美国节点",
+        "AI 稳定", "AI 平台", "YouTube", "Google", "TikTok", "Telegram", "GitHub", "Emby", "Netflix", "Spotify", "Windows", "Apple", "Game", "Download", "bilibili",
+    )
     val i = order.indexOfFirst { key -> name.contains(key, true) }
     return if (i < 0) 9999 else i
 }
