@@ -1,7 +1,10 @@
 package io.github.xgl34222220.bichen
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -39,9 +42,36 @@ internal data class ProxyConnectionUi(
     val id: String,
     val host: String,
     val rule: String,
+    val rulePayload: String,
     val chain: String,
     val upload: Long,
     val download: Long,
+    val network: String = "",
+    val inbound: String = "",
+    val uid: Int = -1,
+    val process: String = "",
+    val appName: String = "",
+    val packageName: String = "",
+    val appIcon: Bitmap? = null,
+)
+
+internal data class ProxyRuleUi(
+    val index: Int,
+    val type: String,
+    val payload: String,
+    val proxy: String,
+    val size: Int = -1,
+    val disabled: Boolean = false,
+    val hitCount: Long = 0L,
+)
+
+internal data class ProxyRuleProviderUi(
+    val name: String,
+    val behavior: String,
+    val ruleCount: Int,
+    val type: String,
+    val vehicleType: String,
+    val updatedAt: String,
 )
 
 internal data class ProxySubscriptionUi(val name: String, val url: String, val placeholder: Boolean)
@@ -133,18 +163,26 @@ internal class ProxyComposeController(context: Context) {
     }
 
     suspend fun stop(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) { root.stop { onProgress(it) } }
-
     suspend fun select(group: String, node: String) = withContext(Dispatchers.IO) { api.select(group, node) }
     suspend fun delay(node: String): Long = withContext(Dispatchers.IO) { api.delay(node) }
     suspend fun closeAll() = withContext(Dispatchers.IO) { api.closeAll() }
+    suspend fun closeConnection(id: String) = withContext(Dispatchers.IO) { api.closeConnection(id) }
     suspend fun diagnostics(): String = withContext(Dispatchers.IO) { root.diagnostics() }
     suspend fun startupConfig(): String = withContext(Dispatchers.IO) { root.prepare(ProxyRuntimeProfile.load(prefs)).startup }
 
-    /**
-     * Prefer Mihomo's native group URLTest for global testing. It performs the fan-out inside the
-     * core instead of opening a burst of controller sockets from the UI. Any uncovered leaf nodes
-     * fall back to the individual endpoint with the controller's own small concurrency gate.
-     */
+    suspend fun rules(): List<ProxyRuleUi> = withContext(Dispatchers.IO) {
+        parseRules(api.rules())
+    }
+
+    suspend fun ruleProviders(): List<ProxyRuleProviderUi> = withContext(Dispatchers.IO) {
+        parseRuleProviders(api.ruleProviders())
+    }
+
+    suspend fun updateRuleProvider(name: String) = withContext(Dispatchers.IO) {
+        api.updateRuleProvider(name)
+    }
+
+    /** Prefer Mihomo's native group URLTest, then fill only uncovered leaf nodes individually. */
     suspend fun globalDelay(): Map<String, Long> = withContext(Dispatchers.IO) {
         val raw = api.proxies()
         val leaves = LinkedHashSet<String>()
@@ -172,9 +210,7 @@ internal class ProxyComposeController(context: Context) {
                 if (groupName in testedGroups) continue
                 val all = raw.optJSONObject(groupName)?.optJSONArray("all") ?: continue
                 var coverage = 0
-                for (i in 0 until all.length()) {
-                    if (all.optString(i) in pending) coverage++
-                }
+                for (i in 0 until all.length()) if (all.optString(i) in pending) coverage++
                 if (coverage > bestCoverage) {
                     bestCoverage = coverage
                     bestGroup = groupName
@@ -217,12 +253,11 @@ internal class ProxyComposeController(context: Context) {
             }
             for ((name, value) in part) result[name] = value
         }
-
         for (name in leaves) if (name !in result) result[name] = -1L
         result
     }
 
-    /** Cache config-declared group icons. Cached files are never re-downloaded on ordinary refresh. */
+    /** Cache config-declared group icons; ordinary refresh only downloads files that are absent. */
     suspend fun ensureIcons(): Int = withContext(Dispatchers.IO) {
         val profile = ProxyRuntimeProfile.load(prefs)
         val entry = configs.selected(profile.core) ?: return@withContext 0
@@ -331,10 +366,7 @@ internal class ProxyComposeController(context: Context) {
                 if (history != null) {
                     for (historyIndex in history.length() - 1 downTo 0) {
                         val value = history.optJSONObject(historyIndex)?.optLong("delay", -1L) ?: -1L
-                        if (value > 0L) {
-                            lastDelay = value
-                            break
-                        }
+                        if (value > 0L) { lastDelay = value; break }
                     }
                 }
                 nodes += ProxyNodeUi(
@@ -365,16 +397,98 @@ internal class ProxyComposeController(context: Context) {
             val meta = c.optJSONObject("metadata") ?: JSONObject()
             val chains = c.optJSONArray("chains") ?: JSONArray()
             val chain = (0 until chains.length()).joinToString(" → ") { chains.optString(it) }
+            val rawHost = meta.optString("host").ifBlank { meta.optString("destinationIP", "未知目标") }
+            val port = meta.optString("destinationPort")
+            val host = if (port.isNotBlank() && !rawHost.endsWith(":$port")) "$rawHost:$port" else rawHost
+            val appIdentity = resolveApp(meta)
             out += ProxyConnectionUi(
                 id = c.optString("id", i.toString()),
-                host = meta.optString("host", meta.optString("destinationIP", "未知目标")),
+                host = host,
                 rule = c.optString("rule", ""),
+                rulePayload = c.optString("rulePayload", ""),
                 chain = chain,
                 upload = c.optLong("upload", 0L),
                 download = c.optLong("download", 0L),
+                network = listOf(meta.optString("network"), meta.optString("type")).filter { it.isNotBlank() }.joinToString(" · "),
+                inbound = meta.optString("inboundName").ifBlank { meta.optString("type") },
+                uid = appIdentity.uid,
+                process = meta.optString("process").ifBlank { meta.optString("processPath") },
+                appName = appIdentity.label,
+                packageName = appIdentity.packageName,
+                appIcon = appIdentity.icon,
             )
         }
         return out
+    }
+
+    private data class AppIdentity(val uid: Int, val packageName: String, val label: String, val icon: Bitmap?)
+
+    private fun resolveApp(meta: JSONObject): AppIdentity {
+        val uid = meta.optInt("uid", -1)
+        val process = meta.optString("process").substringBefore(':')
+        val pm = app.packageManager
+        val candidates = LinkedHashSet<String>()
+        if (uid > 0) pm.getPackagesForUid(uid)?.forEach { candidates += it }
+        if (process.contains('.')) candidates += process
+        val packageName = candidates.firstOrNull { pkg ->
+            try { pm.getApplicationInfo(pkg, 0); true } catch (_: Exception) { false }
+        }.orEmpty()
+        if (packageName.isBlank()) return AppIdentity(uid, "", process, null)
+        return try {
+            val info = pm.getApplicationInfo(packageName, 0)
+            AppIdentity(uid, packageName, pm.getApplicationLabel(info).toString(), loadIcon(packageName))
+        } catch (_: Exception) {
+            AppIdentity(uid, packageName, packageName, null)
+        }
+    }
+
+    private fun loadIcon(packageName: String): Bitmap? = try {
+        val drawable = app.packageManager.getApplicationIcon(packageName)
+        val size = 72
+        if (drawable is BitmapDrawable) Bitmap.createScaledBitmap(drawable.bitmap, size, size, true)
+        else Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888).also { bitmap ->
+            val canvas = Canvas(bitmap)
+            drawable.setBounds(0, 0, size, size)
+            drawable.draw(canvas)
+        }
+    } catch (_: Exception) { null }
+
+    private fun parseRules(root: JSONObject): List<ProxyRuleUi> {
+        val array = root.optJSONArray("rules") ?: JSONArray()
+        val out = ArrayList<ProxyRuleUi>(array.length())
+        for (i in 0 until array.length()) {
+            val r = array.optJSONObject(i) ?: continue
+            val extra = r.optJSONObject("extra")
+            out += ProxyRuleUi(
+                index = r.optInt("index", i),
+                type = r.optString("type", "Rule"),
+                payload = r.optString("payload", ""),
+                proxy = r.optString("proxy", ""),
+                size = r.optInt("size", -1),
+                disabled = extra?.optBoolean("disabled", false) ?: false,
+                hitCount = extra?.optLong("hitCount", 0L) ?: 0L,
+            )
+        }
+        return out
+    }
+
+    private fun parseRuleProviders(root: JSONObject): List<ProxyRuleProviderUi> {
+        val providers = root.optJSONObject("providers") ?: JSONObject()
+        val out = ArrayList<ProxyRuleProviderUi>()
+        val names = providers.keys()
+        while (names.hasNext()) {
+            val name = names.next()
+            val p = providers.optJSONObject(name) ?: continue
+            out += ProxyRuleProviderUi(
+                name = name,
+                behavior = p.optString("behavior", "Domain"),
+                ruleCount = p.optInt("ruleCount", p.optInt("count", 0)),
+                type = p.optString("type", "Rule"),
+                vehicleType = p.optString("vehicleType", p.optString("vehicle", "HTTP")),
+                updatedAt = p.optString("updatedAt", ""),
+            )
+        }
+        return out.sortedBy { it.name.lowercase(Locale.ROOT) }
     }
 
     private fun parseGroupIcons(text: String): Map<String, String> {
@@ -390,9 +504,8 @@ internal class ProxyComposeController(context: Context) {
             }
             if (trimmed.isEmpty() || trimmed.startsWith("#")) continue
             if (indent == 0) break
-            if (trimmed.startsWith("- name:")) {
-                name = yamlScalar(trimmed.substringAfter("- name:"))
-            } else if (name != null && trimmed.startsWith("icon:")) {
+            if (trimmed.startsWith("- name:")) name = yamlScalar(trimmed.substringAfter("- name:"))
+            else if (name != null && trimmed.startsWith("icon:")) {
                 val value = yamlScalar(trimmed.substringAfter("icon:"))
                 if (value.startsWith("https://")) out[name] = value
             }
@@ -407,16 +520,12 @@ internal class ProxyComposeController(context: Context) {
         var cut = s.length
         for (i in s.indices) {
             val c = s[i]
-            if ((c == '\'' || c == '"')) {
+            if (c == '\'' || c == '"') {
                 if (quote == '\u0000') quote = c else if (quote == c) quote = '\u0000'
-            } else if (c == '#' && quote == '\u0000') {
-                cut = i; break
-            }
+            } else if (c == '#' && quote == '\u0000') { cut = i; break }
         }
         var out = s.substring(0, cut).trim()
-        if (out.length >= 2 && ((out.first() == '\'' && out.last() == '\'') || (out.first() == '"' && out.last() == '"'))) {
-            out = out.substring(1, out.length - 1)
-        }
+        if (out.length >= 2 && ((out.first() == '\'' && out.last() == '\'') || (out.first() == '"' && out.last() == '"'))) out = out.substring(1, out.length - 1)
         return out.replace("''", "'")
     }
 }
