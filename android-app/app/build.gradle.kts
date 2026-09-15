@@ -1,6 +1,18 @@
+import org.gradle.api.tasks.Sync
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
+}
+
+val generatedRuleAssets = layout.buildDirectory.dir("generated/bichen-rule-assets")
+val syncBichenRuleAssets = tasks.register<Sync>("syncBichenRuleAssets") {
+    from(rootProject.file("../module/sources.tsv"))
+    from(rootProject.file("../module/rules")) {
+        into("rules")
+        include("adaway.txt", "china.txt", "tracking.txt", "hagezi.txt")
+    }
+    into(generatedRuleAssets)
 }
 
 android {
@@ -11,13 +23,17 @@ android {
         applicationId = "io.github.xgl34222220.bichen"
         minSdk = 26
         targetSdk = 35
-        versionCode = 420
-        versionName = "0.4.0-test.20"
+        versionCode = 421
+        versionName = "0.4.0-test.21"
     }
 
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    sourceSets {
+        getByName("main").assets.srcDir(generatedRuleAssets)
     }
 
     buildTypes {
@@ -41,6 +57,10 @@ android {
             useLegacyPackaging = true
         }
     }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn(syncBichenRuleAssets)
 }
 
 dependencies {
