@@ -2,7 +2,6 @@ package io.github.xgl34222220.bichen
 
 import android.annotation.SuppressLint
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -14,6 +13,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Refresh
@@ -46,12 +46,23 @@ class ProxyWebUiActivity : ComponentActivity() {
 private fun ProxyWebUiScreen(onClose: () -> Unit) {
     val context = LocalContext.current
     val tokens = LocalBichenTokens.current
-    val secret = remember {
-        context.getSharedPreferences("bichen", 0).getString("proxyControllerSecret", "").orEmpty()
-    }
+    val inspector = remember { ProxyRuntimeInspector(context) }
+    val secret = remember { inspector.controllerSecret() }
+    var ready by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf("") }
     var progress by remember { mutableIntStateOf(0) }
-    val webView = remember {
-        WebView(context).apply {
+
+    LaunchedEffect(Unit) {
+        try {
+            inspector.ensureWebUi()
+            ready = true
+        } catch (e: Exception) {
+            error = e.message ?: "WebUI 准备失败"
+        }
+    }
+
+    val webView = remember(ready) {
+        if (!ready) null else WebView(context).apply {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
             settings.allowFileAccess = false
@@ -102,6 +113,7 @@ private fun ProxyWebUiScreen(onClose: () -> Unit) {
     }
 
     DisposableEffect(webView) {
+        if (webView == null) return@DisposableEffect onDispose { }
         val callback = object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (webView.canGoBack()) webView.goBack() else onClose()
@@ -130,13 +142,38 @@ private fun ProxyWebUiScreen(onClose: () -> Unit) {
                 Text("WebUI", color = tokens.textPrimary, style = MaterialTheme.typography.titleLarge)
                 Text("MetaCubeXD · 本机控制接口", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
             }
-            Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-                Surface(onClick = { webView.reload() }, shape = CircleShape, color = tokens.cardBackground, shadowElevation = 1.dp, modifier = Modifier.size(44.dp)) {
-                    Box(contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Refresh, "刷新 WebUI", modifier = Modifier.size(21.dp)) }
+            if (webView != null) {
+                Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                    Surface(onClick = { webView.reload() }, shape = CircleShape, color = tokens.cardBackground, shadowElevation = 1.dp, modifier = Modifier.size(44.dp)) {
+                        Box(contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Refresh, "刷新 WebUI", modifier = Modifier.size(21.dp)) }
+                    }
                 }
             }
         }
-        if (progress in 1..99) LinearProgressIndicator(progress = { progress / 100f }, modifier = Modifier.fillMaxWidth().height(2.dp))
-        AndroidView(factory = { webView }, modifier = Modifier.fillMaxWidth().weight(1f))
+        when {
+            error.isNotBlank() -> {
+                Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+                    Surface(shape = RoundedCornerShape(24.dp), color = tokens.cardBackground) {
+                        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text("WebUI 暂时不可用", color = tokens.textPrimary, style = MaterialTheme.typography.titleMedium)
+                            Text(error, color = tokens.textSecondary, style = MaterialTheme.typography.bodyMedium)
+                            Text("如果这是升级后的第一次打开，请先重启一次代理核心，让新的本地 WebUI 配置生效。", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
+            webView == null -> {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        CircularProgressIndicator()
+                        Text("正在准备 MetaCubeXD…", color = tokens.textSecondary, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+            else -> {
+                if (progress in 1..99) LinearProgressIndicator(progress = { progress / 100f }, modifier = Modifier.fillMaxWidth().height(2.dp))
+                AndroidView(factory = { webView }, modifier = Modifier.fillMaxWidth().weight(1f))
+            }
+        }
     }
 }
