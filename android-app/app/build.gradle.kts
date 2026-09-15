@@ -5,7 +5,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-val generatedRuleAssets = layout.buildDirectory.dir("generated/bichen-rule-assets")
+val generatedRuleAssets = layout.buildDirectory.dir("generated/bichen-rule-assets").get().asFile
 val syncBichenRuleAssets = tasks.register<Sync>("syncBichenRuleAssets") {
     from(rootProject.file("../module/sources.tsv"))
     from(rootProject.file("../module/rules")) {
