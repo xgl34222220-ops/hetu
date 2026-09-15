@@ -37,6 +37,9 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.5.0'
+      - name: Compile Compose UI first
+        working-directory: android-app
+        run: gradle :app:compileDebugKotlin --stacktrace
       - name: Ensure NDK for Mihomo runtime
         run: |
           if [ ! -x "$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang" ]; then
