@@ -23,6 +23,7 @@ internal data class ProxyNodeUi(
     val name: String,
     val type: String = "",
     val udp: Boolean = false,
+    val lastDelay: Long? = null,
 )
 
 internal data class ProxyGroupUi(
@@ -325,10 +326,22 @@ internal class ProxyComposeController(context: Context) {
                 val node = all.optString(i)
                 if (node.isBlank()) continue
                 val nodeInfo = root.optJSONObject(node)
+                val history = nodeInfo?.optJSONArray("history")
+                var lastDelay: Long? = null
+                if (history != null) {
+                    for (historyIndex in history.length() - 1 downTo 0) {
+                        val value = history.optJSONObject(historyIndex)?.optLong("delay", -1L) ?: -1L
+                        if (value > 0L) {
+                            lastDelay = value
+                            break
+                        }
+                    }
+                }
                 nodes += ProxyNodeUi(
                     name = node,
                     type = nodeInfo?.optString("type", "") ?: "",
                     udp = nodeInfo?.optBoolean("udp", false) ?: false,
+                    lastDelay = lastDelay,
                 )
             }
             val iconUrl = iconMap[name].orEmpty()
