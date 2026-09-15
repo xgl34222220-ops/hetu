@@ -92,10 +92,9 @@ internal class ProxyRuntimeInspector(context: Context) {
                 append("Content-Length: 0\r\n")
                 append("Connection: close\r\n\r\n")
             }
-            socket.getOutputStream().use { output ->
-                output.write(request.toByteArray(StandardCharsets.US_ASCII))
-                output.flush()
-            }
+            val output = socket.getOutputStream()
+            output.write(request.toByteArray(StandardCharsets.US_ASCII))
+            output.flush()
             val input = socket.getInputStream().bufferedReader(StandardCharsets.ISO_8859_1)
             val status = input.readLine() ?: error("WebUI 更新没有返回 HTTP 状态")
             val code = status.split(' ').getOrNull(1)?.toIntOrNull() ?: 0
