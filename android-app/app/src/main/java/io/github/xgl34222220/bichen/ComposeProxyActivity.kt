@@ -4,9 +4,9 @@ import android.os.Bundle
 import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.compose.setContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
@@ -24,7 +24,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -95,20 +94,32 @@ private fun ProxyComposeApp(onBack: () -> Unit) {
             key(page) {
                 val enter = remember { Animatable(0f) }
                 LaunchedEffect(Unit) { enter.animateTo(1f, spring(dampingRatio = .86f, stiffness = 430f)) }
-                Box(Modifier.fillMaxSize().padding(bottom = 108.dp).graphicsLayer { translationY = (1f - enter.value) * 10.dp.toPx() }) {
+                Box(
+                    Modifier.fillMaxSize().padding(bottom = 108.dp).graphicsLayer {
+                        alpha = 1f
+                        translationY = (1f - enter.value) * 10.dp.toPx()
+                    },
+                ) {
                     when (page) {
-                        ProxyPage.Home -> ProxyHome(state, progress, onBack, onToggle = {
-                            scope.launch {
-                                progress = if (state.running) "正在停止…" else "正在启动…"
-                                runCatching {
-                                    if (state.running) controller.stop { step -> uiProgress(scope, step) { progress = it } }
-                                    else controller.start { step -> uiProgress(scope, step) { progress = it } }
-                                }.onFailure { progress = it.message ?: "操作失败" }
-                                refresh++
-                                delay(250)
-                                progress = ""
-                            }
-                        }, onPanel = { page = ProxyPage.Panel }, onSettings = { page = ProxyPage.Settings })
+                        ProxyPage.Home -> ProxyHome(
+                            state,
+                            progress,
+                            onBack,
+                            onToggle = {
+                                scope.launch {
+                                    progress = if (state.running) "正在停止…" else "正在启动…"
+                                    runCatching {
+                                        if (state.running) controller.stop { step -> uiProgress(scope, step) { progress = it } }
+                                        else controller.start { step -> uiProgress(scope, step) { progress = it } }
+                                    }.onFailure { progress = it.message ?: "操作失败" }
+                                    refresh++
+                                    delay(250)
+                                    progress = ""
+                                }
+                            },
+                            onPanel = { page = ProxyPage.Panel },
+                            onSettings = { page = ProxyPage.Settings },
+                        )
                         ProxyPage.Panel -> ProxyPanel(state, controller) { refresh++ }
                         ProxyPage.Tools -> ProxyTools(state, controller, onPanel = { page = ProxyPage.Panel })
                         ProxyPage.Settings -> ProxySettings(state, controller) { refresh++ }
@@ -135,74 +146,154 @@ private fun uiProgress(scope: kotlinx.coroutines.CoroutineScope, value: String, 
 private fun ProxyBackdrop(dark: Boolean) {
     val tokens = LocalBichenTokens.current
     val scheme = MaterialTheme.colorScheme
-    Box(Modifier.fillMaxSize().background(tokens.pageBackground).drawBehind {
-        drawRect(Brush.radialGradient(listOf(scheme.primary.copy(alpha = if (dark) .09f else .11f), Color.Transparent), center = Offset(size.width * .88f, 0f), radius = size.width * .86f))
-        drawRect(Brush.radialGradient(listOf(scheme.secondary.copy(alpha = if (dark) .05f else .07f), Color.Transparent), center = Offset(0f, size.height * .75f), radius = size.width))
-    })
+    Box(
+        Modifier.fillMaxSize().background(tokens.pageBackground).drawBehind {
+            drawRect(
+                Brush.radialGradient(
+                    listOf(scheme.primary.copy(alpha = if (dark) .09f else .10f), Color.Transparent),
+                    center = Offset(size.width * .92f, size.height * .02f),
+                    radius = size.width * .85f,
+                ),
+            )
+            drawRect(
+                Brush.radialGradient(
+                    listOf(scheme.secondary.copy(alpha = if (dark) .06f else .07f), Color.Transparent),
+                    center = Offset(size.width * .04f, size.height * .82f),
+                    radius = size.width,
+                ),
+            )
+        },
+    )
 }
 
 @Composable
-private fun ProxyHeader(kicker: String, title: String, subtitle: String, onBack: (() -> Unit)? = null, action: (() -> Unit)? = null) {
+private fun ProxyHeader(
+    kicker: String,
+    title: String,
+    subtitle: String,
+    onBack: (() -> Unit)? = null,
+    action: (() -> Unit)? = null,
+) {
     val tokens = LocalBichenTokens.current
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        Modifier.fillMaxWidth().statusBarsPadding().heightIn(min = 64.dp).padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         if (onBack != null) {
-            IconButton(onClick = onBack, modifier = Modifier.size(46.dp)) { Icon(Icons.Rounded.ArrowBack, null) }
-            Spacer(Modifier.width(6.dp))
-        }
-        Column(Modifier.weight(1f)) {
-            Text(kicker, color = MaterialTheme.colorScheme.primary, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.4.sp)
-            Text(title, color = tokens.textPrimary, fontSize = 36.sp, lineHeight = 42.sp, fontWeight = FontWeight.Black)
-            Text(subtitle, color = tokens.textSecondary, fontSize = 12.sp)
-        }
-        if (action != null) {
-            Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = tokens.elevatedCardBackground), elevation = CardDefaults.cardElevation(4.dp)) {
-                IconButton(onClick = action, modifier = Modifier.size(50.dp)) { Icon(Icons.Rounded.Refresh, null) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ProxyHome(state: ProxyComposeState, progress: String, onBack: () -> Unit, onToggle: () -> Unit, onPanel: () -> Unit, onSettings: () -> Unit) {
-    val tokens = LocalBichenTokens.current
-    val primary = MaterialTheme.colorScheme.primary
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp, 10.dp, 16.dp, 28.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { ProxyHeader("ROOT PROXY", "代理", "${state.core} · ${state.mode}", onBack = onBack) }
-        item {
-            val shape = RoundedCornerShape(30.dp)
-            Card(Modifier.fillMaxWidth().shadow(8.dp, shape, clip = false), shape = shape, colors = CardDefaults.cardColors(containerColor = tokens.cardBackground)) {
-                Box(Modifier.fillMaxWidth().drawBehind {
-                    drawCircle(Brush.radialGradient(listOf(primary.copy(alpha = .18f), Color.Transparent), center = Offset(size.width, 0f), radius = size.width * .78f), radius = size.width * .78f, center = Offset(size.width, 0f))
-                }.padding(20.dp)) {
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.size(10.dp).background(if (state.running) tokens.success else tokens.warning, CircleShape))
-                            Spacer(Modifier.width(8.dp))
-                            Text(if (state.running) "Root 透明代理正在运行" else "Root 透明代理未运行", color = tokens.textSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-                        Spacer(Modifier.height(18.dp))
-                        Text(if (state.running) "已连接" else "准备就绪", color = tokens.textPrimary, fontSize = 36.sp, lineHeight = 42.sp, fontWeight = FontWeight.Black)
-                        Text(state.config, color = tokens.textSecondary, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
-                        Spacer(Modifier.height(20.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            ProxyMetric(formatBytes(state.downloadTotal), "下载", Modifier.weight(1f))
-                            ProxyMetric(formatBytes(state.uploadTotal), "上传", Modifier.weight(1f))
-                            ProxyMetric(state.connections.size.toString(), "连接", Modifier.weight(1f))
-                        }
-                        if (progress.isNotBlank()) {
-                            Spacer(Modifier.height(14.dp)); Text(progress, color = primary, fontSize = 12.sp)
-                        }
-                        Spacer(Modifier.height(18.dp))
-                        Button(onClick = onToggle, Modifier.fillMaxWidth().height(54.dp), shape = RoundedCornerShape(20.dp)) {
-                            Icon(if (state.running) Icons.Rounded.Stop else Icons.Rounded.PowerSettingsNew, null)
-                            Spacer(Modifier.width(8.dp)); Text(if (state.running) "停止代理" else "启动代理", fontWeight = FontWeight.Bold)
-                        }
+            Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                Surface(
+                    modifier = Modifier.size(44.dp),
+                    shape = CircleShape,
+                    color = tokens.cardBackground,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    shadowElevation = 1.dp,
+                ) {
+                    IconButton(onClick = onBack, modifier = Modifier.fillMaxSize()) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回", Modifier.size(21.dp))
                     }
                 }
             }
         }
-        item { ProxySection("QUICK ACCESS", "常用入口", "策略、节点与配置") }
-        item {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                title,
+                color = tokens.textPrimary,
+                fontSize = 26.sp,
+                lineHeight = 34.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (subtitle.isNotBlank()) {
+                Text(subtitle, color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        if (action != null) {
+            Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                Surface(
+                    modifier = Modifier.size(44.dp),
+                    shape = CircleShape,
+                    color = tokens.cardBackground,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    shadowElevation = 1.dp,
+                ) {
+                    IconButton(onClick = action, modifier = Modifier.fillMaxSize()) {
+                        Icon(Icons.Rounded.Refresh, "刷新", Modifier.size(21.dp))
+                    }
+                }
+            }
+        }
+    }
+    @Suppress("UNUSED_VARIABLE") val compactKicker = kicker
+}
+
+@Composable
+private fun ProxyHome(
+    state: ProxyComposeState,
+    progress: String,
+    onBack: () -> Unit,
+    onToggle: () -> Unit,
+    onPanel: () -> Unit,
+    onSettings: () -> Unit,
+) {
+    val tokens = LocalBichenTokens.current
+    val scheme = MaterialTheme.colorScheme
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        item("header") { ProxyHeader("ROOT PROXY", "代理", "${state.core} · ${state.mode}", onBack = onBack) }
+        item("hero") {
+            Surface(shape = RoundedCornerShape(28.dp), color = tokens.cardBackground, shadowElevation = 2.dp) {
+                Column(
+                    Modifier.fillMaxWidth()
+                        .background(Brush.linearGradient(listOf(scheme.primaryContainer.copy(alpha = .46f), tokens.cardBackground)))
+                        .padding(22.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(shape = CircleShape, color = tokens.cardBackground.copy(alpha = .72f)) {
+                            Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Box(Modifier.size(6.dp).background(if (state.running) tokens.success else tokens.warning, CircleShape))
+                                Spacer(Modifier.width(6.dp))
+                                Text(if (state.running) "透明代理已开启" else "透明代理未开启", color = tokens.textPrimary, style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(state.config, color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
+                        Text(
+                            if (state.running) "已连接" else "准备就绪",
+                            color = tokens.textPrimary,
+                            fontSize = 24.sp,
+                            lineHeight = 32.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        ProxyMetric(formatBytes(state.downloadTotal), "下载", Modifier.weight(1f))
+                        ProxyMetric(formatBytes(state.uploadTotal), "上传", Modifier.weight(1f))
+                        ProxyMetric(state.connections.size.toString(), "连接", Modifier.weight(1f))
+                    }
+                    if (progress.isNotBlank()) {
+                        Text(progress, color = scheme.primary, style = MaterialTheme.typography.bodySmall)
+                    }
+                    Button(
+                        onClick = onToggle,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp),
+                        shape = RoundedCornerShape(18.dp),
+                    ) {
+                        Icon(if (state.running) Icons.Rounded.Stop else Icons.Rounded.PowerSettingsNew, null, Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(if (state.running) "停止代理" else "启动代理", style = MaterialTheme.typography.labelLarge)
+                    }
+                }
+            }
+        }
+        item("quick-heading") { ProxySection("QUICK ACCESS", "常用入口", "策略、节点与配置") }
+        item("quick") {
             ProxyActionGroup(
                 listOf(
                     Triple(Icons.Rounded.Public, "策略组与节点", if (state.panelReady) "真实 Clash API 已连接" else "启动后读取策略组") to onPanel,
@@ -211,8 +302,12 @@ private fun ProxyHome(state: ProxyComposeState, progress: String, onBack: () -> 
                 ),
             )
         }
-        if (state.message.isNotBlank() && !state.message.contains("尚未启动")) item {
-            Surface(shape = RoundedCornerShape(22.dp), color = MaterialTheme.colorScheme.errorContainer) { Text(state.message, Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onErrorContainer, fontSize = 12.sp) }
+        if (state.message.isNotBlank() && !state.message.contains("尚未启动")) {
+            item("message") {
+                Surface(shape = RoundedCornerShape(24.dp), color = scheme.errorContainer) {
+                    Text(state.message, Modifier.padding(18.dp), color = scheme.onErrorContainer, style = MaterialTheme.typography.bodySmall)
+                }
+            }
         }
     }
 }
@@ -226,56 +321,116 @@ private fun ProxyPanel(state: ProxyComposeState, controller: ProxyComposeControl
     val scope = rememberCoroutineScope()
     val delays = remember { mutableStateMapOf<String, Long>() }
     val tokens = LocalBichenTokens.current
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp, 10.dp, 16.dp, 28.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        item { ProxyHeader("CLASH PANEL", "面板", if (state.panelReady) "已连接当前运行核心" else "策略接口等待核心启动", action = onRefresh) }
-        item {
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item("header") { ProxyHeader("CLASH PANEL", "面板", if (state.panelReady) "已连接当前运行核心" else "策略接口等待核心启动", action = onRefresh) }
+        item("tabs") {
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                 SegmentedButton(selected = tab == 0, onClick = { tab = 0 }, shape = SegmentedButtonDefaults.itemShape(0, 2)) { Text("策略组") }
                 SegmentedButton(selected = tab == 1, onClick = { tab = 1 }, shape = SegmentedButtonDefaults.itemShape(1, 2)) { Text("连接") }
             }
         }
         if (tab == 0) {
-            item { OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), placeholder = { Text("搜索策略组或当前节点") }, leadingIcon = { Icon(Icons.Rounded.Search, null) }, singleLine = true, shape = RoundedCornerShape(18.dp)) }
+            item("search") {
+                TextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("搜索策略组或当前节点") },
+                    leadingIcon = { Icon(Icons.Rounded.Search, null) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(20.dp),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = tokens.elevatedCardBackground,
+                        unfocusedContainerColor = tokens.elevatedCardBackground,
+                        disabledContainerColor = tokens.elevatedCardBackground,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                        disabledIndicatorColor = Color.Transparent,
+                    ),
+                )
+            }
             val groups = state.groups.filter { query.isBlank() || it.name.contains(query, true) || it.now.contains(query, true) }
-            if (groups.isEmpty()) item { ProxyEmpty(if (state.running) "没有可显示的策略组" else "代理尚未运行", if (state.running) "当前配置没有 Selector / URLTest 组。" else "启动代理后可选择策略组与节点。") }
+            if (groups.isEmpty()) {
+                item("empty-groups") {
+                    ProxyEmpty(
+                        if (state.running) "没有可显示的策略组" else "代理尚未运行",
+                        if (state.running) "当前配置没有 Selector / URLTest 组。" else "启动代理后可选择策略组与节点。",
+                    )
+                }
+            }
             items(groups, key = { it.name }) { group ->
-                Card(Modifier.fillMaxWidth().clickable { selectedGroup = group }, shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = tokens.cardBackground)) {
-                    Column(Modifier.padding(16.dp)) {
-                        Row { Text(group.name, Modifier.weight(1f), color = tokens.textPrimary, fontWeight = FontWeight.Bold); Text(group.type, color = tokens.textSecondary, fontSize = 11.sp) }
-                        Spacer(Modifier.height(7.dp)); Text(group.now, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                        Text("${group.nodes.size} 个节点 · 点击选择与测速", color = tokens.textSecondary, fontSize = 11.sp)
+                Surface(
+                    modifier = Modifier.fillMaxWidth().clickable { selectedGroup = group },
+                    shape = RoundedCornerShape(24.dp),
+                    color = tokens.cardBackground,
+                    shadowElevation = 1.dp,
+                ) {
+                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(group.name, Modifier.weight(1f), color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall)
+                            Text(group.type, color = tokens.textSecondary, style = MaterialTheme.typography.labelSmall)
+                        }
+                        Text(group.now, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleSmall)
+                        Text("${group.nodes.size} 个节点 · 点击选择与测速", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
         } else {
-            item {
+            item("traffic") {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     ProxyStatusMetric("下载", formatBytes(state.downloadTotal), Modifier.weight(1f))
                     ProxyStatusMetric("上传", formatBytes(state.uploadTotal), Modifier.weight(1f))
                     ProxyStatusMetric("连接", state.connections.size.toString(), Modifier.weight(1f))
                 }
             }
-            item { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text("实时连接与流量", Modifier.weight(1f), color = tokens.textSecondary, fontSize = 11.sp); TextButton(onClick = { scope.launch { runCatching { controller.closeAll() }; onRefresh() } }) { Text("清空连接") } } }
-            if (state.connections.isEmpty()) item { ProxyEmpty("暂无连接", "当前没有可显示的活动连接。") }
+            item("connections-heading") {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.weight(1f)) { ProxySection("LIVE", "实时连接", "当前核心连接与流量") }
+                    TextButton(onClick = { scope.launch { runCatching { controller.closeAll() }; onRefresh() } }) { Text("清空") }
+                }
+            }
+            if (state.connections.isEmpty()) item("empty-connections") { ProxyEmpty("暂无连接", "当前没有可显示的活动连接。") }
             items(state.connections, key = { it.id }) { c ->
-                Card(shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = tokens.cardBackground)) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text(c.host, color = tokens.textPrimary, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        if (c.rule.isNotBlank()) Text(c.rule, color = MaterialTheme.colorScheme.primary, fontSize = 11.sp)
-                        if (c.chain.isNotBlank()) Text(c.chain, color = tokens.textSecondary, fontSize = 11.sp, maxLines = 2)
-                        Spacer(Modifier.height(6.dp)); Text("↑ ${formatBytes(c.upload)}   ↓ ${formatBytes(c.download)}", color = tokens.textSecondary, fontSize = 10.sp)
+                Surface(shape = RoundedCornerShape(24.dp), color = tokens.cardBackground, shadowElevation = 1.dp) {
+                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(c.host, color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        if (c.rule.isNotBlank()) Text(c.rule, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall)
+                        if (c.chain.isNotBlank()) Text(c.chain, color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 2)
+                        Text("↑ ${formatBytes(c.upload)}   ↓ ${formatBytes(c.download)}", color = tokens.textSecondary, style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }
         }
     }
     selectedGroup?.let { group ->
-        NodePicker(group, delays, onDismiss = { selectedGroup = null }, onSelect = { node -> scope.launch { runCatching { controller.select(group.name, node) }; selectedGroup = null; onRefresh() } }, onDelay = { node -> scope.launch { delays[node] = runCatching { controller.delay(node) }.getOrDefault(-1L) } })
+        NodePicker(
+            group,
+            delays,
+            onDismiss = { selectedGroup = null },
+            onSelect = { node ->
+                scope.launch {
+                    runCatching { controller.select(group.name, node) }
+                    selectedGroup = null
+                    onRefresh()
+                }
+            },
+            onDelay = { node -> scope.launch { delays[node] = runCatching { controller.delay(node) }.getOrDefault(-1L) } },
+        )
     }
 }
 
 @Composable
-private fun NodePicker(group: ProxyGroupUi, delays: Map<String, Long>, onDismiss: () -> Unit, onSelect: (String) -> Unit, onDelay: (String) -> Unit) {
+private fun NodePicker(
+    group: ProxyGroupUi,
+    delays: Map<String, Long>,
+    onDismiss: () -> Unit,
+    onSelect: (String) -> Unit,
+    onDelay: (String) -> Unit,
+) {
     var query by remember { mutableStateOf("") }
     val nodes = group.nodes.filter { query.isBlank() || it.contains(query, true) }
     AlertDialog(
@@ -283,15 +438,19 @@ private fun NodePicker(group: ProxyGroupUi, delays: Map<String, Long>, onDismiss
         title = { Text(group.name) },
         text = {
             Column {
-                OutlinedTextField(query, { query = it }, placeholder = { Text("搜索节点") }, singleLine = true)
+                OutlinedTextField(query, { query = it }, placeholder = { Text("搜索节点") }, singleLine = true, shape = RoundedCornerShape(18.dp))
                 Spacer(Modifier.height(8.dp))
                 LazyColumn(Modifier.heightIn(max = 440.dp)) {
                     items(nodes) { node ->
                         Row(Modifier.fillMaxWidth().padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f).clickable { onSelect(node) }) {
-                                Text(node, fontWeight = if (node == group.now) FontWeight.Bold else FontWeight.Normal, color = if (node == group.now) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                                Text(
+                                    node,
+                                    fontWeight = if (node == group.now) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (node == group.now) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                )
                                 val d = delays[node]
-                                Text(if (d == null) "未测速" else if (d < 0) "超时" else "$d ms", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(if (d == null) "未测速" else if (d < 0) "超时" else "$d ms", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             TextButton(onClick = { onDelay(node) }) { Text("测速") }
                         }
@@ -308,20 +467,41 @@ private fun ProxyTools(state: ProxyComposeState, controller: ProxyComposeControl
     val scope = rememberCoroutineScope()
     var dialogTitle by remember { mutableStateOf("") }
     var dialogText by remember { mutableStateOf("") }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp, 10.dp, 16.dp, 28.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { ProxyHeader("RUNTIME TOOLS", "工具", "核心 · 日志 · 启动配置") }
-        item { ProxySection("RUNTIME", "运行与诊断", "只展示真实核心状态") }
-        item {
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        item("header") { ProxyHeader("RUNTIME TOOLS", "工具", "核心 · 日志 · 启动配置") }
+        item("section") { ProxySection("RUNTIME", "运行与诊断", "只展示真实核心状态") }
+        item("actions") {
             ProxyActionGroup(
                 listOf(
-                    Triple(Icons.Rounded.Description, "运行日志", "核心启动 · Root · 透明代理规则") to { scope.launch { dialogTitle = "运行日志"; dialogText = runCatching { controller.diagnostics() }.getOrElse { it.message ?: "读取失败" } } },
-                    Triple(Icons.Rounded.Code, "最终启动配置", "实际交给核心的 startup-config") to { scope.launch { dialogTitle = "最终启动配置"; dialogText = runCatching { controller.startupConfig() }.getOrElse { it.message ?: "读取失败" } } },
+                    Triple(Icons.Rounded.Description, "运行日志", "核心启动 · Root · 透明代理规则") to {
+                        scope.launch {
+                            dialogTitle = "运行日志"
+                            dialogText = runCatching { controller.diagnostics() }.getOrElse { it.message ?: "读取失败" }
+                        }
+                    },
+                    Triple(Icons.Rounded.Code, "最终启动配置", "实际交给核心的 startup-config") to {
+                        scope.launch {
+                            dialogTitle = "最终启动配置"
+                            dialogText = runCatching { controller.startupConfig() }.getOrElse { it.message ?: "读取失败" }
+                        }
+                    },
                     Triple(Icons.Rounded.Public, "策略组与节点", if (state.panelReady) "面板接口已连接" else "面板尚未就绪") to onPanel,
                 ),
             )
         }
     }
-    if (dialogTitle.isNotBlank()) AlertDialog(onDismissRequest = { dialogTitle = "" }, title = { Text(dialogTitle) }, text = { Text(dialogText.take(16000), fontSize = 12.sp) }, confirmButton = { TextButton(onClick = { dialogTitle = "" }) { Text("关闭") } })
+    if (dialogTitle.isNotBlank()) {
+        AlertDialog(
+            onDismissRequest = { dialogTitle = "" },
+            title = { Text(dialogTitle) },
+            text = { Text(dialogText.take(16000), style = MaterialTheme.typography.bodySmall) },
+            confirmButton = { TextButton(onClick = { dialogTitle = "" }) { Text("关闭") } },
+        )
+    }
 }
 
 @Composable
@@ -336,40 +516,57 @@ private fun ProxySettings(state: ProxyComposeState, controller: ProxyComposeCont
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             val name = runCatching {
-                context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c -> if (c.moveToFirst()) c.getString(0) else "config.yaml" }
+                context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+                    if (c.moveToFirst()) c.getString(0) else "config.yaml"
+                }
             }.getOrNull() ?: "config.yaml"
             scope.launch { runCatching { controller.importConfig(uri, name) }; onRefresh() }
         }
     }
     val tokens = LocalBichenTokens.current
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp, 10.dp, 16.dp, 28.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { ProxyHeader("PROXY SETTINGS", "设置", "核心 · 运行模式 · 网络 · 配置", action = onRefresh) }
-        item {
-            Card(shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = tokens.cardBackground)) {
-                Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        item("header") { ProxyHeader("PROXY SETTINGS", "设置", "核心 · 运行模式 · 网络 · 配置", action = onRefresh) }
+        item("base") {
+            Surface(shape = RoundedCornerShape(24.dp), color = tokens.cardBackground, shadowElevation = 1.dp) {
+                Column(Modifier.padding(horizontal = 18.dp, vertical = 5.dp)) {
                     SettingRow("核心选择", state.core) { coreMenu = true }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(.30f))
                     SettingRow("运行模式", state.mode) { modeMenu = true }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(.30f))
                     SettingRow("IPv6", state.ipv6) { ipv6Menu = true }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(.30f))
-                    Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) { Text("自动覆写", color = tokens.textPrimary, fontWeight = FontWeight.SemiBold); Text("源配置保留，运行时生成启动副本", color = tokens.textSecondary, fontSize = 11.sp) }
+                    Row(Modifier.fillMaxWidth().padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text("自动覆写", color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall)
+                            Text("源配置保留，运行时生成启动副本", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
+                        }
                         Switch(checked = state.autoOverwrite, onCheckedChange = { controller.setAutoOverwrite(it); onRefresh() })
                     }
                 }
             }
         }
-        item { ProxySection("CONFIG", "配置选择", "源文件不会被运行逻辑直接修改") }
-        item {
-            Card(shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = tokens.cardBackground)) {
-                Column(Modifier.padding(16.dp)) {
+        item("config-heading") { ProxySection("CONFIG", "配置选择", "源文件不会被运行逻辑直接修改") }
+        item("config") {
+            Surface(shape = RoundedCornerShape(24.dp), color = tokens.cardBackground, shadowElevation = 1.dp) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) { Text(state.config, color = tokens.textPrimary, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.MiddleEllipsis); Text("当前配置", color = tokens.textSecondary, fontSize = 11.sp) }
-                        IconButton(onClick = { importLauncher.launch(arrayOf("application/yaml", "text/yaml", "text/plain", "application/json")) }) { Icon(Icons.Rounded.Add, null) }
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text(state.config, color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
+                            Text("当前配置", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
+                        }
+                        Surface(shape = CircleShape, color = tokens.elevatedCardBackground, modifier = Modifier.size(44.dp)) {
+                            IconButton(onClick = { importLauncher.launch(arrayOf("application/yaml", "text/yaml", "text/plain", "application/json")) }) {
+                                Icon(Icons.Rounded.Add, "导入配置", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(21.dp))
+                            }
+                        }
                     }
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedButton(onClick = { configMenu = true }, Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) { Text("切换已保存配置") }
+                    OutlinedButton(onClick = { configMenu = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = RoundedCornerShape(18.dp)) {
+                        Text("切换已保存配置")
+                    }
                 }
             }
         }
@@ -377,37 +574,75 @@ private fun ProxySettings(state: ProxyComposeState, controller: ProxyComposeCont
     if (coreMenu) SelectDialog("核心选择", controller.cores(), state.core, { coreMenu = false }) { id -> controller.setCore(id); coreMenu = false; onRefresh() }
     if (modeMenu) SelectDialog("运行模式", controller.modes(), state.mode, { modeMenu = false }) { id -> controller.setMode(id); modeMenu = false; onRefresh() }
     if (ipv6Menu) SelectDialog("IPv6", controller.ipv6Modes(), state.ipv6, { ipv6Menu = false }) { id -> controller.setIpv6(id); ipv6Menu = false; onRefresh() }
-    if (configMenu) SelectDialog("配置选择", configs.map { it to it }, state.config, { configMenu = false }) { name -> scope.launch { runCatching { controller.selectConfig(name) }; configMenu = false; onRefresh() } }
+    if (configMenu) SelectDialog("配置选择", configs.map { it to it }, state.config, { configMenu = false }) { name ->
+        scope.launch { runCatching { controller.selectConfig(name) }; configMenu = false; onRefresh() }
+    }
 }
 
 @Composable
 private fun SettingRow(title: String, value: String, click: () -> Unit) {
     val tokens = LocalBichenTokens.current
-    Row(Modifier.fillMaxWidth().clickable(onClick = click).padding(vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(title, Modifier.weight(1f), color = tokens.textPrimary, fontWeight = FontWeight.SemiBold)
-        Text(value, color = tokens.textSecondary, fontSize = 13.sp)
-        Spacer(Modifier.width(5.dp)); Icon(Icons.Rounded.ChevronRight, null, tint = tokens.textSecondary)
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = click).padding(vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(title, Modifier.weight(1f), color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall)
+        Text(value, color = tokens.textSecondary, style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.width(5.dp))
+        Icon(Icons.Rounded.ChevronRight, null, tint = tokens.textSecondary, modifier = Modifier.size(20.dp))
     }
 }
 
 @Composable
-private fun SelectDialog(title: String, options: List<Pair<String, String>>, current: String, dismiss: () -> Unit, select: (String) -> Unit) {
-    AlertDialog(onDismissRequest = dismiss, title = { Text(title) }, text = {
-        Column { options.forEach { (id, label) -> Row(Modifier.fillMaxWidth().clickable { select(id) }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) { Text(label, Modifier.weight(1f)); if (label == current || id == current) Icon(Icons.Rounded.Check, null, tint = MaterialTheme.colorScheme.primary) } } }
-    }, confirmButton = { TextButton(onClick = dismiss) { Text("关闭") } })
+private fun SelectDialog(
+    title: String,
+    options: List<Pair<String, String>>,
+    current: String,
+    dismiss: () -> Unit,
+    select: (String) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = dismiss,
+        title = { Text(title) },
+        text = {
+            Column {
+                options.forEach { (id, label) ->
+                    Row(
+                        Modifier.fillMaxWidth().clickable { select(id) }.padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(label, Modifier.weight(1f))
+                        if (label == current || id == current) Icon(Icons.Rounded.Check, null, tint = MaterialTheme.colorScheme.primary)
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = dismiss) { Text("关闭") } },
+    )
 }
 
 @Composable
 private fun ProxyActionGroup(items: List<Pair<Triple<androidx.compose.ui.graphics.vector.ImageVector, String, String>, () -> Unit>>) {
     val tokens = LocalBichenTokens.current
-    Card(shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = tokens.cardBackground)) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+    Surface(shape = RoundedCornerShape(24.dp), color = tokens.cardBackground, shadowElevation = 1.dp) {
+        Column(Modifier.padding(horizontal = 18.dp, vertical = 5.dp)) {
             items.forEachIndexed { index, item ->
                 val (data, action) = item
-                Row(Modifier.fillMaxWidth().clickable(onClick = action).padding(vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Surface(shape = RoundedCornerShape(15.dp), color = tokens.elevatedCardBackground, modifier = Modifier.size(42.dp)) { Box(contentAlignment = Alignment.Center) { Icon(data.first, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp)) } }
-                    Spacer(Modifier.width(12.dp)); Column(Modifier.weight(1f)) { Text(data.second, color = tokens.textPrimary, fontWeight = FontWeight.SemiBold); Text(data.third, color = tokens.textSecondary, fontSize = 11.sp) }
-                    Icon(Icons.Rounded.ChevronRight, null, tint = tokens.textSecondary)
+                Row(
+                    Modifier.fillMaxWidth().clickable(onClick = action).padding(vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Surface(shape = RoundedCornerShape(15.dp), color = tokens.elevatedCardBackground, modifier = Modifier.size(44.dp)) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(data.first, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                        }
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text(data.second, color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall)
+                        Text(data.third, color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
+                    }
+                    Icon(Icons.Rounded.ChevronRight, null, tint = tokens.textSecondary, modifier = Modifier.size(20.dp))
                 }
                 if (index != items.lastIndex) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(.30f))
             }
@@ -418,13 +653,50 @@ private fun ProxyActionGroup(items: List<Pair<Triple<androidx.compose.ui.graphic
 @Composable
 private fun ProxySection(kicker: String, title: String, subtitle: String) {
     val tokens = LocalBichenTokens.current
-    Column(Modifier.fillMaxWidth().padding(start = 2.dp)) { Text(kicker, color = MaterialTheme.colorScheme.primary, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp); Text(title, color = tokens.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold); Text(subtitle, color = tokens.textSecondary, fontSize = 11.sp) }
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Text(title, color = tokens.textPrimary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text(subtitle, color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
+    }
+    @Suppress("UNUSED_VARIABLE") val compactKicker = kicker
 }
 
 @Composable
-private fun ProxyMetric(value: String, label: String, modifier: Modifier = Modifier) { val t = LocalBichenTokens.current; Column(modifier) { Text(value, color = t.textPrimary, fontSize = 21.sp, fontWeight = FontWeight.Black); Text(label, color = t.textSecondary, fontSize = 11.sp) } }
+private fun ProxyMetric(value: String, label: String, modifier: Modifier = Modifier) {
+    val tokens = LocalBichenTokens.current
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(value, color = tokens.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(label, color = tokens.textSecondary, fontSize = 11.sp)
+    }
+}
+
 @Composable
-private fun ProxyStatusMetric(label: String, value: String, modifier: Modifier = Modifier) { val t = LocalBichenTokens.current; Card(modifier, shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = t.cardBackground)) { Column(Modifier.padding(14.dp)) { Text(label, color = t.textSecondary, fontSize = 10.sp); Text(value, color = t.textPrimary, fontWeight = FontWeight.Bold) } } }
+private fun ProxyStatusMetric(label: String, value: String, modifier: Modifier = Modifier) {
+    val tokens = LocalBichenTokens.current
+    Surface(modifier, shape = RoundedCornerShape(20.dp), color = tokens.cardBackground, shadowElevation = 1.dp) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(label, color = tokens.textSecondary, style = MaterialTheme.typography.labelSmall)
+            Text(value, color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall)
+        }
+    }
+}
+
 @Composable
-private fun ProxyEmpty(title: String, desc: String) { val t = LocalBichenTokens.current; Card(shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = t.cardBackground)) { Column(Modifier.padding(18.dp)) { Text(title, color = t.textPrimary, fontWeight = FontWeight.Bold); Spacer(Modifier.height(6.dp)); Text(desc, color = t.textSecondary, fontSize = 12.sp) } } }
-private fun formatBytes(v: Long): String = when { v >= 1_073_741_824L -> "%.1fG".format(v / 1_073_741_824.0); v >= 1_048_576L -> "%.1fM".format(v / 1_048_576.0); v >= 1024L -> "%.0fK".format(v / 1024.0); else -> v.toString() }
+private fun ProxyEmpty(title: String, desc: String) {
+    val tokens = LocalBichenTokens.current
+    Surface(shape = RoundedCornerShape(24.dp), color = tokens.cardBackground, shadowElevation = 1.dp) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(title, color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall)
+            Text(desc, color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+private fun formatBytes(v: Long): String = when {
+    v >= 1_073_741_824L -> "%.1fG".format(v / 1_073_741_824.0)
+    v >= 1_048_576L -> "%.1fM".format(v / 1_048_576.0)
+    v >= 1024L -> "%.0fK".format(v / 1024.0)
+    else -> v.toString()
+}
