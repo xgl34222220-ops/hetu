@@ -263,7 +263,7 @@ private fun CompactHomePage(
         item("header") {
             CompactTopBar("辟尘") {
                 CompactHeaderAction(Icons.Rounded.Settings, "设置", onSettings)
-                CompactHeaderAction(Icons.Rounded.Refresh, "刷新") { refresh++ }
+                CompactHeaderAction(Icons.Rounded.Refresh, "刷新", onClick = { refresh++ })
             }
         }
         item("hero") {
@@ -430,7 +430,7 @@ private fun CompactAppsPage(controller: BichenComposeController) {
     ) {
         item("header") {
             CompactTopBar("应用放行") {
-                CompactHeaderAction(Icons.Rounded.Refresh, "刷新") { reload++; selected = controller.bypassApps() }
+                CompactHeaderAction(Icons.Rounded.Refresh, "刷新", onClick = { reload++; selected = controller.bypassApps() })
             }
         }
         item("search") {
@@ -500,7 +500,7 @@ private fun CompactRulesPage(controller: BichenComposeController) {
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item("header") {
-            CompactTopBar("过滤规则") { CompactHeaderAction(Icons.Rounded.Refresh, "刷新") { reload++ } }
+            CompactTopBar("过滤规则") { CompactHeaderAction(Icons.Rounded.Refresh, "刷新", onClick = { reload++ }) }
         }
         item("summary") {
             Surface(shape = RoundedCornerShape(28.dp), color = tokens.cardBackground, shadowElevation = 2.dp) {
@@ -589,7 +589,7 @@ private fun CompactActivityPage(controller: BichenComposeController) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item("header") {
-            CompactTopBar("请求活动") { CompactHeaderAction(Icons.Rounded.Refresh, "刷新") { refresh++ } }
+            CompactTopBar("请求活动") { CompactHeaderAction(Icons.Rounded.Refresh, "刷新", onClick = { refresh++ }) }
         }
         item("summary") {
             Surface(shape = RoundedCornerShape(24.dp), color = tokens.cardBackground, shadowElevation = 1.dp) {
