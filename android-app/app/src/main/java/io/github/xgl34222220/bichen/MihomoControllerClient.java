@@ -9,13 +9,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.Semaphore;
 
-/** Authenticated localhost-only Mihomo Clash API client for strategy, delay and connections UI.
- * Uses a loopback socket instead of Android's URL connection layer so cleartext policy remains
- * strict for every external host while the private 127.0.0.1 controller can still be reached.
- */
+/** Authenticated localhost-only Mihomo Clash API client for strategy, delay, rules and connections UI. */
 final class MihomoControllerClient {
     private static final int PORT=MihomoStartupConfig.CONTROLLER_PORT;
-    private static final int LIMIT=2*1024*1024;
+    private static final int LIMIT=4*1024*1024;
     private static final Semaphore DELAY_SLOTS=new Semaphore(3,true);
     private static final String[] DELAY_URLS={
         "https://cp.cloudflare.com/generate_204",
@@ -36,8 +33,21 @@ final class MihomoControllerClient {
         return p==null?new JSONObject():p;
     }
     JSONObject connections()throws Exception{return request("GET","/connections",null);}
+    JSONObject rules()throws Exception{return request("GET","/rules",null,12000);}
+    JSONObject ruleProviders()throws Exception{return request("GET","/providers/rules",null,12000);}
     JSONObject version()throws Exception{return request("GET","/version",null);}
-    void select(String group,String node)throws Exception{request("PUT","/proxies/"+Uri.encode(group),new JSONObject().put("name",node));}
+
+    void select(String group,String node)throws Exception{
+        request("PUT","/proxies/"+Uri.encode(group),new JSONObject().put("name",node));
+    }
+
+    void updateRuleProvider(String name)throws Exception{
+        request("PUT","/providers/rules/"+Uri.encode(name),null,20000);
+    }
+
+    void closeConnection(String id)throws Exception{
+        request("DELETE","/connections/"+Uri.encode(id),null);
+    }
 
     long delay(String node)throws Exception{
         DELAY_SLOTS.acquire();
