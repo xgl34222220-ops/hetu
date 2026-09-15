@@ -122,22 +122,30 @@ assert_text "$OUT/proxy-home.xml" "代理"
 assert_text "$OUT/proxy-home.xml" "面板"
 assert_text "$OUT/proxy-home.xml" "工具"
 assert_text "$OUT/proxy-home.xml" "设置"
+assert_text "$OUT/proxy-home.xml" "启动代理"
 
 tap_text "面板"
 dump_ui proxy-panel
-assert_text "$OUT/proxy-panel.xml" "策略组"
+assert_text "$OUT/proxy-panel.xml" "概览"
+assert_text "$OUT/proxy-panel.xml" "节点"
+assert_text "$OUT/proxy-panel.xml" "订阅"
 assert_text "$OUT/proxy-panel.xml" "连接"
+assert_text "$OUT/proxy-panel.xml" "规则集"
 
 tap_text "工具"
 dump_ui proxy-tools
 assert_text "$OUT/proxy-tools.xml" "工具"
-assert_text "$OUT/proxy-tools.xml" "运行日志"
+assert_text "$OUT/proxy-tools.xml" "内核管理"
+assert_text "$OUT/proxy-tools.xml" "订阅与配置"
+assert_text "$OUT/proxy-tools.xml" "WebUI"
 
 tap_text "设置"
 dump_ui proxy-settings
-assert_text "$OUT/proxy-settings.xml" "核心选择"
-assert_text "$OUT/proxy-settings.xml" "运行模式"
+assert_text "$OUT/proxy-settings.xml" "核心"
+assert_text "$OUT/proxy-settings.xml" "模式"
 assert_text "$OUT/proxy-settings.xml" "IPv6"
+assert_text "$OUT/proxy-settings.xml" "配置"
+assert_text "$OUT/proxy-settings.xml" "高级代理设置"
 
 PID=$(adb shell pidof "$PKG" | tr -d '\r')
 test -n "$PID"
