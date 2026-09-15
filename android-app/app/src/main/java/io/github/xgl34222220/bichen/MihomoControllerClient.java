@@ -67,8 +67,13 @@ final class MihomoControllerClient {
         try{
             Exception last=null;
             ArrayList<String> urls=new ArrayList<>();
-            if(preferredUrl!=null&&!preferredUrl.trim().isEmpty())urls.add(preferredUrl.trim());
-            for(String fallback:DEFAULT_DELAY_URLS)if(!urls.contains(fallback))urls.add(fallback);
+            // When Mihomo/provider supplies a test URL, respect it exactly. Dashboard fallbacks are
+            // only for nodes whose running config has no test URL at all.
+            if(preferredUrl!=null&&!preferredUrl.trim().isEmpty()){
+                urls.add(preferredUrl.trim());
+            }else{
+                Collections.addAll(urls,DEFAULT_DELAY_URLS);
+            }
             String expectedRange=(expected==null||expected.trim().isEmpty())?"200-399":expected.trim();
             for(String rawUrl:urls){
                 try{
@@ -82,11 +87,11 @@ final class MihomoControllerClient {
                     );
                     long d=v.optLong("delay",-1);
                     if(d>0)return d;
-                    last=new IOException("测速未返回有效延迟");
+                    last=new IOException("延迟测试未返回有效结果");
                 }catch(Exception e){last=e;}
             }
             if(last!=null)throw last;
-            throw new IOException("测速超时");
+            throw new IOException("延迟测试超时");
         }finally{
             DELAY_SLOTS.release();
         }
@@ -99,8 +104,11 @@ final class MihomoControllerClient {
     JSONObject groupDelay(String group,String preferredUrl,String expected)throws Exception{
         Exception last=null;
         ArrayList<String> urls=new ArrayList<>();
-        if(preferredUrl!=null&&!preferredUrl.trim().isEmpty())urls.add(preferredUrl.trim());
-        for(String fallback:DEFAULT_DELAY_URLS)if(!urls.contains(fallback))urls.add(fallback);
+        if(preferredUrl!=null&&!preferredUrl.trim().isEmpty()){
+            urls.add(preferredUrl.trim());
+        }else{
+            Collections.addAll(urls,DEFAULT_DELAY_URLS);
+        }
         String expectedRange=(expected==null||expected.trim().isEmpty())?"200-399":expected.trim();
         for(String rawUrl:urls){
             try{
@@ -115,7 +123,7 @@ final class MihomoControllerClient {
             }catch(Exception e){last=e;}
         }
         if(last!=null)throw last;
-        throw new IOException("策略组测速失败");
+        throw new IOException("策略组延迟测试失败");
     }
 
     void closeAll()throws Exception{request("DELETE","/connections",null);}
