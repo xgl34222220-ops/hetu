@@ -91,10 +91,76 @@ internal class ProxyDashboardRepository(context: Context) {
         parseRuleSets(api.ruleProviders())
     }
 
-    /** Reuse the controller's complete global test: group-native batch testing plus individual fallback for every uncovered real node. */
-    suspend fun globalDelay(): Map<String, Long> = controller.globalDelay()
+    /**
+ * Test every real leaf node using the same provider/group health-check URL as manual testing.
+ * A failed fresh probe keeps Mihomo's most recent positive result instead of falsely turning
+ * a known-good node into "超时" just because a generic probe endpoint is blocked.
+ */
+suspend fun globalDelay(): Map<String, Long> = withContext(Dispatchers.IO) {
+    val raw = api.proxies()
+    val providers = remoteProviders(api.proxyProviders())
+    val providerByNode = HashMap<String, DashboardProviderUi>()
+    providers.forEach { provider ->
+        provider.nodes.forEach { node -> providerByNode.putIfAbsent(node, provider) }
+    }
 
-    suspend fun delay(node: String): Long = withContext(Dispatchers.IO) {
+    val leaves = LinkedHashSet<String>()
+    val previous = HashMap<String, Long>()
+    val names = raw.keys()
+    while (names.hasNext()) {
+        val name = names.next()
+        if (name == "GLOBAL") continue
+        val item = raw.optJSONObject(name) ?: continue
+        if (item.optJSONArray("all") != null) continue
+        val type = item.optString("type", "").lowercase()
+        if (type in setOf("direct", "reject", "rejectdrop", "pass", "compatible")) continue
+        leaves += name
+        latestDelay(item)?.takeIf { it > 0L }?.let { previous[name] = it }
+    }
+
+    val groupProbe = HashMap<String, Pair<String, String>>()
+    val groupNames = raw.keys()
+    while (groupNames.hasNext()) {
+        val groupName = groupNames.next()
+        val group = raw.optJSONObject(groupName) ?: continue
+        val all = group.optJSONArray("all") ?: continue
+        val url = group.optString("testUrl", "")
+        val expected = group.optString("expectedStatus", "200-399").ifBlank { "200-399" }
+        if (url.isBlank()) continue
+        for (i in 0 until all.length()) {
+            val node = all.optString(i)
+            if (node.isNotBlank()) groupProbe.putIfAbsent(node, url to expected)
+        }
+    }
+
+    val result = LinkedHashMap<String, Long>()
+    for (chunk in leaves.toList().chunked(6)) {
+        val measured = coroutineScope {
+            chunk.map { node ->
+                async {
+                    val provider = providerByNode[node]
+                    val group = groupProbe[node]
+                    val value = try {
+                        when {
+                            provider != null -> api.delay(node, provider.testUrl, provider.expectedStatus)
+                            group != null -> api.delay(node, group.first, group.second)
+                            else -> api.delay(node)
+                        }
+                    } catch (cancel: CancellationException) {
+                        throw cancel
+                    } catch (_: Exception) {
+                        -1L
+                    }
+                    node to if (value > 0L) value else (previous[node] ?: -1L)
+                }
+            }.awaitAll()
+        }
+        measured.forEach { (name, value) -> result[name] = value }
+    }
+    result
+}
+
+suspend fun delay(node: String): Long = withContext(Dispatchers.IO) {
         val provider = parseProviders(api.proxyProviders()).firstOrNull {
             node in it.nodes && it.vehicleType.equals("HTTP", true)
         }

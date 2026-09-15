@@ -36,7 +36,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -566,11 +568,20 @@ private fun CompactAppsPage(controller: BichenComposeController) {
                 shadowElevation = 1.dp,
             ) {
                 Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Surface(shape = RoundedCornerShape(15.dp), color = tokens.elevatedCardBackground) {
-                        Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
-                            Text(app.label.take(1), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                        }
-                    }
+                    if (app.icon != null) {
+              androidx.compose.foundation.Image(
+                  bitmap = app.icon.asImageBitmap(),
+                  contentDescription = null,
+                  modifier = Modifier.size(44.dp).clip(RoundedCornerShape(13.dp)),
+                  contentScale = ContentScale.Fit,
+              )
+          } else {
+              Surface(shape = RoundedCornerShape(13.dp), color = tokens.elevatedCardBackground, modifier = Modifier.size(44.dp)) {
+                  Box(contentAlignment = Alignment.Center) {
+                      Icon(Icons.Rounded.Android, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                  }
+              }
+          }
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(app.label, color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)

@@ -495,6 +495,8 @@ private fun V3Panel(
                     item {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             V3Heading("策略组", if (refreshing) "正在测试全部节点…" else "点策略组展开节点", Modifier.weight(1f))
+                            V3SmallAction(Icons.Rounded.Speed, if (refreshing) "测速中" else "全部测速") { if (!refreshing) refreshTab() }
+                            Spacer(Modifier.width(6.dp))
                             V3SmallAction(Icons.Rounded.Sort, if (sort == V3Sort.Config) "配置" else "延迟") { sort = if (sort == V3Sort.Config) V3Sort.Delay else V3Sort.Config }
                         }
                     }
