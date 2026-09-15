@@ -37,8 +37,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.5.0'
-      - name: Install Android toolchain
-        run: sdkmanager 'platforms;android-37' 'platforms;android-35' 'build-tools;35.0.0' 'ndk;28.2.13676358'
+      - name: Ensure NDK for Mihomo runtime
+        run: |
+          if [ ! -x "$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang" ]; then
+            sdkmanager 'ndk;28.2.13676358'
+          fi
+          ls "$ANDROID_HOME/platforms" || true
       - name: Build pinned Mihomo runtime
         run: |
           cp -r native/bridge .upstream/bichenbridge
@@ -60,7 +64,8 @@ jobs:
         run: |
           APK=android-app/app/build/outputs/apk/debug/app-debug.apk
           test -f "$APK"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | tee compose-apk-badging.txt
+          AAPT=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n 1)
+          "$AAPT" dump badging "$APK" | tee compose-apk-badging.txt
           unzip -t "$APK" >/dev/null
       - uses: actions/upload-artifact@v4
         if: always()
