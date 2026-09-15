@@ -19,11 +19,17 @@ import java.security.MessageDigest
 import java.util.Locale
 import javax.net.ssl.HttpsURLConnection
 
+internal data class ProxyNodeUi(
+    val name: String,
+    val type: String = "",
+    val udp: Boolean = false,
+)
+
 internal data class ProxyGroupUi(
     val name: String,
     val type: String,
     val now: String,
-    val nodes: List<String>,
+    val nodes: List<ProxyNodeUi>,
     val iconUrl: String = "",
     val iconPath: String = "",
 )
@@ -133,6 +139,7 @@ internal class ProxyComposeController(context: Context) {
     suspend fun diagnostics(): String = withContext(Dispatchers.IO) { root.diagnostics() }
     suspend fun startupConfig(): String = withContext(Dispatchers.IO) { root.prepare(ProxyRuntimeProfile.load(prefs)).startup }
 
+    /** Test every real leaf node. Result values use -1 for timeout/failure. */
     suspend fun globalDelay(): Map<String, Long> = withContext(Dispatchers.IO) {
         val raw = api.proxies()
         val names = ArrayList<String>()
@@ -167,17 +174,19 @@ internal class ProxyComposeController(context: Context) {
         result
     }
 
-    suspend fun refreshIcons(force: Boolean = true): Int = withContext(Dispatchers.IO) {
+    /** Cache config-declared group icons. Cached files are never re-downloaded on ordinary refresh. */
+    suspend fun ensureIcons(): Int = withContext(Dispatchers.IO) {
         val profile = ProxyRuntimeProfile.load(prefs)
         val entry = configs.selected(profile.core) ?: return@withContext 0
         val urls = parseGroupIcons(configs.read(entry)).values.filter { it.startsWith("https://") }.distinct()
-        var count = 0
+        var downloaded = 0
         for (chunk in urls.chunked(6)) {
             val part = coroutineScope {
                 chunk.map { url ->
                     async {
+                        if (icons.cached(url) != null) return@async false
                         try {
-                            icons.fetch(url, force) != null
+                            icons.fetchMissing(url) != null
                         } catch (cancel: CancellationException) {
                             throw cancel
                         } catch (_: Exception) {
@@ -186,9 +195,9 @@ internal class ProxyComposeController(context: Context) {
                     }
                 }.awaitAll()
             }
-            count += part.count { it }
+            downloaded += part.count { it }
         }
-        count
+        downloaded
     }
 
     fun cores(): List<Pair<String, String>> = ProxyRuntimeProfile.Core.values().map { it.id to it.label }
@@ -264,10 +273,16 @@ internal class ProxyComposeController(context: Context) {
             if (name == "GLOBAL") continue
             val group = root.optJSONObject(name) ?: continue
             val all = group.optJSONArray("all") ?: continue
-            val nodes = ArrayList<String>()
+            val nodes = ArrayList<ProxyNodeUi>()
             for (i in 0 until all.length()) {
                 val node = all.optString(i)
-                if (node.isNotBlank()) nodes += node
+                if (node.isBlank()) continue
+                val nodeInfo = root.optJSONObject(node)
+                nodes += ProxyNodeUi(
+                    name = node,
+                    type = nodeInfo?.optString("type", "") ?: "",
+                    udp = nodeInfo?.optBoolean("udp", false) ?: false,
+                )
             }
             val iconUrl = iconMap[name].orEmpty()
             result += ProxyGroupUi(
@@ -355,10 +370,10 @@ private class ProxyIconStore(context: Context) {
         return file.takeIf { it.isFile && it.length() in 1..MAX_BYTES && BitmapFactory.decodeFile(it.absolutePath) != null }
     }
 
-    fun fetch(url: String, force: Boolean): File? {
+    fun fetchMissing(url: String): File? {
         if (!url.startsWith("https://")) return null
         val target = File(dir, key(url) + ".img")
-        if (!force) cached(url)?.let { return it }
+        cached(url)?.let { return it }
         val tmp = File(dir, target.name + ".new")
         val connection = (URL(url).openConnection() as? HttpsURLConnection) ?: return null
         connection.connectTimeout = 5_000
