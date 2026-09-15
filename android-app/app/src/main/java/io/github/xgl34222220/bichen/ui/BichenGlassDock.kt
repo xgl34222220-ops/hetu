@@ -6,6 +6,8 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -19,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
@@ -49,6 +52,7 @@ import top.yukonga.miuix.kmp.squircle.squircleClip
 
 data class DockItem(val label: String, val icon: ImageVector, val opticalScale: Float = 1f)
 
+/** Direct adaptation of LuoShu's MiuixAppDock. */
 @OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
 fun BichenGlassDock(
@@ -60,25 +64,44 @@ fun BichenGlassDock(
     modifier: Modifier = Modifier,
 ) {
     val scheme = MaterialTheme.colorScheme
+    val tokens = LocalBichenTokens.current
     val dark = scheme.background.luminance() < .5f
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val shape = RoundedCornerShape(31.dp)
-    val runtimeLiquid = backdrop != null && isRuntimeShaderSupported()
-    val surfaceBackdrop = rememberLayerBackdrop()
-    val haze = if (!runtimeLiquid) Modifier.hazeEffect(state = hazeState, style = HazeMaterials.ultraThin()) {
-        blurRadius = 30.dp
-        noiseFactor = .018f
+    val activeGlass = true
+    val runtimeLiquid = activeGlass && backdrop != null && isRuntimeShaderSupported()
+    val activeHaze = activeGlass && !runtimeLiquid
+    val dockSurfaceBackdrop = rememberLayerBackdrop()
+    val hazeModifier = if (activeHaze) {
+        Modifier.hazeEffect(state = hazeState, style = HazeMaterials.ultraThin()) {
+            blurRadius = 30.dp
+            noiseFactor = .018f
+        }
     } else Modifier
+    val glassBrush = when {
+        activeGlass && dark -> Brush.verticalGradient(listOf(Color.White.copy(alpha = .10f), Color.White.copy(alpha = .035f)))
+        activeGlass -> Brush.verticalGradient(listOf(Color.White.copy(alpha = .22f), Color.White.copy(alpha = .09f)))
+        else -> Brush.verticalGradient(listOf(tokens.elevatedCardBackground.copy(alpha = .98f), tokens.elevatedCardBackground.copy(alpha = .98f)))
+    }
     val shellTint = if (dark) scheme.surface.copy(alpha = .39f) else Color.White.copy(alpha = .40f)
-    val shellModifier = if (runtimeLiquid) {
+    val liquidShellModifier = if (runtimeLiquid) {
         Modifier.drawBackdrop(
             backdrop = requireNotNull(backdrop),
             shape = { shape },
             effects = {
                 padding = maxOf(padding, 30.dp.toPx())
-                colorControls(brightness = if (dark) -.015f else .025f, contrast = 1.05f, saturation = 1.40f)
+                colorControls(
+                    brightness = if (dark) -.015f else .025f,
+                    contrast = 1.05f,
+                    saturation = 1.40f,
+                )
                 blur(9.dp.toPx(), 9.dp.toPx())
-                liquidGlassLens(17.dp.toPx(), 13.dp.toPx(), depthEffect = true, chromaticAberration = .045f)
+                liquidGlassLens(
+                    refractionHeight = 17.dp.toPx(),
+                    refractionAmount = 13.dp.toPx(),
+                    depthEffect = true,
+                    chromaticAberration = .045f,
+                )
             },
             highlight = {
                 (if (dark) Highlight.GlassStrokeSmallDark else Highlight.GlassStrokeSmallLight)
@@ -87,8 +110,8 @@ fun BichenGlassDock(
             onDrawSurface = {
                 drawRect(shellTint)
                 drawRect(
-                    Brush.radialGradient(
-                        listOf(Color.White.copy(alpha = if (dark) .06f else .20f), Color.Transparent),
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color.White.copy(alpha = if (dark) .06f else .20f), Color.Transparent),
                         center = Offset(size.width * .16f, 0f),
                         radius = size.width * .70f,
                     ),
@@ -96,15 +119,21 @@ fun BichenGlassDock(
             },
         )
     } else {
-        Modifier.then(haze).drawBehind {
-            drawRoundRect(
-                brush = Brush.verticalGradient(
-                    if (dark) listOf(Color.White.copy(.10f), Color.White.copy(.035f))
-                    else listOf(Color.White.copy(.32f), Color.White.copy(.12f)),
-                ),
-                cornerRadius = CornerRadius(size.height / 2f),
-            )
-        }
+        Modifier
+            .then(hazeModifier)
+            .background(glassBrush)
+            .drawBehind {
+                if (activeGlass) {
+                    drawRoundRect(
+                        brush = Brush.radialGradient(
+                            colors = listOf(Color.White.copy(alpha = if (dark) .08f else .24f), Color.Transparent),
+                            center = Offset(size.width * .18f, 0f),
+                            radius = size.width * .72f,
+                        ),
+                        cornerRadius = CornerRadius(size.height / 2f),
+                    )
+                }
+            }
     }
 
     Box(
@@ -115,21 +144,33 @@ fun BichenGlassDock(
             .height(72.dp),
     ) {
         Box(
-            Modifier
+            modifier = Modifier
                 .fillMaxSize()
                 .shadow(18.dp, shape, clip = false)
                 .squircleClip(31.dp)
-                .then(if (runtimeLiquid) Modifier.layerBackdrop(surfaceBackdrop) else Modifier)
-                .then(shellModifier)
-                .border(.7.dp, if (dark) Color.White.copy(.11f) else Color.White.copy(.32f), shape),
+                .then(if (runtimeLiquid) Modifier.layerBackdrop(dockSurfaceBackdrop) else Modifier)
+                .then(liquidShellModifier)
+                .border(
+                    if (runtimeLiquid) .45.dp else .7.dp,
+                    if (dark) Color.White.copy(alpha = .11f) else Color.White.copy(alpha = .32f),
+                    shape,
+                ),
         )
+
         DockLayout(
             items = items,
             selected = selected,
             onSelect = onSelect,
-            backdrop = surfaceBackdrop.takeIf { runtimeLiquid },
-            dark = dark,
+            itemHeight = 60.dp,
             modifier = Modifier.fillMaxSize().padding(6.dp),
+            indicatorColor = scheme.primary.copy(alpha = if (dark) .28f else .16f),
+            indicatorBorderColor = Color.White.copy(alpha = if (dark) .18f else .46f),
+            indicatorShadow = 3.dp,
+            selectedColor = scheme.primary,
+            unselectedColor = scheme.onSurfaceVariant.copy(alpha = .90f),
+            liquidGlass = activeGlass,
+            indicatorBackdrop = dockSurfaceBackdrop.takeIf { runtimeLiquid },
+            dark = dark,
         )
     }
 }
@@ -139,73 +180,137 @@ private fun DockLayout(
     items: List<DockItem>,
     selected: Int,
     onSelect: (Int) -> Unit,
-    backdrop: LayerBackdrop?,
-    dark: Boolean,
+    itemHeight: androidx.compose.ui.unit.Dp,
     modifier: Modifier,
+    indicatorColor: Color,
+    indicatorBorderColor: Color,
+    indicatorShadow: androidx.compose.ui.unit.Dp,
+    selectedColor: Color,
+    unselectedColor: Color,
+    liquidGlass: Boolean,
+    indicatorBackdrop: LayerBackdrop?,
+    dark: Boolean,
 ) {
-    val scheme = MaterialTheme.colorScheme
-    BoxWithConstraints(modifier) {
+    BoxWithConstraints(modifier = modifier) {
         val itemWidth = maxWidth / items.size.toFloat()
-        val target = selected.coerceIn(0, items.lastIndex)
-        val stretch = remember { Animatable(0f) }
-        var direction by remember { mutableFloatStateOf(0f) }
-        var previous by remember { mutableIntStateOf(target) }
-        LaunchedEffect(target) {
-            if (target != previous) {
-                direction = if (target > previous) 1f else -1f
-                previous = target
-                stretch.snapTo(1f)
-                stretch.animateTo(0f, spring(dampingRatio = .55f, stiffness = Spring.StiffnessMediumLow))
+        val targetIndex = selected.coerceIn(0, items.lastIndex)
+        val indicatorInset = 4.dp
+        val liquidStretch = remember { Animatable(0f) }
+        var travelDirection by remember { mutableFloatStateOf(0f) }
+        var previousIndex by remember { mutableIntStateOf(targetIndex) }
+        LaunchedEffect(targetIndex) {
+            if (targetIndex != previousIndex) {
+                travelDirection = if (targetIndex > previousIndex) 1f else -1f
+                previousIndex = targetIndex
+                liquidStretch.snapTo(1f)
+                liquidStretch.animateTo(0f, spring(dampingRatio = .55f, stiffness = Spring.StiffnessMediumLow))
             }
         }
-        val x by animateDpAsState(itemWidth * target.toFloat(), spring(dampingRatio = .68f, stiffness = 310f), label = "dockX")
-        val extra = 13.dp * stretch.value
-        val start = x + 4.dp - if (direction < 0f) extra else 0.dp
-        val lensShape = RoundedCornerShape(23.dp)
-        val activeLens = backdrop != null && isRuntimeShaderSupported()
-        val lens = if (activeLens) {
+        val indicatorX by animateDpAsState(
+            targetValue = itemWidth * targetIndex.toFloat(),
+            animationSpec = spring(dampingRatio = if (liquidGlass) .68f else .84f, stiffness = if (liquidGlass) 310f else Spring.StiffnessMediumLow),
+            label = "bichenLuoShuDockX",
+        )
+        val liquidExtra = if (liquidGlass) 13.dp * liquidStretch.value else 0.dp
+        val indicatorStart = indicatorX + indicatorInset - if (travelDirection < 0f) liquidExtra else 0.dp
+        val indicatorShape = RoundedCornerShape(23.dp)
+        val activeLens = liquidGlass && indicatorBackdrop != null
+        val movingLensModifier = if (activeLens) {
             Modifier.drawBackdrop(
-                backdrop = requireNotNull(backdrop),
-                shape = { lensShape },
+                backdrop = requireNotNull(indicatorBackdrop),
+                shape = { indicatorShape },
                 effects = {
+                    val stretch = liquidStretch.value
                     padding = maxOf(padding, 22.dp.toPx())
                     colorControls(brightness = .015f, contrast = 1.06f, saturation = 1.34f)
                     blur(3.dp.toPx(), 3.dp.toPx())
-                    liquidGlassLens((13.dp + 4.dp * stretch.value).toPx(), (14.dp + 5.dp * stretch.value).toPx(), true, .08f + .10f * stretch.value)
+                    liquidGlassLens(
+                        refractionHeight = (13.dp + 4.dp * stretch).toPx(),
+                        refractionAmount = (14.dp + 5.dp * stretch).toPx(),
+                        depthEffect = true,
+                        chromaticAberration = .08f + .10f * stretch,
+                    )
                 },
                 highlight = { (if (dark) Highlight.GlassStrokeSmallDark else Highlight.GlassStrokeSmallLight).copy(alpha = .88f) },
-                layerBlock = { scaleY = 1f - .045f * stretch.value },
-                onDrawSurface = { drawRect(scheme.primary.copy(alpha = if (dark) .28f else .16f)) },
+                layerBlock = { scaleY = 1f - .045f * liquidStretch.value },
+                onDrawSurface = {
+                    drawRect(indicatorColor)
+                    drawRect(Brush.linearGradient(listOf(Color.White.copy(alpha = if (dark) .055f else .16f), Color.Transparent)))
+                },
             )
-        } else Modifier.drawBehind {
-            drawRoundRect(
-                Brush.verticalGradient(listOf(scheme.primary.copy(alpha = if (dark) .28f else .18f), scheme.primary.copy(alpha = if (dark) .16f else .10f))),
-                cornerRadius = CornerRadius(size.height / 2f),
-            )
+        } else {
+            Modifier.drawBehind {
+                val radius = CornerRadius(size.height / 2f)
+                drawRoundRect(
+                    brush = Brush.verticalGradient(listOf(indicatorColor, indicatorColor)),
+                    cornerRadius = radius,
+                )
+                if (liquidGlass) {
+                    drawRoundRect(
+                        brush = Brush.radialGradient(
+                            colors = listOf(Color.White.copy(alpha = if (dark) .10f else .24f), Color.Transparent),
+                            center = Offset(size.width * .27f, 0f),
+                            radius = size.width * .74f,
+                        ),
+                        cornerRadius = radius,
+                    )
+                }
+            }
         }
         Box(
-            Modifier.offset(x = start).width(itemWidth - 8.dp + extra).height(60.dp)
-                .shadow(if (activeLens) 4.dp else 3.dp, lensShape, clip = false)
-                .squircleClip(23.dp).then(lens)
-                .border(1.dp, Color.White.copy(alpha = if (dark) .18f else .46f), lensShape),
+            modifier = Modifier
+                .offset(x = indicatorStart)
+                .width(itemWidth - (indicatorInset * 2) + liquidExtra)
+                .height(itemHeight)
+                .shadow(if (activeLens) 4.dp else indicatorShadow, indicatorShape, clip = false)
+                .squircleClip(23.dp)
+                .then(movingLensModifier)
+                .border(1.dp, indicatorBorderColor, indicatorShape),
         )
         Row(Modifier.fillMaxWidth().selectableGroup()) {
             items.forEachIndexed { index, item ->
-                val on = index == target
+                val selectedItem = index == targetIndex
                 val source = remember(item.label) { MutableInteractionSource() }
                 val pressed by source.collectIsPressedAsState()
-                val base = if (on) scheme.primary else scheme.onSurfaceVariant.copy(.90f)
-                val color by animateColorAsState(if (pressed) base.copy(alpha = .62f) else base, label = "${item.label}Color")
-                val scale by animateFloatAsState(if (pressed) .92f else if (on) 1.035f else 1f, spring(dampingRatio = .66f, stiffness = 520f), label = "${item.label}Scale")
+                val base = if (selectedItem) selectedColor else unselectedColor
+                val itemColor by animateColorAsState(
+                    targetValue = if (pressed) base.copy(alpha = .62f) else base,
+                    animationSpec = tween(170),
+                    label = "${item.label}DockColor",
+                )
+                val itemScale by animateFloatAsState(
+                    targetValue = when {
+                        pressed -> .92f
+                        selectedItem && liquidGlass -> 1.035f
+                        else -> 1f
+                    },
+                    animationSpec = spring(dampingRatio = .66f, stiffness = 520f),
+                    label = "${item.label}DockScale",
+                )
                 Column(
-                    Modifier.width(itemWidth).height(60.dp).graphicsLayer { scaleX = scale; scaleY = scale }
-                        .selectable(on, role = Role.Tab, interactionSource = source, indication = null) { if (!on) onSelect(index) },
+                    modifier = Modifier
+                        .width(itemWidth)
+                        .height(itemHeight)
+                        .graphicsLayer { scaleX = itemScale; scaleY = itemScale }
+                        .clip(RoundedCornerShape(23.dp))
+                        .selectable(
+                            selected = selectedItem,
+                            role = Role.Tab,
+                            interactionSource = source,
+                            indication = null,
+                            onClick = { if (!selectedItem) onSelect(index) },
+                        ),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
-                    Icon(item.icon, null, tint = color, modifier = Modifier.size(22.dp).graphicsLayer { scaleX = item.opticalScale; scaleY = item.opticalScale })
+                    Icon(
+                        imageVector = item.icon,
+                        contentDescription = null,
+                        tint = itemColor,
+                        modifier = Modifier.size(22.dp).graphicsLayer { scaleX = item.opticalScale; scaleY = item.opticalScale },
+                    )
                     Spacer(Modifier.height(3.dp))
-                    Text(item.label, color = color, fontSize = 12.sp, lineHeight = 17.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Medium, maxLines = 1)
+                    Text(item.label, color = itemColor, fontSize = 12.sp, lineHeight = 17.sp, fontWeight = if (selectedItem) FontWeight.Bold else FontWeight.Medium, maxLines = 1)
                 }
             }
         }
