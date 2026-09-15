@@ -40,6 +40,9 @@ final class MihomoStartupConfig {
         yaml=removeTopLevelScalar(yaml,"external-controller");
         yaml=removeTopLevelScalar(yaml,"external-controller-tls");
         yaml=removeTopLevelScalar(yaml,"secret");
+        // Android TPROXY connections need package/process metadata for the connection panel.
+        // strict is Mihomo's normal process-matching mode; keep the user's source file untouched.
+        yaml=removeTopLevelScalar(yaml,"find-process-mode");
 
         int tp=0,rp=0;
         StringBuilder override=new StringBuilder();
@@ -70,6 +73,7 @@ final class MihomoStartupConfig {
             case EBPF:
                 throw new IOException("eBPF 必须使用兼容核心和 eBPF 入站，不能用普通 Mihomo 启动配置冒充");
         }
+        override.append("find-process-mode: strict\n");
         override.append("external-controller: 127.0.0.1:").append(CONTROLLER_PORT).append('\n');
         override.append("secret: '").append(controllerSecret.replace("'","''")).append("'\n");
         override.append("# --- end Bichen runtime-mode isolation ---\n");
