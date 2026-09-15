@@ -7,14 +7,9 @@ import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -22,9 +17,10 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.*
@@ -59,15 +55,7 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Dense, LuoShu-first proxy workspace.
- *
- * UI UX Pro Max audit goals used here:
- * - section surfaces instead of card-per-row/card-inside-card
- * - minimum 48dp interaction targets while keeping information visually compact
- * - state is always expressed by text/icon as well as color
- * - six proxy tabs remain predictable and fit without horizontal page scrolling
- * - compact list rows for subscriptions, connections, rules and rule sets
- * - no runtime shader/haze source in the page; the shared dock uses its stable renderer
+ * Dense, LuoShu-first proxy workspace audited against UI UX Pro Max.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 class ProMaxProxyActivity : ComponentActivity() {
@@ -90,12 +78,19 @@ private fun ProMaxProxyShell(onBack: () -> Unit) {
     val context = LocalContext.current
     val controller = remember { ProxyComposeController(context) }
     val repo = remember { ProxyDashboardRepository(context) }
+    val inspector = remember { ProxyRuntimeInspector(context) }
     val scope = rememberCoroutineScope()
     val haze = rememberHazeState()
     var page by rememberSaveable { mutableStateOf(ProPage.Home) }
     var state by remember { mutableStateOf(ProxyComposeState()) }
+    var runtime by remember { mutableStateOf(ProxyRuntimeSnapshot()) }
+    var cpuPercent by remember { mutableFloatStateOf(0f) }
+    var lastProcessTicks by remember { mutableLongStateOf(0L) }
+    var lastSystemTicks by remember { mutableLongStateOf(0L) }
     var operation by remember { mutableStateOf("") }
     var message by remember { mutableStateOf("") }
+    var homeProviders by remember { mutableStateOf<List<DashboardProviderUi>>(emptyList()) }
+    var logText by remember { mutableStateOf<String?>(null) }
     val delays = remember { mutableStateMapOf<String, Long>() }
     val rates = remember { mutableStateListOf<RatePoint>() }
     var upRate by remember { mutableLongStateOf(0L) }
@@ -117,6 +112,25 @@ private fun ProMaxProxyShell(onBack: () -> Unit) {
             }
             next.groups.flatMap { it.nodes }.forEach { node ->
                 node.lastDelay?.takeIf { it > 0 }?.let { if (node.name !in delays) delays[node.name] = it }
+            }
+            if (next.running) {
+                runCatching { inspector.sample() }.getOrNull()?.let { sample ->
+                    if (sample.processTicks >= lastProcessTicks && sample.systemTicks > lastSystemTicks && lastSystemTicks > 0L) {
+                        val processDelta = sample.processTicks - lastProcessTicks
+                        val systemDelta = sample.systemTicks - lastSystemTicks
+                        val cores = Runtime.getRuntime().availableProcessors().coerceAtLeast(1)
+                        cpuPercent = ((processDelta.toDouble() / systemDelta.toDouble()) * cores * 100.0).toFloat().coerceIn(0f, 999f)
+                    }
+                    lastProcessTicks = sample.processTicks
+                    lastSystemTicks = sample.systemTicks
+                    runtime = sample
+                }
+            } else {
+                runtime = ProxyRuntimeSnapshot()
+                cpuPercent = 0f
+                lastProcessTicks = 0L
+                lastSystemTicks = 0L
+                homeProviders = emptyList()
             }
             lastAt = now
             lastUp = next.uploadTotal
@@ -160,12 +174,41 @@ private fun ProMaxProxyShell(onBack: () -> Unit) {
         }
     }
 
+    fun reloadConfig() {
+        if (operation.isNotBlank() || !state.running) return
+        scope.launch {
+            operation = "正在重载配置…"
+            try {
+                inspector.reloadConfig()
+                message = "运行配置已重载"
+                delay(250)
+                refresh()
+            } catch (e: Exception) {
+                message = e.message ?: "配置重载失败"
+            } finally { operation = "" }
+        }
+    }
+
+    fun showLog() {
+        scope.launch {
+            logText = runCatching { inspector.runtimeLog() }.getOrElse { it.message ?: "日志读取失败" }
+        }
+    }
+
     LaunchedEffect(Unit) {
         runCatching { repo.ensureIcons() }
         refresh()
         while (true) {
             delay(2500)
             refresh()
+        }
+    }
+
+    LaunchedEffect(state.running) {
+        if (!state.running) return@LaunchedEffect
+        while (true) {
+            homeProviders = runCatching { repo.providers() }.getOrDefault(homeProviders)
+            delay(30_000)
         }
     }
 
@@ -183,13 +226,20 @@ private fun ProMaxProxyShell(onBack: () -> Unit) {
             when (page) {
                 ProPage.Home -> ProHome(
                     state = state,
+                    runtime = runtime,
+                    cpuPercent = cpuPercent,
                     delays = delays,
+                    providers = homeProviders,
+                    upRate = upRate,
+                    downRate = downRate,
                     operation = operation,
                     message = message,
                     onBack = onBack,
                     onRefresh = { scope.launch { refresh() } },
                     onStartStop = ::startStop,
+                    onReload = ::reloadConfig,
                     onRestart = ::restart,
+                    onShowLog = ::showLog,
                     onPanel = { page = ProPage.Panel },
                 )
                 ProPage.Panel -> ProPanel(
@@ -214,35 +264,42 @@ private fun ProMaxProxyShell(onBack: () -> Unit) {
             modifier = Modifier.align(Alignment.BottomCenter),
         )
     }
+
+    logText?.let { text -> ProLogDialog(text) { logText = null } }
 }
 
 @Composable
 private fun ProHome(
     state: ProxyComposeState,
+    runtime: ProxyRuntimeSnapshot,
+    cpuPercent: Float,
     delays: Map<String, Long>,
+    providers: List<DashboardProviderUi>,
+    upRate: Long,
+    downRate: Long,
     operation: String,
     message: String,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
     onStartStop: () -> Unit,
+    onReload: () -> Unit,
     onRestart: () -> Unit,
+    onShowLog: () -> Unit,
     onPanel: () -> Unit,
 ) {
     val t = LocalBichenTokens.current
-    val scheme = MaterialTheme.colorScheme
     val values = delays.values.filter { it > 0 }
     val avg = values.takeIf { it.isNotEmpty() }?.average()?.toInt()?.let { "$it ms" } ?: "--"
+    val memory = runtime.rssBytes.takeIf { it > 0L } ?: state.memoryBytes
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 0.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        item {
-            ProTopBar("代理", "${state.core} · ${state.mode}", onBack = onBack, onRefresh = onRefresh)
-        }
+        item { ProTopBar("代理", "${state.core} · ${state.mode}", onBack = onBack, onRefresh = onRefresh) }
         item {
             Surface(shape = RoundedCornerShape(28.dp), color = t.cardBackground, shadowElevation = 2.dp) {
-                Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(17.dp)) {
+                Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         StateBadge(state.running, if (state.running) "运行中" else "已停止")
                         Spacer(Modifier.weight(1f))
@@ -253,13 +310,18 @@ private fun ProHome(
                         Text(state.config, color = t.textPrimary, fontSize = 23.sp, lineHeight = 30.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        ProMetric(bytes(state.memoryBytes), "内存", Modifier.weight(1f))
-                        ProMetric(avg, "延迟", Modifier.weight(1f))
-                        ProMetric(state.connections.size.toString(), "连接", Modifier.weight(1f))
+                        ProMetric(if (state.running) duration(runtime.elapsedSeconds) else "—", "运行时间", Modifier.weight(1f))
+                        ProMetric(if (state.running) String.format(Locale.US, "%.1f%%", cpuPercent) else "—", "CPU", Modifier.weight(1f))
+                        ProMetric(if (state.running) bytes(memory) else "—", "内存", Modifier.weight(1f))
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        ProMetric(bytes(state.downloadTotal), "下载", Modifier.weight(1f))
-                        ProMetric(bytes(state.uploadTotal), "上传", Modifier.weight(1f))
+                        ProMetric(if (state.running) "↓ ${speed(downRate)}" else "—", "下载速度", Modifier.weight(1f))
+                        ProMetric(if (state.running) "↑ ${speed(upRate)}" else "—", "上传速度", Modifier.weight(1f))
+                        ProMetric(avg, "延迟", Modifier.weight(1f))
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ProMetric(state.connections.size.toString(), "连接", Modifier.weight(1f))
+                        ProMetric(runtime.lanAddress, "LAN", Modifier.weight(2f))
                     }
                     Button(onClick = onStartStop, enabled = operation.isBlank(), modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp), shape = RoundedCornerShape(18.dp)) {
                         Icon(if (state.running) Icons.Rounded.Stop else Icons.Rounded.PlayArrow, null, Modifier.size(20.dp))
@@ -268,8 +330,12 @@ private fun ProHome(
                     }
                     if (state.running) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            ProTextAction("重载状态", Icons.Rounded.Refresh, onRefresh, Modifier.weight(1f))
+                            ProTextAction("重载配置", Icons.Rounded.Refresh, onReload, Modifier.weight(1f))
                             ProTextAction("重启核心", Icons.Rounded.RestartAlt, onRestart, Modifier.weight(1f))
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            ProTextAction("运行日志", Icons.Rounded.Article, onShowLog, Modifier.weight(1f))
+                            ProTextAction("代理面板", Icons.Rounded.Public, onPanel, Modifier.weight(1f))
                         }
                     }
                     val note = operation.ifBlank { message }
@@ -277,13 +343,48 @@ private fun ProHome(
                 }
             }
         }
+        if (state.running && providers.isNotEmpty()) item { HomeSubscriptionSummary(providers) }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SectionHeading("代理工作台", "节点、订阅、连接、规则都在一个面板里")
-                FlatActionRow(Icons.Rounded.Public, "打开面板", "高密度视图 · 实时状态", onPanel)
+                SectionHeading("流量统计", "实时速度与本次核心累计流量")
+                FlatListSurface {
+                    Row(Modifier.fillMaxWidth().padding(vertical = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ProMetric(bytes(state.downloadTotal), "累计下载", Modifier.weight(1f))
+                        ProMetric(bytes(state.uploadTotal), "累计上传", Modifier.weight(1f))
+                    }
+                }
             }
         }
         item { Spacer(Modifier.height(8.dp)) }
+    }
+}
+
+@Composable
+private fun HomeSubscriptionSummary(providers: List<DashboardProviderUi>) {
+    val t = LocalBichenTokens.current
+    val tracked = providers.filter { it.hasSubscriptionInfo && it.total > 0L }
+    val used = tracked.sumOf { it.used }
+    val total = tracked.sumOf { it.total }
+    val remaining = (total - used).coerceAtLeast(0L)
+    val ratio = if (total <= 0L) 0f else (used.toDouble() / total.toDouble()).toFloat().coerceIn(0f, 1f)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionHeading("订阅流量", "${providers.size} 个远程订阅")
+        FlatListSurface {
+            Column(Modifier.fillMaxWidth().padding(vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                if (tracked.isNotEmpty()) {
+                    LinearProgressIndicator(progress = { ratio }, modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape))
+                    Row {
+                        Text("已用 ${bytes(used)} / ${bytes(total)}", color = t.textSecondary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                        Text("剩余 ${bytes(remaining)}", color = t.textSecondary, style = MaterialTheme.typography.bodySmall)
+                    }
+                    tracked.mapNotNull { it.expire.takeIf { value -> value > 0L } }.minOrNull()?.let {
+                        Text("最近到期 ${dateFromEpoch(it)}", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+                    }
+                } else {
+                    Text("订阅服务器未返回可用流量信息", color = t.textSecondary, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
     }
 }
 
@@ -302,6 +403,7 @@ private fun ProPanel(
     val t = LocalBichenTokens.current
     var tab by rememberSaveable { mutableStateOf(ProTab.Nodes) }
     var sort by rememberSaveable { mutableStateOf(ProSort.Config) }
+    var query by rememberSaveable { mutableStateOf("") }
     var expanded by rememberSaveable { mutableStateOf<String?>(null) }
     var refreshing by remember { mutableStateOf(false) }
     var providers by remember { mutableStateOf<List<DashboardProviderUi>>(emptyList()) }
@@ -371,9 +473,7 @@ private fun ProPanel(
             if (!state.running) {
                 item { EmptySection(Icons.Rounded.PowerSettingsNew, "代理未运行", "启动代理后显示实时数据") }
             } else when (tab) {
-                ProTab.Overview -> {
-                    item { OverviewSection(state, upRate, downRate, rates) }
-                }
+                ProTab.Overview -> item { OverviewSection(state, upRate, downRate, rates) }
                 ProTab.Nodes -> {
                     item {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -383,9 +483,37 @@ private fun ProPanel(
                             }
                         }
                     }
-                    val groups = if (sort == ProSort.Config) state.groups else state.groups.sortedBy { g ->
+                    item {
+                        OutlinedTextField(
+                            value = query,
+                            onValueChange = { query = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            leadingIcon = { Icon(Icons.Rounded.Search, null) },
+                            trailingIcon = {
+                                if (query.isNotBlank()) IconButton(onClick = { query = "" }) { Icon(Icons.Rounded.Close, "清除搜索") }
+                            },
+                            placeholder = { Text("搜索策略组或节点") },
+                            shape = RoundedCornerShape(18.dp),
+                        )
+                    }
+                    val base = if (sort == ProSort.Config) state.groups else state.groups.sortedBy { g ->
                         g.nodes.firstOrNull { it.name == current(g) }?.let(::nodeDelay)?.takeIf { it > 0 } ?: Long.MAX_VALUE
                     }
+                    val needle = query.trim()
+                    val groups = base.mapNotNull { group ->
+                        if (needle.isBlank()) group
+                        else {
+                            val headerMatch = group.name.contains(needle, true) || current(group).contains(needle, true)
+                            val nodes = group.nodes.filter { it.name.contains(needle, true) || it.type.contains(needle, true) }
+                            when {
+                                headerMatch -> group
+                                nodes.isNotEmpty() -> group.copy(nodes = nodes)
+                                else -> null
+                            }
+                        }
+                    }
+                    if (groups.isEmpty()) item { EmptySection(Icons.Rounded.SearchOff, "没有匹配节点", "换个关键词试试") }
                     groups.chunked(2).forEachIndexed { rowIndex, pair ->
                         item(key = "g$rowIndex-${pair.joinToString { it.name }}") {
                             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -579,11 +707,11 @@ private fun NodeSection(
     onDelay: (String) -> Unit,
 ) {
     val t = LocalBichenTokens.current
-    Surface(shape = RoundedCornerShape(24.dp), color = t.elevatedCardBackground.copy(alpha = .52f)) {
-        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(group.name, Modifier.padding(horizontal = 4.dp, vertical = 2.dp), color = t.textSecondary, style = MaterialTheme.typography.labelMedium)
+    Surface(shape = RoundedCornerShape(24.dp), color = t.elevatedCardBackground.copy(alpha = .42f)) {
+        Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text(group.name, Modifier.padding(horizontal = 6.dp, vertical = 4.dp), color = t.textSecondary, style = MaterialTheme.typography.labelMedium)
             group.nodes.chunked(2).forEach { pair ->
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     pair.forEach { node -> NodeTile(node, selected == node.name, delays[node.name] ?: node.lastDelay, testing[node.name] == true, { onSelect(node.name) }, { onDelay(node.name) }, Modifier.weight(1f)) }
                     if (pair.size == 1) Spacer(Modifier.weight(1f))
                 }
@@ -597,11 +725,11 @@ private fun NodeTile(node: ProxyNodeUi, selected: Boolean, delay: Long?, testing
     val t = LocalBichenTokens.current
     val scheme = MaterialTheme.colorScheme
     Surface(
-        modifier = modifier.heightIn(min = 66.dp), shape = RoundedCornerShape(17.dp),
+        modifier = modifier.heightIn(min = 62.dp), shape = RoundedCornerShape(15.dp),
         color = if (selected) scheme.primaryContainer.copy(alpha = .52f) else Color.Transparent,
     ) {
-        Row(Modifier.fillMaxWidth().clickable(onClick = onSelect).padding(start = 12.dp, end = 7.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (selected) { Icon(Icons.Rounded.CheckCircle, "已选择", tint = scheme.primary, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(7.dp)) }
+        Row(Modifier.fillMaxWidth().clickable(onClick = onSelect).padding(start = 10.dp, end = 5.dp, top = 7.dp, bottom = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (selected) { Icon(Icons.Rounded.CheckCircle, "已选择", tint = scheme.primary, modifier = Modifier.size(17.dp)); Spacer(Modifier.width(6.dp)) }
             Column(Modifier.weight(1f)) {
                 Text(node.name, color = t.textPrimary, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text(listOf(node.type, if (node.udp) "UDP" else "").filter { it.isNotBlank() }.joinToString(" · "), color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
@@ -616,7 +744,14 @@ private fun DelayValue(value: Long?, testing: Boolean, onClick: () -> Unit) {
     val t = LocalBichenTokens.current
     val scheme = MaterialTheme.colorScheme
     val text = when { testing -> "…"; value == null -> "--"; value <= 0 -> "超时"; else -> "$value ms" }
-    val color = when { testing || value == null -> t.textSecondary; value <= 0 -> scheme.error; value <= 350 -> scheme.primary; value <= 600 -> t.success; value <= 900 -> t.warning; else -> scheme.error }
+    val color = when {
+        testing || value == null -> t.textSecondary
+        value <= 0 -> scheme.error
+        value <= 250 -> t.success
+        value <= 600 -> scheme.primary
+        value <= 1000 -> t.warning
+        else -> scheme.error
+    }
     Box(Modifier.heightIn(min = 44.dp).widthIn(min = 48.dp).clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
         Text(text, color = color, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
@@ -644,6 +779,10 @@ private fun ProviderSection(providers: List<DashboardProviderUi>) {
                     Row {
                         Text("已用 ${bytes(p.used)} / ${bytes(p.total)}", color = t.textSecondary, style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f))
                         Text("剩余 ${bytes(p.remaining)}", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+                    }
+                    Row {
+                        Text("↑ ${bytes(p.upload)}", color = t.textSecondary, style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f))
+                        Text("↓ ${bytes(p.download)}", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
                     }
                     if (p.expire > 0) Text("到期 ${dateFromEpoch(p.expire)}", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
                 } else Text("服务端未提供流量信息", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
@@ -755,6 +894,20 @@ private fun ProSettings(state: ProxyComposeState, controller: ProxyComposeContro
         }
         item { Text("运行参数修改后建议重启代理核心生效。", color = t.textSecondary, style = MaterialTheme.typography.bodySmall) }
     }
+}
+
+@Composable
+private fun ProLogDialog(text: String, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Mihomo 运行日志") },
+        text = {
+            Box(Modifier.fillMaxWidth().heightIn(max = 520.dp).verticalScroll(rememberScrollState())) {
+                Text(text, style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("关闭") } },
+    )
 }
 
 @Composable
@@ -894,6 +1047,19 @@ private fun bytes(value: Long): String {
     var v = value.toDouble(); var i = 0
     while (v >= 1024 && i < units.lastIndex) { v /= 1024; i++ }
     return if (i == 0) "${v.toLong()} ${units[i]}" else String.format(Locale.US, "%.1f %s", v, units[i])
+}
+
+private fun duration(seconds: Long): String {
+    if (seconds <= 0L) return "0s"
+    val days = seconds / 86_400
+    val hours = (seconds % 86_400) / 3_600
+    val minutes = (seconds % 3_600) / 60
+    return when {
+        days > 0 -> "${days}d ${hours}h"
+        hours > 0 -> "${hours}h ${minutes}m"
+        minutes > 0 -> "${minutes}m ${seconds % 60}s"
+        else -> "${seconds}s"
+    }
 }
 
 private fun speed(value: Long): String = "${bytes(value)}/s"
