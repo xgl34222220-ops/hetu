@@ -38,6 +38,11 @@ final class MihomoControllerClient {
     JSONObject proxyProviders()throws Exception{return request("GET","/providers/proxies",null,12000);}
     JSONObject version()throws Exception{return request("GET","/version",null);}
 
+    void reloadConfig(String path)throws Exception{
+        if(path==null||path.trim().isEmpty())throw new IOException("重载配置路径为空");
+        request("PUT","/configs?force=true",new JSONObject().put("path",path.trim()),15000);
+    }
+
     void select(String group,String node)throws Exception{
         request("PUT","/proxies/"+Uri.encode(group),new JSONObject().put("name",node));
     }
