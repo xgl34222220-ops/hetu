@@ -22,14 +22,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -39,12 +34,12 @@ import dev.chrisbanes.haze.HazeState
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 
 /**
- * LuoShu-shaped floating dock with a device-safe glass renderer.
+ * Device-safe LuoShu dock.
  *
- * Do not gate the runtime shader only on isRuntimeShaderSupported(): several OEM Android 16
- * compositors report shader support but render the backdrop as an opaque charcoal slab or a
- * horizontal white strip.  The rest of Bichen can still use blur; the dock deliberately uses the
- * same LuoShu geometry/spacing with a stable translucent surface so it never corrupts the UI.
+ * Important: this renderer intentionally has ZERO explicit white overlay layers and ZERO
+ * per-item background surfaces. Some Android 16/OEM compositors turned translucent white
+ * gradients/backdrop layers into opaque rectangular blocks. The dock is now one continuous
+ * rounded shell plus one tinted moving selection lens only.
  */
 data class DockItem(val label: String, val icon: ImageVector, val opticalScale: Float = 1f)
 
@@ -57,32 +52,17 @@ fun BichenGlassDock(
     backdrop: LayerBackdrop?,
     modifier: Modifier = Modifier,
 ) {
-    // Keep parameters for API compatibility with the app shell.  Rendering is intentionally
-    // independent from OEM backdrop shaders until they can be validated per device.
     @Suppress("UNUSED_VARIABLE") val ignoredHaze = hazeState
     @Suppress("UNUSED_VARIABLE") val ignoredBackdrop = backdrop
 
     val scheme = MaterialTheme.colorScheme
     val tokens = LocalBichenTokens.current
-    val dark = scheme.background.luminance() < .5f
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val shape = RoundedCornerShape(31.dp)
 
-    val shellBrush = if (dark) {
-        Brush.verticalGradient(
-            listOf(
-                tokens.elevatedCardBackground.copy(alpha = .90f),
-                tokens.cardBackground.copy(alpha = .82f),
-            ),
-        )
-    } else {
-        Brush.verticalGradient(
-            listOf(
-                Color.White.copy(alpha = .88f),
-                tokens.elevatedCardBackground.copy(alpha = .78f),
-            ),
-        )
-    }
+    // One continuous tinted shell. No Color.White, no shader, no haze, no layered glass bitmap.
+    val shellColor = lerp(tokens.elevatedCardBackground, scheme.primaryContainer, .08f)
+    val shellBorder = lerp(scheme.outlineVariant, scheme.primary, .12f).copy(alpha = .38f)
 
     Box(
         modifier = modifier
@@ -94,27 +74,10 @@ fun BichenGlassDock(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .shadow(16.dp, shape, clip = false)
+                .shadow(12.dp, shape, clip = false)
                 .clip(shape)
-                .background(shellBrush)
-                .drawBehind {
-                    drawRoundRect(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                Color.White.copy(alpha = if (dark) .09f else .42f),
-                                Color.Transparent,
-                            ),
-                            center = Offset(size.width * .18f, 0f),
-                            radius = size.width * .76f,
-                        ),
-                        cornerRadius = CornerRadius(size.height / 2f),
-                    )
-                }
-                .border(
-                    .8.dp,
-                    if (dark) Color.White.copy(alpha = .13f) else Color.White.copy(alpha = .86f),
-                    shape,
-                ),
+                .background(shellColor)
+                .border(.7.dp, shellBorder, shape),
         )
 
         DockLayout(
@@ -122,7 +85,6 @@ fun BichenGlassDock(
             selected = selected,
             onSelect = onSelect,
             modifier = Modifier.fillMaxSize().padding(6.dp),
-            dark = dark,
         )
     }
 }
@@ -133,7 +95,6 @@ private fun DockLayout(
     selected: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier,
-    dark: Boolean,
 ) {
     val scheme = MaterialTheme.colorScheme
     BoxWithConstraints(modifier = modifier) {
@@ -163,58 +124,36 @@ private fun DockLayout(
         val extra = 10.dp * stretch.value
         val start = indicatorX + 4.dp - if (direction < 0f) extra else 0.dp
         val indicatorShape = RoundedCornerShape(23.dp)
-        val indicatorColor = scheme.primary.copy(alpha = if (dark) .25f else .14f)
+        val indicatorColor = lerp(scheme.primaryContainer, scheme.secondaryContainer, .12f)
+        val indicatorBorder = scheme.primary.copy(alpha = .18f)
 
+        // The only moving background in the dock: one rounded primary-tinted lens.
         Box(
             modifier = Modifier
                 .offset(x = start)
                 .width(itemWidth - 8.dp + extra)
                 .height(60.dp)
-                .shadow(3.dp, indicatorShape, clip = false)
+                .shadow(2.dp, indicatorShape, clip = false)
                 .clip(indicatorShape)
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            indicatorColor.copy(alpha = (indicatorColor.alpha * 1.18f).coerceAtMost(1f)),
-                            indicatorColor.copy(alpha = indicatorColor.alpha * .74f),
-                        ),
-                    ),
-                )
-                .drawBehind {
-                    drawRoundRect(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                Color.White.copy(alpha = if (dark) .08f else .28f),
-                                Color.Transparent,
-                            ),
-                            center = Offset(size.width * .26f, 0f),
-                            radius = size.width * .78f,
-                        ),
-                        cornerRadius = CornerRadius(size.height / 2f),
-                    )
-                }
-                .border(
-                    1.dp,
-                    Color.White.copy(alpha = if (dark) .18f else .54f),
-                    indicatorShape,
-                ),
+                .background(indicatorColor)
+                .border(.8.dp, indicatorBorder, indicatorShape),
         )
 
         Row(Modifier.fillMaxWidth().selectableGroup()) {
             items.forEachIndexed { index, item ->
                 val selectedItem = index == targetIndex
-                val interactionSource = remember(item.label) { MutableInteractionSource() }
-                val pressed by interactionSource.collectIsPressedAsState()
-                val baseColor = if (selectedItem) scheme.primary else scheme.onSurfaceVariant.copy(alpha = .90f)
+                val source = remember(item.label) { MutableInteractionSource() }
+                val pressed by source.collectIsPressedAsState()
+                val baseColor = if (selectedItem) scheme.primary else scheme.onSurfaceVariant.copy(alpha = .86f)
                 val itemColor by animateColorAsState(
                     targetValue = if (pressed) baseColor.copy(alpha = .62f) else baseColor,
-                    animationSpec = tween(170),
+                    animationSpec = tween(160),
                     label = "${item.label}DockColor",
                 )
                 val itemScale by animateFloatAsState(
                     targetValue = when {
                         pressed -> .92f
-                        selectedItem -> 1.035f
+                        selectedItem -> 1.03f
                         else -> 1f
                     },
                     animationSpec = spring(dampingRatio = .66f, stiffness = 520f),
@@ -226,11 +165,10 @@ private fun DockLayout(
                         .width(itemWidth)
                         .height(60.dp)
                         .graphicsLayer { scaleX = itemScale; scaleY = itemScale }
-                        .clip(RoundedCornerShape(23.dp))
                         .selectable(
                             selected = selectedItem,
                             role = Role.Tab,
-                            interactionSource = interactionSource,
+                            interactionSource = source,
                             indication = null,
                             onClick = { if (!selectedItem) onSelect(index) },
                         ),
