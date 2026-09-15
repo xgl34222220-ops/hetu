@@ -3,14 +3,19 @@ package io.github.xgl34222220.bichen.ui
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.BitmapDrawable
 import android.net.VpnService
 import io.github.xgl34222220.bichen.DnsVpnService
 import io.github.xgl34222220.bichen.MihomoVpnService
+import io.github.xgl34222220.bichen.ProxyStatusBridge
 import io.github.xgl34222220.bichen.RootBridge
 import io.github.xgl34222220.bichen.RuleStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
+import org.json.JSONObject
 import java.text.Collator
 import java.util.Locale
 
@@ -35,6 +40,7 @@ internal data class AppItem(
     val label: String,
     val packageName: String,
     val system: Boolean,
+    val icon: Bitmap? = null,
 )
 
 internal data class RuleSourceItem(
@@ -65,8 +71,7 @@ internal data class DnsCounters(
     val blocked: Long = 0,
     val errors: Long = 0,
 ) {
-    val blockRate: Int
-        get() = if (queries <= 0L) 0 else ((blocked * 100L) / queries).coerceIn(0L, 100L).toInt()
+    val blockRate: Int get() = if (queries <= 0L) 0 else ((blocked * 100L) / queries).coerceIn(0L, 100L).toInt()
 }
 
 internal class BichenComposeController(private val context: Context) {
@@ -79,13 +84,15 @@ internal class BichenComposeController(private val context: Context) {
         var ruleCount = 0
         var allowCount = 0
         var blockCount = 0
-        runCatching {
+        try {
             rules.reload()
             val summary = rules.summary()
             ruleCount = summary.optInt("effectiveCount")
             allowCount = summary.optInt("allowCount")
             blockCount = summary.optInt("blockCount")
-        }
+        } catch (_: Exception) { }
+
+        val rootProxyRunning = ProxyStatusBridge.rootProxyRunning(app)
         HomeSnapshot(
             rootGranted = status.optBoolean("rootGranted"),
             installed = status.optBoolean("installed"),
@@ -99,7 +106,7 @@ internal class BichenComposeController(private val context: Context) {
             queries = prefs.getLong("queries", 0),
             errors = prefs.getLong("errors", 0),
             vpnRunning = DnsVpnService.running,
-            proxyRunning = MihomoVpnService.engaged || prefs.getBoolean("proxyWanted", false),
+            proxyRunning = rootProxyRunning || MihomoVpnService.engaged || prefs.getBoolean("proxyWanted", false),
             message = status.optString("error", status.optString("message", "")),
         )
     }
@@ -132,27 +139,43 @@ internal class BichenComposeController(private val context: Context) {
     }
 
     suspend fun toggleModuleProtection(currentlyEnabled: Boolean): String = withContext(Dispatchers.IO) {
-        val command = if (currentlyEnabled) "pause" else "resume"
+        val command = if (currentlyEnabled) "pause" else "enable"
         val result = RootBridge.run(app, command)
         if (!result.ok()) throw IllegalStateException(result.output.ifBlank { "模块操作失败" })
-        result.output.trim().ifBlank { if (currentlyEnabled) "模块保护已暂停" else "模块保护已恢复" }
+        val raw = result.output.trim()
+        try { JSONObject(raw).optString("message", raw) } catch (_: Exception) { raw.ifBlank { if (currentlyEnabled) "模块保护已暂停" else "广告拦截已开启" } }
     }
 
     suspend fun loadApps(): List<AppItem> = withContext(Dispatchers.IO) {
         val pm = app.packageManager
         val items = pm.getInstalledApplications(0).asSequence()
             .filter { it.packageName != app.packageName }
-            .map {
+            .map { info ->
                 AppItem(
-                    label = pm.getApplicationLabel(it).toString(),
-                    packageName = it.packageName,
-                    system = (it.flags and ApplicationInfo.FLAG_SYSTEM) != 0,
+                    label = pm.getApplicationLabel(info).toString(),
+                    packageName = info.packageName,
+                    system = (info.flags and ApplicationInfo.FLAG_SYSTEM) != 0,
+                    icon = loadIcon(info),
                 )
             }.toMutableList()
         val collator = Collator.getInstance(Locale.CHINA)
         items.sortWith { a, b -> collator.compare(a.label, b.label) }
         items
     }
+
+    private fun loadIcon(info: ApplicationInfo): Bitmap? = try {
+        val drawable = app.packageManager.getApplicationIcon(info)
+        val size = 72
+        if (drawable is BitmapDrawable && drawable.bitmap != null) {
+            Bitmap.createScaledBitmap(drawable.bitmap, size, size, true)
+        } else {
+            Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888).also { bitmap ->
+                val canvas = Canvas(bitmap)
+                drawable.setBounds(0, 0, size, size)
+                drawable.draw(canvas)
+            }
+        }
+    } catch (_: Exception) { null }
 
     fun bypassApps(): Set<String> = prefs.getStringSet("bypassApps", emptySet())?.toSet() ?: emptySet()
 
@@ -218,7 +241,7 @@ internal class BichenComposeController(private val context: Context) {
 
     fun requestItems(): List<RequestItem> {
         val raw = prefs.getString("dnsLogs", "[]") ?: "[]"
-        val array = runCatching { JSONArray(raw) }.getOrElse { JSONArray() }
+        val array = try { JSONArray(raw) } catch (_: Exception) { JSONArray() }
         val out = ArrayList<RequestItem>()
         for (i in array.length() - 1 downTo 0) {
             val o = array.optJSONObject(i) ?: continue

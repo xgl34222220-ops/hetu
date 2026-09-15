@@ -73,7 +73,7 @@ jobs:
           unzip -l "$APK" | tee compose-apk-files.txt
           grep -q "package: name='io.github.xgl34222220.bichen.preview'" compose-apk-badging.txt
           grep -q "versionName='0.4.0-test.23-preview'" compose-apk-badging.txt
-          grep -q "launchable-activity: name='io.github.xgl34222220.bichen.CompactMainActivity'" compose-apk-badging.txt
+          grep -q "launchable-activity: name='io.github.xgl34222220.bichen.BichenMainActivity'" compose-apk-badging.txt
           grep -q 'assets/sources.tsv' compose-apk-files.txt
           grep -q 'assets/rules/adaway.txt' compose-apk-files.txt
           grep -q 'assets/rules/china.txt' compose-apk-files.txt

@@ -11,9 +11,10 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <application android:name=".BichenApplication" android:label="辟尘" android:theme="@style/AppTheme" android:icon="@drawable/ic_bichen" android:allowBackup="false" android:supportsRtl="true" android:usesCleartextTraffic="false" android:hardwareAccelerated="true">
         <service android:name=".UpdateJobService" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="true" />
-        <activity android:name=".CompactMainActivity" android:exported="true" android:windowSoftInputMode="adjustResize">
+        <activity android:name=".BichenMainActivity" android:exported="true" android:windowSoftInputMode="adjustResize">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity>
+        <activity android:name=".CompactMainActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".ComposeMainActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".MainActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".ComposeProxyActivity" android:label="代理" android:exported="false" />
