@@ -363,19 +363,33 @@ private fun ProxyPanel(state: ProxyComposeState, controller: ProxyComposeControl
                 }
             }
             items(groups, key = { it.name }) { group ->
+                val groupVisual = proxyVisualParts(group.name)
+                val nowVisual = proxyVisualParts(group.now)
                 Surface(
                     modifier = Modifier.fillMaxWidth().clickable { selectedGroup = group },
                     shape = RoundedCornerShape(24.dp),
                     color = tokens.cardBackground,
                     shadowElevation = 1.dp,
                 ) {
-                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(group.name, Modifier.weight(1f), color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall)
-                            Text(group.type, color = tokens.textSecondary, style = MaterialTheme.typography.labelSmall)
+                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        ProxyVisualBadge(groupVisual.first)
+                        Spacer(Modifier.width(13.dp))
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(groupVisual.second, Modifier.weight(1f), color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Surface(shape = CircleShape, color = tokens.elevatedCardBackground) {
+                                    Text(group.type, Modifier.padding(horizontal = 8.dp, vertical = 4.dp), color = tokens.textSecondary, style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(nowVisual.first, fontSize = 16.sp)
+                                Spacer(Modifier.width(6.dp))
+                                Text(nowVisual.second, Modifier.weight(1f), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                            Text("${group.nodes.size} 个节点 · 点击选择与测速", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
                         }
-                        Text(group.now, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleSmall)
-                        Text("${group.nodes.size} 个节点 · 点击选择与测速", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
+                        Spacer(Modifier.width(7.dp))
+                        Icon(Icons.Rounded.ChevronRight, null, tint = tokens.textSecondary, modifier = Modifier.size(20.dp))
                     }
                 }
             }
@@ -396,11 +410,17 @@ private fun ProxyPanel(state: ProxyComposeState, controller: ProxyComposeControl
             if (state.connections.isEmpty()) item("empty-connections") { ProxyEmpty("暂无连接", "当前没有可显示的活动连接。") }
             items(state.connections, key = { it.id }) { c ->
                 Surface(shape = RoundedCornerShape(24.dp), color = tokens.cardBackground, shadowElevation = 1.dp) {
-                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(c.host, color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        if (c.rule.isNotBlank()) Text(c.rule, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall)
-                        if (c.chain.isNotBlank()) Text(c.chain, color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 2)
-                        Text("↑ ${formatBytes(c.upload)}   ↓ ${formatBytes(c.download)}", color = tokens.textSecondary, style = MaterialTheme.typography.labelSmall)
+                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Surface(shape = RoundedCornerShape(15.dp), color = tokens.elevatedCardBackground, modifier = Modifier.size(44.dp)) {
+                            Box(contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Language, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(21.dp)) }
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(c.host, color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            if (c.rule.isNotBlank()) Text(c.rule, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall)
+                            if (c.chain.isNotBlank()) Text(c.chain, color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 2)
+                            Text("↑ ${formatBytes(c.upload)}   ↓ ${formatBytes(c.download)}", color = tokens.textSecondary, style = MaterialTheme.typography.labelSmall)
+                        }
                     }
                 }
             }
@@ -433,26 +453,59 @@ private fun NodePicker(
 ) {
     var query by remember { mutableStateOf("") }
     val nodes = group.nodes.filter { query.isBlank() || it.contains(query, true) }
+    val groupVisual = proxyVisualParts(group.name)
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(group.name) },
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ProxyVisualBadge(groupVisual.first)
+                Spacer(Modifier.width(10.dp))
+                Column {
+                    Text(groupVisual.second, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("${group.nodes.size} 个节点", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        },
         text = {
             Column {
-                OutlinedTextField(query, { query = it }, placeholder = { Text("搜索节点") }, singleLine = true, shape = RoundedCornerShape(18.dp))
+                OutlinedTextField(query, { query = it }, placeholder = { Text("搜索节点") }, leadingIcon = { Icon(Icons.Rounded.Search, null) }, singleLine = true, shape = RoundedCornerShape(18.dp))
                 Spacer(Modifier.height(8.dp))
                 LazyColumn(Modifier.heightIn(max = 440.dp)) {
                     items(nodes) { node ->
-                        Row(Modifier.fillMaxWidth().padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f).clickable { onSelect(node) }) {
-                                Text(
-                                    node,
-                                    fontWeight = if (node == group.now) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (node == group.now) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                                )
-                                val d = delays[node]
-                                Text(if (d == null) "未测速" else if (d < 0) "超时" else "$d ms", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        val visual = proxyVisualParts(node)
+                        val selected = node == group.now
+                        Surface(
+                            onClick = { onSelect(node) },
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            shape = RoundedCornerShape(18.dp),
+                            color = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = .48f) else Color.Transparent,
+                        ) {
+                            Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+                                ProxyVisualBadge(visual.first)
+                                Spacer(Modifier.width(10.dp))
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    Text(
+                                        visual.second,
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    val d = delays[node]
+                                    Text(
+                                        if (d == null) "未测速" else if (d < 0) "超时" else "$d ms",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = when {
+                                            d == null -> MaterialTheme.colorScheme.onSurfaceVariant
+                                            d < 0 -> MaterialTheme.colorScheme.error
+                                            d <= 150 -> MaterialTheme.colorScheme.primary
+                                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
+                                    )
+                                }
+                                if (selected) Icon(Icons.Rounded.CheckCircle, "当前节点", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                                TextButton(onClick = { onDelay(node) }) { Text("测速") }
                             }
-                            TextButton(onClick = { onDelay(node) }) { Text("测速") }
                         }
                     }
                 }
@@ -461,6 +514,37 @@ private fun NodePicker(
         confirmButton = { TextButton(onClick = onDismiss) { Text("关闭") } },
     )
 }
+
+@Composable
+private fun ProxyVisualBadge(symbol: String) {
+    val tokens = LocalBichenTokens.current
+    Surface(
+        shape = RoundedCornerShape(15.dp),
+        color = tokens.elevatedCardBackground,
+        modifier = Modifier.size(44.dp),
+        shadowElevation = 1.dp,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(symbol.ifBlank { "☁️" }, fontSize = 21.sp)
+        }
+    }
+}
+
+private fun proxyVisualParts(value: String): Pair<String, String> {
+    val separator = "\u2009"
+    val cut = value.indexOf(separator)
+    if (cut in 1..8) {
+        val symbol = value.substring(0, cut)
+        if (symbol in PROXY_VISUAL_SYMBOLS) return symbol to value.substring(cut + separator.length).trimStart()
+    }
+    val leading = PROXY_VISUAL_SYMBOLS.firstOrNull { value.startsWith(it) }
+    return if (leading != null) leading to value.removePrefix(leading).trimStart() else "☁️" to value
+}
+
+private val PROXY_VISUAL_SYMBOLS = setOf(
+    "🇭🇰", "🇹🇼", "🇯🇵", "🇸🇬", "🇺🇸", "🇰🇷", "🇬🇧", "🇩🇪", "🇫🇷", "🇨🇦", "🇦🇺", "🇷🇺", "🇮🇳", "🇳🇱", "🇹🇷",
+    "🎯", "⚡", "🛟", "⚖️", "🔗", "🧭", "🌐", "⛔", "🔒", "🌍", "☁️",
+)
 
 @Composable
 private fun ProxyTools(state: ProxyComposeState, controller: ProxyComposeController, onPanel: () -> Unit) {
