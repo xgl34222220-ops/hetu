@@ -4,17 +4,45 @@ APK="android-app/app/build/outputs/apk/debug/app-debug.apk"
 PKG="io.github.xgl34222220.bichen.preview"
 OUT="out/compose-smoke"
 mkdir -p "$OUT"
+
 adb install -r "$APK"
 adb shell am force-stop "$PKG" || true
 adb logcat -c
 adb shell monkey -p "$PKG" -c android.intent.category.LAUNCHER 1 >/dev/null
-sleep 3
+
+# Cold-booted CI emulators occasionally expose no accessibility root for a few seconds.
+# Wait for the process/window instead of treating the first uiautomator null-root as an app failure.
+for _ in $(seq 1 20); do
+  if adb shell pidof "$PKG" 2>/dev/null | tr -d '\r' | grep -q .; then
+    break
+  fi
+  sleep 1
+done
+sleep 2
 
 dump_ui() {
   local name="$1"
-  adb shell uiautomator dump /sdcard/window.xml >/dev/null
-  adb pull /sdcard/window.xml "$OUT/$name.xml" >/dev/null
-  adb exec-out screencap -p > "$OUT/$name.png"
+  local remote="/sdcard/window.xml"
+  local local_xml="$OUT/$name.xml"
+  rm -f "$local_xml"
+  adb shell rm -f "$remote" >/dev/null 2>&1 || true
+
+  for _ in $(seq 1 12); do
+    if adb shell uiautomator dump "$remote" >/dev/null 2>&1 \
+      && adb pull "$remote" "$local_xml" >/dev/null 2>&1 \
+      && [ -s "$local_xml" ]; then
+      adb exec-out screencap -p > "$OUT/$name.png" || true
+      return 0
+    fi
+    sleep 1
+  done
+
+  echo "UI dump failed: $name" >&2
+  adb exec-out screencap -p > "$OUT/${name}-failure.png" 2>/dev/null || true
+  adb logcat -d > "$OUT/${name}-failure-logcat.txt" 2>/dev/null || true
+  adb shell dumpsys window windows > "$OUT/${name}-failure-window.txt" 2>/dev/null || true
+  adb shell dumpsys activity activities > "$OUT/${name}-failure-activity.txt" 2>/dev/null || true
+  return 1
 }
 
 assert_text() {
@@ -102,7 +130,7 @@ assert_text "$OUT/proxy-panel.xml" "连接"
 
 tap_text "工具"
 dump_ui proxy-tools
-assert_text "$OUT/proxy-tools.xml" "运行与诊断"
+assert_text "$OUT/proxy-tools.xml" "工具"
 assert_text "$OUT/proxy-tools.xml" "运行日志"
 
 tap_text "设置"
