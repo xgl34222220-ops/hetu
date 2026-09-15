@@ -15,6 +15,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CloudSync
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -41,6 +42,7 @@ import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import dev.chrisbanes.haze.materials.HazeMaterials
 import io.github.xgl34222220.bichen.ComposeProxyActivity
+import io.github.xgl34222220.bichen.ProxySubscriptionActivity
 import io.github.xgl34222220.bichen.ui.glass.liquidGlassLens
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.blur.blur
@@ -65,39 +67,62 @@ fun BichenGlassDock(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val mainDock = items.map { it.label } == listOf("首页", "应用", "规则", "活动")
-    val renderItems = remember(items, mainDock) {
-        if (mainDock) {
-            listOf(
+    val labels = items.map { it.label }
+    val mainDock = labels == listOf("首页", "应用", "规则", "活动")
+    val proxyDock = labels == listOf("首页", "面板", "工具", "设置")
+    val renderItems = remember(items, mainDock, proxyDock) {
+        when {
+            mainDock -> listOf(
                 items[0],
                 DockItem("代理", Icons.Rounded.Public, .96f),
                 items[1],
                 items[2],
                 items[3],
             )
-        } else items
+            proxyDock -> listOf(
+                items[0],
+                items[1],
+                DockItem("订阅", Icons.Rounded.CloudSync, .96f),
+                items[2],
+                items[3],
+            )
+            else -> items
+        }
     }
-    val renderSelected = if (mainDock) {
-        when (selected) {
+    val renderSelected = when {
+        mainDock -> when (selected) {
             0 -> 0
             1 -> 2
             2 -> 3
             3 -> 4
             else -> 0
         }
-    } else selected
+        proxyDock -> when (selected) {
+            0 -> 0
+            1 -> 1
+            2 -> 3
+            3 -> 4
+            else -> 0
+        }
+        else -> selected
+    }
     val handleSelect: (Int) -> Unit = { index ->
-        if (mainDock && index == 1) {
-            context.startActivity(Intent(context, ComposeProxyActivity::class.java))
-        } else if (mainDock) {
-            when (index) {
+        when {
+            mainDock && index == 1 -> context.startActivity(Intent(context, ComposeProxyActivity::class.java))
+            mainDock -> when (index) {
                 0 -> onSelect(0)
                 2 -> onSelect(1)
                 3 -> onSelect(2)
                 4 -> onSelect(3)
             }
-        } else {
-            onSelect(index)
+            proxyDock && index == 2 -> context.startActivity(Intent(context, ProxySubscriptionActivity::class.java))
+            proxyDock -> when (index) {
+                0 -> onSelect(0)
+                1 -> onSelect(1)
+                3 -> onSelect(2)
+                4 -> onSelect(3)
+            }
+            else -> onSelect(index)
         }
     }
 
