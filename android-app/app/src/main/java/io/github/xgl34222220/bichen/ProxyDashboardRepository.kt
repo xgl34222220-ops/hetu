@@ -91,61 +91,8 @@ internal class ProxyDashboardRepository(context: Context) {
         parseRuleSets(api.ruleProviders())
     }
 
-    /**
-     * Remote providers are tested by Mihomo's own provider health check, so the configured
-     * testUrl/expectedStatus is used. Inline-only configs fall back to group-native tests.
-     */
-    suspend fun globalDelay(): Map<String, Long> = withContext(Dispatchers.IO) {
-        val providerList = remoteProviders(api.proxyProviders())
-        if (providerList.isNotEmpty()) {
-            for (chunk in providerList.chunked(2)) {
-                coroutineScope {
-                    chunk.map { provider ->
-                        async {
-                            try { api.healthCheckProxyProvider(provider.name) }
-                            catch (cancel: CancellationException) { throw cancel }
-                            catch (_: Exception) { }
-                        }
-                    }.awaitAll()
-                }
-            }
-            val wanted = providerList.flatMapTo(LinkedHashSet()) { it.nodes }
-            var result = LinkedHashMap<String, Long>()
-            repeat(10) { round ->
-                if (round > 0) delay(450)
-                result = delaysFromProxies(api.proxies(), wanted)
-                if (wanted.isNotEmpty() && result.values.count { it > 0L } >= (wanted.size * 4) / 5) return@withContext result
-            }
-            // Do not turn unknown history into a fake "all timed out" result.
-            return@withContext result
-        }
-
-        val raw = api.proxies()
-        val result = LinkedHashMap<String, Long>()
-        val groups = raw.keys().asSequence().mapNotNull { name ->
-            val obj = raw.optJSONObject(name) ?: return@mapNotNull null
-            val all = obj.optJSONArray("all") ?: return@mapNotNull null
-            Triple(name, obj, all)
-        }.sortedByDescending { it.third.length() }.toList()
-        val covered = HashSet<String>()
-        for ((name, obj, all) in groups) {
-            val names = (0 until all.length()).map { all.optString(it) }.filter { it.isNotBlank() }
-            if (names.count { it !in covered } < 2 && result.isNotEmpty()) continue
-            try {
-                val measured = api.groupDelay(name, obj.optString("testUrl", ""), obj.optString("expectedStatus", "200-399"))
-                val keys = measured.keys()
-                while (keys.hasNext()) {
-                    val node = keys.next()
-                    val value = measured.optLong(node, -1L)
-                    if (value > 0L) result[node] = value
-                }
-                covered += names
-            } catch (cancel: CancellationException) {
-                throw cancel
-            } catch (_: Exception) { }
-        }
-        result
-    }
+    /** Reuse the controller's complete global test: group-native batch testing plus individual fallback for every uncovered real node. */
+    suspend fun globalDelay(): Map<String, Long> = controller.globalDelay()
 
     suspend fun delay(node: String): Long = withContext(Dispatchers.IO) {
         val provider = parseProviders(api.proxyProviders()).firstOrNull {
@@ -244,12 +191,6 @@ internal class ProxyDashboardRepository(context: Context) {
         "textrule", "text" -> "TEXT"
         "yamlrule", "yaml" -> "YAML"
         else -> raw.uppercase().ifBlank { "RULE" }
-    }
-
-    private fun delaysFromProxies(root: JSONObject, wanted: Set<String>): LinkedHashMap<String, Long> {
-        val out = LinkedHashMap<String, Long>()
-        for (name in wanted) latestDelay(root.optJSONObject(name))?.let { out[name] = it }
-        return out
     }
 
     private fun latestDelay(node: JSONObject?): Long? {
