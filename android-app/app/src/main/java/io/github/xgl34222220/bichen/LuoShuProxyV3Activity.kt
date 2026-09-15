@@ -63,7 +63,7 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * LuoShu V3 proxy workspace.
+ * Bichen V3 proxy workspace.
  *
  * Strategy / node selection surfaces intentionally use only opaque, non-animated fills.
  * This avoids OEM RenderNode partial-invalidation artifacts that appeared as white rectangles
@@ -294,7 +294,7 @@ private fun V3Home(
     ) {
         item { V3DetailBar("代理", onBack, onRefresh) }
         item {
-            Surface(shape = RoundedCornerShape(28.dp), color = t.cardBackground, shadowElevation = 2.dp) {
+            Surface(shape = RoundedCornerShape(24.dp), color = t.cardBackground, shadowElevation = 0.dp) {
                 Column(
                     Modifier.fillMaxWidth()
                         .background(Brush.linearGradient(listOf(lerp(t.cardBackground, scheme.primaryContainer, .38f), t.cardBackground)))
@@ -358,7 +358,7 @@ private fun V3Home(
         }
         if (state.running && providers.isNotEmpty()) item { V3SubscriptionSummary(providers) }
         item {
-            Surface(onClick = onPanel, shape = RoundedCornerShape(24.dp), color = t.cardBackground, shadowElevation = 1.dp) {
+            Surface(onClick = onPanel, shape = RoundedCornerShape(20.dp), color = t.cardBackground, shadowElevation = 0.dp) {
                 Row(Modifier.fillMaxWidth().padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
                     V3IconBox(Icons.Rounded.Public)
                     Spacer(Modifier.width(12.dp))
@@ -623,8 +623,8 @@ private fun V3GroupCard(
     val t = LocalBichenTokens.current
     val scheme = MaterialTheme.colorScheme
     // Opaque + direct state change: never animate/translucently composite this surface.
-    val fill = if (expanded) lerp(t.cardBackground, scheme.primaryContainer, .52f) else t.cardBackground
-    Surface(modifier = modifier, shape = RoundedCornerShape(20.dp), color = fill, shadowElevation = 1.dp) {
+    val fill = if (expanded) t.selectionBackground else t.cardBackground
+    Surface(modifier = modifier, shape = RoundedCornerShape(18.dp), color = fill, shadowElevation = 0.dp) {
         Column(
             Modifier.fillMaxWidth().clickable(onClick = onExpand).padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(9.dp),
@@ -673,8 +673,8 @@ private fun V3NodeCell(node: ProxyNodeUi, selected: Boolean, delay: Long?, testi
     val t = LocalBichenTokens.current
     val scheme = MaterialTheme.colorScheme
     // Same rule here: selected color is an opaque lerp and changes immediately.
-    val fill = if (selected) lerp(t.cardBackground, scheme.primaryContainer, .60f) else t.cardBackground
-    Surface(modifier = modifier.heightIn(min = 64.dp), shape = RoundedCornerShape(17.dp), color = fill, shadowElevation = if (selected) 1.dp else 0.dp) {
+    val fill = if (selected) t.selectionBackground else t.cardBackground
+    Surface(modifier = modifier.heightIn(min = 64.dp), shape = RoundedCornerShape(16.dp), color = fill, shadowElevation = 0.dp) {
         Row(Modifier.fillMaxWidth().clickable(onClick = onSelect).padding(start = 11.dp, end = 5.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             if (selected) {
                 Icon(Icons.Rounded.CheckCircle, "已选择", tint = scheme.primary, modifier = Modifier.size(17.dp))
@@ -739,7 +739,7 @@ private fun V3Delay(value: Long?, testing: Boolean, onClick: () -> Unit) {
 private fun V3Overview(state: ProxyComposeState, up: Long, down: Long, rates: List<V3Rate>) {
     val t = LocalBichenTokens.current
     val scheme = MaterialTheme.colorScheme
-    Surface(shape = RoundedCornerShape(28.dp), color = t.cardBackground, shadowElevation = 1.dp) {
+    Surface(shape = RoundedCornerShape(24.dp), color = t.cardBackground, shadowElevation = 0.dp) {
         Column(
             Modifier.fillMaxWidth().background(Brush.linearGradient(listOf(lerp(t.cardBackground, scheme.primaryContainer, .32f), t.cardBackground))).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -895,7 +895,7 @@ private fun V3Settings(state: ProxyComposeState) {
             }
         }
         item {
-            Surface(onClick = { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }, shape = RoundedCornerShape(24.dp), color = t.cardBackground, shadowElevation = 1.dp) {
+            Surface(onClick = { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }, shape = RoundedCornerShape(20.dp), color = t.cardBackground, shadowElevation = 0.dp) {
                 Row(Modifier.fillMaxWidth().padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
                     V3IconBox(Icons.Rounded.Tune)
                     Spacer(Modifier.width(12.dp))
@@ -932,7 +932,7 @@ private fun V3TopBar(title: String) {
 private fun V3HeaderButton(icon: ImageVector, description: String, onClick: () -> Unit, loading: Boolean = false, tint: Color = MaterialTheme.colorScheme.primary) {
     val t = LocalBichenTokens.current
     Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-        Surface(modifier = Modifier.size(44.dp), shape = CircleShape, color = t.cardBackground, shadowElevation = 1.dp) {
+        Surface(modifier = Modifier.size(44.dp), shape = CircleShape, color = t.cardBackground, shadowElevation = 0.dp) {
             IconButton(onClick = onClick, enabled = !loading, modifier = Modifier.fillMaxSize()) {
                 if (loading) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = tint)
                 else Icon(icon, description, tint = tint, modifier = Modifier.size(21.dp))
@@ -964,14 +964,14 @@ private fun V3Heading(title: String, subtitle: String? = null, modifier: Modifie
 
 @Composable
 private fun V3Card(content: @Composable ColumnScope.() -> Unit) {
-    Surface(shape = RoundedCornerShape(24.dp), color = LocalBichenTokens.current.cardBackground, shadowElevation = 1.dp) {
+    Surface(shape = RoundedCornerShape(20.dp), color = LocalBichenTokens.current.cardBackground, shadowElevation = 0.dp) {
         Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
     }
 }
 
 @Composable
 private fun V3ListCard(content: @Composable ColumnScope.() -> Unit) {
-    Surface(shape = RoundedCornerShape(24.dp), color = LocalBichenTokens.current.cardBackground, shadowElevation = 1.dp) {
+    Surface(shape = RoundedCornerShape(20.dp), color = LocalBichenTokens.current.cardBackground, shadowElevation = 0.dp) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), content = content)
     }
 }
@@ -979,7 +979,7 @@ private fun V3ListCard(content: @Composable ColumnScope.() -> Unit) {
 @Composable
 private fun V3Shortcut(title: String, subtitle: String, icon: ImageVector, onClick: () -> Unit, modifier: Modifier) {
     val t = LocalBichenTokens.current
-    Surface(onClick = onClick, modifier = modifier, shape = RoundedCornerShape(24.dp), color = t.cardBackground, shadowElevation = 1.dp) {
+    Surface(onClick = onClick, modifier = modifier, shape = RoundedCornerShape(20.dp), color = t.cardBackground, shadowElevation = 0.dp) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             V3IconBox(icon)
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -1045,7 +1045,7 @@ private fun V3LatencyMetric(value: String, testing: Boolean, modifier: Modifier)
 @Composable
 private fun V3SmallAction(icon: ImageVector, text: String, onClick: () -> Unit) {
     val t = LocalBichenTokens.current
-    Surface(onClick = onClick, shape = RoundedCornerShape(16.dp), color = t.cardBackground, shadowElevation = 1.dp) {
+    Surface(onClick = onClick, shape = RoundedCornerShape(16.dp), color = t.cardBackground, shadowElevation = 0.dp) {
         Row(Modifier.heightIn(min = 44.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(5.dp))
@@ -1058,7 +1058,7 @@ private fun V3SmallAction(icon: ImageVector, text: String, onClick: () -> Unit) 
 private fun V3Search(value: String, onValueChange: (String) -> Unit, placeholder: String) {
     val t = LocalBichenTokens.current
     val scheme = MaterialTheme.colorScheme
-    Surface(shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 1.dp) {
+    Surface(shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
         Row(Modifier.fillMaxWidth().heightIn(min = 50.dp).padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Rounded.Search, null, tint = t.textSecondary, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(10.dp))
@@ -1079,7 +1079,7 @@ private fun V3Search(value: String, onValueChange: (String) -> Unit, placeholder
 @Composable
 private fun V3Empty(icon: ImageVector, title: String, subtitle: String) {
     val t = LocalBichenTokens.current
-    Surface(shape = RoundedCornerShape(24.dp), color = t.cardBackground, shadowElevation = 1.dp) {
+    Surface(shape = RoundedCornerShape(20.dp), color = t.cardBackground, shadowElevation = 0.dp) {
         Row(Modifier.fillMaxWidth().padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
             V3IconBox(icon, 40.dp); Spacer(Modifier.width(12.dp))
             Column { Text(title, color = t.textPrimary, style = MaterialTheme.typography.titleSmall); Text(subtitle, color = t.textSecondary, style = MaterialTheme.typography.bodySmall) }

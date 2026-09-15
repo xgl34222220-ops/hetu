@@ -183,7 +183,7 @@ private fun CompactTopBar(title: String, actions: @Composable RowScope.() -> Uni
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp), content = actions)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp), content = actions)
     }
 }
 
@@ -199,9 +199,9 @@ private fun CompactHeaderAction(
         Surface(
             modifier = Modifier.size(44.dp),
             shape = CircleShape,
-            color = tokens.cardBackground,
+            color = tokens.controlBackground,
             contentColor = MaterialTheme.colorScheme.primary,
-            shadowElevation = 1.dp,
+            shadowElevation = 0.dp,
         ) {
             IconButton(onClick = onClick, enabled = !loading, modifier = Modifier.fillMaxSize()) {
                 if (loading) CircularProgressIndicator(Modifier.size(21.dp), strokeWidth = 2.dp)
@@ -278,7 +278,7 @@ private fun CompactHomePage(
             }
         }
         item("hero") {
-            Surface(shape = RoundedCornerShape(28.dp), color = tokens.cardBackground, shadowElevation = 2.dp) {
+            Surface(shape = RoundedCornerShape(24.dp), color = tokens.selectionBackground, shadowElevation = 0.dp) {
                 Column(
                     Modifier.fillMaxWidth()
                         .background(Brush.linearGradient(listOf(scheme.primaryContainer.copy(alpha = .46f), tokens.cardBackground)))
@@ -484,7 +484,7 @@ private fun CompactMetric(value: String, label: String, modifier: Modifier = Mod
 @Composable
 private fun CompactShortcut(title: String, subtitle: String, icon: ImageVector, onClick: () -> Unit, modifier: Modifier) {
     val tokens = LocalBichenTokens.current
-    Surface(onClick = onClick, modifier = modifier, shape = RoundedCornerShape(24.dp), color = tokens.cardBackground, shadowElevation = 1.dp) {
+    Surface(onClick = onClick, modifier = modifier, shape = RoundedCornerShape(18.dp), color = tokens.cardBackground, shadowElevation = 0.dp) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Surface(shape = RoundedCornerShape(15.dp), color = tokens.elevatedCardBackground) {
                 Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) { Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp)) }
@@ -563,9 +563,9 @@ private fun CompactAppsPage(controller: BichenComposeController) {
                     controller.setBypass(app.packageName, !checked)
                     selected = controller.bypassApps()
                 },
-                shape = RoundedCornerShape(24.dp),
+                shape = RoundedCornerShape(18.dp),
                 color = tokens.cardBackground,
-                shadowElevation = 1.dp,
+                shadowElevation = 0.dp,
             ) {
                 Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (app.icon != null) {
@@ -615,7 +615,7 @@ private fun CompactRulesPage(controller: BichenComposeController) {
             CompactTopBar("过滤规则") { CompactHeaderAction(Icons.Rounded.Refresh, "刷新", onClick = { reload++ }) }
         }
         item("summary") {
-            Surface(shape = RoundedCornerShape(28.dp), color = tokens.cardBackground, shadowElevation = 2.dp) {
+            Surface(shape = RoundedCornerShape(22.dp), color = tokens.cardBackground, shadowElevation = 0.dp) {
                 Column(Modifier.fillMaxWidth().padding(22.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Text("有效规则", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
                     Text("${state.count}", color = tokens.textPrimary, fontSize = 28.sp, lineHeight = 34.sp, fontWeight = FontWeight.SemiBold)
@@ -632,7 +632,7 @@ private fun CompactRulesPage(controller: BichenComposeController) {
         }
         item("source-heading") { CompactSectionHeading("订阅来源", "关闭来源不会删除手动规则") }
         items(state.sources, key = { it.id }) { source ->
-            Surface(shape = RoundedCornerShape(24.dp), color = tokens.cardBackground, shadowElevation = 1.dp) {
+            Surface(shape = RoundedCornerShape(18.dp), color = tokens.cardBackground, shadowElevation = 0.dp) {
                 Row(Modifier.fillMaxWidth().padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         Text(source.name, color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall)
@@ -710,7 +710,7 @@ private fun CompactActivityPage(controller: BichenComposeController) {
             CompactTopBar("请求活动") { CompactHeaderAction(Icons.Rounded.Refresh, "刷新", onClick = { refresh++ }) }
         }
         item("summary") {
-            Surface(shape = RoundedCornerShape(24.dp), color = tokens.cardBackground, shadowElevation = 1.dp) {
+            Surface(shape = RoundedCornerShape(18.dp), color = tokens.cardBackground, shadowElevation = 0.dp) {
                 Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         CompactMetric(counters.queries.toString(), "DNS 请求", Modifier.weight(1f))
@@ -733,7 +733,7 @@ private fun CompactActivityPage(controller: BichenComposeController) {
             }
         }
         items(requests, key = { it.domain + it.time + it.reason }) { item ->
-            Surface(shape = RoundedCornerShape(24.dp), color = tokens.cardBackground, shadowElevation = 1.dp) {
+            Surface(shape = RoundedCornerShape(18.dp), color = tokens.cardBackground, shadowElevation = 0.dp) {
                 Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(8.dp).background(if (item.blocked) tokens.danger else tokens.success, CircleShape))
                     Spacer(Modifier.width(12.dp))
