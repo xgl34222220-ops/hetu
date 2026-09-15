@@ -31,6 +31,20 @@ if not any(q in x for x in vals):
 PY
 }
 
+assert_not_text() {
+  local file="$1" text="$2"
+  python3 - "$file" "$text" <<'PY'
+import sys,xml.etree.ElementTree as ET
+p,q=sys.argv[1:]
+root=ET.parse(p).getroot()
+vals=[]
+for n in root.iter():
+    vals += [n.attrib.get('text',''), n.attrib.get('content-desc','')]
+if any(q in x for x in vals):
+    raise SystemExit(f"unexpected UI text: {q}")
+PY
+}
+
 tap_text() {
   local text="$1"
   dump_ui tap
@@ -56,6 +70,7 @@ assert_text "$OUT/home.xml" "应用"
 assert_text "$OUT/home.xml" "规则"
 assert_text "$OUT/home.xml" "活动"
 assert_text "$OUT/home.xml" "代理控制台"
+assert_not_text "$OUT/home.xml" "无法读取内置订阅"
 
 tap_text "应用"
 dump_ui apps
@@ -64,6 +79,9 @@ assert_text "$OUT/apps.xml" "应用放行"
 tap_text "规则"
 dump_ui rules
 assert_text "$OUT/rules.xml" "过滤规则"
+assert_text "$OUT/rules.xml" "AdAway 通用规则"
+assert_text "$OUT/rules.xml" "秋风纯广告"
+assert_not_text "$OUT/rules.xml" "无法读取内置订阅"
 
 tap_text "活动"
 dump_ui activity
