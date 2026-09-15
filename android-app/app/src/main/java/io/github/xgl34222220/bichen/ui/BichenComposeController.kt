@@ -11,7 +11,6 @@ import io.github.xgl34222220.bichen.RuleStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
-import org.json.JSONObject
 import java.text.Collator
 import java.util.Locale
 
@@ -61,6 +60,15 @@ internal data class RequestItem(
     val time: String,
 )
 
+internal data class DnsCounters(
+    val queries: Long = 0,
+    val blocked: Long = 0,
+    val errors: Long = 0,
+) {
+    val blockRate: Int
+        get() = if (queries <= 0L) 0 else ((blocked * 100L) / queries).coerceIn(0L, 100L).toInt()
+}
+
 internal class BichenComposeController(private val context: Context) {
     private val app = context.applicationContext
     private val prefs = app.getSharedPreferences("bichen", Context.MODE_PRIVATE)
@@ -96,7 +104,20 @@ internal class BichenComposeController(private val context: Context) {
         )
     }
 
-    fun preferredVpnMode(): Boolean = prefs.getString("preferredMode", "module") == "vpn"
+    fun protectionMode(): String = prefs.getString("preferredMode", "module") ?: "module"
+    fun preferredVpnMode(): Boolean = protectionMode() == "vpn"
+
+    fun setProtectionMode(value: String) {
+        if (value != "module" && value != "vpn") return
+        prefs.edit().putString("preferredMode", value).apply()
+        if (value == "module" && DnsVpnService.running) stopVpn()
+    }
+
+    fun dnsCounters(): DnsCounters = DnsCounters(
+        queries = prefs.getLong("queries", 0L),
+        blocked = prefs.getLong("blocked", 0L),
+        errors = prefs.getLong("errors", 0L),
+    )
 
     fun prepareVpn(): Intent? = VpnService.prepare(app)
 
