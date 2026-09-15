@@ -17,6 +17,7 @@
         <activity android:name=".ComposeMainActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".MainActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".ComposeProxyActivity" android:label="代理" android:exported="false" />
+        <activity android:name=".ProxySubscriptionActivity" android:label="订阅与配置" android:exported="false" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".ProxyActivity" android:label="代理（旧界面）" android:exported="false" />
         <activity android:name=".RootTproxyActivity" android:label="基础代理配置" android:exported="false" />
         <service android:name=".DnsVpnService" android:permission="android.permission.BIND_VPN_SERVICE" android:exported="true" android:foregroundServiceType="specialUse">
