@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.Locale
 
 internal data class ProxyGroupUi(val name: String, val type: String, val now: String, val nodes: List<String>)
 internal data class ProxyConnectionUi(val id: String, val host: String, val rule: String, val chain: String, val upload: Long, val download: Long)
@@ -73,8 +74,10 @@ internal class ProxyComposeController(context: Context) {
 
     suspend fun stop(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) { root.stop { onProgress(it) } }
 
-    suspend fun select(group: String, node: String) = withContext(Dispatchers.IO) { api.select(group, node) }
-    suspend fun delay(node: String): Long = withContext(Dispatchers.IO) { api.delay(node) }
+    suspend fun select(group: String, node: String) = withContext(Dispatchers.IO) {
+        api.select(stripVisualPrefix(group), stripVisualPrefix(node))
+    }
+    suspend fun delay(node: String): Long = withContext(Dispatchers.IO) { api.delay(stripVisualPrefix(node)) }
     suspend fun closeAll() = withContext(Dispatchers.IO) { api.closeAll() }
     suspend fun diagnostics(): String = withContext(Dispatchers.IO) { root.diagnostics() }
     suspend fun startupConfig(): String = withContext(Dispatchers.IO) { root.prepare(ProxyRuntimeProfile.load(prefs)).startup }
@@ -106,15 +109,28 @@ internal class ProxyComposeController(context: Context) {
         val result = ArrayList<ProxyGroupUi>()
         val it = root.keys()
         while (it.hasNext()) {
-            val name = it.next()
-            if (name == "GLOBAL") continue
-            val g = root.optJSONObject(name) ?: continue
+            val rawName = it.next()
+            if (rawName == "GLOBAL") continue
+            val g = root.optJSONObject(rawName) ?: continue
             val all = g.optJSONArray("all") ?: continue
+            val groupType = g.optString("type", "Group")
             val nodes = ArrayList<String>()
-            for (i in 0 until all.length()) nodes += all.optString(i)
-            result += ProxyGroupUi(name, g.optString("type", "Group"), g.optString("now", "未选择"), nodes)
+            for (i in 0 until all.length()) {
+                val rawNode = all.optString(i)
+                if (rawNode.isBlank()) continue
+                val nodeType = root.optJSONObject(rawNode)?.optString("type", "") ?: ""
+                nodes += decorateNode(rawNode, nodeType)
+            }
+            val rawNow = g.optString("now", "未选择")
+            val nowType = root.optJSONObject(rawNow)?.optString("type", "") ?: ""
+            result += ProxyGroupUi(
+                decorateGroup(rawName, groupType),
+                groupType,
+                decorateNode(rawNow, nowType),
+                nodes,
+            )
         }
-        return result.sortedBy { it.name.lowercase() }
+        return result.sortedBy { stripVisualPrefix(it.name).lowercase(Locale.ROOT) }
     }
 
     private fun parseConnections(root: JSONObject): List<ProxyConnectionUi> {
@@ -135,5 +151,74 @@ internal class ProxyComposeController(context: Context) {
             )
         }
         return out
+    }
+
+    private fun decorateGroup(name: String, type: String): String {
+        if (name.isBlank() || hasVisualPrefix(name)) return name
+        val icon = when (type.lowercase(Locale.ROOT)) {
+            "selector" -> "🎯"
+            "urltest", "url-test" -> "⚡"
+            "fallback" -> "🛟"
+            "loadbalance", "load-balance" -> "⚖️"
+            "relay" -> "🔗"
+            else -> "🧭"
+        }
+        return "$icon$VISUAL_SEPARATOR$name"
+    }
+
+    private fun decorateNode(name: String, type: String): String {
+        if (name.isBlank() || hasVisualPrefix(name) || KNOWN_FLAGS.any(name::contains)) return name
+        val icon = countryFlag(name) ?: when (type.lowercase(Locale.ROOT)) {
+            "direct" -> "🌐"
+            "reject", "rejectdrop" -> "⛔"
+            "wireguard" -> "🔗"
+            "tuic", "hysteria", "hysteria2" -> "⚡"
+            "trojan", "vmess", "vless", "ss", "shadowsocks", "ssr" -> "🔒"
+            "socks5", "http" -> "🌍"
+            "selector" -> "🎯"
+            "urltest", "url-test" -> "⚡"
+            else -> "☁️"
+        }
+        return "$icon$VISUAL_SEPARATOR$name"
+    }
+
+    private fun countryFlag(name: String): String? {
+        val n = name.lowercase(Locale.ROOT)
+        return when {
+            containsAny(n, "香港", "hong kong", "hongkong", " hk ", "hk-", "hk_") -> "🇭🇰"
+            containsAny(n, "台湾", "臺灣", "taiwan", " tw ", "tw-", "tw_") -> "🇹🇼"
+            containsAny(n, "日本", "东京", "東京", "大阪", "japan", "tokyo", "osaka", " jp ", "jp-", "jp_") -> "🇯🇵"
+            containsAny(n, "新加坡", "狮城", "獅城", "singapore", " sg ", "sg-", "sg_") -> "🇸🇬"
+            containsAny(n, "美国", "美國", "洛杉矶", "洛杉磯", "圣何塞", "聖何塞", "西雅图", "西雅圖", "usa", "united states", "los angeles", "san jose", "seattle", " us ", "us-", "us_") -> "🇺🇸"
+            containsAny(n, "韩国", "韓國", "首尔", "首爾", "korea", "seoul", " kr ", "kr-", "kr_") -> "🇰🇷"
+            containsAny(n, "英国", "英國", "伦敦", "倫敦", "united kingdom", "london", " uk ", "uk-", "uk_") -> "🇬🇧"
+            containsAny(n, "德国", "德國", "法兰克福", "法蘭克福", "germany", "frankfurt", " de ", "de-", "de_") -> "🇩🇪"
+            containsAny(n, "法国", "法國", "巴黎", "france", "paris", " fr ", "fr-", "fr_") -> "🇫🇷"
+            containsAny(n, "加拿大", "多伦多", "多倫多", "canada", "toronto", " ca ", "ca-", "ca_") -> "🇨🇦"
+            containsAny(n, "澳大利亚", "澳大利亞", "澳洲", "悉尼", "australia", "sydney", " au ", "au-", "au_") -> "🇦🇺"
+            containsAny(n, "俄罗斯", "俄羅斯", "莫斯科", "russia", "moscow", " ru ", "ru-", "ru_") -> "🇷🇺"
+            containsAny(n, "印度", "孟买", "孟買", "india", "mumbai", " in ", "in-", "in_") -> "🇮🇳"
+            containsAny(n, "荷兰", "荷蘭", "阿姆斯特丹", "netherlands", "amsterdam", " nl ", "nl-", "nl_") -> "🇳🇱"
+            containsAny(n, "土耳其", "伊斯坦布尔", "伊斯坦布爾", "turkey", "istanbul", " tr ", "tr-", "tr_") -> "🇹🇷"
+            else -> null
+        }
+    }
+
+    private fun containsAny(value: String, vararg keys: String): Boolean = keys.any(value::contains)
+
+    private fun hasVisualPrefix(value: String): Boolean {
+        val cut = value.indexOf(VISUAL_SEPARATOR)
+        return cut in 1..6 && VISUAL_ICONS.contains(value.substring(0, cut))
+    }
+
+    private fun stripVisualPrefix(value: String): String {
+        val cut = value.indexOf(VISUAL_SEPARATOR)
+        return if (cut in 1..6 && VISUAL_ICONS.contains(value.substring(0, cut))) value.substring(cut + VISUAL_SEPARATOR.length) else value
+    }
+
+    private companion object {
+        private const val VISUAL_SEPARATOR = "\u2009"
+        private val KNOWN_FLAGS = setOf("🇭🇰", "🇹🇼", "🇯🇵", "🇸🇬", "🇺🇸", "🇰🇷", "🇬🇧", "🇩🇪", "🇫🇷", "🇨🇦", "🇦🇺", "🇷🇺", "🇮🇳", "🇳🇱", "🇹🇷")
+        private val VISUAL_ICONS = KNOWN_FLAGS + setOf("🎯", "⚡", "🛟", "⚖️", "🔗", "🧭", "🌐", "⛔", "🔒", "🌍", "☁️")
     }
 }
