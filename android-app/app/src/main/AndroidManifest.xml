@@ -16,7 +16,8 @@
         </activity>
         <activity android:name=".BichenMainActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".MainActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
-        <activity android:name=".ComposeProxyActivity" android:label="代理" android:exported="false" />
+        <activity android:name=".ProxyWorkspaceActivity" android:label="代理" android:exported="false" />
+        <activity-alias android:name=".ComposeProxyActivity" android:targetActivity=".ProxyWorkspaceActivity" android:label="代理" android:exported="false" />
         <activity android:name=".ProxyCoreActivity" android:label="内核管理" android:exported="false" />
         <activity android:name=".ProxySubscriptionActivity" android:label="订阅与配置" android:exported="false" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".ProxyActivity" android:label="代理（旧界面）" android:exported="false" />
