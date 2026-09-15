@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.sp
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import io.github.xgl34222220.bichen.ui.*
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
 import top.yukonga.miuix.kmp.blur.layerBackdrop
@@ -228,16 +229,24 @@ private fun CompactHomePage(
     val snapshot by produceState(initialValue = HomeSnapshot(), refresh) {
         value = runCatching { controller.homeSnapshot() }.getOrElse { HomeSnapshot(message = it.message ?: "状态读取失败") }
     }
+    val counters by produceState(initialValue = controller.dnsCounters()) {
+        while (true) {
+            value = controller.dnsCounters()
+            delay(1000)
+        }
+    }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         if (it.resultCode == Activity.RESULT_OK) controller.startVpn()
         refresh++
     }
-    val active = if (controller.preferredVpnMode()) snapshot.vpnRunning else snapshot.moduleEnabled
+    val vpnMode = controller.preferredVpnMode()
+    val active = if (vpnMode) snapshot.vpnRunning else snapshot.moduleEnabled
     val tokens = LocalBichenTokens.current
     val scheme = MaterialTheme.colorScheme
     var detailsExpanded by rememberSaveable { mutableStateOf(false) }
+    var showModePicker by rememberSaveable { mutableStateOf(false) }
 
     fun toggleProtection() {
         if (controller.preferredVpnMode()) {
@@ -272,34 +281,67 @@ private fun CompactHomePage(
                     Modifier.fillMaxWidth()
                         .background(Brush.linearGradient(listOf(scheme.primaryContainer.copy(alpha = .46f), tokens.cardBackground)))
                         .padding(22.dp),
-                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(shape = CircleShape, color = tokens.cardBackground.copy(alpha = .72f)) {
                             Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Box(Modifier.size(6.dp).background(if (active) tokens.success else tokens.warning, CircleShape))
                                 Spacer(Modifier.width(6.dp))
-                                Text(if (active) "保护已开启" else "保护未开启", color = tokens.textPrimary, style = MaterialTheme.typography.labelMedium)
+                                Text(if (active) "去广告已开启" else "去广告未开启", color = tokens.textPrimary, style = MaterialTheme.typography.labelMedium)
                             }
                         }
                         Spacer(Modifier.weight(1f))
                         Text(snapshot.version, color = tokens.textSecondary, style = MaterialTheme.typography.labelMedium)
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(if (controller.preferredVpnMode()) "应用保护" else "模块保护", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
                         Text(
-                            if (active) "正在守护" else "准备就绪",
+                            if (vpnMode) "应用保护 · 可统计" else "模块保护 · 不占 VPN",
+                            color = tokens.textSecondary,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Text(
+                            if (active) "正在过滤广告" else "准备就绪",
                             color = tokens.textPrimary,
                             fontSize = 24.sp,
                             lineHeight = 32.sp,
                             fontWeight = FontWeight.SemiBold,
                         )
                     }
+                    Surface(
+                        onClick = { showModePicker = true },
+                        shape = RoundedCornerShape(16.dp),
+                        color = tokens.elevatedCardBackground.copy(alpha = .84f),
+                    ) {
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(if (vpnMode) Icons.Rounded.QueryStats else Icons.Rounded.Extension, null, tint = scheme.primary, modifier = Modifier.size(19.dp))
+                            Spacer(Modifier.width(9.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(if (vpnMode) "实时拦截统计" else "Root 模块过滤", color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall)
+                                Text(
+                                    if (vpnMode) "逐条记录 DNS 请求、拦截和拦截率" else "系统 hosts 过滤；点击可切换到可统计模式",
+                                    color = tokens.textSecondary,
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                            Icon(Icons.Rounded.ChevronRight, null, tint = tokens.textSecondary, modifier = Modifier.size(20.dp))
+                        }
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         CompactMetric("${snapshot.ruleCount}", "有效规则", Modifier.weight(1f))
-                        CompactMetric("${snapshot.blockedQueries}", "累计拦截", Modifier.weight(1f))
-                        CompactMetric("${snapshot.queries}", "DNS 请求", Modifier.weight(1f))
+                        CompactMetric("${counters.blocked}", if (vpnMode) "累计拦截" else "历史拦截", Modifier.weight(1f))
+                        CompactMetric("${counters.blockRate}%", if (vpnMode) "拦截率" else "历史拦截率", Modifier.weight(1f))
                     }
+                    Text(
+                        if (vpnMode) {
+                            if (snapshot.vpnRunning) "DNS 请求 ${counters.queries} · 正在实时累计，停止后历史不会清零"
+                            else "历史 DNS 请求 ${counters.queries} · 开启去广告后继续实时累计"
+                        } else {
+                            "模块保护没有逐条 DNS 命中事件，因此不会伪造实时次数；当前显示的是应用保护历史统计。"
+                        },
+                        color = tokens.textSecondary,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                     Button(
                         onClick = ::toggleProtection,
                         modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp),
@@ -307,7 +349,7 @@ private fun CompactHomePage(
                     ) {
                         Icon(if (active) Icons.Rounded.Pause else Icons.Rounded.PowerSettingsNew, null, Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text(if (active) "停止保护" else "开启保护", style = MaterialTheme.typography.labelLarge)
+                        Text(if (active) "停止去广告" else "开启去广告", style = MaterialTheme.typography.labelLarge)
                     }
                 }
             }
@@ -364,6 +406,66 @@ private fun CompactHomePage(
                     }
                 }
             }
+        }
+    }
+
+    if (showModePicker) {
+        AlertDialog(
+            onDismissRequest = { showModePicker = false },
+            title = { Text("去广告保护方式") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    ProtectionModeOption(
+                        selected = !vpnMode,
+                        icon = Icons.Rounded.Extension,
+                        title = "模块保护",
+                        description = "不占 VPN · 全局 hosts 去广告 · 无法获得逐条命中次数",
+                    ) {
+                        controller.setProtectionMode("module")
+                        showModePicker = false
+                        refresh++
+                    }
+                    ProtectionModeOption(
+                        selected = vpnMode,
+                        icon = Icons.Rounded.QueryStats,
+                        title = "应用保护",
+                        description = "本地 DNS VPN · 精确累计请求/拦截 · 支持按应用放行",
+                    ) {
+                        controller.setProtectionMode("vpn")
+                        showModePicker = false
+                        refresh++
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showModePicker = false }) { Text("关闭") } },
+        )
+    }
+}
+
+@Composable
+private fun ProtectionModeOption(
+    selected: Boolean,
+    icon: ImageVector,
+    title: String,
+    description: String,
+    onClick: () -> Unit,
+) {
+    val tokens = LocalBichenTokens.current
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(20.dp),
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = .55f) else tokens.elevatedCardBackground,
+    ) {
+        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Surface(shape = RoundedCornerShape(14.dp), color = tokens.cardBackground, modifier = Modifier.size(42.dp)) {
+                Box(contentAlignment = Alignment.Center) { Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(21.dp)) }
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(title, color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall)
+                Text(description, color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
+            }
+            if (selected) Icon(Icons.Rounded.CheckCircle, null, tint = MaterialTheme.colorScheme.primary)
         }
     }
 }
@@ -492,7 +594,6 @@ private fun CompactRulesPage(controller: BichenComposeController) {
     var addMode by remember { mutableStateOf<Boolean?>(null) }
     var input by remember { mutableStateOf("") }
     val tokens = LocalBichenTokens.current
-    val scheme = MaterialTheme.colorScheme
 
     LazyColumn(
         Modifier.fillMaxSize(),
@@ -580,8 +681,14 @@ private fun CompactRuleList(title: String, domains: List<String>, color: Color, 
 private fun CompactActivityPage(controller: BichenComposeController) {
     var refresh by remember { mutableIntStateOf(0) }
     val requests = remember(refresh) { controller.requestItems() }
-    val snapshot by produceState(initialValue = HomeSnapshot(), refresh) { value = runCatching { controller.homeSnapshot() }.getOrElse { HomeSnapshot() } }
+    val counters by produceState(initialValue = controller.dnsCounters(), refresh) {
+        while (true) {
+            value = controller.dnsCounters()
+            delay(1000)
+        }
+    }
     val tokens = LocalBichenTokens.current
+    val vpnMode = controller.preferredVpnMode()
 
     LazyColumn(
         Modifier.fillMaxSize(),
@@ -593,17 +700,25 @@ private fun CompactActivityPage(controller: BichenComposeController) {
         }
         item("summary") {
             Surface(shape = RoundedCornerShape(24.dp), color = tokens.cardBackground, shadowElevation = 1.dp) {
-                Row(Modifier.fillMaxWidth().padding(18.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    CompactMetric(snapshot.queries.toString(), "请求", Modifier.weight(1f))
-                    CompactMetric(snapshot.blockedQueries.toString(), "拦截", Modifier.weight(1f))
-                    CompactMetric(snapshot.errors.toString(), "错误", Modifier.weight(1f))
+                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        CompactMetric(counters.queries.toString(), "DNS 请求", Modifier.weight(1f))
+                        CompactMetric(counters.blocked.toString(), "累计拦截", Modifier.weight(1f))
+                        CompactMetric("${counters.blockRate}%", "拦截率", Modifier.weight(1f))
+                    }
+                    Text(
+                        if (vpnMode) "应用保护统计会每秒刷新；错误 ${counters.errors} 次。"
+                        else "当前是模块保护：这里只展示应用保护的历史精确统计，模块 hosts 命中不会伪造计数。",
+                        color = tokens.textSecondary,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
             }
         }
         item("recent") {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f)) { CompactSectionHeading("最近记录", if (requests.isEmpty()) "尚无请求记录" else "${requests.size} 条本地记录") }
-                if (requests.isNotEmpty()) TextButton({ controller.clearRequests(); refresh++ }) { Text("清空") }
+                Box(Modifier.weight(1f)) { CompactSectionHeading("最近记录", if (requests.isEmpty()) "尚无可统计 DNS 请求" else "${requests.size} 条本地记录") }
+                if (requests.isNotEmpty()) TextButton({ controller.clearRequests(); refresh++ }) { Text("清空记录") }
             }
         }
         items(requests, key = { it.domain + it.time + it.reason }) { item ->
@@ -627,10 +742,32 @@ private fun CompactActivityPage(controller: BichenComposeController) {
 private fun CompactSettingsSheet(controller: BichenComposeController, onDismiss: () -> Unit, onThemeChanged: () -> Unit) {
     val tokens = LocalBichenTokens.current
     val current = controller.appearance()
+    var mode by remember { mutableStateOf(controller.protectionMode()) }
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = tokens.cardBackground) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text("设置与诊断", fontSize = 22.sp, lineHeight = 30.sp, fontWeight = FontWeight.SemiBold, color = tokens.textPrimary)
             Text("辟尘 · 洛书 Compact UI", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
+            CompactSectionHeading("去广告保护方式", "模块保护不占 VPN；应用保护提供精确累计统计和应用放行")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = mode == "module",
+                    onClick = { controller.setProtectionMode("module"); mode = "module" },
+                    label = { Text("模块保护") },
+                    leadingIcon = { Icon(Icons.Rounded.Extension, null, Modifier.size(18.dp)) },
+                )
+                FilterChip(
+                    selected = mode == "vpn",
+                    onClick = { controller.setProtectionMode("vpn"); mode = "vpn" },
+                    label = { Text("应用保护") },
+                    leadingIcon = { Icon(Icons.Rounded.QueryStats, null, Modifier.size(18.dp)) },
+                )
+            }
+            Text(
+                if (mode == "vpn") "开启去广告后会真实累计 DNS 请求、拦截次数和拦截率，停止后历史仍保留。"
+                else "模块保护直接通过系统 hosts 拦截，不会收到逐条 DNS 命中事件，因此不显示伪造的实时次数。",
+                color = tokens.textSecondary,
+                style = MaterialTheme.typography.bodySmall,
+            )
             CompactSectionHeading("外观")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf("system" to "跟随系统", "light" to "浅色", "dark" to "深色").forEach { (value, label) ->
