@@ -10,6 +10,7 @@ import java.util.Locale
 
 internal data class ProxyGroupUi(val name: String, val type: String, val now: String, val nodes: List<String>)
 internal data class ProxyConnectionUi(val id: String, val host: String, val rule: String, val chain: String, val upload: Long, val download: Long)
+internal data class ProxySubscriptionUi(val name: String, val url: String, val placeholder: Boolean)
 internal data class ProxyComposeState(
     val running: Boolean = false,
     val core: String = "Mihomo",
@@ -69,7 +70,10 @@ internal class ProxyComposeController(context: Context) {
     }
 
     suspend fun start(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
-        root.start(ProxyRuntimeProfile.load(prefs)) { onProgress(it) }
+        val profile = ProxyRuntimeProfile.load(prefs)
+        val selected = configs.selected(profile.core) ?: error("尚未选择配置")
+        if (!configs.hasConfiguredSubscription(selected)) error("内置配置还没有可用订阅，请先到「设置 → 订阅管理」添加或编辑订阅")
+        root.start(profile) { onProgress(it) }
     }
 
     suspend fun stop(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) { root.stop { onProgress(it) } }
@@ -103,6 +107,42 @@ internal class ProxyComposeController(context: Context) {
     suspend fun importConfig(uri: Uri, displayName: String) = withContext(Dispatchers.IO) {
         val input = app.contentResolver.openInputStream(uri) ?: error("无法读取配置文件")
         configs.importConfig(ProxyRuntimeProfile.load(prefs).core, displayName, input)
+    }
+
+    suspend fun subscriptions(): List<ProxySubscriptionUi> = withContext(Dispatchers.IO) {
+        val profile = ProxyRuntimeProfile.load(prefs)
+        val entry = configs.selected(profile.core) ?: return@withContext emptyList()
+        configs.subscriptions(entry).map { ProxySubscriptionUi(it.name, it.url, it.placeholder) }
+    }
+
+    suspend fun updateSubscription(name: String, url: String) = withContext(Dispatchers.IO) {
+        val profile = ProxyRuntimeProfile.load(prefs)
+        val entry = configs.selected(profile.core) ?: error("尚未选择配置")
+        configs.updateSubscription(entry, name, url)
+    }
+
+    suspend fun addSubscription(name: String, url: String) = withContext(Dispatchers.IO) {
+        val profile = ProxyRuntimeProfile.load(prefs)
+        val entry = configs.selected(profile.core) ?: error("尚未选择配置")
+        configs.addSubscription(entry, name, url)
+    }
+
+    suspend fun deleteSubscription(name: String) = withContext(Dispatchers.IO) {
+        val profile = ProxyRuntimeProfile.load(prefs)
+        val entry = configs.selected(profile.core) ?: error("尚未选择配置")
+        configs.deleteSubscription(entry, name)
+    }
+
+    suspend fun configText(): String = withContext(Dispatchers.IO) {
+        val profile = ProxyRuntimeProfile.load(prefs)
+        val entry = configs.selected(profile.core) ?: error("尚未选择配置")
+        configs.read(entry)
+    }
+
+    suspend fun saveConfigText(text: String) = withContext(Dispatchers.IO) {
+        val profile = ProxyRuntimeProfile.load(prefs)
+        val entry = configs.selected(profile.core) ?: error("尚未选择配置")
+        configs.write(entry, text)
     }
 
     private fun parseGroups(root: JSONObject): List<ProxyGroupUi> {
