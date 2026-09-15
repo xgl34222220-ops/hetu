@@ -1,0 +1,208 @@
+name: Apply latency motion UI patch
+
+on:
+  push:
+    branches:
+      - feature/compose-luoshu-ui
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message == 'Add one-shot latency motion UI patch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/compose-luoshu-ui
+          fetch-depth: 0
+      - name: Apply latency motion patch
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/LuoShuProxyV3Activity.kt')
+          text = path.read_text()
+
+          def replace_once(old, new, label):
+              global text
+              if text.count(old) != 1:
+                  raise SystemExit(f'{label}: expected 1 match, found {text.count(old)}')
+              text = text.replace(old, new, 1)
+
+          replace_once(
+              'import androidx.activity.enableEdgeToEdge\nimport androidx.compose.foundation.Image',
+              '''import androidx.activity.enableEdgeToEdge
+          import androidx.compose.animation.Crossfade
+          import androidx.compose.animation.core.LinearEasing
+          import androidx.compose.animation.core.RepeatMode
+          import androidx.compose.animation.core.animateFloat
+          import androidx.compose.animation.core.infiniteRepeatable
+          import androidx.compose.animation.core.rememberInfiniteTransition
+          import androidx.compose.animation.core.tween
+          import androidx.compose.foundation.Image''',
+              'animation imports',
+          )
+
+          replace_once(
+              'import androidx.compose.ui.draw.clip\nimport androidx.compose.ui.graphics.Brush',
+              '''import androidx.compose.ui.draw.alpha
+          import androidx.compose.ui.draw.clip
+          import androidx.compose.ui.draw.rotate
+          import androidx.compose.ui.graphics.Brush''',
+              'draw imports',
+          )
+
+          replace_once(
+              '''                        Box(
+                              Modifier.weight(1f).heightIn(min = 48.dp).clip(RoundedCornerShape(14.dp)).clickable(enabled = state.running, onClick = onTestAll),
+                              contentAlignment = Alignment.CenterStart,
+                          ) { V3Metric(if (testingAll) "…" else avg, "延迟 · 点按测速", Modifier.fillMaxWidth()) }''',
+              '''                        V3LatencyMetric(
+                              value = avg,
+                              testing = testingAll,
+                              enabled = state.running,
+                              onClick = onTestAll,
+                              modifier = Modifier.weight(1f),
+                          )''',
+              'home latency metric',
+          )
+
+          replace_once(
+              '                    V3Tab.Nodes -> delays.putAll(repo.globalDelay())',
+              '''                    V3Tab.Nodes -> {
+                          val nodeNames = state.groups.flatMap { it.nodes }
+                              .map { it.name }
+                              .filter { it.isNotBlank() }
+                              .distinct()
+                          nodeNames.forEach { testing[it] = true }
+                          try {
+                              delays.putAll(repo.globalDelay())
+                          } finally {
+                              nodeNames.forEach { testing.remove(it) }
+                          }
+                      }''',
+              'global latency state',
+          )
+
+          replace_once(
+              '                            V3Heading("策略组", "点策略组展开节点", Modifier.weight(1f))',
+              '                            V3Heading("策略组", if (refreshing) "正在测试全部节点…" else "点策略组展开节点", Modifier.weight(1f))',
+              'node heading feedback',
+          )
+
+          old_delay = '''@Composable
+          private fun V3Delay(value: Long?, testing: Boolean, onClick: () -> Unit) {
+              val t = LocalBichenTokens.current
+              val scheme = MaterialTheme.colorScheme
+              val text = when { testing -> "…"; value == null -> "--"; value <= 0L -> "超时"; else -> "$value ms" }
+              val color = when {
+                  testing || value == null -> t.textSecondary
+                  value <= 0L -> scheme.error
+                  value <= 250L -> t.success
+                  value <= 600L -> scheme.primary
+                  value <= 1000L -> t.warning
+                  else -> scheme.error
+              }
+              Box(Modifier.heightIn(min = 44.dp).widthIn(min = 48.dp).clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
+                  Text(text, color = color, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+              }
+          }'''
+          new_delay = '''@Composable
+          private fun V3Delay(value: Long?, testing: Boolean, onClick: () -> Unit) {
+              val t = LocalBichenTokens.current
+              val scheme = MaterialTheme.colorScheme
+              val text = when { value == null -> "--"; value <= 0L -> "超时"; else -> "$value ms" }
+              val color = when {
+                  value == null -> t.textSecondary
+                  value <= 0L -> scheme.error
+                  value <= 250L -> t.success
+                  value <= 600L -> scheme.primary
+                  value <= 1000L -> t.warning
+                  else -> scheme.error
+              }
+              val motion = rememberInfiniteTransition()
+              val rotation by motion.animateFloat(
+                  initialValue = 0f,
+                  targetValue = 360f,
+                  animationSpec = infiniteRepeatable(animation = tween(820, easing = LinearEasing)),
+              )
+              val pulse by motion.animateFloat(
+                  initialValue = .35f,
+                  targetValue = 1f,
+                  animationSpec = infiniteRepeatable(animation = tween(520), repeatMode = RepeatMode.Reverse),
+              )
+              Box(
+                  Modifier.heightIn(min = 48.dp).widthIn(min = 58.dp).clip(RoundedCornerShape(12.dp)).clickable(enabled = !testing, onClick = onClick),
+                  contentAlignment = Alignment.Center,
+              ) {
+                  Crossfade(targetState = testing, animationSpec = tween(140)) { active ->
+                      if (active) {
+                          Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                              Icon(Icons.Rounded.Refresh, "测速中", tint = scheme.primary, modifier = Modifier.size(13.dp).rotate(rotation))
+                              Text("测速中", color = scheme.primary, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                              Box(Modifier.size(4.dp).alpha(pulse).background(scheme.primary, CircleShape))
+                          }
+                      } else {
+                          Crossfade(targetState = text, animationSpec = tween(120)) { display ->
+                              Text(display, color = color, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                          }
+                      }
+                  }
+              }
+          }'''
+          replace_once(old_delay, new_delay, 'delay micro-interaction')
+
+          metric_anchor = '''@Composable
+          private fun V3SmallAction(icon: ImageVector, text: String, onClick: () -> Unit) {'''
+          latency_metric = '''@Composable
+          private fun V3LatencyMetric(value: String, testing: Boolean, enabled: Boolean, onClick: () -> Unit, modifier: Modifier) {
+              val t = LocalBichenTokens.current
+              val scheme = MaterialTheme.colorScheme
+              val motion = rememberInfiniteTransition()
+              val rotation by motion.animateFloat(
+                  initialValue = 0f,
+                  targetValue = 360f,
+                  animationSpec = infiniteRepeatable(animation = tween(900, easing = LinearEasing)),
+              )
+              val pulse by motion.animateFloat(
+                  initialValue = .35f,
+                  targetValue = 1f,
+                  animationSpec = infiniteRepeatable(animation = tween(560), repeatMode = RepeatMode.Reverse),
+              )
+              Column(
+                  modifier.heightIn(min = 48.dp).clip(RoundedCornerShape(14.dp)).clickable(enabled = enabled && !testing, onClick = onClick),
+                  verticalArrangement = Arrangement.Center,
+              ) {
+                  Crossfade(targetState = testing, animationSpec = tween(150)) { active ->
+                      if (active) {
+                          Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                              Icon(Icons.Rounded.Refresh, "正在测试全部节点", tint = scheme.primary, modifier = Modifier.size(15.dp).rotate(rotation))
+                              Text("测速中", color = scheme.primary, style = MaterialTheme.typography.titleSmall, maxLines = 1)
+                              Box(Modifier.size(5.dp).alpha(pulse).background(scheme.primary, CircleShape))
+                          }
+                      } else {
+                          Crossfade(targetState = value, animationSpec = tween(140)) { display ->
+                              Text(display, color = t.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                          }
+                      }
+                  }
+                  Text(if (testing) "正在测试全部节点" else "延迟 · 点按测速", color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+              }
+          }
+
+          @Composable
+          private fun V3SmallAction(icon: ImageVector, text: String, onClick: () -> Unit) {'''
+          replace_once(metric_anchor, latency_metric, 'latency metric insertion')
+
+          path.write_text(text)
+          PY
+
+          rm -f .github/workflows/apply-latency-motion-patch.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Add latency testing micro-interactions"
+          git push origin HEAD:feature/compose-luoshu-ui
