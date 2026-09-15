@@ -1,0 +1,398 @@
+package io.github.xgl34222220.bichen
+
+import android.net.Uri
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import io.github.xgl34222220.bichen.ui.BichenTheme
+import io.github.xgl34222220.bichen.ui.LocalBichenTokens
+import kotlinx.coroutines.launch
+
+class ProxySubscriptionActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        setContent {
+            BichenTheme {
+                ProxySubscriptionScreen(onBack = { finish() })
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProxySubscriptionScreen(onBack: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val controller = remember { ProxyComposeController(context) }
+    val scope = rememberCoroutineScope()
+    val tokens = LocalBichenTokens.current
+    val scheme = MaterialTheme.colorScheme
+    val dark = scheme.background.luminance() < .5f
+
+    var revision by remember { mutableIntStateOf(0) }
+    var subscriptions by remember { mutableStateOf(emptyList<ProxySubscriptionUi>()) }
+    var configName by remember { mutableStateOf("加载中…") }
+    var loading by remember { mutableStateOf(true) }
+    var message by remember { mutableStateOf("") }
+
+    var editSubscription by remember { mutableStateOf<ProxySubscriptionUi?>(null) }
+    var addingSubscription by remember { mutableStateOf(false) }
+    var editorName by remember { mutableStateOf("") }
+    var editorUrl by remember { mutableStateOf("") }
+    var editorError by remember { mutableStateOf("") }
+    var savingSubscription by remember { mutableStateOf(false) }
+
+    var yamlOpen by remember { mutableStateOf(false) }
+    var yamlText by remember { mutableStateOf("") }
+    var yamlError by remember { mutableStateOf("") }
+    var yamlLoading by remember { mutableStateOf(false) }
+    var yamlSaving by remember { mutableStateOf(false) }
+
+    LaunchedEffect(revision) {
+        loading = true
+        runCatching {
+            val state = controller.state()
+            configName = state.config
+            controller.subscriptions()
+        }.onSuccess {
+            subscriptions = it
+            message = ""
+        }.onFailure {
+            subscriptions = emptyList()
+            message = it.message ?: "读取订阅失败"
+        }
+        loading = false
+    }
+
+    Box(
+        Modifier.fillMaxSize().background(tokens.pageBackground).drawBehind {
+            drawRect(
+                Brush.radialGradient(
+                    listOf(scheme.primary.copy(alpha = if (dark) .09f else .10f), Color.Transparent),
+                    center = Offset(size.width * .92f, size.height * .02f),
+                    radius = size.width * .85f,
+                ),
+            )
+            drawRect(
+                Brush.radialGradient(
+                    listOf(scheme.secondary.copy(alpha = if (dark) .06f else .07f), Color.Transparent),
+                    center = Offset(size.width * .04f, size.height * .82f),
+                    radius = size.width,
+                ),
+            )
+        },
+    ) {
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 36.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            item("header") {
+                Row(
+                    Modifier.fillMaxWidth().statusBarsPadding().heightIn(min = 64.dp).padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Surface(
+                        modifier = Modifier.size(44.dp),
+                        shape = CircleShape,
+                        color = tokens.cardBackground,
+                        contentColor = scheme.primary,
+                        shadowElevation = 1.dp,
+                    ) {
+                        IconButton(onClick = onBack, modifier = Modifier.fillMaxSize()) {
+                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回", Modifier.size(21.dp))
+                        }
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text("订阅与配置", color = tokens.textPrimary, fontSize = 26.sp, lineHeight = 34.sp, fontWeight = FontWeight.Bold)
+                        Text(configName, color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
+                    }
+                    Surface(
+                        modifier = Modifier.size(44.dp),
+                        shape = CircleShape,
+                        color = tokens.cardBackground,
+                        contentColor = scheme.primary,
+                        shadowElevation = 1.dp,
+                    ) {
+                        IconButton(onClick = { revision++ }, enabled = !loading, modifier = Modifier.fillMaxSize()) {
+                            if (loading) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                            else Icon(Icons.Rounded.Refresh, "刷新", Modifier.size(21.dp))
+                        }
+                    }
+                }
+            }
+
+            item("summary") {
+                val configured = subscriptions.count { !it.placeholder }
+                Surface(shape = RoundedCornerShape(28.dp), color = tokens.cardBackground, shadowElevation = 2.dp) {
+                    Column(
+                        Modifier.fillMaxWidth().background(
+                            Brush.linearGradient(listOf(scheme.primaryContainer.copy(alpha = .42f), tokens.cardBackground))
+                        ).padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Surface(shape = RoundedCornerShape(15.dp), color = tokens.elevatedCardBackground, modifier = Modifier.size(46.dp)) {
+                                Box(contentAlignment = Alignment.Center) { Icon(Icons.Rounded.CloudSync, null, tint = scheme.primary, modifier = Modifier.size(23.dp)) }
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("代理订阅", color = tokens.textPrimary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                Text("$configured 个已配置 · ${subscriptions.size - configured} 个待填写", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                        Text(
+                            "内置模板不包含任何私人订阅。订阅链接只保存在 App 私有配置目录；列表仅显示域名，不展示 Token。",
+                            color = tokens.textSecondary,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Button(
+                            onClick = {
+                                addingSubscription = true
+                                editSubscription = null
+                                editorName = ""
+                                editorUrl = ""
+                                editorError = ""
+                            },
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                            shape = RoundedCornerShape(18.dp),
+                        ) {
+                            Icon(Icons.Rounded.Add, null, Modifier.size(20.dp)); Spacer(Modifier.width(7.dp)); Text("添加订阅")
+                        }
+                    }
+                }
+            }
+
+            if (message.isNotBlank()) {
+                item("message") {
+                    Surface(shape = RoundedCornerShape(20.dp), color = scheme.errorContainer) {
+                        Text(message, Modifier.fillMaxWidth().padding(16.dp), color = scheme.onErrorContainer, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+
+            item("subscription-heading") {
+                Column(Modifier.padding(horizontal = 2.dp, vertical = 2.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text("订阅列表", color = tokens.textPrimary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text("点卡片可填写或修改订阅地址", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+
+            if (!loading && subscriptions.isEmpty()) {
+                item("empty") {
+                    Surface(shape = RoundedCornerShape(24.dp), color = tokens.cardBackground) {
+                        Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("当前配置没有 proxy-providers", color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall)
+                            Text("可以直接使用下方 YAML 编辑器修改整份配置。", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
+
+            items(subscriptions, key = { it.name }) { item ->
+                Surface(
+                    onClick = {
+                        addingSubscription = false
+                        editSubscription = item
+                        editorName = item.name
+                        editorUrl = if (item.placeholder) "" else item.url
+                        editorError = ""
+                    },
+                    shape = RoundedCornerShape(24.dp),
+                    color = tokens.cardBackground,
+                    shadowElevation = 1.dp,
+                ) {
+                    Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Surface(shape = RoundedCornerShape(15.dp), color = tokens.elevatedCardBackground, modifier = Modifier.size(44.dp)) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(if (item.placeholder) Icons.Rounded.LinkOff else Icons.Rounded.Link, null, tint = if (item.placeholder) tokens.warning else scheme.primary, modifier = Modifier.size(21.dp))
+                            }
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(item.name, color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(subscriptionSummary(item), color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                        Icon(Icons.Rounded.Edit, "编辑", tint = tokens.textSecondary, modifier = Modifier.size(20.dp))
+                    }
+                }
+            }
+
+            item("yaml-heading") {
+                Column(Modifier.padding(horizontal = 2.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text("高级编辑", color = tokens.textPrimary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text("需要修改策略组、DNS、规则或其他 Mihomo 字段时直接编辑 YAML", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            item("yaml") {
+                Surface(shape = RoundedCornerShape(24.dp), color = tokens.cardBackground, shadowElevation = 1.dp) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Surface(shape = RoundedCornerShape(15.dp), color = tokens.elevatedCardBackground, modifier = Modifier.size(44.dp)) {
+                            Box(contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Code, null, tint = scheme.primary, modifier = Modifier.size(22.dp)) }
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("编辑当前 YAML", color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall)
+                            Text("保存后在下次启动/重启代理时生效", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
+                        }
+                        TextButton(onClick = {
+                            yamlError = ""
+                            yamlLoading = true
+                            scope.launch {
+                                runCatching { controller.configText() }
+                                    .onSuccess { yamlText = it; yamlOpen = true }
+                                    .onFailure { message = it.message ?: "读取配置失败" }
+                                yamlLoading = false
+                            }
+                        }, enabled = !yamlLoading) {
+                            if (yamlLoading) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Text("打开")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (addingSubscription || editSubscription != null) {
+        val existing = editSubscription
+        AlertDialog(
+            onDismissRequest = { if (!savingSubscription) { addingSubscription = false; editSubscription = null } },
+            title = { Text(if (existing == null) "添加订阅" else "编辑订阅") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = editorName,
+                        onValueChange = { if (existing == null) editorName = it },
+                        enabled = existing == null,
+                        label = { Text("订阅名称") },
+                        placeholder = { Text("例如：机场一") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                    )
+                    OutlinedTextField(
+                        value = editorUrl,
+                        onValueChange = { editorUrl = it; editorError = "" },
+                        label = { Text("订阅链接") },
+                        placeholder = { Text("https://…") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                    )
+                    Text("链接仅保存在本机私有配置中；订阅列表不会显示 Token。", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                    if (editorError.isNotBlank()) Text(editorError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    if (existing != null && subscriptions.size > 1) {
+                        TextButton(
+                            onClick = {
+                                savingSubscription = true
+                                scope.launch {
+                                    runCatching { controller.deleteSubscription(existing.name) }
+                                        .onSuccess {
+                                            addingSubscription = false; editSubscription = null; revision++; message = "已删除 ${existing.name}；重启代理后生效"
+                                        }
+                                        .onFailure { editorError = it.message ?: "删除失败" }
+                                    savingSubscription = false
+                                }
+                            },
+                            enabled = !savingSubscription,
+                        ) {
+                            Icon(Icons.Rounded.DeleteOutline, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("删除这个订阅")
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        savingSubscription = true
+                        scope.launch {
+                            val result = if (existing == null) runCatching { controller.addSubscription(editorName, editorUrl) }
+                            else runCatching { controller.updateSubscription(existing.name, editorUrl) }
+                            result.onSuccess {
+                                addingSubscription = false
+                                editSubscription = null
+                                revision++
+                                message = "订阅已保存；重启代理后生效"
+                            }.onFailure { editorError = it.message ?: "保存失败" }
+                            savingSubscription = false
+                        }
+                    },
+                    enabled = !savingSubscription,
+                ) {
+                    if (savingSubscription) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Text("保存")
+                }
+            },
+            dismissButton = { TextButton(onClick = { addingSubscription = false; editSubscription = null }, enabled = !savingSubscription) { Text("取消") } },
+        )
+    }
+
+    if (yamlOpen) {
+        AlertDialog(
+            onDismissRequest = { if (!yamlSaving) yamlOpen = false },
+            title = { Text("编辑当前 YAML") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("直接修改源配置；运行中的代理不会被热改，保存后下次重启代理生效。", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                    OutlinedTextField(
+                        value = yamlText,
+                        onValueChange = { yamlText = it; yamlError = "" },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 360.dp, max = 520.dp),
+                        textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                        shape = RoundedCornerShape(14.dp),
+                    )
+                    if (yamlError.isNotBlank()) Text(yamlError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        yamlSaving = true
+                        scope.launch {
+                            runCatching { controller.saveConfigText(yamlText) }
+                                .onSuccess { yamlOpen = false; revision++; message = "YAML 已保存；重启代理后生效" }
+                                .onFailure { yamlError = it.message ?: "保存失败" }
+                            yamlSaving = false
+                        }
+                    },
+                    enabled = !yamlSaving,
+                ) {
+                    if (yamlSaving) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Text("保存")
+                }
+            },
+            dismissButton = { TextButton(onClick = { yamlOpen = false }, enabled = !yamlSaving) { Text("取消") } },
+        )
+    }
+}
+
+private fun subscriptionSummary(item: ProxySubscriptionUi): String {
+    if (item.placeholder) return "未配置 · 点击填写订阅链接"
+    val host = runCatching { Uri.parse(item.url).host }.getOrNull()
+    return if (host.isNullOrBlank()) "已配置 · 链接已隐藏" else "$host · Token 已隐藏"
+}
