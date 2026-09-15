@@ -12,7 +12,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 55
     steps:
       - uses: actions/checkout@v4
         with:
@@ -37,6 +37,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.5.0'
+          cache-read-only: false
       - name: Compile Compose UI first
         working-directory: android-app
         run: gradle :app:compileDebugKotlin --stacktrace
@@ -45,7 +46,6 @@ jobs:
           if [ ! -x "$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang" ]; then
             sdkmanager 'ndk;28.2.13676358'
           fi
-          ls "$ANDROID_HOME/platforms" || true
       - name: Build pinned Mihomo runtime
         run: |
           cp -r native/bridge .upstream/bichenbridge
@@ -70,6 +70,25 @@ jobs:
           AAPT=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n 1)
           "$AAPT" dump badging "$APK" | tee compose-apk-badging.txt
           unzip -t "$APK" >/dev/null
+          grep -q "package: name='io.github.xgl34222220.bichen.preview'" compose-apk-badging.txt
+          grep -q "launchable-activity: name='io.github.xgl34222220.bichen.preview.ComposeMainActivity'" compose-apk-badging.txt
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Android 35 Compose UI smoke test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          cores: 2
+          disable-animations: false
+          emulator-boot-timeout: 360
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-metrics -camera-back none
+          script: bash tools/smoke_compose_ui.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -77,5 +96,6 @@ jobs:
           path: |
             android-app/app/build/outputs/apk/debug/app-debug.apk
             compose-apk-badging.txt
+            out/compose-smoke/*
           if-no-files-found: warn
           retention-days: 14
