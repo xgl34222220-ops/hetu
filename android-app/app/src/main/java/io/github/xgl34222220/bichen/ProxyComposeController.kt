@@ -139,10 +139,14 @@ internal class ProxyComposeController(context: Context) {
     suspend fun diagnostics(): String = withContext(Dispatchers.IO) { root.diagnostics() }
     suspend fun startupConfig(): String = withContext(Dispatchers.IO) { root.prepare(ProxyRuntimeProfile.load(prefs)).startup }
 
-    /** Test every real leaf node. Result values use -1 for timeout/failure. */
+    /**
+     * Prefer Mihomo's native group URLTest for global testing. It performs the fan-out inside the
+     * core instead of opening a burst of controller sockets from the UI. Any uncovered leaf nodes
+     * fall back to the individual endpoint with the controller's own small concurrency gate.
+     */
     suspend fun globalDelay(): Map<String, Long> = withContext(Dispatchers.IO) {
         val raw = api.proxies()
-        val names = ArrayList<String>()
+        val leaves = LinkedHashSet<String>()
         val iterator = raw.keys()
         while (iterator.hasNext()) {
             val name = iterator.next()
@@ -151,26 +155,69 @@ internal class ProxyComposeController(context: Context) {
             if (item.optJSONArray("all") != null) continue
             val type = item.optString("type", "").lowercase(Locale.ROOT)
             if (type in setOf("direct", "reject", "rejectdrop", "pass", "compatible")) continue
-            names += name
+            leaves += name
         }
+
         val result = LinkedHashMap<String, Long>()
-        for (chunk in names.distinct().chunked(8)) {
+        val pending = LinkedHashSet(leaves)
+        val testedGroups = HashSet<String>()
+
+        while (pending.size > 1) {
+            var bestGroup: String? = null
+            var bestCoverage = 0
+            val groups = raw.keys()
+            while (groups.hasNext()) {
+                val groupName = groups.next()
+                if (groupName in testedGroups) continue
+                val all = raw.optJSONObject(groupName)?.optJSONArray("all") ?: continue
+                var coverage = 0
+                for (i in 0 until all.length()) {
+                    if (all.optString(i) in pending) coverage++
+                }
+                if (coverage > bestCoverage) {
+                    bestCoverage = coverage
+                    bestGroup = groupName
+                }
+            }
+            if (bestGroup == null || bestCoverage < 2) break
+            testedGroups += bestGroup
+            val before = pending.size
+            try {
+                val measured = api.groupDelay(bestGroup)
+                val names = measured.keys()
+                while (names.hasNext()) {
+                    val name = names.next()
+                    val value = measured.optLong(name, -1L)
+                    if (value > 0L && name in leaves) {
+                        result[name] = value
+                        pending.remove(name)
+                    }
+                }
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (_: Exception) { }
+            if (pending.size == before && testedGroups.size > 6) break
+        }
+
+        for (chunk in pending.toList().chunked(3)) {
             val part = coroutineScope {
                 chunk.map { node ->
                     async {
-                        val delay = try {
+                        val value = try {
                             api.delay(node)
                         } catch (cancel: CancellationException) {
                             throw cancel
                         } catch (_: Exception) {
                             -1L
                         }
-                        node to delay
+                        node to value
                     }
                 }.awaitAll()
             }
-            for ((name, delay) in part) result[name] = delay
+            for ((name, value) in part) result[name] = value
         }
+
+        for (name in leaves) if (name !in result) result[name] = -1L
         result
     }
 
