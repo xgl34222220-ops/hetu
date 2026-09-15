@@ -63,15 +63,21 @@ jobs:
       - name: Build Compose test APK
         working-directory: android-app
         run: gradle :app:assembleDebug --stacktrace
-      - name: Verify APK structure
+      - name: Verify APK structure and bundled ad-block rules
         run: |
           APK=android-app/app/build/outputs/apk/debug/app-debug.apk
           test -f "$APK"
           AAPT=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n 1)
           "$AAPT" dump badging "$APK" | tee compose-apk-badging.txt
           unzip -t "$APK" >/dev/null
+          unzip -l "$APK" | tee compose-apk-files.txt
           grep -q "package: name='io.github.xgl34222220.bichen.preview'" compose-apk-badging.txt
           grep -q "launchable-activity: name='io.github.xgl34222220.bichen.CompactMainActivity'" compose-apk-badging.txt
+          grep -q 'assets/sources.tsv' compose-apk-files.txt
+          grep -q 'assets/rules/adaway.txt' compose-apk-files.txt
+          grep -q 'assets/rules/china.txt' compose-apk-files.txt
+          grep -q 'assets/rules/tracking.txt' compose-apk-files.txt
+          grep -q 'assets/rules/hagezi.txt' compose-apk-files.txt
       - name: Enable emulator acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -92,10 +98,11 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: Bichen-0.4.0-test.20-compose
+          name: Bichen-0.4.0-test.21-compose
           path: |
             android-app/app/build/outputs/apk/debug/app-debug.apk
             compose-apk-badging.txt
+            compose-apk-files.txt
             out/compose-smoke/*
           if-no-files-found: warn
           retention-days: 14
