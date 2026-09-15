@@ -26,7 +26,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -36,7 +35,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/** Exact LuoShu compact layout scale, shared by Bichen proxy screens. */
+/**
+ * Bichen's shared native-mobile scale.
+ *
+ * The historical LuoShu-prefixed API names are kept so existing screens do not churn, but the
+ * visual rules are now Bichen-specific: 48dp Android touch targets, restrained surfaces, a clear
+ * 4/8dp rhythm, and no decorative elevation where hierarchy can be expressed by tone instead.
+ */
 object BichenLuoShuIconTokens {
     val HeaderTouchTarget = 48.dp
     val HeaderContainer = 44.dp
@@ -76,7 +81,7 @@ fun BichenLuoShuHeaderAction(
     icon: ImageVector,
     contentDescription: String,
     onClick: () -> Unit,
-    containerColor: Color = LocalBichenTokens.current.cardBackground,
+    containerColor: Color = LocalBichenTokens.current.controlBackground,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     loading: Boolean = false,
@@ -91,7 +96,7 @@ fun BichenLuoShuHeaderAction(
             color = containerColor,
             contentColor = resolved,
             tonalElevation = 0.dp,
-            shadowElevation = 1.dp,
+            shadowElevation = 0.dp,
         ) {
             IconButton(
                 onClick = onClick,
@@ -144,7 +149,7 @@ fun BichenLuoShuTopBar(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) { actions() }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) { actions() }
     }
 }
 
@@ -157,10 +162,11 @@ fun BichenLuoShuSurfaceCard(
     val tokens = LocalBichenTokens.current
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        color = if (emphasized) lerp(tokens.cardBackground, MaterialTheme.colorScheme.primaryContainer, .34f) else tokens.cardBackground,
+        shape = RoundedCornerShape(20.dp),
+        color = if (emphasized) tokens.selectionBackground else tokens.cardBackground,
         contentColor = tokens.textPrimary,
-        shadowElevation = 1.dp,
+        tonalElevation = 0.dp,
+        shadowElevation = if (emphasized) 1.dp else 0.dp,
     ) {
         Column(
             modifier = Modifier.padding(20.dp),
