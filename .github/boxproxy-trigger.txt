@@ -1,1 +1,1 @@
-BoxProxy UI/UX spec patch trigger
+BoxProxy UI/UX spec patch trigger v3
