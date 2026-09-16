@@ -1,0 +1,64 @@
+name: Quick real-device fix APK
+on:
+  push:
+    branches: ['feature/compose-luoshu-ui']
+    paths: ['.github/workflows/quick-realdevice-fix-apk.yml']
+permissions:
+  actions: read
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+      - name: Reuse already verified Mihomo runtime
+        uses: actions/download-artifact@v4
+        with:
+          name: Bichen-0.4.0-test.26-boxproxy-spec
+          path: /tmp/base
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: xgl34222220-ops/pichen
+          run-id: 35066227201
+      - name: Restore runtime from previous verified APK
+        shell: bash
+        run: |
+          BASE=$(find /tmp/base -name '*.apk' -type f | head -n1)
+          test -n "$BASE"
+          mkdir -p android-app/app/src/main/jniLibs/arm64-v8a android-app/app/src/main/jniLibs/x86_64
+          mkdir -p android-app/app/src/main/assets/mihomo-root/arm64-v8a android-app/app/src/main/assets/mihomo-root/x86_64
+          unzip -p "$BASE" lib/arm64-v8a/libbichen_core.so > android-app/app/src/main/jniLibs/arm64-v8a/libbichen_core.so
+          unzip -p "$BASE" lib/x86_64/libbichen_core.so > android-app/app/src/main/jniLibs/x86_64/libbichen_core.so
+          unzip -p "$BASE" assets/mihomo-root/arm64-v8a/mihomo > android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo
+          unzip -p "$BASE" assets/mihomo-root/x86_64/mihomo > android-app/app/src/main/assets/mihomo-root/x86_64/mihomo
+          unzip -p "$BASE" assets/MIHOMO-LICENSE > android-app/app/src/main/assets/MIHOMO-LICENSE
+          unzip -p "$BASE" assets/mihomo-revision.txt > android-app/app/src/main/assets/mihomo-revision.txt
+          test -s android-app/app/src/main/jniLibs/arm64-v8a/libbichen_core.so
+          test -s android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo
+      - name: Compile and build current branch
+        working-directory: android-app
+        run: |
+          gradle :app:compileDebugKotlin --stacktrace
+          gradle :app:assembleDebug --stacktrace
+      - name: Verify APK
+        shell: bash
+        run: |
+          APK=android-app/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          unzip -t "$APK" >/dev/null
+          AAPT=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n1)
+          "$AAPT" dump badging "$APK" | grep -q "package: name='io.github.xgl34222220.bichen.preview'"
+          sha256sum "$APK"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Bichen-0.4.0-test.26-realdevice-webui-fix
+          path: android-app/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
