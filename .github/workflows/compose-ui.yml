@@ -38,6 +38,15 @@ jobs:
           git add -A
           git commit -m 'Implement BoxProxy UI UX architecture'
           git push origin HEAD:feature/compose-luoshu-ui
+      - name: Verify Root controller source
+        shell: bash
+        run: |
+          set -euo pipefail
+          sh -n android-app/app/src/main/assets/proxy-root-v3.sh
+          grep -q 'proxy-root-v3.sh' android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java
+          grep -q 'killSwitchActive' android-app/app/src/main/assets/proxy-root-v3.sh
+          grep -q 'proxySharedNetwork' android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyPolicy.java
+          grep -q 'STRICT' android-app/app/src/main/java/io/github/xgl34222220/bichen/RootTproxyActivity.java
       - uses: actions/checkout@v4
         with:
           repository: MetaCubeX/mihomo
@@ -84,7 +93,7 @@ jobs:
       - name: Build Compose test APK
         working-directory: android-app
         run: gradle :app:assembleDebug --stacktrace
-      - name: Verify APK structure and bundled ad-block rules
+      - name: Verify APK structure and bundled proxy assets
         run: |
           APK=android-app/app/build/outputs/apk/debug/app-debug.apk
           test -f "$APK"
@@ -93,8 +102,9 @@ jobs:
           unzip -t "$APK" >/dev/null
           unzip -l "$APK" | tee compose-apk-files.txt
           grep -q "package: name='io.github.xgl34222220.bichen.preview'" compose-apk-badging.txt
-          grep -q "versionName='0.4.0-test.26-preview'" compose-apk-badging.txt
+          grep -q "versionName='0.4.0-test.27-preview'" compose-apk-badging.txt
           grep -q "launchable-activity: name='io.github.xgl34222220.bichen.CompactMainActivity'" compose-apk-badging.txt
+          grep -q 'assets/proxy-root-v3.sh' compose-apk-files.txt
           grep -q 'assets/sources.tsv' compose-apk-files.txt
           grep -q 'assets/rules/adaway.txt' compose-apk-files.txt
           grep -q 'assets/rules/china.txt' compose-apk-files.txt
@@ -122,7 +132,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: Bichen-0.4.0-test.26-boxproxy-spec
+          name: Bichen-0.4.0-test.27-proxy-P1
           path: |
             android-app/app/build/outputs/apk/debug/app-debug.apk
             compose-apk-badging.txt
