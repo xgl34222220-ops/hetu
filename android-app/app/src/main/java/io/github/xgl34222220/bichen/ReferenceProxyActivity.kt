@@ -12,6 +12,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
@@ -25,13 +28,20 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -341,84 +351,87 @@ private fun RefHome(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {
-  Row(
-      Modifier.fillMaxWidth().statusBarsPadding().padding(top = 10.dp, bottom = 6.dp),
-      verticalAlignment = Alignment.CenterVertically,
-  ) {
-      Text("代理", color = t.textPrimary, fontSize = 27.sp, lineHeight = 33.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-      IconButton(onClick = onRefresh, modifier = Modifier.size(44.dp)) {
-          Icon(Icons.Rounded.Refresh, "刷新", tint = t.textSecondary, modifier = Modifier.size(20.dp))
-      }
-      IconButton(onClick = onBack, modifier = Modifier.size(44.dp)) {
-          Icon(Icons.Rounded.Close, "关闭", tint = t.textSecondary, modifier = Modifier.size(20.dp))
-      }
-  }
+            Row(
+                Modifier.fillMaxWidth().statusBarsPadding().padding(top = 10.dp, bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("代理", color = t.textPrimary, fontSize = 27.sp, lineHeight = 33.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                IconButton(onClick = onRefresh, modifier = Modifier.size(44.dp)) {
+                    Icon(Icons.Rounded.Refresh, "刷新", tint = t.textSecondary, modifier = Modifier.size(20.dp))
+                }
+                IconButton(onClick = onBack, modifier = Modifier.size(44.dp)) {
+                    Icon(Icons.Rounded.Close, "关闭", tint = t.textSecondary, modifier = Modifier.size(20.dp))
+                }
+            }
         }
         item {
-  Surface(shape = RoundedCornerShape(26.dp), color = t.heroBackground, shadowElevation = 0.dp) {
-      Column(Modifier.fillMaxWidth().padding(17.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-          Row(verticalAlignment = Alignment.Top) {
-              Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                  Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                      Box(Modifier.size(9.dp).background(if (state.running) t.success else t.danger, CircleShape))
-                      Text(if (state.running) "运行中" else "已停止", color = t.textPrimary, fontSize = 19.sp, fontWeight = FontWeight.Bold)
-                      Text(if (state.running) refDuration(runtime.elapsedSeconds) else "等待启动", color = t.textSecondary, style = MaterialTheme.typography.labelMedium)
-                  }
-                  Text("${state.core} · ${state.mode}", color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
-                  Text(state.config, color = t.textSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-              }
-              Box(
-                  Modifier.size(58.dp).background(if (state.running) scheme.primary else t.controlBackground, CircleShape),
-                  contentAlignment = Alignment.Center,
-              ) {
-                  Icon(
-                      if (state.running) Icons.Rounded.Check else Icons.Rounded.PowerSettingsNew,
-                      null,
-                      tint = if (state.running) Color.White else t.textMuted,
-                      modifier = Modifier.size(31.dp),
-                  )
-              }
-          }
-          HorizontalDivider(color = t.outline.copy(alpha = .75f))
-          Row(Modifier.fillMaxWidth()) {
-              RefActionText("重载", state.running && operation.isBlank(), onReload, Modifier.weight(1f), scheme.primary)
-              VerticalDivider(Modifier.height(32.dp), color = t.outline)
-              RefActionText(if (state.running) "停止" else "启动", operation.isBlank(), onToggle, Modifier.weight(1f), t.danger)
-              VerticalDivider(Modifier.height(32.dp), color = t.outline)
-              RefActionText("重启", state.running && operation.isBlank(), onRestart, Modifier.weight(1f), t.warning)
-          }
-      }
-  }
+            Surface(
+                shape = RoundedCornerShape(26.dp),
+                color = t.heroBackground,
+                border = BorderStroke(.7.dp, scheme.primary.copy(alpha = .10f)),
+                shadowElevation = 0.dp,
+            ) {
+                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Row(verticalAlignment = Alignment.Top) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Box(Modifier.size(9.dp).background(if (state.running) t.success else t.danger, CircleShape))
+                                Text(if (state.running) "运行中" else "已停止", color = t.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                                Text(if (state.running) refDuration(runtime.elapsedSeconds) else "等待启动", color = t.textMuted, fontSize = 11.sp)
+                            }
+                            Text("${state.core} · ${state.mode}", color = t.textSecondary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                            Text(state.config, color = t.textMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                        Box(
+                            Modifier.size(56.dp).background(if (state.running) scheme.primary else t.controlBackground, CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                if (state.running) Icons.Rounded.Check else Icons.Rounded.PowerSettingsNew,
+                                null,
+                                tint = if (state.running) Color.White else t.textMuted,
+                                modifier = Modifier.size(30.dp),
+                            )
+                        }
+                    }
+                    HorizontalDivider(color = scheme.primary.copy(alpha = .10f))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        RefActionText("重载", state.running && operation.isBlank(), onReload, Modifier.weight(1f), t.textPrimary)
+                        RefActionText(if (state.running) "停止" else "启动", operation.isBlank(), onToggle, Modifier.weight(1f), t.danger)
+                        RefActionText("重启", state.running && operation.isBlank(), onRestart, Modifier.weight(1f), t.textPrimary)
+                    }
+                }
+            }
         }
         item {
-  Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-      RefSmallTool("WebUI", "Web 界面", Icons.Rounded.Language, onWebUi, Modifier.weight(1f))
-      RefSmallTool("日志", "查看", Icons.Rounded.Article, onLog, Modifier.weight(1f))
-  }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                RefSmallTool("WebUI", "Web 界面", Icons.Rounded.Language, onWebUi, Modifier.weight(1f))
+                RefSmallTool("日志", "查看", Icons.Rounded.Article, onLog, Modifier.weight(1f))
+            }
         }
         item {
-  RefLatencyPanel(
-      baidu = siteDelays["Baidu"],
-      cloudflare = siteDelays["Cloudflare"],
-      google = siteDelays["Google"],
-      testing = testing,
-      onClick = onDelay,
-  )
+            RefLatencyPanel(
+                baidu = siteDelays["Baidu"],
+                cloudflare = siteDelays["Cloudflare"],
+                google = siteDelays["Google"],
+                testing = testing,
+                onClick = onDelay,
+            )
         }
         item {
-  Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-      RefNetworkIdentityCard(runtime, state.connections.size, Modifier.weight(1f))
-      RefSpeedCard(upRate, downRate, Modifier.weight(1f))
-  }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                RefNetworkIdentityCard(runtime, state.connections.size, Modifier.weight(1f))
+                RefSpeedCard(upRate, downRate, Modifier.weight(1f))
+            }
         }
         item {
-  Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-      RefSubscriptionCompact(providers, Modifier.weight(1f))
-      RefResourceCard(memory, cpuPercent, runtime.pid, Modifier.weight(1f))
-  }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                RefSubscriptionCompact(providers, Modifier.weight(1f))
+                RefResourceCard(memory, cpuPercent, runtime.pid, Modifier.weight(1f))
+            }
         }
         if (operation.isNotBlank() || message.isNotBlank()) {
-  item { Text(operation.ifBlank { message }, color = t.textSecondary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)) }
+            item { Text(operation.ifBlank { message }, color = t.textSecondary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)) }
         }
     }
 }
@@ -467,20 +480,33 @@ private fun RefLatencyColumn(label: String, value: Long?, testing: Boolean, modi
 private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: Int, modifier: Modifier) {
     val t = LocalBichenTokens.current
     var lanMode by rememberSaveable { mutableStateOf(true) }
-    Surface(onClick = { lanMode = !lanMode }, modifier = modifier, shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
-        Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-  Row(verticalAlignment = Alignment.CenterVertically) {
-      Text(if (lanMode) "LAN" else "WAN", color = t.textPrimary, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-      Text("点击切换", color = t.textMuted, style = MaterialTheme.typography.labelSmall)
-  }
-  if (lanMode) {
-      Text("IP  ${runtime.lanAddress}", color = t.textPrimary, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-      Text("接口  ${runtime.lanInterface}", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
-  } else {
-      Text("IP  ${runtime.wanAddress}", color = t.textPrimary, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-      Text("${countryEmoji(runtime.wanCountryCode)} ${runtime.wanRegion}", color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-  }
-  Text("连接  $connections", color = t.textMuted, style = MaterialTheme.typography.labelSmall)
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) .97f else 1f, spring(dampingRatio = .78f, stiffness = 520f), label = "networkCardPress")
+    val shape = RoundedCornerShape(18.dp)
+    Surface(
+        modifier = modifier.graphicsLayer { scaleX = scale; scaleY = scale }.clip(shape)
+            .clickable(interactionSource = source, indication = null) { lanMode = !lanMode },
+        shape = shape,
+        color = t.cardBackground,
+        shadowElevation = 0.dp,
+    ) {
+        Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(if (lanMode) "LAN" else "WAN", color = t.textPrimary, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                Box(Modifier.size(27.dp).background(MaterialTheme.colorScheme.primary.copy(alpha = .09f), CircleShape), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Rounded.SwapHoriz, "切换 LAN/WAN", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(15.dp))
+                }
+            }
+            if (lanMode) {
+                Text("IP", color = t.textSecondary, fontSize = 11.sp)
+                Text(runtime.lanAddress, color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("${runtime.lanInterface} · $connections 连接", color = t.textMuted, fontSize = 11.sp, maxLines = 1)
+            } else {
+                Text("公网 IP", color = t.textSecondary, fontSize = 11.sp)
+                Text(runtime.wanAddress, color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("${countryEmoji(runtime.wanCountryCode)} ${runtime.wanRegion}", color = t.textMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         }
     }
 }
@@ -533,11 +559,16 @@ private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, modifier: M
 private fun RefResourceCard(memory: Long, cpuPercent: Float, pid: Int, modifier: Modifier) {
     val t = LocalBichenTokens.current
     Surface(modifier = modifier, shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
-        Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-  Text("资源占用", color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
-  Text("内存  ${refBytes(memory)}", color = t.textPrimary, style = MaterialTheme.typography.bodyMedium)
-  Text("CPU  ${String.format(java.util.Locale.US, "%.1f%%", cpuPercent)}", color = t.textPrimary, style = MaterialTheme.typography.bodyMedium)
-  Text("PID  ${if (pid > 0) pid else "—"}", color = t.textMuted, style = MaterialTheme.typography.labelSmall)
+        Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Text("资源占用", color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("内存", color = t.textSecondary, fontSize = 12.sp)
+                Text(refBytes(memory), color = t.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("CPU", color = t.textSecondary, fontSize = 12.sp)
+                Text(String.format(java.util.Locale.US, "%.1f%%", cpuPercent), color = t.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            }
         }
     }
 }
@@ -552,11 +583,21 @@ private fun countryEmoji(code: String): String {
 
 @Composable
 private fun RefActionText(text: String, enabled: Boolean, onClick: () -> Unit, modifier: Modifier, color: Color = LocalBichenTokens.current.textPrimary) {
+    val t = LocalBichenTokens.current
+    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
+    val source = remember(text) { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) .95f else 1f, spring(dampingRatio = .72f, stiffness = 620f), label = "heroAction$text")
     Box(
-        modifier.height(34.dp).clickable(enabled = enabled, onClick = onClick),
+        modifier
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .height(38.dp)
+            .clip(CircleShape)
+            .background(if (dark) t.elevatedCardBackground.copy(alpha = .82f) else Color.White.copy(alpha = .84f))
+            .clickable(enabled = enabled, interactionSource = source, indication = null, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, color = if (enabled) color else LocalBichenTokens.current.textSecondary.copy(alpha = .45f), style = MaterialTheme.typography.labelLarge)
+        Text(text, color = if (enabled) color else t.textSecondary.copy(alpha = .42f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -579,9 +620,21 @@ private fun RefMetricCard(title: String, value: String, icon: ImageVector, modif
 @Composable
 private fun RefSmallTool(title: String, subtitle: String, icon: ImageVector, onClick: () -> Unit, modifier: Modifier) {
     val t = LocalBichenTokens.current
-    Surface(onClick = onClick, modifier = modifier, shape = RoundedCornerShape(14.dp), color = t.cardBackground, shadowElevation = 0.dp) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(19.dp))
+    val source = remember(title) { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) .97f else 1f, spring(dampingRatio = .78f, stiffness = 520f), label = "smallTool$title")
+    val shape = RoundedCornerShape(16.dp)
+    Surface(
+        modifier = modifier.graphicsLayer { scaleX = scale; scaleY = scale }.clip(shape)
+            .clickable(interactionSource = source, indication = null, onClick = onClick),
+        shape = shape,
+        color = t.cardBackground,
+        shadowElevation = 0.dp,
+    ) {
+        Row(Modifier.padding(13.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(32.dp).background(MaterialTheme.colorScheme.primary.copy(alpha = .09f), RoundedCornerShape(11.dp)), contentAlignment = Alignment.Center) {
+                Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+            }
             Spacer(Modifier.width(9.dp))
             Column(Modifier.weight(1f)) {
                 Text(title, color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
@@ -705,7 +758,7 @@ private fun RefPanel(
 
     LaunchedEffect(tab, state.running) { loadTab() }
 
-    PullToRefreshBox(isRefreshing = refreshing, onRefresh = ::refresh, modifier = Modifier.fillMaxSize()) {
+    PullToRefreshBox(isRefreshing = refreshing, onRefresh = ::refresh, modifier = Modifier.fillMaxSize().blur(if (selectedGroupName != null) 4.dp else 0.dp)) {
         LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
@@ -823,12 +876,12 @@ private fun RefPanel(
             containerColor = t.elevatedCardBackground,
             contentColor = t.textPrimary,
             tonalElevation = 0.dp,
-            scrimColor = Color.Black.copy(alpha = .34f),
+            scrimColor = Color.Black.copy(alpha = .35f),
             dragHandle = {
                 Box(
                     Modifier.padding(top = 10.dp, bottom = 6.dp)
-                        .size(width = 38.dp, height = 4.dp)
-                        .background(t.outline.copy(alpha = .75f), CircleShape),
+                        .size(width = 36.dp, height = 4.dp)
+                        .background(Color(0xFFCBD5E1), CircleShape),
                 )
             },
         ) {
@@ -942,6 +995,9 @@ private fun RefNodeSheet(
             ) {
                 items(group.nodes, key = { it.name }) { node ->
                     val active = node.name == selected
+                    val interactionSource = remember(node.name) { MutableInteractionSource() }
+                    val pressed by interactionSource.collectIsPressedAsState()
+                    val pressScale by animateFloatAsState(if (pressed) .97f else 1f, spring(dampingRatio = .78f, stiffness = 560f), label = "node${node.name}")
                     val shape = RoundedCornerShape(14.dp)
                     val fill = if (active) {
                         Brush.verticalGradient(listOf(t.selectionBackground.copy(alpha = .94f), scheme.primaryContainer.copy(alpha = .56f)))
@@ -950,9 +1006,10 @@ private fun RefNodeSheet(
                     }
                     Row(
                         Modifier.fillMaxWidth()
+                            .graphicsLayer { scaleX = pressScale; scaleY = pressScale }
                             .background(fill, shape)
                             .border(.7.dp, if (active) scheme.primary.copy(alpha = .28f) else t.outline.copy(alpha = .34f), shape)
-                            .clickable { onSelect(node.name) }
+                            .clickable(interactionSource = interactionSource, indication = null) { onSelect(node.name) }
                             .padding(horizontal = 14.dp, vertical = 11.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -987,20 +1044,37 @@ private fun RefNodeSheet(
 @Composable
 private fun RefPanelTabs(selected: RefPanelTab, onSelect: (RefPanelTab) -> Unit) {
     val t = LocalBichenTokens.current
-    Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    val scheme = MaterialTheme.colorScheme
+    val dark = scheme.background.luminance() < .5f
+    val tabs = RefPanelTab.entries
+    BoxWithConstraints(
+        Modifier.fillMaxWidth().height(38.dp).background(t.controlBackground.copy(alpha = .72f), CircleShape).padding(2.dp),
     ) {
-        RefPanelTab.entries.forEach { tab ->
-            val active = tab == selected
-            Surface(
-                onClick = { onSelect(tab) },
-                shape = RoundedCornerShape(10.dp),
-                color = if (active) t.selectionBackground else t.cardBackground,
-                shadowElevation = 0.dp,
-            ) {
-                Box(Modifier.height(34.dp).padding(horizontal = 13.dp), contentAlignment = Alignment.Center) {
-                    Text(tab.label, color = if (active) MaterialTheme.colorScheme.primary else t.textPrimary, fontSize = 12.sp, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1)
+        val itemWidth = maxWidth / tabs.size.toFloat()
+        val index = tabs.indexOf(selected).coerceAtLeast(0)
+        val indicatorX by animateDpAsState(
+            targetValue = itemWidth * index.toFloat(),
+            animationSpec = spring(dampingRatio = .78f, stiffness = 480f),
+            label = "panelTabIndicator",
+        )
+        Box(
+            Modifier.offset(x = indicatorX).width(itemWidth).fillMaxHeight()
+                .clip(CircleShape)
+                .background(if (dark) scheme.primary.copy(alpha = .22f) else Color(0xFFE0EDFF)),
+        )
+        Row(Modifier.fillMaxSize()) {
+            tabs.forEach { tab ->
+                val active = tab == selected
+                val source = remember(tab) { MutableInteractionSource() }
+                val pressed by source.collectIsPressedAsState()
+                val scale by animateFloatAsState(if (pressed) .95f else 1f, spring(dampingRatio = .78f, stiffness = 560f), label = "tab${tab.name}")
+                Box(
+                    Modifier.width(itemWidth).fillMaxHeight().graphicsLayer { scaleX = scale; scaleY = scale }
+                        .clip(CircleShape)
+                        .clickable(interactionSource = source, indication = null) { onSelect(tab) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(tab.label, color = if (active) scheme.primary else t.textSecondary, fontSize = 11.sp, fontWeight = if (active) FontWeight.Bold else FontWeight.Medium, maxLines = 1)
                 }
             }
         }
@@ -1028,29 +1102,29 @@ private fun RefPanelOverview(state: ProxyComposeState, delays: Map<String, Long>
 private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolean, delay: Long?, modifier: Modifier, onClick: () -> Unit) {
     val t = LocalBichenTokens.current
     val scheme = MaterialTheme.colorScheme
-    val shape = RoundedCornerShape(17.dp)
-    val glass = if (expanded) t.selectionBackground else t.cardBackground
+    val source = remember(group.name) { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) .97f else 1f, spring(dampingRatio = .76f, stiffness = 560f), label = "group${group.name}")
+    val shape = RoundedCornerShape(18.dp)
     Column(
-        modifier.background(glass, shape)
-  .border(1.dp, if (expanded) scheme.primary.copy(alpha = .28f) else t.outline, shape)
-  .clickable(onClick = onClick)
-  .padding(horizontal = 11.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .heightIn(min = 106.dp)
+            .background(if (expanded) t.selectionBackground else t.cardBackground, shape)
+            .border(.7.dp, if (expanded) scheme.primary.copy(alpha = .18f) else t.outline.copy(alpha = .34f), shape)
+            .clickable(interactionSource = source, indication = null, onClick = onClick)
+            .padding(12.dp),
+        verticalArrangement = Arrangement.SpaceBetween,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-  RefGroupVisualIcon(group, Modifier.size(34.dp))
-  Spacer(Modifier.width(8.dp))
-  Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-      Text(group.name, color = t.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-      Text(refGroupType(group.type).uppercase(java.util.Locale.ROOT), color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1)
-  }
-  RefDelayBadge(delay, false, null)
+            RefGroupVisualIcon(group, Modifier.size(26.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(group.name, color = t.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Spacer(Modifier.width(6.dp))
+            RefDelayBadge(delay, false, null)
         }
-        Text(selected.ifBlank { "未选择" }, color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-  Text("${group.nodes.size} 节点", color = t.textMuted, style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f))
-  if (expanded) Icon(Icons.Rounded.CheckCircle, "已打开", tint = scheme.primary, modifier = Modifier.size(16.dp))
-        }
+        Text("${group.type.uppercase(java.util.Locale.ROOT).ifBlank { refGroupType(group.type) }} · ${group.nodes.size} 节点", color = t.textMuted, fontSize = 11.sp, maxLines = 1)
+        Text(selected.ifBlank { "未选择" }, color = t.textSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -1067,7 +1141,7 @@ private fun RefGroupVisualIcon(group: ProxyGroupUi, modifier: Modifier) {
         if (bitmap != null) {
   Image(bitmap = bitmap, contentDescription = group.name, modifier = Modifier.fillMaxSize().padding(5.dp), contentScale = ContentScale.Fit)
         } else {
-  Icon(refGroupIcon(group.type), null, tint = scheme.primary, modifier = Modifier.size(19.dp))
+  Icon(refScenarioIcon(group.name, group.type), null, tint = scheme.primary, modifier = Modifier.size(19.dp))
         }
     }
 }
@@ -1093,6 +1167,15 @@ private fun RefLeafNodeCard(node: ProxyNodeUi, delay: Long?, modifier: Modifier,
     }
 }
 
+private fun refScenarioIcon(name: String, type: String): ImageVector = when {
+    name.contains("chatgpt", true) || name.contains("openai", true) || name.contains("ai", true) -> Icons.Rounded.SmartToy
+    name.contains("youtube", true) -> Icons.Rounded.PlayCircle
+    name.contains("tiktok", true) -> Icons.Rounded.MusicNote
+    name.contains("netflix", true) -> Icons.Rounded.Movie
+    name.contains("apple", true) -> Icons.Rounded.PhoneIphone
+    else -> refGroupIcon(type)
+}
+
 private fun refGroupIcon(type: String): ImageVector = when (type.lowercase()) {
     "urltest", "fallback" -> Icons.Rounded.Speed
     "selector" -> Icons.Rounded.Tune
@@ -1110,23 +1193,24 @@ private fun refGroupType(type: String): String = when (type.lowercase()) {
 
 @Composable
 private fun RefDelayBadge(value: Long?, testing: Boolean, onClick: (() -> Unit)?) {
-    val t = LocalBichenTokens.current
     val scheme = MaterialTheme.colorScheme
     val text = if (testing) "…" else refDelay(value)
-    val textColor = when {
-        testing -> scheme.primary
-        value == null -> t.textSecondary
-        value <= 0L -> scheme.error
-        value < 100L -> t.success
-        value <= 300L -> t.warning
-        else -> t.danger
+    val (background, textColor) = when {
+        testing -> scheme.primary.copy(alpha = .12f) to scheme.primary
+        value == null -> Color(0x1F94A3B8) to Color(0xFF64748B)
+        value <= 0L || value > 300L -> Color(0x1FEF4444) to Color(0xFFDC2626)
+        value < 100L -> Color(0x1F10B981) to Color(0xFF059669)
+        else -> Color(0x1FF59E0B) to Color(0xFFD97706)
     }
-    val shape = RoundedCornerShape(9.dp)
+    val source = remember(text, onClick) { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) .94f else 1f, spring(dampingRatio = .78f, stiffness = 620f), label = "delayBadge")
     val modifier = Modifier
-        .background(scheme.primary.copy(alpha = .08f), shape)
-        .then(if (onClick != null) Modifier.clickable(enabled = !testing, onClick = onClick) else Modifier)
-        .padding(horizontal = 9.dp, vertical = 5.dp)
-    Text(text, modifier = modifier, color = textColor, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+        .graphicsLayer { scaleX = scale; scaleY = scale }
+        .background(background, CircleShape)
+        .then(if (onClick != null) Modifier.clickable(enabled = !testing, interactionSource = source, indication = null, onClick = onClick) else Modifier)
+        .padding(horizontal = 8.dp, vertical = 2.dp)
+    Text(text, modifier = modifier, color = textColor, fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
 }
 
 @Composable
@@ -1214,33 +1298,43 @@ private fun RefRateCard(title: String, value: Long, icon: ImageVector, color: Co
 @Composable
 private fun RefProviderRow(item: DashboardProviderUi, onRefresh: () -> Unit, onClick: () -> Unit) {
     val t = LocalBichenTokens.current
-    Surface(onClick = onClick, shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+    val source = remember(item.name) { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) .97f else 1f, spring(dampingRatio = .78f, stiffness = 520f), label = "provider${item.name}")
+    val shape = RoundedCornerShape(18.dp)
+    Surface(
+        modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale }.clip(shape)
+            .clickable(interactionSource = source, indication = null, onClick = onClick),
+        shape = shape,
+        color = t.cardBackground,
+        shadowElevation = 0.dp,
+    ) {
         Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-  Row(verticalAlignment = Alignment.CenterVertically) {
-      Column(Modifier.weight(1f)) {
-          Text(item.name, color = t.textPrimary, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-          Text("${item.nodes.size} 个节点 · 剩余 ${refExpireDays(item.expire)}", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
-      }
-      IconButton(onClick = onRefresh, modifier = Modifier.size(40.dp)) {
-          Icon(Icons.Rounded.Sync, "同步更新", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-      }
-  }
-  if (item.hasSubscriptionInfo && item.total > 0L) {
-      LinearProgressIndicator(progress = { item.ratio }, modifier = Modifier.fillMaxWidth().height(5.dp).clip(CircleShape))
-      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          RefMetric("已上传", refBytes(item.upload), Modifier.weight(1f))
-          RefMetric("已下载", refBytes(item.download), Modifier.weight(1f))
-          Surface(modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp), color = t.selectionBackground) {
-              Column(Modifier.padding(horizontal = 9.dp, vertical = 8.dp)) {
-                  Text(refBytes(item.remaining), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                  Text("剩余流量", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
-              }
-          }
-      }
-  } else {
-      Text("该订阅没有上报流量信息", color = t.textMuted, style = MaterialTheme.typography.bodySmall)
-  }
-  Text("到期 ${refExpireDate(item.expire)} · 更新 ${item.updatedAt.ifBlank { "—" }}", color = t.textMuted, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(item.name, color = t.textPrimary, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("${item.nodes.size} 个节点 · 剩余 ${refExpireDays(item.expire)}", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+                }
+                IconButton(onClick = onRefresh, modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.Rounded.Sync, "同步更新", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                }
+            }
+            if (item.hasSubscriptionInfo && item.total > 0L) {
+                LinearProgressIndicator(progress = { item.ratio }, modifier = Modifier.fillMaxWidth().height(5.dp).clip(CircleShape))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    RefMetric("已上传", refBytes(item.upload), Modifier.weight(1f))
+                    RefMetric("已下载", refBytes(item.download), Modifier.weight(1f))
+                    Surface(modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp), color = t.selectionBackground) {
+                        Column(Modifier.padding(horizontal = 9.dp, vertical = 8.dp)) {
+                            Text(refBytes(item.remaining), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text("剩余流量", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+            } else {
+                Text("该订阅没有上报流量信息", color = t.textMuted, style = MaterialTheme.typography.bodySmall)
+            }
+            Text("到期 ${refExpireDate(item.expire)} · ${refUpdatedAt(item.updatedAt)}", color = t.textMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -1301,7 +1395,7 @@ private fun RefRuleSetRow(item: DashboardRuleSetUi, onRefresh: () -> Unit) {
   Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
       Text(item.name, color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
       Text(listOf(item.behavior, item.format, item.vehicleType).filter { it.isNotBlank() }.joinToString(" · "), color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
-      Text("${if (item.ruleCount > 0) "${item.ruleCount} 条规则" else "规则数 —"} · ${item.updatedAt.ifBlank { "未记录更新时间" }}", color = t.textMuted, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+      Text("${if (item.ruleCount > 0) "${item.ruleCount} 条规则" else "规则数 —"} · ${refUpdatedAt(item.updatedAt)}", color = t.textMuted, style = MaterialTheme.typography.labelSmall, maxLines = 1)
   }
   IconButton(onClick = onRefresh, modifier = Modifier.size(40.dp)) { Icon(Icons.Rounded.Sync, "远端更新", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(19.dp)) }
         }
@@ -1494,8 +1588,13 @@ private fun RefGroup(content: @Composable ColumnScope.() -> Unit) {
 @Composable
 private fun RefToolRow(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
     val t = LocalBichenTokens.current
+    val source = remember(title) { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) .97f else 1f, spring(dampingRatio = .78f, stiffness = 560f), label = "tool$title")
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 12.dp),
+        Modifier.fillMaxWidth().graphicsLayer { scaleX = scale; scaleY = scale }
+            .clickable(interactionSource = source, indication = null, onClick = onClick)
+            .padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(21.dp))
@@ -1511,7 +1610,11 @@ private fun RefToolRow(icon: ImageVector, title: String, subtitle: String, onCli
 @Composable
 private fun RefValueRow(title: String, value: String, onClick: (() -> Unit)? = null) {
     val t = LocalBichenTokens.current
-    val modifier = if (onClick == null) Modifier.fillMaxWidth() else Modifier.fillMaxWidth().clickable(onClick = onClick)
+    val source = remember(title) { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed && onClick != null) .98f else 1f, spring(dampingRatio = .80f, stiffness = 560f), label = "value$title")
+    val modifier = if (onClick == null) Modifier.fillMaxWidth() else Modifier.fillMaxWidth().graphicsLayer { scaleX = scale; scaleY = scale }
+        .clickable(interactionSource = source, indication = null, onClick = onClick)
     Row(modifier.padding(vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(title, color = t.textPrimary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
         if (value.isNotBlank()) Text(value, color = t.textSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 190.dp))
@@ -1564,6 +1667,17 @@ private fun RefTitleBar(title: String) {
         fontWeight = FontWeight.Bold,
         modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(top = 12.dp, bottom = 8.dp),
     )
+}
+
+private fun refUpdatedAt(value: String): String {
+    if (value.isBlank()) return "更新于 —"
+    val raw = value.trim()
+    val compact = when {
+        raw.length >= 16 && raw[4] == '-' && raw[7] == '-' -> raw.substring(5, 16).replace('T', ' ')
+        raw.length >= 16 -> raw.take(16).replace('T', ' ')
+        else -> raw.replace('T', ' ')
+    }
+    return "更新于 $compact"
 }
 
 private fun refDelay(value: Long?): String = when {
