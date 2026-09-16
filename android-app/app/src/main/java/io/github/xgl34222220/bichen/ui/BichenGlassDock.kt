@@ -31,7 +31,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -70,15 +69,13 @@ fun BichenGlassDock(
     modifier: Modifier = Modifier,
 ) {
     if (items.isEmpty()) return
-    val context = LocalContext.current
-    val prefs = remember { context.getSharedPreferences("bichen", 0) }
     val scheme = MaterialTheme.colorScheme
     val tokens = LocalBichenTokens.current
     val dark = scheme.background.luminance() < .5f
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val floating = prefs.getBoolean("floatingBottomBar", true)
-    val enableBlur = prefs.getBoolean("enableBlur", true)
-    val activeGlass = prefs.getBoolean("liquidGlass", true)
+    val floating = true
+    val enableBlur = true
+    val activeGlass = true
     val shape = if (floating) RoundedCornerShape(31.dp) else RoundedCornerShape(topStart = 31.dp, topEnd = 31.dp)
     val runtimeLiquid = activeGlass && enableBlur && backdrop != null && isRuntimeShaderSupported()
     val activeHaze = activeGlass && enableBlur && !runtimeLiquid
