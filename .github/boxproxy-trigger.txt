@@ -1,1 +1,1 @@
-BoxProxy UI/UX spec patch trigger v3
+BoxProxy UI/UX artifact smoke trigger
