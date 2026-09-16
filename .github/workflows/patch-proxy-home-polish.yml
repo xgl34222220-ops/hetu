@@ -1,4 +1,4 @@
-name: Patch proxy home polish
+name: Fix proxy launch crash
 
 on:
   push:
@@ -9,247 +9,50 @@ permissions:
 
 jobs:
   patch:
-    if: github.event.head_commit.message == 'Run proxy home polish'
+    if: github.event.head_commit.message == 'Fix proxy launch crash'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
           ref: feature/compose-luoshu-ui
           fetch-depth: 0
-      - name: Polish proxy home
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+          cache-read-only: true
+      - name: Disable unstable per-card RuntimeShader blur
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ComposeProxyActivity.kt')
           s = p.read_text()
-          start = s.index('@Composable\nprivate fun ProxyHome(')
-          end = s.index('@Composable\nprivate fun ProxyPanel(', start)
-          replacement = r'''@Composable
-private fun ProxyHome(
-    state: ProxyComposeState,
-    delays: Map<String, Long>,
-    notice: String,
-    busyText: String,
-    testing: Boolean,
-    onBack: () -> Unit,
-    onRefresh: () -> Unit,
-    onToggle: () -> Unit,
-    onRestart: () -> Unit,
-    onPanel: () -> Unit,
-    onSpeedTest: () -> Unit,
-) {
-    val context = LocalContext.current
-    val tokens = LocalBichenTokens.current
-    val scheme = MaterialTheme.colorScheme
-    val good = delays.values.filter { it > 0L }
-    val averageDelay = if (good.isEmpty()) "—" else "${good.average().toInt()} ms"
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 18.dp, end = 18.dp, bottom = 26.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item("header") {
-            ProxyDetailTopBar(
-                title = "代理",
-                subtitle = "${state.core} · ${state.mode}",
-                onBack = onBack,
-                actions = {
-                    ProxyHeaderAction(
-                        icon = Icons.Rounded.Refresh,
-                        description = "刷新",
-                        onClick = onRefresh,
-                    )
-                },
-            )
-        }
-
-        item("status") {
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = tokens.cardBackground,
-                shadowElevation = 0.dp,
-            ) {
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 17.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Box(
-                                Modifier.size(9.dp).background(
-                                    if (state.running) tokens.success else tokens.warning,
-                                    CircleShape,
-                                ),
-                            )
-                            Text(
-                                if (state.running) "代理运行中" else "代理已停止",
-                                color = tokens.textPrimary,
-                                fontSize = 20.sp,
-                                lineHeight = 26.sp,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                        }
-                        Text(
-                            state.config,
-                            color = tokens.textPrimary,
-                            style = MaterialTheme.typography.bodyMedium,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            if (state.panelReady) "本机控制接口在线" else "等待本机控制接口",
-                            color = tokens.textSecondary,
-                            style = MaterialTheme.typography.labelSmall,
-                        )
-                    }
-                    Spacer(Modifier.width(14.dp))
-                    Surface(
-                        onClick = onToggle,
-                        enabled = busyText.isBlank(),
-                        modifier = Modifier.size(52.dp),
-                        shape = CircleShape,
-                        color = if (state.running) tokens.controlBackground else scheme.primary,
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            if (busyText.isNotBlank()) {
-                                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                            } else {
-                                Icon(
-                                    if (state.running) Icons.Rounded.Stop else Icons.Rounded.PlayArrow,
-                                    contentDescription = if (state.running) "停止代理" else "启动代理",
-                                    tint = if (state.running) tokens.danger else scheme.onPrimary,
-                                    modifier = Modifier.size(22.dp),
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        if (notice.isNotBlank() || busyText.isNotBlank()) {
-            item("notice") {
-                Text(
-                    busyText.ifBlank { notice },
-                    color = if (busyText.isNotBlank()) scheme.primary else tokens.textSecondary,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
-                )
-            }
-        }
-
-        item("actions") {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PolishedHomeAction(
-                    icon = Icons.Rounded.Language,
-                    label = "WebUI",
-                    enabled = state.running,
-                    modifier = Modifier.weight(1f),
-                    onClick = { context.startActivity(Intent(context, ProxyWebUiActivity::class.java)) },
-                )
-                PolishedHomeAction(
-                    icon = Icons.Rounded.Public,
-                    label = "策略",
-                    modifier = Modifier.weight(1f),
-                    onClick = onPanel,
-                )
-                PolishedHomeAction(
-                    icon = Icons.Rounded.Speed,
-                    label = if (testing) "测速中" else "测速",
-                    enabled = state.running && !testing,
-                    modifier = Modifier.weight(1f),
-                    onClick = onSpeedTest,
-                )
-                PolishedHomeAction(
-                    icon = Icons.Rounded.RestartAlt,
-                    label = "重启",
-                    enabled = state.running && busyText.isBlank(),
-                    modifier = Modifier.weight(1f),
-                    onClick = onRestart,
-                )
-            }
-        }
-
-        item("metrics") {
-            Surface(
-                shape = RoundedCornerShape(18.dp),
-                color = tokens.cardBackground,
-                shadowElevation = 0.dp,
-            ) {
-                Column(Modifier.fillMaxWidth().padding(vertical = 14.dp)) {
-                    Row(Modifier.fillMaxWidth()) {
-                        ProxyMetric(
-                            value = if (state.memoryBytes > 0) formatBytes(state.memoryBytes) else "—",
-                            label = "内存",
-                            modifier = Modifier.weight(1f),
-                        )
-                        ProxyMetric(averageDelay, "平均延迟", Modifier.weight(1f))
-                        ProxyMetric(state.connections.size.toString(), "连接", Modifier.weight(1f))
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    HorizontalDivider(color = tokens.outline, modifier = Modifier.padding(horizontal = 16.dp))
-                    Spacer(Modifier.height(12.dp))
-                    Row(Modifier.fillMaxWidth()) {
-                        ProxyMetric(formatBytes(state.downloadTotal), "下载", Modifier.weight(1f))
-                        ProxyMetric(formatBytes(state.uploadTotal), "上传", Modifier.weight(1f))
-                        ProxyMetric(if (state.panelReady) "在线" else "等待", "控制接口", Modifier.weight(1f))
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PolishedHomeAction(
-    icon: ImageVector,
-    label: String,
-    modifier: Modifier,
-    enabled: Boolean = true,
-    onClick: () -> Unit,
-) {
-    val tokens = LocalBichenTokens.current
-    val scheme = MaterialTheme.colorScheme
-    Surface(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier.height(68.dp),
-        shape = RoundedCornerShape(16.dp),
-        color = tokens.cardBackground,
-        shadowElevation = 0.dp,
-    ) {
-        Column(
-            Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Icon(
-                icon,
-                contentDescription = label,
-                tint = if (enabled) scheme.primary else tokens.textSecondary.copy(alpha = .45f),
-                modifier = Modifier.size(20.dp),
-            )
-            Spacer(Modifier.height(5.dp))
-            Text(
-                label,
-                color = if (enabled) tokens.textPrimary else tokens.textSecondary.copy(alpha = .45f),
-                style = MaterialTheme.typography.labelMedium,
-                maxLines = 1,
-            )
-        }
-    }
-}
-
-'''
-          p.write_text(s[:start] + replacement + s[end:])
+          old = '''    var surface = modifier\n    if (backdrop != null) {\n        surface = surface.textureBlur(backdrop = backdrop, shape = shape, blurRadius = 18f)\n    }\n    surface = surface\n        .background(tokens.cardBackground.copy(alpha = if (backdrop != null) tintAlpha else .98f), shape)\n        .border(1.dp, tokens.outline.copy(alpha = if (backdrop != null) .42f else .60f), shape)\n        .clip(shape)\n'''
+          new = '''    // Do not attach a RuntimeShader blur to every scrolling card. Some OEM GPU/WebView\n    // combinations crash the whole activity while Compose creates multiple blur RenderNodes.\n    // Keep the glass hierarchy with a translucent one-layer surface; the dock can still use\n    // the single, already-proven backdrop blur.\n    var surface = modifier\n        .background(tokens.cardBackground.copy(alpha = if (backdrop != null) tintAlpha else .98f), shape)\n        .border(1.dp, tokens.outline.copy(alpha = if (backdrop != null) .42f else .60f), shape)\n        .clip(shape)\n'''
+          if old not in s:
+              raise SystemExit('GlassBlock blur block not found')
+          s = s.replace(old, new, 1)
+          # Drop the direct textureBlur import from this activity; only BichenGlassDock owns blur now.
+          s = s.replace('import top.yukonga.miuix.kmp.blur.textureBlur\n', '')
+          p.write_text(s)
           PY
-      - name: Commit patch
+      - name: Compile proxy UI
+        working-directory: android-app
+        run: gradle :app:compileDebugKotlin --stacktrace
+      - name: Commit fix
         shell: bash
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add android-app/app/src/main/java/io/github/xgl34222220/bichen/ComposeProxyActivity.kt
-          git commit -m "Polish proxy home hierarchy and actions"
+          git commit -m 'Stabilize proxy launch by limiting RuntimeShader blur'
           git push origin HEAD:feature/compose-luoshu-ui
