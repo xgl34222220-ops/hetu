@@ -129,7 +129,8 @@ jobs:
           rm -rf .upstream android-app/app/src/main/jniLibs android-app/app/src/main/assets/mihomo-root android-app/app/src/main/assets/MIHOMO-LICENSE android-app/app/src/main/assets/mihomo-revision.txt
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add android-app tests .github/workflows/compose-ui.yml
+          git add -u android-app tests .github/workflows/compose-ui.yml
+          git add android-app/app/src/main/assets/cnip/bichen-cn-v4.txt android-app/app/src/main/assets/cnip/bichen-cn-v6.txt
           git diff --cached --check
           git commit -m 'Implement Bichen 0.4.0-test.28 Proxy P2'
           git push origin HEAD:feature/compose-luoshu-ui
