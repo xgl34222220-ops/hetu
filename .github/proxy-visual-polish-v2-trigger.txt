@@ -1,1 +1,1 @@
-2026-09-17 inset grouped tools settings + segmented tabs + smooth sparkline + LuoShu edge-to-edge glass dock
+2026-09-17 fix Home dock white flash: keep LuoShu outer glass, disable nested moving lens backdrop
