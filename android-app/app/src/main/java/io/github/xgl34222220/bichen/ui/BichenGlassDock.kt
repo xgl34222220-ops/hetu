@@ -1,12 +1,10 @@
 package io.github.xgl34222220.bichen.ui
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -43,136 +41,103 @@ fun BichenGlassDock(
     backdrop: LayerBackdrop?,
     modifier: Modifier = Modifier,
 ) {
-    @Suppress("UNUSED_VARIABLE") val ignoredHazeFallback = hazeState
-
+    @Suppress("UNUSED_VARIABLE") val unusedFallback = hazeState
     val tokens = LocalBichenTokens.current
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val shape = RoundedCornerShape(26.dp)
-    val glassModifier = if (backdrop != null) {
+    val shape = RoundedCornerShape(21.dp)
+    val glass = if (backdrop != null) {
         Modifier
-            .textureBlur(
-                backdrop = backdrop,
-                shape = shape,
-                blurRadius = 24f,
-            )
-            .background(tokens.cardBackground.copy(alpha = .56f), shape)
+            .textureBlur(backdrop = backdrop, shape = shape, blurRadius = 18f)
+            .background(tokens.cardBackground.copy(alpha = .60f), shape)
     } else {
         Modifier.background(tokens.cardBackground.copy(alpha = .97f), shape)
     }
 
     Box(
         modifier = modifier
-            .padding(horizontal = 16.dp)
-            .padding(bottom = bottomInset + 9.dp)
+            .padding(horizontal = 14.dp)
+            .padding(bottom = bottomInset + 7.dp)
             .fillMaxWidth()
-            .height(66.dp),
+            .height(58.dp),
     ) {
         Box(
-            modifier = Modifier
+            Modifier
                 .fillMaxSize()
-                .shadow(10.dp, shape, clip = false)
-                .then(glassModifier),
+                .shadow(7.dp, shape, clip = false)
+                .then(glass),
         )
-
-        DockLayout(
-            items = items,
-            selected = selected,
-            onSelect = onSelect,
-            modifier = Modifier.fillMaxSize().padding(5.dp),
-        )
+        DockItems(items, selected, onSelect, Modifier.fillMaxSize().padding(4.dp))
     }
 }
 
 @Composable
-private fun DockLayout(
+private fun DockItems(
     items: List<DockItem>,
     selected: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier,
 ) {
-    val scheme = MaterialTheme.colorScheme
     val tokens = LocalBichenTokens.current
+    val scheme = MaterialTheme.colorScheme
     BoxWithConstraints(modifier = modifier) {
-        val itemWidth = maxWidth / items.size.toFloat()
-        val targetIndex = selected.coerceIn(0, items.lastIndex)
-        val stretch = remember { Animatable(0f) }
-        var direction by remember { mutableFloatStateOf(0f) }
-        var previousIndex by remember { mutableIntStateOf(targetIndex) }
-
-        LaunchedEffect(targetIndex) {
-            if (targetIndex != previousIndex) {
-                direction = if (targetIndex > previousIndex) 1f else -1f
-                previousIndex = targetIndex
-                stretch.snapTo(1f)
-                stretch.animateTo(0f, spring(dampingRatio = .78f, stiffness = Spring.StiffnessMediumLow))
-            }
-        }
-
-        val indicatorX by animateDpAsState(
-            targetValue = itemWidth * targetIndex.toFloat(),
-            animationSpec = spring(dampingRatio = .80f, stiffness = 420f),
-            label = "bichenDockX",
+        val width = maxWidth / items.size.toFloat()
+        val index = selected.coerceIn(0, items.lastIndex)
+        val x by animateDpAsState(
+            targetValue = width * index.toFloat(),
+            animationSpec = spring(dampingRatio = .82f, stiffness = 430f),
+            label = "dockX",
         )
-        val extra = 5.dp * stretch.value
-        val start = indicatorX + 3.dp - if (direction < 0f) extra else 0.dp
-        val indicatorShape = RoundedCornerShape(19.dp)
-
         Box(
-            modifier = Modifier
-                .offset(x = start)
-                .width(itemWidth - 6.dp + extra)
-                .height(56.dp)
-                .clip(indicatorShape)
-                .background(tokens.selectionBackground.copy(alpha = .86f)),
+            Modifier
+                .offset(x = x + 2.dp)
+                .width(width - 4.dp)
+                .height(50.dp)
+                .clip(RoundedCornerShape(17.dp))
+                .background(tokens.selectionBackground.copy(alpha = .88f)),
         )
 
         Row(Modifier.fillMaxWidth().selectableGroup()) {
-            items.forEachIndexed { index, item ->
-                val selectedItem = index == targetIndex
+            items.forEachIndexed { i, item ->
+                val active = i == index
                 val source = remember(item.label) { MutableInteractionSource() }
                 val pressed by source.collectIsPressedAsState()
-                val baseColor = if (selectedItem) scheme.primary else tokens.textSecondary
-                val itemColor by animateColorAsState(
-                    targetValue = if (pressed) baseColor.copy(alpha = .70f) else baseColor,
-                    animationSpec = tween(100),
-                    label = "${item.label}DockColor",
+                val scale by animateFloatAsState(
+                    targetValue = if (pressed) .95f else 1f,
+                    animationSpec = spring(dampingRatio = .8f, stiffness = Spring.StiffnessHigh),
+                    label = "dockScale${item.label}",
                 )
-                val itemScale by animateFloatAsState(
-                    targetValue = if (pressed) .94f else 1f,
-                    animationSpec = spring(dampingRatio = .76f, stiffness = 700f),
-                    label = "${item.label}DockScale",
+                val color by animateColorAsState(
+                    targetValue = if (active) scheme.primary else tokens.textSecondary,
+                    label = "dockColor${item.label}",
                 )
-
                 Column(
-                    modifier = Modifier
-                        .width(itemWidth)
-                        .height(56.dp)
-                        .graphicsLayer { scaleX = itemScale; scaleY = itemScale }
+                    Modifier
+                        .width(width)
+                        .height(50.dp)
+                        .graphicsLayer { scaleX = scale; scaleY = scale }
                         .selectable(
-                            selected = selectedItem,
+                            selected = active,
                             role = Role.Tab,
                             interactionSource = source,
                             indication = null,
-                            onClick = { if (!selectedItem) onSelect(index) },
+                            onClick = { if (!active) onSelect(i) },
                         ),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
                     Icon(
-                        imageVector = item.icon,
-                        contentDescription = null,
-                        tint = itemColor,
-                        modifier = Modifier
-                            .size(BichenLuoShuIconTokens.DockGlyph)
-                            .graphicsLayer { scaleX = item.opticalScale; scaleY = item.opticalScale },
+                        item.icon,
+                        contentDescription = item.label,
+                        tint = color,
+                        modifier = Modifier.size(20.dp).graphicsLayer { scaleX = item.opticalScale; scaleY = item.opticalScale },
                     )
-                    Spacer(Modifier.height(2.dp))
+                    Spacer(Modifier.height(1.dp))
                     Text(
                         item.label,
-                        color = itemColor,
-                        fontSize = 10.5.sp,
-                        lineHeight = 14.sp,
-                        fontWeight = if (selectedItem) FontWeight.SemiBold else FontWeight.Medium,
+                        color = color,
+                        fontSize = 9.5.sp,
+                        lineHeight = 12.sp,
+                        fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
                         maxLines = 1,
                     )
                 }
