@@ -59,7 +59,7 @@ class ReferenceProxyActivity : ComponentActivity() {
 
 private enum class RefProxyPage { Home, Panel, Tools, Settings }
 private enum class RefPanelTab(val label: String) {
-    Overview("概览"), Nodes("节点"), Subscriptions("订阅"), Connections("连接"), Rules("规则"), RuleSets("规则集")
+    Overview("策略"), Nodes("节点"), Subscriptions("订阅"), Connections("连接"), Rules("规则"), RuleSets("规则集")
 }
 
 @Composable
@@ -296,7 +296,7 @@ private fun RefHome(
                 Modifier.fillMaxWidth().statusBarsPadding().padding(top = 12.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("辟尘", color = t.textPrimary, fontSize = 32.sp, lineHeight = 38.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Text("代理", color = t.textPrimary, fontSize = 26.sp, lineHeight = 32.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                 IconButton(onClick = onRefresh, modifier = Modifier.size(42.dp)) {
                     Icon(Icons.Rounded.Refresh, "刷新", tint = t.textSecondary, modifier = Modifier.size(20.dp))
                 }
@@ -309,21 +309,15 @@ private fun RefHome(
             Box(
                 Modifier.fillMaxWidth()
                     .background(if (state.running) t.selectionBackground else t.cardBackground, RoundedCornerShape(18.dp))
-                    .heightIn(min = 158.dp),
+                    .heightIn(min = 118.dp),
             ) {
-                Icon(
-                    if (state.running) Icons.Rounded.CheckCircle else Icons.Rounded.PowerSettingsNew,
-                    contentDescription = null,
-                    tint = scheme.primary.copy(alpha = .50f),
-                    modifier = Modifier.align(Alignment.BottomEnd).offset(x = 22.dp, y = 22.dp).size(114.dp),
-                )
                 Column(
-                    Modifier.fillMaxWidth().padding(18.dp),
+                    Modifier.fillMaxWidth().padding(15.dp),
                     verticalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Box(Modifier.size(8.dp).background(if (state.running) scheme.primary else t.warning, CircleShape))
-                        Text(if (state.running) "运行中" else "已停止", color = if (state.running) scheme.primary else t.textPrimary, fontSize = 21.sp, fontWeight = FontWeight.Bold)
+                        Text(if (state.running) "运行中" else "已停止", color = if (state.running) scheme.primary else t.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
                     }
                     Text(if (state.running) refDuration(runtime.elapsedSeconds) else "等待启动", color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Medium)
                     Text("${state.core} · ${state.mode}", color = t.textPrimary, style = MaterialTheme.typography.bodyMedium)
@@ -527,8 +521,9 @@ private fun RefPanel(
     onRefreshState: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val t = LocalBichenTokens.current
-    var tab by rememberSaveable { mutableStateOf(RefPanelTab.Nodes) }
+    var tab by rememberSaveable { mutableStateOf(RefPanelTab.Overview) }
     var refreshing by remember { mutableStateOf(false) }
     var providers by remember { mutableStateOf<List<DashboardProviderUi>>(emptyList()) }
     var rules by remember { mutableStateOf<List<ProxyRuleUi>>(emptyList()) }
@@ -538,6 +533,20 @@ private fun RefPanel(
     val selectedLocal = remember { mutableStateMapOf<String, String>() }
     val testing = remember { mutableStateMapOf<String, Boolean>() }
     var error by remember { mutableStateOf("") }
+    var searchOpen by rememberSaveable { mutableStateOf(false) }
+    var query by rememberSaveable { mutableStateOf("") }
+
+    val filteredGroups = remember(state.groups, query) {
+        state.groups.filter { group ->
+            query.isBlank() || group.name.contains(query, true) || group.now.contains(query, true) ||
+                group.nodes.any { it.name.contains(query, true) }
+        }
+    }
+    val filteredNodes = remember(state.groups, query) {
+        state.groups.flatMap { it.nodes }.distinctBy { it.name }.filter { node ->
+            query.isBlank() || node.name.contains(query, true) || node.type.contains(query, true)
+        }
+    }
 
     suspend fun loadTab() {
         if (!state.running) return
@@ -562,11 +571,11 @@ private fun RefPanel(
             error = ""
             try {
                 when (tab) {
-                    RefPanelTab.Nodes -> delays.putAll(repo.globalDelay())
+                    RefPanelTab.Overview, RefPanelTab.Nodes -> delays.putAll(repo.globalDelay())
                     RefPanelTab.Subscriptions -> providers = repo.refreshSubscriptions()
                     RefPanelTab.RuleSets -> ruleSets = repo.refreshRuleSets()
                     RefPanelTab.Rules -> rules = repo.rules()
-                    RefPanelTab.Overview, RefPanelTab.Connections -> onRefreshState()
+                    RefPanelTab.Connections -> onRefreshState()
                 }
             } catch (cancel: CancellationException) {
                 throw cancel
@@ -589,29 +598,52 @@ private fun RefPanel(
             item {
                 Column(Modifier.statusBarsPadding(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Spacer(Modifier.width(44.dp))
-                        Text("面板", color = t.textPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                        IconButton(onClick = ::refresh, enabled = !refreshing) {
-                            if (refreshing) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                            else Icon(Icons.Rounded.Refresh, "刷新")
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                            Text("代理面板", color = t.textPrimary, fontSize = 24.sp, lineHeight = 30.sp, fontWeight = FontWeight.Bold)
+                            Text("${state.groups.size} 个策略组", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+                        }
+                        IconButton(onClick = { context.startActivity(Intent(context, ProxyWebUiActivity::class.java)) }, modifier = Modifier.size(40.dp)) {
+                            Icon(Icons.Rounded.Language, "WebUI", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(19.dp))
+                        }
+                        IconButton(onClick = { searchOpen = !searchOpen; if (!searchOpen) query = "" }, modifier = Modifier.size(40.dp)) {
+                            Icon(if (searchOpen) Icons.Rounded.Close else Icons.Rounded.Search, "搜索", tint = t.textSecondary, modifier = Modifier.size(19.dp))
                         }
                     }
                     RefPanelTabs(tab) { tab = it }
+                    if (searchOpen) {
+                        OutlinedTextField(
+                            value = query,
+                            onValueChange = { query = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            placeholder = { Text("搜索策略组或节点") },
+                            leadingIcon = { Icon(Icons.Rounded.Search, null, Modifier.size(18.dp)) },
+                            shape = RoundedCornerShape(13.dp),
+                        )
+                    }
                 }
             }
             if (error.isNotBlank()) item { RefNotice(error) }
             if (!state.running) {
                 item { RefNotice("代理未运行") }
             } else when (tab) {
-                RefPanelTab.Overview -> item { RefPanelOverview(state, delays) }
-                RefPanelTab.Nodes -> {
+                RefPanelTab.Overview -> {
                     item {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("策略组", color = t.textPrimary, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                            TextButton(onClick = ::refresh, enabled = !refreshing) { Text(if (refreshing) "测速中" else "全部测速") }
+                        Surface(shape = RoundedCornerShape(15.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+                            Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Box(Modifier.size(34.dp).background(t.selectionBackground, RoundedCornerShape(11.dp)), contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Rounded.Speed, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(19.dp))
+                                }
+                                Spacer(Modifier.width(10.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text("策略组", color = t.textPrimary, style = MaterialTheme.typography.titleMedium)
+                                    Text("${filteredGroups.size} 个策略组 · 点击卡片选择节点", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+                                }
+                                TextButton(onClick = ::refresh, enabled = !refreshing) { Text(if (refreshing) "测速中" else "全部测速") }
+                            }
                         }
                     }
-                    itemsIndexed(state.groups.chunked(2), key = { index, _ -> "groups-$index" }) { _, pair ->
+                    itemsIndexed(filteredGroups.chunked(2), key = { index, _ -> "groups-$index" }) { _, pair ->
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             pair.forEach { group ->
                                 val selected = selectedLocal[group.name] ?: group.now
@@ -621,17 +653,39 @@ private fun RefPanel(
                                     expanded = selectedGroupName == group.name,
                                     delay = delays[selected] ?: group.nodes.firstOrNull { it.name == selected }?.lastDelay,
                                     modifier = Modifier.weight(1f),
-                                    onClick = {
-                                        selectedGroupName = group.name
-                                        pendingNode = selected
-                                    },
+                                    onClick = { selectedGroupName = group.name; pendingNode = selected },
                                 )
                             }
                             if (pair.size == 1) Spacer(Modifier.weight(1f))
                         }
                     }
                 }
-                RefPanelTab.Subscriptions -> items(providers, key = { it.name }) { RefProviderRow(it) }
+                RefPanelTab.Nodes -> {
+                    item {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("全部节点", color = t.textPrimary, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                            TextButton(onClick = ::refresh, enabled = !refreshing) { Text(if (refreshing) "测速中" else "全部测速") }
+                        }
+                    }
+                    itemsIndexed(filteredNodes.chunked(2), key = { index, _ -> "nodes-$index" }) { _, pair ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            pair.forEach { node ->
+                                RefLeafNodeCard(node, delays[node.name] ?: node.lastDelay, Modifier.weight(1f)) {
+                                    if (testing[node.name] != true) scope.launch {
+                                        testing[node.name] = true
+                                        try { delays[node.name] = repo.delay(node.name) }
+                                        catch (_: Exception) { delays[node.name] = -1L }
+                                        finally { testing.remove(node.name) }
+                                    }
+                                }
+                            }
+                            if (pair.size == 1) Spacer(Modifier.weight(1f))
+                        }
+                    }
+                }
+                RefPanelTab.Subscriptions -> items(providers, key = { it.name }) { item ->
+                    RefProviderRow(item) { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) }
+                }
                 RefPanelTab.Connections -> items(state.connections, key = { it.id }) { c ->
                     RefConnectionRow(c) { scope.launch { repo.closeConnection(c.id); onRefreshState() } }
                 }
@@ -717,9 +771,15 @@ private fun RefNodeSheet(
         Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(group.name, color = t.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("${group.nodes.size} 个节点", color = t.textSecondary, style = MaterialTheme.typography.bodySmall)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(38.dp).background(scheme.primary.copy(alpha = .09f), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+                Icon(refGroupIcon(group.type), null, tint = scheme.primary, modifier = Modifier.size(21.dp))
+            }
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(group.name, color = t.textPrimary, fontSize = 19.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("${refGroupType(group.type)} · ${group.nodes.size} 个节点", color = t.textSecondary, style = MaterialTheme.typography.bodySmall)
+            }
         }
         Row(
             Modifier.fillMaxWidth()
@@ -830,28 +890,70 @@ private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolea
     val scheme = MaterialTheme.colorScheme
     val shape = RoundedCornerShape(15.dp)
     val glass = if (expanded) {
-        Brush.verticalGradient(listOf(t.selectionBackground.copy(alpha = .95f), scheme.primaryContainer.copy(alpha = .52f)))
+        Brush.verticalGradient(listOf(t.selectionBackground.copy(alpha = .96f), scheme.primaryContainer.copy(alpha = .38f)))
     } else {
-        Brush.verticalGradient(listOf(t.elevatedCardBackground.copy(alpha = .82f), t.cardBackground.copy(alpha = .62f)))
+        Brush.verticalGradient(listOf(t.cardBackground.copy(alpha = .98f), t.elevatedCardBackground.copy(alpha = .72f)))
     }
     Column(
-        modifier
-            .background(glass, shape)
-            .border(.7.dp, if (expanded) scheme.primary.copy(alpha = .26f) else t.outline.copy(alpha = .36f), shape)
+        modifier.background(glass, shape)
+            .border(.7.dp, if (expanded) scheme.primary.copy(alpha = .24f) else t.outline.copy(alpha = .46f), shape)
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 11.dp),
+            .padding(horizontal = 11.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(32.dp).background(scheme.primary.copy(alpha = .09f), RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
+                Icon(refGroupIcon(group.type), null, tint = scheme.primary, modifier = Modifier.size(18.dp))
+            }
+            Spacer(Modifier.width(8.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(group.name, color = t.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(refGroupType(group.type), color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+            }
+            RefDelayBadge(delay, false, null)
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(selected.ifBlank { "未选择" }, color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Text("${group.nodes.size} 节点", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+            if (expanded) { Spacer(Modifier.width(5.dp)); Icon(Icons.Rounded.CheckCircle, "已打开", tint = scheme.primary, modifier = Modifier.size(15.dp)) }
+        }
+    }
+}
+
+@Composable
+private fun RefLeafNodeCard(node: ProxyNodeUi, delay: Long?, modifier: Modifier, onClick: () -> Unit) {
+    val t = LocalBichenTokens.current
+    val scheme = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(14.dp)
+    Column(
+        modifier.background(t.cardBackground, shape).border(.7.dp, t.outline.copy(alpha = .45f), shape).clickable(onClick = onClick).padding(11.dp),
         verticalArrangement = Arrangement.spacedBy(7.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(group.name, color = t.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-            if (expanded) Icon(Icons.Rounded.Check, "当前策略组", tint = scheme.primary, modifier = Modifier.size(17.dp))
-        }
-        Text(selected.ifBlank { "未选择" }, color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("${group.type} · ${group.nodes.size} 节点", color = t.textSecondary, style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f))
+            Box(Modifier.size(28.dp).background(scheme.primary.copy(alpha = .08f), RoundedCornerShape(9.dp)), contentAlignment = Alignment.Center) {
+                Icon(Icons.Rounded.Public, null, tint = scheme.primary, modifier = Modifier.size(16.dp))
+            }
+            Spacer(Modifier.width(7.dp))
+            Text(node.name, color = t.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             RefDelayBadge(delay, false, null)
         }
+        Text(listOf(node.type.ifBlank { "节点" }, if (node.udp) "UDP" else "").filter { it.isNotBlank() }.joinToString(" · "), color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
+}
+
+private fun refGroupIcon(type: String): ImageVector = when (type.lowercase()) {
+    "urltest", "fallback" -> Icons.Rounded.Speed
+    "selector" -> Icons.Rounded.Tune
+    "loadbalance" -> Icons.Rounded.SwapHoriz
+    else -> Icons.Rounded.Hub
+}
+
+private fun refGroupType(type: String): String = when (type.lowercase()) {
+    "urltest" -> "自动测速"
+    "selector" -> "手动选择"
+    "fallback" -> "故障转移"
+    "loadbalance" -> "负载均衡"
+    else -> type.ifBlank { "策略组" }
 }
 
 @Composable
@@ -876,9 +978,9 @@ private fun RefDelayBadge(value: Long?, testing: Boolean, onClick: (() -> Unit)?
 }
 
 @Composable
-private fun RefProviderRow(item: DashboardProviderUi) {
+private fun RefProviderRow(item: DashboardProviderUi, onClick: () -> Unit) {
     val t = LocalBichenTokens.current
-    Surface(shape = RoundedCornerShape(12.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+    Surface(onClick = onClick, shape = RoundedCornerShape(12.dp), color = t.cardBackground, shadowElevation = 0.dp) {
         Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text(item.name, color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
             Text("${item.nodes.size} 个节点 · ${item.vehicleType}", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
@@ -981,13 +1083,13 @@ private fun RefSettings(state: ProxyComposeState) {
             RefGroup {
                 RefValueRow("基础代理配置", "") { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }
                 RefDivider()
-                RefValueRow("核心", state.core, null)
+                RefValueRow("核心", state.core) { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }
                 RefDivider()
-                RefValueRow("运行模式", state.mode, null)
+                RefValueRow("运行模式", state.mode) { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }
                 RefDivider()
-                RefValueRow("IPv6", state.ipv6, null)
+                RefValueRow("IPv6", state.ipv6) { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }
                 RefDivider()
-                RefValueRow("当前配置", state.config, null)
+                RefValueRow("当前配置", state.config) { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) }
             }
         }
         item {

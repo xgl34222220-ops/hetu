@@ -145,7 +145,7 @@ internal class BichenComposeController(private val context: Context) {
     fun prepareVpn(): Intent? = VpnService.prepare(app)
 
     fun startVpn() {
-        prefs.edit().putBoolean("vpnWanted", true).remove("vpnError").apply()
+        prefs.edit().putBoolean("vpnWanted", true).putBoolean("requestLogs", true).remove("vpnError").apply()
         val intent = Intent(app, DnsVpnService::class.java).setAction(DnsVpnService.ACTION_START)
         if (android.os.Build.VERSION.SDK_INT >= 26) app.startForegroundService(intent) else app.startService(intent)
     }

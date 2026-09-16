@@ -586,7 +586,7 @@ private fun CompactActionTile(
     onClick: () -> Unit,
 ) {
     val tokens = LocalBichenTokens.current
-    Surface(onClick = onClick, modifier = modifier.height(108.dp), shape = RoundedCornerShape(18.dp), color = tokens.cardBackground, border = BorderStroke(1.dp, tokens.outline)) {
+    Surface(onClick = onClick, modifier = modifier.height(92.dp), shape = RoundedCornerShape(18.dp), color = tokens.cardBackground, border = BorderStroke(1.dp, tokens.outline)) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.SpaceBetween) {
             Box(Modifier.size(38.dp).background(tokens.controlBackground, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
                 Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))

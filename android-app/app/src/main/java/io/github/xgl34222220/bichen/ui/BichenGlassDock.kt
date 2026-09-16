@@ -63,7 +63,7 @@ fun BichenGlassDock(
         Box(
             Modifier
                 .fillMaxSize()
-                .shadow(7.dp, shape, clip = false)
+                .shadow(4.dp, shape, clip = false)
                 .then(glass),
         )
         DockItems(items, selected, onSelect, Modifier.fillMaxSize().padding(4.dp))
