@@ -188,7 +188,11 @@ fun BichenGlassDock(
             selectedColor = scheme.primary,
             unselectedColor = scheme.onSurfaceVariant.copy(alpha = .90f),
             liquidGlass = activeGlass,
-            indicatorBackdrop = dockSurfaceBackdrop.takeIf { runtimeLiquid },
+            // Keep LuoShu's outer RuntimeShader glass, but force the moving selection lens
+            // through LuoShu's own non-nested fallback path. On some HyperOS/GPU stacks,
+            // nesting drawBackdrop inside a layerBackdrop shell flashes a wide white strip
+            // exactly when the indicator travels back to Home.
+            indicatorBackdrop = null,
             dark = dark,
         )
     }
