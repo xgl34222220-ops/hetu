@@ -8,7 +8,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -32,13 +31,6 @@ import androidx.compose.ui.unit.sp
 import dev.chrisbanes.haze.HazeState
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 
-/**
- * Bichen's restrained glass dock.
- *
- * Glass is kept only for navigation chrome; data/content cards stay mostly flat. The renderer
- * deliberately avoids translucent white overlay stacks because some Android 16/OEM compositors
- * can leave opaque rectangular artifacts after partial invalidation.
- */
 data class DockItem(val label: String, val icon: ImageVector, val opticalScale: Float = 1f)
 
 @Composable
@@ -53,32 +45,30 @@ fun BichenGlassDock(
     @Suppress("UNUSED_VARIABLE") val ignoredHaze = hazeState
     @Suppress("UNUSED_VARIABLE") val ignoredBackdrop = backdrop
 
-    val scheme = MaterialTheme.colorScheme
     val tokens = LocalBichenTokens.current
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val shape = RoundedCornerShape(25.dp)
+    val shape = RoundedCornerShape(23.dp)
 
     Box(
         modifier = modifier
-            .padding(horizontal = 18.dp)
-            .padding(bottom = bottomInset + 10.dp)
+            .padding(horizontal = 16.dp)
+            .padding(bottom = bottomInset + 8.dp)
             .fillMaxWidth()
-            .height(64.dp),
+            .height(60.dp),
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .shadow(10.dp, shape, clip = false)
+                .shadow(6.dp, shape, clip = false)
                 .clip(shape)
-                .background(tokens.elevatedCardBackground)
-                .border(.7.dp, tokens.outline, shape),
+                .background(tokens.cardBackground),
         )
 
         DockLayout(
             items = items,
             selected = selected,
             onSelect = onSelect,
-            modifier = Modifier.fillMaxSize().padding(6.dp),
+            modifier = Modifier.fillMaxSize().padding(5.dp),
         )
     }
 }
@@ -104,30 +94,26 @@ private fun DockLayout(
                 direction = if (targetIndex > previousIndex) 1f else -1f
                 previousIndex = targetIndex
                 stretch.snapTo(1f)
-                stretch.animateTo(
-                    0f,
-                    spring(dampingRatio = .68f, stiffness = Spring.StiffnessMediumLow),
-                )
+                stretch.animateTo(0f, spring(dampingRatio = .78f, stiffness = Spring.StiffnessMediumLow))
             }
         }
 
         val indicatorX by animateDpAsState(
             targetValue = itemWidth * targetIndex.toFloat(),
-            animationSpec = spring(dampingRatio = .76f, stiffness = 360f),
+            animationSpec = spring(dampingRatio = .80f, stiffness = 420f),
             label = "bichenDockX",
         )
-        val extra = 7.dp * stretch.value
-        val start = indicatorX + 4.dp - if (direction < 0f) extra else 0.dp
-        val indicatorShape = RoundedCornerShape(18.dp)
+        val extra = 4.dp * stretch.value
+        val start = indicatorX + 3.dp - if (direction < 0f) extra else 0.dp
+        val indicatorShape = RoundedCornerShape(17.dp)
 
         Box(
             modifier = Modifier
                 .offset(x = start)
-                .width(itemWidth - 8.dp + extra)
-                .height(52.dp)
+                .width(itemWidth - 6.dp + extra)
+                .height(50.dp)
                 .clip(indicatorShape)
-                .background(tokens.selectionBackground)
-                .border(.8.dp, scheme.primary.copy(alpha = .15f), indicatorShape),
+                .background(tokens.selectionBackground),
         )
 
         Row(Modifier.fillMaxWidth().selectableGroup()) {
@@ -138,19 +124,19 @@ private fun DockLayout(
                 val baseColor = if (selectedItem) scheme.primary else tokens.textSecondary
                 val itemColor by animateColorAsState(
                     targetValue = if (pressed) baseColor.copy(alpha = .72f) else baseColor,
-                    animationSpec = tween(120),
+                    animationSpec = tween(100),
                     label = "${item.label}DockColor",
                 )
                 val itemScale by animateFloatAsState(
-                    targetValue = if (pressed) .97f else 1f,
-                    animationSpec = spring(dampingRatio = .74f, stiffness = 620f),
+                    targetValue = if (pressed) .96f else 1f,
+                    animationSpec = spring(dampingRatio = .78f, stiffness = 650f),
                     label = "${item.label}DockScale",
                 )
 
                 Column(
                     modifier = Modifier
                         .width(itemWidth)
-                        .height(52.dp)
+                        .height(50.dp)
                         .graphicsLayer { scaleX = itemScale; scaleY = itemScale }
                         .selectable(
                             selected = selectedItem,
@@ -170,13 +156,13 @@ private fun DockLayout(
                             .size(BichenLuoShuIconTokens.DockGlyph)
                             .graphicsLayer { scaleX = item.opticalScale; scaleY = item.opticalScale },
                     )
-                    Spacer(Modifier.height(3.dp))
+                    Spacer(Modifier.height(2.dp))
                     Text(
                         item.label,
                         color = itemColor,
-                        fontSize = 11.5.sp,
-                        lineHeight = 17.sp,
-                        fontWeight = if (selectedItem) FontWeight.Bold else FontWeight.Medium,
+                        fontSize = 10.5.sp,
+                        lineHeight = 14.sp,
+                        fontWeight = if (selectedItem) FontWeight.SemiBold else FontWeight.Medium,
                         maxLines = 1,
                     )
                 }
