@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -28,6 +29,7 @@ LOCAL_TOOLS = ROOT.parent / "tooling"
 BUILD = ROOT / "android-app" / "build"
 VERSION = "0.3.0-beta.1"
 VERSION_CODE = 301
+PACKAGE = "io.github.xgl34222220.bichen"
 
 
 def run(args: list[str | Path], *, env: dict[str, str] | None = None) -> None:
@@ -92,6 +94,20 @@ def sign_key() -> tuple[Path, str, dict[str, str]]:
     return keystore, alias, env
 
 
+def aapt_manifest(source: Path, target: Path) -> Path:
+    """Create an AAPT1-only manifest without polluting the modern AGP source manifest.
+
+    AGP uses android.namespace and intentionally no longer needs package= in the source
+    manifest, while the legacy `aapt package` path still requires it to generate R.java.
+    """
+    text = source.read_text(encoding="utf-8")
+    if not re.search(r"<manifest\b[^>]*\bpackage\s*=", text, flags=re.DOTALL):
+        text = re.sub(r"<manifest\b", f'<manifest package="{PACKAGE}"', text, count=1)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(text, encoding="utf-8")
+    return target
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, default=ROOT / "out" / f"Bichen-{VERSION}.apk")
@@ -103,8 +119,9 @@ def main() -> None:
     ecj = LOCAL_TOOLS / "ecj.jar"
     if not java or (not javac and not ecj.is_file()):
         raise RuntimeError("JDK 17 is required (or the local Java runtime + tooling/ecj.jar).")
-    if not (MAIN / "AndroidManifest.xml").is_file():
-        raise RuntimeError(f"Missing manifest: {MAIN / 'AndroidManifest.xml'}")
+    source_manifest = MAIN / "AndroidManifest.xml"
+    if not source_manifest.is_file():
+        raise RuntimeError(f"Missing manifest: {source_manifest}")
 
     BUILD.mkdir(parents=True, exist_ok=True)
     # Clean only generated compilation outputs; keep the signing key between builds.
@@ -114,8 +131,10 @@ def main() -> None:
             shutil.rmtree(path)
         path.mkdir()
     output.parent.mkdir(parents=True, exist_ok=True)
+
+    legacy_manifest = aapt_manifest(source_manifest, BUILD / "generated" / "AndroidManifest-aapt.xml")
     aapt = [
-        tools / "aapt", "package", "-f", "-M", MAIN / "AndroidManifest.xml",
+        tools / "aapt", "package", "-f", "-M", legacy_manifest,
         "-I", android_jar, "-J", BUILD / "generated", "-F", BUILD / "resources.apk",
         "--min-sdk-version", "26", "--target-sdk-version", "35",
         "--version-code", str(VERSION_CODE), "--version-name", VERSION,
