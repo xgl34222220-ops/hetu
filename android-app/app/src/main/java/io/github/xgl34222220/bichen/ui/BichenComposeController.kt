@@ -17,6 +17,8 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.Collator
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 internal data class HomeSnapshot(
@@ -71,6 +73,10 @@ internal data class DnsCounters(
     val queries: Long = 0,
     val blocked: Long = 0,
     val errors: Long = 0,
+    val sessionQueries: Long = 0,
+    val sessionBlocked: Long = 0,
+    val lastBlockedDomain: String = "",
+    val lastBlockedAt: Long = 0,
 ) {
     val blockRate: Int get() = if (queries <= 0L) 0 else ((blocked * 100L) / queries).coerceIn(0L, 100L).toInt()
 }
@@ -105,9 +111,9 @@ internal class BichenComposeController(private val context: Context) {
             ruleCount = if (status.optInt("ruleCount") > 0) status.optInt("ruleCount") else ruleCount,
             allowCount = allowCount,
             blockCount = blockCount,
-            blockedQueries = prefs.getLong("blocked", 0),
-            queries = prefs.getLong("queries", 0),
-            errors = prefs.getLong("errors", 0),
+            blockedQueries = DnsVpnService.currentBlocked(app),
+            queries = DnsVpnService.currentQueries(app),
+            errors = DnsVpnService.currentErrors(app),
             vpnRunning = DnsVpnService.running,
             vpnWanted = prefs.getBoolean("vpnWanted", false),
             proxyRunning = rootProxyRunning || MihomoVpnService.engaged || prefs.getBoolean("proxyWanted", false),
@@ -127,9 +133,13 @@ internal class BichenComposeController(private val context: Context) {
     }
 
     fun dnsCounters(): DnsCounters = DnsCounters(
-        queries = prefs.getLong("queries", 0L),
-        blocked = prefs.getLong("blocked", 0L),
-        errors = prefs.getLong("errors", 0L),
+        queries = DnsVpnService.currentQueries(app),
+        blocked = DnsVpnService.currentBlocked(app),
+        errors = DnsVpnService.currentErrors(app),
+        sessionQueries = DnsVpnService.sessionQueries(),
+        sessionBlocked = DnsVpnService.sessionBlocked(),
+        lastBlockedDomain = DnsVpnService.lastBlockedDomain(),
+        lastBlockedAt = DnsVpnService.lastBlockedAt(),
     )
 
     fun prepareVpn(): Intent? = VpnService.prepare(app)
@@ -266,6 +276,12 @@ internal class BichenComposeController(private val context: Context) {
         if (rules.updateRules(moduleInstalled())) "规则已更新" else "规则已校验，没有变化"
     }
 
+    private fun requestTime(o: JSONObject): String {
+        val millis = o.optLong("time", 0L)
+        return if (millis > 0L) SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(millis))
+        else o.optString("timestamp", "")
+    }
+
     fun requestItems(): List<RequestItem> {
         val raw = prefs.getString("dnsLogs", "[]") ?: "[]"
         val array = try { JSONArray(raw) } catch (_: Exception) { JSONArray() }
@@ -275,8 +291,8 @@ internal class BichenComposeController(private val context: Context) {
             out += RequestItem(
                 domain = o.optString("domain", o.optString("name", "未知域名")),
                 reason = o.optString("reason", o.optString("result", "DNS 请求")),
-                blocked = o.optBoolean("blocked", false),
-                time = o.optString("time", o.optString("timestamp", "")),
+                blocked = o.optBoolean("blocked", o.optString("result", "").startsWith("blocked")),
+                time = requestTime(o),
             )
         }
         return out
@@ -285,6 +301,9 @@ internal class BichenComposeController(private val context: Context) {
     fun clearRequests() {
         prefs.edit().putString("dnsLogs", "[]").remove("dnsLogError").remove("dnsLogNotice").apply()
     }
+
+    fun requestLoggingEnabled(): Boolean = prefs.getBoolean("requestLogs", false)
+    fun setRequestLogging(enabled: Boolean) = DnsVpnService.setRequestLogging(app, enabled)
 
     fun appearance(): String = prefs.getString("appearance", "system") ?: "system"
     fun setAppearance(value: String) { prefs.edit().putString("appearance", value).apply() }

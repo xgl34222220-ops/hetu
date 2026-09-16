@@ -69,6 +69,9 @@ public final class DnsVpnService extends VpnService {
     private final AtomicInteger generation = new AtomicInteger();
     private final AtomicInteger commandSequence = new AtomicInteger();
     private final AtomicLong queries = new AtomicLong(), blocked = new AtomicLong(), errors = new AtomicLong();
+    private long sessionStartQueries, sessionStartBlocked;
+    private static volatile String liveLastBlockedDomain = "";
+    private static volatile long liveLastBlockedAt;
     private final AtomicLong cacheHits = new AtomicLong(), fallbackCount = new AtomicLong(), latencyMs = new AtomicLong();
     private final DnsCache cache = new DnsCache();
     private final Object outputLock = new Object();
@@ -87,12 +90,36 @@ public final class DnsVpnService extends VpnService {
         prefs = getSharedPreferences("bichen", MODE_PRIVATE);
         rules = new RuleStore(this);
         queries.set(prefs.getLong("queries", 0)); blocked.set(prefs.getLong("blocked", 0)); errors.set(prefs.getLong("errors", 0));
+        sessionStartQueries = queries.get(); sessionStartBlocked = blocked.get();
         cacheHits.set(prefs.getLong("cacheHits", 0)); fallbackCount.set(prefs.getLong("dnsFallbackCount", 0));
         latencyMs.set(prefs.getLong("dnsLatencyMs", 0));
         NotificationManager manager = getSystemService(NotificationManager.class);
         manager.createNotificationChannel(new NotificationChannel(CHANNEL, "DNS 去广告", NotificationManager.IMPORTANCE_LOW));
         statistics.scheduleWithFixedDelay(this::flushStatistics, 10, 10, TimeUnit.SECONDS);
     }
+
+    public static long currentQueries(Context context) {
+        DnsVpnService instance = latestInstance;
+        return running && instance != null ? instance.queries.get() : context.getSharedPreferences("bichen", MODE_PRIVATE).getLong("queries", 0L);
+    }
+    public static long currentBlocked(Context context) {
+        DnsVpnService instance = latestInstance;
+        return running && instance != null ? instance.blocked.get() : context.getSharedPreferences("bichen", MODE_PRIVATE).getLong("blocked", 0L);
+    }
+    public static long currentErrors(Context context) {
+        DnsVpnService instance = latestInstance;
+        return running && instance != null ? instance.errors.get() : context.getSharedPreferences("bichen", MODE_PRIVATE).getLong("errors", 0L);
+    }
+    public static long sessionQueries() {
+        DnsVpnService instance = latestInstance;
+        return running && instance != null ? Math.max(0L, instance.queries.get() - instance.sessionStartQueries) : 0L;
+    }
+    public static long sessionBlocked() {
+        DnsVpnService instance = latestInstance;
+        return running && instance != null ? Math.max(0L, instance.blocked.get() - instance.sessionStartBlocked) : 0L;
+    }
+    public static String lastBlockedDomain() { return liveLastBlockedDomain == null ? "" : liveLastBlockedDomain; }
+    public static long lastBlockedAt() { return liveLastBlockedAt; }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         if(MihomoVpnService.engaged){stopSelf(startId);return START_NOT_STICKY;}
@@ -325,7 +352,7 @@ public final class DnsVpnService extends VpnService {
                 }
                 queries.incrementAndGet();
                 if (query.queryClass == 1 && rules.isBlocked(query.domain)) {
-                    blocked.incrementAndGet();
+                    blocked.incrementAndGet(); liveLastBlockedDomain = query.domain; liveLastBlockedAt = System.currentTimeMillis();
                     record(query.domain, "blocked");
                     writePacket(DnsPacket.responsePacket(query, DnsPacket.error(query, 3)), token);
                     continue;
@@ -418,7 +445,7 @@ public final class DnsVpnService extends VpnService {
     private boolean replyBlockedIfNeeded(DnsPacket.Query query, int token) {
         if (query.queryClass != 1 || !rules.isBlocked(query.domain)) return false;
         if (active(token)) {
-            blocked.incrementAndGet(); record(query.domain, "blocked");
+            blocked.incrementAndGet(); liveLastBlockedDomain = query.domain; liveLastBlockedAt = System.currentTimeMillis(); record(query.domain, "blocked");
             writePacket(DnsPacket.responsePacket(query, DnsPacket.error(query, 3)), token);
         }
         return true;
@@ -428,7 +455,7 @@ public final class DnsVpnService extends VpnService {
         String target = rules.blockedAlias(query, answer, prefs.getBoolean("cnameProtection", false));
         if (target == null) return false;
         if (active(token)) {
-            blocked.incrementAndGet(); record(query.domain, "blocked_cname", target);
+            blocked.incrementAndGet(); liveLastBlockedDomain = query.domain; liveLastBlockedAt = System.currentTimeMillis(); record(query.domain, "blocked_cname", target);
             writePacket(DnsPacket.responsePacket(query, DnsPacket.error(query, 3)), token);
         }
         return true;
@@ -538,7 +565,7 @@ public final class DnsVpnService extends VpnService {
                     if (entry != null && !entry.optString("domain").isEmpty() && !entry.optString("result").isEmpty()) next.put(entry);
                     else repaired = true;
                 }
-                next.put(new JSONObject().put("time", System.currentTimeMillis()).put("domain", domain).put("result", outcome).put("matchedDomain", matchedDomain));
+                next.put(new JSONObject().put("time", System.currentTimeMillis()).put("domain", domain).put("result", outcome).put("matchedDomain", matchedDomain).put("blocked", outcome.startsWith("blocked")));
                 SharedPreferences.Editor edit = prefs.edit().putString("dnsLogs", next.toString()).remove("dnsLogError");
                 if (repaired) edit.putString("dnsLogNotice", "旧请求记录损坏，已重建记录；丢失内容不会补造");
                 edit.apply();

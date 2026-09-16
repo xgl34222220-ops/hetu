@@ -290,7 +290,7 @@ private fun CompactHomePage(
 
     LazyColumn(
         Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 124.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 112.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         item("header") {
@@ -393,20 +393,77 @@ private fun CompactHomePage(
 
         item("metrics") {
             Surface(
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(20.dp),
                 color = tokens.cardBackground,
                 border = BorderStroke(1.dp, tokens.outline),
+                shadowElevation = 0.dp,
             ) {
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    CompactMetric(counters.blocked.toString(), "累计拦截", Modifier.weight(1f))
-                    VerticalDivider(Modifier.height(36.dp), color = tokens.outline)
-                    CompactMetric(snapshot.ruleCount.toString(), "有效规则", Modifier.weight(1f))
-                    VerticalDivider(Modifier.height(36.dp), color = tokens.outline)
-                    CompactMetric("${counters.blockRate}%", "拦截率", Modifier.weight(1f))
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(if (vpnMode) "实时拦截" else "模块保护", color = tokens.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                if (vpnMode) {
+                                    if (snapshot.vpnRunning) "正在实时统计 DNS 命中" else "未运行，开启后会实时显示命中"
+                                } else {
+                                    if (active) "hosts 规则已加载并生效" else "模块保护未开启"
+                                },
+                                color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(999.dp),
+                            color = if (active) tokens.success.copy(alpha = .12f) else tokens.warning.copy(alpha = .12f),
+                        ) {
+                            Text(
+                                if (active) "保护中" else "未保护",
+                                Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                color = if (active) tokens.success else tokens.warning,
+                                style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                    }
+                    if (vpnMode) {
+                        Row(verticalAlignment = Alignment.Bottom) {
+                            Text(counters.blocked.toString(), color = tokens.textPrimary, fontSize = 38.sp, lineHeight = 42.sp, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.width(7.dp))
+                            Text("次拦截", color = tokens.textSecondary, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(bottom = 5.dp))
+                            Spacer(Modifier.weight(1f))
+                            Text("${counters.blockRate}%", color = if (counters.blocked > 0) tokens.success else MaterialTheme.colorScheme.primary, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                        LinearProgressIndicator(
+                            progress = { (counters.blockRate / 100f).coerceIn(0f, 1f) },
+                            modifier = Modifier.fillMaxWidth().height(5.dp).clip(CircleShape),
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            CompactMetric(counters.queries.toString(), "累计 DNS", Modifier.weight(1f))
+                            CompactMetric(counters.sessionBlocked.toString(), "本次拦截", Modifier.weight(1f))
+                            CompactMetric(counters.sessionQueries.toString(), "本次请求", Modifier.weight(1f))
+                        }
+                        if (counters.lastBlockedDomain.isNotBlank()) {
+                            Row(
+                                Modifier.fillMaxWidth().background(tokens.controlBackground, RoundedCornerShape(13.dp)).padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Box(Modifier.size(8.dp).background(tokens.danger, CircleShape))
+                                Spacer(Modifier.width(9.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text("最近拦截", color = tokens.textSecondary, style = MaterialTheme.typography.labelSmall)
+                                    Text(counters.lastBlockedDomain, color = tokens.textPrimary, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
+                            }
+                        }
+                    } else {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            CompactMetric(snapshot.ruleCount.toString(), "有效规则", Modifier.weight(1f))
+                            CompactMetric(snapshot.blockCount.toString(), "拦截规则", Modifier.weight(1f))
+                            CompactMetric(snapshot.allowCount.toString(), "放行规则", Modifier.weight(1f))
+                        }
+                        Text(
+                            "模块模式是系统 hosts 静态拦截，Android 不会回传每一次命中，所以这里不伪造次数；状态 + 规则数量用于确认是否生效。需要看实时拦截次数时切到应用保护。",
+                            color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall, lineHeight = 17.sp,
+                        )
+                    }
                 }
             }
         }
@@ -650,7 +707,7 @@ private fun CompactAppsPage(controller: BichenComposeController) {
 
     LazyColumn(
         Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 124.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 112.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item("header") {
@@ -701,7 +758,7 @@ private fun CompactAppsPage(controller: BichenComposeController) {
                 color = if (checked) tokens.selectionBackground else Color.Transparent,
                 shadowElevation = 0.dp,
             ) {
-                Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.padding(horizontal = 12.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (icon != null) {
               androidx.compose.foundation.Image(
                   bitmap = icon!!.asImageBitmap(),
@@ -744,7 +801,7 @@ private fun CompactRulesPage(controller: BichenComposeController) {
 
     LazyColumn(
         Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 124.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 112.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item("header") {
@@ -857,19 +914,25 @@ private fun CompactRuleList(title: String, domains: List<String>, color: Color, 
 @Composable
 private fun CompactActivityPage(controller: BichenComposeController) {
     var refresh by remember { mutableIntStateOf(0) }
-    val requests = remember(refresh) { controller.requestItems() }
+    val requests by produceState(initialValue = controller.requestItems(), refresh) {
+        while (true) {
+            value = controller.requestItems()
+            delay(1000)
+        }
+    }
     val counters by produceState(initialValue = controller.dnsCounters(), refresh) {
         while (true) {
             value = controller.dnsCounters()
-            delay(1000)
+            delay(500)
         }
     }
     val tokens = LocalBichenTokens.current
     val vpnMode = controller.preferredVpnMode()
+    var logging by rememberSaveable { mutableStateOf(controller.requestLoggingEnabled()) }
 
     LazyColumn(
         Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 124.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 112.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item("header") {
@@ -879,13 +942,21 @@ private fun CompactActivityPage(controller: BichenComposeController) {
             Surface(shape = RoundedCornerShape(18.dp), color = tokens.cardBackground, shadowElevation = 0.dp) {
                 Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        CompactMetric(counters.queries.toString(), "DNS 请求", Modifier.weight(1f))
                         CompactMetric(counters.blocked.toString(), "累计拦截", Modifier.weight(1f))
+                        CompactMetric(counters.sessionBlocked.toString(), "本次拦截", Modifier.weight(1f))
                         CompactMetric("${counters.blockRate}%", "拦截率", Modifier.weight(1f))
                     }
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        CompactMetric(counters.queries.toString(), "累计请求", Modifier.weight(1f))
+                        CompactMetric(counters.sessionQueries.toString(), "本次请求", Modifier.weight(1f))
+                        CompactMetric(counters.errors.toString(), "错误", Modifier.weight(1f))
+                    }
+                    if (vpnMode && counters.lastBlockedDomain.isNotBlank()) {
+                        Text("最近拦截 · ${counters.lastBlockedDomain}", color = tokens.danger, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
                     Text(
-                        if (vpnMode) "应用保护统计会每秒刷新；错误 ${counters.errors} 次。"
-                        else "当前是模块保护：这里只展示应用保护的历史精确统计，模块 hosts 命中不会伪造计数。",
+                        if (vpnMode) "统计直接读取正在运行的 DNS 防护计数器，约 0.5 秒刷新，不再等 10 秒写入磁盘。"
+                        else "当前是模块保护：hosts 模式没有逐次命中回调，因此只展示应用保护的历史精确统计，不伪造数字。",
                         color = tokens.textSecondary,
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -893,21 +964,26 @@ private fun CompactActivityPage(controller: BichenComposeController) {
             }
         }
         item("recent") {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f)) { CompactSectionHeading("最近记录", if (requests.isEmpty()) "尚无可统计 DNS 请求" else "${requests.size} 条本地记录") }
-                if (requests.isNotEmpty()) TextButton({ controller.clearRequests(); refresh++ }) { Text("清空记录") }
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.weight(1f)) { CompactSectionHeading("最近记录", if (!logging) "记录默认关闭，打开后只保留最近 100 条" else if (requests.isEmpty()) "等待新的 DNS 请求" else "${requests.size} 条本地记录") }
+                    Switch(checked = logging, onCheckedChange = { logging = it; controller.setRequestLogging(it); refresh++ })
+                }
+                if (requests.isNotEmpty()) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton({ controller.clearRequests(); refresh++ }) { Text("清空记录") }
+                }
             }
         }
         items(requests, key = { it.domain + it.time + it.reason }) { item ->
             Surface(shape = RoundedCornerShape(18.dp), color = tokens.cardBackground, shadowElevation = 0.dp) {
-                Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.padding(horizontal = 12.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(8.dp).background(if (item.blocked) tokens.danger else tokens.success, CircleShape))
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         Text(item.domain, color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(item.reason, color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
-                    if (item.time.isNotBlank()) Text(item.time.takeLast(8), color = tokens.textSecondary, style = MaterialTheme.typography.labelSmall)
+                    if (item.time.isNotBlank()) Text(item.time, color = tokens.textSecondary, style = MaterialTheme.typography.labelSmall)
                 }
             }
         }
