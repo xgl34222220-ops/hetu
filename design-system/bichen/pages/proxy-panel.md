@@ -19,6 +19,7 @@ The proxy panel is a dense real-time workspace. It should prioritize scan speed,
 - Latency is a small rounded badge anchored at the right edge, not loose text floating in the card.
 - Avoid nested translucent Surface + clip stacks. Keep the glass effect on one drawing layer so Android/OEM partial invalidation cannot leave white rectangular artifacts.
 - The bottom sheet uses a soft dim scrim and a large rounded top edge, matching the reference hierarchy rather than expanding nodes directly inside the grid.
+- On HyperOS/Android 16, do not sample a second LayerBackdrop inside the moving dock indicator. Keep one refractive glass shell and render the moving selection indicator as a direct translucent gradient; nested RuntimeShader backdrop sampling can be flattened by the OEM compositor into a horizontal white strip.
 
 ## Motion
 
