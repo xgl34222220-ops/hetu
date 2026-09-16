@@ -1,0 +1,213 @@
+from pathlib import Path
+
+root = Path('.')
+
+# 1. Home shortcut tiles: fixed 92dp clipped custom/system fonts on real devices.
+p = root / 'android-app/app/src/main/java/io/github/xgl34222220/bichen/CompactMainActivity.kt'
+s = p.read_text()
+old = '''    Surface(onClick = onClick, modifier = modifier.height(92.dp), shape = RoundedCornerShape(18.dp), color = tokens.cardBackground, border = BorderStroke(1.dp, tokens.outline)) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.SpaceBetween) {
+            Box(Modifier.size(38.dp).background(tokens.controlBackground, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+                Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(title, color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall)
+                Text(subtitle, color = tokens.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }'''
+new = '''    Surface(onClick = onClick, modifier = modifier.heightIn(min = 108.dp), shape = RoundedCornerShape(18.dp), color = tokens.cardBackground, border = BorderStroke(1.dp, tokens.outline)) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 13.dp)) {
+            Box(Modifier.size(38.dp).background(tokens.controlBackground, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+                Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+            }
+            Spacer(Modifier.height(9.dp))
+            Text(title, color = tokens.textPrimary, fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            Spacer(Modifier.height(1.dp))
+            Text(subtitle, color = tokens.textSecondary, fontSize = 11.sp, lineHeight = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }'''
+if old not in s:
+    raise SystemExit('CompactActionTile block not found')
+p.write_text(s.replace(old, new, 1))
+
+# 2. Make external-ui location explicit. Mihomo is started with -d run/, but an absolute path removes ambiguity.
+p = root / 'android-app/app/src/main/java/io/github/xgl34222220/bichen/MihomoStartupConfig.java'
+s = p.read_text()
+old = 'override.append("external-ui: ").append(EXTERNAL_UI_DIR).append(\'\\n\');'
+new = 'override.append("external-ui: /data/adb/bichen/proxy/run/").append(EXTERNAL_UI_DIR).append(\'\\n\');'
+if old not in s:
+    raise SystemExit('external-ui line not found')
+p.write_text(s.replace(old, new, 1))
+
+# 3. Use Mihomo's own external-ui updater instead of relying only on app-side ZIP extraction.
+p = root / 'android-app/app/src/main/java/io/github/xgl34222220/bichen/MihomoControllerClient.java'
+s = p.read_text()
+anchor = '''    void updateProxyProvider(String name)throws Exception{
+        request("PUT","/providers/proxies/"+Uri.encode(name),null,30000);
+    }
+'''
+if 'void upgradeUi()' not in s:
+    if anchor not in s:
+        raise SystemExit('MihomoControllerClient anchor missing')
+    s = s.replace(anchor, anchor + '''
+    /** Use Mihomo's external-ui-url updater through the local authenticated controller. */
+    void upgradeUi()throws Exception{
+        request("POST","/upgrade/ui",null,90000);
+    }
+''', 1)
+p.write_text(s)
+
+# 4. WebUI: official controller upgrade first, verify both files and actual localhost HTTP response, then fallback.
+p = root / 'android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyRuntimeInspector.kt'
+s = p.read_text()
+old = '''    suspend fun ensureWebUi() = withContext(Dispatchers.IO) {
+        if (webUiReady()) return@withContext
+        installZashboard()
+    }
+
+    suspend fun repairWebUi() = withContext(Dispatchers.IO) {
+        installZashboard()
+    }
+'''
+new = '''    suspend fun ensureWebUi() = withContext(Dispatchers.IO) {
+        if (waitWebUiReady(1_200L)) return@withContext
+        var officialError = ""
+        try {
+            api.upgradeUi()
+            if (waitWebUiReady(10_000L)) return@withContext
+            officialError = "Mihomo /upgrade/ui 已返回，但 /ui/ 仍不可访问"
+        } catch (error: Exception) {
+            officialError = error.message ?: "Mihomo /upgrade/ui 调用失败"
+        }
+        try {
+            installZashboard()
+            if (waitWebUiReady(5_000L)) return@withContext
+            error("本地文件已安装，但 Mihomo 没有从 /ui/ 提供页面")
+        } catch (fallback: Exception) {
+            val second = fallback.message ?: "本地安装失败"
+            error("WebUI 安装失败：$officialError；备用安装：$second")
+        }
+    }
+
+    suspend fun repairWebUi() = withContext(Dispatchers.IO) {
+        removeWebUiFiles()
+        ensureWebUi()
+    }
+'''
+if old not in s:
+    raise SystemExit('ensureWebUi block not found')
+s = s.replace(old, new, 1)
+old_ready = '''    private fun webUiReady(): Boolean {
+        val uiPath = "/data/adb/bichen/proxy/run/${MihomoStartupConfig.EXTERNAL_UI_DIR}"
+        val command = "UI=${RootBridge.quote(uiPath)}; test -s \\\"${'$'}UI/index.html\\\" && grep -qi 'zashboard' \\\"${'$'}UI/index.html\\\" && find \\\"${'$'}UI\\\" -type f -name '*.js' -print -quit 2>/dev/null | grep -q . && echo READY || echo MISSING"
+        val result = RootBridge.rootShell(app, command, 4_000L)
+        return result.ok() && result.output.contains("READY")
+    }
+'''
+new_ready = '''    private fun webUiReady(): Boolean {
+        val uiPath = "/data/adb/bichen/proxy/run/${MihomoStartupConfig.EXTERNAL_UI_DIR}"
+        val command = "UI=${RootBridge.quote(uiPath)}; test -s \\\"${'$'}UI/index.html\\\" && find \\\"${'$'}UI\\\" -type f \\( -name '*.js' -o -name '*.mjs' \\) -print -quit 2>/dev/null | grep -q . && echo READY || echo MISSING"
+        val result = RootBridge.rootShell(app, command, 4_000L)
+        return result.ok() && result.output.contains("READY")
+    }
+
+    private fun webUiHttpReady(): Boolean {
+        val connection = (URL("http://127.0.0.1:${MihomoStartupConfig.CONTROLLER_PORT}/ui/").openConnection() as HttpURLConnection).apply {
+            instanceFollowRedirects = true
+            connectTimeout = 2_000
+            readTimeout = 3_000
+            requestMethod = "GET"
+            setRequestProperty("Accept", "text/html,*/*")
+            controllerSecret().takeIf { it.isNotBlank() }?.let { setRequestProperty("Authorization", "Bearer $it") }
+        }
+        return try {
+            val code = connection.responseCode
+            if (code !in 200..299) false else {
+                val head = connection.inputStream.bufferedReader().use { reader ->
+                    val chars = CharArray(4096)
+                    val count = reader.read(chars)
+                    if (count <= 0) "" else String(chars, 0, count)
+                }
+                head.contains("<html", ignoreCase = true) || head.contains("<!doctype", ignoreCase = true)
+            }
+        } catch (_: Exception) {
+            false
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private fun waitWebUiReady(timeoutMs: Long): Boolean {
+        val end = SystemClock.elapsedRealtime() + timeoutMs
+        do {
+            if (webUiReady() && webUiHttpReady()) return true
+            if (SystemClock.elapsedRealtime() >= end) break
+            Thread.sleep(180L)
+        } while (true)
+        return false
+    }
+
+    private fun removeWebUiFiles() {
+        val uiPath = "/data/adb/bichen/proxy/run/${MihomoStartupConfig.EXTERNAL_UI_DIR}"
+        RootBridge.rootShell(app, "rm -rf ${RootBridge.quote(uiPath)}; mkdir -p ${RootBridge.quote(uiPath)}", 8_000L)
+    }
+'''
+if old_ready not in s:
+    raise SystemExit('webUiReady block not found')
+p.write_text(s.replace(old_ready, new_ready, 1))
+
+# 5. Remove fake tool routes. Unimplemented rows must say so instead of all opening Basic Proxy.
+p = root / 'android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt'
+s = p.read_text()
+old_start = '''private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
+    val context = LocalContext.current
+    val inspector = remember { ProxyRuntimeInspector(context) }
+    val scope = rememberCoroutineScope()
+    LazyColumn('''
+new_start = '''private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
+    val context = LocalContext.current
+    val inspector = remember { ProxyRuntimeInspector(context) }
+    val scope = rememberCoroutineScope()
+    var unavailable by remember { mutableStateOf<String?>(null) }
+    LazyColumn('''
+if old_start not in s:
+    raise SystemExit('RefTools start missing')
+s = s.replace(old_start, new_start, 1)
+replacements = {
+    'RefToolRow(Icons.Rounded.Terminal, "脚本", "后台服务生命周期与启动配置") { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }':
+    'RefToolRow(Icons.Rounded.Terminal, "脚本", "启动配置与运行文件") { context.startActivity(Intent(context, ReferenceFileManagerActivity::class.java)) }',
+    'RefToolRow(Icons.Rounded.Wifi, "网络匹配", "SSID 与自动切换规则") { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }':
+    'RefToolRow(Icons.Rounded.Wifi, "网络匹配", "后端尚未接入 · 不再跳错页面") { unavailable = "网络匹配目前只有规格，没有真实 SSID 自动切换后端。我已取消错误的基础代理跳转，接入完成前不会假装可用。" }',
+    'RefToolRow(Icons.Rounded.WifiTethering, "共享网络", "热点中继与透明代理") { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }':
+    'RefToolRow(Icons.Rounded.WifiTethering, "共享网络", "后端尚未接入 · 不再跳错页面") { unavailable = "共享网络开关目前没有独立后端控制。我已取消错误跳转，避免看起来能设置但实际无效。" }',
+    'RefToolRow(Icons.Rounded.AltRoute, "绕过规则", "CIDR 与接口直连配置") { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }':
+    'RefToolRow(Icons.Rounded.AltRoute, "绕过规则", "后端尚未接入 · 不再跳错页面") { unavailable = "自定义 CIDR/接口绕过还没有接入运行时规则生成器，因此不再把你带到基础代理页。" }',
+    'RefToolRow(Icons.Rounded.Public, "CNIP 设置", "IPv4 / IPv6 国内地址库") { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }':
+    'RefToolRow(Icons.Rounded.Public, "CNIP 设置", "后端尚未接入 · 不再跳错页面") { unavailable = "CNIP 下载源和运行时应用后端尚未接入；当前不再提供假入口。" }',
+}
+for before, after in replacements.items():
+    if before not in s:
+        raise SystemExit('missing fake tool route: ' + before[:64])
+    s = s.replace(before, after, 1)
+marker = '''    }
+}
+
+@Composable
+private fun RefSettings(state: ProxyComposeState)'''
+inject = '''    }
+    unavailable?.let { text ->
+        AlertDialog(
+            onDismissRequest = { unavailable = null },
+            title = { Text("功能尚未接入") },
+            text = { Text(text) },
+            confirmButton = { TextButton(onClick = { unavailable = null }) { Text("知道了") } },
+        )
+    }
+}
+
+@Composable
+private fun RefSettings(state: ProxyComposeState)'''
+if marker not in s:
+    raise SystemExit('RefTools end marker missing')
+p.write_text(s.replace(marker, inject, 1))
