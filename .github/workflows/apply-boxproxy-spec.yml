@@ -1,0 +1,765 @@
+name: Apply BoxProxy UI UX spec
+
+on:
+  push:
+    branches: ['feature/compose-luoshu-ui']
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message == 'Run BoxProxy spec patch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/compose-luoshu-ui
+          fetch-depth: 1
+      - name: Apply BoxProxy architecture
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_between(text, start_marker, end_marker, replacement, start_at=0):
+              start = text.index(start_marker, start_at)
+              end = text.index(end_marker, start)
+              return text[:start] + replacement + text[end:]
+
+          # ---- Runtime network metrics: LAN interface + cached WAN identity ----
+          p = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyRuntimeInspector.kt')
+          s = p.read_text()
+          if 'import android.os.SystemClock' not in s:
+              s = s.replace('import android.content.Context\n', 'import android.content.Context\nimport android.os.SystemClock\n', 1)
+
+          old_snapshot = '''internal data class ProxyRuntimeSnapshot(\n    val running: Boolean = false,\n    val pid: Int = 0,\n    val elapsedSeconds: Long = 0L,\n    val processTicks: Long = 0L,\n    val systemTicks: Long = 0L,\n    val rssBytes: Long = 0L,\n    val lanAddress: String = "—",\n)'''
+          new_snapshot = '''internal data class ProxyRuntimeSnapshot(\n    val running: Boolean = false,\n    val pid: Int = 0,\n    val elapsedSeconds: Long = 0L,\n    val processTicks: Long = 0L,\n    val systemTicks: Long = 0L,\n    val rssBytes: Long = 0L,\n    val lanAddress: String = "—",\n    val lanInterface: String = "—",\n    val wanAddress: String = "—",\n    val wanCountryCode: String = "",\n    val wanRegion: String = "—",\n)'''
+          if old_snapshot in s:
+              s = s.replace(old_snapshot, new_snapshot, 1)
+
+          marker = '    private val prefs = app.getSharedPreferences("bichen", Context.MODE_PRIVATE)\n'
+          if 'wanCacheAt' not in s:
+              s = s.replace(marker, marker + '''    @Volatile private var wanCacheAt = 0L\n    @Volatile private var wanCache = Triple("—", "", "—")\n''', 1)
+
+          sample_start = '    suspend fun sample(): ProxyRuntimeSnapshot = withContext(Dispatchers.IO) {'
+          sample_end = '    suspend fun reloadConfig() = withContext(Dispatchers.IO) {'
+          new_sample = '''    suspend fun sample(): ProxyRuntimeSnapshot = withContext(Dispatchers.IO) {\n        val command = """\n            P=${'$'}(cat /data/adb/bichen/proxy/run/core.pid 2>/dev/null || echo 0)\n            case "${'$'}P" in ''|*[!0-9]*) P=0;; esac\n            if [ "${'$'}P" -gt 0 ] && kill -0 "${'$'}P" >/dev/null 2>&1; then\n              UP=${'$'}(cut -d' ' -f1 /proc/uptime 2>/dev/null | cut -d. -f1)\n              START=${'$'}(awk '{print int(${'$'}22/100)}' /proc/${'$'}P/stat 2>/dev/null || echo 0)\n              case "${'$'}UP" in ''|*[!0-9]*) UP=0;; esac\n              case "${'$'}START" in ''|*[!0-9]*) START=0;; esac\n              ELAPSED=0\n              if [ "${'$'}UP" -ge "${'$'}START" ]; then ELAPSED=${'$'}((UP-START)); fi\n              PT=${'$'}(awk '{print ${'$'}14+${'$'}15}' /proc/${'$'}P/stat 2>/dev/null || echo 0)\n              ST=${'$'}(awk '/^cpu /{s=0; for(i=2;i<=NF;i++)s+=${'$'}i; print s; exit}' /proc/stat 2>/dev/null || echo 0)\n              RKB=${'$'}(awk '/^VmRSS:/{print ${'$'}2; exit}' /proc/${'$'}P/status 2>/dev/null || echo 0)\n              case "${'$'}PT" in ''|*[!0-9]*) PT=0;; esac\n              case "${'$'}ST" in ''|*[!0-9]*) ST=0;; esac\n              case "${'$'}RKB" in ''|*[!0-9]*) RKB=0;; esac\n              printf '{"running":true,"pid":%s,"elapsed":%s,"processTicks":%s,"systemTicks":%s,"rssBytes":%s}\\n' "${'$'}P" "${'$'}ELAPSED" "${'$'}PT" "${'$'}ST" "${'$'}((RKB*1024))"\n            else\n              printf '%s\\n' '{"running":false,"pid":0,"elapsed":0,"processTicks":0,"systemTicks":0,"rssBytes":0}'\n            fi\n        """.trimIndent()\n        val result = RootBridge.rootShell(app, command, 8_000L)\n        val json = if (result.ok()) runCatching { JSONObject(result.output.trim()) }.getOrNull() else null\n        val local = localNetwork()\n        val wan = publicNetwork()\n        ProxyRuntimeSnapshot(\n            running = json?.optBoolean("running", false) == true,\n            pid = json?.optInt("pid", 0) ?: 0,\n            elapsedSeconds = json?.optLong("elapsed", 0L) ?: 0L,\n            processTicks = json?.optLong("processTicks", 0L) ?: 0L,\n            systemTicks = json?.optLong("systemTicks", 0L) ?: 0L,\n            rssBytes = json?.optLong("rssBytes", 0L) ?: 0L,\n            lanAddress = local.first,\n            lanInterface = local.second,\n            wanAddress = wan.first,\n            wanCountryCode = wan.second,\n            wanRegion = wan.third,\n        )\n    }\n\n'''
+          s = replace_between(s, sample_start, sample_end, new_sample)
+
+          tail_start = s.index('    private fun localIpv4Address(): String {')
+          class_end = s.rfind('\n}')
+          new_tail = '''    private fun localNetwork(): Pair<String, String> {\n        return runCatching {\n            val preferred = ArrayList<Triple<Int, String, String>>()\n            val interfaces = NetworkInterface.getNetworkInterfaces() ?: return@runCatching "—" to "—"\n            while (interfaces.hasMoreElements()) {\n                val network = interfaces.nextElement()\n                if (!network.isUp || network.isLoopback) continue\n                val rank = when {\n                    network.name.startsWith("wlan", true) -> 0\n                    network.name.startsWith("eth", true) -> 1\n                    network.name.startsWith("rmnet", true) -> 2\n                    else -> 3\n                }\n                val addresses = network.inetAddresses\n                while (addresses.hasMoreElements()) {\n                    val address = addresses.nextElement()\n                    if (address is Inet4Address && !address.isLoopbackAddress && !address.isLinkLocalAddress) {\n                        preferred += Triple(rank, address.hostAddress.orEmpty(), network.name)\n                    }\n                }\n            }\n            preferred.sortedBy { it.first }.firstOrNull()?.let { it.second to it.third } ?: ("—" to "—")\n        }.getOrDefault("—" to "—")\n    }\n\n    private fun publicNetwork(): Triple<String, String, String> {\n        val now = SystemClock.elapsedRealtime()\n        if (now - wanCacheAt < 60_000L && wanCache.first != "—") return wanCache\n        val fresh = runCatching {\n            val connection = (URL("https://ipwho.is/?fields=success,ip,country_code,region").openConnection() as HttpURLConnection).apply {\n                connectTimeout = 3_000\n                readTimeout = 3_000\n                requestMethod = "GET"\n                setRequestProperty("User-Agent", "Bichen-Android")\n            }\n            try {\n                if (connection.responseCode !in 200..299) error("HTTP ${connection.responseCode}")\n                val json = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })\n                if (!json.optBoolean("success", true)) error("WAN lookup failed")\n                Triple(\n                    json.optString("ip", "—").ifBlank { "—" },\n                    json.optString("country_code", ""),\n                    json.optString("region", "—").ifBlank { "—" },\n                )\n            } finally {\n                connection.disconnect()\n            }\n        }.getOrNull()\n        if (fresh != null) {\n            wanCache = fresh\n            wanCacheAt = now\n        }\n        return fresh ?: wanCache\n    }\n'''
+          s = s[:tail_start] + new_tail + s[class_end:]
+          p.write_text(s)
+
+          # ---- Dashboard repository: real site latency and per-provider refresh ----
+          p = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyDashboardRepository.kt')
+          s = p.read_text()
+          if 'import android.os.SystemClock' not in s:
+              s = s.replace('import android.content.Context\n', 'import android.content.Context\nimport android.os.SystemClock\n', 1)
+          if 'import java.net.HttpURLConnection' not in s:
+              s = s.replace('import org.json.JSONObject\n', 'import org.json.JSONObject\nimport java.net.HttpURLConnection\nimport java.net.URL\n', 1)
+          insert_at = s.index('    private fun remoteProviders')
+          if 'suspend fun siteLatencies()' not in s:
+              methods = '''    suspend fun siteLatencies(): Map<String, Long> = withContext(Dispatchers.IO) {\n        val sites = listOf(\n            "Baidu" to "https://www.baidu.com/",\n            "Cloudflare" to "https://cp.cloudflare.com/generate_204",\n            "Google" to "https://www.gstatic.com/generate_204",\n        )\n        coroutineScope {\n            sites.map { (name, url) -> async { name to measureSiteLatency(url) } }.awaitAll().toMap()\n        }\n    }\n\n    suspend fun refreshProvider(name: String): DashboardProviderUi? = withContext(Dispatchers.IO) {\n        try { api.updateProxyProvider(name) }\n        catch (cancel: CancellationException) { throw cancel }\n        catch (_: Exception) { }\n        remoteProviders(api.proxyProviders()).firstOrNull { it.name == name }\n    }\n\n    private fun measureSiteLatency(url: String): Long {\n        return try {\n            val started = SystemClock.elapsedRealtime()\n            val connection = (URL(url).openConnection() as HttpURLConnection).apply {\n                instanceFollowRedirects = true\n                connectTimeout = 3_000\n                readTimeout = 3_000\n                requestMethod = "GET"\n                setRequestProperty("User-Agent", "Bichen-Android")\n                setRequestProperty("Cache-Control", "no-cache")\n            }\n            try {\n                val code = connection.responseCode\n                if (code in 200..499) (SystemClock.elapsedRealtime() - started).coerceAtLeast(1L) else -1L\n            } finally {\n                runCatching { connection.inputStream?.close() }\n                connection.disconnect()\n            }\n        } catch (_: Exception) {\n            -1L\n        }\n    }\n\n'''
+              s = s[:insert_at] + methods + s[insert_at:]
+          p.write_text(s)
+
+          # ---- Proxy workspace ----
+          p = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt')
+          s = p.read_text()
+          imports = {
+              'import android.content.Intent\n': 'import android.content.Intent\nimport android.graphics.BitmapFactory\n',
+              'import androidx.compose.foundation.background\n': 'import androidx.compose.foundation.Canvas\nimport androidx.compose.foundation.Image\nimport androidx.compose.foundation.background\n',
+              'import androidx.compose.ui.graphics.Brush\n': 'import androidx.compose.ui.graphics.Brush\nimport androidx.compose.ui.graphics.Path\nimport androidx.compose.ui.graphics.asImageBitmap\nimport androidx.compose.ui.graphics.drawscope.Stroke\n',
+              'import androidx.compose.ui.platform.LocalContext\n': 'import androidx.compose.ui.layout.ContentScale\nimport androidx.compose.ui.platform.LocalContext\n',
+              'import dev.chrisbanes.haze.rememberHazeState\n': 'import dev.chrisbanes.haze.hazeSource\nimport dev.chrisbanes.haze.rememberHazeState\nimport top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported\nimport top.yukonga.miuix.kmp.blur.layerBackdrop\nimport top.yukonga.miuix.kmp.blur.rememberLayerBackdrop\n',
+          }
+          for old, new in imports.items():
+              if new.splitlines()[0] not in s or old == 'import android.content.Intent\n':
+                  if old in s and new not in s:
+                      s = s.replace(old, new, 1)
+
+          old_activity = '''class ReferenceProxyActivity : ComponentActivity() {\n    override fun onCreate(savedInstanceState: Bundle?) {\n        super.onCreate(savedInstanceState)\n        enableEdgeToEdge()\n        setContent { BichenTheme { RefProxyShell { finish() } } }\n    }\n}'''
+          new_activity = '''class ReferenceProxyActivity : ComponentActivity() {\n    private var uiRevision by mutableIntStateOf(0)\n\n    override fun onCreate(savedInstanceState: Bundle?) {\n        super.onCreate(savedInstanceState)\n        enableEdgeToEdge()\n        setContent {\n            key(uiRevision) { BichenTheme { RefProxyShell { finish() } } }\n        }\n    }\n\n    override fun onResume() {\n        super.onResume()\n        uiRevision++\n    }\n}'''
+          if old_activity in s:
+              s = s.replace(old_activity, new_activity, 1)
+
+          s = s.replace('Overview("策略"), Nodes("节点"), Subscriptions("订阅"), Connections("连接"), Rules("规则"), RuleSets("规则集")', 'Overview("节点"), Nodes("概览"), Subscriptions("订阅"), Connections("连接"), Rules("规则"), RuleSets("规则集")', 1)
+
+          s = s.replace('''    val scope = rememberCoroutineScope()\n    val haze = rememberHazeState()\n''', '''    val scope = rememberCoroutineScope()\n    val haze = rememberHazeState()\n    val liquidBackdrop = rememberLayerBackdrop()\n    val liquid = isRuntimeShaderSupported()\n    val prefs = remember { context.getSharedPreferences("bichen", 0) }\n    val showPanelTab = prefs.getBoolean("showPanelTab", true)\n''', 1)
+
+          s = s.replace('''    var providers by remember { mutableStateOf<List<DashboardProviderUi>>(emptyList()) }\n    val delays = remember { mutableStateMapOf<String, Long>() }\n''', '''    var providers by remember { mutableStateOf<List<DashboardProviderUi>>(emptyList()) }\n    var siteDelays by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }\n    val delays = remember { mutableStateMapOf<String, Long>() }\n    var cpuPercent by remember { mutableFloatStateOf(0f) }\n    var lastProcessTicks by remember { mutableLongStateOf(0L) }\n    var lastSystemTicks by remember { mutableLongStateOf(0L) }\n''', 1)
+
+          refresh_start = '    suspend fun refresh() {'
+          refresh_end = '    fun toggle() {'
+          new_refresh = '''    suspend fun refresh() {\n        try {\n            val next = repo.state()\n            val now = SystemClock.elapsedRealtime()\n            if (lastAt > 0L && now > lastAt && next.uploadTotal >= lastUp && next.downloadTotal >= lastDown) {\n                val elapsed = now - lastAt\n                upRate = ((next.uploadTotal - lastUp) * 1000L / elapsed).coerceAtLeast(0L)\n                downRate = ((next.downloadTotal - lastDown) * 1000L / elapsed).coerceAtLeast(0L)\n            }\n            next.groups.flatMap { it.nodes }.forEach { node ->\n                node.lastDelay?.takeIf { it > 0L }?.let { delays.putIfAbsent(node.name, it) }\n            }\n            val sampled = if (next.running) runCatching { inspector.sample() }.getOrDefault(runtime) else ProxyRuntimeSnapshot()\n            if (next.running && lastSystemTicks > 0L && sampled.systemTicks > lastSystemTicks && sampled.processTicks >= lastProcessTicks) {\n                val deltaProcess = sampled.processTicks - lastProcessTicks\n                val deltaSystem = sampled.systemTicks - lastSystemTicks\n                val cores = Runtime.getRuntime().availableProcessors().coerceAtLeast(1)\n                cpuPercent = ((deltaProcess.toDouble() / deltaSystem.toDouble()) * 100.0 * cores).toFloat().coerceIn(0f, 100f)\n            } else if (!next.running) {\n                cpuPercent = 0f\n            }\n            lastProcessTicks = sampled.processTicks\n            lastSystemTicks = sampled.systemTicks\n            runtime = sampled\n            providers = if (next.running) runCatching { repo.providers() }.getOrDefault(providers) else emptyList()\n            state = next\n            message = next.message\n            lastAt = now\n            lastUp = next.uploadTotal\n            lastDown = next.downloadTotal\n        } catch (cancel: CancellationException) {\n            throw cancel\n        } catch (error: Exception) {\n            message = error.message ?: "状态读取失败"\n        }\n    }\n\n'''
+          s = replace_between(s, refresh_start, refresh_end, new_refresh)
+
+          measure_start = '    fun quickDelay() {'
+          measure_end = '    LaunchedEffect(Unit) {'
+          new_measure = '''    fun measureSites() {\n        if (!state.running || testing) return\n        scope.launch {\n            testing = true\n            try {\n                siteDelays = repo.siteLatencies()\n                if (siteDelays.values.none { it > 0L }) message = "关键站点测速失败，请检查当前网络"\n            } catch (cancel: CancellationException) {\n                throw cancel\n            } catch (error: Exception) {\n                message = error.message ?: "测速失败"\n            } finally {\n                testing = false\n            }\n        }\n    }\n\n'''
+          s = replace_between(s, measure_start, measure_end, new_measure)
+
+          loop_marker = '''    LaunchedEffect(Unit) {\n        runCatching { repo.ensureIcons() }\n        refresh()\n        while (true) {\n            delay(2200)\n            refresh()\n        }\n    }\n\n'''
+          if loop_marker in s:
+              s = s.replace(loop_marker, loop_marker + '''    LaunchedEffect(state.running) {\n        if (!state.running) { siteDelays = emptyMap(); return@LaunchedEffect }\n        siteDelays = runCatching { repo.siteLatencies() }.getOrDefault(siteDelays)\n        while (true) {\n            delay(15_000)\n            siteDelays = runCatching { repo.siteLatencies() }.getOrDefault(siteDelays)\n        }\n    }\n\n''', 1)
+
+          dock_start = s.index('    val dock = remember {')
+          dock_end = s.index('\n\n    Box(Modifier.fillMaxSize()', dock_start)
+          new_dock = '''    val dockPages = remember(showPanelTab) {\n        if (showPanelTab) listOf(RefProxyPage.Home, RefProxyPage.Panel, RefProxyPage.Tools, RefProxyPage.Settings)\n        else listOf(RefProxyPage.Home, RefProxyPage.Tools, RefProxyPage.Settings)\n    }\n    LaunchedEffect(showPanelTab) { if (!showPanelTab && page == RefProxyPage.Panel) page = RefProxyPage.Home }\n    val dock = remember(showPanelTab) {\n        dockPages.map { destination ->\n            when (destination) {\n                RefProxyPage.Home -> DockItem("首页", Icons.Rounded.Home, .94f)\n                RefProxyPage.Panel -> DockItem("面板", Icons.Rounded.Link, .96f)\n                RefProxyPage.Tools -> DockItem("工具", Icons.Rounded.GridView, .96f)\n                RefProxyPage.Settings -> DockItem("设置", Icons.Rounded.Settings, .94f)\n            }\n        }\n    }'''
+          s = s[:dock_start] + new_dock + s[dock_end:]
+
+          s = s.replace('''        Box(Modifier.fillMaxSize().padding(bottom = 88.dp)) {''', '''        Box(\n            Modifier.fillMaxSize()\n                .then(if (!liquid) Modifier.hazeSource(haze) else Modifier)\n                .then(if (liquid) Modifier.layerBackdrop(liquidBackdrop) else Modifier)\n                .padding(bottom = 88.dp),\n        ) {''', 1)
+
+          s = s.replace('''                    delays = delays,\n                    upRate = upRate,''', '''                    siteDelays = siteDelays,\n                    upRate = upRate,''', 1)
+          s = s.replace('''                    downRate = downRate,\n                    operation = operation,''', '''                    downRate = downRate,\n                    cpuPercent = cpuPercent,\n                    operation = operation,''', 1)
+          s = s.replace('onDelay = ::quickDelay,', 'onDelay = ::measureSites,', 1)
+          s = s.replace('''            selected = page.ordinal,\n            onSelect = { page = RefProxyPage.entries[it] },\n            hazeState = haze,\n            backdrop = null,''', '''            selected = dockPages.indexOf(page).coerceAtLeast(0),\n            onSelect = { page = dockPages[it] },\n            hazeState = haze,\n            backdrop = liquidBackdrop.takeIf { liquid },''', 1)
+
+          home_start = s.index('@Composable\nprivate fun RefHome(')
+          home_end = s.index('@Composable\nprivate fun RefActionText', home_start)
+          new_home = r'''@Composable
+private fun RefHome(
+    state: ProxyComposeState,
+    runtime: ProxyRuntimeSnapshot,
+    providers: List<DashboardProviderUi>,
+    siteDelays: Map<String, Long>,
+    upRate: Long,
+    downRate: Long,
+    cpuPercent: Float,
+    operation: String,
+    message: String,
+    testing: Boolean,
+    onBack: () -> Unit,
+    onRefresh: () -> Unit,
+    onToggle: () -> Unit,
+    onReload: () -> Unit,
+    onRestart: () -> Unit,
+    onDelay: () -> Unit,
+    onWebUi: () -> Unit,
+    onLog: () -> Unit,
+) {
+    val t = LocalBichenTokens.current
+    val scheme = MaterialTheme.colorScheme
+    val memory = runtime.rssBytes.takeIf { it > 0L } ?: state.memoryBytes
+
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        item {
+            Row(
+                Modifier.fillMaxWidth().statusBarsPadding().padding(top = 10.dp, bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("代理", color = t.textPrimary, fontSize = 27.sp, lineHeight = 33.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                IconButton(onClick = onRefresh, modifier = Modifier.size(44.dp)) {
+                    Icon(Icons.Rounded.Refresh, "刷新", tint = t.textSecondary, modifier = Modifier.size(20.dp))
+                }
+                IconButton(onClick = onBack, modifier = Modifier.size(44.dp)) {
+                    Icon(Icons.Rounded.Close, "关闭", tint = t.textSecondary, modifier = Modifier.size(20.dp))
+                }
+            }
+        }
+        item {
+            Surface(shape = RoundedCornerShape(26.dp), color = t.heroBackground, shadowElevation = 0.dp) {
+                Column(Modifier.fillMaxWidth().padding(17.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Row(verticalAlignment = Alignment.Top) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Box(Modifier.size(9.dp).background(if (state.running) t.success else t.danger, CircleShape))
+                                Text(if (state.running) "运行中" else "已停止", color = t.textPrimary, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                                Text(if (state.running) refDuration(runtime.elapsedSeconds) else "等待启动", color = t.textSecondary, style = MaterialTheme.typography.labelMedium)
+                            }
+                            Text("${state.core} · ${state.mode}", color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
+                            Text(state.config, color = t.textSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        }
+                        Box(
+                            Modifier.size(58.dp).background(if (state.running) scheme.primary else t.controlBackground, CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                if (state.running) Icons.Rounded.Check else Icons.Rounded.PowerSettingsNew,
+                                null,
+                                tint = if (state.running) Color.White else t.textMuted,
+                                modifier = Modifier.size(31.dp),
+                            )
+                        }
+                    }
+                    HorizontalDivider(color = t.outline.copy(alpha = .75f))
+                    Row(Modifier.fillMaxWidth()) {
+                        RefActionText("重载", state.running && operation.isBlank(), onReload, Modifier.weight(1f), scheme.primary)
+                        VerticalDivider(Modifier.height(32.dp), color = t.outline)
+                        RefActionText(if (state.running) "停止" else "启动", operation.isBlank(), onToggle, Modifier.weight(1f), t.danger)
+                        VerticalDivider(Modifier.height(32.dp), color = t.outline)
+                        RefActionText("重启", state.running && operation.isBlank(), onRestart, Modifier.weight(1f), t.warning)
+                    }
+                }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                RefSmallTool("WebUI", "Web 界面", Icons.Rounded.Language, onWebUi, Modifier.weight(1f))
+                RefSmallTool("日志", "查看", Icons.Rounded.Article, onLog, Modifier.weight(1f))
+            }
+        }
+        item {
+            RefLatencyPanel(
+                baidu = siteDelays["Baidu"],
+                cloudflare = siteDelays["Cloudflare"],
+                google = siteDelays["Google"],
+                testing = testing,
+                onClick = onDelay,
+            )
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                RefNetworkIdentityCard(runtime, state.connections.size, Modifier.weight(1f))
+                RefSpeedCard(upRate, downRate, Modifier.weight(1f))
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                RefSubscriptionCompact(providers, Modifier.weight(1f))
+                RefResourceCard(memory, cpuPercent, runtime.pid, Modifier.weight(1f))
+            }
+        }
+        if (operation.isNotBlank() || message.isNotBlank()) {
+            item { Text(operation.ifBlank { message }, color = t.textSecondary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)) }
+        }
+    }
+}
+
+@Composable
+private fun RefLatencyPanel(baidu: Long?, cloudflare: Long?, google: Long?, testing: Boolean, onClick: () -> Unit) {
+    val t = LocalBichenTokens.current
+    Surface(onClick = onClick, enabled = !testing, shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 13.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("延迟", color = t.textPrimary, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Text(if (testing) "测试中" else "全部测速", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium)
+                Spacer(Modifier.width(6.dp))
+                if (testing) CircularProgressIndicator(Modifier.size(17.dp), strokeWidth = 2.dp)
+                else Icon(Icons.Rounded.Refresh, "测速", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+            }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                RefLatencyColumn("Baidu", baidu, testing, Modifier.weight(1f))
+                VerticalDivider(Modifier.height(38.dp), color = t.outline)
+                RefLatencyColumn("Cloudflare", cloudflare, testing, Modifier.weight(1f))
+                VerticalDivider(Modifier.height(38.dp), color = t.outline)
+                RefLatencyColumn("Google", google, testing, Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun RefLatencyColumn(label: String, value: Long?, testing: Boolean, modifier: Modifier) {
+    val t = LocalBichenTokens.current
+    val color = when {
+        testing -> MaterialTheme.colorScheme.primary
+        value == null -> t.textMuted
+        value <= 0L -> t.danger
+        value < 100L -> t.success
+        value <= 300L -> t.warning
+        else -> t.danger
+    }
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text(label, color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+        Text(if (testing) "…" else refDelay(value), color = color, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    }
+}
+
+@Composable
+private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: Int, modifier: Modifier) {
+    val t = LocalBichenTokens.current
+    var lanMode by rememberSaveable { mutableStateOf(true) }
+    Surface(onClick = { lanMode = !lanMode }, modifier = modifier, shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+        Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(if (lanMode) "LAN" else "WAN", color = t.textPrimary, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                Text("点击切换", color = t.textMuted, style = MaterialTheme.typography.labelSmall)
+            }
+            if (lanMode) {
+                Text("IP  ${runtime.lanAddress}", color = t.textPrimary, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("接口  ${runtime.lanInterface}", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+            } else {
+                Text("IP  ${runtime.wanAddress}", color = t.textPrimary, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("${countryEmoji(runtime.wanCountryCode)} ${runtime.wanRegion}", color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Text("连接  $connections", color = t.textMuted, style = MaterialTheme.typography.labelSmall)
+        }
+    }
+}
+
+@Composable
+private fun RefSpeedCard(up: Long, down: Long, modifier: Modifier) {
+    val t = LocalBichenTokens.current
+    Surface(modifier = modifier, shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+        Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Text("网速", color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Rounded.ArrowUpward, null, tint = t.success, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(5.dp))
+                Text(refSpeed(up), color = t.textPrimary, style = MaterialTheme.typography.bodyMedium)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Rounded.ArrowDownward, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(5.dp))
+                Text(refSpeed(down), color = t.textPrimary, style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, modifier: Modifier) {
+    val t = LocalBichenTokens.current
+    val tracked = items.filter { it.hasSubscriptionInfo && it.total > 0L }
+    val used = tracked.sumOf { it.used }
+    val total = tracked.sumOf { it.total }
+    val remain = (total - used).coerceAtLeast(0L)
+    val ratio = if (total <= 0L) 0f else (used.toDouble() / total.toDouble()).toFloat().coerceIn(0f, 1f)
+    Surface(modifier = modifier, shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+        Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("订阅", color = t.textPrimary, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                if (total > 0L) Surface(shape = RoundedCornerShape(999.dp), color = t.selectionBackground) {
+                    Text("剩余 ${((1f - ratio) * 100f).toInt()}%", Modifier.padding(horizontal = 8.dp, vertical = 3.dp), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall)
+                }
+            }
+            Text(if (total > 0L) "已用 ${refBytes(used)}" else "${items.size} 个远程订阅", color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+            Text(if (total > 0L) "总量 ${refBytes(total)}" else "剩余 —", color = t.textPrimary, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+            if (total > 0L) LinearProgressIndicator(progress = { ratio }, modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape))
+            if (total > 0L) Text("剩余 ${refBytes(remain)}", color = t.textMuted, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+        }
+    }
+}
+
+@Composable
+private fun RefResourceCard(memory: Long, cpuPercent: Float, pid: Int, modifier: Modifier) {
+    val t = LocalBichenTokens.current
+    Surface(modifier = modifier, shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+        Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Text("资源占用", color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
+            Text("内存  ${refBytes(memory)}", color = t.textPrimary, style = MaterialTheme.typography.bodyMedium)
+            Text("CPU  ${String.format(java.util.Locale.US, "%.1f%%", cpuPercent)}", color = t.textPrimary, style = MaterialTheme.typography.bodyMedium)
+            Text("PID  ${if (pid > 0) pid else "—"}", color = t.textMuted, style = MaterialTheme.typography.labelSmall)
+        }
+    }
+}
+
+private fun countryEmoji(code: String): String {
+    val upper = code.trim().uppercase(java.util.Locale.ROOT)
+    if (upper.length != 2 || upper.any { it !in 'A'..'Z' }) return "🌐"
+    val first = Character.toChars(0x1F1E6 + (upper[0] - 'A'))
+    val second = Character.toChars(0x1F1E6 + (upper[1] - 'A'))
+    return String(first) + String(second)
+}
+
+'''
+          s = s[:home_start] + new_home + s[home_end:]
+
+          # Real config-declared strategy icon first, generic strategy icon as fallback.
+          group_start = s.index('private fun RefGroupCard(')
+          leaf_start = s.index('@Composable\nprivate fun RefLeafNodeCard', group_start)
+          new_group = r'''private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolean, delay: Long?, modifier: Modifier, onClick: () -> Unit) {
+    val t = LocalBichenTokens.current
+    val scheme = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(17.dp)
+    val glass = if (expanded) t.selectionBackground else t.cardBackground
+    Column(
+        modifier.background(glass, shape)
+            .border(1.dp, if (expanded) scheme.primary.copy(alpha = .28f) else t.outline, shape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 11.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            RefGroupVisualIcon(group, Modifier.size(34.dp))
+            Spacer(Modifier.width(8.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(group.name, color = t.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(refGroupType(group.type).uppercase(java.util.Locale.ROOT), color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+            }
+            RefDelayBadge(delay, false, null)
+        }
+        Text(selected.ifBlank { "未选择" }, color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("${group.nodes.size} 节点", color = t.textMuted, style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f))
+            if (expanded) Icon(Icons.Rounded.CheckCircle, "已打开", tint = scheme.primary, modifier = Modifier.size(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun RefGroupVisualIcon(group: ProxyGroupUi, modifier: Modifier) {
+    val t = LocalBichenTokens.current
+    val scheme = MaterialTheme.colorScheme
+    val bitmap = remember(group.iconPath) {
+        runCatching {
+            group.iconPath.takeIf { it.isNotBlank() }?.let { BitmapFactory.decodeFile(it)?.asImageBitmap() }
+        }.getOrNull()
+    }
+    Box(modifier.background(t.controlBackground, RoundedCornerShape(11.dp)).clip(RoundedCornerShape(11.dp)), contentAlignment = Alignment.Center) {
+        if (bitmap != null) {
+            Image(bitmap = bitmap, contentDescription = group.name, modifier = Modifier.fillMaxSize().padding(5.dp), contentScale = ContentScale.Fit)
+        } else {
+            Icon(refGroupIcon(group.type), null, tint = scheme.primary, modifier = Modifier.size(19.dp))
+        }
+    }
+}
+
+@Composable
+'''
+          s = s[:group_start] + new_group + s[leaf_start + len('@Composable\n'):]
+          s = s.replace('''            Box(Modifier.size(38.dp).background(scheme.primary.copy(alpha = .09f), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {\n                Icon(refGroupIcon(group.type), null, tint = scheme.primary, modifier = Modifier.size(21.dp))\n            }''', '            RefGroupVisualIcon(group, Modifier.size(38.dp))', 1)
+
+          s = s.replace('''        value <= 250L -> t.success\n        value <= 650L -> scheme.primary\n        else -> t.warning''', '''        value < 100L -> t.success\n        value <= 300L -> t.warning\n        else -> t.danger''', 1)
+
+          # Connections: preserve disappeared rows locally as closed-history view.
+          state_marker = '    var query by rememberSaveable { mutableStateOf("") }\n\n'
+          if state_marker in s and 'connectionView' not in s:
+              s = s.replace(state_marker, '''    var query by rememberSaveable { mutableStateOf("") }\n    var connectionView by rememberSaveable { mutableStateOf("active") }\n    val closedConnections = remember { mutableStateListOf<ProxyConnectionUi>() }\n    var previousConnections by remember { mutableStateOf<List<ProxyConnectionUi>>(emptyList()) }\n\n    LaunchedEffect(state.connections) {\n        if (previousConnections.isNotEmpty()) {\n            val currentIds = state.connections.mapTo(HashSet()) { it.id }\n            previousConnections.filter { it.id !in currentIds }.forEach { item ->\n                if (closedConnections.none { it.id == item.id }) closedConnections.add(0, item)\n            }\n            while (closedConnections.size > 80) closedConnections.removeAt(closedConnections.lastIndex)\n        }\n        previousConnections = state.connections\n    }\n\n''', 1)
+
+          # Overview internal enum (Nodes) becomes real traffic overview, while first tab (Overview) remains strategy groups.
+          s = s.replace('RefPanelTab.Overview, RefPanelTab.Nodes -> delays.putAll(repo.globalDelay())', 'RefPanelTab.Overview -> delays.putAll(repo.globalDelay())\n                    RefPanelTab.Nodes -> onRefreshState()', 1)
+          when_pos = s.index('            } else when (tab) {')
+          nodes_start = s.index('                RefPanelTab.Nodes -> {', when_pos)
+          sub_start = s.index('                RefPanelTab.Subscriptions ->', nodes_start)
+          s = s[:nodes_start] + '''                RefPanelTab.Nodes -> item { RefTrafficOverview(state) }\n''' + s[sub_start:]
+
+          old_sub = '''                RefPanelTab.Subscriptions -> items(providers, key = { it.name }) { item ->\n                    RefProviderRow(item) { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) }\n                }'''
+          new_sub = '''                RefPanelTab.Subscriptions -> items(providers, key = { it.name }) { item ->\n                    RefProviderRow(\n                        item = item,\n                        onRefresh = {\n                            scope.launch {\n                                repo.refreshProvider(item.name)?.let { updated ->\n                                    providers = providers.map { if (it.name == updated.name) updated else it }\n                                }\n                            }\n                        },\n                        onClick = { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) },\n                    )\n                }'''
+          if old_sub in s:
+              s = s.replace(old_sub, new_sub, 1)
+
+          old_conn = '''                RefPanelTab.Connections -> items(state.connections, key = { it.id }) { c ->\n                    RefConnectionRow(c) { scope.launch { repo.closeConnection(c.id); onRefreshState() } }\n                }'''
+          new_conn = '''                RefPanelTab.Connections -> {\n                    item {\n                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {\n                            FilterChip(selected = connectionView == "active", onClick = { connectionView = "active" }, label = { Text("活跃 ${state.connections.size}") })\n                            FilterChip(selected = connectionView == "closed", onClick = { connectionView = "closed" }, label = { Text("已关闭 ${closedConnections.size}") })\n                            Spacer(Modifier.weight(1f))\n                            if (connectionView == "active" && state.connections.isNotEmpty()) {\n                                TextButton(onClick = { scope.launch { repo.closeAll(); onRefreshState() } }) { Text("终止全部", color = t.danger) }\n                            }\n                        }\n                    }\n                    val shown = if (connectionView == "active") state.connections else closedConnections\n                    items(shown, key = { (if (connectionView == "active") "a-" else "c-") + it.id }) { c ->\n                        RefConnectionRow(c, if (connectionView == "active") ({ scope.launch { repo.closeConnection(c.id); onRefreshState() } }) else null)\n                    }\n                }'''
+          if old_conn in s:
+              s = s.replace(old_conn, new_conn, 1)
+
+          s = s.replace('RefPanelTab.RuleSets -> items(ruleSets, key = { it.name }) { RefRuleSetRow(it) }', '''RefPanelTab.RuleSets -> items(ruleSets, key = { it.name }) { item ->\n                    RefRuleSetRow(item) { scope.launch { ruleSets = repo.refreshRuleSets() } }\n                }''', 1)
+
+          # Traffic overview composables inserted before provider rows.
+          provider_pos = s.index('@Composable\nprivate fun RefProviderRow')
+          traffic = r'''@Composable
+private fun RefTrafficOverview(state: ProxyComposeState) {
+    val t = LocalBichenTokens.current
+    val scheme = MaterialTheme.colorScheme
+    val history = remember { mutableStateListOf<Triple<Long, Long, Long>>() }
+    var lastUpload by remember { mutableLongStateOf(state.uploadTotal) }
+    var lastDownload by remember { mutableLongStateOf(state.downloadTotal) }
+    var lastAt by remember { mutableLongStateOf(0L) }
+    var upRate by remember { mutableLongStateOf(0L) }
+    var downRate by remember { mutableLongStateOf(0L) }
+
+    LaunchedEffect(state.uploadTotal, state.downloadTotal) {
+        val now = SystemClock.elapsedRealtime()
+        if (lastAt > 0L && now > lastAt && state.uploadTotal >= lastUpload && state.downloadTotal >= lastDownload) {
+            val elapsed = now - lastAt
+            upRate = ((state.uploadTotal - lastUpload) * 1000L / elapsed).coerceAtLeast(0L)
+            downRate = ((state.downloadTotal - lastDownload) * 1000L / elapsed).coerceAtLeast(0L)
+            history += Triple(now, upRate, downRate)
+            while (history.isNotEmpty() && history.first().first < now - 60_000L) history.removeAt(0)
+        }
+        lastAt = now
+        lastUpload = state.uploadTotal
+        lastDownload = state.downloadTotal
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            RefRateCard("上行速率", upRate, Icons.Rounded.ArrowUpward, t.success, Modifier.weight(1f))
+            RefRateCard("下行速率", downRate, Icons.Rounded.ArrowDownward, scheme.primary, Modifier.weight(1f))
+        }
+        Surface(shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("累计吞吐", color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
+                Row {
+                    RefMetric("总上行", refBytes(state.uploadTotal), Modifier.weight(1f))
+                    RefMetric("总下行", refBytes(state.downloadTotal), Modifier.weight(1f))
+                }
+            }
+        }
+        Surface(shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("最近 60 秒流量", color = t.textPrimary, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                    Text("↑ 上行   ↓ 下行", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+                }
+                val points = history.toList()
+                Canvas(Modifier.fillMaxWidth().height(150.dp)) {
+                    if (points.size > 1) {
+                        val maxRate = points.maxOf { maxOf(it.second, it.third) }.coerceAtLeast(1L).toFloat()
+                        val end = points.last().first
+                        val start = end - 60_000L
+                        fun makePath(index: Int): Path {
+                            val path = Path()
+                            points.forEachIndexed { i, point ->
+                                val x = (((point.first - start).coerceIn(0L, 60_000L)).toFloat() / 60_000f) * size.width
+                                val value = if (index == 1) point.second else point.third
+                                val y = size.height - (value.toFloat() / maxRate * size.height * .88f)
+                                if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                            }
+                            return path
+                        }
+                        drawPath(makePath(1), color = t.success, style = Stroke(width = 2.5.dp.toPx()))
+                        drawPath(makePath(2), color = scheme.primary, style = Stroke(width = 2.5.dp.toPx()))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RefRateCard(title: String, value: Long, icon: ImageVector, color: Color, modifier: Modifier) {
+    val t = LocalBichenTokens.current
+    Surface(modifier = modifier, shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(icon, null, tint = color, modifier = Modifier.size(22.dp))
+            Text(refSpeed(value), color = t.textPrimary, fontSize = 21.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+            Text(title, color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+        }
+    }
+}
+
+'''
+          s = s[:provider_pos] + traffic + s[provider_pos:]
+
+          # Rich subscription/provider card.
+          provider_start = s.index('@Composable\nprivate fun RefProviderRow')
+          conn_start = s.index('@Composable\nprivate fun RefConnectionRow', provider_start)
+          provider_new = r'''@Composable
+private fun RefProviderRow(item: DashboardProviderUi, onRefresh: () -> Unit, onClick: () -> Unit) {
+    val t = LocalBichenTokens.current
+    Surface(onClick = onClick, shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+        Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(item.name, color = t.textPrimary, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("${item.nodes.size} 个节点 · 剩余 ${refExpireDays(item.expire)}", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+                }
+                IconButton(onClick = onRefresh, modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.Rounded.Sync, "同步更新", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                }
+            }
+            if (item.hasSubscriptionInfo && item.total > 0L) {
+                LinearProgressIndicator(progress = { item.ratio }, modifier = Modifier.fillMaxWidth().height(5.dp).clip(CircleShape))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    RefMetric("已上传", refBytes(item.upload), Modifier.weight(1f))
+                    RefMetric("已下载", refBytes(item.download), Modifier.weight(1f))
+                    Surface(modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp), color = t.selectionBackground) {
+                        Column(Modifier.padding(horizontal = 9.dp, vertical = 8.dp)) {
+                            Text(refBytes(item.remaining), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text("剩余流量", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+            } else {
+                Text("该订阅没有上报流量信息", color = t.textMuted, style = MaterialTheme.typography.bodySmall)
+            }
+            Text("到期 ${refExpireDate(item.expire)} · 更新 ${item.updatedAt.ifBlank { "—" }}", color = t.textMuted, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+private fun refExpireDays(expire: Long): String {
+    if (expire <= 0L) return "—"
+    val millis = if (expire < 10_000_000_000L) expire * 1000L else expire
+    val days = ((millis - System.currentTimeMillis()) / 86_400_000L)
+    return if (days < 0L) "已到期" else "${days} 天"
+}
+
+private fun refExpireDate(expire: Long): String {
+    if (expire <= 0L) return "—"
+    val millis = if (expire < 10_000_000_000L) expire * 1000L else expire
+    return runCatching { java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date(millis)) }.getOrDefault("—")
+}
+
+'''
+          s = s[:provider_start] + provider_new + s[conn_start:]
+
+          # Connection rows show path + transfer and optional close action.
+          conn_start = s.index('@Composable\nprivate fun RefConnectionRow')
+          rule_start = s.index('@Composable\nprivate fun RefRuleRow', conn_start)
+          conn_new = r'''@Composable
+private fun RefConnectionRow(item: ProxyConnectionUi, onClose: (() -> Unit)?) {
+    val t = LocalBichenTokens.current
+    Surface(shape = RoundedCornerShape(16.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(item.host, color = t.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(listOf(item.network, item.inbound).filter { it.isNotBlank() }.joinToString(" · "), color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                Text(item.chain.ifBlank { item.rule.ifBlank { "DIRECT" } }, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("↑ ${refBytes(item.upload)}   ↓ ${refBytes(item.download)}", color = t.textMuted, style = MaterialTheme.typography.labelSmall)
+            }
+            if (onClose != null) IconButton(onClick = onClose) { Icon(Icons.Rounded.Close, "终止连接", tint = t.danger) }
+        }
+    }
+}
+
+'''
+          s = s[:conn_start] + conn_new + s[rule_start:]
+
+          # Rules and rule providers get index, strategy pill and refresh action.
+          rule_start = s.index('@Composable\nprivate fun RefRuleRow')
+          ruleset_start = s.index('@Composable\nprivate fun RefRuleSetRow', rule_start)
+          rule_new = r'''@Composable
+private fun RefRuleRow(item: ProxyRuleUi) {
+    val t = LocalBichenTokens.current
+    Surface(shape = RoundedCornerShape(15.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("#${item.index}", color = t.textMuted, style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(42.dp))
+            Column(Modifier.weight(1f)) {
+                Text(item.type, color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
+                Text(item.payload.ifBlank { "—" }, color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+            Surface(shape = RoundedCornerShape(999.dp), color = if (item.proxy.equals("REJECT", true)) t.danger.copy(alpha = .12f) else t.selectionBackground) {
+                Text(item.proxy, Modifier.padding(horizontal = 9.dp, vertical = 5.dp), color = if (item.proxy.equals("REJECT", true)) t.danger else MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+            }
+        }
+    }
+}
+
+'''
+          s = s[:rule_start] + rule_new + s[ruleset_start:]
+
+          ruleset_start = s.index('@Composable\nprivate fun RefRuleSetRow')
+          tools_start = s.index('@Composable\nprivate fun RefTools', ruleset_start)
+          ruleset_new = r'''@Composable
+private fun RefRuleSetRow(item: DashboardRuleSetUi, onRefresh: () -> Unit) {
+    val t = LocalBichenTokens.current
+    Surface(shape = RoundedCornerShape(15.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Rounded.Inventory2, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(9.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(item.name, color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
+                Text(listOf(item.behavior, item.format, item.vehicleType).filter { it.isNotBlank() }.joinToString(" · "), color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+                Text("${if (item.ruleCount > 0) "${item.ruleCount} 条规则" else "规则数 —"} · ${item.updatedAt.ifBlank { "未记录更新时间" }}", color = t.textMuted, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+            }
+            IconButton(onClick = onRefresh, modifier = Modifier.size(40.dp)) { Icon(Icons.Rounded.Sync, "远端更新", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(19.dp)) }
+        }
+    }
+}
+
+'''
+          s = s[:ruleset_start] + ruleset_new + s[tools_start:]
+
+          # Tools: every visible row has a real destination/action.
+          tools_start = s.index('@Composable\nprivate fun RefTools')
+          settings_start = s.index('@Composable\nprivate fun RefSettings', tools_start)
+          tools_new = r'''@Composable
+private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
+    val context = LocalContext.current
+    val inspector = remember { ProxyRuntimeInspector(context) }
+    val scope = rememberCoroutineScope()
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        item { RefTitleBar("工具") }
+        item {
+            RefGroup {
+                RefToolRow(Icons.Rounded.Terminal, "脚本", "后台服务生命周期与启动配置") { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }
+                RefDivider()
+                RefToolRow(Icons.Rounded.Article, "日志查看", "实时查看 Mihomo stdout / stderr") { scope.launch { onLog(runCatching { inspector.runtimeLog() }.getOrElse { it.message ?: "日志读取失败" }) } }
+                RefDivider()
+                RefToolRow(Icons.Rounded.Apps, "应用管理", "分应用放行与代理相关应用列表") { context.startActivity(Intent(context, CompactMainActivity::class.java)) }
+                RefDivider()
+                RefToolRow(Icons.Rounded.Wifi, "网络匹配", "SSID 与自动切换规则") { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }
+                RefDivider()
+                RefToolRow(Icons.Rounded.WifiTethering, "共享网络", "热点中继与透明代理") { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }
+                RefDivider()
+                RefToolRow(Icons.Rounded.AltRoute, "绕过规则", "CIDR 与接口直连配置") { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }
+                RefDivider()
+                RefToolRow(Icons.Rounded.CloudDownload, "订阅管理", state.config) { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) }
+                RefDivider()
+                RefToolRow(Icons.Rounded.Public, "CNIP 设置", "IPv4 / IPv6 国内地址库") { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }
+                RefDivider()
+                RefToolRow(Icons.Rounded.Language, "更新 WebUI", "本地面板 · Zashboard · MetaCubeXD") { context.startActivity(Intent(context, ProxyWebUiActivity::class.java)) }
+                RefDivider()
+                RefToolRow(Icons.Rounded.Memory, "更新核心", state.core) { context.startActivity(Intent(context, ProxyCoreActivity::class.java)) }
+            }
+        }
+    }
+}
+
+'''
+          s = s[:tools_start] + tools_new + s[settings_start:]
+
+          settings_start = s.index('@Composable\nprivate fun RefSettings')
+          group_helper = s.index('@Composable\nprivate fun RefGroup(', settings_start)
+          settings_new = r'''@Composable
+private fun RefSettings(state: ProxyComposeState) {
+    val context = LocalContext.current
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        item { RefTitleBar("设置") }
+        item {
+            RefGroup {
+                RefValueRow("核心选择", state.core) { context.startActivity(Intent(context, ProxyCoreActivity::class.java)) }
+                RefDivider()
+                RefValueRow("运行模式", state.mode) { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }
+                RefDivider()
+                RefValueRow("IPv6", state.ipv6) { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }
+                RefDivider()
+                RefValueRow("端口细则", "混合 / Redir / TProxy") { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }
+                RefDivider()
+                RefValueRow("当前配置", state.config) { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) }
+            }
+        }
+        item {
+            RefGroup {
+                RefValueRow("主题与界面", "Miuix · Material · Monet · OLED") { context.startActivity(Intent(context, ThemeSettingsActivity::class.java)) }
+                RefDivider()
+                RefValueRow("WebUI 面板", "本地 · Zashboard · MetaCubeXD") { context.startActivity(Intent(context, ProxyWebUiActivity::class.java)) }
+                RefDivider()
+                RefValueRow("文件管理", "代理运行目录") { context.startActivity(Intent(context, ReferenceFileManagerActivity::class.java)) }
+                RefDivider()
+                RefValueRow("订阅与配置", "链接 · User-Agent · 更新") { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) }
+            }
+        }
+    }
+}
+
+'''
+          s = s[:settings_start] + settings_new + s[group_helper:]
+          p.write_text(s)
+
+          # ---- Adblock settings points to the same shared BoxProxy theme engine ----
+          p = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/CompactMainActivity.kt')
+          s = p.read_text()
+          s = s.replace('''private fun CompactSettingsSheet(controller: BichenComposeController, onDismiss: () -> Unit, onThemeChanged: () -> Unit) {\n    val tokens = LocalBichenTokens.current\n    val current = controller.appearance()''', '''private fun CompactSettingsSheet(controller: BichenComposeController, onDismiss: () -> Unit, onThemeChanged: () -> Unit) {\n    val tokens = LocalBichenTokens.current\n    val context = LocalContext.current''', 1)
+          s = s.replace('Text("辟尘 · 洛书 Compact UI", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)', 'Text("辟尘 · BoxProxy Design System", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)', 1)
+          appearance_start = s.index('            CompactSectionHeading("外观")')
+          appearance_end = s.index('        }\n    }\n}', appearance_start)
+          appearance_block = '''            CompactSectionHeading("主题引擎", "去广告与代理共用同一套颜色、圆角、玻璃与缩放设置")\n            Surface(\n                onClick = { context.startActivity(Intent(context, ThemeSettingsActivity::class.java)) },\n                shape = RoundedCornerShape(18.dp),\n                color = tokens.controlBackground,\n            ) {\n                Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {\n                    Icon(Icons.Rounded.Palette, null, tint = MaterialTheme.colorScheme.primary)\n                    Spacer(Modifier.width(10.dp))\n                    Column(Modifier.weight(1f)) {\n                        Text("主题与界面", color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall)\n                        Text("Miuix / Material · Monet · OLED · 液态玻璃", color = tokens.textSecondary, style = MaterialTheme.typography.labelSmall)\n                    }\n                    Icon(Icons.Rounded.ChevronRight, null, tint = tokens.textMuted)\n                }\n            }\n            Text("代理、规则、应用放行、活动记录与代理工作区均共享 BoxProxy Design System。", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)\n'''
+          s = s[:appearance_start] + appearance_block + s[appearance_end:]
+          p.write_text(s)
+
+          # Build version already bumped; remove this one-shot workflow before commit.
+          Path('.github/workflows/apply-boxproxy-spec.yml').unlink(missing_ok=True)
+          PY
+
+          git diff --check
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyRuntimeInspector.kt \
+                  android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyDashboardRepository.kt \
+                  android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt \
+                  android-app/app/src/main/java/io/github/xgl34222220/bichen/CompactMainActivity.kt \
+                  .github/workflows/apply-boxproxy-spec.yml
+          git commit -m 'Implement BoxProxy UI UX architecture'
+          git push origin HEAD:feature/compose-luoshu-ui
