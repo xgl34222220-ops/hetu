@@ -13,4 +13,7 @@ internal fun Modifier.graphicsLayer(block: GraphicsLayerScope.() -> Unit): Modif
 typealias Path = androidx.compose.ui.graphics.Path
 typealias Stroke = androidx.compose.ui.graphics.drawscope.Stroke
 
+@Suppress("FunctionName")
+fun Path(): Path = androidx.compose.ui.graphics.Path()
+
 fun Bitmap.asImageBitmap(): ImageBitmap = this.composeAsImageBitmap()
