@@ -1,0 +1,105 @@
+name: Patch proxy strategy group sheet
+
+on:
+  push:
+    branches: ['feature/compose-luoshu-ui']
+    paths: ['.github/workflows/patch-proxy-group-sheet.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/compose-luoshu-ui
+          fetch-depth: 0
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+      - name: Install Android SDK components
+        shell: bash
+        run: |
+          SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"; fi
+          test -x "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+          "$SDKMANAGER" 'platform-tools' 'platforms;android-37' 'build-tools;35.0.0'
+      - name: Repair strategy group sheet
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt')
+          text = path.read_text(encoding='utf-8')
+          original = text
+
+          state_anchor = '    var selectedGroupName by rememberSaveable { mutableStateOf<String?>(null) }\n'
+          state_insert = state_anchor + '    val groupSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)\n'
+          if 'val groupSheetState = rememberModalBottomSheetState' not in text:
+              if state_anchor not in text:
+                  raise SystemExit('selectedGroupName anchor not found')
+              text = text.replace(state_anchor, state_insert, 1)
+
+          sheet_old = '''        ModalBottomSheet(\n            onDismissRequest = { selectedGroupName = null },\n            shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),\n            containerColor = t.cardBackground,\n            scrimColor = Color.Black.copy(alpha = .30f),\n'''
+          sheet_new = '''        ModalBottomSheet(\n            onDismissRequest = { selectedGroupName = null },\n            sheetState = groupSheetState,\n            shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),\n            containerColor = t.elevatedCardBackground,\n            contentColor = t.textPrimary,\n            tonalElevation = 0.dp,\n            scrimColor = Color.Black.copy(alpha = .34f),\n'''
+          if 'sheetState = groupSheetState' not in text:
+              if sheet_old not in text:
+                  raise SystemExit('ModalBottomSheet anchor not found')
+              text = text.replace(sheet_old, sheet_new, 1)
+
+          column_old = '        Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 18.dp),\n'
+          column_new = '        Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(start = 18.dp, end = 18.dp, bottom = 18.dp),\n'
+          node_fn = text.index('private fun RefNodeSheet(')
+          column_pos = text.find(column_old, node_fn)
+          if column_pos >= 0:
+              text = text[:column_pos] + text[column_pos:].replace(column_old, column_new, 1)
+
+          node_fn = text.index('private fun RefNodeSheet(')
+          list_start_marker = '        LazyColumn(\n            modifier = Modifier.fillMaxWidth().heightIn(max = 430.dp),\n'
+          list_start = text.find(list_start_marker, node_fn)
+          button_start = text.find('        Button(\n', list_start)
+          if list_start < 0 or button_start < 0:
+              raise SystemExit('node list/button anchors not found')
+          current_block = text[list_start:button_start]
+          if '当前策略组没有可选节点' not in current_block:
+              indented = ''.join('    ' + line if line.strip() else line for line in current_block.splitlines(True))
+              replacement = '''        if (group.nodes.isEmpty()) {\n            Surface(\n                modifier = Modifier.fillMaxWidth(),\n                shape = RoundedCornerShape(16.dp),\n                color = t.controlBackground,\n                shadowElevation = 0.dp,\n            ) {\n                Column(\n                    Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 22.dp),\n                    horizontalAlignment = Alignment.CenterHorizontally,\n                    verticalArrangement = Arrangement.spacedBy(7.dp),\n                ) {\n                    Icon(Icons.Rounded.Info, null, tint = t.textSecondary, modifier = Modifier.size(24.dp))\n                    Text("当前策略组没有可选节点", color = t.textPrimary, style = MaterialTheme.typography.titleSmall)\n                    Text("请刷新订阅或检查当前配置后再试", color = t.textSecondary, style = MaterialTheme.typography.bodySmall)\n                }\n            }\n        } else {\n''' + indented + '        }\n'
+              text = text[:list_start] + replacement + text[button_start:]
+
+          button_anchor = '''        Button(\n            onClick = onConfirm,\n            modifier = Modifier.fillMaxWidth().height(52.dp),\n'''
+          button_replacement = '''        Button(\n            onClick = onConfirm,\n            enabled = group.nodes.isNotEmpty() && selected.isNotBlank(),\n            modifier = Modifier.fillMaxWidth().height(52.dp),\n'''
+          if 'enabled = group.nodes.isNotEmpty() && selected.isNotBlank()' not in text:
+              if button_anchor not in text:
+                  raise SystemExit('confirm button anchor not found')
+              text = text.replace(button_anchor, button_replacement, 1)
+
+          if text == original:
+              print('Strategy group sheet already patched')
+          else:
+              path.write_text(text, encoding='utf-8')
+              print('Patched', path)
+          PY
+      - name: Compile Kotlin
+        working-directory: android-app
+        run: gradle :app:compileDebugKotlin --stacktrace
+      - name: Commit verified source patch
+        shell: bash
+        run: |
+          if git diff --quiet -- android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt; then
+            echo 'No source change needed'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
+          git commit -m 'Fix strategy group sheet blank panel'
+          git push origin HEAD:feature/compose-luoshu-ui
