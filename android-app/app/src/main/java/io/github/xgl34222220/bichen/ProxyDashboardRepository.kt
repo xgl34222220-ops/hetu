@@ -91,7 +91,27 @@ internal class ProxyDashboardRepository(context: Context) {
         parseRuleSets(api.ruleProviders())
     }
 
-    /**
+        /** Fast homepage probe: test only the currently selected nodes from strategy groups. */
+    suspend fun quickDelay(): Map<String, Long> = withContext(Dispatchers.IO) {
+        val targets = controller.state().groups.map { it.now }.filter { it.isNotBlank() }.distinct()
+        if (targets.isEmpty()) return@withContext emptyMap()
+        coroutineScope {
+            targets.map { node ->
+                async {
+                    val value = try {
+                        delay(node)
+                    } catch (cancel: CancellationException) {
+                        throw cancel
+                    } catch (_: Exception) {
+                        -1L
+                    }
+                    node to value
+                }
+            }.awaitAll().toMap()
+        }
+    }
+
+/**
  * Test every real leaf node using the same provider/group health-check URL as manual testing.
  * A failed fresh probe keeps Mihomo's most recent positive result instead of falsely turning
  * a known-good node into "超时" just because a generic probe endpoint is blocked.

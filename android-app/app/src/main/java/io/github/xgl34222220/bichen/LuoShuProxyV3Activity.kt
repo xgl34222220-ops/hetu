@@ -187,9 +187,17 @@ private fun V3Shell(onBack: () -> Unit) {
         if (!state.running || testingAll) return
         scope.launch {
             testingAll = true
-            try { delays.putAll(repo.globalDelay()) }
-            catch (e: Exception) { message = e.message ?: "测速失败" }
-            finally { testingAll = false }
+            try {
+                val result = repo.quickDelay()
+                delays.putAll(result)
+                if (result.isEmpty()) message = "没有可测速的当前节点"
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (e: Exception) {
+                message = e.message ?: "测速失败"
+            } finally {
+                testingAll = false
+            }
         }
     }
 
@@ -327,10 +335,19 @@ private fun V3Home(
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                         V3Metric(runtime.lanAddress, "LAN", Modifier.weight(1.5f))
-                        Box(
-                            Modifier.weight(1f).heightIn(min = 48.dp).clip(RoundedCornerShape(14.dp)).clickable(enabled = state.running, onClick = onTestAll),
-                            contentAlignment = Alignment.CenterStart,
-                        ) { V3LatencyMetric(avg, testingAll, Modifier.fillMaxWidth()) }
+                        Surface(
+                            onClick = onTestAll,
+                            enabled = state.running && !testingAll,
+                            modifier = Modifier.weight(1f).heightIn(min = 50.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            color = t.elevatedCardBackground,
+                        ) {
+                            V3LatencyMetric(
+                                avg,
+                                testingAll,
+                                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 7.dp),
+                            )
+                        }
                     }
                     Button(onClick = onToggle, enabled = operation.isBlank(), modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp), shape = RoundedCornerShape(18.dp)) {
                         Icon(if (state.running) Icons.Rounded.Stop else Icons.Rounded.PlayArrow, null, Modifier.size(20.dp))
@@ -1028,7 +1045,7 @@ private fun V3LatencyMetric(value: String, testing: Boolean, modifier: Modifier)
         Crossfade(targetState = testing, animationSpec = tween(150), label = "global-latency-state") { active ->
             if (active) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Icon(Icons.Rounded.Refresh, "正在测试全部节点", tint = scheme.primary, modifier = Modifier.size(15.dp).rotate(rotation))
+                    Icon(Icons.Rounded.Refresh, "正在测试当前节点", tint = scheme.primary, modifier = Modifier.size(15.dp).rotate(rotation))
                     Text("测速中", color = scheme.primary, style = MaterialTheme.typography.titleSmall, maxLines = 1)
                     Box(Modifier.size(5.dp).alpha(pulse).background(scheme.primary, CircleShape))
                 }
@@ -1038,7 +1055,7 @@ private fun V3LatencyMetric(value: String, testing: Boolean, modifier: Modifier)
                 }
             }
         }
-        Text(if (testing) "正在测试全部节点" else "延迟 · 点按测速", color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(if (testing) "正在测试当前节点" else "延迟 · 点按测速", color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

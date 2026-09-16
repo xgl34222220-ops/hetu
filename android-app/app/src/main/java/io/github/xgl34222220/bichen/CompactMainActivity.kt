@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.sp
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import io.github.xgl34222220.bichen.ui.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
@@ -76,6 +77,7 @@ private enum class CompactPage { Home, Apps, Rules, Activity }
 private fun CompactBichenApp(onThemeChanged: () -> Unit) {
     val context = LocalContext.current
     val controller = remember { BichenComposeController(context) }
+    LaunchedEffect(controller) { controller.preloadApps() }
     var page by rememberSaveable { mutableStateOf(CompactPage.Home) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
@@ -230,7 +232,16 @@ private fun CompactHomePage(
 ) {
     var refresh by remember { mutableIntStateOf(0) }
     val snapshot by produceState(initialValue = HomeSnapshot(), refresh) {
-        value = runCatching { controller.homeSnapshot() }.getOrElse { HomeSnapshot(message = it.message ?: "状态读取失败") }
+        while (true) {
+            value = try {
+                controller.homeSnapshot()
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) {
+                HomeSnapshot(message = error.message ?: "状态读取失败")
+            }
+            delay(if (value.vpnWanted && !value.vpnRunning) 350 else 1000)
+        }
     }
     val counters by produceState(initialValue = controller.dnsCounters()) {
         while (true) {
@@ -250,19 +261,29 @@ private fun CompactHomePage(
     val scheme = MaterialTheme.colorScheme
     var detailsExpanded by rememberSaveable { mutableStateOf(false) }
     var showModePicker by rememberSaveable { mutableStateOf(false) }
+    var actionBusy by remember { mutableStateOf(false) }
 
     fun toggleProtection() {
+        if (actionBusy || (snapshot.vpnWanted && !snapshot.vpnRunning)) return
         if (controller.preferredVpnMode()) {
-            if (snapshot.vpnRunning) controller.stopVpn()
-            else {
+            if (snapshot.vpnRunning) {
+                controller.stopVpn()
+            } else {
                 val permission = controller.prepareVpn()
                 if (permission == null) controller.startVpn() else launcher.launch(permission)
             }
             refresh++
         } else {
             scope.launch {
-                runCatching { controller.toggleModuleProtection(snapshot.moduleEnabled) }
-                refresh++
+                actionBusy = true
+                try {
+                    controller.toggleModuleProtection(snapshot.moduleEnabled)
+                } catch (cancel: CancellationException) {
+                    throw cancel
+                } finally {
+                    actionBusy = false
+                    refresh++
+                }
             }
         }
     }
@@ -341,14 +362,29 @@ private fun CompactHomePage(
                                 Icon(Icons.Rounded.UnfoldMore, null, tint = tokens.textSecondary, modifier = Modifier.size(18.dp))
                             }
                         }
+                        val starting = vpnMode && snapshot.vpnWanted && !snapshot.vpnRunning
                         Button(
                             onClick = ::toggleProtection,
+                            enabled = !actionBusy && !starting,
                             modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                             shape = RoundedCornerShape(14.dp),
                         ) {
-                            Icon(if (active) Icons.Rounded.Pause else Icons.Rounded.PowerSettingsNew, null, Modifier.size(19.dp))
+                            if (actionBusy || starting) {
+                                CircularProgressIndicator(
+                                    Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                )
+                            } else {
+                                Icon(if (active) Icons.Rounded.Pause else Icons.Rounded.PowerSettingsNew, null, Modifier.size(19.dp))
+                            }
                             Spacer(Modifier.width(7.dp))
-                            Text(if (active) "暂停保护" else "立即开启")
+                            Text(when {
+                                starting -> "开启中"
+                                actionBusy -> "处理中"
+                                active -> "暂停保护"
+                                else -> "立即开启"
+                            })
                         }
                     }
                 }
@@ -356,33 +392,21 @@ private fun CompactHomePage(
         }
 
         item("metrics") {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                Surface(
-                    modifier = Modifier.weight(1.35f).height(150.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    color = tokens.selectionBackground,
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = tokens.cardBackground,
+                border = BorderStroke(1.dp, tokens.outline),
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.SpaceBetween) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Rounded.Block, null, tint = scheme.primary, modifier = Modifier.size(21.dp))
-                            Spacer(Modifier.weight(1f))
-                            Text(if (vpnMode) "实时" else "历史", color = tokens.textSecondary, style = MaterialTheme.typography.labelSmall)
-                        }
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(
-                                counters.blocked.toString(),
-                                color = tokens.textPrimary,
-                                fontSize = 34.sp,
-                                lineHeight = 39.sp,
-                                fontWeight = FontWeight.Bold,
-                            )
-                            Text("累计拦截", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                }
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    CompactDataTile(snapshot.ruleCount.toString(), "有效规则", Icons.Rounded.Rule, Modifier.weight(1f))
-                    CompactDataTile("${counters.blockRate}%", "拦截率", Icons.Rounded.QueryStats, Modifier.weight(1f))
+                    CompactMetric(counters.blocked.toString(), "累计拦截", Modifier.weight(1f))
+                    VerticalDivider(Modifier.height(36.dp), color = tokens.outline)
+                    CompactMetric(snapshot.ruleCount.toString(), "有效规则", Modifier.weight(1f))
+                    VerticalDivider(Modifier.height(36.dp), color = tokens.outline)
+                    CompactMetric("${counters.blockRate}%", "拦截率", Modifier.weight(1f))
                 }
             }
         }
@@ -603,7 +627,15 @@ private fun CompactStatusCell(modifier: Modifier, title: String, value: String, 
 @Composable
 private fun CompactAppsPage(controller: BichenComposeController) {
     var reload by remember { mutableIntStateOf(0) }
-    val apps by produceState(initialValue = emptyList<AppItem>(), reload) { value = runCatching { controller.loadApps() }.getOrElse { emptyList() } }
+    val apps by produceState(initialValue = controller.cachedApps(), reload) {
+        value = try {
+            controller.loadApps(forceRefresh = reload > 0)
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (_: Exception) {
+            controller.cachedApps()
+        }
+    }
     var query by rememberSaveable { mutableStateOf("") }
     var showSystem by rememberSaveable { mutableStateOf(false) }
     var selectedOnly by rememberSaveable { mutableStateOf(false) }
@@ -645,21 +677,34 @@ private fun CompactAppsPage(controller: BichenComposeController) {
                 if (DnsVpnService.running) TextButton(onClick = controller::applyVpnBypass) { Text("应用") }
             }
         }
+        if (apps.isEmpty()) item("apps-loading") {
+            Column(
+                Modifier.fillMaxWidth().padding(vertical = 28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 2.dp)
+                Text("正在读取本机应用…", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
+            }
+        }
         items(visible, key = { it.packageName }) { app ->
             val checked = app.packageName in selected
+            val icon by produceState(initialValue = app.icon, app.packageName) {
+                value = controller.appIcon(app.packageName)
+            }
             Surface(
                 modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).clickable {
                     controller.setBypass(app.packageName, !checked)
                     selected = controller.bypassApps()
                 },
-                shape = RoundedCornerShape(18.dp),
-                color = tokens.cardBackground,
+                shape = RoundedCornerShape(14.dp),
+                color = if (checked) tokens.selectionBackground else Color.Transparent,
                 shadowElevation = 0.dp,
             ) {
                 Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (app.icon != null) {
+                    if (icon != null) {
               androidx.compose.foundation.Image(
-                  bitmap = app.icon.asImageBitmap(),
+                  bitmap = icon!!.asImageBitmap(),
                   contentDescription = null,
                   modifier = Modifier.size(44.dp).clip(RoundedCornerShape(13.dp)),
                   contentScale = ContentScale.Fit,
@@ -691,6 +736,8 @@ private fun CompactRulesPage(controller: BichenComposeController) {
     var reload by remember { mutableIntStateOf(0) }
     val state by produceState(initialValue = RulesSnapshot(), reload) { value = runCatching { controller.rulesSnapshot() }.getOrElse { RulesSnapshot() } }
     val scope = rememberCoroutineScope()
+    var updating by remember { mutableStateOf(false) }
+    var updateMessage by remember { mutableStateOf("") }
     var addMode by remember { mutableStateOf<Boolean?>(null) }
     var input by remember { mutableStateOf("") }
     val tokens = LocalBichenTokens.current
@@ -710,11 +757,41 @@ private fun CompactRulesPage(controller: BichenComposeController) {
                     Text("${state.count}", color = tokens.textPrimary, fontSize = 28.sp, lineHeight = 34.sp, fontWeight = FontWeight.SemiBold)
                     Text(state.profile, color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
                     Button(
-                        onClick = { scope.launch { runCatching { controller.updateRules() }; reload++ } },
-                        Modifier.fillMaxWidth().heightIn(min = 50.dp),
-                        shape = RoundedCornerShape(18.dp),
+                        onClick = {
+                            if (updating) return@Button
+                            scope.launch {
+                                updating = true
+                                updateMessage = "正在更新规则…"
+                                try {
+                                    updateMessage = controller.updateRules()
+                                    reload++
+                                } catch (cancel: CancellationException) {
+                                    throw cancel
+                                } catch (error: Exception) {
+                                    updateMessage = error.message ?: "规则更新失败"
+                                } finally {
+                                    updating = false
+                                }
+                            }
+                        },
+                        enabled = !updating,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                        shape = RoundedCornerShape(14.dp),
                     ) {
-                        Icon(Icons.Rounded.Sync, null, Modifier.size(20.dp)); Spacer(Modifier.width(8.dp)); Text("更新订阅")
+                        if (updating) {
+                            CircularProgressIndicator(
+                                Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                            )
+                        } else {
+                            Icon(Icons.Rounded.Sync, null, Modifier.size(20.dp))
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Text(if (updating) "更新中" else "更新规则")
+                    }
+                    if (updateMessage.isNotBlank()) {
+                        Text(updateMessage, color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }

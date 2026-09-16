@@ -32,6 +32,7 @@ internal data class HomeSnapshot(
     val queries: Long = 0,
     val errors: Long = 0,
     val vpnRunning: Boolean = false,
+    val vpnWanted: Boolean = false,
     val proxyRunning: Boolean = false,
     val message: String = "",
 )
@@ -77,6 +78,8 @@ internal data class DnsCounters(
 internal class BichenComposeController(private val context: Context) {
     private val app = context.applicationContext
     private val prefs = app.getSharedPreferences("bichen", Context.MODE_PRIVATE)
+    @Volatile private var appCache: List<AppItem>? = null
+    private val iconCache = android.util.LruCache<String, Bitmap>(128)
 
     suspend fun homeSnapshot(): HomeSnapshot = withContext(Dispatchers.IO) {
         val status = RootBridge.status(app)
@@ -106,8 +109,11 @@ internal class BichenComposeController(private val context: Context) {
             queries = prefs.getLong("queries", 0),
             errors = prefs.getLong("errors", 0),
             vpnRunning = DnsVpnService.running,
+            vpnWanted = prefs.getBoolean("vpnWanted", false),
             proxyRunning = rootProxyRunning || MihomoVpnService.engaged || prefs.getBoolean("proxyWanted", false),
-            message = status.optString("error", status.optString("message", "")),
+            message = prefs.getString("vpnError", "")?.takeIf {
+                preferredVpnMode() && !DnsVpnService.running && it.isNotBlank()
+            } ?: status.optString("error", status.optString("message", "")),
         )
     }
 
@@ -129,11 +135,13 @@ internal class BichenComposeController(private val context: Context) {
     fun prepareVpn(): Intent? = VpnService.prepare(app)
 
     fun startVpn() {
+        prefs.edit().putBoolean("vpnWanted", true).remove("vpnError").apply()
         val intent = Intent(app, DnsVpnService::class.java).setAction(DnsVpnService.ACTION_START)
         if (android.os.Build.VERSION.SDK_INT >= 26) app.startForegroundService(intent) else app.startService(intent)
     }
 
     fun stopVpn() {
+        prefs.edit().putBoolean("vpnWanted", false).apply()
         val intent = Intent(app, DnsVpnService::class.java).setAction(DnsVpnService.ACTION_STOP)
         app.startService(intent)
     }
@@ -146,21 +154,40 @@ internal class BichenComposeController(private val context: Context) {
         try { JSONObject(raw).optString("message", raw) } catch (_: Exception) { raw.ifBlank { if (currentlyEnabled) "模块保护已暂停" else "广告拦截已开启" } }
     }
 
-    suspend fun loadApps(): List<AppItem> = withContext(Dispatchers.IO) {
+    fun cachedApps(): List<AppItem> = appCache ?: emptyList()
+
+    suspend fun preloadApps() {
+        loadApps(forceRefresh = false)
+    }
+
+    suspend fun loadApps(forceRefresh: Boolean = false): List<AppItem> = withContext(Dispatchers.IO) {
+        if (!forceRefresh) appCache?.let { return@withContext it }
         val pm = app.packageManager
         val items = pm.getInstalledApplications(0).asSequence()
             .filter { it.packageName != app.packageName }
             .map { info ->
+                // Do not decode every installed app icon before showing the list. Icons are loaded
+                // lazily for visible rows by appIcon(), so the page can appear immediately.
                 AppItem(
                     label = pm.getApplicationLabel(info).toString(),
                     packageName = info.packageName,
                     system = (info.flags and ApplicationInfo.FLAG_SYSTEM) != 0,
-                    icon = loadIcon(info),
+                    icon = null,
                 )
             }.toMutableList()
         val collator = Collator.getInstance(Locale.CHINA)
         items.sortWith { a, b -> collator.compare(a.label, b.label) }
-        items
+        items.toList().also { appCache = it }
+    }
+
+    suspend fun appIcon(packageName: String): Bitmap? = withContext(Dispatchers.IO) {
+        iconCache.get(packageName)?.let { return@withContext it }
+        try {
+            val info = app.packageManager.getApplicationInfo(packageName, 0)
+            loadIcon(info)?.also { iconCache.put(packageName, it) }
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun loadIcon(info: ApplicationInfo): Bitmap? = try {

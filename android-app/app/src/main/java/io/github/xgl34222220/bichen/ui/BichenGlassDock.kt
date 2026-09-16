@@ -56,14 +56,14 @@ fun BichenGlassDock(
     val scheme = MaterialTheme.colorScheme
     val tokens = LocalBichenTokens.current
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val shape = RoundedCornerShape(28.dp)
+    val shape = RoundedCornerShape(25.dp)
 
     Box(
         modifier = modifier
-            .padding(horizontal = 20.dp)
-            .padding(bottom = bottomInset + 12.dp)
+            .padding(horizontal = 18.dp)
+            .padding(bottom = bottomInset + 10.dp)
             .fillMaxWidth()
-            .height(70.dp),
+            .height(64.dp),
     ) {
         Box(
             modifier = Modifier
@@ -118,13 +118,13 @@ private fun DockLayout(
         )
         val extra = 7.dp * stretch.value
         val start = indicatorX + 4.dp - if (direction < 0f) extra else 0.dp
-        val indicatorShape = RoundedCornerShape(21.dp)
+        val indicatorShape = RoundedCornerShape(18.dp)
 
         Box(
             modifier = Modifier
                 .offset(x = start)
                 .width(itemWidth - 8.dp + extra)
-                .height(58.dp)
+                .height(52.dp)
                 .clip(indicatorShape)
                 .background(tokens.selectionBackground)
                 .border(.8.dp, scheme.primary.copy(alpha = .15f), indicatorShape),
@@ -150,7 +150,7 @@ private fun DockLayout(
                 Column(
                     modifier = Modifier
                         .width(itemWidth)
-                        .height(58.dp)
+                        .height(52.dp)
                         .graphicsLayer { scaleX = itemScale; scaleY = itemScale }
                         .selectable(
                             selected = selectedItem,
@@ -174,7 +174,7 @@ private fun DockLayout(
                     Text(
                         item.label,
                         color = itemColor,
-                        fontSize = 12.sp,
+                        fontSize = 11.5.sp,
                         lineHeight = 17.sp,
                         fontWeight = if (selectedItem) FontWeight.Bold else FontWeight.Medium,
                         maxLines = 1,
