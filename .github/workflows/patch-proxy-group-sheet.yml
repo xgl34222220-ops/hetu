@@ -1,4 +1,5 @@
 name: Patch proxy strategy group sheet
+# one-shot source repair; merge this workflow update to trigger the verified patch
 
 on:
   push:
