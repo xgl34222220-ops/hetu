@@ -1,5 +1,6 @@
 package io.github.xgl34222220.bichen
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -28,6 +29,7 @@ import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Downloading
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -37,7 +39,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -108,7 +109,7 @@ private fun CoreManagerScreen(onBack: () -> Unit) {
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text("内核管理", color = tokens.textPrimary, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                    Text("只有 Mihomo 随 App 内置，其余按需下载", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
+                    Text("内核版本与 Root 运行能力", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
                 }
                 Surface(shape = CircleShape, color = tokens.cardBackground, modifier = Modifier.size(46.dp), shadowElevation = 1.dp) {
                     IconButton(onClick = { if (busyCore.isBlank()) revision++ }) { Icon(Icons.Rounded.Refresh, "检查更新", tint = MaterialTheme.colorScheme.primary) }
@@ -117,13 +118,22 @@ private fun CoreManagerScreen(onBack: () -> Unit) {
         }
         item("intro") {
             Surface(shape = RoundedCornerShape(24.dp), color = tokens.cardBackground, shadowElevation = 1.dp) {
-                Column(Modifier.fillMaxWidth().padding(17.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                Column(Modifier.fillMaxWidth().padding(17.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Rounded.Memory, null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(9.dp))
                         Text("核心按设备 ABI 从发布源直接拉取", color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall)
                     }
-                    Text("Mihomo 没有下载更新时自动回退到 App 内置版本；下载更新后优先使用下载版。Mihomo Smart 可下载后直接用于现有 Root 后端。其他核心先完成下载与版本管理，运行后端未接入时不会假报可用。", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
+                    Text("Mihomo 没有下载更新时自动回退到 App 内置版本；下载更新后优先使用下载版。其他核心先完成下载与版本管理，运行后端未接入时不会假报可用。", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
+                    OutlinedButton(
+                        onClick = { context.startActivity(Intent(context, RootTproxyActivity::class.java)) },
+                        modifier = Modifier.fillMaxWidth().height(46.dp),
+                        shape = RoundedCornerShape(17.dp),
+                    ) {
+                        Icon(Icons.Rounded.Tune, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(7.dp))
+                        Text("Root 网络高级设置")
+                    }
                     if (progress.isNotBlank()) Text(progress, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
                     else if (notice.isNotBlank()) Text(notice, color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
                     if (loading) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
