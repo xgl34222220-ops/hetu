@@ -44,9 +44,7 @@ jobs:
           emulator-boot-timeout: 360
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-metrics -camera-back none
           script: |
-            set -eu
-            APK=$(find proxy-apk -name '*.apk' -type f | head -n 1)
-            adb install -r "$APK"
+            APK=$(find proxy-apk -name '*.apk' -type f | head -n 1); test -n "$APK"; adb install -r "$APK"
             adb logcat -c
             adb shell am start -W -n io.github.xgl34222220.bichen.preview/io.github.xgl34222220.bichen.ComposeProxyActivity
             sleep 5
@@ -54,16 +52,8 @@ jobs:
             adb logcat -d -v threadtime > out/proxy-crash/logcat.txt
             adb shell dumpsys activity activities > out/proxy-crash/activities.txt
             grep -n -E 'FATAL EXCEPTION|AndroidRuntime|ComposeProxyActivity|IllegalStateException|NoClassDefFoundError|VerifyError|RuntimeShader|textureBlur|LayerBackdrop' out/proxy-crash/logcat.txt | tail -n 220 > out/proxy-crash/interesting.txt || true
-            if grep -q 'FATAL EXCEPTION' out/proxy-crash/logcat.txt; then
-              echo 'Proxy launch produced a fatal exception'
-              cat out/proxy-crash/interesting.txt
-              exit 1
-            fi
-            if ! grep -q 'io.github.xgl34222220.bichen.ComposeProxyActivity' out/proxy-crash/activities.txt; then
-              echo 'ComposeProxyActivity is not present after launch'
-              tail -n 120 out/proxy-crash/activities.txt
-              exit 1
-            fi
+            if grep -q 'FATAL EXCEPTION' out/proxy-crash/logcat.txt; then echo 'Proxy launch produced a fatal exception'; cat out/proxy-crash/interesting.txt; exit 1; fi
+            if ! grep -q 'io.github.xgl34222220.bichen.ComposeProxyActivity' out/proxy-crash/activities.txt; then echo 'ComposeProxyActivity is not present after launch'; tail -n 120 out/proxy-crash/activities.txt; exit 1; fi
             echo 'ComposeProxyActivity remained alive for 5 seconds with no fatal exception.' | tee out/proxy-crash/result.txt
       - uses: actions/upload-artifact@v4
         if: always()
