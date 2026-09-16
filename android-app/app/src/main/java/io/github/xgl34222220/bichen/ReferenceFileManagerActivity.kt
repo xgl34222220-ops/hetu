@@ -7,7 +7,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -19,9 +18,9 @@ import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -90,7 +89,7 @@ private suspend fun readTextFile(context: android.content.Context, path: String)
 
 @Composable
 private fun ReferenceFileManagerScreen(onClose: () -> Unit) {
-    val context = LocalContext.current
+    val context = androidx.compose.ui.platform.LocalContext.current
     val t = LocalBichenTokens.current
     var path by rememberSaveable { mutableStateOf(REF_FILE_ROOT) }
     var refresh by remember { mutableIntStateOf(0) }
@@ -133,7 +132,7 @@ private fun ReferenceFileManagerScreen(onClose: () -> Unit) {
             val relative = path.removePrefix(REF_FILE_ROOT).trim('/')
             Surface(shape = RoundedCornerShape(12.dp), color = t.selectionBackground) {
                 Text(
-                    if (relative.isBlank()) "proxy" else "proxy  ›  ${relative.replace('/', ' › ')}",
+                    if (relative.isBlank()) "proxy" else "proxy  ›  ${relative.replace("/", " › ")}",
                     Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                     color = t.textSecondary,
                     style = MaterialTheme.typography.labelMedium,
