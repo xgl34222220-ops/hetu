@@ -7,6 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -24,6 +25,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -436,7 +438,8 @@ private fun RefPanel(
     var providers by remember { mutableStateOf<List<DashboardProviderUi>>(emptyList()) }
     var rules by remember { mutableStateOf<List<ProxyRuleUi>>(emptyList()) }
     var ruleSets by remember { mutableStateOf<List<DashboardRuleSetUi>>(emptyList()) }
-    var expanded by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedGroupName by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingNode by rememberSaveable { mutableStateOf("") }
     val selectedLocal = remember { mutableStateMapOf<String, String>() }
     val testing = remember { mutableStateMapOf<String, Boolean>() }
     var error by remember { mutableStateOf("") }
@@ -520,41 +523,16 @@ private fun RefPanel(
                                 RefGroupCard(
                                     group = group,
                                     selected = selected,
-                                    expanded = expanded == group.name,
+                                    expanded = selectedGroupName == group.name,
                                     delay = delays[selected] ?: group.nodes.firstOrNull { it.name == selected }?.lastDelay,
                                     modifier = Modifier.weight(1f),
-                                    onClick = { expanded = if (expanded == group.name) null else group.name },
+                                    onClick = {
+                                        selectedGroupName = group.name
+                                        pendingNode = selected
+                                    },
                                 )
                             }
                             if (pair.size == 1) Spacer(Modifier.weight(1f))
-                        }
-                        pair.firstOrNull { expanded == it.name }?.let { group ->
-                            Spacer(Modifier.height(6.dp))
-                            RefNodeGrid(
-                                group = group,
-                                selected = selectedLocal[group.name] ?: group.now,
-                                delays = delays,
-                                testing = testing,
-                                onSelect = { node ->
-                                    selectedLocal[group.name] = node
-                                    scope.launch {
-                                        try {
-                                            repo.select(group.name, node)
-                                            onRefreshState()
-                                        } catch (_: Exception) {
-                                            selectedLocal.remove(group.name)
-                                        }
-                                    }
-                                },
-                                onDelay = { node ->
-                                    if (testing[node] != true) scope.launch {
-                                        testing[node] = true
-                                        try { delays[node] = repo.delay(node) }
-                                        catch (_: Exception) { delays[node] = -1L }
-                                        finally { testing.remove(node) }
-                                    }
-                                },
-                            )
                         }
                     }
                 }
@@ -565,6 +543,148 @@ private fun RefPanel(
                 RefPanelTab.Rules -> items(rules, key = { it.index }) { RefRuleRow(it) }
                 RefPanelTab.RuleSets -> items(ruleSets, key = { it.name }) { RefRuleSetRow(it) }
             }
+        }
+    }
+
+    val selectedGroup = selectedGroupName?.let { name -> state.groups.firstOrNull { it.name == name } }
+    if (selectedGroup != null) {
+        ModalBottomSheet(
+            onDismissRequest = { selectedGroupName = null },
+            shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
+            containerColor = t.cardBackground,
+            scrimColor = Color.Black.copy(alpha = .30f),
+            dragHandle = {
+                Box(
+                    Modifier.padding(top = 10.dp, bottom = 6.dp)
+                        .size(width = 38.dp, height = 4.dp)
+                        .background(t.outline.copy(alpha = .75f), CircleShape),
+                )
+            },
+        ) {
+            RefNodeSheet(
+                group = selectedGroup,
+                selected = pendingNode.ifBlank { selectedLocal[selectedGroup.name] ?: selectedGroup.now },
+                delays = delays,
+                testing = testing,
+                onSelect = { pendingNode = it },
+                onDelay = { node ->
+                    if (testing[node] != true) scope.launch {
+                        testing[node] = true
+                        try { delays[node] = repo.delay(node) }
+                        catch (_: Exception) { delays[node] = -1L }
+                        finally { testing.remove(node) }
+                    }
+                },
+                onTestAll = {
+                    selectedGroup.nodes.forEach { node ->
+                        if (testing[node.name] != true) scope.launch {
+                            testing[node.name] = true
+                            try { delays[node.name] = repo.delay(node.name) }
+                            catch (_: Exception) { delays[node.name] = -1L }
+                            finally { testing.remove(node.name) }
+                        }
+                    }
+                },
+                onConfirm = {
+                    val node = pendingNode.ifBlank { selectedLocal[selectedGroup.name] ?: selectedGroup.now }
+                    if (node.isNotBlank()) {
+                        selectedLocal[selectedGroup.name] = node
+                        scope.launch {
+                            try {
+                                repo.select(selectedGroup.name, node)
+                                onRefreshState()
+                            } catch (_: Exception) {
+                                selectedLocal.remove(selectedGroup.name)
+                            }
+                        }
+                    }
+                    selectedGroupName = null
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun RefNodeSheet(
+    group: ProxyGroupUi,
+    selected: String,
+    delays: Map<String, Long>,
+    testing: Map<String, Boolean>,
+    onSelect: (String) -> Unit,
+    onDelay: (String) -> Unit,
+    onTestAll: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    val t = LocalBichenTokens.current
+    val scheme = MaterialTheme.colorScheme
+    Column(
+        Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(group.name, color = t.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("${group.nodes.size} 个节点", color = t.textSecondary, style = MaterialTheme.typography.bodySmall)
+        }
+        Row(
+            Modifier.fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(listOf(t.elevatedCardBackground.copy(alpha = .86f), t.cardBackground.copy(alpha = .70f))),
+                    RoundedCornerShape(14.dp),
+                )
+                .border(.7.dp, t.outline.copy(alpha = .45f), RoundedCornerShape(14.dp))
+                .clickable(onClick = onTestAll)
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("测试全部节点", color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
+                Text("${group.nodes.size} 个节点", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+            }
+            Icon(Icons.Rounded.Refresh, "测试全部节点", tint = scheme.primary, modifier = Modifier.size(21.dp))
+        }
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth().heightIn(max = 430.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(group.nodes, key = { it.name }) { node ->
+                val active = node.name == selected
+                val shape = RoundedCornerShape(14.dp)
+                val fill = if (active) {
+                    Brush.verticalGradient(listOf(t.selectionBackground.copy(alpha = .94f), scheme.primaryContainer.copy(alpha = .56f)))
+                } else {
+                    Brush.verticalGradient(listOf(t.elevatedCardBackground.copy(alpha = .82f), t.cardBackground.copy(alpha = .64f)))
+                }
+                Row(
+                    Modifier.fillMaxWidth()
+                        .background(fill, shape)
+                        .border(.7.dp, if (active) scheme.primary.copy(alpha = .28f) else t.outline.copy(alpha = .34f), shape)
+                        .clickable { onSelect(node.name) }
+                        .padding(horizontal = 14.dp, vertical = 11.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(node.name, color = t.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(listOf(node.type, if (node.udp) "UDP" else "").filter { it.isNotBlank() }.joinToString(" · "), color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+                    }
+                    if (active) {
+                        Icon(Icons.Rounded.Check, "已选择", tint = scheme.primary, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                    }
+                    RefDelayBadge(
+                        value = delays[node.name] ?: node.lastDelay,
+                        testing = testing[node.name] == true,
+                        onClick = { onDelay(node.name) },
+                    )
+                }
+            }
+        }
+        Button(
+            onClick = onConfirm,
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+            shape = RoundedCornerShape(14.dp),
+        ) {
+            Text("确定", fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -610,53 +730,52 @@ private fun RefPanelOverview(state: ProxyComposeState, delays: Map<String, Long>
 @Composable
 private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolean, delay: Long?, modifier: Modifier, onClick: () -> Unit) {
     val t = LocalBichenTokens.current
+    val scheme = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(15.dp)
+    val glass = if (expanded) {
+        Brush.verticalGradient(listOf(t.selectionBackground.copy(alpha = .95f), scheme.primaryContainer.copy(alpha = .52f)))
+    } else {
+        Brush.verticalGradient(listOf(t.elevatedCardBackground.copy(alpha = .82f), t.cardBackground.copy(alpha = .62f)))
+    }
     Column(
         modifier
-            .background(if (expanded) t.selectionBackground else t.cardBackground, RoundedCornerShape(12.dp))
+            .background(glass, shape)
+            .border(.7.dp, if (expanded) scheme.primary.copy(alpha = .26f) else t.outline.copy(alpha = .36f), shape)
             .clickable(onClick = onClick)
-            .padding(11.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+            .padding(horizontal = 12.dp, vertical = 11.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp),
     ) {
-        Text(group.name, color = t.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(group.name, color = t.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            if (expanded) Icon(Icons.Rounded.Check, "当前策略组", tint = scheme.primary, modifier = Modifier.size(17.dp))
+        }
         Text(selected.ifBlank { "未选择" }, color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(group.type, color = t.textSecondary, style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f))
-            Text(refDelay(delay), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium)
+            Text("${group.type} · ${group.nodes.size} 节点", color = t.textSecondary, style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f))
+            RefDelayBadge(delay, false, null)
         }
     }
 }
 
 @Composable
-private fun RefNodeGrid(group: ProxyGroupUi, selected: String, delays: Map<String, Long>, testing: Map<String, Boolean>, onSelect: (String) -> Unit, onDelay: (String) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        group.nodes.chunked(2).forEach { pair ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                pair.forEach { node ->
-                    val active = selected == node.name
-                    val t = LocalBichenTokens.current
-                    Row(
-                        Modifier.weight(1f)
-                            .background(if (active) t.selectionBackground else t.cardBackground, RoundedCornerShape(11.dp))
-                            .clickable { onSelect(node.name) }
-                            .padding(horizontal = 10.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(node.name, color = t.textPrimary, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            Text(node.type, color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
-                        }
-                        Text(
-                            if (testing[node.name] == true) "…" else refDelay(delays[node.name] ?: node.lastDelay),
-                            color = MaterialTheme.colorScheme.primary,
-                            style = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier.clickable(enabled = testing[node.name] != true) { onDelay(node.name) }.padding(6.dp),
-                        )
-                    }
-                }
-                if (pair.size == 1) Spacer(Modifier.weight(1f))
-            }
-        }
+private fun RefDelayBadge(value: Long?, testing: Boolean, onClick: (() -> Unit)?) {
+    val t = LocalBichenTokens.current
+    val scheme = MaterialTheme.colorScheme
+    val text = if (testing) "…" else refDelay(value)
+    val textColor = when {
+        testing -> scheme.primary
+        value == null -> t.textSecondary
+        value <= 0L -> scheme.error
+        value <= 250L -> t.success
+        value <= 650L -> scheme.primary
+        else -> t.warning
     }
+    val shape = RoundedCornerShape(9.dp)
+    val modifier = Modifier
+        .background(scheme.primary.copy(alpha = .08f), shape)
+        .then(if (onClick != null) Modifier.clickable(enabled = !testing, onClick = onClick) else Modifier)
+        .padding(horizontal = 9.dp, vertical = 5.dp)
+    Text(text, modifier = modifier, color = textColor, style = MaterialTheme.typography.labelMedium, maxLines = 1)
 }
 
 @Composable
