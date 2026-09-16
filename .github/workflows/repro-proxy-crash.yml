@@ -19,20 +19,20 @@ jobs:
         with:
           packages: platform-tools
           log-accepted-android-sdk-licenses: false
-      - name: Download latest proxy UI APK
+      - name: Download stabilized proxy UI APK
         uses: actions/download-artifact@v4
         with:
           name: Bichen-0.4.0-test.23-visible-redesign
           path: proxy-apk
           github-token: ${{ github.token }}
           repository: xgl34222220-ops/pichen
-          run-id: 35053736395
+          run-id: 35054819745
       - name: Enable emulator acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: Reproduce Compose proxy launch
+      - name: Verify Compose proxy launch
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -44,17 +44,27 @@ jobs:
           emulator-boot-timeout: 360
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-metrics -camera-back none
           script: |
-            set -euo pipefail
+            set -eu
             APK=$(find proxy-apk -name '*.apk' -type f | head -n 1)
             adb install -r "$APK"
             adb logcat -c
-            adb shell am start -W -n io.github.xgl34222220.bichen.preview/io.github.xgl34222220.bichen.ComposeProxyActivity || true
-            sleep 4
+            adb shell am start -W -n io.github.xgl34222220.bichen.preview/io.github.xgl34222220.bichen.ComposeProxyActivity
+            sleep 5
             mkdir -p out/proxy-crash
             adb logcat -d -v threadtime > out/proxy-crash/logcat.txt
             adb shell dumpsys activity activities > out/proxy-crash/activities.txt
-            grep -n -E 'FATAL EXCEPTION|AndroidRuntime|ComposeProxyActivity|IllegalStateException|NoClassDefFoundError|VerifyError|RuntimeShader|textureBlur|LayerBackdrop' out/proxy-crash/logcat.txt | tail -n 220 | tee out/proxy-crash/fatal.txt || true
-            test ! -s out/proxy-crash/fatal.txt || true
+            grep -n -E 'FATAL EXCEPTION|AndroidRuntime|ComposeProxyActivity|IllegalStateException|NoClassDefFoundError|VerifyError|RuntimeShader|textureBlur|LayerBackdrop' out/proxy-crash/logcat.txt | tail -n 220 > out/proxy-crash/interesting.txt || true
+            if grep -q 'FATAL EXCEPTION' out/proxy-crash/logcat.txt; then
+              echo 'Proxy launch produced a fatal exception'
+              cat out/proxy-crash/interesting.txt
+              exit 1
+            fi
+            if ! grep -q 'io.github.xgl34222220.bichen.ComposeProxyActivity' out/proxy-crash/activities.txt; then
+              echo 'ComposeProxyActivity is not present after launch'
+              tail -n 120 out/proxy-crash/activities.txt
+              exit 1
+            fi
+            echo 'ComposeProxyActivity remained alive for 5 seconds with no fatal exception.' | tee out/proxy-crash/result.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
