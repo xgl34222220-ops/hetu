@@ -77,12 +77,7 @@ private val BUILTIN_DASHBOARDS = listOf(
     DashboardTarget(
         id = "metacubexd",
         name = "MetaCubeXD",
-        url = "https://metacubex.github.io/metacubexd/",
-    ),
-    DashboardTarget(
-        id = "singbox",
-        name = "Sing-Box Dashboard",
-        url = "https://sing-box-dashboard.sagernet.org/",
+        url = "https://d.metacubex.one/",
     ),
 )
 
@@ -117,6 +112,12 @@ private fun loadCustomDashboards(context: Context): List<DashboardTarget> {
             }
         }
     }.getOrDefault(emptyList())
+}
+
+private fun resolvedDashboardUrl(target: DashboardTarget, secret: String): String {
+    if (target.id != "zashboard") return target.url
+    val encoded = android.net.Uri.encode(secret)
+    return target.url.trimEnd('/') + "/#/setup?protocol=http&hostname=127.0.0.1&port=${MihomoStartupConfig.CONTROLLER_PORT}&secret=$encoded&disableUpgradeCore=1&disableTunMode=1"
 }
 
 private fun saveCustomDashboards(context: Context, items: List<DashboardTarget>) {
@@ -209,7 +210,9 @@ private fun ProxyWebUiScreen(onClose: () -> Unit) {
                     super.onPageFinished(view, url)
                     if (url.isNullOrBlank()) return
                     pageError = ""
-                    if (!selected.local || !url.startsWith("http://127.0.0.1:${MihomoStartupConfig.CONTROLLER_PORT}/ui/")) return
+                    val injectEndpoint = selected.local || selected.id == "metacubexd"
+                    if (!injectEndpoint) return
+                    if (selected.local && !url.startsWith("http://127.0.0.1:${MihomoStartupConfig.CONTROLLER_PORT}/ui/")) return
 
                     val endpoint = JSONObject()
                         .put("id", "bichen-local")
@@ -267,7 +270,7 @@ private fun ProxyWebUiScreen(onClose: () -> Unit) {
             if (selected.local) inspector.ensureWebUi()
             webView.stopLoading()
             webView.clearHistory()
-            webView.loadUrl(selected.url)
+            webView.loadUrl(resolvedDashboardUrl(selected, secret))
             prefs.edit().putString(PREF_WEB_DASHBOARD, selected.id).apply()
         } catch (e: Exception) {
             prepareError = e.message ?: "面板准备失败"
@@ -301,8 +304,13 @@ private fun ProxyWebUiScreen(onClose: () -> Unit) {
                 webView.loadUrl("http://127.0.0.1:${MihomoStartupConfig.CONTROLLER_PORT}/ui/?bichen_retry=$stamp")
             }
         } else {
-            val separator = if (selected.url.contains('?')) '&' else '?'
-            webView.loadUrl("${selected.url}$separator" + "bichen_retry=$stamp")
+            val base = resolvedDashboardUrl(selected, secret)
+            if (selected.id == "zashboard") {
+                webView.loadUrl(base)
+            } else {
+                val separator = if (base.contains('?')) '&' else '?'
+                webView.loadUrl("$base$separator" + "bichen_retry=$stamp")
+            }
         }
     }
 
@@ -465,7 +473,7 @@ private fun ProxyWebUiScreen(onClose: () -> Unit) {
                     }
                 }
                 Text(
-                    "外部面板不会自动获得本机控制密钥；本地 MetaCubeXD 才会安全注入控制端点。",
+                    "Zashboard 与 MetaCubeXD 会自动连接本机 Mihomo；自定义面板仍需按其自身方式填写控制端点。",
                     color = tokens.textSecondary,
                     style = MaterialTheme.typography.labelSmall,
                 )
