@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.chrisbanes.haze.HazeState
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
+import top.yukonga.miuix.kmp.blur.textureBlur
 
 data class DockItem(val label: String, val icon: ImageVector, val opticalScale: Float = 1f)
 
@@ -42,26 +43,35 @@ fun BichenGlassDock(
     backdrop: LayerBackdrop?,
     modifier: Modifier = Modifier,
 ) {
-    @Suppress("UNUSED_VARIABLE") val ignoredHaze = hazeState
-    @Suppress("UNUSED_VARIABLE") val ignoredBackdrop = backdrop
+    @Suppress("UNUSED_VARIABLE") val ignoredHazeFallback = hazeState
 
     val tokens = LocalBichenTokens.current
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val shape = RoundedCornerShape(23.dp)
+    val shape = RoundedCornerShape(26.dp)
+    val glassModifier = if (backdrop != null) {
+        Modifier
+            .textureBlur(
+                backdrop = backdrop,
+                shape = shape,
+                blurRadius = 24f,
+            )
+            .background(tokens.cardBackground.copy(alpha = .56f), shape)
+    } else {
+        Modifier.background(tokens.cardBackground.copy(alpha = .97f), shape)
+    }
 
     Box(
         modifier = modifier
             .padding(horizontal = 16.dp)
-            .padding(bottom = bottomInset + 8.dp)
+            .padding(bottom = bottomInset + 9.dp)
             .fillMaxWidth()
-            .height(60.dp),
+            .height(66.dp),
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .shadow(6.dp, shape, clip = false)
-                .clip(shape)
-                .background(tokens.cardBackground),
+                .shadow(10.dp, shape, clip = false)
+                .then(glassModifier),
         )
 
         DockLayout(
@@ -103,17 +113,17 @@ private fun DockLayout(
             animationSpec = spring(dampingRatio = .80f, stiffness = 420f),
             label = "bichenDockX",
         )
-        val extra = 4.dp * stretch.value
+        val extra = 5.dp * stretch.value
         val start = indicatorX + 3.dp - if (direction < 0f) extra else 0.dp
-        val indicatorShape = RoundedCornerShape(17.dp)
+        val indicatorShape = RoundedCornerShape(19.dp)
 
         Box(
             modifier = Modifier
                 .offset(x = start)
                 .width(itemWidth - 6.dp + extra)
-                .height(50.dp)
+                .height(56.dp)
                 .clip(indicatorShape)
-                .background(tokens.selectionBackground),
+                .background(tokens.selectionBackground.copy(alpha = .86f)),
         )
 
         Row(Modifier.fillMaxWidth().selectableGroup()) {
@@ -123,20 +133,20 @@ private fun DockLayout(
                 val pressed by source.collectIsPressedAsState()
                 val baseColor = if (selectedItem) scheme.primary else tokens.textSecondary
                 val itemColor by animateColorAsState(
-                    targetValue = if (pressed) baseColor.copy(alpha = .72f) else baseColor,
+                    targetValue = if (pressed) baseColor.copy(alpha = .70f) else baseColor,
                     animationSpec = tween(100),
                     label = "${item.label}DockColor",
                 )
                 val itemScale by animateFloatAsState(
-                    targetValue = if (pressed) .96f else 1f,
-                    animationSpec = spring(dampingRatio = .78f, stiffness = 650f),
+                    targetValue = if (pressed) .94f else 1f,
+                    animationSpec = spring(dampingRatio = .76f, stiffness = 700f),
                     label = "${item.label}DockScale",
                 )
 
                 Column(
                     modifier = Modifier
                         .width(itemWidth)
-                        .height(50.dp)
+                        .height(56.dp)
                         .graphicsLayer { scaleX = itemScale; scaleY = itemScale }
                         .selectable(
                             selected = selectedItem,
