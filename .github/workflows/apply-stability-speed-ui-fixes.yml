@@ -1,0 +1,357 @@
+name: Apply stability speed UI fixes
+
+on:
+  push:
+    branches: ['feature/compose-luoshu-ui']
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message == 'Apply stability speed UI fixes'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/compose-luoshu-ui
+          fetch-depth: 0
+
+      - name: Patch protection apps rules latency and UI
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(text, old, new, label):
+              if old not in text:
+                  raise SystemExit(f'pattern not found: {label}')
+              return text.replace(old, new, 1)
+
+          # --- controller: real VPN state feedback + app cache ---
+          p = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ui/BichenComposeController.kt')
+          s = p.read_text()
+          s = replace_once(s,
+              '    val vpnRunning: Boolean = false,\n    val proxyRunning: Boolean = false,',
+              '    val vpnRunning: Boolean = false,\n    val vpnWanted: Boolean = false,\n    val proxyRunning: Boolean = false,',
+              'HomeSnapshot vpnWanted')
+          s = replace_once(s,
+              '    private val prefs = app.getSharedPreferences("bichen", Context.MODE_PRIVATE)\n',
+              '    private val prefs = app.getSharedPreferences("bichen", Context.MODE_PRIVATE)\n    @Volatile private var appCache: List<AppItem>? = null\n',
+              'app cache field')
+          s = replace_once(s,
+              '            vpnRunning = DnsVpnService.running,\n            proxyRunning = rootProxyRunning || MihomoVpnService.engaged || prefs.getBoolean("proxyWanted", false),\n            message = status.optString("error", status.optString("message", "")),',
+              '            vpnRunning = DnsVpnService.running,\n            vpnWanted = prefs.getBoolean("vpnWanted", false),\n            proxyRunning = rootProxyRunning || MihomoVpnService.engaged || prefs.getBoolean("proxyWanted", false),\n            message = prefs.getString("vpnError", "")?.takeIf { preferredVpnMode() && !DnsVpnService.running && it.isNotBlank() }\n                ?: status.optString("error", status.optString("message", "")),',
+              'vpn status error surface')
+          s = replace_once(s,
+              '    fun startVpn() {\n        val intent = Intent(app, DnsVpnService::class.java).setAction(DnsVpnService.ACTION_START)\n        if (android.os.Build.VERSION.SDK_INT >= 26) app.startForegroundService(intent) else app.startService(intent)\n    }\n\n    fun stopVpn() {\n        val intent = Intent(app, DnsVpnService::class.java).setAction(DnsVpnService.ACTION_STOP)\n        app.startService(intent)\n    }',
+              '    fun startVpn() {\n        prefs.edit().putBoolean("vpnWanted", true).remove("vpnError").apply()\n        val intent = Intent(app, DnsVpnService::class.java).setAction(DnsVpnService.ACTION_START)\n        if (android.os.Build.VERSION.SDK_INT >= 26) app.startForegroundService(intent) else app.startService(intent)\n    }\n\n    fun stopVpn() {\n        prefs.edit().putBoolean("vpnWanted", false).apply()\n        val intent = Intent(app, DnsVpnService::class.java).setAction(DnsVpnService.ACTION_STOP)\n        app.startService(intent)\n    }',
+              'vpn desired state')
+          old_load = '''    suspend fun loadApps(): List<AppItem> = withContext(Dispatchers.IO) {
+        val pm = app.packageManager
+        val items = pm.getInstalledApplications(0).asSequence()
+            .filter { it.packageName != app.packageName }
+            .map { info ->
+                AppItem(
+                    label = pm.getApplicationLabel(info).toString(),
+                    packageName = info.packageName,
+                    system = (info.flags and ApplicationInfo.FLAG_SYSTEM) != 0,
+                    icon = loadIcon(info),
+                )
+            }.toMutableList()
+        val collator = Collator.getInstance(Locale.CHINA)
+        items.sortWith { a, b -> collator.compare(a.label, b.label) }
+        items
+    }
+'''
+          new_load = '''    fun cachedApps(): List<AppItem> = appCache ?: emptyList()
+
+    suspend fun preloadApps() { loadApps(forceRefresh = false) }
+
+    suspend fun loadApps(forceRefresh: Boolean = false): List<AppItem> = withContext(Dispatchers.IO) {
+        if (!forceRefresh) appCache?.let { return@withContext it }
+        val pm = app.packageManager
+        val items = pm.getInstalledApplications(0).asSequence()
+            .filter { it.packageName != app.packageName }
+            .map { info ->
+                AppItem(
+                    label = pm.getApplicationLabel(info).toString(),
+                    packageName = info.packageName,
+                    system = (info.flags and ApplicationInfo.FLAG_SYSTEM) != 0,
+                    icon = loadIcon(info),
+                )
+            }.toMutableList()
+        val collator = Collator.getInstance(Locale.CHINA)
+        items.sortWith { a, b -> collator.compare(a.label, b.label) }
+        items.toList().also { appCache = it }
+    }
+'''
+          s = replace_once(s, old_load, new_load, 'cached loadApps')
+          p.write_text(s)
+
+          # --- launcher UI: do not swallow cancellation, poll async VPN start, prewarm apps, visible update feedback ---
+          p = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/CompactMainActivity.kt')
+          s = p.read_text()
+          if 'import kotlinx.coroutines.CancellationException' not in s:
+              s = s.replace('import kotlinx.coroutines.delay\n', 'import kotlinx.coroutines.CancellationException\nimport kotlinx.coroutines.delay\n', 1)
+          s = replace_once(s,
+              '    val controller = remember { BichenComposeController(context) }\n    var page by rememberSaveable { mutableStateOf(CompactPage.Home) }',
+              '    val controller = remember { BichenComposeController(context) }\n    LaunchedEffect(controller) { controller.preloadApps() }\n    var page by rememberSaveable { mutableStateOf(CompactPage.Home) }',
+              'prewarm apps')
+          old_snapshot = '''    val snapshot by produceState(initialValue = HomeSnapshot(), refresh) {
+        value = runCatching { controller.homeSnapshot() }.getOrElse { HomeSnapshot(message = it.message ?: "状态读取失败") }
+    }
+'''
+          new_snapshot = '''    val snapshot by produceState(initialValue = HomeSnapshot(), refresh) {
+        while (true) {
+            value = try {
+                controller.homeSnapshot()
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) {
+                HomeSnapshot(message = error.message ?: "状态读取失败")
+            }
+            delay(if (value.vpnWanted && !value.vpnRunning) 350 else 1000)
+        }
+    }
+'''
+          s = replace_once(s, old_snapshot, new_snapshot, 'home snapshot polling')
+          s = replace_once(s,
+              '    var detailsExpanded by rememberSaveable { mutableStateOf(false) }\n    var showModePicker by rememberSaveable { mutableStateOf(false) }',
+              '    var detailsExpanded by rememberSaveable { mutableStateOf(false) }\n    var showModePicker by rememberSaveable { mutableStateOf(false) }\n    var actionBusy by remember { mutableStateOf(false) }',
+              'home actionBusy')
+          old_toggle = '''    fun toggleProtection() {
+        if (controller.preferredVpnMode()) {
+            if (snapshot.vpnRunning) controller.stopVpn()
+            else {
+                val permission = controller.prepareVpn()
+                if (permission == null) controller.startVpn() else launcher.launch(permission)
+            }
+            refresh++
+        } else {
+            scope.launch {
+                runCatching { controller.toggleModuleProtection(snapshot.moduleEnabled) }
+                refresh++
+            }
+        }
+    }
+'''
+          new_toggle = '''    fun toggleProtection() {
+        if (actionBusy || (snapshot.vpnWanted && !snapshot.vpnRunning)) return
+        if (controller.preferredVpnMode()) {
+            if (snapshot.vpnRunning) controller.stopVpn()
+            else {
+                val permission = controller.prepareVpn()
+                if (permission == null) controller.startVpn() else launcher.launch(permission)
+            }
+            refresh++
+        } else {
+            scope.launch {
+                actionBusy = true
+                try {
+                    controller.toggleModuleProtection(snapshot.moduleEnabled)
+                } catch (cancel: CancellationException) {
+                    throw cancel
+                } finally {
+                    actionBusy = false
+                    refresh++
+                }
+            }
+        }
+    }
+'''
+          s = replace_once(s, old_toggle, new_toggle, 'toggle protection')
+          # button now reflects real asynchronous start instead of looking dead
+          s = replace_once(s,
+              '                        Button(\n                            onClick = ::toggleProtection,\n                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),\n                            shape = RoundedCornerShape(14.dp),\n                        ) {\n                            Icon(if (active) Icons.Rounded.Pause else Icons.Rounded.PowerSettingsNew, null, Modifier.size(19.dp))\n                            Spacer(Modifier.width(7.dp))\n                            Text(if (active) "暂停保护" else "立即开启")\n                        }',
+              '                        val starting = vpnMode && snapshot.vpnWanted && !snapshot.vpnRunning\n                        Button(\n                            onClick = ::toggleProtection,\n                            enabled = !actionBusy && !starting,\n                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),\n                            shape = RoundedCornerShape(14.dp),\n                        ) {\n                            if (actionBusy || starting) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)\n                            else Icon(if (active) Icons.Rounded.Pause else Icons.Rounded.PowerSettingsNew, null, Modifier.size(19.dp))\n                            Spacer(Modifier.width(7.dp))\n                            Text(when { starting -> "开启中"; actionBusy -> "处理中"; active -> "暂停保护"; else -> "立即开启" })\n                        }',
+              'protection button feedback')
+          # compact metrics: remove the oversized empty bento block seen in the recording
+          old_metrics = '''        item("metrics") {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                Surface(
+                    modifier = Modifier.weight(1.35f).height(150.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    color = tokens.selectionBackground,
+                ) {
+                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.SpaceBetween) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Rounded.Block, null, tint = scheme.primary, modifier = Modifier.size(21.dp))
+                            Spacer(Modifier.weight(1f))
+                            Text(if (vpnMode) "实时" else "历史", color = tokens.textSecondary, style = MaterialTheme.typography.labelSmall)
+                        }
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                counters.blocked.toString(),
+                                color = tokens.textPrimary,
+                                fontSize = 34.sp,
+                                lineHeight = 39.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Text("累计拦截", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    CompactDataTile(snapshot.ruleCount.toString(), "有效规则", Icons.Rounded.Rule, Modifier.weight(1f))
+                    CompactDataTile("${counters.blockRate}%", "拦截率", Icons.Rounded.QueryStats, Modifier.weight(1f))
+                }
+            }
+        }
+'''
+          new_metrics = '''        item("metrics") {
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = tokens.cardBackground,
+                border = BorderStroke(1.dp, tokens.outline),
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    CompactMetric(counters.blocked.toString(), "累计拦截", Modifier.weight(1f))
+                    VerticalDivider(Modifier.height(36.dp), color = tokens.outline)
+                    CompactMetric(snapshot.ruleCount.toString(), "有效规则", Modifier.weight(1f))
+                    VerticalDivider(Modifier.height(36.dp), color = tokens.outline)
+                    CompactMetric("${counters.blockRate}%", "拦截率", Modifier.weight(1f))
+                }
+            }
+        }
+'''
+          s = replace_once(s, old_metrics, new_metrics, 'compact home metrics')
+          # cached app list: instant when prewarm is complete, explicit loading when it is not
+          s = replace_once(s,
+              '    val apps by produceState(initialValue = emptyList<AppItem>(), reload) { value = runCatching { controller.loadApps() }.getOrElse { emptyList() } }',
+              '    val apps by produceState(initialValue = controller.cachedApps(), reload) {\n        value = try { controller.loadApps(forceRefresh = reload > 0) }\n        catch (cancel: CancellationException) { throw cancel }\n        catch (_: Exception) { controller.cachedApps() }\n    }',
+              'apps cached state')
+          s = replace_once(s,
+              '        item("filters") {\n            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {\n                FilterChip(selected = showSystem, onClick = { showSystem = !showSystem }, label = { Text("系统应用") })\n                FilterChip(selected = selectedOnly, onClick = { selectedOnly = !selectedOnly }, label = { Text("已选择") })\n                Spacer(Modifier.weight(1f))\n                if (DnsVpnService.running) TextButton(onClick = controller::applyVpnBypass) { Text("应用") }\n            }\n        }',
+              '        item("filters") {\n            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {\n                FilterChip(selected = showSystem, onClick = { showSystem = !showSystem }, label = { Text("系统应用") })\n                FilterChip(selected = selectedOnly, onClick = { selectedOnly = !selectedOnly }, label = { Text("已选择") })\n                Spacer(Modifier.weight(1f))\n                if (DnsVpnService.running) TextButton(onClick = controller::applyVpnBypass) { Text("应用") }\n            }\n        }\n        if (apps.isEmpty()) item("apps-loading") {\n            Column(Modifier.fillMaxWidth().padding(vertical = 28.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {\n                CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 2.dp)\n                Text("正在读取本机应用…", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)\n            }\n        }',
+              'apps loading state')
+          # flatter selected app rows, less card-stack look
+          s = replace_once(s,
+              '                shape = RoundedCornerShape(18.dp),\n                color = tokens.cardBackground,\n                shadowElevation = 0.dp,',
+              '                shape = RoundedCornerShape(14.dp),\n                color = if (checked) tokens.selectionBackground else Color.Transparent,\n                shadowElevation = 0.dp,',
+              'app row visual')
+          # rules: busy animation + actual success/error result, no silent runCatching
+          s = replace_once(s,
+              '    val scope = rememberCoroutineScope()\n    var addMode by remember { mutableStateOf<Boolean?>(null) }',
+              '    val scope = rememberCoroutineScope()\n    var updating by remember { mutableStateOf(false) }\n    var updateMessage by remember { mutableStateOf("") }\n    var addMode by remember { mutableStateOf<Boolean?>(null) }',
+              'rules state feedback')
+          old_update = '''                    Button(
+                        onClick = { scope.launch { runCatching { controller.updateRules() }; reload++ } },
+                        Modifier.fillMaxWidth().heightIn(min = 50.dp),
+                        shape = RoundedCornerShape(18.dp),
+                    ) {
+                        Icon(Icons.Rounded.Sync, null, Modifier.size(20.dp)); Spacer(Modifier.width(8.dp)); Text("更新订阅")
+                    }
+'''
+          new_update = '''                    Button(
+                        onClick = {
+                            if (updating) return@Button
+                            scope.launch {
+                                updating = true
+                                updateMessage = "正在更新规则…"
+                                try {
+                                    updateMessage = controller.updateRules()
+                                    reload++
+                                } catch (cancel: CancellationException) {
+                                    throw cancel
+                                } catch (error: Exception) {
+                                    updateMessage = error.message ?: "规则更新失败"
+                                } finally {
+                                    updating = false
+                                }
+                            }
+                        },
+                        enabled = !updating,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                        shape = RoundedCornerShape(14.dp),
+                    ) {
+                        if (updating) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                        else Icon(Icons.Rounded.Sync, null, Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(if (updating) "更新中" else "更新规则")
+                    }
+                    if (updateMessage.isNotBlank()) Text(updateMessage, color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
+'''
+          s = replace_once(s, old_update, new_update, 'rules update feedback')
+          p.write_text(s)
+
+          # --- proxy dashboard repository: homepage uses quick selected-node probe; panel keeps full all-node probe ---
+          p = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyDashboardRepository.kt')
+          s = p.read_text()
+          marker = '''    /**
+ * Test every real leaf node using the same provider/group health-check URL as manual testing.
+'''
+          quick = '''    /** Fast homepage probe: test only currently selected nodes from each strategy group. */
+    suspend fun quickDelay(): Map<String, Long> = withContext(Dispatchers.IO) {
+        val targets = controller.state().groups.map { it.now }.filter { it.isNotBlank() }.distinct()
+        if (targets.isEmpty()) return@withContext emptyMap()
+        coroutineScope {
+            targets.map { node ->
+                async {
+                    val value = try { delay(node) }
+                    catch (cancel: CancellationException) { throw cancel }
+                    catch (_: Exception) { -1L }
+                    node to value
+                }
+            }.awaitAll().toMap()
+        }
+    }
+
+'''
+          if marker not in s:
+              raise SystemExit('pattern not found: quick delay marker')
+          s = s.replace(marker, quick + marker, 1)
+          p.write_text(s)
+
+          # --- proxy homepage: obvious tappable latency control + fast selected-node test ---
+          p = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/LuoShuProxyV3Activity.kt')
+          s = p.read_text()
+          s = replace_once(s,
+              '            testingAll = true\n            try { delays.putAll(repo.globalDelay()) }\n            catch (e: Exception) { message = e.message ?: "测速失败" }\n            finally { testingAll = false }',
+              '            testingAll = true\n            try {\n                val result = repo.quickDelay()\n                delays.putAll(result)\n                if (result.isEmpty()) message = "没有可测速的当前节点"\n            }\n            catch (e: Exception) { message = e.message ?: "测速失败" }\n            finally { testingAll = false }',
+              'home quick latency')
+          old_box = '''                        Box(
+                            Modifier.weight(1f).heightIn(min = 48.dp).clip(RoundedCornerShape(14.dp)).clickable(enabled = state.running, onClick = onTestAll),
+                            contentAlignment = Alignment.CenterStart,
+                        ) { V3LatencyMetric(avg, testingAll, Modifier.fillMaxWidth()) }
+'''
+          new_box = '''                        Surface(
+                            onClick = onTestAll,
+                            enabled = state.running && !testingAll,
+                            modifier = Modifier.weight(1f).heightIn(min = 50.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            color = t.elevatedCardBackground,
+                        ) {
+                            V3LatencyMetric(avg, testingAll, Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 7.dp))
+                        }
+'''
+          s = replace_once(s, old_box, new_box, 'latency tappable surface')
+          s = s.replace('Text(if (testing) "正在测试全部节点" else "延迟 · 点按测速"', 'Text(if (testing) "正在测试当前节点" else "延迟 · 点按测速"', 1)
+          s = s.replace('Icon(Icons.Rounded.Refresh, "正在测试全部节点"', 'Icon(Icons.Rounded.Refresh, "正在测试当前节点"', 1)
+          p.write_text(s)
+
+          # --- bottom dock: reduce the oversized floating slab visible in the recording ---
+          p = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ui/BichenGlassDock.kt')
+          s = p.read_text()
+          s = s.replace('.padding(horizontal = 20.dp)\n            .padding(bottom = bottomInset + 12.dp)\n            .fillMaxWidth()\n            .height(72.dp)', '.padding(horizontal = 18.dp)\n            .padding(bottom = bottomInset + 10.dp)\n            .fillMaxWidth()\n            .height(66.dp)', 1)
+          s = s.replace('val shape = RoundedCornerShape(31.dp)', 'val shape = RoundedCornerShape(27.dp)', 1)
+          s = s.replace('val indicatorShape = RoundedCornerShape(23.dp)', 'val indicatorShape = RoundedCornerShape(20.dp)', 1)
+          s = s.replace('.height(60.dp)', '.height(54.dp)', 2)
+          s = s.replace('.height(60.dp)\n                        .graphicsLayer', '.height(54.dp)\n                        .graphicsLayer', 1)
+          s = s.replace('modifier = Modifier\n                            .size(22.dp)', 'modifier = Modifier\n                            .size(21.dp)', 1)
+          s = s.replace('fontSize = 12.sp,', 'fontSize = 11.5.sp,', 1)
+          p.write_text(s)
+          PY
+
+      - name: Commit fixes
+        shell: bash
+        run: |
+          rm -f .github/workflows/apply-stability-speed-ui-fixes.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Fix protection startup app preload rules and latency feedback"
+          git push origin HEAD:feature/compose-luoshu-ui
