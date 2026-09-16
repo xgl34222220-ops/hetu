@@ -10,7 +10,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -19,12 +18,7 @@ import androidx.compose.ui.unit.sp
 import com.materialkolor.DynamicMaterialTheme
 import com.materialkolor.PaletteStyle
 
-/**
- * Semantic UI tokens for Bichen.
- *
- * The visual language follows the compact reference layout used by the proxy video:
- * warm neutral canvas, flat light cards, muted brick/coral accent and one-layer surfaces.
- */
+/** Clean LuoShu / MIUI-inspired semantic tokens shared by Bichen surfaces. */
 @Immutable
 data class BichenTokens(
     val pageBackground: Color,
@@ -42,42 +36,42 @@ data class BichenTokens(
 
 val LocalBichenTokens = staticCompositionLocalOf {
     BichenTokens(
-        pageBackground = Color(0xFFF3F2EF),
-        cardBackground = Color(0xFFFCFCFA),
-        elevatedCardBackground = Color(0xFFF0EFEC),
-        textPrimary = Color(0xFF1D1C1A),
-        textSecondary = Color(0xFF72706C),
-        success = Color(0xFF2C8662),
-        warning = Color(0xFF9A6B28),
-        danger = Color(0xFFB44835),
-        outline = Color(0xFFE0DDD8),
-        controlBackground = Color(0xFFF0EFEC),
-        selectionBackground = Color(0xFFF8D8CF),
+        pageBackground = Color(0xFFF5F7FB),
+        cardBackground = Color(0xFFFFFFFF),
+        elevatedCardBackground = Color(0xFFF0F3F8),
+        textPrimary = Color(0xFF171A1F),
+        textSecondary = Color(0xFF747B86),
+        success = Color(0xFF2E956D),
+        warning = Color(0xFFA87925),
+        danger = Color(0xFFC54E4A),
+        outline = Color(0xFFE3E7EE),
+        controlBackground = Color(0xFFF0F3F8),
+        selectionBackground = Color(0xFFE8EEFF),
     )
 }
 
 private val BichenShapes = Shapes(
     extraSmall = RoundedCornerShape(7.dp),
     small = RoundedCornerShape(10.dp),
-    medium = RoundedCornerShape(15.dp),
+    medium = RoundedCornerShape(14.dp),
     large = RoundedCornerShape(18.dp),
-    extraLarge = RoundedCornerShape(24.dp),
+    extraLarge = RoundedCornerShape(22.dp),
 )
 
 private val BichenTypography = Typography(
-    displaySmall = TextStyle(fontSize = 32.sp, lineHeight = 38.sp, fontWeight = FontWeight.Bold),
-    headlineLarge = TextStyle(fontSize = 28.sp, lineHeight = 35.sp, fontWeight = FontWeight.Bold),
-    headlineMedium = TextStyle(fontSize = 24.sp, lineHeight = 31.sp, fontWeight = FontWeight.Bold),
-    headlineSmall = TextStyle(fontSize = 21.sp, lineHeight = 27.sp, fontWeight = FontWeight.SemiBold),
-    titleLarge = TextStyle(fontSize = 20.sp, lineHeight = 27.sp, fontWeight = FontWeight.SemiBold),
-    titleMedium = TextStyle(fontSize = 16.sp, lineHeight = 23.sp, fontWeight = FontWeight.SemiBold),
+    displaySmall = TextStyle(fontSize = 30.sp, lineHeight = 36.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.4).sp),
+    headlineLarge = TextStyle(fontSize = 27.sp, lineHeight = 34.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.35).sp),
+    headlineMedium = TextStyle(fontSize = 23.sp, lineHeight = 30.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.3).sp),
+    headlineSmall = TextStyle(fontSize = 20.sp, lineHeight = 27.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.2).sp),
+    titleLarge = TextStyle(fontSize = 19.sp, lineHeight = 25.sp, fontWeight = FontWeight.SemiBold),
+    titleMedium = TextStyle(fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold),
     titleSmall = TextStyle(fontSize = 14.5.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold),
     bodyLarge = TextStyle(fontSize = 15.sp, lineHeight = 22.sp),
     bodyMedium = TextStyle(fontSize = 14.sp, lineHeight = 20.sp),
-    bodySmall = TextStyle(fontSize = 12.sp, lineHeight = 17.sp),
+    bodySmall = TextStyle(fontSize = 12.5.sp, lineHeight = 18.sp),
     labelLarge = TextStyle(fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold),
     labelMedium = TextStyle(fontSize = 11.5.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium),
-    labelSmall = TextStyle(fontSize = 10.5.sp, lineHeight = 15.sp, fontWeight = FontWeight.Medium, letterSpacing = .15.sp),
+    labelSmall = TextStyle(fontSize = 10.5.sp, lineHeight = 15.sp, fontWeight = FontWeight.Medium, letterSpacing = .1.sp),
 )
 
 @Composable
@@ -87,8 +81,8 @@ fun BichenTheme(content: @Composable () -> Unit) {
     val appearance = prefs.getString("appearance", "system") ?: "system"
     val dark = appearance == "dark" || (appearance == "system" && isSystemInDarkTheme())
 
-    // Keep the product identity stable instead of inheriting an arbitrary device accent.
-    val seed = Color(0xFFB5533D)
+    // Stable cool accent: closer to modern MIUI/LuoShu than the previous brick-red palette.
+    val seed = Color(0xFF5572F6)
 
     DynamicMaterialTheme(
         seedColor = seed,
@@ -98,24 +92,35 @@ fun BichenTheme(content: @Composable () -> Unit) {
         typography = BichenTypography,
         animate = true,
     ) {
-        val scheme = MaterialTheme.colorScheme
-        val page = if (dark) Color(0xFF141311) else Color(0xFFF3F2EF)
-        val card = if (dark) Color(0xFF201E1C) else Color(0xFFFCFCFA)
-        val elevated = if (dark) Color(0xFF292624) else Color(0xFFF0EFEC)
-        val selected = if (dark) lerp(card, Color(0xFF8D4334), .46f) else Color(0xFFF8D8CF)
-        val tokens = BichenTokens(
-            pageBackground = page,
-            cardBackground = card,
-            elevatedCardBackground = elevated,
-            textPrimary = if (dark) Color(0xFFF1EEEA) else Color(0xFF1D1C1A),
-            textSecondary = if (dark) Color(0xFFB7B0AA) else Color(0xFF72706C),
-            success = if (dark) Color(0xFF70CDA7) else Color(0xFF2C8662),
-            warning = if (dark) Color(0xFFE3B96F) else Color(0xFF9A6B28),
-            danger = if (dark) Color(0xFFFFA997) else Color(0xFFB44835),
-            outline = if (dark) Color(0xFF3B3733) else Color(0xFFE0DDD8),
-            controlBackground = elevated,
-            selectionBackground = selected,
-        )
+        val tokens = if (dark) {
+            BichenTokens(
+                pageBackground = Color(0xFF0F1115),
+                cardBackground = Color(0xFF181B20),
+                elevatedCardBackground = Color(0xFF20242B),
+                textPrimary = Color(0xFFF3F5F7),
+                textSecondary = Color(0xFFA7ADB7),
+                success = Color(0xFF72D1A9),
+                warning = Color(0xFFE3B96F),
+                danger = Color(0xFFFFAAA5),
+                outline = Color(0xFF2B3038),
+                controlBackground = Color(0xFF22262D),
+                selectionBackground = Color(0xFF283354),
+            )
+        } else {
+            BichenTokens(
+                pageBackground = Color(0xFFF5F7FB),
+                cardBackground = Color(0xFFFFFFFF),
+                elevatedCardBackground = Color(0xFFF0F3F8),
+                textPrimary = Color(0xFF171A1F),
+                textSecondary = Color(0xFF747B86),
+                success = Color(0xFF2E956D),
+                warning = Color(0xFFA87925),
+                danger = Color(0xFFC54E4A),
+                outline = Color(0xFFE3E7EE),
+                controlBackground = Color(0xFFF0F3F8),
+                selectionBackground = Color(0xFFE8EEFF),
+            )
+        }
         CompositionLocalProvider(LocalBichenTokens provides tokens, content = content)
     }
 }
