@@ -19,7 +19,9 @@ jobs:
           fetch-depth: 0
 
       - name: Apply BoxProxy visual polish
-        run: python3 scripts/polish_proxy_ui.py
+        run: |
+          python3 scripts/polish_proxy_ui.py
+          python3 scripts/fix_proxy_dock_flash.py
 
       - name: Commit polished proxy UI
         run: |
@@ -27,7 +29,7 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt \
                   android-app/app/src/main/java/io/github/xgl34222220/bichen/ui/BichenGlassDock.kt
-          git commit -m 'Polish proxy grouped UI and LuoShu glass dock'
+          git commit -m 'Fix proxy dock white flash on Home transition'
           git push
 
       - uses: actions/setup-java@v4
@@ -76,7 +78,7 @@ jobs:
           unzip -l "$APK" | grep -q 'assets/mihomo-root/arm64-v8a/mihomo'
       - uses: actions/upload-artifact@v4
         with:
-          name: Bichen-0.4.0-test.27-Inset-LuoShu-Glass
+          name: Bichen-0.4.0-test.28-Home-Dock-Flash-Fix
           path: android-app/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
