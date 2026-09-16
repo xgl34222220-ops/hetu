@@ -1,0 +1,33 @@
+name: Run interaction speed fix
+
+on:
+  push:
+    branches: ['feature/compose-luoshu-ui']
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message == 'Run interaction speed fix script'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/compose-luoshu-ui
+          fetch-depth: 0
+      - name: Apply source fixes
+        run: python3 tools/apply_interaction_speed_fixes.py
+      - name: Commit source fixes
+        shell: bash
+        run: |
+          rm -f tools/apply_interaction_speed_fixes.py
+          rm -f .github/workflows/run-interaction-speed-fix.yml
+          rm -f .github/workflows/apply-stability-speed-ui-fixes.yml
+          rm -f .github/workflows/recover-stability-speed-ui-fixes.yml
+          rm -f .github/workflows/apply-stability-speed-ui-fixes-v2.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Fix protection apps rules latency and UI feedback"
+          git push origin HEAD:feature/compose-luoshu-ui
