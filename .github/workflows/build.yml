@@ -16,17 +16,22 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
-      # GitHub's Ubuntu Android image already includes sdkmanager. setup-android@v3
-      # currently asks sdkmanager for the removed legacy package "tools" and fails
-      # before our build starts, so install only the SDK components Bichen needs.
+      # GitHub's Ubuntu Android image already contains cmdline-tools. Avoid
+      # setup-android@v3 because its default legacy "tools" package is gone.
       - name: Install Android SDK
+        shell: bash
         run: |
-          yes | sdkmanager --licenses >/dev/null 2>&1 || true
-          sdkmanager 'platform-tools' 'platforms;android-35' 'build-tools;35.0.0'
+          SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then
+            SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          fi
+          test -x "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+          "$SDKMANAGER" 'platform-tools' 'platforms;android-35' 'build-tools;35.0.0'
       - name: Restore configured signing key
         env:
           SIGNING_KEY_BASE64: ${{ secrets.BICHEN_KEYSTORE_BASE64 }}
