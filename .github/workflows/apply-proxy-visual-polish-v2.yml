@@ -18,19 +18,18 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Apply BoxProxy visual polish
-        run: |
-          python3 scripts/polish_proxy_ui.py
-          python3 scripts/fix_proxy_dock_flash.py
+      - name: Fix Home dock white flash
+        run: python3 scripts/fix_proxy_dock_flash.py
 
-      - name: Commit polished proxy UI
+      - name: Commit dock fix
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt \
-                  android-app/app/src/main/java/io/github/xgl34222220/bichen/ui/BichenGlassDock.kt
-          git commit -m 'Fix proxy dock white flash on Home transition'
-          git push
+          git add android-app/app/src/main/java/io/github/xgl34222220/bichen/ui/BichenGlassDock.kt
+          if ! git diff --cached --quiet; then
+            git commit -m 'Fix proxy dock white flash on Home transition'
+            git push
+          fi
 
       - uses: actions/setup-java@v4
         with:
