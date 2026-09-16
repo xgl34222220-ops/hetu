@@ -45,8 +45,6 @@ import top.yukonga.miuix.kmp.blur.colorControls
 import top.yukonga.miuix.kmp.blur.drawBackdrop
 import top.yukonga.miuix.kmp.blur.highlight.Highlight
 import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
-import top.yukonga.miuix.kmp.blur.layerBackdrop
-import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.squircle.squircleClip
 
 data class DockItem(val label: String, val icon: ImageVector, val opticalScale: Float = 1f)
@@ -82,7 +80,6 @@ fun BichenGlassDock(
     val shape = if (floating) RoundedCornerShape(31.dp) else RoundedCornerShape(topStart = 31.dp, topEnd = 31.dp)
     val runtimeLiquid = glassEnabled && blurEnabled && backdrop != null && isRuntimeShaderSupported()
     val activeHaze = glassEnabled && blurEnabled && !runtimeLiquid
-    val dockSurfaceBackdrop = rememberLayerBackdrop()
 
     val hazeModifier = if (activeHaze) {
         Modifier.hazeEffect(state = hazeState, style = HazeMaterials.ultraThin()) {
@@ -150,7 +147,6 @@ fun BichenGlassDock(
                 .fillMaxSize()
                 .shadow(if (floating) 18.dp else 5.dp, shape, clip = false)
                 .squircleClip(31.dp)
-                .then(if (runtimeLiquid) Modifier.layerBackdrop(dockSurfaceBackdrop) else Modifier)
                 .then(liquidShellModifier)
                 .border(
                     if (runtimeLiquid) .45.dp else .7.dp,
@@ -170,7 +166,9 @@ fun BichenGlassDock(
             onSelect = onSelect,
             itemHeight = 60.dp,
             liquidGlass = glassEnabled,
-            indicatorBackdrop = dockSurfaceBackdrop.takeIf { runtimeLiquid },
+            // HyperOS/Android 16 can flatten a nested RuntimeShader backdrop into a white strip.
+            // Keep the LuoShu shell/geometry/animation, but draw the moving indicator as a single translucent layer.
+            indicatorBackdrop = null,
             dark = dark,
             modifier = Modifier
                 .fillMaxSize()
@@ -252,7 +250,16 @@ private fun DockItems(
                 },
             )
         } else {
-            Modifier.background(indicatorColor, indicatorShape)
+            Modifier.background(
+                Brush.verticalGradient(
+                    listOf(
+                        scheme.primary.copy(alpha = if (dark) .24f else .17f),
+                        Color.White.copy(alpha = if (dark) .055f else .15f),
+                        scheme.primary.copy(alpha = if (dark) .16f else .10f),
+                    ),
+                ),
+                indicatorShape,
+            )
         }
 
         // Moving visual layer only; content is drawn in the Row below as a sibling.
