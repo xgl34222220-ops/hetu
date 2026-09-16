@@ -1,0 +1,249 @@
+from pathlib import Path
+
+p = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt')
+s = p.read_text()
+
+if 'import androidx.compose.foundation.rememberScrollState' not in s:
+    s = s.replace(
+        'import androidx.compose.foundation.layout.*\n',
+        'import androidx.compose.foundation.layout.*\nimport androidx.compose.foundation.rememberScrollState\nimport androidx.compose.foundation.horizontalScroll\n',
+        1,
+    )
+
+start = s.index('@Composable\nprivate fun RefHome(')
+end = s.index('@Composable\nprivate fun RefActionText', start)
+replacement = r'''@Composable
+private fun RefHome(
+    state: ProxyComposeState,
+    runtime: ProxyRuntimeSnapshot,
+    providers: List<DashboardProviderUi>,
+    delays: Map<String, Long>,
+    upRate: Long,
+    downRate: Long,
+    operation: String,
+    message: String,
+    testing: Boolean,
+    onBack: () -> Unit,
+    onRefresh: () -> Unit,
+    onToggle: () -> Unit,
+    onReload: () -> Unit,
+    onRestart: () -> Unit,
+    onDelay: () -> Unit,
+    onWebUi: () -> Unit,
+    onLog: () -> Unit,
+) {
+    val t = LocalBichenTokens.current
+    val scheme = MaterialTheme.colorScheme
+    val selectedDelays = state.groups.mapNotNull { group ->
+        val name = group.now
+        (delays[name] ?: group.nodes.firstOrNull { it.name == name }?.lastDelay)?.takeIf { it > 0L }
+    }
+    val measured = delays.values.filter { it > 0L }
+    val current = selectedDelays.firstOrNull()
+    val avg = selectedDelays.takeIf { it.isNotEmpty() }?.average()?.toInt()?.toLong()
+        ?: measured.takeIf { it.isNotEmpty() }?.average()?.toInt()?.toLong()
+    val fastest = measured.minOrNull()
+    val memory = runtime.rssBytes.takeIf { it > 0L } ?: state.memoryBytes
+
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        item {
+            Row(
+                Modifier.fillMaxWidth().statusBarsPadding().padding(top = 12.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("辟尘", color = t.textPrimary, fontSize = 32.sp, lineHeight = 38.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                IconButton(onClick = onRefresh, modifier = Modifier.size(42.dp)) {
+                    Icon(Icons.Rounded.Refresh, "刷新", tint = t.textSecondary, modifier = Modifier.size(20.dp))
+                }
+                IconButton(onClick = onBack, modifier = Modifier.size(42.dp)) {
+                    Icon(Icons.Rounded.Close, "关闭", tint = t.textSecondary, modifier = Modifier.size(20.dp))
+                }
+            }
+        }
+        item {
+            Box(
+                Modifier.fillMaxWidth()
+                    .background(if (state.running) t.selectionBackground else t.cardBackground, RoundedCornerShape(18.dp))
+                    .heightIn(min = 158.dp),
+            ) {
+                Icon(
+                    if (state.running) Icons.Rounded.CheckCircle else Icons.Rounded.PowerSettingsNew,
+                    contentDescription = null,
+                    tint = scheme.primary.copy(alpha = .50f),
+                    modifier = Modifier.align(Alignment.BottomEnd).offset(x = 22.dp, y = 22.dp).size(114.dp),
+                )
+                Column(
+                    Modifier.fillMaxWidth().padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(5.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Box(Modifier.size(8.dp).background(if (state.running) scheme.primary else t.warning, CircleShape))
+                        Text(if (state.running) "运行中" else "已停止", color = if (state.running) scheme.primary else t.textPrimary, fontSize = 21.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Text(if (state.running) refDuration(runtime.elapsedSeconds) else "等待启动", color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                    Text("${state.core} · ${state.mode}", color = t.textPrimary, style = MaterialTheme.typography.bodyMedium)
+                    Text(state.config, color = t.textPrimary, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
+        item {
+            Surface(shape = RoundedCornerShape(15.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+                Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    RefActionText("重载", state.running && operation.isBlank(), onReload, Modifier.weight(1f), scheme.primary)
+                    VerticalDivider(Modifier.height(30.dp).align(Alignment.CenterVertically), color = t.outline)
+                    RefActionText(if (state.running) "停止" else "启动", operation.isBlank(), onToggle, Modifier.weight(1f), scheme.error)
+                    VerticalDivider(Modifier.height(30.dp).align(Alignment.CenterVertically), color = t.outline)
+                    RefActionText("重启", state.running && operation.isBlank(), onRestart, Modifier.weight(1f), t.warning)
+                }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                RefSmallTool("WebUI", "Web 界面", Icons.Rounded.Language, onWebUi, Modifier.weight(1f))
+                RefSmallTool("日志", "查看", Icons.Rounded.Article, onLog, Modifier.weight(1f))
+            }
+        }
+        item { RefLatencyPanel(current, avg, fastest, testing, onDelay) }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                RefNetworkIdentityCard(runtime.lanAddress, state.connections.size, Modifier.weight(1f))
+                RefSpeedCard(upRate, downRate, Modifier.weight(1f))
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                RefSubscriptionCompact(providers, Modifier.weight(1f))
+                RefResourceCard(memory, runtime.pid, state.connections.size, Modifier.weight(1f))
+            }
+        }
+        if (operation.isNotBlank() || message.isNotBlank()) {
+            item { Text(operation.ifBlank { message }, color = t.textSecondary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)) }
+        }
+    }
+}
+
+@Composable
+private fun RefLatencyPanel(current: Long?, average: Long?, fastest: Long?, testing: Boolean, onClick: () -> Unit) {
+    val t = LocalBichenTokens.current
+    Surface(onClick = onClick, enabled = !testing, shape = RoundedCornerShape(15.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("延迟", color = t.textPrimary, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Icon(Icons.Rounded.Tune, null, tint = t.textSecondary, modifier = Modifier.size(17.dp))
+                Spacer(Modifier.width(10.dp))
+                if (testing) CircularProgressIndicator(Modifier.size(17.dp), strokeWidth = 2.dp) else Icon(Icons.Rounded.Refresh, "测速", tint = t.textSecondary, modifier = Modifier.size(18.dp))
+            }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                RefLatencyColumn("当前", if (testing) "…" else refDelay(current), Modifier.weight(1f))
+                VerticalDivider(Modifier.height(36.dp), color = t.outline)
+                RefLatencyColumn("平均", if (testing) "…" else refDelay(average), Modifier.weight(1f))
+                VerticalDivider(Modifier.height(36.dp), color = t.outline)
+                RefLatencyColumn("最快", if (testing) "…" else refDelay(fastest), Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun RefLatencyColumn(label: String, value: String, modifier: Modifier) {
+    val t = LocalBichenTokens.current
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(label, color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+        Text(value, color = MaterialTheme.colorScheme.primary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    }
+}
+
+@Composable
+private fun RefNetworkIdentityCard(lan: String, connections: Int, modifier: Modifier) {
+    val t = LocalBichenTokens.current
+    Surface(modifier = modifier, shape = RoundedCornerShape(15.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+        Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("网络", color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
+            Text("LAN", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+            Text(lan.ifBlank { "—" }, color = t.textPrimary, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("连接  $connections", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+        }
+    }
+}
+
+@Composable
+private fun RefSpeedCard(up: Long, down: Long, modifier: Modifier) {
+    val t = LocalBichenTokens.current
+    Surface(modifier = modifier, shape = RoundedCornerShape(15.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+        Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("网速", color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
+            Text("上行   ${refSpeed(up)}", color = t.textPrimary, style = MaterialTheme.typography.bodyMedium)
+            Text("下行   ${refSpeed(down)}", color = t.textPrimary, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+@Composable
+private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, modifier: Modifier) {
+    val t = LocalBichenTokens.current
+    val tracked = items.filter { it.hasSubscriptionInfo && it.total > 0L }
+    val used = tracked.sumOf { it.used }
+    val total = tracked.sumOf { it.total }
+    val remain = (total - used).coerceAtLeast(0L)
+    val ratio = if (total <= 0L) 0f else (used.toDouble() / total.toDouble()).toFloat().coerceIn(0f, 1f)
+    Surface(modifier = modifier, shape = RoundedCornerShape(15.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+        Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("订阅", color = t.textPrimary, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                if (total > 0L) Text("剩余 ${((1f - ratio).coerceIn(0f, 1f) * 100).toInt()}%", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+            }
+            Text(if (tracked.isEmpty()) "${items.size} 个远程订阅" else "剩余 ${refBytes(remain)}", color = t.textPrimary, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (total > 0L) LinearProgressIndicator(progress = { ratio }, modifier = Modifier.fillMaxWidth().height(3.dp).clip(CircleShape))
+        }
+    }
+}
+
+@Composable
+private fun RefResourceCard(memory: Long, pid: Int, connections: Int, modifier: Modifier) {
+    val t = LocalBichenTokens.current
+    Surface(modifier = modifier, shape = RoundedCornerShape(15.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+        Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("资源占用", color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
+            Text("内存   ${refBytes(memory)}", color = t.textPrimary, style = MaterialTheme.typography.bodyMedium)
+            Text("PID   ${if (pid > 0) pid else "—"}", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+            Text("连接   $connections", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+        }
+    }
+}
+
+'''
+s = s[:start] + replacement + s[end:]
+
+tabs_start = s.index('@Composable\nprivate fun RefPanelTabs(')
+tabs_end = s.index('@Composable\nprivate fun RefPanelOverview', tabs_start)
+tabs = r'''@Composable
+private fun RefPanelTabs(selected: RefPanelTab, onSelect: (RefPanelTab) -> Unit) {
+    val t = LocalBichenTokens.current
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        RefPanelTab.entries.forEach { tab ->
+            val active = tab == selected
+            Surface(
+                onClick = { onSelect(tab) },
+                shape = RoundedCornerShape(10.dp),
+                color = if (active) t.selectionBackground else t.cardBackground,
+                shadowElevation = 0.dp,
+            ) {
+                Box(Modifier.height(34.dp).padding(horizontal = 13.dp), contentAlignment = Alignment.Center) {
+                    Text(tab.label, color = if (active) MaterialTheme.colorScheme.primary else t.textPrimary, fontSize = 12.sp, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1)
+                }
+            }
+        }
+    }
+}
+
+'''
+s = s[:tabs_start] + tabs + s[tabs_end:]
+
+p.write_text(s)
