@@ -41,6 +41,7 @@ final class MihomoStartupConfig {
         yaml=removeTopLevelBlock(yaml,"tun");
         yaml=removeTopLevelScalar(yaml,"external-controller");
         yaml=removeTopLevelScalar(yaml,"external-controller-tls");
+        yaml=removeTopLevelBlock(yaml,"external-controller-cors");
         yaml=removeTopLevelScalar(yaml,"secret");
         // Bichen owns its loopback-only WebUI runtime, so a source profile cannot replace it
         // with a remote/exposed path or dashboard URL. The source file itself remains untouched.
@@ -82,6 +83,13 @@ final class MihomoStartupConfig {
         }
         override.append("find-process-mode: strict\n");
         override.append("external-controller: 127.0.0.1:").append(CONTROLLER_PORT).append('\n');
+        // Hosted dashboards run in a different origin from the loopback controller. Allowing CORS
+        // and Private Network Access is required for Zashboard/MetaCubeXD to connect from WebView.
+        // The controller remains loopback-only and still requires the random per-install secret.
+        override.append("external-controller-cors:\n");
+        override.append("  allow-origins:\n");
+        override.append("    - '*'\n");
+        override.append("  allow-private-network: true\n");
         override.append("secret: '").append(controllerSecret.replace("'","''")).append("'\n");
         override.append("external-ui: ").append(EXTERNAL_UI_DIR).append('\n');
         override.append("external-ui-url: '").append(EXTERNAL_UI_URL).append("'\n");
