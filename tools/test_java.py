@@ -17,7 +17,10 @@ PROTOCOL_CLASSES = (
     'ProxyNetworkState', 'ProxyAppPolicy', 'DomainRuleProjection',
 )
 ANDROID_HOST_TESTS = ('ProxyRuntimeProfileTest', 'MihomoStartupConfigTest')
-ANDROID_HOST_CLASSES = ('ProxyRuntimeProfile', 'MihomoStartupConfig', 'RuleStore')
+ANDROID_HOST_CLASSES = (
+    'ProxyRuntimeProfile', 'MihomoStartupConfig', 'RuleStore',
+    'RootBridge', 'RootShellCommand',
+)
 
 
 def main():
