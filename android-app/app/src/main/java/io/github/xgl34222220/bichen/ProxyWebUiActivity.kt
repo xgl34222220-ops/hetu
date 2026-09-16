@@ -242,7 +242,7 @@ private fun ProxyWebUiScreen(onClose: () -> Unit) {
                                   await Promise.all(keys.map(function(key) { return caches.delete(key); }));
                                 }
                               } catch (_) {}
-                              window.location.replace('/ui/?bichen_fresh=1');
+                              ${if (selected.local) "window.location.replace('/ui/?bichen_fresh=1');" else "window.location.reload();"}
                               return 'reloading';
                             }
                             return 'ready';
@@ -253,7 +253,7 @@ private fun ProxyWebUiScreen(onClose: () -> Unit) {
                     """.trimIndent()
                     view.evaluateJavascript(js) { result ->
                         if (result?.contains("bootstrap-error:") == true) {
-                            pageError = "本地 MetaCubeXD 初始化失败，请刷新重试"
+                            pageError = "${selected.name} 初始化失败，请刷新重试"
                         }
                     }
                 }
