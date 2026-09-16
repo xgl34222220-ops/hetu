@@ -428,7 +428,7 @@ private fun CompactHomePage(
                         subtitle = if (snapshot.proxyRunning) "运行中" else "节点与连接",
                         icon = Icons.Rounded.Public,
                         modifier = Modifier.weight(1f),
-                    ) { context.startActivity(Intent(context, ComposeProxyActivity::class.java)) }
+                    ) { context.startActivity(Intent(context, ReferenceProxyActivity::class.java)) }
                     CompactActionTile("规则", "订阅与名单", Icons.Rounded.Rule, Modifier.weight(1f), onRules)
                     CompactActionTile("应用", "放行管理", Icons.Rounded.Apps, Modifier.weight(1f), onApps)
                 }
