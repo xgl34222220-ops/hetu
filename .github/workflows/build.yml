@@ -37,21 +37,8 @@ jobs:
         run: |
           bash -n android-app/app/src/main/assets/proxy-root.sh
           bash -n android-app/app/src/main/assets/tproxy-root.sh
-      - name: Restore configured signing key
-        env:
-          SIGNING_KEY_BASE64: ${{ secrets.BICHEN_KEYSTORE_BASE64 }}
-        run: |
-          if [ -n "$SIGNING_KEY_BASE64" ]; then
-            umask 077
-            printf '%s' "$SIGNING_KEY_BASE64" | base64 --decode > "$RUNNER_TEMP/bichen.keystore"
-            echo "BICHEN_KEYSTORE=$RUNNER_TEMP/bichen.keystore" >> "$GITHUB_ENV"
-          fi
-      - name: Build module, APK, and source archive
-        env:
-          BICHEN_KEY_ALIAS: ${{ secrets.BICHEN_KEY_ALIAS || 'androiddebugkey' }}
-          BICHEN_STOREPASS: ${{ secrets.BICHEN_STOREPASS || 'android' }}
-          BICHEN_KEYPASS: ${{ secrets.BICHEN_KEYPASS || secrets.BICHEN_STOREPASS || 'android' }}
-        run: python3 tools/package.py --build-app
+      - name: Build module and source smoke packages
+        run: python3 tools/package.py
       - name: Protocol, parser, and isolated module regression tests
         run: |
           python3 tools/test_java.py
@@ -67,5 +54,6 @@ jobs:
             out/*-source.zip
           if-no-files-found: error
           retention-days: 30
-      # Installable APKs live in downloads/ and retain the previous app's signing
-      # key. A runner-generated development key cannot sign a compatible update.
+      # The current UI is Kotlin/Compose. Installable APKs are built by the
+      # dedicated Compose/Android workflows; the legacy Java-only build_app.py
+      # is intentionally not used as the pull-request gate here.
