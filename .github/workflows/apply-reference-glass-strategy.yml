@@ -1,0 +1,370 @@
+name: Apply reference glass strategy UI
+
+on:
+  push:
+    branches: ['feature/compose-luoshu-ui']
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message == 'Apply reference glass strategy UI'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/compose-luoshu-ui
+          fetch-depth: 0
+      - name: Rebuild panel glass strategy UI
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt')
+          s = p.read_text()
+
+          if 'import androidx.compose.foundation.border\n' not in s:
+              s = s.replace('import androidx.compose.foundation.background\n', 'import androidx.compose.foundation.background\nimport androidx.compose.foundation.border\n')
+          if 'import androidx.compose.ui.graphics.Brush\n' not in s:
+              s = s.replace('import androidx.compose.ui.graphics.Color\n', 'import androidx.compose.ui.graphics.Brush\nimport androidx.compose.ui.graphics.Color\n')
+
+          panel_start = s.index('@OptIn(ExperimentalMaterial3Api::class)\n@Composable\nprivate fun RefPanel(')
+          tabs_start = s.index('@Composable\nprivate fun RefPanelTabs', panel_start)
+          new_panel = r'''@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RefPanel(
+    state: ProxyComposeState,
+    repo: ProxyDashboardRepository,
+    delays: MutableMap<String, Long>,
+    onRefreshState: () -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    val t = LocalBichenTokens.current
+    var tab by rememberSaveable { mutableStateOf(RefPanelTab.Nodes) }
+    var refreshing by remember { mutableStateOf(false) }
+    var providers by remember { mutableStateOf<List<DashboardProviderUi>>(emptyList()) }
+    var rules by remember { mutableStateOf<List<ProxyRuleUi>>(emptyList()) }
+    var ruleSets by remember { mutableStateOf<List<DashboardRuleSetUi>>(emptyList()) }
+    var selectedGroupName by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingNode by rememberSaveable { mutableStateOf("") }
+    val selectedLocal = remember { mutableStateMapOf<String, String>() }
+    val testing = remember { mutableStateMapOf<String, Boolean>() }
+    var error by remember { mutableStateOf("") }
+
+    suspend fun loadTab() {
+        if (!state.running) return
+        try {
+            when (tab) {
+                RefPanelTab.Subscriptions -> providers = repo.providers()
+                RefPanelTab.Rules -> rules = repo.rules()
+                RefPanelTab.RuleSets -> ruleSets = repo.ruleSets()
+                else -> Unit
+            }
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (e: Exception) {
+            error = e.message ?: "读取失败"
+        }
+    }
+
+    fun refresh() {
+        if (refreshing) return
+        scope.launch {
+            refreshing = true
+            error = ""
+            try {
+                when (tab) {
+                    RefPanelTab.Nodes -> delays.putAll(repo.globalDelay())
+                    RefPanelTab.Subscriptions -> providers = repo.refreshSubscriptions()
+                    RefPanelTab.RuleSets -> ruleSets = repo.refreshRuleSets()
+                    RefPanelTab.Rules -> rules = repo.rules()
+                    RefPanelTab.Overview, RefPanelTab.Connections -> onRefreshState()
+                }
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (e: Exception) {
+                error = e.message ?: "刷新失败"
+            } finally {
+                refreshing = false
+            }
+        }
+    }
+
+    LaunchedEffect(tab, state.running) { loadTab() }
+
+    PullToRefreshBox(isRefreshing = refreshing, onRefresh = ::refresh, modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            item {
+                Column(Modifier.statusBarsPadding(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Spacer(Modifier.width(44.dp))
+                        Text("面板", color = t.textPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        IconButton(onClick = ::refresh, enabled = !refreshing) {
+                            if (refreshing) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                            else Icon(Icons.Rounded.Refresh, "刷新")
+                        }
+                    }
+                    RefPanelTabs(tab) { tab = it }
+                }
+            }
+            if (error.isNotBlank()) item { RefNotice(error) }
+            if (!state.running) {
+                item { RefNotice("代理未运行") }
+            } else when (tab) {
+                RefPanelTab.Overview -> item { RefPanelOverview(state, delays) }
+                RefPanelTab.Nodes -> {
+                    item {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("策略组", color = t.textPrimary, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                            TextButton(onClick = ::refresh, enabled = !refreshing) { Text(if (refreshing) "测速中" else "全部测速") }
+                        }
+                    }
+                    itemsIndexed(state.groups.chunked(2), key = { index, _ -> "groups-$index" }) { _, pair ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            pair.forEach { group ->
+                                val selected = selectedLocal[group.name] ?: group.now
+                                RefGroupCard(
+                                    group = group,
+                                    selected = selected,
+                                    expanded = selectedGroupName == group.name,
+                                    delay = delays[selected] ?: group.nodes.firstOrNull { it.name == selected }?.lastDelay,
+                                    modifier = Modifier.weight(1f),
+                                    onClick = {
+                                        selectedGroupName = group.name
+                                        pendingNode = selected
+                                    },
+                                )
+                            }
+                            if (pair.size == 1) Spacer(Modifier.weight(1f))
+                        }
+                    }
+                }
+                RefPanelTab.Subscriptions -> items(providers, key = { it.name }) { RefProviderRow(it) }
+                RefPanelTab.Connections -> items(state.connections, key = { it.id }) { c ->
+                    RefConnectionRow(c) { scope.launch { repo.closeConnection(c.id); onRefreshState() } }
+                }
+                RefPanelTab.Rules -> items(rules, key = { it.index }) { RefRuleRow(it) }
+                RefPanelTab.RuleSets -> items(ruleSets, key = { it.name }) { RefRuleSetRow(it) }
+            }
+        }
+    }
+
+    val selectedGroup = selectedGroupName?.let { name -> state.groups.firstOrNull { it.name == name } }
+    if (selectedGroup != null) {
+        ModalBottomSheet(
+            onDismissRequest = { selectedGroupName = null },
+            shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
+            containerColor = t.cardBackground,
+            scrimColor = Color.Black.copy(alpha = .30f),
+            dragHandle = {
+                Box(
+                    Modifier.padding(top = 10.dp, bottom = 6.dp)
+                        .size(width = 38.dp, height = 4.dp)
+                        .background(t.outline.copy(alpha = .75f), CircleShape),
+                )
+            },
+        ) {
+            RefNodeSheet(
+                group = selectedGroup,
+                selected = pendingNode.ifBlank { selectedLocal[selectedGroup.name] ?: selectedGroup.now },
+                delays = delays,
+                testing = testing,
+                onSelect = { pendingNode = it },
+                onDelay = { node ->
+                    if (testing[node] != true) scope.launch {
+                        testing[node] = true
+                        try { delays[node] = repo.delay(node) }
+                        catch (_: Exception) { delays[node] = -1L }
+                        finally { testing.remove(node) }
+                    }
+                },
+                onTestAll = {
+                    selectedGroup.nodes.forEach { node ->
+                        if (testing[node.name] != true) scope.launch {
+                            testing[node.name] = true
+                            try { delays[node.name] = repo.delay(node.name) }
+                            catch (_: Exception) { delays[node.name] = -1L }
+                            finally { testing.remove(node.name) }
+                        }
+                    }
+                },
+                onConfirm = {
+                    val node = pendingNode.ifBlank { selectedLocal[selectedGroup.name] ?: selectedGroup.now }
+                    if (node.isNotBlank()) {
+                        selectedLocal[selectedGroup.name] = node
+                        scope.launch {
+                            try {
+                                repo.select(selectedGroup.name, node)
+                                onRefreshState()
+                            } catch (_: Exception) {
+                                selectedLocal.remove(selectedGroup.name)
+                            }
+                        }
+                    }
+                    selectedGroupName = null
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun RefNodeSheet(
+    group: ProxyGroupUi,
+    selected: String,
+    delays: Map<String, Long>,
+    testing: Map<String, Boolean>,
+    onSelect: (String) -> Unit,
+    onDelay: (String) -> Unit,
+    onTestAll: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    val t = LocalBichenTokens.current
+    val scheme = MaterialTheme.colorScheme
+    Column(
+        Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(group.name, color = t.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("${group.nodes.size} 个节点", color = t.textSecondary, style = MaterialTheme.typography.bodySmall)
+        }
+        Row(
+            Modifier.fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(listOf(t.elevatedCardBackground.copy(alpha = .86f), t.cardBackground.copy(alpha = .70f))),
+                    RoundedCornerShape(14.dp),
+                )
+                .border(.7.dp, t.outline.copy(alpha = .45f), RoundedCornerShape(14.dp))
+                .clickable(onClick = onTestAll)
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("测试全部节点", color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
+                Text("${group.nodes.size} 个节点", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+            }
+            Icon(Icons.Rounded.Refresh, "测试全部节点", tint = scheme.primary, modifier = Modifier.size(21.dp))
+        }
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth().heightIn(max = 430.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(group.nodes, key = { it.name }) { node ->
+                val active = node.name == selected
+                val shape = RoundedCornerShape(14.dp)
+                val fill = if (active) {
+                    Brush.verticalGradient(listOf(t.selectionBackground.copy(alpha = .94f), scheme.primaryContainer.copy(alpha = .56f)))
+                } else {
+                    Brush.verticalGradient(listOf(t.elevatedCardBackground.copy(alpha = .82f), t.cardBackground.copy(alpha = .64f)))
+                }
+                Row(
+                    Modifier.fillMaxWidth()
+                        .background(fill, shape)
+                        .border(.7.dp, if (active) scheme.primary.copy(alpha = .28f) else t.outline.copy(alpha = .34f), shape)
+                        .clickable { onSelect(node.name) }
+                        .padding(horizontal = 14.dp, vertical = 11.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(node.name, color = t.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(listOf(node.type, if (node.udp) "UDP" else "").filter { it.isNotBlank() }.joinToString(" · "), color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+                    }
+                    if (active) {
+                        Icon(Icons.Rounded.Check, "已选择", tint = scheme.primary, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                    }
+                    RefDelayBadge(
+                        value = delays[node.name] ?: node.lastDelay,
+                        testing = testing[node.name] == true,
+                        onClick = { onDelay(node.name) },
+                    )
+                }
+            }
+        }
+        Button(
+            onClick = onConfirm,
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+            shape = RoundedCornerShape(14.dp),
+        ) {
+            Text("确定", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+'''
+          s = s[:panel_start] + new_panel + s[tabs_start:]
+
+          group_start = s.index('@Composable\nprivate fun RefGroupCard')
+          nodegrid_start = s.index('@Composable\nprivate fun RefNodeGrid', group_start)
+          provider_start = s.index('@Composable\nprivate fun RefProviderRow', nodegrid_start)
+          new_group = r'''@Composable
+private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolean, delay: Long?, modifier: Modifier, onClick: () -> Unit) {
+    val t = LocalBichenTokens.current
+    val scheme = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(15.dp)
+    val glass = if (expanded) {
+        Brush.verticalGradient(listOf(t.selectionBackground.copy(alpha = .95f), scheme.primaryContainer.copy(alpha = .52f)))
+    } else {
+        Brush.verticalGradient(listOf(t.elevatedCardBackground.copy(alpha = .82f), t.cardBackground.copy(alpha = .62f)))
+    }
+    Column(
+        modifier
+            .background(glass, shape)
+            .border(.7.dp, if (expanded) scheme.primary.copy(alpha = .26f) else t.outline.copy(alpha = .36f), shape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 11.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(group.name, color = t.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            if (expanded) Icon(Icons.Rounded.Check, "当前策略组", tint = scheme.primary, modifier = Modifier.size(17.dp))
+        }
+        Text(selected.ifBlank { "未选择" }, color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("${group.type} · ${group.nodes.size} 节点", color = t.textSecondary, style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f))
+            RefDelayBadge(delay, false, null)
+        }
+    }
+}
+
+@Composable
+private fun RefDelayBadge(value: Long?, testing: Boolean, onClick: (() -> Unit)?) {
+    val t = LocalBichenTokens.current
+    val scheme = MaterialTheme.colorScheme
+    val text = if (testing) "…" else refDelay(value)
+    val textColor = when {
+        testing -> scheme.primary
+        value == null -> t.textSecondary
+        value <= 0L -> scheme.error
+        value <= 250L -> t.success
+        value <= 650L -> scheme.primary
+        else -> t.warning
+    }
+    val shape = RoundedCornerShape(9.dp)
+    val modifier = Modifier
+        .background(scheme.primary.copy(alpha = .08f), shape)
+        .then(if (onClick != null) Modifier.clickable(enabled = !testing, onClick = onClick) else Modifier)
+        .padding(horizontal = 9.dp, vertical = 5.dp)
+    Text(text, modifier = modifier, color = textColor, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+}
+
+'''
+          # Inline node grid is no longer used; replace both old group card and grid with glass group card + badge.
+          s = s[:group_start] + new_group + s[provider_start:]
+          p.write_text(s)
+          PY
+      - name: Commit glass strategy UI
+        shell: bash
+        run: |
+          rm -f .github/workflows/apply-reference-glass-strategy.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Match reference glass strategy cards and node sheet"
+          git push origin HEAD:feature/compose-luoshu-ui
