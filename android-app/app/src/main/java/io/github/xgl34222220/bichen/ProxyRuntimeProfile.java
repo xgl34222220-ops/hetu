@@ -22,7 +22,15 @@ final class ProxyRuntimeProfile {
         final String id,label;Mode(String id,String label){this.id=id;this.label=label;}
         static Mode from(String value){for(Mode m:values())if(m.id.equals(value))return m;return TPROXY;}
     }
-    enum Ipv6 { ENABLE("enable"),BYPASS("bypass"),DISABLE("disable");final String id;Ipv6(String id){this.id=id;}static Ipv6 from(String v){for(Ipv6 x:values())if(x.id.equals(v))return x;return ENABLE;} }
+    enum Ipv6 {
+        ENABLE("enable"),
+        BYPASS("bypass"),
+        STRICT("strict"),
+        DISABLE("disable");
+        final String id;
+        Ipv6(String id){this.id=id;}
+        static Ipv6 from(String v){for(Ipv6 x:values())if(x.id.equals(v))return x;return ENABLE;}
+    }
     enum AppScope { BLACKLIST("blacklist"),WHITELIST("whitelist"),CORE("core");final String id;AppScope(String id){this.id=id;}static AppScope from(String v){for(AppScope x:values())if(x.id.equals(v))return x;return BLACKLIST;} }
     enum DnsHijack { OFF("off"),TPROXY("tproxy"),REDIRECT("redirect");final String id;DnsHijack(String id){this.id=id;}static DnsHijack from(String v){for(DnsHijack x:values())if(x.id.equals(v))return x;return TPROXY;} }
 
@@ -42,12 +50,12 @@ final class ProxyRuntimeProfile {
         boolean mihomo=core==Core.MIHOMO||core==Core.MIHOMO_SMART;
         if(!mihomo)return new Capability(false,false,false,false,false,false,false,false,false,core.label+" 已进入核心/配置模型，但运行后端正在接入，当前不会假报可用");
         switch(mode){
-            case TUN:return new Capability(core==Core.MIHOMO,true,true,false,false,false,false,true,false,core==Core.MIHOMO?"":"Mihomo Smart 的 Android TUN 后端尚未接入");
             case TPROXY:return new Capability(true,true,true,true,true,true,true,true,true,"");
-            case REDIRECT:return new Capability(true,true,false,true,true,true,true,true,false,"");
+            case REDIRECT:return new Capability(true,true,false,true,true,true,true,true,true,"");
             case ENHANCE:return new Capability(true,true,true,true,true,true,true,true,true,"");
-            case EBPF:return new Capability(false,false,false,false,false,false,false,false,false,"eBPF 必须使用兼容核心与 eBPF 入站；后端接通前不开放");
-            case MIXED:return new Capability(false,false,false,false,false,false,false,false,false,"Mixed 的 Root TUN + Redirect 后端正在接入，当前不开放");
+            case TUN:return new Capability(false,true,true,true,false,false,false,true,true,"Root TUN 正在并入统一运行时；旧 VpnService 仍保留，但这里不再假报为 Root 模式可用");
+            case EBPF:return new Capability(false,false,false,false,false,false,false,false,false,"eBPF 必须完成 verifier/attach/map 能力探测并使用兼容核心；后端接通前不开放");
+            case MIXED:return new Capability(false,false,false,false,false,false,false,false,false,"Mixed 的 Root TUN + Redirect 事务后端正在接入，当前不开放");
             default:return new Capability(false,false,false,false,false,false,false,false,false,"未知运行模式");
         }
     }

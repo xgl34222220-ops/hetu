@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# Bichen Root transparent proxy controller. JSON only on stdout.
+# Bichen Root transparent proxy controller v2. JSON only on stdout.
 set -u
 umask 077
 
@@ -11,13 +11,23 @@ LOG="$RUN/core.log"
 CHECKLOG="$RUN/config-check.log"
 IPV6_STATE="$RUN/ipv6.state"
 NET_STATE="$RUN/net.state"
+WATCHDOG_PID="$RUN/watchdog.pid"
+WATCHDOG_LOG="$RUN/watchdog.log"
+CRASH_STATE="$RUN/last-crash"
+LOCK_DIR="$RUN/.txn.lock"
 
-PROBE_MARK=0x200000
-PROBE_MASK=0x200000
+# Android netd uses its own fwmark fields. Bichen only considers the AOSP-reserved
+# high bits 21..28 and also verifies that candidate marks are not already referenced.
+# 0x08000000 is reserved for Mihomo outbound sockets so UID 0 does not need a blanket bypass.
+BYPASS_MARK=0x08000000
+BYPASS_MASK=0x08000000
+PROBE_MARK=0x04000000
+PROBE_MASK=0x04000000
 MARK=""
 MASK=""
 TABLE=""
 PREF=""
+LOCK_HELD=0
 
 LEGACY_MARK=0x2333
 LEGACY_MASK=0xffff
@@ -28,6 +38,12 @@ MOUT=BICHEN_MOUT
 MPRE=BICHEN_MPRE
 NOUT=BICHEN_NOUT
 NPRE=BICHEN_NPRE
+DNSOUT=BICHEN_DNSOUT
+DNSPRE=BICHEN_DNSPRE
+QUICOUT=BICHEN_QUICOUT
+QUICFWD=BICHEN_QUICFWD
+V6OUT=BICHEN_V6OUT
+V6FWD=BICHEN_V6FWD
 
 ok(){ printf '{"ok":true,"message":"%s"}\n' "$1"; }
 fail(){ printf '{"ok":false,"message":"%s"}\n' "$1"; exit 1; }
@@ -35,7 +51,34 @@ root(){ [ "$(id -u)" = 0 ] || fail "需要 Root 权限"; }
 has(){ command -v "$1" >/dev/null 2>&1; }
 port(){ case "${1:-}" in ''|*[!0-9]*) return 1;; esac; [ "$1" -ge 1 ] && [ "$1" -le 65535 ]; }
 mode(){ case "${1:-}" in tproxy|redirect|enhance) return 0;; *) return 1;; esac; }
-ipv6mode(){ case "${1:-}" in enable|bypass|disable) return 0;; *) return 1;; esac; }
+ipv6mode(){ case "${1:-}" in enable|bypass|strict|disable) return 0;; *) return 1;; esac; }
+dnsmode(){ case "${1:-}" in off|tproxy|redirect) return 0;; *) return 1;; esac; }
+bool(){ case "${1:-}" in 0|1) return 0;; *) return 1;; esac; }
+
+release_lock(){
+  if [ "$LOCK_HELD" = 1 ]; then
+    rm -rf "$LOCK_DIR" >/dev/null 2>&1 || true
+    LOCK_HELD=0
+  fi
+}
+trap 'release_lock' EXIT
+
+acquire_lock(){
+  mkdir -p "$RUN" || return 1
+  N=0
+  while ! mkdir "$LOCK_DIR" >/dev/null 2>&1; do
+    OWNER=$(cat "$LOCK_DIR/pid" 2>/dev/null || true)
+    case "$OWNER" in
+      ''|*[!0-9]*) ;;
+      *) if ! kill -0 "$OWNER" >/dev/null 2>&1; then rm -rf "$LOCK_DIR" >/dev/null 2>&1 || true; continue; fi;;
+    esac
+    N=$((N+1))
+    [ "$N" -lt 100 ] || return 1
+    sleep 0.05
+  done
+  printf '%s\n' "$$" > "$LOCK_DIR/pid"
+  LOCK_HELD=1
+}
 
 state_value(){
   K="$1"
@@ -96,18 +139,16 @@ prefused(){
 
 allocnet(){
   MARK=""; MASK=""; TABLE=""; PREF=""
-  for C in 0x200000 0x400000 0x800000 0x1000000 0x2000000 0x4000000 0x8000000 0x10000000; do
+  for C in 0x200000 0x400000 0x800000 0x1000000 0x2000000 0x4000000 0x10000000; do
     if ! markused "$C"; then MARK="$C"; MASK="$C"; break; fi
   done
   [ -n "$MARK" ] || return 1
-
   T=20260
   while [ "$T" -le 20299 ]; do
     if ! tableused "$T"; then TABLE="$T"; break; fi
     T=$((T+1))
   done
   [ -n "$TABLE" ] || return 1
-
   P=28700
   while [ "$P" -le 28799 ]; do
     if ! prefused "$P"; then PREF="$P"; break; fi
@@ -124,21 +165,24 @@ cleanlegacy(){
   ip -6 route del local ::/0 dev lo table "$LEGACY_TABLE" >/dev/null 2>&1 || true
 }
 
+unhook(){
+  BIN="$1"; T="$2"; BASECHAIN="$3"; CHAIN="$4"
+  while "$BIN" -t "$T" -C "$BASECHAIN" -j "$CHAIN" >/dev/null 2>&1; do
+    "$BIN" -t "$T" -D "$BASECHAIN" -j "$CHAIN" >/dev/null 2>&1 || break
+  done
+  "$BIN" -t "$T" -F "$CHAIN" >/dev/null 2>&1 || true
+  "$BIN" -t "$T" -X "$CHAIN" >/dev/null 2>&1 || true
+}
+
 cleanup4(){
-  iptables -t mangle -D OUTPUT -j "$MOUT" >/dev/null 2>&1 || true
-  iptables -t mangle -D PREROUTING -j "$MPRE" >/dev/null 2>&1 || true
-  iptables -t mangle -F "$MOUT" >/dev/null 2>&1 || true
-  iptables -t mangle -X "$MOUT" >/dev/null 2>&1 || true
-  iptables -t mangle -F "$MPRE" >/dev/null 2>&1 || true
-  iptables -t mangle -X "$MPRE" >/dev/null 2>&1 || true
-
-  iptables -t nat -D OUTPUT -j "$NOUT" >/dev/null 2>&1 || true
-  iptables -t nat -D PREROUTING -j "$NPRE" >/dev/null 2>&1 || true
-  iptables -t nat -F "$NOUT" >/dev/null 2>&1 || true
-  iptables -t nat -X "$NOUT" >/dev/null 2>&1 || true
-  iptables -t nat -F "$NPRE" >/dev/null 2>&1 || true
-  iptables -t nat -X "$NPRE" >/dev/null 2>&1 || true
-
+  unhook iptables mangle OUTPUT "$MOUT"
+  unhook iptables mangle PREROUTING "$MPRE"
+  unhook iptables nat OUTPUT "$DNSOUT"
+  unhook iptables nat PREROUTING "$DNSPRE"
+  unhook iptables nat OUTPUT "$NOUT"
+  unhook iptables nat PREROUTING "$NPRE"
+  unhook iptables filter OUTPUT "$QUICOUT"
+  unhook iptables filter FORWARD "$QUICFWD"
   if [ -n "$MARK" ] && [ -n "$MASK" ] && [ -n "$TABLE" ] && [ -n "$PREF" ]; then
     ip rule del pref "$PREF" fwmark "$MARK/$MASK" table "$TABLE" >/dev/null 2>&1 || true
     ip route del local 0.0.0.0/0 dev lo table "$TABLE" >/dev/null 2>&1 || true
@@ -147,20 +191,16 @@ cleanup4(){
 
 cleanup6(){
   has ip6tables || return 0
-  ip6tables -t mangle -D OUTPUT -j "$MOUT" >/dev/null 2>&1 || true
-  ip6tables -t mangle -D PREROUTING -j "$MPRE" >/dev/null 2>&1 || true
-  ip6tables -t mangle -F "$MOUT" >/dev/null 2>&1 || true
-  ip6tables -t mangle -X "$MOUT" >/dev/null 2>&1 || true
-  ip6tables -t mangle -F "$MPRE" >/dev/null 2>&1 || true
-  ip6tables -t mangle -X "$MPRE" >/dev/null 2>&1 || true
-
-  ip6tables -t nat -D OUTPUT -j "$NOUT" >/dev/null 2>&1 || true
-  ip6tables -t nat -D PREROUTING -j "$NPRE" >/dev/null 2>&1 || true
-  ip6tables -t nat -F "$NOUT" >/dev/null 2>&1 || true
-  ip6tables -t nat -X "$NOUT" >/dev/null 2>&1 || true
-  ip6tables -t nat -F "$NPRE" >/dev/null 2>&1 || true
-  ip6tables -t nat -X "$NPRE" >/dev/null 2>&1 || true
-
+  unhook ip6tables mangle OUTPUT "$MOUT"
+  unhook ip6tables mangle PREROUTING "$MPRE"
+  unhook ip6tables nat OUTPUT "$DNSOUT"
+  unhook ip6tables nat PREROUTING "$DNSPRE"
+  unhook ip6tables nat OUTPUT "$NOUT"
+  unhook ip6tables nat PREROUTING "$NPRE"
+  unhook ip6tables filter OUTPUT "$QUICOUT"
+  unhook ip6tables filter FORWARD "$QUICFWD"
+  unhook ip6tables filter OUTPUT "$V6OUT"
+  unhook ip6tables filter FORWARD "$V6FWD"
   if [ -n "$MARK" ] && [ -n "$MASK" ] && [ -n "$TABLE" ] && [ -n "$PREF" ]; then
     ip -6 rule del pref "$PREF" fwmark "$MARK/$MASK" table "$TABLE" >/dev/null 2>&1 || true
     ip -6 route del local ::/0 dev lo table "$TABLE" >/dev/null 2>&1 || true
@@ -184,6 +224,15 @@ pidcore(){
   case "$CMD" in *"$BASE/"*core*) return 0;; *) return 1;; esac
 }
 
+stopwatchdog(){
+  [ -f "$WATCHDOG_PID" ] || return 0
+  W=$(cat "$WATCHDOG_PID" 2>/dev/null || true)
+  case "$W" in ''|*[!0-9]*) ;; *)
+    if [ "$W" != "$$" ] && kill -0 "$W" >/dev/null 2>&1; then kill "$W" >/dev/null 2>&1 || true; fi;;
+  esac
+  rm -f "$WATCHDOG_PID"
+}
+
 stopcore(){
   if [ -f "$PIDFILE" ]; then
     P=$(cat "$PIDFILE" 2>/dev/null || true)
@@ -193,7 +242,7 @@ stopcore(){
         N=0
         while kill -0 "$P" >/dev/null 2>&1 && [ "$N" -lt 20 ]; do sleep 0.1; N=$((N+1)); done
         if pidcore "$P" && kill -0 "$P" >/dev/null 2>&1; then kill -9 "$P" >/dev/null 2>&1 || true; fi
-      fi
+      fi;;
     esac
   fi
   rm -f "$PIDFILE" "$MODEFILE"
@@ -271,10 +320,10 @@ probetp6(){
 }
 
 probered4(){
-  P="$1"
+  P="$1"; PROTO="${2:-tcp}"
   iptables -t nat -N BICHEN_PROBE >/dev/null 2>&1 || true
   iptables -t nat -F BICHEN_PROBE >/dev/null 2>&1 || true
-  iptables -t nat -A BICHEN_PROBE -p tcp -j REDIRECT --to-ports "$P" >/dev/null 2>&1
+  iptables -t nat -A BICHEN_PROBE -p "$PROTO" -j REDIRECT --to-ports "$P" >/dev/null 2>&1
   R=$?
   iptables -t nat -F BICHEN_PROBE >/dev/null 2>&1 || true
   iptables -t nat -X BICHEN_PROBE >/dev/null 2>&1 || true
@@ -282,10 +331,10 @@ probered4(){
 }
 
 probered6(){
-  P="$1"; has ip6tables || return 1
+  P="$1"; PROTO="${2:-tcp}"; has ip6tables || return 1
   ip6tables -t nat -N BICHEN_PROBE >/dev/null 2>&1 || true
   ip6tables -t nat -F BICHEN_PROBE >/dev/null 2>&1 || true
-  ip6tables -t nat -A BICHEN_PROBE -p tcp -j REDIRECT --to-ports "$P" >/dev/null 2>&1
+  ip6tables -t nat -A BICHEN_PROBE -p "$PROTO" -j REDIRECT --to-ports "$P" >/dev/null 2>&1
   R=$?
   ip6tables -t nat -F BICHEN_PROBE >/dev/null 2>&1 || true
   ip6tables -t nat -X BICHEN_PROBE >/dev/null 2>&1 || true
@@ -293,25 +342,44 @@ probered6(){
 }
 
 preflight(){
-  M="$1"; TP="$2"; RP="$3"; V6="$4"
+  M="$1"; TP="$2"; RP="$3"; V6="$4"; TCP="$5"; UDP="$6"; DNS="$7"; QUIC="$8"; DP="$9"; CP="${10}"
   root
   mode "$M" || fail "运行模式无效"
   ipv6mode "$V6" || fail "IPv6 模式无效"
+  dnsmode "$DNS" || fail "DNS 劫持模式无效"
+  bool "$TCP" || fail "TCP 开关无效"
+  bool "$UDP" || fail "UDP 开关无效"
+  bool "$QUIC" || fail "QUIC 开关无效"
+  port "$DP" || fail "DNS 监听端口无效"
+  port "$CP" || fail "控制接口端口无效"
   has ip || fail "系统缺少 ip 命令"
   has iptables || fail "系统缺少 iptables"
 
+  NEED_TP=0; NEED_RP=0
   case "$M" in
-    tproxy) port "$TP" || fail "TPROXY 端口无效"; probetp4 "$TP" || fail "当前内核或 iptables 不支持 TPROXY";;
-    redirect) port "$RP" || fail "Redirect 端口无效"; probered4 "$RP" || fail "当前 iptables 不支持 REDIRECT";;
-    enhance) port "$TP" || fail "TPROXY 端口无效"; port "$RP" || fail "Redirect 端口无效"; probetp4 "$TP" || fail "当前内核或 iptables 不支持 TPROXY"; probered4 "$RP" || fail "当前 iptables 不支持 REDIRECT";;
+    tproxy) if [ "$TCP" = 1 ] || [ "$UDP" = 1 ]; then NEED_TP=1; fi;;
+    redirect) [ "$TCP" = 1 ] && NEED_RP=1;;
+    enhance) [ "$TCP" = 1 ] && NEED_RP=1; [ "$UDP" = 1 ] && NEED_TP=1;;
   esac
+  [ "$DNS" = tproxy ] && NEED_TP=1
+  [ "$DNS" = redirect ] && { probered4 "$DP" tcp || fail "当前 iptables 不支持 TCP DNS REDIRECT"; probered4 "$DP" udp || fail "当前 iptables 不支持 UDP DNS REDIRECT"; }
+  [ "$NEED_TP" = 1 ] && { port "$TP" || fail "TPROXY 端口无效"; probetp4 "$TP" || fail "当前内核或 iptables 不支持 TPROXY"; }
+  [ "$NEED_RP" = 1 ] && { port "$RP" || fail "Redirect 端口无效"; probered4 "$RP" tcp || fail "当前 iptables 不支持 REDIRECT"; }
+  if [ "$NEED_TP" = 0 ] && [ "$NEED_RP" = 0 ] && [ "$DNS" = off ]; then fail "TCP、UDP 与 DNS 接管均已关闭，代理没有可接管流量"; fi
 
   if [ "$V6" = enable ] && v6active; then
-    case "$M" in
-      tproxy) probetp6 "$TP" || fail "IPv6 TPROXY 不可用，可选择 IPv6 不进核心";;
-      redirect) probered6 "$RP" || fail "IPv6 REDIRECT 不可用，可选择 IPv6 不进核心";;
-      enhance) probetp6 "$TP" || fail "IPv6 TPROXY 不可用"; probered6 "$RP" || fail "IPv6 REDIRECT 不可用";;
-    esac
+    [ "$NEED_TP" = 0 ] || probetp6 "$TP" || fail "IPv6 TPROXY 不可用，可改用严格 IPv4 或 IPv6 不进核心"
+    [ "$NEED_RP" = 0 ] || probered6 "$RP" tcp || fail "IPv6 REDIRECT 不可用，可改用严格 IPv4 或 IPv6 不进核心"
+    if [ "$DNS" = redirect ]; then
+      probered6 "$DP" tcp || fail "IPv6 TCP DNS REDIRECT 不可用"
+      probered6 "$DP" udp || fail "IPv6 UDP DNS REDIRECT 不可用"
+    fi
+  fi
+  if [ "$V6" = strict ] && v6active; then has ip6tables || fail "严格 IPv4 需要 ip6tables"; fi
+  if [ "$V6" = disable ]; then
+    TESTED=0
+    for P in /proc/sys/net/ipv6/conf/*/disable_ipv6; do [ -w "$P" ] && TESTED=1 && break; done
+    [ "$TESTED" = 1 ] || fail "系统不允许临时禁用 IPv6"
   fi
   ok "Root 代理预检通过"
 }
@@ -326,44 +394,75 @@ route6(){
   ip -6 rule add pref "$PREF" fwmark "$MARK/$MASK" table "$TABLE" || return 1
 }
 
-tproxy4(){
-  P="$1"; PROTO="$2"
+install_mangle4(){
+  P="$1"; M="$2"; TCP="$3"; UDP="$4"; DNS="$5"
+  NEED=0
+  case "$M" in tproxy) if [ "$TCP" = 1 ] || [ "$UDP" = 1 ]; then NEED=1; fi;; enhance) [ "$UDP" = 1 ] && NEED=1;; esac
+  [ "$DNS" = tproxy ] && NEED=1
+  [ "$NEED" = 1 ] || return 0
   route4 || return 1
   iptables -t mangle -N "$MOUT" || return 1
   iptables -t mangle -N "$MPRE" || return 1
-  iptables -t mangle -A "$MOUT" -m owner --uid-owner 0 -j RETURN || return 1
+  iptables -t mangle -A "$MOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1
+  iptables -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1
+  if [ "$DNS" = tproxy ]; then
+    for X in tcp udp; do
+      iptables -t mangle -A "$MOUT" -p "$X" --dport 53 -j MARK --set-xmark "$MARK/$MASK" || return 1
+      iptables -t mangle -A "$MPRE" -p "$X" --dport 53 -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1
+    done
+  fi
   bypass4 "$MOUT" mangle || return 1
   bypass4 "$MPRE" mangle || return 1
-  for X in $PROTO; do
-    iptables -t mangle -A "$MOUT" -p "$X" -j MARK --set-xmark "$MARK/$MASK" || return 1
-    iptables -t mangle -A "$MPRE" -p "$X" -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1
-  done
+  if [ "$M" = tproxy ]; then
+    [ "$TCP" = 0 ] || { iptables -t mangle -A "$MOUT" -p tcp -j MARK --set-xmark "$MARK/$MASK" || return 1; iptables -t mangle -A "$MPRE" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; }
+    [ "$UDP" = 0 ] || { iptables -t mangle -A "$MOUT" -p udp -j MARK --set-xmark "$MARK/$MASK" || return 1; iptables -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; }
+  elif [ "$M" = enhance ] && [ "$UDP" = 1 ]; then
+    iptables -t mangle -A "$MOUT" -p udp -j MARK --set-xmark "$MARK/$MASK" || return 1
+    iptables -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1
+  fi
   iptables -t mangle -A OUTPUT -j "$MOUT" || return 1
   iptables -t mangle -A PREROUTING -j "$MPRE" || return 1
 }
 
-tproxy6(){
-  P="$1"; PROTO="$2"
+install_mangle6(){
+  P="$1"; M="$2"; TCP="$3"; UDP="$4"; DNS="$5"
   v6active || return 0
+  NEED=0
+  case "$M" in tproxy) if [ "$TCP" = 1 ] || [ "$UDP" = 1 ]; then NEED=1; fi;; enhance) [ "$UDP" = 1 ] && NEED=1;; esac
+  [ "$DNS" = tproxy ] && NEED=1
+  [ "$NEED" = 1 ] || return 0
   route6 || return 1
   ip6tables -t mangle -N "$MOUT" || return 1
   ip6tables -t mangle -N "$MPRE" || return 1
-  ip6tables -t mangle -A "$MOUT" -m owner --uid-owner 0 -j RETURN || return 1
+  ip6tables -t mangle -A "$MOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1
+  ip6tables -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1
+  if [ "$DNS" = tproxy ]; then
+    for X in tcp udp; do
+      ip6tables -t mangle -A "$MOUT" -p "$X" --dport 53 -j MARK --set-xmark "$MARK/$MASK" || return 1
+      ip6tables -t mangle -A "$MPRE" -p "$X" --dport 53 -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1
+    done
+  fi
   bypass6 "$MOUT" mangle || return 1
   bypass6 "$MPRE" mangle || return 1
-  for X in $PROTO; do
-    ip6tables -t mangle -A "$MOUT" -p "$X" -j MARK --set-xmark "$MARK/$MASK" || return 1
-    ip6tables -t mangle -A "$MPRE" -p "$X" -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1
-  done
+  if [ "$M" = tproxy ]; then
+    [ "$TCP" = 0 ] || { ip6tables -t mangle -A "$MOUT" -p tcp -j MARK --set-xmark "$MARK/$MASK" || return 1; ip6tables -t mangle -A "$MPRE" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; }
+    [ "$UDP" = 0 ] || { ip6tables -t mangle -A "$MOUT" -p udp -j MARK --set-xmark "$MARK/$MASK" || return 1; ip6tables -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; }
+  elif [ "$M" = enhance ] && [ "$UDP" = 1 ]; then
+    ip6tables -t mangle -A "$MOUT" -p udp -j MARK --set-xmark "$MARK/$MASK" || return 1
+    ip6tables -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1
+  fi
   ip6tables -t mangle -A OUTPUT -j "$MOUT" || return 1
   ip6tables -t mangle -A PREROUTING -j "$MPRE" || return 1
 }
 
-redirect4(){
-  P="$1"
+install_redirect4(){
+  P="$1"; M="$2"; TCP="$3"
+  [ "$TCP" = 1 ] || return 0
+  case "$M" in redirect|enhance) ;; *) return 0;; esac
   iptables -t nat -N "$NOUT" || return 1
   iptables -t nat -N "$NPRE" || return 1
-  iptables -t nat -A "$NOUT" -m owner --uid-owner 0 -j RETURN || return 1
+  iptables -t nat -A "$NOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1
+  iptables -t nat -A "$NPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1
   bypass4 "$NOUT" nat || return 1
   bypass4 "$NPRE" nat || return 1
   iptables -t nat -A "$NOUT" -p tcp -j REDIRECT --to-ports "$P" || return 1
@@ -372,12 +471,15 @@ redirect4(){
   iptables -t nat -A PREROUTING -j "$NPRE" || return 1
 }
 
-redirect6(){
-  P="$1"
+install_redirect6(){
+  P="$1"; M="$2"; TCP="$3"
   v6active || return 0
+  [ "$TCP" = 1 ] || return 0
+  case "$M" in redirect|enhance) ;; *) return 0;; esac
   ip6tables -t nat -N "$NOUT" || return 1
   ip6tables -t nat -N "$NPRE" || return 1
-  ip6tables -t nat -A "$NOUT" -m owner --uid-owner 0 -j RETURN || return 1
+  ip6tables -t nat -A "$NOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1
+  ip6tables -t nat -A "$NPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1
   bypass6 "$NOUT" nat || return 1
   bypass6 "$NPRE" nat || return 1
   ip6tables -t nat -A "$NOUT" -p tcp -j REDIRECT --to-ports "$P" || return 1
@@ -386,27 +488,164 @@ redirect6(){
   ip6tables -t nat -A PREROUTING -j "$NPRE" || return 1
 }
 
+install_dns_redirect4(){
+  P="$1"
+  iptables -t nat -N "$DNSOUT" || return 1
+  iptables -t nat -N "$DNSPRE" || return 1
+  iptables -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1
+  iptables -t nat -A "$DNSPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1
+  for X in tcp udp; do
+    iptables -t nat -A "$DNSOUT" -p "$X" --dport 53 -j REDIRECT --to-ports "$P" || return 1
+    iptables -t nat -A "$DNSPRE" -p "$X" --dport 53 -j REDIRECT --to-ports "$P" || return 1
+  done
+  iptables -t nat -I OUTPUT 1 -j "$DNSOUT" || return 1
+  iptables -t nat -I PREROUTING 1 -j "$DNSPRE" || return 1
+}
+
+install_dns_redirect6(){
+  P="$1"; v6active || return 0
+  ip6tables -t nat -N "$DNSOUT" || return 1
+  ip6tables -t nat -N "$DNSPRE" || return 1
+  ip6tables -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1
+  ip6tables -t nat -A "$DNSPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1
+  for X in tcp udp; do
+    ip6tables -t nat -A "$DNSOUT" -p "$X" --dport 53 -j REDIRECT --to-ports "$P" || return 1
+    ip6tables -t nat -A "$DNSPRE" -p "$X" --dport 53 -j REDIRECT --to-ports "$P" || return 1
+  done
+  ip6tables -t nat -I OUTPUT 1 -j "$DNSOUT" || return 1
+  ip6tables -t nat -I PREROUTING 1 -j "$DNSPRE" || return 1
+}
+
+install_quic4(){
+  iptables -t filter -N "$QUICOUT" || return 1
+  iptables -t filter -N "$QUICFWD" || return 1
+  iptables -t filter -A "$QUICOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1
+  iptables -t filter -A "$QUICOUT" -p udp --dport 443 -j DROP || return 1
+  iptables -t filter -A "$QUICFWD" -p udp --dport 443 -j DROP || return 1
+  iptables -t filter -A OUTPUT -j "$QUICOUT" || return 1
+  iptables -t filter -A FORWARD -j "$QUICFWD" || return 1
+}
+
+install_quic6(){
+  v6active || return 0
+  ip6tables -t filter -N "$QUICOUT" || return 1
+  ip6tables -t filter -N "$QUICFWD" || return 1
+  ip6tables -t filter -A "$QUICOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1
+  ip6tables -t filter -A "$QUICOUT" -p udp --dport 443 -j DROP || return 1
+  ip6tables -t filter -A "$QUICFWD" -p udp --dport 443 -j DROP || return 1
+  ip6tables -t filter -A OUTPUT -j "$QUICOUT" || return 1
+  ip6tables -t filter -A FORWARD -j "$QUICFWD" || return 1
+}
+
+install_v6_strict(){
+  v6active || return 0
+  ip6tables -t filter -N "$V6OUT" || return 1
+  ip6tables -t filter -N "$V6FWD" || return 1
+  ip6tables -t filter -A "$V6OUT" -o lo -j RETURN || return 1
+  ip6tables -t filter -A "$V6OUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1
+  for NET in ::1/128 fc00::/7 fe80::/10 ff00::/8; do ip6tables -t filter -A "$V6OUT" -d "$NET" -j RETURN || return 1; done
+  for NET in fc00::/7 fe80::/10 ff00::/8; do ip6tables -t filter -A "$V6FWD" -d "$NET" -j RETURN || return 1; done
+  ip6tables -t filter -A "$V6OUT" -j REJECT || return 1
+  ip6tables -t filter -A "$V6FWD" -j REJECT || return 1
+  ip6tables -t filter -A OUTPUT -j "$V6OUT" || return 1
+  ip6tables -t filter -A FORWARD -j "$V6FWD" || return 1
+}
+
 validatecfg(){
   BIN="$1"; CFG="$2"
   : > "$CHECKLOG"
   "$BIN" -t -d "$RUN" -f "$CFG" >>"$CHECKLOG" 2>&1
 }
 
+hexport(){ printf '%04X' "$1" 2>/dev/null; }
+
+tcp_listen(){
+  P="$1"
+  if has ss && ss -lnt 2>/dev/null | grep -Eq "[:.]${P}([[:space:]]|$)"; then return 0; fi
+  if has netstat && netstat -lnt 2>/dev/null | grep -Eq "[:.]${P}([[:space:]]|$)"; then return 0; fi
+  H=$(hexport "$P") || return 1
+  awk -v x=":$H" '$2 ~ x"$" && $4=="0A" {found=1} END{exit(found?0:1)}' /proc/net/tcp /proc/net/tcp6 2>/dev/null
+}
+
+udp_listen(){
+  P="$1"
+  if has ss && ss -lnu 2>/dev/null | grep -Eq "[:.]${P}([[:space:]]|$)"; then return 0; fi
+  if has netstat && netstat -lnu 2>/dev/null | grep -Eq "[:.]${P}([[:space:]]|$)"; then return 0; fi
+  H=$(hexport "$P") || return 1
+  awk -v x=":$H" '$2 ~ x"$" {found=1} END{exit(found?0:1)}' /proc/net/udp /proc/net/udp6 2>/dev/null
+}
+
+ready(){
+  PID="$1"; M="$2"; TP="$3"; RP="$4"; TCP="$5"; UDP="$6"; DNS="$7"; DP="$8"; CP="$9"
+  pidcore "$PID" && kill -0 "$PID" >/dev/null 2>&1 || return 1
+  tcp_listen "$CP" || return 1
+  case "$M" in
+    tproxy) [ "$TCP" = 0 ] || tcp_listen "$TP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;;
+    redirect) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1;;
+    enhance) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;;
+  esac
+  if [ "$DNS" = tproxy ]; then tcp_listen "$TP" || return 1; udp_listen "$TP" || return 1; fi
+  if [ "$DNS" = redirect ]; then tcp_listen "$DP" || return 1; udp_listen "$DP" || return 1; fi
+  return 0
+}
+
+wait_ready(){
+  PID="$1"; M="$2"; TP="$3"; RP="$4"; TCP="$5"; UDP="$6"; DNS="$7"; DP="$8"; CP="$9"
+  N=0
+  while [ "$N" -lt 80 ]; do
+    ready "$PID" "$M" "$TP" "$RP" "$TCP" "$UDP" "$DNS" "$DP" "$CP" && return 0
+    pidcore "$PID" && kill -0 "$PID" >/dev/null 2>&1 || return 1
+    sleep 0.1
+    N=$((N+1))
+  done
+  return 1
+}
+
+watchdog(){
+  COREPID="$1"
+  mkdir -p "$RUN" || exit 0
+  printf '%s\n' "$$" > "$WATCHDOG_PID"
+  while pidcore "$COREPID" && kill -0 "$COREPID" >/dev/null 2>&1; do sleep 2; done
+  acquire_lock || exit 0
+  REC=$(cat "$PIDFILE" 2>/dev/null || true)
+  if [ "$REC" = "$COREPID" ]; then
+    cleanup
+    restorev6
+    rm -f "$PIDFILE" "$MODEFILE"
+    date '+%Y-%m-%dT%H:%M:%S%z core exited; network restored' > "$CRASH_STATE" 2>/dev/null || true
+    printf '%s core=%s network-restored\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$COREPID" >> "$WATCHDOG_LOG" 2>/dev/null || true
+  fi
+  rm -f "$WATCHDOG_PID"
+}
+
+start_watchdog(){
+  COREPID="$1"
+  stopwatchdog
+  "$0" watchdog "$COREPID" >/dev/null 2>&1 &
+}
+
 start(){
-  BIN="$1"; CFG="$2"; M="$3"; TP="$4"; RP="$5"; V6="$6"
-  preflight "$M" "$TP" "$RP" "$V6" >/dev/null
+  BIN="$1"; CFG="$2"; M="$3"; TP="$4"; RP="$5"; V6="$6"; TCP="$7"; UDP="$8"; DNS="$9"; QUIC="${10}"; DP="${11}"; CP="${12}"
+  preflight "$M" "$TP" "$RP" "$V6" "$TCP" "$UDP" "$DNS" "$QUIC" "$DP" "$CP" >/dev/null
   [ -x "$BIN" ] || fail "核心文件不存在或不可执行"
   [ -r "$CFG" ] || fail "启动配置不存在"
   mkdir -p "$RUN" || fail "无法创建运行目录"
-
   validatecfg "$BIN" "$CFG" || fail "Mihomo 配置校验失败，当前网络未被接管"
+  acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
+
+  stopwatchdog
   cleanup
   restorev6
   stopcore
+  rm -f "$CRASH_STATE"
 
-  case "$M" in
-    tproxy|enhance) allocnet || { cleanup; fail "找不到安全的 fwmark/路由表/规则优先级，已保持直连"; };;
-  esac
+  NEED_TP=0
+  case "$M" in tproxy) if [ "$TCP" = 1 ] || [ "$UDP" = 1 ]; then NEED_TP=1; fi;; enhance) [ "$UDP" = 1 ] && NEED_TP=1;; esac
+  [ "$DNS" = tproxy ] && NEED_TP=1
+  if [ "$NEED_TP" = 1 ]; then
+    markused "$BYPASS_MARK" && fail "安全出站 mark 已被其他网络规则占用，未接管网络"
+    allocnet || { cleanup; fail "找不到安全的 fwmark/路由表/规则优先级，已保持直连"; }
+  fi
 
   if [ "$V6" = disable ]; then disablev6 || { cleanup; fail "禁用系统 IPv6 失败，已恢复原状态"; }; fi
 
@@ -416,29 +655,28 @@ start(){
   printf '%s\n' "$P" > "$PIDFILE"
   printf '%s\n' "$M" > "$MODEFILE"
 
-  N=0
-  while [ "$N" -lt 30 ]; do
-    pidcore "$P" && kill -0 "$P" >/dev/null 2>&1 && break
-    sleep 0.1
-    N=$((N+1))
-  done
-  if ! pidcore "$P" || ! kill -0 "$P" >/dev/null 2>&1; then stopcore; cleanup; restorev6; fail "核心启动失败，请查看运行日志"; fi
-
-  case "$M" in
-    tproxy) tproxy4 "$TP" "tcp udp" || { cleanup; stopcore; restorev6; fail "TPROXY 规则安装失败，已回滚"; };;
-    redirect) redirect4 "$RP" || { cleanup; stopcore; restorev6; fail "Redirect 规则安装失败，已回滚"; };;
-    enhance) redirect4 "$RP" && tproxy4 "$TP" "udp" || { cleanup; stopcore; restorev6; fail "Enhance 规则安装失败，已回滚"; };;
-  esac
-
-  if [ "$V6" = enable ]; then
-    case "$M" in
-      tproxy) tproxy6 "$TP" "tcp udp";;
-      redirect) redirect6 "$RP";;
-      enhance) redirect6 "$RP" && tproxy6 "$TP" "udp";;
-    esac || { cleanup; stopcore; restorev6; fail "IPv6 透明代理规则安装失败，已回滚"; }
+  if ! wait_ready "$P" "$M" "$TP" "$RP" "$TCP" "$UDP" "$DNS" "$DP" "$CP"; then
+    stopcore; cleanup; restorev6
+    fail "核心进程已启动但透明代理/DNS/API 监听未就绪，网络未被接管"
   fi
 
-  if [ -n "$MARK" ]; then ok "Root $M 已启动（mark=$MARK，table=$TABLE）"; else ok "Root $M 已启动"; fi
+  install_mangle4 "$TP" "$M" "$TCP" "$UDP" "$DNS" || { cleanup; stopcore; restorev6; fail "IPv4 TPROXY 规则安装失败，已回滚"; }
+  install_redirect4 "$RP" "$M" "$TCP" || { cleanup; stopcore; restorev6; fail "IPv4 Redirect 规则安装失败，已回滚"; }
+  [ "$DNS" != redirect ] || install_dns_redirect4 "$DP" || { cleanup; stopcore; restorev6; fail "IPv4 DNS 劫持安装失败，已回滚"; }
+  [ "$QUIC" = 0 ] || install_quic4 || { cleanup; stopcore; restorev6; fail "IPv4 QUIC 策略安装失败，已回滚"; }
+
+  if [ "$V6" = enable ]; then
+    install_mangle6 "$TP" "$M" "$TCP" "$UDP" "$DNS" || { cleanup; stopcore; restorev6; fail "IPv6 TPROXY 规则安装失败，已回滚"; }
+    install_redirect6 "$RP" "$M" "$TCP" || { cleanup; stopcore; restorev6; fail "IPv6 Redirect 规则安装失败，已回滚"; }
+    [ "$DNS" != redirect ] || install_dns_redirect6 "$DP" || { cleanup; stopcore; restorev6; fail "IPv6 DNS 劫持安装失败，已回滚"; }
+    [ "$QUIC" = 0 ] || install_quic6 || { cleanup; stopcore; restorev6; fail "IPv6 QUIC 策略安装失败，已回滚"; }
+  elif [ "$V6" = strict ]; then
+    install_v6_strict || { cleanup; stopcore; restorev6; fail "严格 IPv4 防泄漏规则安装失败，已回滚"; }
+  fi
+
+  start_watchdog "$P"
+  DESC="tcp=$TCP,udp=$UDP,dns=$DNS,ipv6=$V6,quicBlock=$QUIC"
+  if [ -n "$MARK" ]; then ok "Root $M 已启动（$DESC，mark=$MARK，table=$TABLE）"; else ok "Root $M 已启动（$DESC）"; fi
 }
 
 status(){
@@ -449,35 +687,33 @@ status(){
     case "$X" in ''|*[!0-9]*) ;; *) if pidcore "$X" && kill -0 "$X" >/dev/null 2>&1; then R=true; P="$X"; fi;; esac
   fi
   M=$(cat "$MODEFILE" 2>/dev/null || echo none)
-
   HAS4=false
-  iptables -t mangle -C OUTPUT -j "$MOUT" >/dev/null 2>&1 && HAS4=true
-  iptables -t nat -C OUTPUT -j "$NOUT" >/dev/null 2>&1 && HAS4=true
+  for SPEC in "mangle OUTPUT $MOUT" "nat OUTPUT $NOUT" "nat OUTPUT $DNSOUT" "filter OUTPUT $QUICOUT"; do set -- $SPEC; iptables -t "$1" -C "$2" -j "$3" >/dev/null 2>&1 && HAS4=true; done
   HAS6=false
   if has ip6tables; then
-    ip6tables -t mangle -C OUTPUT -j "$MOUT" >/dev/null 2>&1 && HAS6=true
-    ip6tables -t nat -C OUTPUT -j "$NOUT" >/dev/null 2>&1 && HAS6=true
+    for SPEC in "mangle OUTPUT $MOUT" "nat OUTPUT $NOUT" "nat OUTPUT $DNSOUT" "filter OUTPUT $QUICOUT" "filter OUTPUT $V6OUT"; do set -- $SPEC; ip6tables -t "$1" -C "$2" -j "$3" >/dev/null 2>&1 && HAS6=true; done
   fi
   V6OFF=false; [ -f "$IPV6_STATE" ] && V6OFF=true
   RECOVERED=false
-
   if [ "$R" = false ] && { [ "$HAS4" = true ] || [ "$HAS6" = true ] || [ "$V6OFF" = true ]; }; then
-    cleanup
-    restorev6
-    rm -f "$PIDFILE" "$MODEFILE"
-    M=none; HAS4=false; HAS6=false; V6OFF=false; RECOVERED=true
+    if acquire_lock; then
+      cleanup; restorev6; rm -f "$PIDFILE" "$MODEFILE"; M=none; HAS4=false; HAS6=false; V6OFF=false; RECOVERED=true
+    fi
   fi
-
+  WD=false
+  W=$(cat "$WATCHDOG_PID" 2>/dev/null || true)
+  case "$W" in ''|*[!0-9]*) ;; *) kill -0 "$W" >/dev/null 2>&1 && WD=true;; esac
   SM=""; ST=""
   if loadnet >/dev/null 2>&1; then SM="$MARK"; ST="$TABLE"; fi
-  printf '{"ok":true,"running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6DisabledByBichen":%s,"recoveredStaleRules":%s,"mark":"%s","table":"%s","log":"%s","configCheckLog":"%s"}\n' \
-    "$R" "$P" "$M" "$HAS4" "$HAS6" "$V6OFF" "$RECOVERED" "$SM" "$ST" "$LOG" "$CHECKLOG"
+  printf '{"ok":true,"running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6DisabledByBichen":%s,"watchdog":%s,"recoveredStaleRules":%s,"mark":"%s","table":"%s","log":"%s","configCheckLog":"%s"}\n' \
+    "$R" "$P" "$M" "$HAS4" "$HAS6" "$V6OFF" "$WD" "$RECOVERED" "$SM" "$ST" "$LOG" "$CHECKLOG"
 }
 
 case "${1:-status}" in
-  preflight) [ "$#" = 5 ] || fail "参数错误"; preflight "$2" "$3" "$4" "$5";;
-  start) [ "$#" = 7 ] || fail "参数错误"; root; start "$2" "$3" "$4" "$5" "$6" "$7";;
-  stop) root; cleanup; stopcore; restorev6; ok "Root 代理已停止并恢复网络状态";;
+  preflight) [ "$#" = 11 ] || fail "参数错误"; preflight "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}";;
+  start) [ "$#" = 13 ] || fail "参数错误"; root; start "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}";;
+  stop) root; acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"; stopwatchdog; cleanup; stopcore; restorev6; ok "Root 代理已停止并恢复网络状态";;
   status) status;;
+  watchdog) [ "$#" = 2 ] || exit 0; root; watchdog "$2";;
   *) fail "未知 Root 代理操作";;
 esac
