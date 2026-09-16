@@ -38,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -383,7 +384,10 @@ private fun RefHome(
                             Text(state.config, color = t.textMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                         Box(
-                            Modifier.size(56.dp).background(if (state.running) scheme.primary else t.controlBackground, CircleShape),
+                            Modifier
+                                .size(56.dp)
+                                .shadow(if (state.running) 10.dp else 0.dp, CircleShape, clip = false)
+                                .background(if (state.running) scheme.primary else t.controlBackground, CircleShape),
                             contentAlignment = Alignment.Center,
                         ) {
                             Icon(
@@ -396,9 +400,10 @@ private fun RefHome(
                     }
                     HorizontalDivider(color = scheme.primary.copy(alpha = .10f))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        RefActionText("重载", state.running && operation.isBlank(), onReload, Modifier.weight(1f), t.textPrimary)
-                        RefActionText(if (state.running) "停止" else "启动", operation.isBlank(), onToggle, Modifier.weight(1f), t.danger)
-                        RefActionText("重启", state.running && operation.isBlank(), onRestart, Modifier.weight(1f), t.textPrimary)
+                        val neutralAction = if (scheme.background.luminance() < .5f) Color(0xFFE2E8F0) else Color(0xFF334155)
+                        RefActionText("重载", state.running && operation.isBlank(), onReload, Modifier.weight(1f), neutralAction)
+                        RefActionText(if (state.running) "停止" else "启动", operation.isBlank(), onToggle, Modifier.weight(1f), Color(0xFFEF4444))
+                        RefActionText("重启", state.running && operation.isBlank(), onRestart, Modifier.weight(1f), neutralAction)
                     }
                 }
             }
@@ -427,7 +432,7 @@ private fun RefHome(
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 RefSubscriptionCompact(providers, Modifier.weight(1f))
-                RefResourceCard(memory, cpuPercent, runtime.pid, Modifier.weight(1f))
+                RefResourceCard(memory, cpuPercent, Modifier.weight(1f))
             }
         }
         if (operation.isNotBlank() || message.isNotBlank()) {
@@ -462,17 +467,9 @@ private fun RefLatencyPanel(baidu: Long?, cloudflare: Long?, google: Long?, test
 @Composable
 private fun RefLatencyColumn(label: String, value: Long?, testing: Boolean, modifier: Modifier) {
     val t = LocalBichenTokens.current
-    val color = when {
-        testing -> MaterialTheme.colorScheme.primary
-        value == null -> t.textMuted
-        value <= 0L -> t.danger
-        value < 100L -> t.success
-        value <= 300L -> t.warning
-        else -> t.danger
-    }
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        Text(label, color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1)
-        Text(if (testing) "…" else refDelay(value), color = color, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Text(label, color = t.textSecondary, fontSize = 11.sp, lineHeight = 15.sp, maxLines = 1)
+        RefDelayBadge(value = value, testing = testing, onClick = null)
     }
 }
 
@@ -485,7 +482,7 @@ private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: I
     val scale by animateFloatAsState(if (pressed) .97f else 1f, spring(dampingRatio = .78f, stiffness = 520f), label = "networkCardPress")
     val shape = RoundedCornerShape(18.dp)
     Surface(
-        modifier = modifier.graphicsLayer { scaleX = scale; scaleY = scale }.clip(shape)
+        modifier = modifier.graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .90f else 1f }.clip(shape)
             .clickable(interactionSource = source, indication = null) { lanMode = !lanMode },
         shape = shape,
         color = t.cardBackground,
@@ -556,7 +553,7 @@ private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, modifier: M
 }
 
 @Composable
-private fun RefResourceCard(memory: Long, cpuPercent: Float, pid: Int, modifier: Modifier) {
+private fun RefResourceCard(memory: Long, cpuPercent: Float, modifier: Modifier) {
     val t = LocalBichenTokens.current
     Surface(modifier = modifier, shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
         Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
@@ -590,7 +587,7 @@ private fun RefActionText(text: String, enabled: Boolean, onClick: () -> Unit, m
     val scale by animateFloatAsState(if (pressed) .95f else 1f, spring(dampingRatio = .72f, stiffness = 620f), label = "heroAction$text")
     Box(
         modifier
-            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .90f else 1f }
             .height(38.dp)
             .clip(CircleShape)
             .background(if (dark) t.elevatedCardBackground.copy(alpha = .82f) else Color.White.copy(alpha = .84f))
@@ -1006,7 +1003,7 @@ private fun RefNodeSheet(
                     }
                     Row(
                         Modifier.fillMaxWidth()
-                            .graphicsLayer { scaleX = pressScale; scaleY = pressScale }
+                            .graphicsLayer { scaleX = pressScale; scaleY = pressScale; alpha = if (pressed) .90f else 1f }
                             .background(fill, shape)
                             .border(.7.dp, if (active) scheme.primary.copy(alpha = .28f) else t.outline.copy(alpha = .34f), shape)
                             .clickable(interactionSource = interactionSource, indication = null) { onSelect(node.name) }
@@ -1069,7 +1066,7 @@ private fun RefPanelTabs(selected: RefPanelTab, onSelect: (RefPanelTab) -> Unit)
                 val pressed by source.collectIsPressedAsState()
                 val scale by animateFloatAsState(if (pressed) .95f else 1f, spring(dampingRatio = .78f, stiffness = 560f), label = "tab${tab.name}")
                 Box(
-                    Modifier.width(itemWidth).fillMaxHeight().graphicsLayer { scaleX = scale; scaleY = scale }
+                    Modifier.width(itemWidth).fillMaxHeight().graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .90f else 1f }
                         .clip(CircleShape)
                         .clickable(interactionSource = source, indication = null) { onSelect(tab) },
                     contentAlignment = Alignment.Center,
@@ -1106,9 +1103,11 @@ private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolea
     val pressed by source.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) .97f else 1f, spring(dampingRatio = .76f, stiffness = 560f), label = "group${group.name}")
     val shape = RoundedCornerShape(18.dp)
+    val nodeName = selected.ifBlank { "未选择" }
+    val nodeFlag = refNodeFlag(nodeName)
     Column(
         modifier
-            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .90f else 1f }
             .heightIn(min = 106.dp)
             .background(if (expanded) t.selectionBackground else t.cardBackground, shape)
             .border(.7.dp, if (expanded) scheme.primary.copy(alpha = .18f) else t.outline.copy(alpha = .34f), shape)
@@ -1123,8 +1122,8 @@ private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolea
             Spacer(Modifier.width(6.dp))
             RefDelayBadge(delay, false, null)
         }
-        Text("${group.type.uppercase(java.util.Locale.ROOT).ifBlank { refGroupType(group.type) }} · ${group.nodes.size} 节点", color = t.textMuted, fontSize = 11.sp, maxLines = 1)
-        Text(selected.ifBlank { "未选择" }, color = t.textSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text("${refGroupTypeCompact(group.type)} · ${group.nodes.size} 节点", color = Color(0xFF94A3B8), fontSize = 11.sp, maxLines = 1)
+        Text(if (nodeFlag.isBlank()) nodeName else "$nodeFlag $nodeName", color = t.textSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -1191,6 +1190,32 @@ private fun refGroupType(type: String): String = when (type.lowercase()) {
     else -> type.ifBlank { "策略组" }
 }
 
+private fun refGroupTypeCompact(type: String): String = when (type.lowercase()) {
+    "urltest", "url-test" -> "URLTest"
+    "selector" -> "手动选择"
+    "fallback" -> "Fallback"
+    "loadbalance", "load-balance" -> "LoadBalance"
+    else -> type.ifBlank { "Group" }
+}
+
+private fun refNodeFlag(name: String): String {
+    val value = name.trim()
+    if (listOf("🇭🇰", "🇹🇼", "🇯🇵", "🇸🇬", "🇰🇷", "🇺🇸", "🇬🇧", "🇩🇪", "🇫🇷").any(value::contains)) return ""
+    val upper = value.uppercase(java.util.Locale.ROOT)
+    return when {
+        value.contains("香港") || upper.contains("HONG KONG") || upper.startsWith("HK") -> "🇭🇰"
+        value.contains("台湾") || value.contains("台灣") || upper.contains("TAIWAN") || upper.startsWith("TW") -> "🇹🇼"
+        value.contains("日本") || upper.contains("JAPAN") || upper.startsWith("JP") -> "🇯🇵"
+        value.contains("新加坡") || upper.contains("SINGAPORE") || upper.startsWith("SG") -> "🇸🇬"
+        value.contains("韩国") || value.contains("韓國") || upper.contains("KOREA") || upper.startsWith("KR") -> "🇰🇷"
+        value.contains("美国") || value.contains("美國") || upper.contains("UNITED STATES") || upper.startsWith("US") -> "🇺🇸"
+        value.contains("英国") || value.contains("英國") || upper.contains("UNITED KINGDOM") || upper.startsWith("UK") -> "🇬🇧"
+        value.contains("德国") || value.contains("德國") || upper.contains("GERMANY") || upper.startsWith("DE") -> "🇩🇪"
+        value.contains("法国") || value.contains("法國") || upper.contains("FRANCE") || upper.startsWith("FR") -> "🇫🇷"
+        else -> ""
+    }
+}
+
 @Composable
 private fun RefDelayBadge(value: Long?, testing: Boolean, onClick: (() -> Unit)?) {
     val scheme = MaterialTheme.colorScheme
@@ -1206,7 +1231,7 @@ private fun RefDelayBadge(value: Long?, testing: Boolean, onClick: (() -> Unit)?
     val pressed by source.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) .94f else 1f, spring(dampingRatio = .78f, stiffness = 620f), label = "delayBadge")
     val modifier = Modifier
-        .graphicsLayer { scaleX = scale; scaleY = scale }
+        .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .90f else 1f }
         .background(background, CircleShape)
         .then(if (onClick != null) Modifier.clickable(enabled = !testing, interactionSource = source, indication = null, onClick = onClick) else Modifier)
         .padding(horizontal = 8.dp, vertical = 2.dp)
@@ -1303,7 +1328,7 @@ private fun RefProviderRow(item: DashboardProviderUi, onRefresh: () -> Unit, onC
     val scale by animateFloatAsState(if (pressed) .97f else 1f, spring(dampingRatio = .78f, stiffness = 520f), label = "provider${item.name}")
     val shape = RoundedCornerShape(18.dp)
     Surface(
-        modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale }.clip(shape)
+        modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .90f else 1f }.clip(shape)
             .clickable(interactionSource = source, indication = null, onClick = onClick),
         shape = shape,
         color = t.cardBackground,
@@ -1334,7 +1359,7 @@ private fun RefProviderRow(item: DashboardProviderUi, onRefresh: () -> Unit, onC
             } else {
                 Text("该订阅没有上报流量信息", color = t.textMuted, style = MaterialTheme.typography.bodySmall)
             }
-            Text("到期 ${refExpireDate(item.expire)} · ${refUpdatedAt(item.updatedAt)}", color = t.textMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("到期 ${refExpireDate(item.expire)} · ${refUpdatedAt(item.updatedAt)}", color = Color(0xFF94A3B8), fontSize = 11.sp, lineHeight = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -1632,8 +1657,8 @@ private fun RefDivider() { HorizontalDivider(color = LocalBichenTokens.current.o
 private fun RefMetric(title: String, value: String, modifier: Modifier) {
     val t = LocalBichenTokens.current
     Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(value, color = t.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(title, color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+        Text(value, color = t.textPrimary, fontSize = 16.sp, lineHeight = 21.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(title, color = t.textSecondary, fontSize = 12.sp, lineHeight = 16.sp, maxLines = 1)
     }
 }
 
