@@ -1,0 +1,33 @@
+name: Run reference full UI patch
+
+on:
+  push:
+    branches: ['feature/compose-luoshu-ui']
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message == 'Execute reference full UI patch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/compose-luoshu-ui
+          fetch-depth: 0
+      - name: Apply reference video patch
+        run: python3 tools/patch_reference_full_ui.py
+      - name: Commit patch
+        shell: bash
+        run: |
+          rm -f tools/patch_reference_full_ui.py \
+            tools/run-reference-full-ui.txt \
+            tools/run-reference-full-ui-2.txt \
+            .github/workflows/apply-reference-full-ui.yml \
+            .github/workflows/run-reference-full-ui-patch.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Rebuild all reference video surfaces and tools"
+          git push origin HEAD:feature/compose-luoshu-ui
