@@ -1,0 +1,324 @@
+from pathlib import Path
+
+path = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/CompactMainActivity.kt')
+text = path.read_text()
+
+start = text.index('@Composable\nprivate fun CompactHomePage(')
+end = text.index('@Composable\nprivate fun ProtectionModeOption(', start)
+
+home = '''@Composable
+private fun CompactHomePage(
+    controller: BichenComposeController,
+    onSettings: () -> Unit,
+    onApps: () -> Unit,
+    onRules: () -> Unit,
+) {
+    var refresh by remember { mutableIntStateOf(0) }
+    val snapshot by produceState(initialValue = HomeSnapshot(), refresh) {
+        value = runCatching { controller.homeSnapshot() }.getOrElse { HomeSnapshot(message = it.message ?: "状态读取失败") }
+    }
+    val counters by produceState(initialValue = controller.dnsCounters()) {
+        while (true) {
+            value = controller.dnsCounters()
+            delay(1000)
+        }
+    }
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        if (it.resultCode == Activity.RESULT_OK) controller.startVpn()
+        refresh++
+    }
+    val vpnMode = controller.preferredVpnMode()
+    val active = if (vpnMode) snapshot.vpnRunning else snapshot.moduleEnabled
+    val tokens = LocalBichenTokens.current
+    val scheme = MaterialTheme.colorScheme
+    var detailsExpanded by rememberSaveable { mutableStateOf(false) }
+    var showModePicker by rememberSaveable { mutableStateOf(false) }
+
+    fun toggleProtection() {
+        if (controller.preferredVpnMode()) {
+            if (snapshot.vpnRunning) controller.stopVpn()
+            else {
+                val permission = controller.prepareVpn()
+                if (permission == null) controller.startVpn() else launcher.launch(permission)
+            }
+            refresh++
+        } else {
+            scope.launch {
+                runCatching { controller.toggleModuleProtection(snapshot.moduleEnabled) }
+                refresh++
+            }
+        }
+    }
+
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 124.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        item("header") {
+            CompactTopBar("辟尘") {
+                CompactHeaderAction(Icons.Rounded.Settings, "设置", onSettings)
+                CompactHeaderAction(Icons.Rounded.Refresh, "刷新", onClick = { refresh++ })
+            }
+        }
+
+        item("hero") {
+            Surface(
+                shape = RoundedCornerShape(22.dp),
+                color = tokens.cardBackground,
+                border = BorderStroke(1.dp, tokens.outline),
+                shadowElevation = 0.dp,
+            ) {
+                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            Modifier.size(72.dp).background(tokens.selectionBackground, RoundedCornerShape(20.dp)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = if (active) Icons.Rounded.Shield else Icons.Rounded.Security,
+                                contentDescription = null,
+                                tint = if (active) tokens.success else scheme.primary,
+                                modifier = Modifier.size(34.dp),
+                            )
+                            Box(
+                                Modifier.align(Alignment.BottomEnd).padding(7.dp).size(10.dp)
+                                    .background(if (active) tokens.success else tokens.warning, CircleShape),
+                            )
+                        }
+                        Spacer(Modifier.width(16.dp))
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text(
+                                if (active) "设备已保护" else "保护未开启",
+                                color = tokens.textPrimary,
+                                fontSize = 25.sp,
+                                lineHeight = 31.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Text(
+                                if (vpnMode) "应用保护 · DNS 实时统计" else "Root 模块 · 全局 hosts 过滤",
+                                color = tokens.textSecondary,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                        Text(snapshot.version, color = tokens.textSecondary, style = MaterialTheme.typography.labelSmall)
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Surface(
+                            onClick = { showModePicker = true },
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            color = tokens.controlBackground,
+                        ) {
+                            Row(
+                                Modifier.fillMaxSize().padding(horizontal = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(if (vpnMode) Icons.Rounded.QueryStats else Icons.Rounded.Extension, null, tint = scheme.primary, modifier = Modifier.size(19.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(if (vpnMode) "应用保护" else "模块保护", color = tokens.textPrimary, style = MaterialTheme.typography.labelLarge)
+                                    Text("点击切换", color = tokens.textSecondary, style = MaterialTheme.typography.labelSmall)
+                                }
+                                Icon(Icons.Rounded.UnfoldMore, null, tint = tokens.textSecondary, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                        Button(
+                            onClick = ::toggleProtection,
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                            shape = RoundedCornerShape(14.dp),
+                        ) {
+                            Icon(if (active) Icons.Rounded.Pause else Icons.Rounded.PowerSettingsNew, null, Modifier.size(19.dp))
+                            Spacer(Modifier.width(7.dp))
+                            Text(if (active) "暂停保护" else "立即开启")
+                        }
+                    }
+                }
+            }
+        }
+
+        item("metrics") {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                Surface(
+                    modifier = Modifier.weight(1.35f).height(150.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    color = tokens.selectionBackground,
+                ) {
+                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.SpaceBetween) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Rounded.Block, null, tint = scheme.primary, modifier = Modifier.size(21.dp))
+                            Spacer(Modifier.weight(1f))
+                            Text(if (vpnMode) "实时" else "历史", color = tokens.textSecondary, style = MaterialTheme.typography.labelSmall)
+                        }
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                counters.blocked.toString(),
+                                color = tokens.textPrimary,
+                                fontSize = 34.sp,
+                                lineHeight = 39.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Text("累计拦截", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    CompactDataTile(snapshot.ruleCount.toString(), "有效规则", Icons.Rounded.Rule, Modifier.weight(1f))
+                    CompactDataTile("${counters.blockRate}%", "拦截率", Icons.Rounded.QueryStats, Modifier.weight(1f))
+                }
+            }
+        }
+
+        if (snapshot.message.isNotBlank() && !snapshot.message.contains("尚未安装")) {
+            item("message") {
+                Surface(shape = RoundedCornerShape(16.dp), color = scheme.errorContainer) {
+                    Text(snapshot.message, Modifier.padding(16.dp), color = scheme.onErrorContainer, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+
+        item("quick") {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                CompactSectionHeading("常用功能", "把高频操作放到一眼能找到的位置")
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    CompactActionTile(
+                        title = "代理",
+                        subtitle = if (snapshot.proxyRunning) "运行中" else "节点与连接",
+                        icon = Icons.Rounded.Public,
+                        modifier = Modifier.weight(1f),
+                    ) { context.startActivity(Intent(context, ComposeProxyActivity::class.java)) }
+                    CompactActionTile("规则", "订阅与名单", Icons.Rounded.Rule, Modifier.weight(1f), onRules)
+                    CompactActionTile("应用", "放行管理", Icons.Rounded.Apps, Modifier.weight(1f), onApps)
+                }
+            }
+        }
+
+        item("device") {
+            Surface(shape = RoundedCornerShape(18.dp), color = tokens.cardBackground, border = BorderStroke(1.dp, tokens.outline)) {
+                Column(Modifier.fillMaxWidth()) {
+                    Row(
+                        Modifier.fillMaxWidth().clickable { detailsExpanded = !detailsExpanded }.padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("设备状态", color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall)
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            if (snapshot.rootGranted && snapshot.installed) "运行环境正常" else "需要检查",
+                            color = if (snapshot.rootGranted && snapshot.installed) tokens.success else tokens.warning,
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Icon(if (detailsExpanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore, null, tint = tokens.textSecondary)
+                    }
+                    AnimatedVisibility(detailsExpanded) {
+                        Column(
+                            Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 14.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                CompactStatusBlock("Root", if (snapshot.rootGranted) "已授权" else "未授权", snapshot.rootGranted, Modifier.weight(1f))
+                                CompactStatusBlock("模块", if (snapshot.installed) snapshot.version else "未安装", snapshot.installed, Modifier.weight(1f))
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                CompactStatusBlock("规则", "${snapshot.ruleCount} 条", snapshot.ruleCount > 0, Modifier.weight(1f))
+                                CompactStatusBlock("代理", if (snapshot.proxyRunning) "运行中" else "未运行", snapshot.proxyRunning, Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showModePicker) {
+        AlertDialog(
+            onDismissRequest = { showModePicker = false },
+            title = { Text("去广告保护方式") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    ProtectionModeOption(
+                        selected = !vpnMode,
+                        icon = Icons.Rounded.Extension,
+                        title = "模块保护",
+                        description = "不占 VPN · 全局 hosts 去广告 · 无法获得逐条命中次数",
+                    ) {
+                        controller.setProtectionMode("module")
+                        showModePicker = false
+                        refresh++
+                    }
+                    ProtectionModeOption(
+                        selected = vpnMode,
+                        icon = Icons.Rounded.QueryStats,
+                        title = "应用保护",
+                        description = "本地 DNS VPN · 精确累计请求/拦截 · 支持按应用放行",
+                    ) {
+                        controller.setProtectionMode("vpn")
+                        showModePicker = false
+                        refresh++
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showModePicker = false }) { Text("关闭") } },
+        )
+    }
+}
+
+@Composable
+private fun CompactDataTile(value: String, label: String, icon: ImageVector, modifier: Modifier = Modifier) {
+    val tokens = LocalBichenTokens.current
+    Surface(modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = tokens.controlBackground) {
+        Row(Modifier.fillMaxSize().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(19.dp))
+            Spacer(Modifier.width(10.dp))
+            Column {
+                Text(value, color = tokens.textPrimary, fontSize = 18.sp, lineHeight = 22.sp, fontWeight = FontWeight.Bold)
+                Text(label, color = tokens.textSecondary, style = MaterialTheme.typography.labelSmall)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompactActionTile(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    val tokens = LocalBichenTokens.current
+    Surface(onClick = onClick, modifier = modifier.height(108.dp), shape = RoundedCornerShape(18.dp), color = tokens.cardBackground, border = BorderStroke(1.dp, tokens.outline)) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.SpaceBetween) {
+            Box(Modifier.size(38.dp).background(tokens.controlBackground, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+                Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(title, color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall)
+                Text(subtitle, color = tokens.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompactStatusBlock(title: String, value: String, healthy: Boolean, modifier: Modifier = Modifier) {
+    val tokens = LocalBichenTokens.current
+    Surface(modifier = modifier, shape = RoundedCornerShape(14.dp), color = tokens.controlBackground) {
+        Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(7.dp).background(if (healthy) tokens.success else tokens.warning, CircleShape))
+            Spacer(Modifier.width(8.dp))
+            Column {
+                Text(title, color = tokens.textSecondary, style = MaterialTheme.typography.labelSmall)
+                Text(value, color = tokens.textPrimary, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}
+
+'''
+
+text = text[:start] + home + text[end:]
+path.write_text(text)
