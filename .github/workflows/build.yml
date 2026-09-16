@@ -32,6 +32,11 @@ jobs:
           test -x "$SDKMANAGER"
           yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
           "$SDKMANAGER" 'platform-tools' 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Validate Root proxy scripts
+        shell: bash
+        run: |
+          bash -n android-app/app/src/main/assets/proxy-root.sh
+          bash -n android-app/app/src/main/assets/tproxy-root.sh
       - name: Restore configured signing key
         env:
           SIGNING_KEY_BASE64: ${{ secrets.BICHEN_KEYSTORE_BASE64 }}
