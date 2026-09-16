@@ -22,6 +22,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 tools/apply_test28_proxy_p2.py
+          python3 tools/fix_test28_redirect_regression.py
           mkdir -p android-app/app/src/main/assets/cnip
           curl -fsSL --retry 3 --connect-timeout 15 \
             https://raw.githubusercontent.com/gaoyifan/china-operator-ip/ip-lists/china.txt \
