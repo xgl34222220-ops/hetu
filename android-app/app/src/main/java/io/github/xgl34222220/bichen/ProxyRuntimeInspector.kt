@@ -205,7 +205,7 @@ internal class ProxyRuntimeInspector(context: Context) {
 
     private fun webUiReady(): Boolean {
         val uiPath = "/data/adb/bichen/proxy/run/${MihomoStartupConfig.EXTERNAL_UI_DIR}"
-        val command = "UI=${RootBridge.quote(uiPath)}; test -s \"${'$'}UI/index.html\" && find \"${'$'}UI\" -type f \( -name '*.js' -o -name '*.mjs' \) -print -quit 2>/dev/null | grep -q . && echo READY || echo MISSING"
+        val command = "UI=${RootBridge.quote(uiPath)}; test -s \"${'$'}UI/index.html\" && find \"${'$'}UI\" -type f -print 2>/dev/null | grep -Eq '\\.(m?js)$' && echo READY || echo MISSING"
         val result = RootBridge.rootShell(app, command, 4_000L)
         return result.ok() && result.output.contains("READY")
     }
