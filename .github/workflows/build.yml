@@ -44,6 +44,7 @@ jobs:
           python3 tools/test_java.py
           python3 -m unittest discover -s tests -p '*test.py' -v
       - name: Verify checked-in install packages
+        if: github.event_name != 'pull_request'
         run: python3 tools/verify_downloads.py
       - name: Upload test build artifacts
         uses: actions/upload-artifact@v4
@@ -54,6 +55,7 @@ jobs:
             out/*-source.zip
           if-no-files-found: error
           retention-days: 30
-      # The current UI is Kotlin/Compose. Installable APKs are built by the
-      # dedicated Compose/Android workflows; the legacy Java-only build_app.py
-      # is intentionally not used as the pull-request gate here.
+      # Checked-in downloads are release artifacts and are expected to differ
+      # from source-changing PRs until a release is intentionally produced.
+      # The current UI is Kotlin/Compose, so installable APKs are built by the
+      # dedicated Compose/Android workflows rather than legacy build_app.py.
