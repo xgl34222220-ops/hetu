@@ -1,0 +1,49 @@
+name: Fix dock white strip
+
+on:
+  push:
+    branches:
+      - feature/compose-luoshu-ui
+    paths:
+      - .github/workflows/fix-dock-white-strip.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/compose-luoshu-ui
+          fetch-depth: 0
+      - name: Remove nested dock shader layer
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ui/BichenGlassDock.kt')
+          s = p.read_text()
+          old = s
+          s = s.replace('import top.yukonga.miuix.kmp.blur.layerBackdrop\n', '')
+          s = s.replace('import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop\n', '')
+          s = s.replace('    val dockSurfaceBackdrop = rememberLayerBackdrop()\n', '')
+          s = s.replace('                .then(if (runtimeLiquid) Modifier.layerBackdrop(dockSurfaceBackdrop) else Modifier)\n', '')
+          s = s.replace('            indicatorBackdrop = dockSurfaceBackdrop.takeIf { runtimeLiquid },\n', '            // HyperOS/Android 16 can flatten a nested RuntimeShader backdrop into a white strip.\n            // Keep the LuoShu shell/geometry/animation, but draw the moving indicator as a single translucent layer.\n            indicatorBackdrop = null,\n')
+          s = s.replace(
+              '        } else {\n            Modifier.background(indicatorColor, indicatorShape)\n        }',
+              '''        } else {\n            Modifier.background(\n                Brush.verticalGradient(\n                    listOf(\n                        scheme.primary.copy(alpha = if (dark) .24f else .17f),\n                        Color.White.copy(alpha = if (dark) .055f else .15f),\n                        scheme.primary.copy(alpha = if (dark) .16f else .10f),\n                    ),\n                ),\n                indicatorShape,\n            )\n        }'''
+          )
+          if s == old:
+              raise SystemExit('dock patch made no changes')
+          p.write_text(s)
+          PY
+          rm -f .github/workflows/fix-dock-white-strip.yml
+      - name: Commit fix
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add android-app/app/src/main/java/io/github/xgl34222220/bichen/ui/BichenGlassDock.kt .github/workflows/fix-dock-white-strip.yml
+          git commit -m "Fix HyperOS dock white strip"
+          git push origin HEAD:feature/compose-luoshu-ui
