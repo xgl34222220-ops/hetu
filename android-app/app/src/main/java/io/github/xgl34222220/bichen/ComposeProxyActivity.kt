@@ -51,7 +51,6 @@ import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
-import top.yukonga.miuix.kmp.blur.textureBlur
 
 class ComposeProxyActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -1076,11 +1075,11 @@ private fun GlassBlock(
 ) {
     val tokens = LocalBichenTokens.current
     val shape = RoundedCornerShape(radius.dp)
+    // Do not attach a RuntimeShader blur to every scrolling card. Some OEM GPU/WebView
+    // combinations crash the whole activity while Compose creates multiple blur RenderNodes.
+    // Keep the glass hierarchy with a translucent one-layer surface; the dock can still use
+    // the single, already-proven backdrop blur.
     var surface = modifier
-    if (backdrop != null) {
-        surface = surface.textureBlur(backdrop = backdrop, shape = shape, blurRadius = 18f)
-    }
-    surface = surface
         .background(tokens.cardBackground.copy(alpha = if (backdrop != null) tintAlpha else .98f), shape)
         .border(1.dp, tokens.outline.copy(alpha = if (backdrop != null) .42f else .60f), shape)
         .clip(shape)
