@@ -1,0 +1,59 @@
+name: Patch WebUI reliability
+
+on:
+  push:
+    branches: ['feature/compose-luoshu-ui']
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message == 'Run WebUI reliability patch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/compose-luoshu-ui
+          fetch-depth: 0
+      - name: Patch WebUI
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyWebUiActivity.kt')
+          s = p.read_text()
+
+          old = '''    DashboardTarget(\n        id = "metacubexd",\n        name = "MetaCubeXD",\n        url = "https://metacubex.github.io/metacubexd/",\n    ),\n    DashboardTarget(\n        id = "singbox",\n        name = "Sing-Box Dashboard",\n        url = "https://sing-box-dashboard.sagernet.org/",\n    ),'''
+          new = '''    DashboardTarget(\n        id = "metacubexd",\n        name = "MetaCubeXD",\n        url = "https://d.metacubex.one/",\n    ),'''
+          if old not in s:
+              raise SystemExit('builtin dashboard block not found')
+          s = s.replace(old, new, 1)
+
+          marker = '''private fun saveCustomDashboards(context: Context, items: List<DashboardTarget>) {\n'''
+          helper = '''private fun resolvedDashboardUrl(target: DashboardTarget, secret: String): String {\n    if (target.id != "zashboard") return target.url\n    val encoded = android.net.Uri.encode(secret)\n    return target.url.trimEnd('/') + "/#/setup?protocol=http&hostname=127.0.0.1&port=${MihomoStartupConfig.CONTROLLER_PORT}&secret=$encoded&disableUpgradeCore=1&disableTunMode=1"\n}\n\n'''
+          if helper not in s:
+              s = s.replace(marker, helper + marker, 1)
+
+          s = s.replace('''                    if (!selected.local || !url.startsWith("http://127.0.0.1:${MihomoStartupConfig.CONTROLLER_PORT}/ui/")) return\n''', '''                    val injectEndpoint = selected.local || selected.id == "metacubexd"\n                    if (!injectEndpoint) return\n                    if (selected.local && !url.startsWith("http://127.0.0.1:${MihomoStartupConfig.CONTROLLER_PORT}/ui/")) return\n''', 1)
+
+          s = s.replace('''            webView.loadUrl(selected.url)\n''', '''            webView.loadUrl(resolvedDashboardUrl(selected, secret))\n''', 1)
+
+          old_reload = '''        } else {\n            val separator = if (selected.url.contains('?')) '&' else '?'\n            webView.loadUrl("${selected.url}$separator" + "bichen_retry=$stamp")\n        }\n'''
+          new_reload = '''        } else {\n            val base = resolvedDashboardUrl(selected, secret)\n            if (selected.id == "zashboard") {\n                webView.loadUrl(base)\n            } else {\n                val separator = if (base.contains('?')) '&' else '?'\n                webView.loadUrl("$base$separator" + "bichen_retry=$stamp")\n            }\n        }\n'''
+          if old_reload not in s:
+              raise SystemExit('reload block not found')
+          s = s.replace(old_reload, new_reload, 1)
+
+          s = s.replace('''                    "外部面板不会自动获得本机控制密钥；本地 MetaCubeXD 才会安全注入控制端点。",\n''', '''                    "Zashboard 与 MetaCubeXD 会自动连接本机 Mihomo；自定义面板仍需按其自身方式填写控制端点。",\n''', 1)
+
+          p.write_text(s)
+          PY
+      - name: Commit patch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyWebUiActivity.kt
+          git commit -m "Make bundled WebUIs actually connect to Mihomo"
+          git push origin HEAD:feature/compose-luoshu-ui
