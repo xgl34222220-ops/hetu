@@ -1,6 +1,7 @@
 package io.github.xgl34222220.bichen
 
 import android.content.Context
+import android.os.SystemClock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -19,6 +20,10 @@ internal data class ProxyRuntimeSnapshot(
     val systemTicks: Long = 0L,
     val rssBytes: Long = 0L,
     val lanAddress: String = "—",
+    val lanInterface: String = "—",
+    val wanAddress: String = "—",
+    val wanCountryCode: String = "",
+    val wanRegion: String = "—",
 )
 
 /** Lightweight runtime inspector used by the proxy dashboard. */
@@ -26,6 +31,8 @@ internal class ProxyRuntimeInspector(context: Context) {
     private val app = context.applicationContext
     private val api = MihomoControllerClient(app)
     private val prefs = app.getSharedPreferences("bichen", Context.MODE_PRIVATE)
+    @Volatile private var wanCacheAt = 0L
+    @Volatile private var wanCache = Triple("—", "", "—")
 
     companion object {
         private const val ZASHBOARD_ZIP = "https://github.com/Zephyruso/zashboard/releases/latest/download/dist-no-fonts.zip"
@@ -55,6 +62,8 @@ internal class ProxyRuntimeInspector(context: Context) {
         """.trimIndent()
         val result = RootBridge.rootShell(app, command, 8_000L)
         val json = if (result.ok()) runCatching { JSONObject(result.output.trim()) }.getOrNull() else null
+        val local = localNetwork()
+        val wan = publicNetwork()
         ProxyRuntimeSnapshot(
             running = json?.optBoolean("running", false) == true,
             pid = json?.optInt("pid", 0) ?: 0,
@@ -62,7 +71,11 @@ internal class ProxyRuntimeInspector(context: Context) {
             processTicks = json?.optLong("processTicks", 0L) ?: 0L,
             systemTicks = json?.optLong("systemTicks", 0L) ?: 0L,
             rssBytes = json?.optLong("rssBytes", 0L) ?: 0L,
-            lanAddress = localIpv4Address(),
+            lanAddress = local.first,
+            lanInterface = local.second,
+            wanAddress = wan.first,
+            wanCountryCode = wan.second,
+            wanRegion = wan.third,
         )
     }
 
@@ -181,10 +194,10 @@ internal class ProxyRuntimeInspector(context: Context) {
         return result.ok() && result.output.contains("READY")
     }
 
-    private fun localIpv4Address(): String {
+    private fun localNetwork(): Pair<String, String> {
         return runCatching {
-            val preferred = ArrayList<Pair<Int, String>>()
-            val interfaces = NetworkInterface.getNetworkInterfaces() ?: return@runCatching "—"
+            val preferred = ArrayList<Triple<Int, String, String>>()
+            val interfaces = NetworkInterface.getNetworkInterfaces() ?: return@runCatching "—" to "—"
             while (interfaces.hasMoreElements()) {
                 val network = interfaces.nextElement()
                 if (!network.isUp || network.isLoopback) continue
@@ -198,11 +211,42 @@ internal class ProxyRuntimeInspector(context: Context) {
                 while (addresses.hasMoreElements()) {
                     val address = addresses.nextElement()
                     if (address is Inet4Address && !address.isLoopbackAddress && !address.isLinkLocalAddress) {
-                        preferred += rank to address.hostAddress.orEmpty()
+                        preferred += Triple(rank, address.hostAddress.orEmpty(), network.name)
                     }
                 }
             }
-            preferred.sortedBy { it.first }.firstOrNull()?.second?.takeIf { it.isNotBlank() } ?: "—"
-        }.getOrDefault("—")
+            preferred.sortedBy { it.first }.firstOrNull()?.let { it.second to it.third } ?: ("—" to "—")
+        }.getOrDefault("—" to "—")
     }
+
+    private fun publicNetwork(): Triple<String, String, String> {
+        val now = SystemClock.elapsedRealtime()
+        if (now - wanCacheAt < 60_000L && wanCache.first != "—") return wanCache
+        val fresh = runCatching {
+            val connection = (URL("https://ipwho.is/?fields=success,ip,country_code,region").openConnection() as HttpURLConnection).apply {
+                connectTimeout = 3_000
+                readTimeout = 3_000
+                requestMethod = "GET"
+                setRequestProperty("User-Agent", "Bichen-Android")
+            }
+            try {
+                if (connection.responseCode !in 200..299) error("HTTP ${connection.responseCode}")
+                val json = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
+                if (!json.optBoolean("success", true)) error("WAN lookup failed")
+                Triple(
+                    json.optString("ip", "—").ifBlank { "—" },
+                    json.optString("country_code", ""),
+                    json.optString("region", "—").ifBlank { "—" },
+                )
+            } finally {
+                connection.disconnect()
+            }
+        }.getOrNull()
+        if (fresh != null) {
+            wanCache = fresh
+            wanCacheAt = now
+        }
+        return fresh ?: wanCache
+    }
+
 }

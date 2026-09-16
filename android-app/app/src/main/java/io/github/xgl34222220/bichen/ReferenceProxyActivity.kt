@@ -1,11 +1,14 @@
 package io.github.xgl34222220.bichen
 
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -30,12 +33,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
+import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
+import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import io.github.xgl34222220.bichen.ui.BichenGlassDock
 import io.github.xgl34222220.bichen.ui.BichenTheme
 import io.github.xgl34222220.bichen.ui.DockItem
@@ -50,16 +58,25 @@ import kotlinx.coroutines.launch
  */
 @OptIn(ExperimentalMaterial3Api::class)
 class ReferenceProxyActivity : ComponentActivity() {
+    private var uiRevision by mutableIntStateOf(0)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { BichenTheme { RefProxyShell { finish() } } }
+        setContent {
+            key(uiRevision) { BichenTheme { RefProxyShell { finish() } } }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        uiRevision++
     }
 }
 
 private enum class RefProxyPage { Home, Panel, Tools, Settings }
 private enum class RefPanelTab(val label: String) {
-    Overview("策略"), Nodes("节点"), Subscriptions("订阅"), Connections("连接"), Rules("规则"), RuleSets("规则集")
+    Overview("节点"), Nodes("概览"), Subscriptions("订阅"), Connections("连接"), Rules("规则"), RuleSets("规则集")
 }
 
 @Composable
@@ -70,12 +87,20 @@ private fun RefProxyShell(onBack: () -> Unit) {
     val inspector = remember { ProxyRuntimeInspector(context) }
     val scope = rememberCoroutineScope()
     val haze = rememberHazeState()
+    val liquidBackdrop = rememberLayerBackdrop()
+    val liquid = isRuntimeShaderSupported()
+    val prefs = remember { context.getSharedPreferences("bichen", 0) }
+    val showPanelTab = prefs.getBoolean("showPanelTab", true)
 
     var page by rememberSaveable { mutableStateOf(RefProxyPage.Home) }
     var state by remember { mutableStateOf(ProxyComposeState()) }
     var runtime by remember { mutableStateOf(ProxyRuntimeSnapshot()) }
     var providers by remember { mutableStateOf<List<DashboardProviderUi>>(emptyList()) }
+    var siteDelays by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
     val delays = remember { mutableStateMapOf<String, Long>() }
+    var cpuPercent by remember { mutableFloatStateOf(0f) }
+    var lastProcessTicks by remember { mutableLongStateOf(0L) }
+    var lastSystemTicks by remember { mutableLongStateOf(0L) }
     var upRate by remember { mutableLongStateOf(0L) }
     var downRate by remember { mutableLongStateOf(0L) }
     var lastUp by remember { mutableLongStateOf(0L) }
@@ -98,7 +123,18 @@ private fun RefProxyShell(onBack: () -> Unit) {
             next.groups.flatMap { it.nodes }.forEach { node ->
                 node.lastDelay?.takeIf { it > 0L }?.let { delays.putIfAbsent(node.name, it) }
             }
-            runtime = if (next.running) runCatching { inspector.sample() }.getOrDefault(runtime) else ProxyRuntimeSnapshot()
+            val sampled = if (next.running) runCatching { inspector.sample() }.getOrDefault(runtime) else ProxyRuntimeSnapshot()
+            if (next.running && lastSystemTicks > 0L && sampled.systemTicks > lastSystemTicks && sampled.processTicks >= lastProcessTicks) {
+                val deltaProcess = sampled.processTicks - lastProcessTicks
+                val deltaSystem = sampled.systemTicks - lastSystemTicks
+                val cores = Runtime.getRuntime().availableProcessors().coerceAtLeast(1)
+                cpuPercent = ((deltaProcess.toDouble() / deltaSystem.toDouble()) * 100.0 * cores).toFloat().coerceIn(0f, 100f)
+            } else if (!next.running) {
+                cpuPercent = 0f
+            }
+            lastProcessTicks = sampled.processTicks
+            lastSystemTicks = sampled.systemTicks
+            runtime = sampled
             providers = if (next.running) runCatching { repo.providers() }.getOrDefault(providers) else emptyList()
             state = next
             message = next.message
@@ -169,14 +205,13 @@ private fun RefProxyShell(onBack: () -> Unit) {
         }
     }
 
-    fun quickDelay() {
+    fun measureSites() {
         if (!state.running || testing) return
         scope.launch {
             testing = true
             try {
-                val result = repo.quickDelay()
-                delays.putAll(result)
-                if (result.isEmpty()) message = "没有可测速的当前节点"
+                siteDelays = repo.siteLatencies()
+                if (siteDelays.values.none { it > 0L }) message = "关键站点测速失败，请检查当前网络"
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
@@ -196,25 +231,47 @@ private fun RefProxyShell(onBack: () -> Unit) {
         }
     }
 
-    val dock = remember {
-        listOf(
-            DockItem("首页", Icons.Rounded.Home, .94f),
-            DockItem("面板", Icons.Rounded.Link, .96f),
-            DockItem("工具", Icons.Rounded.GridView, .96f),
-            DockItem("设置", Icons.Rounded.Settings, .94f),
-        )
+    LaunchedEffect(state.running) {
+        if (!state.running) { siteDelays = emptyMap(); return@LaunchedEffect }
+        siteDelays = runCatching { repo.siteLatencies() }.getOrDefault(siteDelays)
+        while (true) {
+            delay(15_000)
+            siteDelays = runCatching { repo.siteLatencies() }.getOrDefault(siteDelays)
+        }
+    }
+
+    val dockPages = remember(showPanelTab) {
+        if (showPanelTab) listOf(RefProxyPage.Home, RefProxyPage.Panel, RefProxyPage.Tools, RefProxyPage.Settings)
+        else listOf(RefProxyPage.Home, RefProxyPage.Tools, RefProxyPage.Settings)
+    }
+    LaunchedEffect(showPanelTab) { if (!showPanelTab && page == RefProxyPage.Panel) page = RefProxyPage.Home }
+    val dock = remember(showPanelTab) {
+        dockPages.map { destination ->
+            when (destination) {
+                RefProxyPage.Home -> DockItem("首页", Icons.Rounded.Home, .94f)
+                RefProxyPage.Panel -> DockItem("面板", Icons.Rounded.Link, .96f)
+                RefProxyPage.Tools -> DockItem("工具", Icons.Rounded.GridView, .96f)
+                RefProxyPage.Settings -> DockItem("设置", Icons.Rounded.Settings, .94f)
+            }
+        }
     }
 
     Box(Modifier.fillMaxSize().background(LocalBichenTokens.current.pageBackground)) {
-        Box(Modifier.fillMaxSize().padding(bottom = 88.dp)) {
+        Box(
+            Modifier.fillMaxSize()
+                .then(if (!liquid) Modifier.hazeSource(haze) else Modifier)
+                .then(if (liquid) Modifier.layerBackdrop(liquidBackdrop) else Modifier)
+                .padding(bottom = 88.dp),
+        ) {
             when (page) {
                 RefProxyPage.Home -> RefHome(
                     state = state,
                     runtime = runtime,
                     providers = providers,
-                    delays = delays,
+                    siteDelays = siteDelays,
                     upRate = upRate,
                     downRate = downRate,
+                    cpuPercent = cpuPercent,
                     operation = operation,
                     message = message,
                     testing = testing,
@@ -223,7 +280,7 @@ private fun RefProxyShell(onBack: () -> Unit) {
                     onToggle = ::toggle,
                     onReload = ::reload,
                     onRestart = ::restart,
-                    onDelay = ::quickDelay,
+                    onDelay = ::measureSites,
                     onWebUi = { context.startActivity(Intent(context, ProxyWebUiActivity::class.java)) },
                     onLog = { scope.launch { logText = runCatching { inspector.runtimeLog() }.getOrElse { it.message ?: "日志读取失败" } } },
                 )
@@ -234,10 +291,10 @@ private fun RefProxyShell(onBack: () -> Unit) {
         }
         BichenGlassDock(
             items = dock,
-            selected = page.ordinal,
-            onSelect = { page = RefProxyPage.entries[it] },
+            selected = dockPages.indexOf(page).coerceAtLeast(0),
+            onSelect = { page = dockPages[it] },
             hazeState = haze,
-            backdrop = null,
+            backdrop = liquidBackdrop.takeIf { liquid },
             modifier = Modifier.align(Alignment.BottomCenter),
         )
     }
@@ -258,9 +315,10 @@ private fun RefHome(
     state: ProxyComposeState,
     runtime: ProxyRuntimeSnapshot,
     providers: List<DashboardProviderUi>,
-    delays: Map<String, Long>,
+    siteDelays: Map<String, Long>,
     upRate: Long,
     downRate: Long,
+    cpuPercent: Float,
     operation: String,
     message: String,
     testing: Boolean,
@@ -275,15 +333,6 @@ private fun RefHome(
 ) {
     val t = LocalBichenTokens.current
     val scheme = MaterialTheme.colorScheme
-    val selectedDelays = state.groups.mapNotNull { group ->
-        val name = group.now
-        (delays[name] ?: group.nodes.firstOrNull { it.name == name }?.lastDelay)?.takeIf { it > 0L }
-    }
-    val measured = delays.values.filter { it > 0L }
-    val current = selectedDelays.firstOrNull()
-    val avg = selectedDelays.takeIf { it.isNotEmpty() }?.average()?.toInt()?.toLong()
-        ?: measured.takeIf { it.isNotEmpty() }?.average()?.toInt()?.toLong()
-    val fastest = measured.minOrNull()
     val memory = runtime.rssBytes.takeIf { it > 0L } ?: state.memoryBytes
 
     LazyColumn(
@@ -292,115 +341,146 @@ private fun RefHome(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {
-            Row(
-                Modifier.fillMaxWidth().statusBarsPadding().padding(top = 12.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("代理", color = t.textPrimary, fontSize = 26.sp, lineHeight = 32.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                IconButton(onClick = onRefresh, modifier = Modifier.size(42.dp)) {
-                    Icon(Icons.Rounded.Refresh, "刷新", tint = t.textSecondary, modifier = Modifier.size(20.dp))
-                }
-                IconButton(onClick = onBack, modifier = Modifier.size(42.dp)) {
-                    Icon(Icons.Rounded.Close, "关闭", tint = t.textSecondary, modifier = Modifier.size(20.dp))
-                }
-            }
+  Row(
+      Modifier.fillMaxWidth().statusBarsPadding().padding(top = 10.dp, bottom = 6.dp),
+      verticalAlignment = Alignment.CenterVertically,
+  ) {
+      Text("代理", color = t.textPrimary, fontSize = 27.sp, lineHeight = 33.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+      IconButton(onClick = onRefresh, modifier = Modifier.size(44.dp)) {
+          Icon(Icons.Rounded.Refresh, "刷新", tint = t.textSecondary, modifier = Modifier.size(20.dp))
+      }
+      IconButton(onClick = onBack, modifier = Modifier.size(44.dp)) {
+          Icon(Icons.Rounded.Close, "关闭", tint = t.textSecondary, modifier = Modifier.size(20.dp))
+      }
+  }
         }
         item {
-            Box(
-                Modifier.fillMaxWidth()
-                    .background(if (state.running) t.selectionBackground else t.cardBackground, RoundedCornerShape(18.dp))
-                    .heightIn(min = 118.dp),
-            ) {
-                Column(
-                    Modifier.fillMaxWidth().padding(15.dp),
-                    verticalArrangement = Arrangement.spacedBy(5.dp),
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(Modifier.size(8.dp).background(if (state.running) scheme.primary else t.warning, CircleShape))
-                        Text(if (state.running) "运行中" else "已停止", color = if (state.running) scheme.primary else t.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                    }
-                    Text(if (state.running) refDuration(runtime.elapsedSeconds) else "等待启动", color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                    Text("${state.core} · ${state.mode}", color = t.textPrimary, style = MaterialTheme.typography.bodyMedium)
-                    Text(state.config, color = t.textPrimary, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                }
-            }
+  Surface(shape = RoundedCornerShape(26.dp), color = t.heroBackground, shadowElevation = 0.dp) {
+      Column(Modifier.fillMaxWidth().padding(17.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+          Row(verticalAlignment = Alignment.Top) {
+              Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                  Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                      Box(Modifier.size(9.dp).background(if (state.running) t.success else t.danger, CircleShape))
+                      Text(if (state.running) "运行中" else "已停止", color = t.textPrimary, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                      Text(if (state.running) refDuration(runtime.elapsedSeconds) else "等待启动", color = t.textSecondary, style = MaterialTheme.typography.labelMedium)
+                  }
+                  Text("${state.core} · ${state.mode}", color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
+                  Text(state.config, color = t.textSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+              }
+              Box(
+                  Modifier.size(58.dp).background(if (state.running) scheme.primary else t.controlBackground, CircleShape),
+                  contentAlignment = Alignment.Center,
+              ) {
+                  Icon(
+                      if (state.running) Icons.Rounded.Check else Icons.Rounded.PowerSettingsNew,
+                      null,
+                      tint = if (state.running) Color.White else t.textMuted,
+                      modifier = Modifier.size(31.dp),
+                  )
+              }
+          }
+          HorizontalDivider(color = t.outline.copy(alpha = .75f))
+          Row(Modifier.fillMaxWidth()) {
+              RefActionText("重载", state.running && operation.isBlank(), onReload, Modifier.weight(1f), scheme.primary)
+              VerticalDivider(Modifier.height(32.dp), color = t.outline)
+              RefActionText(if (state.running) "停止" else "启动", operation.isBlank(), onToggle, Modifier.weight(1f), t.danger)
+              VerticalDivider(Modifier.height(32.dp), color = t.outline)
+              RefActionText("重启", state.running && operation.isBlank(), onRestart, Modifier.weight(1f), t.warning)
+          }
+      }
+  }
         }
         item {
-            Surface(shape = RoundedCornerShape(15.dp), color = t.cardBackground, shadowElevation = 0.dp) {
-                Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                    RefActionText("重载", state.running && operation.isBlank(), onReload, Modifier.weight(1f), scheme.primary)
-                    VerticalDivider(Modifier.height(30.dp).align(Alignment.CenterVertically), color = t.outline)
-                    RefActionText(if (state.running) "停止" else "启动", operation.isBlank(), onToggle, Modifier.weight(1f), scheme.error)
-                    VerticalDivider(Modifier.height(30.dp).align(Alignment.CenterVertically), color = t.outline)
-                    RefActionText("重启", state.running && operation.isBlank(), onRestart, Modifier.weight(1f), t.warning)
-                }
-            }
+  Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+      RefSmallTool("WebUI", "Web 界面", Icons.Rounded.Language, onWebUi, Modifier.weight(1f))
+      RefSmallTool("日志", "查看", Icons.Rounded.Article, onLog, Modifier.weight(1f))
+  }
         }
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                RefSmallTool("WebUI", "Web 界面", Icons.Rounded.Language, onWebUi, Modifier.weight(1f))
-                RefSmallTool("日志", "查看", Icons.Rounded.Article, onLog, Modifier.weight(1f))
-            }
-        }
-        item { RefLatencyPanel(current, avg, fastest, testing, onDelay) }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                RefNetworkIdentityCard(runtime.lanAddress, state.connections.size, Modifier.weight(1f))
-                RefSpeedCard(upRate, downRate, Modifier.weight(1f))
-            }
+  RefLatencyPanel(
+      baidu = siteDelays["Baidu"],
+      cloudflare = siteDelays["Cloudflare"],
+      google = siteDelays["Google"],
+      testing = testing,
+      onClick = onDelay,
+  )
         }
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                RefSubscriptionCompact(providers, Modifier.weight(1f))
-                RefResourceCard(memory, runtime.pid, state.connections.size, Modifier.weight(1f))
-            }
+  Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+      RefNetworkIdentityCard(runtime, state.connections.size, Modifier.weight(1f))
+      RefSpeedCard(upRate, downRate, Modifier.weight(1f))
+  }
+        }
+        item {
+  Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+      RefSubscriptionCompact(providers, Modifier.weight(1f))
+      RefResourceCard(memory, cpuPercent, runtime.pid, Modifier.weight(1f))
+  }
         }
         if (operation.isNotBlank() || message.isNotBlank()) {
-            item { Text(operation.ifBlank { message }, color = t.textSecondary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)) }
+  item { Text(operation.ifBlank { message }, color = t.textSecondary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)) }
         }
     }
 }
 
 @Composable
-private fun RefLatencyPanel(current: Long?, average: Long?, fastest: Long?, testing: Boolean, onClick: () -> Unit) {
+private fun RefLatencyPanel(baidu: Long?, cloudflare: Long?, google: Long?, testing: Boolean, onClick: () -> Unit) {
     val t = LocalBichenTokens.current
-    Surface(onClick = onClick, enabled = !testing, shape = RoundedCornerShape(15.dp), color = t.cardBackground, shadowElevation = 0.dp) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("延迟", color = t.textPrimary, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                Icon(Icons.Rounded.Tune, null, tint = t.textSecondary, modifier = Modifier.size(17.dp))
-                Spacer(Modifier.width(10.dp))
-                if (testing) CircularProgressIndicator(Modifier.size(17.dp), strokeWidth = 2.dp) else Icon(Icons.Rounded.Refresh, "测速", tint = t.textSecondary, modifier = Modifier.size(18.dp))
-            }
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                RefLatencyColumn("当前", if (testing) "…" else refDelay(current), Modifier.weight(1f))
-                VerticalDivider(Modifier.height(36.dp), color = t.outline)
-                RefLatencyColumn("平均", if (testing) "…" else refDelay(average), Modifier.weight(1f))
-                VerticalDivider(Modifier.height(36.dp), color = t.outline)
-                RefLatencyColumn("最快", if (testing) "…" else refDelay(fastest), Modifier.weight(1f))
-            }
+    Surface(onClick = onClick, enabled = !testing, shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 13.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+  Row(verticalAlignment = Alignment.CenterVertically) {
+      Text("延迟", color = t.textPrimary, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+      Text(if (testing) "测试中" else "全部测速", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium)
+      Spacer(Modifier.width(6.dp))
+      if (testing) CircularProgressIndicator(Modifier.size(17.dp), strokeWidth = 2.dp)
+      else Icon(Icons.Rounded.Refresh, "测速", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+  }
+  Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+      RefLatencyColumn("Baidu", baidu, testing, Modifier.weight(1f))
+      VerticalDivider(Modifier.height(38.dp), color = t.outline)
+      RefLatencyColumn("Cloudflare", cloudflare, testing, Modifier.weight(1f))
+      VerticalDivider(Modifier.height(38.dp), color = t.outline)
+      RefLatencyColumn("Google", google, testing, Modifier.weight(1f))
+  }
         }
     }
 }
 
 @Composable
-private fun RefLatencyColumn(label: String, value: String, modifier: Modifier) {
+private fun RefLatencyColumn(label: String, value: Long?, testing: Boolean, modifier: Modifier) {
     val t = LocalBichenTokens.current
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(label, color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
-        Text(value, color = MaterialTheme.colorScheme.primary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    val color = when {
+        testing -> MaterialTheme.colorScheme.primary
+        value == null -> t.textMuted
+        value <= 0L -> t.danger
+        value < 100L -> t.success
+        value <= 300L -> t.warning
+        else -> t.danger
+    }
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text(label, color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+        Text(if (testing) "…" else refDelay(value), color = color, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 
 @Composable
-private fun RefNetworkIdentityCard(lan: String, connections: Int, modifier: Modifier) {
+private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: Int, modifier: Modifier) {
     val t = LocalBichenTokens.current
-    Surface(modifier = modifier, shape = RoundedCornerShape(15.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+    var lanMode by rememberSaveable { mutableStateOf(true) }
+    Surface(onClick = { lanMode = !lanMode }, modifier = modifier, shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
         Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("网络", color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
-            Text("LAN", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
-            Text(lan.ifBlank { "—" }, color = t.textPrimary, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("连接  $connections", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+  Row(verticalAlignment = Alignment.CenterVertically) {
+      Text(if (lanMode) "LAN" else "WAN", color = t.textPrimary, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+      Text("点击切换", color = t.textMuted, style = MaterialTheme.typography.labelSmall)
+  }
+  if (lanMode) {
+      Text("IP  ${runtime.lanAddress}", color = t.textPrimary, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+      Text("接口  ${runtime.lanInterface}", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+  } else {
+      Text("IP  ${runtime.wanAddress}", color = t.textPrimary, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+      Text("${countryEmoji(runtime.wanCountryCode)} ${runtime.wanRegion}", color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+  }
+  Text("连接  $connections", color = t.textMuted, style = MaterialTheme.typography.labelSmall)
         }
     }
 }
@@ -408,11 +488,19 @@ private fun RefNetworkIdentityCard(lan: String, connections: Int, modifier: Modi
 @Composable
 private fun RefSpeedCard(up: Long, down: Long, modifier: Modifier) {
     val t = LocalBichenTokens.current
-    Surface(modifier = modifier, shape = RoundedCornerShape(15.dp), color = t.cardBackground, shadowElevation = 0.dp) {
-        Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("网速", color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
-            Text("上行   ${refSpeed(up)}", color = t.textPrimary, style = MaterialTheme.typography.bodyMedium)
-            Text("下行   ${refSpeed(down)}", color = t.textPrimary, style = MaterialTheme.typography.bodyMedium)
+    Surface(modifier = modifier, shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+        Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+  Text("网速", color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
+  Row(verticalAlignment = Alignment.CenterVertically) {
+      Icon(Icons.Rounded.ArrowUpward, null, tint = t.success, modifier = Modifier.size(16.dp))
+      Spacer(Modifier.width(5.dp))
+      Text(refSpeed(up), color = t.textPrimary, style = MaterialTheme.typography.bodyMedium)
+  }
+  Row(verticalAlignment = Alignment.CenterVertically) {
+      Icon(Icons.Rounded.ArrowDownward, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+      Spacer(Modifier.width(5.dp))
+      Text(refSpeed(down), color = t.textPrimary, style = MaterialTheme.typography.bodyMedium)
+  }
         }
     }
 }
@@ -425,29 +513,41 @@ private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, modifier: M
     val total = tracked.sumOf { it.total }
     val remain = (total - used).coerceAtLeast(0L)
     val ratio = if (total <= 0L) 0f else (used.toDouble() / total.toDouble()).toFloat().coerceIn(0f, 1f)
-    Surface(modifier = modifier, shape = RoundedCornerShape(15.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+    Surface(modifier = modifier, shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
         Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("订阅", color = t.textPrimary, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-                if (total > 0L) Text("剩余 ${((1f - ratio).coerceIn(0f, 1f) * 100).toInt()}%", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
-            }
-            Text(if (tracked.isEmpty()) "${items.size} 个远程订阅" else "剩余 ${refBytes(remain)}", color = t.textPrimary, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (total > 0L) LinearProgressIndicator(progress = { ratio }, modifier = Modifier.fillMaxWidth().height(3.dp).clip(CircleShape))
+  Row(verticalAlignment = Alignment.CenterVertically) {
+      Text("订阅", color = t.textPrimary, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+      if (total > 0L) Surface(shape = RoundedCornerShape(999.dp), color = t.selectionBackground) {
+          Text("剩余 ${((1f - ratio) * 100f).toInt()}%", Modifier.padding(horizontal = 8.dp, vertical = 3.dp), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall)
+      }
+  }
+  Text(if (total > 0L) "已用 ${refBytes(used)}" else "${items.size} 个远程订阅", color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+  Text(if (total > 0L) "总量 ${refBytes(total)}" else "剩余 —", color = t.textPrimary, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+  if (total > 0L) LinearProgressIndicator(progress = { ratio }, modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape))
+  if (total > 0L) Text("剩余 ${refBytes(remain)}", color = t.textMuted, style = MaterialTheme.typography.labelSmall, maxLines = 1)
         }
     }
 }
 
 @Composable
-private fun RefResourceCard(memory: Long, pid: Int, connections: Int, modifier: Modifier) {
+private fun RefResourceCard(memory: Long, cpuPercent: Float, pid: Int, modifier: Modifier) {
     val t = LocalBichenTokens.current
-    Surface(modifier = modifier, shape = RoundedCornerShape(15.dp), color = t.cardBackground, shadowElevation = 0.dp) {
-        Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("资源占用", color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
-            Text("内存   ${refBytes(memory)}", color = t.textPrimary, style = MaterialTheme.typography.bodyMedium)
-            Text("PID   ${if (pid > 0) pid else "—"}", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
-            Text("连接   $connections", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+    Surface(modifier = modifier, shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+        Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+  Text("资源占用", color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
+  Text("内存  ${refBytes(memory)}", color = t.textPrimary, style = MaterialTheme.typography.bodyMedium)
+  Text("CPU  ${String.format(java.util.Locale.US, "%.1f%%", cpuPercent)}", color = t.textPrimary, style = MaterialTheme.typography.bodyMedium)
+  Text("PID  ${if (pid > 0) pid else "—"}", color = t.textMuted, style = MaterialTheme.typography.labelSmall)
         }
     }
+}
+
+private fun countryEmoji(code: String): String {
+    val upper = code.trim().uppercase(java.util.Locale.ROOT)
+    if (upper.length != 2 || upper.any { it !in 'A'..'Z' }) return "🌐"
+    val first = Character.toChars(0x1F1E6 + (upper[0] - 'A'))
+    val second = Character.toChars(0x1F1E6 + (upper[1] - 'A'))
+    return String(first) + String(second)
 }
 
 @Composable
@@ -535,6 +635,20 @@ private fun RefPanel(
     var error by remember { mutableStateOf("") }
     var searchOpen by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
+    var connectionView by rememberSaveable { mutableStateOf("active") }
+    val closedConnections = remember { mutableStateListOf<ProxyConnectionUi>() }
+    var previousConnections by remember { mutableStateOf<List<ProxyConnectionUi>>(emptyList()) }
+
+    LaunchedEffect(state.connections) {
+        if (previousConnections.isNotEmpty()) {
+            val currentIds = state.connections.mapTo(HashSet()) { it.id }
+            previousConnections.filter { it.id !in currentIds }.forEach { item ->
+                if (closedConnections.none { it.id == item.id }) closedConnections.add(0, item)
+            }
+            while (closedConnections.size > 80) closedConnections.removeAt(closedConnections.lastIndex)
+        }
+        previousConnections = state.connections
+    }
 
     val filteredGroups = remember(state.groups, query) {
         state.groups.filter { group ->
@@ -571,7 +685,8 @@ private fun RefPanel(
             error = ""
             try {
                 when (tab) {
-                    RefPanelTab.Overview, RefPanelTab.Nodes -> delays.putAll(repo.globalDelay())
+                    RefPanelTab.Overview -> delays.putAll(repo.globalDelay())
+                    RefPanelTab.Nodes -> onRefreshState()
                     RefPanelTab.Subscriptions -> providers = repo.refreshSubscriptions()
                     RefPanelTab.RuleSets -> ruleSets = repo.refreshRuleSets()
                     RefPanelTab.Rules -> rules = repo.rules()
@@ -660,37 +775,40 @@ private fun RefPanel(
                         }
                     }
                 }
-                RefPanelTab.Nodes -> {
-                    item {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("全部节点", color = t.textPrimary, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                            TextButton(onClick = ::refresh, enabled = !refreshing) { Text(if (refreshing) "测速中" else "全部测速") }
-                        }
-                    }
-                    itemsIndexed(filteredNodes.chunked(2), key = { index, _ -> "nodes-$index" }) { _, pair ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            pair.forEach { node ->
-                                RefLeafNodeCard(node, delays[node.name] ?: node.lastDelay, Modifier.weight(1f)) {
-                                    if (testing[node.name] != true) scope.launch {
-                                        testing[node.name] = true
-                                        try { delays[node.name] = repo.delay(node.name) }
-                                        catch (_: Exception) { delays[node.name] = -1L }
-                                        finally { testing.remove(node.name) }
-                                    }
+                RefPanelTab.Nodes -> item { RefTrafficOverview(state) }
+                RefPanelTab.Subscriptions -> items(providers, key = { it.name }) { item ->
+                    RefProviderRow(
+                        item = item,
+                        onRefresh = {
+                            scope.launch {
+                                repo.refreshProvider(item.name)?.let { updated ->
+                                    providers = providers.map { if (it.name == updated.name) updated else it }
                                 }
                             }
-                            if (pair.size == 1) Spacer(Modifier.weight(1f))
+                        },
+                        onClick = { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) },
+                    )
+                }
+                RefPanelTab.Connections -> {
+                    item {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(selected = connectionView == "active", onClick = { connectionView = "active" }, label = { Text("活跃 ${state.connections.size}") })
+                            FilterChip(selected = connectionView == "closed", onClick = { connectionView = "closed" }, label = { Text("已关闭 ${closedConnections.size}") })
+                            Spacer(Modifier.weight(1f))
+                            if (connectionView == "active" && state.connections.isNotEmpty()) {
+                                TextButton(onClick = { scope.launch { repo.closeAll(); onRefreshState() } }) { Text("终止全部", color = t.danger) }
+                            }
                         }
                     }
-                }
-                RefPanelTab.Subscriptions -> items(providers, key = { it.name }) { item ->
-                    RefProviderRow(item) { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) }
-                }
-                RefPanelTab.Connections -> items(state.connections, key = { it.id }) { c ->
-                    RefConnectionRow(c) { scope.launch { repo.closeConnection(c.id); onRefreshState() } }
+                    val shown = if (connectionView == "active") state.connections else closedConnections
+                    items(shown, key = { (if (connectionView == "active") "a-" else "c-") + it.id }) { c ->
+                        RefConnectionRow(c, if (connectionView == "active") ({ scope.launch { repo.closeConnection(c.id); onRefreshState() } }) else null)
+                    }
                 }
                 RefPanelTab.Rules -> items(rules, key = { it.index }) { RefRuleRow(it) }
-                RefPanelTab.RuleSets -> items(ruleSets, key = { it.name }) { RefRuleSetRow(it) }
+                RefPanelTab.RuleSets -> items(ruleSets, key = { it.name }) { item ->
+                    RefRuleSetRow(item) { scope.launch { ruleSets = repo.refreshRuleSets() } }
+                }
             }
         }
     }
@@ -772,9 +890,7 @@ private fun RefNodeSheet(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(38.dp).background(scheme.primary.copy(alpha = .09f), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
-                Icon(refGroupIcon(group.type), null, tint = scheme.primary, modifier = Modifier.size(21.dp))
-            }
+            RefGroupVisualIcon(group, Modifier.size(38.dp))
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Text(group.name, color = t.textPrimary, fontSize = 19.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -888,34 +1004,46 @@ private fun RefPanelOverview(state: ProxyComposeState, delays: Map<String, Long>
 private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolean, delay: Long?, modifier: Modifier, onClick: () -> Unit) {
     val t = LocalBichenTokens.current
     val scheme = MaterialTheme.colorScheme
-    val shape = RoundedCornerShape(15.dp)
-    val glass = if (expanded) {
-        Brush.verticalGradient(listOf(t.selectionBackground.copy(alpha = .96f), scheme.primaryContainer.copy(alpha = .38f)))
-    } else {
-        Brush.verticalGradient(listOf(t.cardBackground.copy(alpha = .98f), t.elevatedCardBackground.copy(alpha = .72f)))
-    }
+    val shape = RoundedCornerShape(17.dp)
+    val glass = if (expanded) t.selectionBackground else t.cardBackground
     Column(
         modifier.background(glass, shape)
-            .border(.7.dp, if (expanded) scheme.primary.copy(alpha = .24f) else t.outline.copy(alpha = .46f), shape)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 11.dp, vertical = 10.dp),
+  .border(1.dp, if (expanded) scheme.primary.copy(alpha = .28f) else t.outline, shape)
+  .clickable(onClick = onClick)
+  .padding(horizontal = 11.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(32.dp).background(scheme.primary.copy(alpha = .09f), RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
-                Icon(refGroupIcon(group.type), null, tint = scheme.primary, modifier = Modifier.size(18.dp))
-            }
-            Spacer(Modifier.width(8.dp))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                Text(group.name, color = t.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(refGroupType(group.type), color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1)
-            }
-            RefDelayBadge(delay, false, null)
+  RefGroupVisualIcon(group, Modifier.size(34.dp))
+  Spacer(Modifier.width(8.dp))
+  Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+      Text(group.name, color = t.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+      Text(refGroupType(group.type).uppercase(java.util.Locale.ROOT), color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+  }
+  RefDelayBadge(delay, false, null)
         }
+        Text(selected.ifBlank { "未选择" }, color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(selected.ifBlank { "未选择" }, color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-            Text("${group.nodes.size} 节点", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
-            if (expanded) { Spacer(Modifier.width(5.dp)); Icon(Icons.Rounded.CheckCircle, "已打开", tint = scheme.primary, modifier = Modifier.size(15.dp)) }
+  Text("${group.nodes.size} 节点", color = t.textMuted, style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f))
+  if (expanded) Icon(Icons.Rounded.CheckCircle, "已打开", tint = scheme.primary, modifier = Modifier.size(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun RefGroupVisualIcon(group: ProxyGroupUi, modifier: Modifier) {
+    val t = LocalBichenTokens.current
+    val scheme = MaterialTheme.colorScheme
+    val bitmap = remember(group.iconPath) {
+        runCatching {
+  group.iconPath.takeIf { it.isNotBlank() }?.let { BitmapFactory.decodeFile(it)?.asImageBitmap() }
+        }.getOrNull()
+    }
+    Box(modifier.background(t.controlBackground, RoundedCornerShape(11.dp)).clip(RoundedCornerShape(11.dp)), contentAlignment = Alignment.Center) {
+        if (bitmap != null) {
+  Image(bitmap = bitmap, contentDescription = group.name, modifier = Modifier.fillMaxSize().padding(5.dp), contentScale = ContentScale.Fit)
+        } else {
+  Icon(refGroupIcon(group.type), null, tint = scheme.primary, modifier = Modifier.size(19.dp))
         }
     }
 }
@@ -965,9 +1093,9 @@ private fun RefDelayBadge(value: Long?, testing: Boolean, onClick: (() -> Unit)?
         testing -> scheme.primary
         value == null -> t.textSecondary
         value <= 0L -> scheme.error
-        value <= 250L -> t.success
-        value <= 650L -> scheme.primary
-        else -> t.warning
+        value < 100L -> t.success
+        value <= 300L -> t.warning
+        else -> t.danger
     }
     val shape = RoundedCornerShape(9.dp)
     val modifier = Modifier
@@ -978,31 +1106,146 @@ private fun RefDelayBadge(value: Long?, testing: Boolean, onClick: (() -> Unit)?
 }
 
 @Composable
-private fun RefProviderRow(item: DashboardProviderUi, onClick: () -> Unit) {
+private fun RefTrafficOverview(state: ProxyComposeState) {
     val t = LocalBichenTokens.current
-    Surface(onClick = onClick, shape = RoundedCornerShape(12.dp), color = t.cardBackground, shadowElevation = 0.dp) {
-        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            Text(item.name, color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
-            Text("${item.nodes.size} 个节点 · ${item.vehicleType}", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
-            if (item.hasSubscriptionInfo && item.total > 0L) {
-                LinearProgressIndicator(progress = { item.ratio }, modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape))
-                Text("剩余 ${refBytes(item.remaining)}", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
-            }
+    val scheme = MaterialTheme.colorScheme
+    val history = remember { mutableStateListOf<Triple<Long, Long, Long>>() }
+    var lastUpload by remember { mutableLongStateOf(state.uploadTotal) }
+    var lastDownload by remember { mutableLongStateOf(state.downloadTotal) }
+    var lastAt by remember { mutableLongStateOf(0L) }
+    var upRate by remember { mutableLongStateOf(0L) }
+    var downRate by remember { mutableLongStateOf(0L) }
+
+    LaunchedEffect(state.uploadTotal, state.downloadTotal) {
+        val now = SystemClock.elapsedRealtime()
+        if (lastAt > 0L && now > lastAt && state.uploadTotal >= lastUpload && state.downloadTotal >= lastDownload) {
+  val elapsed = now - lastAt
+  upRate = ((state.uploadTotal - lastUpload) * 1000L / elapsed).coerceAtLeast(0L)
+  downRate = ((state.downloadTotal - lastDownload) * 1000L / elapsed).coerceAtLeast(0L)
+  history += Triple(now, upRate, downRate)
+  while (history.isNotEmpty() && history.first().first < now - 60_000L) history.removeAt(0)
+        }
+        lastAt = now
+        lastUpload = state.uploadTotal
+        lastDownload = state.downloadTotal
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+  RefRateCard("上行速率", upRate, Icons.Rounded.ArrowUpward, t.success, Modifier.weight(1f))
+  RefRateCard("下行速率", downRate, Icons.Rounded.ArrowDownward, scheme.primary, Modifier.weight(1f))
+        }
+        Surface(shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+  Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+      Text("累计吞吐", color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
+      Row {
+          RefMetric("总上行", refBytes(state.uploadTotal), Modifier.weight(1f))
+          RefMetric("总下行", refBytes(state.downloadTotal), Modifier.weight(1f))
+      }
+  }
+        }
+        Surface(shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+  Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+      Row(verticalAlignment = Alignment.CenterVertically) {
+          Text("最近 60 秒流量", color = t.textPrimary, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+          Text("↑ 上行   ↓ 下行", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+      }
+      val points = history.toList()
+      Canvas(Modifier.fillMaxWidth().height(150.dp)) {
+          if (points.size > 1) {
+              val maxRate = points.maxOf { maxOf(it.second, it.third) }.coerceAtLeast(1L).toFloat()
+              val end = points.last().first
+              val start = end - 60_000L
+              fun makePath(index: Int): Path {
+                  val path = Path()
+                  points.forEachIndexed { i, point ->
+                      val x = (((point.first - start).coerceIn(0L, 60_000L)).toFloat() / 60_000f) * size.width
+                      val value = if (index == 1) point.second else point.third
+                      val y = size.height - (value.toFloat() / maxRate * size.height * .88f)
+                      if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                  }
+                  return path
+              }
+              drawPath(makePath(1), color = t.success, style = Stroke(width = 2.5.dp.toPx()))
+              drawPath(makePath(2), color = scheme.primary, style = Stroke(width = 2.5.dp.toPx()))
+          }
+      }
+  }
         }
     }
 }
 
 @Composable
-private fun RefConnectionRow(item: ProxyConnectionUi, onClose: () -> Unit) {
+private fun RefRateCard(title: String, value: Long, icon: ImageVector, color: Color, modifier: Modifier) {
     val t = LocalBichenTokens.current
-    Surface(shape = RoundedCornerShape(12.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+    Surface(modifier = modifier, shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+  Icon(icon, null, tint = color, modifier = Modifier.size(22.dp))
+  Text(refSpeed(value), color = t.textPrimary, fontSize = 21.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+  Text(title, color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+        }
+    }
+}
+
+@Composable
+private fun RefProviderRow(item: DashboardProviderUi, onRefresh: () -> Unit, onClick: () -> Unit) {
+    val t = LocalBichenTokens.current
+    Surface(onClick = onClick, shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+        Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+  Row(verticalAlignment = Alignment.CenterVertically) {
+      Column(Modifier.weight(1f)) {
+          Text(item.name, color = t.textPrimary, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+          Text("${item.nodes.size} 个节点 · 剩余 ${refExpireDays(item.expire)}", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+      }
+      IconButton(onClick = onRefresh, modifier = Modifier.size(40.dp)) {
+          Icon(Icons.Rounded.Sync, "同步更新", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+      }
+  }
+  if (item.hasSubscriptionInfo && item.total > 0L) {
+      LinearProgressIndicator(progress = { item.ratio }, modifier = Modifier.fillMaxWidth().height(5.dp).clip(CircleShape))
+      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+          RefMetric("已上传", refBytes(item.upload), Modifier.weight(1f))
+          RefMetric("已下载", refBytes(item.download), Modifier.weight(1f))
+          Surface(modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp), color = t.selectionBackground) {
+              Column(Modifier.padding(horizontal = 9.dp, vertical = 8.dp)) {
+                  Text(refBytes(item.remaining), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                  Text("剩余流量", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+              }
+          }
+      }
+  } else {
+      Text("该订阅没有上报流量信息", color = t.textMuted, style = MaterialTheme.typography.bodySmall)
+  }
+  Text("到期 ${refExpireDate(item.expire)} · 更新 ${item.updatedAt.ifBlank { "—" }}", color = t.textMuted, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+private fun refExpireDays(expire: Long): String {
+    if (expire <= 0L) return "—"
+    val millis = if (expire < 10_000_000_000L) expire * 1000L else expire
+    val days = ((millis - System.currentTimeMillis()) / 86_400_000L)
+    return if (days < 0L) "已到期" else "${days} 天"
+}
+
+private fun refExpireDate(expire: Long): String {
+    if (expire <= 0L) return "—"
+    val millis = if (expire < 10_000_000_000L) expire * 1000L else expire
+    return runCatching { java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date(millis)) }.getOrDefault("—")
+}
+
+@Composable
+private fun RefConnectionRow(item: ProxyConnectionUi, onClose: (() -> Unit)?) {
+    val t = LocalBichenTokens.current
+    Surface(shape = RoundedCornerShape(16.dp), color = t.cardBackground, shadowElevation = 0.dp) {
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(item.appName.ifBlank { item.host }, color = t.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(item.host, color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(listOf(item.network, item.rule, item.chain).filter { it.isNotBlank() }.joinToString(" · "), color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            IconButton(onClick = onClose) { Icon(Icons.Rounded.Close, "关闭", tint = t.textSecondary) }
+  Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+      Text(item.host, color = t.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+      Text(listOf(item.network, item.inbound).filter { it.isNotBlank() }.joinToString(" · "), color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+      Text(item.chain.ifBlank { item.rule.ifBlank { "DIRECT" } }, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+      Text("↑ ${refBytes(item.upload)}   ↓ ${refBytes(item.download)}", color = t.textMuted, style = MaterialTheme.typography.labelSmall)
+  }
+  if (onClose != null) IconButton(onClick = onClose) { Icon(Icons.Rounded.Close, "终止连接", tint = t.danger) }
         }
     }
 }
@@ -1010,29 +1253,33 @@ private fun RefConnectionRow(item: ProxyConnectionUi, onClose: () -> Unit) {
 @Composable
 private fun RefRuleRow(item: ProxyRuleUi) {
     val t = LocalBichenTokens.current
-    Surface(shape = RoundedCornerShape(12.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+    Surface(shape = RoundedCornerShape(15.dp), color = t.cardBackground, shadowElevation = 0.dp) {
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(item.type, color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
-                Text(item.payload.ifBlank { "—" }, color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            }
-            Text(item.proxy, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 92.dp))
+  Text("#${item.index}", color = t.textMuted, style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(42.dp))
+  Column(Modifier.weight(1f)) {
+      Text(item.type, color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
+      Text(item.payload.ifBlank { "—" }, color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+  }
+  Surface(shape = RoundedCornerShape(999.dp), color = if (item.proxy.equals("REJECT", true)) t.danger.copy(alpha = .12f) else t.selectionBackground) {
+      Text(item.proxy, Modifier.padding(horizontal = 9.dp, vertical = 5.dp), color = if (item.proxy.equals("REJECT", true)) t.danger else MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+  }
         }
     }
 }
 
 @Composable
-private fun RefRuleSetRow(item: DashboardRuleSetUi) {
+private fun RefRuleSetRow(item: DashboardRuleSetUi, onRefresh: () -> Unit) {
     val t = LocalBichenTokens.current
-    Surface(shape = RoundedCornerShape(12.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+    Surface(shape = RoundedCornerShape(15.dp), color = t.cardBackground, shadowElevation = 0.dp) {
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Rounded.Inventory2, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(9.dp))
-            Column(Modifier.weight(1f)) {
-                Text(item.name, color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
-                Text(listOf(item.behavior, item.format, item.vehicleType).filter { it.isNotBlank() }.joinToString(" · "), color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
-            }
-            if (item.ruleCount > 0) Text(item.ruleCount.toString(), color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+  Icon(Icons.Rounded.Inventory2, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+  Spacer(Modifier.width(9.dp))
+  Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+      Text(item.name, color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
+      Text(listOf(item.behavior, item.format, item.vehicleType).filter { it.isNotBlank() }.joinToString(" · "), color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+      Text("${if (item.ruleCount > 0) "${item.ruleCount} 条规则" else "规则数 —"} · ${item.updatedAt.ifBlank { "未记录更新时间" }}", color = t.textMuted, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+  }
+  IconButton(onClick = onRefresh, modifier = Modifier.size(40.dp)) { Icon(Icons.Rounded.Sync, "远端更新", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(19.dp)) }
         }
     }
 }
@@ -1049,23 +1296,27 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
     ) {
         item { RefTitleBar("工具") }
         item {
-            RefGroup {
-                RefToolRow(Icons.Rounded.Folder, "文件管理", "代理目录 · 配置 · 运行文件") { context.startActivity(Intent(context, ReferenceFileManagerActivity::class.java)) }
-                RefDivider()
-                RefToolRow(Icons.Rounded.Apps, "应用管理", "去广告应用放行与规则") { context.startActivity(Intent(context, CompactMainActivity::class.java)) }
-                RefDivider()
-                RefToolRow(Icons.Rounded.Memory, "内核管理", "${state.core} · 在线更新") { context.startActivity(Intent(context, ProxyCoreActivity::class.java)) }
-                RefDivider()
-                RefToolRow(Icons.Rounded.CloudDownload, "订阅管理", state.config) { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) }
-                RefDivider()
-                RefToolRow(Icons.Rounded.Tune, "基础代理配置", "核心、模式、IPv6 与配置") { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }
-                RefDivider()
-                RefToolRow(Icons.Rounded.Language, "WebUI", "本地 · Zashboard · MetaCubeXD · 自定义") { context.startActivity(Intent(context, ProxyWebUiActivity::class.java)) }
-                RefDivider()
-                RefToolRow(Icons.Rounded.Article, "运行日志", "查看 Mihomo 核心输出") {
-                    scope.launch { onLog(runCatching { inspector.runtimeLog() }.getOrElse { it.message ?: "日志读取失败" }) }
-                }
-            }
+  RefGroup {
+      RefToolRow(Icons.Rounded.Terminal, "脚本", "后台服务生命周期与启动配置") { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }
+      RefDivider()
+      RefToolRow(Icons.Rounded.Article, "日志查看", "实时查看 Mihomo stdout / stderr") { scope.launch { onLog(runCatching { inspector.runtimeLog() }.getOrElse { it.message ?: "日志读取失败" }) } }
+      RefDivider()
+      RefToolRow(Icons.Rounded.Apps, "应用管理", "分应用放行与代理相关应用列表") { context.startActivity(Intent(context, CompactMainActivity::class.java)) }
+      RefDivider()
+      RefToolRow(Icons.Rounded.Wifi, "网络匹配", "SSID 与自动切换规则") { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }
+      RefDivider()
+      RefToolRow(Icons.Rounded.WifiTethering, "共享网络", "热点中继与透明代理") { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }
+      RefDivider()
+      RefToolRow(Icons.Rounded.AltRoute, "绕过规则", "CIDR 与接口直连配置") { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }
+      RefDivider()
+      RefToolRow(Icons.Rounded.CloudDownload, "订阅管理", state.config) { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) }
+      RefDivider()
+      RefToolRow(Icons.Rounded.Public, "CNIP 设置", "IPv4 / IPv6 国内地址库") { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }
+      RefDivider()
+      RefToolRow(Icons.Rounded.Language, "更新 WebUI", "本地面板 · Zashboard · MetaCubeXD") { context.startActivity(Intent(context, ProxyWebUiActivity::class.java)) }
+      RefDivider()
+      RefToolRow(Icons.Rounded.Memory, "更新核心", state.core) { context.startActivity(Intent(context, ProxyCoreActivity::class.java)) }
+  }
         }
     }
 }
@@ -1080,26 +1331,28 @@ private fun RefSettings(state: ProxyComposeState) {
     ) {
         item { RefTitleBar("设置") }
         item {
-            RefGroup {
-                RefValueRow("基础代理配置", "") { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }
-                RefDivider()
-                RefValueRow("核心", state.core) { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }
-                RefDivider()
-                RefValueRow("运行模式", state.mode) { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }
-                RefDivider()
-                RefValueRow("IPv6", state.ipv6) { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }
-                RefDivider()
-                RefValueRow("当前配置", state.config) { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) }
-            }
+  RefGroup {
+      RefValueRow("核心选择", state.core) { context.startActivity(Intent(context, ProxyCoreActivity::class.java)) }
+      RefDivider()
+      RefValueRow("运行模式", state.mode) { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }
+      RefDivider()
+      RefValueRow("IPv6", state.ipv6) { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }
+      RefDivider()
+      RefValueRow("端口细则", "混合 / Redir / TProxy") { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }
+      RefDivider()
+      RefValueRow("当前配置", state.config) { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) }
+  }
         }
         item {
-            RefGroup {
-                RefValueRow("文件管理", "代理运行目录") { context.startActivity(Intent(context, ReferenceFileManagerActivity::class.java)) }
-                RefDivider()
-                RefValueRow("WebUI", "多面板 · 可自定义") { context.startActivity(Intent(context, ProxyWebUiActivity::class.java)) }
-                RefDivider()
-                RefValueRow("订阅与配置", "管理远程订阅") { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) }
-            }
+  RefGroup {
+      RefValueRow("主题与界面", "Miuix · Material · Monet · OLED") { context.startActivity(Intent(context, ThemeSettingsActivity::class.java)) }
+      RefDivider()
+      RefValueRow("WebUI 面板", "本地 · Zashboard · MetaCubeXD") { context.startActivity(Intent(context, ProxyWebUiActivity::class.java)) }
+      RefDivider()
+      RefValueRow("文件管理", "代理运行目录") { context.startActivity(Intent(context, ReferenceFileManagerActivity::class.java)) }
+      RefDivider()
+      RefValueRow("订阅与配置", "链接 · User-Agent · 更新") { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) }
+  }
         }
     }
 }

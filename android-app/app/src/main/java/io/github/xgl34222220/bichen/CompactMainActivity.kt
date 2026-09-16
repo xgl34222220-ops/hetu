@@ -994,12 +994,12 @@ private fun CompactActivityPage(controller: BichenComposeController) {
 @Composable
 private fun CompactSettingsSheet(controller: BichenComposeController, onDismiss: () -> Unit, onThemeChanged: () -> Unit) {
     val tokens = LocalBichenTokens.current
-    val current = controller.appearance()
+    val context = LocalContext.current
     var mode by remember { mutableStateOf(controller.protectionMode()) }
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = tokens.cardBackground) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text("设置与诊断", fontSize = 22.sp, lineHeight = 30.sp, fontWeight = FontWeight.SemiBold, color = tokens.textPrimary)
-            Text("辟尘 · 洛书 Compact UI", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
+            Text("辟尘 · BoxProxy Design System", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
             CompactSectionHeading("去广告保护方式", "模块保护不占 VPN；应用保护提供精确累计统计和应用放行")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(
@@ -1021,13 +1021,23 @@ private fun CompactSettingsSheet(controller: BichenComposeController, onDismiss:
                 color = tokens.textSecondary,
                 style = MaterialTheme.typography.bodySmall,
             )
-            CompactSectionHeading("外观")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("system" to "跟随系统", "light" to "浅色", "dark" to "深色").forEach { (value, label) ->
-                    FilterChip(selected = current == value, onClick = { controller.setAppearance(value); onThemeChanged(); onDismiss() }, label = { Text(label) })
+            CompactSectionHeading("主题引擎", "去广告与代理共用同一套颜色、圆角、玻璃与缩放设置")
+            Surface(
+                onClick = { context.startActivity(Intent(context, ThemeSettingsActivity::class.java)) },
+                shape = RoundedCornerShape(18.dp),
+                color = tokens.controlBackground,
+            ) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.Palette, null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("主题与界面", color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall)
+                        Text("Miuix / Material · Monet · OLED · 液态玻璃", color = tokens.textSecondary, style = MaterialTheme.typography.labelSmall)
+                    }
+                    Icon(Icons.Rounded.ChevronRight, null, tint = tokens.textMuted)
                 }
             }
-            Text("代理、规则、应用放行和活动记录均使用同一套洛书页面层级。", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
+            Text("代理、规则、应用放行、活动记录与代理工作区均共享 BoxProxy Design System。", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
         }
     }
 }

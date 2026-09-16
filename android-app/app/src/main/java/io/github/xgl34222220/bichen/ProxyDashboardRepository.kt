@@ -1,6 +1,7 @@
 package io.github.xgl34222220.bichen
 
 import android.content.Context
+import android.os.SystemClock
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -10,6 +11,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
 
 internal data class DashboardProviderUi(
     val name: String,
@@ -205,6 +208,47 @@ suspend fun delay(node: String): Long = withContext(Dispatchers.IO) {
         }
         val group = groupName?.let { raw.optJSONObject(it) }
         api.delay(node, group?.optString("testUrl", "") ?: "", group?.optString("expectedStatus", "200-399") ?: "200-399")
+    }
+
+    suspend fun siteLatencies(): Map<String, Long> = withContext(Dispatchers.IO) {
+        val sites = listOf(
+            "Baidu" to "https://www.baidu.com/",
+            "Cloudflare" to "https://cp.cloudflare.com/generate_204",
+            "Google" to "https://www.gstatic.com/generate_204",
+        )
+        coroutineScope {
+            sites.map { (name, url) -> async { name to measureSiteLatency(url) } }.awaitAll().toMap()
+        }
+    }
+
+    suspend fun refreshProvider(name: String): DashboardProviderUi? = withContext(Dispatchers.IO) {
+        try { api.updateProxyProvider(name) }
+        catch (cancel: CancellationException) { throw cancel }
+        catch (_: Exception) { }
+        remoteProviders(api.proxyProviders()).firstOrNull { it.name == name }
+    }
+
+    private fun measureSiteLatency(url: String): Long {
+        return try {
+            val started = SystemClock.elapsedRealtime()
+            val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+                instanceFollowRedirects = true
+                connectTimeout = 3_000
+                readTimeout = 3_000
+                requestMethod = "GET"
+                setRequestProperty("User-Agent", "Bichen-Android")
+                setRequestProperty("Cache-Control", "no-cache")
+            }
+            try {
+                val code = connection.responseCode
+                if (code in 200..499) (SystemClock.elapsedRealtime() - started).coerceAtLeast(1L) else -1L
+            } finally {
+                runCatching { connection.inputStream?.close() }
+                connection.disconnect()
+            }
+        } catch (_: Exception) {
+            -1L
+        }
     }
 
     private fun remoteProviders(root: JSONObject): List<DashboardProviderUi> =
