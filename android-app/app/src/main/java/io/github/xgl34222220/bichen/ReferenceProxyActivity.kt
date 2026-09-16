@@ -1289,6 +1289,7 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
     val context = LocalContext.current
     val inspector = remember { ProxyRuntimeInspector(context) }
     val scope = rememberCoroutineScope()
+    var unavailable by remember { mutableStateOf<String?>(null) }
     LazyColumn(
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
@@ -1297,27 +1298,35 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
         item { RefTitleBar("工具") }
         item {
   RefGroup {
-      RefToolRow(Icons.Rounded.Terminal, "脚本", "后台服务生命周期与启动配置") { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }
+      RefToolRow(Icons.Rounded.Terminal, "脚本", "启动配置与运行文件") { context.startActivity(Intent(context, ReferenceFileManagerActivity::class.java)) }
       RefDivider()
       RefToolRow(Icons.Rounded.Article, "日志查看", "实时查看 Mihomo stdout / stderr") { scope.launch { onLog(runCatching { inspector.runtimeLog() }.getOrElse { it.message ?: "日志读取失败" }) } }
       RefDivider()
       RefToolRow(Icons.Rounded.Apps, "应用管理", "分应用放行与代理相关应用列表") { context.startActivity(Intent(context, CompactMainActivity::class.java)) }
       RefDivider()
-      RefToolRow(Icons.Rounded.Wifi, "网络匹配", "SSID 与自动切换规则") { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }
+      RefToolRow(Icons.Rounded.Wifi, "网络匹配", "后端尚未接入 · 不再跳错页面") { unavailable = "网络匹配目前只有规格，没有真实 SSID 自动切换后端。我已取消错误的基础代理跳转，接入完成前不会假装可用。" }
       RefDivider()
-      RefToolRow(Icons.Rounded.WifiTethering, "共享网络", "热点中继与透明代理") { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }
+      RefToolRow(Icons.Rounded.WifiTethering, "共享网络", "后端尚未接入 · 不再跳错页面") { unavailable = "共享网络开关目前没有独立后端控制。我已取消错误跳转，避免看起来能设置但实际无效。" }
       RefDivider()
-      RefToolRow(Icons.Rounded.AltRoute, "绕过规则", "CIDR 与接口直连配置") { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }
+      RefToolRow(Icons.Rounded.AltRoute, "绕过规则", "后端尚未接入 · 不再跳错页面") { unavailable = "自定义 CIDR/接口绕过还没有接入运行时规则生成器，因此不再把你带到基础代理页。" }
       RefDivider()
       RefToolRow(Icons.Rounded.CloudDownload, "订阅管理", state.config) { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) }
       RefDivider()
-      RefToolRow(Icons.Rounded.Public, "CNIP 设置", "IPv4 / IPv6 国内地址库") { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }
+      RefToolRow(Icons.Rounded.Public, "CNIP 设置", "后端尚未接入 · 不再跳错页面") { unavailable = "CNIP 下载源和运行时应用后端尚未接入；当前不再提供假入口。" }
       RefDivider()
       RefToolRow(Icons.Rounded.Language, "更新 WebUI", "本地面板 · Zashboard · MetaCubeXD") { context.startActivity(Intent(context, ProxyWebUiActivity::class.java)) }
       RefDivider()
       RefToolRow(Icons.Rounded.Memory, "更新核心", state.core) { context.startActivity(Intent(context, ProxyCoreActivity::class.java)) }
   }
         }
+    }
+    unavailable?.let { text ->
+        AlertDialog(
+            onDismissRequest = { unavailable = null },
+            title = { Text("功能尚未接入") },
+            text = { Text(text) },
+            confirmButton = { TextButton(onClick = { unavailable = null }) { Text("知道了") } },
+        )
     }
 }
 

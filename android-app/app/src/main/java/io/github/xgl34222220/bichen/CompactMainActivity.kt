@@ -586,15 +586,15 @@ private fun CompactActionTile(
     onClick: () -> Unit,
 ) {
     val tokens = LocalBichenTokens.current
-    Surface(onClick = onClick, modifier = modifier.height(92.dp), shape = RoundedCornerShape(18.dp), color = tokens.cardBackground, border = BorderStroke(1.dp, tokens.outline)) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.SpaceBetween) {
+    Surface(onClick = onClick, modifier = modifier.heightIn(min = 108.dp), shape = RoundedCornerShape(18.dp), color = tokens.cardBackground, border = BorderStroke(1.dp, tokens.outline)) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 13.dp)) {
             Box(Modifier.size(38.dp).background(tokens.controlBackground, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
                 Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
             }
-            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                Text(title, color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall)
-                Text(subtitle, color = tokens.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
+            Spacer(Modifier.height(9.dp))
+            Text(title, color = tokens.textPrimary, fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            Spacer(Modifier.height(1.dp))
+            Text(subtitle, color = tokens.textSecondary, fontSize = 11.sp, lineHeight = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }

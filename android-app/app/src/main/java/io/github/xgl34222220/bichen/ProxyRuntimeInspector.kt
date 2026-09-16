@@ -96,12 +96,28 @@ internal class ProxyRuntimeInspector(context: Context) {
      * no longer depends on hosted-page CORS or Private Network Access behavior.
      */
     suspend fun ensureWebUi() = withContext(Dispatchers.IO) {
-        if (webUiReady()) return@withContext
-        installZashboard()
+        if (waitWebUiReady(1_200L)) return@withContext
+        var officialError = ""
+        try {
+            api.upgradeUi()
+            if (waitWebUiReady(10_000L)) return@withContext
+            officialError = "Mihomo /upgrade/ui 已返回，但 /ui/ 仍不可访问"
+        } catch (error: Exception) {
+            officialError = error.message ?: "Mihomo /upgrade/ui 调用失败"
+        }
+        try {
+            installZashboard()
+            if (waitWebUiReady(5_000L)) return@withContext
+            error("本地文件已安装，但 Mihomo 没有从 /ui/ 提供页面")
+        } catch (fallback: Exception) {
+            val second = fallback.message ?: "本地安装失败"
+            error("WebUI 安装失败：$officialError；备用安装：$second")
+        }
     }
 
     suspend fun repairWebUi() = withContext(Dispatchers.IO) {
-        installZashboard()
+        removeWebUiFiles()
+        ensureWebUi()
     }
 
     fun controllerSecret(): String = prefs.getString("proxyControllerSecret", "").orEmpty()
@@ -189,9 +205,50 @@ internal class ProxyRuntimeInspector(context: Context) {
 
     private fun webUiReady(): Boolean {
         val uiPath = "/data/adb/bichen/proxy/run/${MihomoStartupConfig.EXTERNAL_UI_DIR}"
-        val command = "UI=${RootBridge.quote(uiPath)}; test -s \"${'$'}UI/index.html\" && grep -qi 'zashboard' \"${'$'}UI/index.html\" && find \"${'$'}UI\" -type f -name '*.js' -print -quit 2>/dev/null | grep -q . && echo READY || echo MISSING"
+        val command = "UI=${RootBridge.quote(uiPath)}; test -s \"${'$'}UI/index.html\" && find \"${'$'}UI\" -type f \( -name '*.js' -o -name '*.mjs' \) -print -quit 2>/dev/null | grep -q . && echo READY || echo MISSING"
         val result = RootBridge.rootShell(app, command, 4_000L)
         return result.ok() && result.output.contains("READY")
+    }
+
+    private fun webUiHttpReady(): Boolean {
+        val connection = (URL("http://127.0.0.1:${MihomoStartupConfig.CONTROLLER_PORT}/ui/").openConnection() as HttpURLConnection).apply {
+            instanceFollowRedirects = true
+            connectTimeout = 2_000
+            readTimeout = 3_000
+            requestMethod = "GET"
+            setRequestProperty("Accept", "text/html,*/*")
+            controllerSecret().takeIf { it.isNotBlank() }?.let { setRequestProperty("Authorization", "Bearer $it") }
+        }
+        return try {
+            val code = connection.responseCode
+            if (code !in 200..299) false else {
+                val head = connection.inputStream.bufferedReader().use { reader ->
+                    val chars = CharArray(4096)
+                    val count = reader.read(chars)
+                    if (count <= 0) "" else String(chars, 0, count)
+                }
+                head.contains("<html", ignoreCase = true) || head.contains("<!doctype", ignoreCase = true)
+            }
+        } catch (_: Exception) {
+            false
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private fun waitWebUiReady(timeoutMs: Long): Boolean {
+        val end = SystemClock.elapsedRealtime() + timeoutMs
+        do {
+            if (webUiReady() && webUiHttpReady()) return true
+            if (SystemClock.elapsedRealtime() >= end) break
+            Thread.sleep(180L)
+        } while (true)
+        return false
+    }
+
+    private fun removeWebUiFiles() {
+        val uiPath = "/data/adb/bichen/proxy/run/${MihomoStartupConfig.EXTERNAL_UI_DIR}"
+        RootBridge.rootShell(app, "rm -rf ${RootBridge.quote(uiPath)}; mkdir -p ${RootBridge.quote(uiPath)}", 8_000L)
     }
 
     private fun localNetwork(): Pair<String, String> {

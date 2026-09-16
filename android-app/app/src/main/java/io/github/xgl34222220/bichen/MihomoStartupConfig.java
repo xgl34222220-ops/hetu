@@ -92,7 +92,7 @@ final class MihomoStartupConfig {
         override.append("    - '*'\n");
         override.append("  allow-private-network: true\n");
         override.append("secret: '").append(controllerSecret.replace("'","''")).append("'\n");
-        override.append("external-ui: ").append(EXTERNAL_UI_DIR).append('\n');
+        override.append("external-ui: /data/adb/bichen/proxy/run/").append(EXTERNAL_UI_DIR).append('\n');
         override.append("external-ui-url: '").append(EXTERNAL_UI_URL).append("'\n");
         override.append("# --- end Bichen runtime-mode isolation ---\n");
         return new Result(yaml+override,tp,rp);
