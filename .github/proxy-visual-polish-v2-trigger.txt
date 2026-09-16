@@ -1,1 +1,1 @@
-2026-09-17 fix Home dock white flash: keep LuoShu outer glass, disable nested moving lens backdrop
+2026-09-17 rerun Home dock white flash fix after pipeline correction
