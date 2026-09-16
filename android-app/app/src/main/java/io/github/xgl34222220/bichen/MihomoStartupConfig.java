@@ -9,7 +9,9 @@ final class MihomoStartupConfig {
     static final int REDIRECT_PORT=9797;
     static final int CONTROLLER_PORT=19090;
     static final String EXTERNAL_UI_DIR="ui";
-    static final String EXTERNAL_UI_URL="https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip";
+    // Keep the dashboard on Mihomo's own /ui/ origin. This avoids hosted-dashboard
+    // CORS / Private Network Access failures in Android WebView and is also much faster.
+    static final String EXTERNAL_UI_URL="https://github.com/Zephyruso/zashboard/releases/latest/download/dist-no-fonts.zip";
 
     static final class Result {
         final String yaml;
@@ -83,9 +85,8 @@ final class MihomoStartupConfig {
         }
         override.append("find-process-mode: strict\n");
         override.append("external-controller: 127.0.0.1:").append(CONTROLLER_PORT).append('\n');
-        // Hosted dashboards run in a different origin from the loopback controller. Allowing CORS
-        // and Private Network Access is required for Zashboard/MetaCubeXD to connect from WebView.
-        // The controller remains loopback-only and still requires the random per-install secret.
+        // Keep standards-correct CORS settings for external tools, even though the bundled
+        // dashboard deliberately uses the same loopback origin and therefore does not depend on CORS.
         override.append("external-controller-cors:\n");
         override.append("  allow-origins:\n");
         override.append("    - '*'\n");
