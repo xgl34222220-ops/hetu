@@ -629,6 +629,7 @@ private fun RefPanel(
     var rules by remember { mutableStateOf<List<ProxyRuleUi>>(emptyList()) }
     var ruleSets by remember { mutableStateOf<List<DashboardRuleSetUi>>(emptyList()) }
     var selectedGroupName by rememberSaveable { mutableStateOf<String?>(null) }
+    val groupSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var pendingNode by rememberSaveable { mutableStateOf("") }
     val selectedLocal = remember { mutableStateMapOf<String, String>() }
     val testing = remember { mutableStateMapOf<String, Boolean>() }
@@ -817,9 +818,12 @@ private fun RefPanel(
     if (selectedGroup != null) {
         ModalBottomSheet(
             onDismissRequest = { selectedGroupName = null },
+            sheetState = groupSheetState,
             shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
-            containerColor = t.cardBackground,
-            scrimColor = Color.Black.copy(alpha = .30f),
+            containerColor = t.elevatedCardBackground,
+            contentColor = t.textPrimary,
+            tonalElevation = 0.dp,
+            scrimColor = Color.Black.copy(alpha = .34f),
             dragHandle = {
                 Box(
                     Modifier.padding(top = 10.dp, bottom = 6.dp)
@@ -886,7 +890,7 @@ private fun RefNodeSheet(
     val t = LocalBichenTokens.current
     val scheme = MaterialTheme.colorScheme
     Column(
-        Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
+        Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -914,44 +918,64 @@ private fun RefNodeSheet(
             }
             Icon(Icons.Rounded.Refresh, "测试全部节点", tint = scheme.primary, modifier = Modifier.size(21.dp))
         }
-        LazyColumn(
-            modifier = Modifier.fillMaxWidth().heightIn(max = 430.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            items(group.nodes, key = { it.name }) { node ->
-                val active = node.name == selected
-                val shape = RoundedCornerShape(14.dp)
-                val fill = if (active) {
-                    Brush.verticalGradient(listOf(t.selectionBackground.copy(alpha = .94f), scheme.primaryContainer.copy(alpha = .56f)))
-                } else {
-                    Brush.verticalGradient(listOf(t.elevatedCardBackground.copy(alpha = .82f), t.cardBackground.copy(alpha = .64f)))
-                }
-                Row(
-                    Modifier.fillMaxWidth()
-                        .background(fill, shape)
-                        .border(.7.dp, if (active) scheme.primary.copy(alpha = .28f) else t.outline.copy(alpha = .34f), shape)
-                        .clickable { onSelect(node.name) }
-                        .padding(horizontal = 14.dp, vertical = 11.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+        if (group.nodes.isEmpty()) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = t.controlBackground,
+                shadowElevation = 0.dp,
+            ) {
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 22.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(7.dp),
                 ) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(node.name, color = t.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(listOf(node.type, if (node.udp) "UDP" else "").filter { it.isNotBlank() }.joinToString(" · "), color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+                    Icon(Icons.Rounded.Info, null, tint = t.textSecondary, modifier = Modifier.size(24.dp))
+                    Text("当前策略组没有可选节点", color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
+                    Text("请刷新订阅或检查当前配置后再试", color = t.textSecondary, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 430.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(group.nodes, key = { it.name }) { node ->
+                    val active = node.name == selected
+                    val shape = RoundedCornerShape(14.dp)
+                    val fill = if (active) {
+                        Brush.verticalGradient(listOf(t.selectionBackground.copy(alpha = .94f), scheme.primaryContainer.copy(alpha = .56f)))
+                    } else {
+                        Brush.verticalGradient(listOf(t.elevatedCardBackground.copy(alpha = .82f), t.cardBackground.copy(alpha = .64f)))
                     }
-                    if (active) {
-                        Icon(Icons.Rounded.Check, "已选择", tint = scheme.primary, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .background(fill, shape)
+                            .border(.7.dp, if (active) scheme.primary.copy(alpha = .28f) else t.outline.copy(alpha = .34f), shape)
+                            .clickable { onSelect(node.name) }
+                            .padding(horizontal = 14.dp, vertical = 11.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(node.name, color = t.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(listOf(node.type, if (node.udp) "UDP" else "").filter { it.isNotBlank() }.joinToString(" · "), color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+                        }
+                        if (active) {
+                            Icon(Icons.Rounded.Check, "已选择", tint = scheme.primary, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                        }
+                        RefDelayBadge(
+                            value = delays[node.name] ?: node.lastDelay,
+                            testing = testing[node.name] == true,
+                            onClick = { onDelay(node.name) },
+                        )
                     }
-                    RefDelayBadge(
-                        value = delays[node.name] ?: node.lastDelay,
-                        testing = testing[node.name] == true,
-                        onClick = { onDelay(node.name) },
-                    )
                 }
             }
         }
         Button(
             onClick = onConfirm,
+            enabled = group.nodes.isNotEmpty() && selected.isNotBlank(),
             modifier = Modifier.fillMaxWidth().height(52.dp),
             shape = RoundedCornerShape(14.dp),
         ) {
