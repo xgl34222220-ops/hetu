@@ -18,16 +18,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Match LuoShu backdrop source architecture
-        run: python3 scripts/fix_proxy_backdrop_source.py
+      - name: Refine proxy native UI
+        run: python3 scripts/refine_proxy_ui_test31.py
 
-      - name: Commit Home backdrop source fix
+      - name: Commit proxy UI refinement
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
           if ! git diff --cached --quiet; then
-            git commit -m 'Place proxy backdrop inside liquid glass source'
+            git commit -m 'Refine BoxProxy layout and bottom sheets'
             git push
           fi
 
@@ -75,9 +75,10 @@ jobs:
           unzip -t "$APK" >/dev/null
           unzip -l "$APK" | grep -q 'lib/arm64-v8a/libbichen_core.so'
           unzip -l "$APK" | grep -q 'assets/mihomo-root/arm64-v8a/mihomo'
+          ! grep -q 'AlertDialog(' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
       - uses: actions/upload-artifact@v4
         with:
-          name: Bichen-0.4.0-test.30-LuoShu-Backdrop-Source
+          name: Bichen-0.4.0-test.31-Native-UI-Refine
           path: android-app/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
