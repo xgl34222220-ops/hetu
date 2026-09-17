@@ -1,1 +1,1 @@
-2026-09-17 LuoShu exact dock + commercial compact proxy UI test.29
+2026-09-17 Home white-strip fix: move full-screen backdrop inside LuoShu layerBackdrop source
