@@ -4,6 +4,7 @@ import android.content.Intent
 import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.os.SystemClock
+import android.view.HapticFeedbackConstants
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.BackHandler
@@ -54,6 +55,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -81,6 +83,8 @@ import io.github.xgl34222220.bichen.ui.DockItem
 import io.github.xgl34222220.bichen.ui.LocalBichenTokens
 import io.github.xgl34222220.bichen.ui.glass.liquidGlassLens
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -130,6 +134,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
 
     var page by rememberSaveable { mutableStateOf(RefProxyPage.Home) }
     var panelTab by rememberSaveable { mutableStateOf(RefPanelTab.Overview) }
+    var panelSearchRequest by rememberSaveable { mutableIntStateOf(0) }
     var panelDetailVisible by rememberSaveable { mutableStateOf(false) }
     var state by remember { mutableStateOf(ProxyComposeState()) }
     var runtime by remember { mutableStateOf(ProxyRuntimeSnapshot()) }
@@ -355,6 +360,12 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                         panelTab = RefPanelTab.Subscriptions
                         page = RefProxyPage.Panel
                     },
+                    onSearch = {
+                        panelTab = RefPanelTab.Overview
+                        panelSearchRequest++
+                        page = RefProxyPage.Panel
+                    },
+                    onSettings = { page = RefProxyPage.Settings },
                 )
                 RefProxyPage.Panel -> RefPanel(
                     state = state,
@@ -362,6 +373,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                     delays = delays,
                     selectedTab = panelTab,
                     onSelectedTabChange = { panelTab = it },
+                    searchRequest = panelSearchRequest,
                     hazeState = haze,
                     backdrop = null,
                     onRefreshState = { scope.launch { refresh() } },
@@ -417,6 +429,8 @@ private fun RefHome(
     onWebUi: () -> Unit,
     onLog: () -> Unit,
     onSubscription: () -> Unit,
+    onSearch: () -> Unit,
+    onSettings: () -> Unit,
 ) {
     val t = LocalBichenTokens.current
     val scheme = MaterialTheme.colorScheme
@@ -434,16 +448,28 @@ private fun RefHome(
     ) {
         item {
             Row(
-                Modifier.fillMaxWidth().statusBarsPadding().padding(top = 14.dp, bottom = 10.dp),
+                Modifier.fillMaxWidth().statusBarsPadding().padding(top = 12.dp, bottom = 10.dp).height(44.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     "BoxProxy",
-                    color = t.textPrimary,
-                    fontSize = 22.sp,
-                    lineHeight = 28.sp,
+                    color = if (scheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A),
+                    fontSize = 26.sp,
+                    lineHeight = 32.sp,
                     fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = (-0.6).sp,
                     modifier = Modifier.weight(1f),
+                )
+                RefPanelHeaderAction(
+                    icon = Icons.Rounded.Search,
+                    contentDescription = "搜索",
+                    onClick = onSearch,
+                )
+                Spacer(Modifier.width(8.dp))
+                RefPanelHeaderAction(
+                    icon = Icons.Rounded.Settings,
+                    contentDescription = "设置",
+                    onClick = onSettings,
                 )
             }
         }
@@ -572,7 +598,7 @@ private fun RefLatencyColumn(label: String, value: Long?, testing: Boolean, modi
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(label, color = Color(0xFF64748B), fontSize = 11.sp, lineHeight = 15.sp, maxLines = 1)
         Text(
-            if (testing) "…" else refDelay(value),
+            refDelay(value),
             color = if (value == null && !testing) Color(0xFF94A3B8) else scheme.primary,
             fontSize = 17.sp,
             lineHeight = 21.sp,
@@ -731,6 +757,7 @@ private fun countryEmoji(code: String): String {
 private fun RefActionText(text: String, enabled: Boolean, onClick: () -> Unit, modifier: Modifier, color: Color = LocalBichenTokens.current.textPrimary) {
     val t = LocalBichenTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
+    val view = LocalView.current
     val source = remember(text) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) .95f else 1f, spring(dampingRatio = .72f, stiffness = 620f), label = "heroAction$text")
@@ -740,7 +767,10 @@ private fun RefActionText(text: String, enabled: Boolean, onClick: () -> Unit, m
             .height(38.dp)
             .clip(CircleShape)
             .background(if (dark) t.elevatedCardBackground.copy(alpha = .82f) else Color.White.copy(alpha = .84f))
-            .clickable(enabled = enabled, interactionSource = source, indication = null, onClick = onClick),
+            .clickable(enabled = enabled, interactionSource = source, indication = null) {
+                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                onClick()
+            },
         contentAlignment = Alignment.Center,
     ) {
         Text(text, color = if (enabled) color else t.textSecondary.copy(alpha = .42f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
@@ -819,6 +849,7 @@ private fun RefPanel(
     delays: MutableMap<String, Long>,
     selectedTab: RefPanelTab,
     onSelectedTabChange: (RefPanelTab) -> Unit,
+    searchRequest: Int,
     hazeState: HazeState,
     backdrop: LayerBackdrop?,
     onRefreshState: () -> Unit,
@@ -829,6 +860,7 @@ private fun RefPanel(
     val context = LocalContext.current
     val t = LocalBichenTokens.current
     val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
     val tab = selectedTab
     var refreshing by remember { mutableStateOf(false) }
     var providers by remember { mutableStateOf<List<DashboardProviderUi>>(emptyList()) }
@@ -912,6 +944,7 @@ private fun RefPanel(
     }
 
     LaunchedEffect(tab, state.running) { loadTab() }
+    LaunchedEffect(searchRequest) { if (searchRequest > 0) searchOpen = true }
 
     LaunchedEffect(tab) {
         if (tab != RefPanelTab.Overview) selectedGroupName = null
@@ -965,7 +998,7 @@ private fun RefPanel(
                                         delay = delays[selected] ?: group.nodes.firstOrNull { it.name == selected }?.lastDelay,
                                         modifier = Modifier.weight(1f),
                                         onClick = {
-                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                                             selectedGroupName = if (selectedGroupName == group.name) null else group.name
                                         },
                                     )
@@ -993,7 +1026,7 @@ private fun RefPanel(
                                         onSelect = { node ->
                                             val previous = selectedLocal[group.name] ?: group.now
                                             selectedLocal[group.name] = node
-                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                                             scope.launch {
                                                 try {
                                                     repo.select(group.name, node)
@@ -1012,12 +1045,19 @@ private fun RefPanel(
                                             }
                                         },
                                         onTestAll = {
-                                            group.nodes.forEach { node ->
-                                                if (testing[node.name] != true) scope.launch {
-                                                    testing[node.name] = true
-                                                    try { delays[node.name] = repo.delay(node.name) }
-                                                    catch (_: Exception) { delays[node.name] = -1L }
-                                                    finally { testing.remove(node.name) }
+                                            val pending = group.nodes.filter { testing[it.name] != true }
+                                            if (pending.isNotEmpty()) scope.launch {
+                                                pending.forEach { testing[it.name] = true }
+                                                try {
+                                                    pending.map { node ->
+                                                        async {
+                                                            try { delays[node.name] = repo.delay(node.name) }
+                                                            catch (_: Exception) { delays[node.name] = -1L }
+                                                        }
+                                                    }.awaitAll()
+                                                    view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                                                } finally {
+                                                    pending.forEach { testing.remove(it.name) }
                                                 }
                                             }
                                         },
@@ -1500,6 +1540,7 @@ private fun RefPanelHeaderAction(
     val t = LocalBichenTokens.current
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
+    val view = LocalView.current
     val source = remember(contentDescription) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val scale by animateFloatAsState(
@@ -1523,7 +1564,10 @@ private fun RefPanelHeaderAction(
             .background(bubbleBrush, shape)
             .border(.55.dp, Color.White.copy(alpha = if (dark) .12f else .92f), shape)
             .clip(shape)
-            .clickable(interactionSource = source, indication = null, onClick = onClick),
+            .clickable(interactionSource = source, indication = null) {
+                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                onClick()
+            },
         contentAlignment = Alignment.Center,
     ) {
         Icon(
@@ -1721,10 +1765,12 @@ private fun RefInlineGroupExpansion(
                     Text("全测速 ⚡", color = Color(0xFF2563EB), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
-            group.nodes.chunked(2).forEach { pair ->
+            group.nodes.withIndex().toList().chunked(2).forEach { pair ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    pair.forEach { node ->
+                    pair.forEach { entry ->
+                        val node = entry.value
                         RefInlineNodeCard(
+                            index = entry.index,
                             node = node,
                             active = node.name == selected,
                             delay = delays[node.name] ?: node.lastDelay,
@@ -1743,6 +1789,7 @@ private fun RefInlineGroupExpansion(
 
 @Composable
 private fun RefInlineNodeCard(
+    index: Int,
     node: ProxyNodeUi,
     active: Boolean,
     delay: Long?,
@@ -1756,39 +1803,53 @@ private fun RefInlineNodeCard(
     val shape = RoundedCornerShape(14.dp)
     val source = remember(node.name) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .98f else 1f, spring(dampingRatio = .78f, stiffness = 560f), label = "inlineNode${node.name}")
+    val scale by animateFloatAsState(if (pressed) .96f else 1f, spring(dampingRatio = .74f, stiffness = 560f), label = "inlineNode${node.name}")
+    var revealed by remember(node.name) { mutableStateOf(false) }
+    LaunchedEffect(node.name) {
+        delay((index * 20L).coerceAtMost(260L))
+        revealed = true
+    }
     val background = when {
         dark && active -> Color(0xFF172554)
         dark -> t.cardBackground
         active -> Color(0xFFF8FBFF)
         else -> Color.White
     }
-    Row(
-        modifier.height(50.dp)
-            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .92f else 1f }
-            .shadow(if (active) 3.dp else 1.dp, shape, clip = false)
-            .background(background, shape)
-            .border(if (active) 1.3.dp else .7.dp, if (active) Color(0xFF2563EB) else Color(0xFFE2E8F0), shape)
-            .clip(shape)
-            .clickable(interactionSource = source, indication = null, onClick = onSelect)
-            .padding(horizontal = 9.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        val flag = refNodeFlag(node.name)
-        if (flag.isNotBlank()) {
-            Text(flag, fontSize = 13.sp)
-            Spacer(Modifier.width(4.dp))
+    Box(modifier.height(50.dp)) {
+        androidx.compose.animation.AnimatedVisibility(
+            visible = revealed,
+            modifier = Modifier.fillMaxSize(),
+            enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(180)) +
+                androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(220)) { it / 3 },
+        ) {
+            Row(
+                Modifier.fillMaxSize()
+                    .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .88f else 1f }
+                    .shadow(if (active) 3.dp else 1.dp, shape, clip = false)
+                    .background(background, shape)
+                    .border(if (active) 1.3.dp else .7.dp, if (active) Color(0xFF2563EB) else Color(0xFFE2E8F0), shape)
+                    .clip(shape)
+                    .clickable(interactionSource = source, indication = null, onClick = onSelect)
+                    .padding(horizontal = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                val flag = refNodeFlag(node.name)
+                if (flag.isNotBlank()) {
+                    Text(flag, fontSize = 13.sp)
+                    Spacer(Modifier.width(4.dp))
+                }
+                Text(
+                    node.name,
+                    color = if (active) Color(0xFF1E3A8A) else t.textPrimary,
+                    fontSize = 11.sp,
+                    fontWeight = if (active) FontWeight.Bold else FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).padding(end = 4.dp),
+                )
+                RefDelayBadge(delay, testing, onDelay)
+            }
         }
-        Text(
-            node.name,
-            color = if (active) Color(0xFF1E3A8A) else t.textPrimary,
-            fontSize = 11.sp,
-            fontWeight = if (active) FontWeight.Bold else FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f).padding(end = 4.dp),
-        )
-        RefDelayBadge(delay, testing, onDelay)
     }
 }
 
@@ -1897,24 +1958,59 @@ private fun refNodeFlag(name: String): String {
 
 @Composable
 private fun RefDelayBadge(value: Long?, testing: Boolean, onClick: (() -> Unit)?) {
-    val scheme = MaterialTheme.colorScheme
-    val text = if (testing) "…" else refDelay(value)
+    val text = refDelay(value)
     val (background, textColor) = when {
-        testing -> Color(0xFFEFF6FF) to Color(0xFF2563EB)
         value == null -> Color(0xFFF1F5F9) to Color(0xFF64748B)
         value <= 0L -> Color(0xFFFEF2F2) to Color(0xFFDC2626)
         value > 200L -> Color(0xFFFFF7ED) to Color(0xFFD97706)
         else -> Color(0xFFEFF6FF) to Color(0xFF2563EB)
     }
-    val source = remember(text, onClick) { MutableInteractionSource() }
+    val source = remember(onClick) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .94f else 1f, spring(dampingRatio = .78f, stiffness = 620f), label = "delayBadge")
-    val modifier = Modifier
-        .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .90f else 1f }
-        .background(background, CircleShape)
-        .then(if (onClick != null) Modifier.clickable(enabled = !testing, interactionSource = source, indication = null, onClick = onClick) else Modifier)
-        .padding(horizontal = 8.dp, vertical = 2.dp)
-    Text(text, modifier = modifier, color = textColor, fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    val infinite = androidx.compose.animation.core.rememberInfiniteTransition(label = "latencyPulse")
+    val pulse by infinite.animateFloat(
+        initialValue = .66f,
+        targetValue = 1f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = androidx.compose.animation.core.tween(620),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
+        ),
+        label = "latencyPulseAlpha",
+    )
+    var revealTarget by remember { mutableFloatStateOf(1f) }
+    LaunchedEffect(text) {
+        revealTarget = .94f
+        delay(26)
+        revealTarget = 1f
+    }
+    val reveal by animateFloatAsState(revealTarget, spring(dampingRatio = .64f, stiffness = 520f), label = "latencyReveal")
+    val pressScale by animateFloatAsState(if (pressed) .96f else 1f, spring(dampingRatio = .74f, stiffness = 620f), label = "latencyPress")
+    val alpha = if (testing) pulse else 1f
+    Box(
+        Modifier.widthIn(min = 58.dp).height(22.dp)
+            .graphicsLayer { scaleX = reveal * pressScale; scaleY = reveal * pressScale; this.alpha = if (pressed) .86f else alpha }
+            .background(if (testing) background.copy(alpha = .72f) else background, CircleShape)
+            .border(.7.dp, if (testing) Color(0xFF2563EB).copy(alpha = .24f + .28f * pulse) else Color.Transparent, CircleShape)
+            .then(if (onClick != null) Modifier.clickable(enabled = !testing, interactionSource = source, indication = null, onClick = onClick) else Modifier)
+            .padding(horizontal = 6.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        androidx.compose.animation.Crossfade(
+            targetState = text,
+            animationSpec = androidx.compose.animation.core.tween(220),
+            label = "latencyCrossFade",
+        ) { shown ->
+            Text(
+                shown,
+                color = textColor,
+                fontSize = 11.sp,
+                lineHeight = 14.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
+            )
+        }
+    }
 }
 
 @Composable
@@ -2632,7 +2728,7 @@ private fun RefToolRow(
     val t = LocalBichenTokens.current
     val source = remember(title) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .985f else 1f, spring(dampingRatio = .78f, stiffness = 560f), label = "tool$title")
+    val scale by animateFloatAsState(if (pressed) .96f else 1f, spring(dampingRatio = .78f, stiffness = 560f), label = "tool$title")
     Row(
         Modifier.fillMaxWidth()
             .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .91f else 1f }
@@ -2683,7 +2779,7 @@ private fun RefValueRow(
     val t = LocalBichenTokens.current
     val source = remember(title) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed && onClick != null) .985f else 1f, spring(dampingRatio = .80f, stiffness = 560f), label = "value$title")
+    val scale by animateFloatAsState(if (pressed && onClick != null) .96f else 1f, spring(dampingRatio = .80f, stiffness = 560f), label = "value$title")
     val modifier = if (onClick == null) Modifier.fillMaxWidth() else Modifier.fillMaxWidth()
         .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .91f else 1f }
         .background(if (pressed) t.controlBackground.copy(alpha = .42f) else Color.Transparent)
