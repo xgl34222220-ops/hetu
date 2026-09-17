@@ -307,7 +307,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
     Box(Modifier.fillMaxSize().background(shellBackground)) {
         Box(
             Modifier.fillMaxSize()
-                .then(if (!liquid || page == RefProxyPage.Panel) Modifier.hazeSource(haze) else Modifier)
+                .then(if (!liquid) Modifier.hazeSource(haze) else Modifier)
                 .then(if (liquid) Modifier.layerBackdrop(liquidBackdrop) else Modifier),
         ) {
             // Match LuoShu's backdrop architecture: the full-screen page backdrop must live
@@ -1368,39 +1368,39 @@ private fun RefPanelGlassHeader(
     val t = LocalBichenTokens.current
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
-    // Panel header deliberately uses Haze only. RuntimeShader here crashes on some OEM GPUs.
+    // Panel header intentionally avoids both RuntimeShader and Haze on affected OEM GPUs.
+    // The glass look is drawn from transparent layered highlights only, so no rectangular
+    // backdrop sampling surface can leak through as a giant white block.
     val runtimeLiquid = false
     val shape = RoundedCornerShape(28.dp)
-    // Use a custom page-matched blur style here. The material preset adds too much white tint
-    // on this very light page and turns the whole header into a large white slab.
-    val panelBase = if (dark) scheme.background else Color(0xFFF1F5F9)
-    val panelTint = if (dark) Color.White.copy(alpha = .025f) else Color.White.copy(alpha = .035f)
-    val panelGlassStyle = HazeStyle(
-        backgroundColor = panelBase,
-        tint = HazeTint(panelTint),
-        blurRadius = 22.dp,
-        noiseFactor = .008f,
-    )
-    val glassSheen = if (dark) {
-        Brush.verticalGradient(listOf(Color.White.copy(alpha = .055f), Color.Transparent))
+    val shellBrush = if (dark) {
+        Brush.verticalGradient(
+            listOf(
+                scheme.surface.copy(alpha = .34f),
+                Color.White.copy(alpha = .035f),
+                scheme.surface.copy(alpha = .18f),
+            ),
+        )
     } else {
-        Brush.verticalGradient(listOf(Color.White.copy(alpha = .075f), Color.Transparent))
+        Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = .20f),
+                Color(0xFFDCE8F5).copy(alpha = .085f),
+                Color.White.copy(alpha = .035f),
+            ),
+        )
     }
-    val hazeModifier = Modifier.hazeEffect(state = hazeState, style = panelGlassStyle)
-    val liquidShellModifier = Modifier.then(hazeModifier).background(glassSheen)
+    val edgeColor = if (dark) Color.White.copy(alpha = .09f) else Color.White.copy(alpha = .24f)
+    val liquidShellModifier = Modifier.background(shellBrush)
 
 
     Box(
         Modifier
             .fillMaxWidth()
-            .shadow(9.dp, shape, clip = false)
+            .shadow(7.dp, shape, clip = false)
             .squircleClip(28.dp)
             .then(liquidShellModifier)
-            .border(
-                if (runtimeLiquid) .45.dp else .7.dp,
-                if (dark) Color.White.copy(alpha = .09f) else Color.White.copy(alpha = .20f),
-                shape,
-            ),
+            .border(.7.dp, edgeColor, shape),
     ) {
         Column(
             Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 11.dp),
