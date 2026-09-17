@@ -18,6 +18,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -341,12 +342,11 @@ private fun RefProxyShell(onBack: () -> Unit) {
     }
 
     logText?.let { text ->
-        AlertDialog(
-            onDismissRequest = { logText = null },
-            shape = RoundedCornerShape(20.dp),
-            title = { Text("运行日志") },
-            text = { Text(text, style = MaterialTheme.typography.bodySmall, maxLines = 24, overflow = TextOverflow.Ellipsis) },
-            confirmButton = { TextButton(onClick = { logText = null }) { Text("关闭") } },
+        RefInfoBottomSheet(
+            title = "运行日志",
+            text = text,
+            actionLabel = "关闭",
+            onDismiss = { logText = null },
         )
     }
 }
@@ -382,22 +382,23 @@ private fun RefHome(
             start = 16.dp,
             top = 8.dp,
             end = 16.dp,
-            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 108.dp,
+            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 132.dp,
         ),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {
             Row(
-                Modifier.fillMaxWidth().statusBarsPadding().padding(top = 10.dp, bottom = 6.dp),
+                Modifier.fillMaxWidth().statusBarsPadding().padding(top = 14.dp, bottom = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("代理", color = t.textPrimary, fontSize = 27.sp, lineHeight = 33.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                IconButton(onClick = onRefresh, modifier = Modifier.size(44.dp)) {
-                    Icon(Icons.Rounded.Refresh, "刷新", tint = t.textSecondary, modifier = Modifier.size(20.dp))
-                }
-                IconButton(onClick = onBack, modifier = Modifier.size(44.dp)) {
-                    Icon(Icons.Rounded.Close, "关闭", tint = t.textSecondary, modifier = Modifier.size(20.dp))
-                }
+                Text(
+                    "BoxProxy",
+                    color = t.textPrimary,
+                    fontSize = 22.sp,
+                    lineHeight = 28.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
         item {
@@ -410,10 +411,27 @@ private fun RefHome(
                 Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Row(verticalAlignment = Alignment.Top) {
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 Box(Modifier.size(9.dp).background(if (state.running) t.success else t.danger, CircleShape))
-                                Text(if (state.running) "运行中" else "已停止", color = t.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                                Text(if (state.running) refDuration(runtime.elapsedSeconds) else "等待启动", color = t.textMuted, fontSize = 11.sp)
+                                Spacer(Modifier.width(9.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Text(
+                                        if (state.running) "运行中" else "已停止",
+                                        color = t.textPrimary,
+                                        fontSize = 20.sp,
+                                        lineHeight = 24.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        modifier = Modifier.alignByBaseline(),
+                                    )
+                                    Text(
+                                        if (state.running) refDuration(runtime.elapsedSeconds) else "等待启动",
+                                        color = t.textMuted,
+                                        fontSize = 11.sp,
+                                        lineHeight = 15.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        modifier = Modifier.alignByBaseline(),
+                                    )
+                                }
                             }
                             Text("${state.core} · ${state.mode}", color = t.textSecondary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                             Text(state.config, color = t.textMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -516,7 +534,7 @@ private fun RefLatencyColumn(label: String, value: Long?, testing: Boolean, modi
             color = valueColor,
             fontSize = 16.sp,
             lineHeight = 20.sp,
-            fontWeight = FontWeight.ExtraBold,
+            fontWeight = FontWeight.Bold,
             maxLines = 1,
         )
     }
@@ -531,24 +549,37 @@ private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: I
     val scale by animateFloatAsState(if (pressed) .97f else 1f, spring(dampingRatio = .78f, stiffness = 520f), label = "networkCardPress")
     val shape = RoundedCornerShape(18.dp)
     Surface(
-        modifier = modifier.height(96.dp).graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .90f else 1f }.clip(shape)
+        modifier = modifier
+            .height(96.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .90f else 1f }
+            .clip(shape)
             .clickable(interactionSource = source, indication = null) { lanMode = !lanMode },
         shape = shape,
         color = t.cardBackground,
         shadowElevation = 0.dp,
     ) {
-        Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(if (lanMode) "LAN" else "WAN", color = Color(0xFF94A3B8), fontSize = 12.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-                Icon(Icons.Rounded.SwapHoriz, "切换 LAN/WAN", tint = t.textMuted.copy(alpha = .62f), modifier = Modifier.size(15.dp))
-            }
-            if (lanMode) {
-                Text(runtime.lanAddress, color = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A), fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("${runtime.lanInterface} · $connections 连接", color = Color(0xFF94A3B8), fontSize = 11.sp, maxLines = 1)
-            } else {
-                Text(runtime.wanAddress, color = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A), fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("${countryEmoji(runtime.wanCountryCode)} ${runtime.wanRegion}", color = Color(0xFF94A3B8), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
+        Column(
+            Modifier.fillMaxSize().padding(13.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(if (lanMode) "LAN" else "WAN", color = Color(0xFF94A3B8), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            Text(
+                if (lanMode) runtime.lanAddress else runtime.wanAddress,
+                color = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A),
+                fontSize = 18.sp,
+                lineHeight = 22.sp,
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                if (lanMode) "${runtime.lanInterface} · $connections 连接" else "${countryEmoji(runtime.wanCountryCode)} ${runtime.wanRegion}",
+                color = Color(0xFF94A3B8),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -556,18 +587,23 @@ private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: I
 @Composable
 private fun RefSpeedCard(up: Long, down: Long, modifier: Modifier) {
     val t = LocalBichenTokens.current
+    val valueColor = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A)
     Surface(modifier = modifier.height(96.dp), shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
-        Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Column(Modifier.fillMaxSize().padding(13.dp), verticalArrangement = Arrangement.SpaceBetween) {
             Text("网速", color = Color(0xFF94A3B8), fontSize = 12.sp, fontWeight = FontWeight.Medium)
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Rounded.ArrowUpward, null, tint = t.success, modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(5.dp))
-                Text(refSpeed(up), color = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                Text("上行", color = Color(0xFF94A3B8), fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.weight(1f))
+                Text(refSpeed(up), color = valueColor, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1)
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Rounded.ArrowDownward, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(5.dp))
-                Text(refSpeed(down), color = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                Text("下行", color = Color(0xFF94A3B8), fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.weight(1f))
+                Text(refSpeed(down), color = valueColor, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1)
             }
         }
     }
@@ -581,7 +617,7 @@ private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, modifier: M
     val total = tracked.sumOf { it.total }
     val ratio = if (total <= 0L) 0f else (used.toDouble() / total.toDouble()).toFloat().coerceIn(0f, 1f)
     Surface(modifier = modifier.height(96.dp), shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
-        Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(Modifier.fillMaxSize().padding(13.dp), verticalArrangement = Arrangement.SpaceBetween) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("订阅", color = Color(0xFF94A3B8), fontSize = 12.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
                 if (total > 0L) Surface(shape = RoundedCornerShape(999.dp), color = t.selectionBackground) {
@@ -591,12 +627,12 @@ private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, modifier: M
             Text(
                 if (total > 0L) refBytes(used) else "${items.size} 个",
                 color = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A),
-                fontSize = 17.sp,
-                lineHeight = 21.sp,
-                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                lineHeight = 22.sp,
+                fontWeight = FontWeight.ExtraBold,
                 maxLines = 1,
             )
-            Text(if (total > 0L) "总 ${refBytes(total)}" else "远程订阅", color = Color(0xFF94A3B8), fontSize = 11.sp, maxLines = 1)
+            Text(if (total > 0L) "总 ${refBytes(total)}" else "远程订阅", color = Color(0xFF94A3B8), fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1)
         }
     }
 }
@@ -604,17 +640,18 @@ private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, modifier: M
 @Composable
 private fun RefResourceCard(memory: Long, cpuPercent: Float, modifier: Modifier) {
     val t = LocalBichenTokens.current
+    val valueColor = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A)
     Surface(modifier = modifier.height(96.dp), shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
-        Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.fillMaxSize().padding(13.dp), verticalArrangement = Arrangement.SpaceBetween) {
             Text("资源占用", color = Color(0xFF94A3B8), fontSize = 12.sp, fontWeight = FontWeight.Medium)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                    Text(refBytes(memory), color = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A), fontSize = 15.sp, lineHeight = 19.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                    Text("内存", color = Color(0xFF94A3B8), fontSize = 11.sp)
+                    Text(refBytes(memory), color = valueColor, fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
+                    Text("内存", color = Color(0xFF94A3B8), fontSize = 11.sp, fontWeight = FontWeight.Medium)
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                    Text(String.format(java.util.Locale.US, "%.1f%%", cpuPercent), color = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A), fontSize = 15.sp, lineHeight = 19.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                    Text("CPU", color = Color(0xFF94A3B8), fontSize = 11.sp)
+                    Text(String.format(java.util.Locale.US, "%.1f%%", cpuPercent), color = valueColor, fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
+                    Text("CPU", color = Color(0xFF94A3B8), fontSize = 11.sp, fontWeight = FontWeight.Medium)
                 }
             }
         }
@@ -822,7 +859,7 @@ private fun RefPanel(
                 start = 16.dp,
                 top = 8.dp,
                 end = 16.dp,
-                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 108.dp,
+                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 132.dp,
             ),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -1542,7 +1579,7 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
             start = 16.dp,
             top = 8.dp,
             end = 16.dp,
-            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 108.dp,
+            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 132.dp,
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -1585,11 +1622,11 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
         }
     }
     unavailable?.let { text ->
-        AlertDialog(
-            onDismissRequest = { unavailable = null },
-            title = { Text("功能尚未接入") },
-            text = { Text(text) },
-            confirmButton = { TextButton(onClick = { unavailable = null }) { Text("知道了") } },
+        RefInfoBottomSheet(
+            title = "功能尚未接入",
+            text = text,
+            actionLabel = "知道了",
+            onDismiss = { unavailable = null },
         )
     }
 }
@@ -1611,7 +1648,7 @@ private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
             start = 16.dp,
             top = 8.dp,
             end = 16.dp,
-            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 108.dp,
+            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 132.dp,
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -1654,32 +1691,18 @@ private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
 
     if (modePicker) {
         val profile = ProxyRuntimeProfile.load(prefs)
-        val choices = ProxyRuntimeProfile.Mode.values().filter {
-            ProxyRuntimeProfile.capability(profile.core, it).available
-        }
-        AlertDialog(
-            onDismissRequest = { modePicker = false },
-            title = { Text("运行模式") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    choices.forEach { mode ->
-                        Row(
-                            Modifier.fillMaxWidth().clickable {
-                                prefs.edit().putString("proxyBaseMode", mode.id).apply()
-                                modePicker = false
-                                notice = if (state.running) "运行模式已保存，重启代理后生效" else "运行模式已保存"
-                                onChanged()
-                            }.padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            RadioButton(selected = profile.mode == mode, onClick = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(mode.label, modifier = Modifier.weight(1f))
-                        }
-                    }
-                }
+        val choices = ProxyRuntimeProfile.Mode.values().filter { ProxyRuntimeProfile.capability(profile.core, it).available }
+        RefChoiceBottomSheet(
+            title = "运行模式",
+            options = choices.map { it.label to (profile.mode == it) },
+            onDismiss = { modePicker = false },
+            onSelect = { index ->
+                val mode = choices[index]
+                prefs.edit().putString("proxyBaseMode", mode.id).apply()
+                modePicker = false
+                notice = if (state.running) "运行模式已保存，重启代理后生效" else "运行模式已保存"
+                onChanged()
             },
-            confirmButton = { TextButton(onClick = { modePicker = false }) { Text("取消") } },
         )
     }
 
@@ -1690,55 +1713,134 @@ private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
             ProxyRuntimeProfile.Ipv6.BYPASS to "IPv6 不进核心",
             ProxyRuntimeProfile.Ipv6.DISABLE to "禁用系统 IPv6",
         )
-        AlertDialog(
-            onDismissRequest = { ipv6Picker = false },
-            title = { Text("IPv6") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    values.forEach { (value, label) ->
-                        Row(
-                            Modifier.fillMaxWidth().clickable {
-                                prefs.edit().putString("proxyBaseIpv6", value.id).apply()
-                                ipv6Picker = false
-                                notice = if (state.running) "IPv6 设置已保存，重启代理后生效" else "IPv6 设置已保存"
-                                onChanged()
-                            }.padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            RadioButton(selected = profile.ipv6 == value, onClick = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(label, modifier = Modifier.weight(1f))
-                        }
-                    }
-                }
+        RefChoiceBottomSheet(
+            title = "IPv6",
+            options = values.map { (value, label) -> label to (profile.ipv6 == value) },
+            onDismiss = { ipv6Picker = false },
+            onSelect = { index ->
+                val value = values[index].first
+                prefs.edit().putString("proxyBaseIpv6", value.id).apply()
+                ipv6Picker = false
+                notice = if (state.running) "IPv6 设置已保存，重启代理后生效" else "IPv6 设置已保存"
+                onChanged()
             },
-            confirmButton = { TextButton(onClick = { ipv6Picker = false }) { Text("取消") } },
         )
     }
 
     if (portsInfo) {
-        AlertDialog(
-            onDismissRequest = { portsInfo = false },
-            title = { Text("端口细则") },
-            text = {
-                Text(
-                    "TProxy：${MihomoStartupConfig.TPROXY_PORT}\n" +
-                        "Redirect：${MihomoStartupConfig.REDIRECT_PORT}\n" +
-                        "控制器：127.0.0.1:${MihomoStartupConfig.CONTROLLER_PORT}\n\n" +
-                        "这些是辟尘运行副本使用的安全端口。源订阅文件不会被直接修改。",
-                )
-            },
-            confirmButton = { TextButton(onClick = { portsInfo = false }) { Text("关闭") } },
+        RefInfoBottomSheet(
+            title = "端口细则",
+            text = "TProxy：${MihomoStartupConfig.TPROXY_PORT}
+" +
+                "Redirect：${MihomoStartupConfig.REDIRECT_PORT}
+" +
+                "控制器：127.0.0.1:${MihomoStartupConfig.CONTROLLER_PORT}
+
+" +
+                "这些是辟尘运行副本使用的安全端口。源订阅文件不会被直接修改。",
+            actionLabel = "关闭",
+            onDismiss = { portsInfo = false },
         )
     }
 
     notice?.let { text ->
-        AlertDialog(
-            onDismissRequest = { notice = null },
-            text = { Text(text) },
-            confirmButton = { TextButton(onClick = { notice = null }) { Text("知道了") } },
+        RefInfoBottomSheet(
+            title = "设置已保存",
+            text = text,
+            actionLabel = "知道了",
+            onDismiss = { notice = null },
         )
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RefChoiceBottomSheet(
+    title: String,
+    options: List<Pair<String, Boolean>>,
+    onDismiss: () -> Unit,
+    onSelect: (Int) -> Unit,
+) {
+    val t = LocalBichenTokens.current
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
+        containerColor = t.elevatedCardBackground,
+        contentColor = t.textPrimary,
+        tonalElevation = 0.dp,
+        scrimColor = Color.Black.copy(alpha = .35f),
+        dragHandle = { RefSheetDragHandle() },
+    ) {
+        Column(
+            Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(title, color = t.textPrimary, fontSize = 20.sp, lineHeight = 25.sp, fontWeight = FontWeight.Bold)
+            options.forEachIndexed { index, option ->
+                val selected = option.second
+                val shape = RoundedCornerShape(15.dp)
+                Row(
+                    Modifier.fillMaxWidth()
+                        .clip(shape)
+                        .background(if (selected) t.selectionBackground else t.controlBackground.copy(alpha = .42f), shape)
+                        .clickable { onSelect(index) }
+                        .padding(horizontal = 14.dp, vertical = 13.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(option.first, color = t.textPrimary, fontSize = 15.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, modifier = Modifier.weight(1f))
+                    if (selected) Icon(Icons.Rounded.Check, "已选择", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RefInfoBottomSheet(
+    title: String,
+    text: String,
+    actionLabel: String,
+    onDismiss: () -> Unit,
+) {
+    val t = LocalBichenTokens.current
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
+        containerColor = t.elevatedCardBackground,
+        contentColor = t.textPrimary,
+        tonalElevation = 0.dp,
+        scrimColor = Color.Black.copy(alpha = .35f),
+        dragHandle = { RefSheetDragHandle() },
+    ) {
+        Column(
+            Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(title, color = t.textPrimary, fontSize = 20.sp, lineHeight = 25.sp, fontWeight = FontWeight.Bold)
+            Box(
+                Modifier.fillMaxWidth()
+                    .heightIn(max = 430.dp)
+                    .background(t.controlBackground.copy(alpha = .54f), RoundedCornerShape(16.dp))
+                    .padding(14.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                Text(text, color = t.textSecondary, fontSize = 13.sp, lineHeight = 20.sp)
+            }
+            Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(14.dp)) {
+                Text(actionLabel, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RefSheetDragHandle() {
+    Box(
+        Modifier.padding(top = 10.dp, bottom = 6.dp)
+            .size(width = 36.dp, height = 4.dp)
+            .background(Color(0xFFCBD5E1), CircleShape),
+    )
 }
 
 @Composable
