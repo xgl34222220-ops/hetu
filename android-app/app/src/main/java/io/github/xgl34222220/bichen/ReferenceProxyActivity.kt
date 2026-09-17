@@ -282,6 +282,10 @@ private fun RefProxyShell(onBack: () -> Unit) {
                 .then(if (!liquid) Modifier.hazeSource(haze) else Modifier)
                 .then(if (liquid) Modifier.layerBackdrop(liquidBackdrop) else Modifier),
         ) {
+            // Match LuoShu's backdrop architecture: the full-screen page backdrop must live
+            // INSIDE the layerBackdrop source. Keeping it only on the parent leaves transparent
+            // pixels near the Home tail, which the RuntimeShader can stretch into a white strip.
+            Box(Modifier.matchParentSize().background(shellBackground))
             key(page) {
                 val pageEnter = remember { Animatable(0f) }
                 LaunchedEffect(Unit) {
