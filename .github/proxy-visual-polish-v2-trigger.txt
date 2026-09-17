@@ -1,1 +1,1 @@
-2026-09-17 Home white-strip fix: move full-screen backdrop inside LuoShu layerBackdrop source
+2026-09-17 test31 native UI refine: safe bottom spacing + BoxProxy title + strong typography + bottom sheets
