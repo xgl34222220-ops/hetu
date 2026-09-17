@@ -18,16 +18,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Fix Compose animation import
-        run: python3 scripts/fix_test45_animate_float_import.py
+      - name: Apply test46 native visual polish
+        run: python3 scripts/run_visual_refine_test46.py
 
-      - name: Commit test45 compile fix
+      - name: Commit test46 polish
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
           if ! git diff --cached --quiet; then
-            git commit -m 'Fix test45 Compose animation import'
+            git commit -m 'Polish ghost header latency spinner and terminal log'
             git push
           fi
 
@@ -68,7 +68,7 @@ jobs:
       - name: Build APK
         working-directory: android-app
         run: gradle :app:assembleDebug --stacktrace
-      - name: Verify APK and test45 invariants
+      - name: Verify APK and test46 invariants
         run: |
           set -euo pipefail
           APK=android-app/app/build/outputs/apk/debug/app-debug.apk
@@ -78,25 +78,29 @@ jobs:
           unzip -t "$APK" >/dev/null
           unzip -l "$APK" | grep -q 'lib/arm64-v8a/libbichen_core.so'
           unzip -l "$APK" | grep -q 'assets/mihomo-root/arm64-v8a/mihomo'
-          grep -q 'import androidx.compose.animation.core.animateFloat' "$UI"
-          grep -q 'widthIn(min = 58.dp).height(22.dp)' "$UI"
+          grep -q 'label = "test46GhostHeader"' "$UI"
+          grep -q 'Icons.Rounded.MoreHoriz' "$UI"
+          grep -q 'padding(top = 16.dp, bottom = 10.dp).height(44.dp)' "$UI"
+          grep -q 'Modifier.width(62.dp).height(22.dp)' "$UI"
           grep -q 'fontFeatureSettings = "tnum"' "$UI"
           grep -q 'latencyCrossFade' "$UI"
-          grep -q 'latencyPulseAlpha' "$UI"
+          grep -q 'trackColor = textColor.copy(alpha = .14f)' "$UI"
+          grep -q 'Color(0xFF10B981)' "$UI"
+          grep -q 'Color(0xFFF59E0B)' "$UI"
+          grep -q 'Color(0xFFF43F5E)' "$UI"
+          grep -q 'Color(0xFFF8FAFC)' "$UI"
+          grep -q 'initialScale = .05f' "$UI"
+          grep -q 'runtime.log' "$UI"
+          grep -q 'FontFamily.Monospace' "$UI"
           grep -q 'HapticFeedbackConstants.CLOCK_TICK' "$UI"
           grep -q 'HapticFeedbackConstants.VIRTUAL_KEY' "$UI"
           grep -q 'HapticFeedbackConstants.CONFIRM' "$UI"
-          grep -q 'panelSearchRequest++' "$UI"
-          grep -q 'letterSpacing = (-0.6).sp' "$UI"
           grep -q 'index \* 20L' "$UI"
-          grep -q 'private fun RefInlineGroupExpansion' "$UI"
-          grep -q 'providerProgress' "$UI"
-          test "$(grep -o 'height(100.dp)' "$UI" | wc -l)" -ge 4
           test "$(git rev-parse HEAD:$DOCK)" = '7efba3c815e6429fcc35df87dc91f5be968111c6'
           ! grep -q 'AlertDialog(' "$UI"
       - uses: actions/upload-artifact@v4
         with:
-          name: Bichen-0.4.0-test.45-Micro-Motion-Haptics-Topbar
+          name: Bichen-0.4.0-test.46-Ghost-Header-Latency-Spinner-Terminal
           path: android-app/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
