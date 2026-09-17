@@ -19,7 +19,7 @@ jobs:
           fetch-depth: 0
 
       - name: Apply dashboard micro interaction polish
-        run: python3 scripts/patch_proxy_micro_interactions_test44.py
+        run: python3 scripts/run_proxy_micro_interactions_test44.py
 
       - name: Commit dashboard micro interaction polish
         run: |
