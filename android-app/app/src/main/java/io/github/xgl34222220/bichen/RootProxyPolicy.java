@@ -12,58 +12,69 @@ import java.util.regex.Pattern;
 final class RootProxyPolicy {
     private static final int FIRST_APP_UID = 10000;
     private static final int MAX_UIDS = 512;
+    private static final int MAX_DIRECT_UIDS = 256;
     private static final int MAX_CIDRS = 256;
     private static final int MAX_INTERFACES = 32;
     private static final Pattern CIDR_SAFE = Pattern.compile("[0-9A-Fa-f:.]+/[0-9]{1,3}");
     private static final Pattern IFACE_SAFE = Pattern.compile("[A-Za-z0-9_.:@-]+\\+?");
+    private static final Pattern PKG_SAFE = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)+(?:\\*)?");
 
     final String appScope;
     final String uidRanges;
+    final String directUidRanges;
     final boolean sharedNetwork;
     final boolean killSwitch;
     final String cidrs;
     final String interfaces;
     final Set<String> missingPackages;
     final Set<String> skippedSystemPackages;
+    final Set<String> directPackages;
 
     private RootProxyPolicy(
             String appScope,
             String uidRanges,
+            String directUidRanges,
             boolean sharedNetwork,
             boolean killSwitch,
             String cidrs,
             String interfaces,
             Set<String> missingPackages,
-            Set<String> skippedSystemPackages) {
+            Set<String> skippedSystemPackages,
+            Set<String> directPackages) {
         this.appScope = appScope;
         this.uidRanges = uidRanges;
+        this.directUidRanges = directUidRanges;
         this.sharedNetwork = sharedNetwork;
         this.killSwitch = killSwitch;
         this.cidrs = cidrs;
         this.interfaces = interfaces;
-        this.missingPackages = Collections.unmodifiableSet(missingPackages);
-        this.skippedSystemPackages = Collections.unmodifiableSet(skippedSystemPackages);
+        this.missingPackages = Collections.unmodifiableSet(new TreeSet<>(missingPackages));
+        this.skippedSystemPackages = Collections.unmodifiableSet(new TreeSet<>(skippedSystemPackages));
+        this.directPackages = Collections.unmodifiableSet(new TreeSet<>(directPackages));
     }
 
     static RootProxyPolicy load(Context context, SharedPreferences prefs, ProxyRuntimeProfile profile) throws IOException {
+        return load(context, prefs, profile, Collections.emptySet());
+    }
+
+    static RootProxyPolicy load(Context context, SharedPreferences prefs, ProxyRuntimeProfile profile, Set<String> directPatterns) throws IOException {
         String scope = profile.appScope.id;
         TreeSet<Integer> uids = new TreeSet<>();
+        TreeSet<Integer> directUids = new TreeSet<>();
         TreeSet<String> missing = new TreeSet<>();
         TreeSet<String> skipped = new TreeSet<>();
+        TreeSet<String> resolvedDirectPackages = new TreeSet<>();
         Set<String> selected = prefs.getStringSet("proxyAppPackages", Collections.emptySet());
         if (selected == null) selected = Collections.emptySet();
+        PackageManager pm = context.getPackageManager();
 
         if (profile.appScope != ProxyRuntimeProfile.AppScope.CORE) {
-            PackageManager pm = context.getPackageManager();
             for (String pkg : new TreeSet<>(selected)) {
                 if (pkg == null || pkg.isEmpty() || pkg.equals(context.getPackageName())) continue;
                 try {
                     ApplicationInfo info = pm.getApplicationInfo(pkg, 0);
-                    if (info.uid < FIRST_APP_UID) {
-                        skipped.add(pkg);
-                    } else {
-                        uids.add(info.uid);
-                    }
+                    if (info.uid < FIRST_APP_UID) skipped.add(pkg);
+                    else uids.add(info.uid);
                 } catch (PackageManager.NameNotFoundException missingPackage) {
                     missing.add(pkg);
                 }
@@ -74,23 +85,58 @@ final class RootProxyPolicy {
                 throw new IOException("当前是“仅所选应用代理”，但应用名单没有可用的普通应用 UID");
         }
 
+        if (directPatterns != null && !directPatterns.isEmpty()) {
+            List<ApplicationInfo> installed = null;
+            for (String raw : new TreeSet<>(directPatterns)) {
+                String pattern = raw == null ? "" : raw.trim();
+                if (pattern.isEmpty() || !PKG_SAFE.matcher(pattern).matches()) continue;
+                boolean wildcard = pattern.endsWith("*");
+                String prefix = wildcard ? pattern.substring(0, pattern.length() - 1) : pattern;
+                if (wildcard) {
+                    if (installed == null) installed = pm.getInstalledApplications(0);
+                    for (ApplicationInfo info : installed) {
+                        String pkg = info.packageName;
+                        if (pkg == null || !pkg.startsWith(prefix) || pkg.equals(context.getPackageName())) continue;
+                        if (info.uid >= FIRST_APP_UID) {
+                            directUids.add(info.uid);
+                            resolvedDirectPackages.add(pkg);
+                        }
+                    }
+                } else {
+                    if (prefix.equals(context.getPackageName())) continue;
+                    try {
+                        ApplicationInfo info = pm.getApplicationInfo(prefix, 0);
+                        if (info.uid >= FIRST_APP_UID) {
+                            directUids.add(info.uid);
+                            resolvedDirectPackages.add(prefix);
+                        }
+                    } catch (PackageManager.NameNotFoundException ignored) { }
+                }
+            }
+        }
+        if (directUids.size() > MAX_DIRECT_UIDS)
+            throw new IOException("配置中的 DIRECT 应用超过 " + MAX_DIRECT_UIDS + " 个 UID，请缩小 PROCESS-NAME 规则范围");
+
         String cidrs = sanitizeCidrs(prefs.getStringSet("proxyBypassCidrs", Collections.emptySet()));
         String interfaces = sanitizeInterfaces(prefs.getStringSet("proxyBypassInterfaces", Collections.emptySet()));
         return new RootProxyPolicy(
                 scope,
                 compress(uids),
+                compress(directUids),
                 prefs.getBoolean("proxySharedNetwork", false),
                 prefs.getBoolean("proxyKillSwitch", false),
                 cidrs,
                 interfaces,
                 missing,
-                skipped);
+                skipped,
+                resolvedDirectPackages);
     }
 
     String warning() {
         ArrayList<String> parts = new ArrayList<>();
         if (!missingPackages.isEmpty()) parts.add("已忽略 " + missingPackages.size() + " 个已卸载应用");
         if (!skippedSystemPackages.isEmpty()) parts.add("为避免影响系统服务，已忽略 " + skippedSystemPackages.size() + " 个系统 UID 应用");
+        if (!directPackages.isEmpty()) parts.add("已将配置中的 " + directPackages.size() + " 个 DIRECT 应用下沉为 Root 直连");
         return String.join("；", parts);
     }
 
@@ -99,14 +145,8 @@ final class RootProxyPolicy {
         StringBuilder out = new StringBuilder();
         int start = -1, previous = -1;
         for (int value : values) {
-            if (start < 0) {
-                start = previous = value;
-                continue;
-            }
-            if (value == previous + 1) {
-                previous = value;
-                continue;
-            }
+            if (start < 0) { start = previous = value; continue; }
+            if (value == previous + 1) { previous = value; continue; }
             appendRange(out, start, previous);
             start = previous = value;
         }
