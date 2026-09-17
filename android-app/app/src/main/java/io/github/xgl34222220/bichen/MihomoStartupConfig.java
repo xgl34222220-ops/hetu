@@ -6,10 +6,10 @@ import java.util.regex.*;
 
 /** Builds a private Mihomo startup copy. The selected source config is never edited. */
 final class MihomoStartupConfig {
-    static final int TPROXY_PORT=9898;
-    static final int REDIRECT_PORT=9797;
-    static final int DNS_PORT=1053;
-    static final int CONTROLLER_PORT=19090;
+    static final int TPROXY_PORT=19898;
+    static final int REDIRECT_PORT=19797;
+    static final int DNS_PORT=11053;
+    static final int CONTROLLER_PORT=29090;
     /** AOSP-reserved high fwmark bit used only by Mihomo outbound sockets. */
     static final int OUTBOUND_ROUTING_MARK=0x08000000;
     static final String EXTERNAL_UI_DIR="ui";
@@ -46,6 +46,12 @@ final class MihomoStartupConfig {
         yaml=removeTopLevelScalar(yaml,"global-client-fingerprint");
         yaml=removeTopLevelScalar(yaml,"tproxy-port");
         yaml=removeTopLevelScalar(yaml,"redir-port");
+        // TPROXY/Redirect Root mode is the only ingress owned by this private runtime.
+        // Never inherit local HTTP/SOCKS/Mixed listeners from the user's subscription;
+        // they are unnecessary here and commonly collide with another Clash app on 7890.
+        yaml=removeTopLevelScalar(yaml,"mixed-port");
+        yaml=removeTopLevelScalar(yaml,"socks-port");
+        yaml=removeTopLevelScalar(yaml,"port");
         yaml=removeTopLevelBlock(yaml,"tun");
         yaml=removeTopLevelScalar(yaml,"routing-mark");
         yaml=removeTopLevelScalar(yaml,"external-controller");
@@ -71,22 +77,22 @@ final class MihomoStartupConfig {
         override.append("\n# --- Bichen runtime isolation; source file is unchanged ---\n");
         switch(profile.mode){
             case TPROXY:
-                tp=profile.autoOverwrite||sourceTp==0?TPROXY_PORT:sourceTp;
+                tp=TPROXY_PORT;
                 override.append("tproxy-port: ").append(tp).append('\n');
                 override.append("redir-port: 0\n");
                 override.append("tun:\n  enable: false\n");
                 break;
             case REDIRECT:
-                rp=profile.autoOverwrite||sourceRp==0?REDIRECT_PORT:sourceRp;
+                rp=REDIRECT_PORT;
                 if(profile.dnsHijack==ProxyRuntimeProfile.DnsHijack.TPROXY)
-                    tp=profile.autoOverwrite||sourceTp==0?TPROXY_PORT:sourceTp;
+                    tp=TPROXY_PORT;
                 override.append("redir-port: ").append(rp).append('\n');
                 override.append("tproxy-port: ").append(tp).append('\n');
                 override.append("tun:\n  enable: false\n");
                 break;
             case ENHANCE:
-                tp=profile.autoOverwrite||sourceTp==0?TPROXY_PORT:sourceTp;
-                rp=profile.autoOverwrite||sourceRp==0?REDIRECT_PORT:sourceRp;
+                tp=TPROXY_PORT;
+                rp=REDIRECT_PORT;
                 override.append("redir-port: ").append(rp).append('\n');
                 override.append("tproxy-port: ").append(tp).append('\n');
                 override.append("tun:\n  enable: false\n");

@@ -149,8 +149,10 @@ cleanup6(){
 cleanup(){ MARK=""; MASK=""; TABLE=""; PREF=""; loadnet >/dev/null 2>&1 || true; cleanup4; cleanup6; cleanlegacy; rm -f "$NET_STATE"; MARK=""; MASK=""; TABLE=""; PREF=""; }
 
 pidcore(){
-  P="$1"; [ -r "/proc/$P/cmdline" ] || return 1
-  CMD=$(tr '\000' ' ' < "/proc/$P/cmdline" 2>/dev/null || true); case "$CMD" in *"$BASE/"*core*) return 0;; *) return 1;; esac
+  P="$1"; [ -d "/proc/$P" ] || return 1
+  CMD=$(tr '\000' ' ' < "/proc/$P/cmdline" 2>/dev/null || true)
+  EXE=$(readlink "/proc/$P/exe" 2>/dev/null || true)
+  case "$CMD $EXE" in *"$BASE/bin/core"*) return 0;; *) return 1;; esac
 }
 stopwatchdog(){
   [ -f "$WATCHDOG_PID" ] || return 0; W=$(cat "$WATCHDOG_PID" 2>/dev/null || true)
@@ -165,7 +167,8 @@ stopcore(){
   for PROC in /proc/[0-9]*; do
     OPID=${PROC#/proc/}; [ "$OPID" != "$$" ] || continue; [ -r "$PROC/cmdline" ] || continue
     OCMD=$(tr '\000' ' ' < "$PROC/cmdline" 2>/dev/null || true)
-    case "$OCMD" in *"$BASE/bin/core"*)
+    OEXE=$(readlink "$PROC/exe" 2>/dev/null || true)
+    case "$OCMD $OEXE" in *"$BASE/bin/core"*)
       kill "$OPID" >/dev/null 2>&1 || true
       N=0; while kill -0 "$OPID" >/dev/null 2>&1 && [ "$N" -lt 20 ]; do sleep 0.1; N=$((N+1)); done
       kill -0 "$OPID" >/dev/null 2>&1 && kill -9 "$OPID" >/dev/null 2>&1 || true
@@ -377,6 +380,31 @@ ready(){
   case "$M" in tproxy) [ "$TCP" = 0 ] || tcp_listen "$TP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; redirect) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1;; enhance) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; esac
   if [ "$DNS" = tproxy ]; then tcp_listen "$TP" || return 1; udp_listen "$TP" || return 1; fi; if [ "$DNS" = redirect ]; then tcp_listen "$DP" || return 1; udp_listen "$DP" || return 1; fi; return 0
 }
+check_start_ports(){
+  M="$1"; TP="$2"; RP="$3"; TCP="$4"; UDP="$5"; DNS="$6"; DP="$7"; CP="$8"
+  tcp_listen "$CP" && fail "控制接口端口 $CP 已被其他程序占用，请关闭冲突进程后重试"
+  case "$M" in
+    tproxy)
+      [ "$TCP" = 0 ] || { tcp_listen "$TP" && fail "TPROXY TCP 端口 $TP 已被其他程序占用"; }
+      [ "$UDP" = 0 ] || { udp_listen "$TP" && fail "TPROXY UDP 端口 $TP 已被其他程序占用"; }
+    ;;
+    redirect)
+      [ "$TCP" = 0 ] || { tcp_listen "$RP" && fail "Redirect 端口 $RP 已被其他程序占用"; }
+    ;;
+    enhance)
+      [ "$TCP" = 0 ] || { tcp_listen "$RP" && fail "Redirect 端口 $RP 已被其他程序占用"; }
+      [ "$UDP" = 0 ] || { udp_listen "$TP" && fail "TPROXY UDP 端口 $TP 已被其他程序占用"; }
+    ;;
+  esac
+  if [ "$DNS" = tproxy ]; then
+    tcp_listen "$TP" && fail "DNS/TPROXY TCP 端口 $TP 已被其他程序占用"
+    udp_listen "$TP" && fail "DNS/TPROXY UDP 端口 $TP 已被其他程序占用"
+  elif [ "$DNS" = redirect ]; then
+    tcp_listen "$DP" && fail "DNS TCP 端口 $DP 已被其他程序占用"
+    udp_listen "$DP" && fail "DNS UDP 端口 $DP 已被其他程序占用"
+  fi
+}
+
 wait_ready(){
   PID="$1"; M="$2"; TP="$3"; RP="$4"; TCP="$5"; UDP="$6"; DNS="$7"; DP="$8"; CP="$9"
   # A real user config may have dozens of remote proxy/rule providers. On the first
@@ -413,7 +441,8 @@ start(){
   START_BIN="$1"; START_CFG="$2"; START_MODE="$3"; START_TP="$4"; START_RP="$5"; START_V6="$6"; START_TCP="$7"; START_UDP="$8"; START_DNS="$9"; START_QUIC="${10}"; START_DP="${11}"; START_CP="${12}"; START_SCOPE="${13}"; START_UIDS="${14}"; START_SHARE="${15}"; START_KILL="${16}"; START_CIDRS="${17}"; START_IFACES="${18}"
   preflight "$START_MODE" "$START_TP" "$START_RP" "$START_V6" "$START_TCP" "$START_UDP" "$START_DNS" "$START_QUIC" "$START_DP" "$START_CP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_KILL" "$START_CIDRS" "$START_IFACES" >/dev/null
   [ -x "$START_BIN" ] || fail "核心文件不存在或不可执行"; [ -r "$START_CFG" ] || fail "启动配置不存在"; mkdir -p "$RUN" || fail "无法创建运行目录"; validatecfg "$START_BIN" "$START_CFG" || fail "Mihomo 配置校验失败，当前网络未被接管"; acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
-  stopwatchdog; cleanup; restorev6; stopcore; rm -f "$CRASH_STATE" "$SESSION"
+  stopwatchdog; cleanup; restorev6; stopcore; sleep 0.20; rm -f "$CRASH_STATE" "$SESSION"
+  check_start_ports "$START_MODE" "$START_TP" "$START_RP" "$START_TCP" "$START_UDP" "$START_DNS" "$START_DP" "$START_CP"
   markused "$BYPASS_MARK" && fail "安全出站 mark 已被其他网络规则占用，未接管网络"
   NEED_TP=0; case "$START_MODE" in tproxy) if [ "$START_TCP" = 1 ] || [ "$START_UDP" = 1 ]; then NEED_TP=1; fi;; enhance) [ "$START_UDP" = 1 ] && NEED_TP=1;; esac; [ "$START_DNS" = tproxy ] && NEED_TP=1
   if [ "$NEED_TP" = 1 ]; then allocnet || { cleanup; fail "找不到安全的 fwmark/路由表/规则优先级，已保持直连"; }; fi
