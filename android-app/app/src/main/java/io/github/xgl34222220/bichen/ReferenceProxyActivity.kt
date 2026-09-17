@@ -218,6 +218,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                 }
             } finally {
                 operation = ""
+                runCatching { refresh() }
             }
         }
     }
@@ -291,7 +292,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
         launch { runCatching { repo.ensureIcons() } }
         while (true) {
             delay(2200)
-            refresh()
+            if (operation.isBlank()) refresh()
         }
     }
 

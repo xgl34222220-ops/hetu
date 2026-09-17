@@ -52,6 +52,10 @@ start_stage(){ mkdir -p "$RUN" >/dev/null 2>&1 || true; printf '%s %s\n' "$(date
 fail(){ MSG="$1"; mkdir -p "$RUN" >/dev/null 2>&1 || true; printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$MSG" > "$START_ERROR" 2>/dev/null || true; printf '{"ok":false,"message":"%s"}\n' "$MSG"; exit 1; }
 root(){ [ "$(id -u)" = 0 ] || fail "需要 Root 权限"; }
 has(){ command -v "$1" >/dev/null 2>&1; }
+# Serialize with Android netd/other root firewalls on /system/etc/xtables.lock.
+# iptables itself owns the lock; -w avoids racy fail/rollback while preserving atomic rules.
+xt4(){ command iptables -w 15 "$@"; }
+xt6(){ command ip6tables -w 15 "$@"; }
 port(){ case "${1:-}" in ''|*[!0-9]*) return 1;; esac; [ "$1" -ge 1 ] && [ "$1" -le 65535 ]; }
 mode(){ case "${1:-}" in tproxy|redirect|enhance) return 0;; *) return 1;; esac; }
 ipv6mode(){ case "${1:-}" in enable|bypass|strict|disable) return 0;; *) return 1;; esac; }
@@ -129,11 +133,11 @@ unhook(){
   "$BIN" -t "$T" -F "$CHAIN" >/dev/null 2>&1 || true; "$BIN" -t "$T" -X "$CHAIN" >/dev/null 2>&1 || true
 }
 cleanup4(){
-  unhook iptables mangle OUTPUT "$MOUT"; unhook iptables mangle PREROUTING "$MPRE"
-  unhook iptables nat OUTPUT "$DNSOUT"; unhook iptables nat PREROUTING "$DNSPRE"
-  unhook iptables nat OUTPUT "$NOUT"; unhook iptables nat PREROUTING "$NPRE"
-  unhook iptables filter OUTPUT "$QUICOUT"; unhook iptables filter FORWARD "$QUICFWD"
-  unhook iptables filter OUTPUT "$KOUT"; unhook iptables filter FORWARD "$KFWD"
+  unhook xt4 mangle OUTPUT "$MOUT"; unhook xt4 mangle PREROUTING "$MPRE"
+  unhook xt4 nat OUTPUT "$DNSOUT"; unhook xt4 nat PREROUTING "$DNSPRE"
+  unhook xt4 nat OUTPUT "$NOUT"; unhook xt4 nat PREROUTING "$NPRE"
+  unhook xt4 filter OUTPUT "$QUICOUT"; unhook xt4 filter FORWARD "$QUICFWD"
+  unhook xt4 filter OUTPUT "$KOUT"; unhook xt4 filter FORWARD "$KFWD"
   if [ -n "$MARK" ] && [ -n "$MASK" ] && [ -n "$TABLE" ] && [ -n "$PREF" ]; then
     ip rule del pref "$PREF" fwmark "$MARK/$MASK" table "$TABLE" >/dev/null 2>&1 || true
     ip route del local 0.0.0.0/0 dev lo table "$TABLE" >/dev/null 2>&1 || true
@@ -141,12 +145,12 @@ cleanup4(){
 }
 cleanup6(){
   has ip6tables || return 0
-  unhook ip6tables mangle OUTPUT "$MOUT"; unhook ip6tables mangle PREROUTING "$MPRE"
-  unhook ip6tables nat OUTPUT "$DNSOUT"; unhook ip6tables nat PREROUTING "$DNSPRE"
-  unhook ip6tables nat OUTPUT "$NOUT"; unhook ip6tables nat PREROUTING "$NPRE"
-  unhook ip6tables filter OUTPUT "$QUICOUT"; unhook ip6tables filter FORWARD "$QUICFWD"
-  unhook ip6tables filter OUTPUT "$V6OUT"; unhook ip6tables filter FORWARD "$V6FWD"
-  unhook ip6tables filter OUTPUT "$KOUT"; unhook ip6tables filter FORWARD "$KFWD"
+  unhook xt6 mangle OUTPUT "$MOUT"; unhook xt6 mangle PREROUTING "$MPRE"
+  unhook xt6 nat OUTPUT "$DNSOUT"; unhook xt6 nat PREROUTING "$DNSPRE"
+  unhook xt6 nat OUTPUT "$NOUT"; unhook xt6 nat PREROUTING "$NPRE"
+  unhook xt6 filter OUTPUT "$QUICOUT"; unhook xt6 filter FORWARD "$QUICFWD"
+  unhook xt6 filter OUTPUT "$V6OUT"; unhook xt6 filter FORWARD "$V6FWD"
+  unhook xt6 filter OUTPUT "$KOUT"; unhook xt6 filter FORWARD "$KFWD"
   if [ -n "$MARK" ] && [ -n "$MASK" ] && [ -n "$TABLE" ] && [ -n "$PREF" ]; then
     ip -6 rule del pref "$PREF" fwmark "$MARK/$MASK" table "$TABLE" >/dev/null 2>&1 || true
     ip -6 route del local ::/0 dev lo table "$TABLE" >/dev/null 2>&1 || true
@@ -249,30 +253,30 @@ scoped_reject_all(){
 
 bypass4(){
   C="$1"; T="$2"; CIDRS="$3"
-  for NET in 0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8 169.254.0.0/16 172.16.0.0/12 192.168.0.0/16 224.0.0.0/4 240.0.0.0/4; do iptables -t "$T" -A "$C" -d "$NET" -j RETURN || return 1; done
-  [ -z "$CIDRS" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $CIDRS; IFS=$OLDIFS; for NET in "$@"; do case "$NET" in *:*) ;; *) iptables -t "$T" -A "$C" -d "$NET" -j RETURN || return 1;; esac; done
+  for NET in 0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8 169.254.0.0/16 172.16.0.0/12 192.168.0.0/16 224.0.0.0/4 240.0.0.0/4; do xt4 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1; done
+  [ -z "$CIDRS" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $CIDRS; IFS=$OLDIFS; for NET in "$@"; do case "$NET" in *:*) ;; *) xt4 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1;; esac; done
 }
 bypass6(){
   C="$1"; T="$2"; CIDRS="$3"
-  for NET in ::1/128 fc00::/7 fe80::/10 ff00::/8; do ip6tables -t "$T" -A "$C" -d "$NET" -j RETURN || return 1; done
-  [ -z "$CIDRS" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $CIDRS; IFS=$OLDIFS; for NET in "$@"; do case "$NET" in *:*) ip6tables -t "$T" -A "$C" -d "$NET" -j RETURN || return 1;; esac; done
+  for NET in ::1/128 fc00::/7 fe80::/10 ff00::/8; do xt6 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1; done
+  [ -z "$CIDRS" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $CIDRS; IFS=$OLDIFS; for NET in "$@"; do case "$NET" in *:*) xt6 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1;; esac; done
 }
 
-probetp4(){ P="$1"; iptables -t mangle -N BICHEN_PROBE >/dev/null 2>&1 || true; iptables -t mangle -F BICHEN_PROBE >/dev/null 2>&1 || true; iptables -t mangle -A BICHEN_PROBE -p udp -j TPROXY --on-port "$P" --tproxy-mark "$PROBE_MARK/$PROBE_MASK" >/dev/null 2>&1; R=$?; iptables -t mangle -F BICHEN_PROBE >/dev/null 2>&1 || true; iptables -t mangle -X BICHEN_PROBE >/dev/null 2>&1 || true; return "$R"; }
-probetp6(){ P="$1"; has ip6tables || return 1; ip6tables -t mangle -N BICHEN_PROBE >/dev/null 2>&1 || true; ip6tables -t mangle -F BICHEN_PROBE >/dev/null 2>&1 || true; ip6tables -t mangle -A BICHEN_PROBE -p udp -j TPROXY --on-port "$P" --tproxy-mark "$PROBE_MARK/$PROBE_MASK" >/dev/null 2>&1; R=$?; ip6tables -t mangle -F BICHEN_PROBE >/dev/null 2>&1 || true; ip6tables -t mangle -X BICHEN_PROBE >/dev/null 2>&1 || true; return "$R"; }
-probered4(){ P="$1"; PROTO="${2:-tcp}"; iptables -t nat -N BICHEN_PROBE >/dev/null 2>&1 || true; iptables -t nat -F BICHEN_PROBE >/dev/null 2>&1 || true; iptables -t nat -A BICHEN_PROBE -p "$PROTO" -j REDIRECT --to-ports "$P" >/dev/null 2>&1; R=$?; iptables -t nat -F BICHEN_PROBE >/dev/null 2>&1 || true; iptables -t nat -X BICHEN_PROBE >/dev/null 2>&1 || true; return "$R"; }
-probered6(){ P="$1"; PROTO="${2:-tcp}"; has ip6tables || return 1; ip6tables -t nat -N BICHEN_PROBE >/dev/null 2>&1 || true; ip6tables -t nat -F BICHEN_PROBE >/dev/null 2>&1 || true; ip6tables -t nat -A BICHEN_PROBE -p "$PROTO" -j REDIRECT --to-ports "$P" >/dev/null 2>&1; R=$?; ip6tables -t nat -F BICHEN_PROBE >/dev/null 2>&1 || true; ip6tables -t nat -X BICHEN_PROBE >/dev/null 2>&1 || true; return "$R"; }
+probetp4(){ P="$1"; xt4 -t mangle -N BICHEN_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -F BICHEN_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -A BICHEN_PROBE -p udp -j TPROXY --on-port "$P" --tproxy-mark "$PROBE_MARK/$PROBE_MASK" >/dev/null 2>&1; R=$?; xt4 -t mangle -F BICHEN_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -X BICHEN_PROBE >/dev/null 2>&1 || true; return "$R"; }
+probetp6(){ P="$1"; has ip6tables || return 1; xt6 -t mangle -N BICHEN_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -F BICHEN_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -A BICHEN_PROBE -p udp -j TPROXY --on-port "$P" --tproxy-mark "$PROBE_MARK/$PROBE_MASK" >/dev/null 2>&1; R=$?; xt6 -t mangle -F BICHEN_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -X BICHEN_PROBE >/dev/null 2>&1 || true; return "$R"; }
+probered4(){ P="$1"; PROTO="${2:-tcp}"; xt4 -t nat -N BICHEN_PROBE >/dev/null 2>&1 || true; xt4 -t nat -F BICHEN_PROBE >/dev/null 2>&1 || true; xt4 -t nat -A BICHEN_PROBE -p "$PROTO" -j REDIRECT --to-ports "$P" >/dev/null 2>&1; R=$?; xt4 -t nat -F BICHEN_PROBE >/dev/null 2>&1 || true; xt4 -t nat -X BICHEN_PROBE >/dev/null 2>&1 || true; return "$R"; }
+probered6(){ P="$1"; PROTO="${2:-tcp}"; has ip6tables || return 1; xt6 -t nat -N BICHEN_PROBE >/dev/null 2>&1 || true; xt6 -t nat -F BICHEN_PROBE >/dev/null 2>&1 || true; xt6 -t nat -A BICHEN_PROBE -p "$PROTO" -j REDIRECT --to-ports "$P" >/dev/null 2>&1; R=$?; xt6 -t nat -F BICHEN_PROBE >/dev/null 2>&1 || true; xt6 -t nat -X BICHEN_PROBE >/dev/null 2>&1 || true; return "$R"; }
 probeowner(){
   U="$1"; [ -n "$U" ] || return 0
-  iptables -t mangle -N BICHEN_PROBE >/dev/null 2>&1 || true; iptables -t mangle -F BICHEN_PROBE >/dev/null 2>&1 || true
-  iptables -t mangle -A BICHEN_PROBE -m owner --uid-owner "$U" -j RETURN >/dev/null 2>&1; R=$?
-  iptables -t mangle -F BICHEN_PROBE >/dev/null 2>&1 || true; iptables -t mangle -X BICHEN_PROBE >/dev/null 2>&1 || true; return "$R"
+  xt4 -t mangle -N BICHEN_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -F BICHEN_PROBE >/dev/null 2>&1 || true
+  xt4 -t mangle -A BICHEN_PROBE -m owner --uid-owner "$U" -j RETURN >/dev/null 2>&1; R=$?
+  xt4 -t mangle -F BICHEN_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -X BICHEN_PROBE >/dev/null 2>&1 || true; return "$R"
 }
 probecidrs(){
   LIST="$1"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS
   for X in "$@"; do
-    if echo "$X" | grep -q ':'; then has ip6tables || return 1; ip6tables -t mangle -N BICHEN_PROBE >/dev/null 2>&1 || true; ip6tables -t mangle -F BICHEN_PROBE >/dev/null 2>&1 || true; ip6tables -t mangle -A BICHEN_PROBE -d "$X" -j RETURN >/dev/null 2>&1 || { ip6tables -t mangle -F BICHEN_PROBE >/dev/null 2>&1 || true; ip6tables -t mangle -X BICHEN_PROBE >/dev/null 2>&1 || true; return 1; }; ip6tables -t mangle -F BICHEN_PROBE >/dev/null 2>&1 || true; ip6tables -t mangle -X BICHEN_PROBE >/dev/null 2>&1 || true
-    else iptables -t mangle -N BICHEN_PROBE >/dev/null 2>&1 || true; iptables -t mangle -F BICHEN_PROBE >/dev/null 2>&1 || true; iptables -t mangle -A BICHEN_PROBE -d "$X" -j RETURN >/dev/null 2>&1 || { iptables -t mangle -F BICHEN_PROBE >/dev/null 2>&1 || true; iptables -t mangle -X BICHEN_PROBE >/dev/null 2>&1 || true; return 1; }; iptables -t mangle -F BICHEN_PROBE >/dev/null 2>&1 || true; iptables -t mangle -X BICHEN_PROBE >/dev/null 2>&1 || true; fi
+    if echo "$X" | grep -q ':'; then has ip6tables || return 1; xt6 -t mangle -N BICHEN_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -F BICHEN_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -A BICHEN_PROBE -d "$X" -j RETURN >/dev/null 2>&1 || { xt6 -t mangle -F BICHEN_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -X BICHEN_PROBE >/dev/null 2>&1 || true; return 1; }; xt6 -t mangle -F BICHEN_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -X BICHEN_PROBE >/dev/null 2>&1 || true
+    else xt4 -t mangle -N BICHEN_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -F BICHEN_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -A BICHEN_PROBE -d "$X" -j RETURN >/dev/null 2>&1 || { xt4 -t mangle -F BICHEN_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -X BICHEN_PROBE >/dev/null 2>&1 || true; return 1; }; xt4 -t mangle -F BICHEN_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -X BICHEN_PROBE >/dev/null 2>&1 || true; fi
   done
 }
 
@@ -301,7 +305,7 @@ preflight(){
     [ "$NEED_RP" = 0 ] || probered6 "$RP" tcp || fail "IPv6 REDIRECT 不可用，可改用严格 IPv4 或 IPv6 不进核心"
     if [ "$DNS" = tproxy ] || [ "$DNS" = redirect ]; then probered6 "$DP" tcp || fail "IPv6 TCP DNS REDIRECT 不可用"; probered6 "$DP" udp || fail "IPv6 UDP DNS REDIRECT 不可用"; fi
   fi
-  if [ "$V6" = strict ] && v6active; then has ip6tables || fail "严格 IPv4 需要 ip6tables"; fi
+  if [ "$V6" = strict ] && v6active; then has ip6tables || fail "严格 IPv4 需要 xt6"; fi
   if [ "$V6" = disable ]; then TESTED=0; for P in /proc/sys/net/ipv6/conf/*/disable_ipv6; do [ -w "$P" ] && TESTED=1 && break; done; [ "$TESTED" = 1 ] || fail "系统不允许临时禁用 IPv6"; fi
   ok "Root 代理预检通过"
 }
@@ -312,86 +316,86 @@ route6(){ ip -6 route replace local ::/0 dev lo table "$TABLE" || return 1; ip -
 install_mangle4(){
   P="$1"; M="$2"; TCP="$3"; UDP="$4"; DNS="$5"; S="$6"; UIDS="$7"; SHARE="$8"; CIDRS="$9"; IFACES="${10}"
   NEED=0; case "$M" in tproxy) if [ "$TCP" = 1 ] || [ "$UDP" = 1 ]; then NEED=1; fi;; enhance) [ "$UDP" = 1 ] && NEED=1;; esac; [ "$NEED" = 1 ] || return 0
-  route4 || return 1; iptables -t mangle -N "$MOUT" || return 1; iptables -t mangle -N "$MPRE" || return 1
-  iptables -t mangle -A "$MOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1
-  iptables -t mangle -A "$MOUT" -m owner --uid-owner 0 -j RETURN || return 1
-  iface_out iptables mangle "$MOUT" "$IFACES" || return 1; blacklist_returns iptables mangle "$MOUT" "$S" "$UIDS" || return 1
-  iptables -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in iptables mangle "$MPRE" "$IFACES" || return 1
+  route4 || return 1; xt4 -t mangle -N "$MOUT" || return 1; xt4 -t mangle -N "$MPRE" || return 1
+  xt4 -t mangle -A "$MOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1
+  xt4 -t mangle -A "$MOUT" -m owner --uid-owner 0 -j RETURN || return 1
+  iface_out xt4 mangle "$MOUT" "$IFACES" || return 1; blacklist_returns xt4 mangle "$MOUT" "$S" "$UIDS" || return 1
+  xt4 -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt4 mangle "$MPRE" "$IFACES" || return 1
   if [ "$DNS" = tproxy ] || [ "$DNS" = redirect ]; then
-    iptables -t mangle -A "$MOUT" -p tcp --dport 53 -j RETURN || return 1
-    iptables -t mangle -A "$MOUT" -p udp --dport 53 -j RETURN || return 1
+    xt4 -t mangle -A "$MOUT" -p tcp --dport 53 -j RETURN || return 1
+    xt4 -t mangle -A "$MOUT" -p udp --dport 53 -j RETURN || return 1
   fi
   bypass4 "$MOUT" mangle "$CIDRS" || return 1; bypass4 "$MPRE" mangle "$CIDRS" || return 1
   if [ "$M" = tproxy ]; then
-    [ "$TCP" = 0 ] || { scoped_mark iptables mangle "$MOUT" "$S" "$UIDS" tcp "" "$MARK/$MASK" || return 1; if [ "$SHARE" = 1 ]; then iptables -t mangle -A "$MPRE" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else iptables -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
-    [ "$UDP" = 0 ] || { scoped_mark iptables mangle "$MOUT" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; if [ "$SHARE" = 1 ]; then iptables -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else iptables -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
-  elif [ "$M" = enhance ] && [ "$UDP" = 1 ]; then scoped_mark iptables mangle "$MOUT" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; if [ "$SHARE" = 1 ]; then iptables -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else iptables -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; fi
-  iptables -t mangle -A OUTPUT -j "$MOUT" || return 1; iptables -t mangle -A PREROUTING -j "$MPRE" || return 1
+    [ "$TCP" = 0 ] || { scoped_mark xt4 mangle "$MOUT" "$S" "$UIDS" tcp "" "$MARK/$MASK" || return 1; if [ "$SHARE" = 1 ]; then xt4 -t mangle -A "$MPRE" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt4 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
+    [ "$UDP" = 0 ] || { scoped_mark xt4 mangle "$MOUT" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; if [ "$SHARE" = 1 ]; then xt4 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt4 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
+  elif [ "$M" = enhance ] && [ "$UDP" = 1 ]; then scoped_mark xt4 mangle "$MOUT" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; if [ "$SHARE" = 1 ]; then xt4 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt4 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; fi
+  xt4 -t mangle -A OUTPUT -j "$MOUT" || return 1; xt4 -t mangle -A PREROUTING -j "$MPRE" || return 1
 }
 
 install_mangle6(){
   P="$1"; M="$2"; TCP="$3"; UDP="$4"; DNS="$5"; S="$6"; UIDS="$7"; SHARE="$8"; CIDRS="$9"; IFACES="${10}"; v6active || return 0
   NEED=0; case "$M" in tproxy) if [ "$TCP" = 1 ] || [ "$UDP" = 1 ]; then NEED=1; fi;; enhance) [ "$UDP" = 1 ] && NEED=1;; esac; [ "$NEED" = 1 ] || return 0
-  route6 || return 1; ip6tables -t mangle -N "$MOUT" || return 1; ip6tables -t mangle -N "$MPRE" || return 1
-  ip6tables -t mangle -A "$MOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1
-  ip6tables -t mangle -A "$MOUT" -m owner --uid-owner 0 -j RETURN || return 1
-  iface_out ip6tables mangle "$MOUT" "$IFACES" || return 1; blacklist_returns ip6tables mangle "$MOUT" "$S" "$UIDS" || return 1
-  ip6tables -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in ip6tables mangle "$MPRE" "$IFACES" || return 1
+  route6 || return 1; xt6 -t mangle -N "$MOUT" || return 1; xt6 -t mangle -N "$MPRE" || return 1
+  xt6 -t mangle -A "$MOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1
+  xt6 -t mangle -A "$MOUT" -m owner --uid-owner 0 -j RETURN || return 1
+  iface_out xt6 mangle "$MOUT" "$IFACES" || return 1; blacklist_returns xt6 mangle "$MOUT" "$S" "$UIDS" || return 1
+  xt6 -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt6 mangle "$MPRE" "$IFACES" || return 1
   if [ "$DNS" = tproxy ] || [ "$DNS" = redirect ]; then
-    ip6tables -t mangle -A "$MOUT" -p tcp --dport 53 -j RETURN || return 1
-    ip6tables -t mangle -A "$MOUT" -p udp --dport 53 -j RETURN || return 1
+    xt6 -t mangle -A "$MOUT" -p tcp --dport 53 -j RETURN || return 1
+    xt6 -t mangle -A "$MOUT" -p udp --dport 53 -j RETURN || return 1
   fi
   bypass6 "$MOUT" mangle "$CIDRS" || return 1; bypass6 "$MPRE" mangle "$CIDRS" || return 1
   if [ "$M" = tproxy ]; then
-    [ "$TCP" = 0 ] || { scoped_mark ip6tables mangle "$MOUT" "$S" "$UIDS" tcp "" "$MARK/$MASK" || return 1; if [ "$SHARE" = 1 ]; then ip6tables -t mangle -A "$MPRE" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else ip6tables -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
-    [ "$UDP" = 0 ] || { scoped_mark ip6tables mangle "$MOUT" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; if [ "$SHARE" = 1 ]; then ip6tables -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else ip6tables -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
-  elif [ "$M" = enhance ] && [ "$UDP" = 1 ]; then scoped_mark ip6tables mangle "$MOUT" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; if [ "$SHARE" = 1 ]; then ip6tables -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else ip6tables -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; fi
-  ip6tables -t mangle -A OUTPUT -j "$MOUT" || return 1; ip6tables -t mangle -A PREROUTING -j "$MPRE" || return 1
+    [ "$TCP" = 0 ] || { scoped_mark xt6 mangle "$MOUT" "$S" "$UIDS" tcp "" "$MARK/$MASK" || return 1; if [ "$SHARE" = 1 ]; then xt6 -t mangle -A "$MPRE" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt6 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
+    [ "$UDP" = 0 ] || { scoped_mark xt6 mangle "$MOUT" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; if [ "$SHARE" = 1 ]; then xt6 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt6 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
+  elif [ "$M" = enhance ] && [ "$UDP" = 1 ]; then scoped_mark xt6 mangle "$MOUT" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; if [ "$SHARE" = 1 ]; then xt6 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt6 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; fi
+  xt6 -t mangle -A OUTPUT -j "$MOUT" || return 1; xt6 -t mangle -A PREROUTING -j "$MPRE" || return 1
 }
 
 install_redirect4(){
   P="$1"; M="$2"; TCP="$3"; S="$4"; UIDS="$5"; SHARE="$6"; CIDRS="$7"; IFACES="$8"; [ "$TCP" = 1 ] || return 0; case "$M" in redirect|enhance) ;; *) return 0;; esac
-  iptables -t nat -N "$NOUT" || return 1; iptables -t nat -A "$NOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iptables -t nat -A "$NOUT" -m owner --uid-owner 0 -j RETURN || return 1; iface_out iptables nat "$NOUT" "$IFACES" || return 1; blacklist_returns iptables nat "$NOUT" "$S" "$UIDS" || return 1; bypass4 "$NOUT" nat "$CIDRS" || return 1; scoped_redirect iptables nat "$NOUT" "$S" "$UIDS" tcp "" "$P" || return 1; iptables -t nat -A OUTPUT -j "$NOUT" || return 1
-  if [ "$SHARE" = 1 ]; then iptables -t nat -N "$NPRE" || return 1; iptables -t nat -A "$NPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in iptables nat "$NPRE" "$IFACES" || return 1; bypass4 "$NPRE" nat "$CIDRS" || return 1; iptables -t nat -A "$NPRE" -p tcp -j REDIRECT --to-ports "$P" || return 1; iptables -t nat -A PREROUTING -j "$NPRE" || return 1; fi
+  xt4 -t nat -N "$NOUT" || return 1; xt4 -t nat -A "$NOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; xt4 -t nat -A "$NOUT" -m owner --uid-owner 0 -j RETURN || return 1; iface_out xt4 nat "$NOUT" "$IFACES" || return 1; blacklist_returns xt4 nat "$NOUT" "$S" "$UIDS" || return 1; bypass4 "$NOUT" nat "$CIDRS" || return 1; scoped_redirect xt4 nat "$NOUT" "$S" "$UIDS" tcp "" "$P" || return 1; xt4 -t nat -A OUTPUT -j "$NOUT" || return 1
+  if [ "$SHARE" = 1 ]; then xt4 -t nat -N "$NPRE" || return 1; xt4 -t nat -A "$NPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt4 nat "$NPRE" "$IFACES" || return 1; bypass4 "$NPRE" nat "$CIDRS" || return 1; xt4 -t nat -A "$NPRE" -p tcp -j REDIRECT --to-ports "$P" || return 1; xt4 -t nat -A PREROUTING -j "$NPRE" || return 1; fi
 }
 install_redirect6(){
   P="$1"; M="$2"; TCP="$3"; S="$4"; UIDS="$5"; SHARE="$6"; CIDRS="$7"; IFACES="$8"; v6active || return 0; [ "$TCP" = 1 ] || return 0; case "$M" in redirect|enhance) ;; *) return 0;; esac
-  ip6tables -t nat -N "$NOUT" || return 1; ip6tables -t nat -A "$NOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; ip6tables -t nat -A "$NOUT" -m owner --uid-owner 0 -j RETURN || return 1; iface_out ip6tables nat "$NOUT" "$IFACES" || return 1; blacklist_returns ip6tables nat "$NOUT" "$S" "$UIDS" || return 1; bypass6 "$NOUT" nat "$CIDRS" || return 1; scoped_redirect ip6tables nat "$NOUT" "$S" "$UIDS" tcp "" "$P" || return 1; ip6tables -t nat -A OUTPUT -j "$NOUT" || return 1
-  if [ "$SHARE" = 1 ]; then ip6tables -t nat -N "$NPRE" || return 1; ip6tables -t nat -A "$NPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in ip6tables nat "$NPRE" "$IFACES" || return 1; bypass6 "$NPRE" nat "$CIDRS" || return 1; ip6tables -t nat -A "$NPRE" -p tcp -j REDIRECT --to-ports "$P" || return 1; ip6tables -t nat -A PREROUTING -j "$NPRE" || return 1; fi
+  xt6 -t nat -N "$NOUT" || return 1; xt6 -t nat -A "$NOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; xt6 -t nat -A "$NOUT" -m owner --uid-owner 0 -j RETURN || return 1; iface_out xt6 nat "$NOUT" "$IFACES" || return 1; blacklist_returns xt6 nat "$NOUT" "$S" "$UIDS" || return 1; bypass6 "$NOUT" nat "$CIDRS" || return 1; scoped_redirect xt6 nat "$NOUT" "$S" "$UIDS" tcp "" "$P" || return 1; xt6 -t nat -A OUTPUT -j "$NOUT" || return 1
+  if [ "$SHARE" = 1 ]; then xt6 -t nat -N "$NPRE" || return 1; xt6 -t nat -A "$NPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt6 nat "$NPRE" "$IFACES" || return 1; bypass6 "$NPRE" nat "$CIDRS" || return 1; xt6 -t nat -A "$NPRE" -p tcp -j REDIRECT --to-ports "$P" || return 1; xt6 -t nat -A PREROUTING -j "$NPRE" || return 1; fi
 }
 
 install_dns_redirect4(){
-  P="$1"; S="$2"; UIDS="$3"; SHARE="$4"; IFACES="$5"; iptables -t nat -N "$DNSOUT" || return 1; iptables -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iptables -t nat -A "$DNSOUT" -m owner --uid-owner 0 -j RETURN || return 1; iface_out iptables nat "$DNSOUT" "$IFACES" || return 1; blacklist_returns iptables nat "$DNSOUT" "$S" "$UIDS" || return 1
-  for X in tcp udp; do scoped_redirect iptables nat "$DNSOUT" "$S" "$UIDS" "$X" 53 "$P" || return 1; done; iptables -t nat -I OUTPUT 1 -j "$DNSOUT" || return 1
-  if [ "$SHARE" = 1 ]; then iptables -t nat -N "$DNSPRE" || return 1; iface_in iptables nat "$DNSPRE" "$IFACES" || return 1; for X in tcp udp; do iptables -t nat -A "$DNSPRE" -p "$X" --dport 53 -j REDIRECT --to-ports "$P" || return 1; done; iptables -t nat -I PREROUTING 1 -j "$DNSPRE" || return 1; fi
+  P="$1"; S="$2"; UIDS="$3"; SHARE="$4"; IFACES="$5"; xt4 -t nat -N "$DNSOUT" || return 1; xt4 -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; xt4 -t nat -A "$DNSOUT" -m owner --uid-owner 0 -j RETURN || return 1; iface_out xt4 nat "$DNSOUT" "$IFACES" || return 1; blacklist_returns xt4 nat "$DNSOUT" "$S" "$UIDS" || return 1
+  for X in tcp udp; do scoped_redirect xt4 nat "$DNSOUT" "$S" "$UIDS" "$X" 53 "$P" || return 1; done; xt4 -t nat -I OUTPUT 1 -j "$DNSOUT" || return 1
+  if [ "$SHARE" = 1 ]; then xt4 -t nat -N "$DNSPRE" || return 1; iface_in xt4 nat "$DNSPRE" "$IFACES" || return 1; for X in tcp udp; do xt4 -t nat -A "$DNSPRE" -p "$X" --dport 53 -j REDIRECT --to-ports "$P" || return 1; done; xt4 -t nat -I PREROUTING 1 -j "$DNSPRE" || return 1; fi
 }
 install_dns_redirect6(){
-  P="$1"; S="$2"; UIDS="$3"; SHARE="$4"; IFACES="$5"; v6active || return 0; ip6tables -t nat -N "$DNSOUT" || return 1; ip6tables -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; ip6tables -t nat -A "$DNSOUT" -m owner --uid-owner 0 -j RETURN || return 1; iface_out ip6tables nat "$DNSOUT" "$IFACES" || return 1; blacklist_returns ip6tables nat "$DNSOUT" "$S" "$UIDS" || return 1
-  for X in tcp udp; do scoped_redirect ip6tables nat "$DNSOUT" "$S" "$UIDS" "$X" 53 "$P" || return 1; done; ip6tables -t nat -I OUTPUT 1 -j "$DNSOUT" || return 1
-  if [ "$SHARE" = 1 ]; then ip6tables -t nat -N "$DNSPRE" || return 1; iface_in ip6tables nat "$DNSPRE" "$IFACES" || return 1; for X in tcp udp; do ip6tables -t nat -A "$DNSPRE" -p "$X" --dport 53 -j REDIRECT --to-ports "$P" || return 1; done; ip6tables -t nat -I PREROUTING 1 -j "$DNSPRE" || return 1; fi
+  P="$1"; S="$2"; UIDS="$3"; SHARE="$4"; IFACES="$5"; v6active || return 0; xt6 -t nat -N "$DNSOUT" || return 1; xt6 -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; xt6 -t nat -A "$DNSOUT" -m owner --uid-owner 0 -j RETURN || return 1; iface_out xt6 nat "$DNSOUT" "$IFACES" || return 1; blacklist_returns xt6 nat "$DNSOUT" "$S" "$UIDS" || return 1
+  for X in tcp udp; do scoped_redirect xt6 nat "$DNSOUT" "$S" "$UIDS" "$X" 53 "$P" || return 1; done; xt6 -t nat -I OUTPUT 1 -j "$DNSOUT" || return 1
+  if [ "$SHARE" = 1 ]; then xt6 -t nat -N "$DNSPRE" || return 1; iface_in xt6 nat "$DNSPRE" "$IFACES" || return 1; for X in tcp udp; do xt6 -t nat -A "$DNSPRE" -p "$X" --dport 53 -j REDIRECT --to-ports "$P" || return 1; done; xt6 -t nat -I PREROUTING 1 -j "$DNSPRE" || return 1; fi
 }
 
 install_quic4(){
-  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; iptables -t filter -N "$QUICOUT" || return 1; iptables -t filter -A "$QUICOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iptables -t filter -A "$QUICOUT" -m owner --uid-owner 0 -j RETURN || return 1; iface_out iptables filter "$QUICOUT" "$IFACES" || return 1; blacklist_returns iptables filter "$QUICOUT" "$S" "$UIDS" || return 1; bypass4 "$QUICOUT" filter "$CIDRS" || return 1; scoped_drop_quic iptables "$QUICOUT" "$S" "$UIDS" || return 1; iptables -t filter -A OUTPUT -j "$QUICOUT" || return 1
-  if [ "$SHARE" = 1 ]; then iptables -t filter -N "$QUICFWD" || return 1; iface_in iptables filter "$QUICFWD" "$IFACES" || return 1; bypass4 "$QUICFWD" filter "$CIDRS" || return 1; iptables -t filter -A "$QUICFWD" -p udp --dport 443 -j DROP || return 1; iptables -t filter -A FORWARD -j "$QUICFWD" || return 1; fi
+  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; xt4 -t filter -N "$QUICOUT" || return 1; xt4 -t filter -A "$QUICOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; xt4 -t filter -A "$QUICOUT" -m owner --uid-owner 0 -j RETURN || return 1; iface_out xt4 filter "$QUICOUT" "$IFACES" || return 1; blacklist_returns xt4 filter "$QUICOUT" "$S" "$UIDS" || return 1; bypass4 "$QUICOUT" filter "$CIDRS" || return 1; scoped_drop_quic xt4 "$QUICOUT" "$S" "$UIDS" || return 1; xt4 -t filter -A OUTPUT -j "$QUICOUT" || return 1
+  if [ "$SHARE" = 1 ]; then xt4 -t filter -N "$QUICFWD" || return 1; iface_in xt4 filter "$QUICFWD" "$IFACES" || return 1; bypass4 "$QUICFWD" filter "$CIDRS" || return 1; xt4 -t filter -A "$QUICFWD" -p udp --dport 443 -j DROP || return 1; xt4 -t filter -A FORWARD -j "$QUICFWD" || return 1; fi
 }
 install_quic6(){
-  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; v6active || return 0; ip6tables -t filter -N "$QUICOUT" || return 1; ip6tables -t filter -A "$QUICOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; ip6tables -t filter -A "$QUICOUT" -m owner --uid-owner 0 -j RETURN || return 1; iface_out ip6tables filter "$QUICOUT" "$IFACES" || return 1; blacklist_returns ip6tables filter "$QUICOUT" "$S" "$UIDS" || return 1; bypass6 "$QUICOUT" filter "$CIDRS" || return 1; scoped_drop_quic ip6tables "$QUICOUT" "$S" "$UIDS" || return 1; ip6tables -t filter -A OUTPUT -j "$QUICOUT" || return 1
-  if [ "$SHARE" = 1 ]; then ip6tables -t filter -N "$QUICFWD" || return 1; iface_in ip6tables filter "$QUICFWD" "$IFACES" || return 1; bypass6 "$QUICFWD" filter "$CIDRS" || return 1; ip6tables -t filter -A "$QUICFWD" -p udp --dport 443 -j DROP || return 1; ip6tables -t filter -A FORWARD -j "$QUICFWD" || return 1; fi
+  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; v6active || return 0; xt6 -t filter -N "$QUICOUT" || return 1; xt6 -t filter -A "$QUICOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; xt6 -t filter -A "$QUICOUT" -m owner --uid-owner 0 -j RETURN || return 1; iface_out xt6 filter "$QUICOUT" "$IFACES" || return 1; blacklist_returns xt6 filter "$QUICOUT" "$S" "$UIDS" || return 1; bypass6 "$QUICOUT" filter "$CIDRS" || return 1; scoped_drop_quic xt6 "$QUICOUT" "$S" "$UIDS" || return 1; xt6 -t filter -A OUTPUT -j "$QUICOUT" || return 1
+  if [ "$SHARE" = 1 ]; then xt6 -t filter -N "$QUICFWD" || return 1; iface_in xt6 filter "$QUICFWD" "$IFACES" || return 1; bypass6 "$QUICFWD" filter "$CIDRS" || return 1; xt6 -t filter -A "$QUICFWD" -p udp --dport 443 -j DROP || return 1; xt6 -t filter -A FORWARD -j "$QUICFWD" || return 1; fi
 }
 
 install_v6_strict(){
-  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; v6active || return 0; ip6tables -t filter -N "$V6OUT" || return 1; ip6tables -t filter -A "$V6OUT" -o lo -j RETURN || return 1; ip6tables -t filter -A "$V6OUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_out ip6tables filter "$V6OUT" "$IFACES" || return 1; blacklist_returns ip6tables filter "$V6OUT" "$S" "$UIDS" || return 1; bypass6 "$V6OUT" filter "$CIDRS" || return 1; scoped_reject_all ip6tables "$V6OUT" "$S" "$UIDS" || return 1; ip6tables -t filter -A OUTPUT -j "$V6OUT" || return 1
-  if [ "$SHARE" = 1 ]; then ip6tables -t filter -N "$V6FWD" || return 1; iface_in ip6tables filter "$V6FWD" "$IFACES" || return 1; bypass6 "$V6FWD" filter "$CIDRS" || return 1; ip6tables -t filter -A "$V6FWD" -j REJECT || return 1; ip6tables -t filter -A FORWARD -j "$V6FWD" || return 1; fi
+  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; v6active || return 0; xt6 -t filter -N "$V6OUT" || return 1; xt6 -t filter -A "$V6OUT" -o lo -j RETURN || return 1; xt6 -t filter -A "$V6OUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_out xt6 filter "$V6OUT" "$IFACES" || return 1; blacklist_returns xt6 filter "$V6OUT" "$S" "$UIDS" || return 1; bypass6 "$V6OUT" filter "$CIDRS" || return 1; scoped_reject_all xt6 "$V6OUT" "$S" "$UIDS" || return 1; xt6 -t filter -A OUTPUT -j "$V6OUT" || return 1
+  if [ "$SHARE" = 1 ]; then xt6 -t filter -N "$V6FWD" || return 1; iface_in xt6 filter "$V6FWD" "$IFACES" || return 1; bypass6 "$V6FWD" filter "$CIDRS" || return 1; xt6 -t filter -A "$V6FWD" -j REJECT || return 1; xt6 -t filter -A FORWARD -j "$V6FWD" || return 1; fi
 }
 
 install_kill4(){
-  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; iptables -t filter -N "$KOUT" >/dev/null 2>&1 || true; iptables -t filter -F "$KOUT" || return 1; iptables -t filter -A "$KOUT" -o lo -j RETURN || return 1; iface_out iptables filter "$KOUT" "$IFACES" || return 1; blacklist_returns iptables filter "$KOUT" "$S" "$UIDS" || return 1; bypass4 "$KOUT" filter "$CIDRS" || return 1; scoped_reject_all iptables "$KOUT" "$S" "$UIDS" || return 1; iptables -t filter -I OUTPUT 1 -j "$KOUT" || return 1
-  if [ "$SHARE" = 1 ]; then iptables -t filter -N "$KFWD" >/dev/null 2>&1 || true; iptables -t filter -F "$KFWD" || return 1; iface_in iptables filter "$KFWD" "$IFACES" || return 1; bypass4 "$KFWD" filter "$CIDRS" || return 1; iptables -t filter -A "$KFWD" -j REJECT || return 1; iptables -t filter -I FORWARD 1 -j "$KFWD" || return 1; fi
+  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; xt4 -t filter -N "$KOUT" >/dev/null 2>&1 || true; xt4 -t filter -F "$KOUT" || return 1; xt4 -t filter -A "$KOUT" -o lo -j RETURN || return 1; iface_out xt4 filter "$KOUT" "$IFACES" || return 1; blacklist_returns xt4 filter "$KOUT" "$S" "$UIDS" || return 1; bypass4 "$KOUT" filter "$CIDRS" || return 1; scoped_reject_all xt4 "$KOUT" "$S" "$UIDS" || return 1; xt4 -t filter -I OUTPUT 1 -j "$KOUT" || return 1
+  if [ "$SHARE" = 1 ]; then xt4 -t filter -N "$KFWD" >/dev/null 2>&1 || true; xt4 -t filter -F "$KFWD" || return 1; iface_in xt4 filter "$KFWD" "$IFACES" || return 1; bypass4 "$KFWD" filter "$CIDRS" || return 1; xt4 -t filter -A "$KFWD" -j REJECT || return 1; xt4 -t filter -I FORWARD 1 -j "$KFWD" || return 1; fi
 }
 install_kill6(){
-  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; has ip6tables || return 0; v6active || return 0; ip6tables -t filter -N "$KOUT" >/dev/null 2>&1 || true; ip6tables -t filter -F "$KOUT" || return 1; ip6tables -t filter -A "$KOUT" -o lo -j RETURN || return 1; iface_out ip6tables filter "$KOUT" "$IFACES" || return 1; blacklist_returns ip6tables filter "$KOUT" "$S" "$UIDS" || return 1; bypass6 "$KOUT" filter "$CIDRS" || return 1; scoped_reject_all ip6tables "$KOUT" "$S" "$UIDS" || return 1; ip6tables -t filter -I OUTPUT 1 -j "$KOUT" || return 1
-  if [ "$SHARE" = 1 ]; then ip6tables -t filter -N "$KFWD" >/dev/null 2>&1 || true; ip6tables -t filter -F "$KFWD" || return 1; iface_in ip6tables filter "$KFWD" "$IFACES" || return 1; bypass6 "$KFWD" filter "$CIDRS" || return 1; ip6tables -t filter -A "$KFWD" -j REJECT || return 1; ip6tables -t filter -I FORWARD 1 -j "$KFWD" || return 1; fi
+  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; has ip6tables || return 0; v6active || return 0; xt6 -t filter -N "$KOUT" >/dev/null 2>&1 || true; xt6 -t filter -F "$KOUT" || return 1; xt6 -t filter -A "$KOUT" -o lo -j RETURN || return 1; iface_out xt6 filter "$KOUT" "$IFACES" || return 1; blacklist_returns xt6 filter "$KOUT" "$S" "$UIDS" || return 1; bypass6 "$KOUT" filter "$CIDRS" || return 1; scoped_reject_all xt6 "$KOUT" "$S" "$UIDS" || return 1; xt6 -t filter -I OUTPUT 1 -j "$KOUT" || return 1
+  if [ "$SHARE" = 1 ]; then xt6 -t filter -N "$KFWD" >/dev/null 2>&1 || true; xt6 -t filter -F "$KFWD" || return 1; iface_in xt6 filter "$KFWD" "$IFACES" || return 1; bypass6 "$KFWD" filter "$CIDRS" || return 1; xt6 -t filter -A "$KFWD" -j REJECT || return 1; xt6 -t filter -I FORWARD 1 -j "$KFWD" || return 1; fi
 }
 
 validatecfg(){ BIN="$1"; CFG="$2"; : > "$CHECKLOG"; "$BIN" -t -d "$RUN" -f "$CFG" >>"$CHECKLOG" 2>&1; }
@@ -507,8 +511,8 @@ status(){
   if [ -f "$PIDFILE" ]; then X=$(cat "$PIDFILE" 2>/dev/null || true); case "$X" in ''|*[!0-9]*) ;; *) if pidcore "$X" && kill -0 "$X" >/dev/null 2>&1; then STATUS_RUNNING=true; STATUS_PID="$X"; fi;; esac; fi
   if [ "$STATUS_RUNNING" = false ]; then RECOVER_PID=$(findcorepid 2>/dev/null || true); case "$RECOVER_PID" in ''|*[!0-9]*) ;; *) STATUS_RUNNING=true; STATUS_PID="$RECOVER_PID"; printf '%s\n' "$RECOVER_PID" > "$PIDFILE" 2>/dev/null || true;; esac; fi
   STATUS_MODE=$(cat "$MODEFILE" 2>/dev/null || echo none); T4=false; T6=false; K4=false; K6=false
-  for SPEC in "mangle OUTPUT $MOUT" "nat OUTPUT $NOUT" "nat OUTPUT $DNSOUT" "filter OUTPUT $QUICOUT"; do set -- $SPEC; iptables -t "$1" -C "$2" -j "$3" >/dev/null 2>&1 && T4=true; done; iptables -t filter -C OUTPUT -j "$KOUT" >/dev/null 2>&1 && K4=true
-  if has ip6tables; then for SPEC in "mangle OUTPUT $MOUT" "nat OUTPUT $NOUT" "nat OUTPUT $DNSOUT" "filter OUTPUT $QUICOUT" "filter OUTPUT $V6OUT"; do set -- $SPEC; ip6tables -t "$1" -C "$2" -j "$3" >/dev/null 2>&1 && T6=true; done; ip6tables -t filter -C OUTPUT -j "$KOUT" >/dev/null 2>&1 && K6=true; fi
+  for SPEC in "mangle OUTPUT $MOUT" "nat OUTPUT $NOUT" "nat OUTPUT $DNSOUT" "filter OUTPUT $QUICOUT"; do set -- $SPEC; xt4 -t "$1" -C "$2" -j "$3" >/dev/null 2>&1 && T4=true; done; xt4 -t filter -C OUTPUT -j "$KOUT" >/dev/null 2>&1 && K4=true
+  if has ip6tables; then for SPEC in "mangle OUTPUT $MOUT" "nat OUTPUT $NOUT" "nat OUTPUT $DNSOUT" "filter OUTPUT $QUICOUT" "filter OUTPUT $V6OUT"; do set -- $SPEC; xt6 -t "$1" -C "$2" -j "$3" >/dev/null 2>&1 && T6=true; done; xt6 -t filter -C OUTPUT -j "$KOUT" >/dev/null 2>&1 && K6=true; fi
   V6OFF=false; [ -f "$IPV6_STATE" ] && V6OFF=true; RECOVERED=false
   if [ "$STATUS_RUNNING" = false ] && [ "$K4" = false ] && [ "$K6" = false ] && { [ "$T4" = true ] || [ "$T6" = true ] || [ "$V6OFF" = true ]; }; then if acquire_lock; then cleanup; restorev6; rm -f "$PIDFILE" "$MODEFILE" "$SESSION"; STATUS_MODE=none; T4=false; T6=false; V6OFF=false; RECOVERED=true; fi; fi
   WD=false; W=$(cat "$WATCHDOG_PID" 2>/dev/null || true); case "$W" in ''|*[!0-9]*) ;; *) kill -0 "$W" >/dev/null 2>&1 && WD=true;; esac
