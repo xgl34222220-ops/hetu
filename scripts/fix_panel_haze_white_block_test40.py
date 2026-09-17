@@ -25,8 +25,8 @@ old = '''    val shape = RoundedCornerShape(28.dp)
     val liquidShellModifier = Modifier.then(hazeModifier).background(fallbackBrush)
 '''
 new = '''    val shape = RoundedCornerShape(28.dp)
-    // Avoid HazeMaterials.ultraThin() here: its light tint becomes a large white slab
-    // on this very light page. Use a page-matched blur base with only a tiny white tint.
+    // Use a custom page-matched blur style here. The material preset adds too much white tint
+    // on this very light page and turns the whole header into a large white slab.
     val panelBase = if (dark) scheme.background else Color(0xFFF1F5F9)
     val panelTint = if (dark) Color.White.copy(alpha = .025f) else Color.White.copy(alpha = .035f)
     val panelGlassStyle = HazeStyle(
