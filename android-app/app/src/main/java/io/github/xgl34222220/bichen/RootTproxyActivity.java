@@ -23,7 +23,7 @@ public final class RootTproxyActivity extends Activity {
     private ProxyCoreStore cores;
     private ProxyConfigLibrary configs;
     private RootProxyManager root;
-    private TextView coreValue,modeValue,ipv6Value,overwriteValue,appScopeValue,tcpValue,udpValue,dnsValue,quicValue,shareValue,killValue,cidrValue,ifaceValue;
+    private TextView coreValue,modeValue,ipv6Value,overwriteValue,appScopeValue,tcpValue,udpValue,dnsValue,quicValue,shareValue,killValue,cnIpValue,cidrValue,ifaceValue;
     private LinearLayout configRows;
     private boolean destroyed,busy;
 
@@ -65,12 +65,15 @@ public final class RootTproxyActivity extends Activity {
         killValue=settingRow(traffic,"Kill Switch","",()->toggle("proxyKillSwitch",false));
 
         LinearLayout bypass=u.card(body);bypass.setPadding(u.dp(18),0,u.dp(18),0);
-        cidrValue=settingRow(bypass,"CIDR 绕过","",()->editSet("proxyBypassCidrs","CIDR 绕过","每行一个 IPv4/IPv6 CIDR。可用于自定义 CNIP 段；无自动 CNIP 数据源时不会假装已更新。"));u.separator(bypass);
+        cnIpValue=settingRow(bypass,"中国 IP 自动直连","",()->toggle("proxyCnIpDirect",false));u.separator(bypass);
+        cidrValue=settingRow(bypass,"CIDR 绕过","",()->editSet("proxyBypassCidrs","CIDR 绕过","每行一个 IPv4/IPv6 CIDR。这里保留少量 Root 层自定义绕过；大规模中国 IP 段请使用上面的自动直连规则。"));u.separator(bypass);
         ifaceValue=settingRow(bypass,"接口绕过","",()->editSet("proxyBypassInterfaces","接口绕过","每行一个接口名，例如 wlan0、rmnet_data0、tun+。不能填写 lo。"));
 
         LinearLayout startup=u.card(body);startup.setPadding(u.dp(18),0,u.dp(18),0);
         plainAction(startup,"查看启动配置",this::showStartupConfig);u.separator(startup);
-        plainAction(startup,"运行预检",this::runPreflight);
+        plainAction(startup,"运行预检",this::runPreflight);u.separator(startup);
+        plainAction(startup,"查看 Root 诊断",this::showDiagnostics);u.separator(startup);
+        plainAction(startup,"清理残留并恢复网络",this::confirmRepairNetwork);
 
         LinearLayout cfg=u.card(body);cfg.setPadding(u.dp(18),u.dp(4),u.dp(18),u.dp(6));
         LinearLayout head=u.row();head.setMinimumHeight(u.dp(66));
@@ -178,10 +181,21 @@ public final class RootTproxyActivity extends Activity {
         task(()->{RootProxyManager.Prepared prepared=root.prepare(profile());String text=prepared.startup;ui.post(()->new AlertDialog.Builder(this).setTitle("启动配置").setMessage(text.length()>14000?text.substring(0,14000)+"\n…已截断":text).setPositiveButton("关闭",null).show());return null;});
     }
 
+    private void showDiagnostics(){
+        task(()->{String text=root.diagnostics();if(TextUtils.isEmpty(text))text="未取得 Root 诊断信息";String finalText=text;ui.post(()->new AlertDialog.Builder(this).setTitle("Root 诊断").setMessage(finalText).setPositiveButton("关闭",null).show());return null;});
+    }
+
+    private void confirmRepairNetwork(){
+        new AlertDialog.Builder(this).setTitle("清理残留并恢复网络").setMessage("这会停止当前 Root 代理，并清理辟尘创建的透明代理、Kill Switch、IPv6 临时状态和残留规则。不会删除订阅或节点配置。")
+                .setPositiveButton("清理并停止",(d,w)->repairNetwork()).setNegativeButton("取消",null).show();
+    }
+
+    private void repairNetwork(){task(()->{root.stop();return "已停止 Root 代理并恢复辟尘网络规则";});}
+
     private void refresh(){
         if(destroyed)return;ProxyRuntimeProfile p=profile();coreValue.setText(p.core.label);modeValue.setText(p.mode.label);ipv6Value.setText(ipv6Label(p.ipv6));overwriteValue.setText(on(p.autoOverwrite));
         appScopeValue.setText(scopeLabel(p.appScope));tcpValue.setText(on(p.tcp));udpValue.setText(on(p.udp));dnsValue.setText(dnsLabel(p.dnsHijack));quicValue.setText(on(p.quicBlocked));shareValue.setText(on(prefs.getBoolean("proxySharedNetwork",false)));killValue.setText(on(prefs.getBoolean("proxyKillSwitch",false)));
-        cidrValue.setText(stringSet("proxyBypassCidrs").isEmpty()?"未设置":stringSet("proxyBypassCidrs").size()+" 条");ifaceValue.setText(stringSet("proxyBypassInterfaces").isEmpty()?"未设置":stringSet("proxyBypassInterfaces").size()+" 个");renderConfigs();
+        cnIpValue.setText(on(p.cnIpDirect));cidrValue.setText(stringSet("proxyBypassCidrs").isEmpty()?"未设置":stringSet("proxyBypassCidrs").size()+" 条");ifaceValue.setText(stringSet("proxyBypassInterfaces").isEmpty()?"未设置":stringSet("proxyBypassInterfaces").size()+" 个");renderConfigs();
     }
 
     private void task(Work work){if(busy||destroyed)return;busy=true;worker.execute(()->{String result=null;Throwable failure=null;try{result=work.run();}catch(Throwable e){failure=e;}String text=result;Throwable error=failure;ui.post(()->{busy=false;if(destroyed)return;if(error!=null)toast(safe(error));else if(!TextUtils.isEmpty(text))toast(text);});});}

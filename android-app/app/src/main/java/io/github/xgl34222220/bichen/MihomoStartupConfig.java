@@ -1,6 +1,7 @@
 package io.github.xgl34222220.bichen;
 
 import java.io.IOException;
+import java.util.*;
 import java.util.regex.*;
 
 /** Builds a private Mihomo startup copy. The selected source config is never edited. */
@@ -13,6 +14,10 @@ final class MihomoStartupConfig {
     static final int OUTBOUND_ROUTING_MARK=0x08000000;
     static final String EXTERNAL_UI_DIR="ui";
     static final String EXTERNAL_UI_URL="https://github.com/Zephyruso/zashboard/releases/latest/download/dist-no-fonts.zip";
+    static final String CNIP_V4_URL="https://raw.githubusercontent.com/gaoyifan/china-operator-ip/ip-lists/china.txt";
+    static final String CNIP_V6_URL="https://raw.githubusercontent.com/gaoyifan/china-operator-ip/ip-lists/china6.txt";
+    static final String CNIP_V4_PATH="./ruleset/bichen-cn-v4.txt";
+    static final String CNIP_V6_PATH="./ruleset/bichen-cn-v6.txt";
 
     static final class Result {
         final String yaml;
@@ -54,6 +59,8 @@ final class MihomoStartupConfig {
 
         if(profile.dnsHijack==ProxyRuntimeProfile.DnsHijack.REDIRECT)
             yaml=ensureDnsListener(yaml,DNS_PORT);
+        if(profile.cnIpDirect)
+            yaml=ensureCnIpDirect(yaml);
 
         int tp=0,rp=0;
         StringBuilder override=new StringBuilder();
@@ -96,6 +103,91 @@ final class MihomoStartupConfig {
         override.append("external-ui-url: '").append(EXTERNAL_UI_URL).append("'\n");
         override.append("# --- end Bichen runtime isolation ---\n");
         return new Result(yaml+override,tp,rp);
+    }
+
+    /** Merge Bichen CN IP providers into the private startup copy without editing the subscription. */
+    private static String ensureCnIpDirect(String source)throws IOException{
+        String yaml=normalize(source);
+        yaml=injectCnProviders(yaml);
+        yaml=prependCnRules(yaml);
+        return yaml;
+    }
+
+    private static String injectCnProviders(String source)throws IOException{
+        String[] lines=normalize(source).split("\\n",-1);
+        int index=-1;
+        Matcher found=null;
+        Pattern top=Pattern.compile("^rule-providers\\s*:(.*)$");
+        for(int i=0;i<lines.length;i++){
+            if(indent(lines[i])!=0)continue;
+            Matcher m=top.matcher(lines[i]);
+            if(m.find()){index=i;found=m;break;}
+        }
+        String providerBlock=
+                "  bichen-cn-v4:\n"+
+                "    type: http\n"+
+                "    behavior: ipcidr\n"+
+                "    format: text\n"+
+                "    path: "+CNIP_V4_PATH+"\n"+
+                "    url: '"+CNIP_V4_URL+"'\n"+
+                "    interval: 86400\n"+
+                "  bichen-cn-v6:\n"+
+                "    type: http\n"+
+                "    behavior: ipcidr\n"+
+                "    format: text\n"+
+                "    path: "+CNIP_V6_PATH+"\n"+
+                "    url: '"+CNIP_V6_URL+"'\n"+
+                "    interval: 86400\n";
+        if(index<0){
+            String base=trimOne(source);
+            return base+(base.isEmpty()?"":"\n")+"rule-providers:\n"+providerBlock;
+        }
+        String rest=found.group(1).trim();
+        if(!rest.isEmpty()&&!rest.equals("{}"))
+            throw new IOException("中国 IP 自动直连需要普通 rule-providers: 配置块；当前源配置使用行内写法");
+        int end=lines.length;
+        for(int i=index+1;i<lines.length;i++){
+            String t=lines[i].trim();
+            if(t.isEmpty()||t.startsWith("#"))continue;
+            if(indent(lines[i])==0){end=i;break;}
+        }
+        for(int i=index+1;i<end;i++){
+            String t=lines[i].trim();
+            if(t.startsWith("bichen-cn-v4:")||t.startsWith("bichen-cn-v6:"))
+                throw new IOException("源配置占用了辟尘保留的 CNIP provider 名称");
+        }
+        StringBuilder out=new StringBuilder();
+        for(int i=0;i<lines.length;i++){
+            if(i==index){out.append("rule-providers:\n").append(providerBlock);continue;}
+            out.append(lines[i]).append('\n');
+        }
+        return trimOne(out.toString());
+    }
+
+    private static String prependCnRules(String source)throws IOException{
+        String[] lines=normalize(source).split("\\n",-1);
+        int index=-1;
+        Matcher found=null;
+        Pattern top=Pattern.compile("^rules\\s*:(.*)$");
+        for(int i=0;i<lines.length;i++){
+            if(indent(lines[i])!=0)continue;
+            Matcher m=top.matcher(lines[i]);
+            if(m.find()){index=i;found=m;break;}
+        }
+        String cnRules="  - RULE-SET,bichen-cn-v4,DIRECT,no-resolve\n  - RULE-SET,bichen-cn-v6,DIRECT,no-resolve\n";
+        if(index<0){
+            String base=trimOne(source);
+            return base+(base.isEmpty()?"":"\n")+"rules:\n"+cnRules;
+        }
+        String rest=found.group(1).trim();
+        if(!rest.isEmpty()&&!rest.equals("[]"))
+            throw new IOException("中国 IP 自动直连需要普通 rules: 列表；当前源配置使用行内 rules 写法");
+        StringBuilder out=new StringBuilder();
+        for(int i=0;i<lines.length;i++){
+            if(i==index){out.append("rules:\n").append(cnRules);continue;}
+            out.append(lines[i]).append('\n');
+        }
+        return trimOne(out.toString());
     }
 
     /** Ensure Mihomo's built-in DNS server owns a dedicated TCP+UDP loop used by DNS REDIRECT. */

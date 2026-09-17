@@ -128,6 +128,7 @@ final class RootProxyManager {
                 .put("uidRanges",policy.uidRanges)
                 .put("sharedNetwork",policy.sharedNetwork)
                 .put("killSwitch",policy.killSwitch)
+                .put("cnIpDirect",profile.cnIpDirect)
                 .put("bypassCidrs",policy.cidrs)
                 .put("bypassInterfaces",policy.interfaces);
         if(!warning.isEmpty())result.put("warning",warning);
@@ -150,6 +151,7 @@ final class RootProxyManager {
             RootBridge.requireWorkerThread();
             String cmd="echo '--- root ---'; id; echo '--- runtime ---'; ls -l "+RootBridge.quote(ROOT)+" "+RootBridge.quote(ROOT+"/bin")+" "+RootBridge.quote(ROOT+"/run")+" 2>&1; "+
                     "echo '--- session ---'; cat "+RootBridge.quote(ROOT+"/run/session.state")+" 2>/dev/null || true; "+
+                    "echo '--- cnip cache ---'; ls -lh "+RootBridge.quote(ROOT+"/run/ruleset")+" 2>&1 || true; "+
                     "echo '--- sockets ---'; (ss -lntup 2>/dev/null || netstat -lntup 2>/dev/null || true) | tail -n 35; "+
                     "echo '--- policy ---'; ip rule show 2>/dev/null | tail -n 30; ip -6 rule show 2>/dev/null | tail -n 20; "+
                     "echo '--- bichen chains ---'; iptables-save 2>/dev/null | grep BICHEN | tail -n 70; ip6tables-save 2>/dev/null | grep BICHEN | tail -n 55; "+
@@ -220,13 +222,23 @@ final class RootProxyManager {
         copyAsset("proxy-root-v3.sh",script,true);
         File binary=coreFile(p.profile.core,stage);
         File cfg=new File(stage,"startup-config");
+        File cn4=null,cn6=null;
+        if(p.profile.cnIpDirect){
+            cn4=new File(stage,"bichen-cn-v4.txt");copyAsset("cnip/bichen-cn-v4.txt",cn4,false);
+            cn6=new File(stage,"bichen-cn-v6.txt");copyAsset("cnip/bichen-cn-v6.txt",cn6,false);
+        }
         if(includeConfig)Files.write(cfg.toPath(),p.startup.getBytes(StandardCharsets.UTF_8));
         StringBuilder cmd=new StringBuilder("set -e; mkdir -p ")
-                .append(RootBridge.quote(ROOT+"/bin")).append(' ').append(RootBridge.quote(ROOT+"/run/state"))
+                .append(RootBridge.quote(ROOT+"/bin")).append(' ').append(RootBridge.quote(ROOT+"/run/state")).append(' ').append(RootBridge.quote(ROOT+"/run/ruleset"))
                 .append("; cp ").append(RootBridge.quote(script.getAbsolutePath())).append(' ').append(RootBridge.quote(SCRIPT))
                 .append("; chmod 700 ").append(RootBridge.quote(SCRIPT)).append("; chown 0:0 ").append(RootBridge.quote(SCRIPT))
                 .append("; cp ").append(RootBridge.quote(binary.getAbsolutePath())).append(' ').append(RootBridge.quote(BIN))
                 .append("; chmod 700 ").append(RootBridge.quote(BIN)).append("; chown 0:0 ").append(RootBridge.quote(BIN));
+        if(p.profile.cnIpDirect){
+            String dst4=ROOT+"/run/ruleset/bichen-cn-v4.txt",dst6=ROOT+"/run/ruleset/bichen-cn-v6.txt";
+            cmd.append("; if [ ! -s ").append(RootBridge.quote(dst4)).append(" ]; then cp ").append(RootBridge.quote(cn4.getAbsolutePath())).append(' ').append(RootBridge.quote(dst4)).append("; chmod 600 ").append(RootBridge.quote(dst4)).append("; chown 0:0 ").append(RootBridge.quote(dst4)).append("; fi")
+                    .append("; if [ ! -s ").append(RootBridge.quote(dst6)).append(" ]; then cp ").append(RootBridge.quote(cn6.getAbsolutePath())).append(' ').append(RootBridge.quote(dst6)).append("; chmod 600 ").append(RootBridge.quote(dst6)).append("; chown 0:0 ").append(RootBridge.quote(dst6)).append("; fi");
+        }
         if(includeConfig)cmd.append("; cp ").append(RootBridge.quote(cfg.getAbsolutePath())).append(' ').append(RootBridge.quote(CONFIG))
                 .append("; chmod 600 ").append(RootBridge.quote(CONFIG)).append("; chown 0:0 ").append(RootBridge.quote(CONFIG));
         RootBridge.Result r=RootBridge.rootShell(context,cmd.toString(),45000L);
