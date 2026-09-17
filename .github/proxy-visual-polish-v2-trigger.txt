@@ -1,1 +1,1 @@
-2026-09-17 test47: Bichen title, lifecycle latency refresh, frosted action pills, 66dp inline nodes, dark terminal sheet, full-screen YAML editor
+2026-09-17 test47 retry: scoped dark terminal patch and full native dashboard build
