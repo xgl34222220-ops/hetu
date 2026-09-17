@@ -1,1 +1,1 @@
-2026-09-17 test32 anti-flicker: preserve proxy/ad-block home state
+2026-09-17 test32 anti-flicker retry: preserve proxy/ad-block home state
