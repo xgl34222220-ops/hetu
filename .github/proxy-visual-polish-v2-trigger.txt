@@ -1,1 +1,1 @@
-2026-09-17 test40 panel Haze tint white-block fix
+2026-09-17 test40 retry after validation-scope fix
