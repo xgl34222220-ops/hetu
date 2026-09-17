@@ -303,7 +303,9 @@ install_mangle4(){
   P="$1"; M="$2"; TCP="$3"; UDP="$4"; DNS="$5"; S="$6"; UIDS="$7"; SHARE="$8"; CIDRS="$9"; IFACES="${10}"
   NEED=0; case "$M" in tproxy) if [ "$TCP" = 1 ] || [ "$UDP" = 1 ]; then NEED=1; fi;; enhance) [ "$UDP" = 1 ] && NEED=1;; esac; [ "$NEED" = 1 ] || return 0
   route4 || return 1; iptables -t mangle -N "$MOUT" || return 1; iptables -t mangle -N "$MPRE" || return 1
-  iptables -t mangle -A "$MOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_out iptables mangle "$MOUT" "$IFACES" || return 1; blacklist_returns iptables mangle "$MOUT" "$S" "$UIDS" || return 1
+  iptables -t mangle -A "$MOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1
+  iptables -t mangle -A "$MOUT" -m owner --uid-owner 0 -j RETURN || return 1
+  iface_out iptables mangle "$MOUT" "$IFACES" || return 1; blacklist_returns iptables mangle "$MOUT" "$S" "$UIDS" || return 1
   iptables -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in iptables mangle "$MPRE" "$IFACES" || return 1
   if [ "$DNS" = tproxy ] || [ "$DNS" = redirect ]; then
     iptables -t mangle -A "$MOUT" -p tcp --dport 53 -j RETURN || return 1
@@ -321,7 +323,9 @@ install_mangle6(){
   P="$1"; M="$2"; TCP="$3"; UDP="$4"; DNS="$5"; S="$6"; UIDS="$7"; SHARE="$8"; CIDRS="$9"; IFACES="${10}"; v6active || return 0
   NEED=0; case "$M" in tproxy) if [ "$TCP" = 1 ] || [ "$UDP" = 1 ]; then NEED=1; fi;; enhance) [ "$UDP" = 1 ] && NEED=1;; esac; [ "$NEED" = 1 ] || return 0
   route6 || return 1; ip6tables -t mangle -N "$MOUT" || return 1; ip6tables -t mangle -N "$MPRE" || return 1
-  ip6tables -t mangle -A "$MOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_out ip6tables mangle "$MOUT" "$IFACES" || return 1; blacklist_returns ip6tables mangle "$MOUT" "$S" "$UIDS" || return 1
+  ip6tables -t mangle -A "$MOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1
+  ip6tables -t mangle -A "$MOUT" -m owner --uid-owner 0 -j RETURN || return 1
+  iface_out ip6tables mangle "$MOUT" "$IFACES" || return 1; blacklist_returns ip6tables mangle "$MOUT" "$S" "$UIDS" || return 1
   ip6tables -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in ip6tables mangle "$MPRE" "$IFACES" || return 1
   if [ "$DNS" = tproxy ] || [ "$DNS" = redirect ]; then
     ip6tables -t mangle -A "$MOUT" -p tcp --dport 53 -j RETURN || return 1
@@ -337,32 +341,32 @@ install_mangle6(){
 
 install_redirect4(){
   P="$1"; M="$2"; TCP="$3"; S="$4"; UIDS="$5"; SHARE="$6"; CIDRS="$7"; IFACES="$8"; [ "$TCP" = 1 ] || return 0; case "$M" in redirect|enhance) ;; *) return 0;; esac
-  iptables -t nat -N "$NOUT" || return 1; iptables -t nat -A "$NOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_out iptables nat "$NOUT" "$IFACES" || return 1; blacklist_returns iptables nat "$NOUT" "$S" "$UIDS" || return 1; bypass4 "$NOUT" nat "$CIDRS" || return 1; scoped_redirect iptables nat "$NOUT" "$S" "$UIDS" tcp "" "$P" || return 1; iptables -t nat -A OUTPUT -j "$NOUT" || return 1
+  iptables -t nat -N "$NOUT" || return 1; iptables -t nat -A "$NOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iptables -t nat -A "$NOUT" -m owner --uid-owner 0 -j RETURN || return 1; iface_out iptables nat "$NOUT" "$IFACES" || return 1; blacklist_returns iptables nat "$NOUT" "$S" "$UIDS" || return 1; bypass4 "$NOUT" nat "$CIDRS" || return 1; scoped_redirect iptables nat "$NOUT" "$S" "$UIDS" tcp "" "$P" || return 1; iptables -t nat -A OUTPUT -j "$NOUT" || return 1
   if [ "$SHARE" = 1 ]; then iptables -t nat -N "$NPRE" || return 1; iptables -t nat -A "$NPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in iptables nat "$NPRE" "$IFACES" || return 1; bypass4 "$NPRE" nat "$CIDRS" || return 1; iptables -t nat -A "$NPRE" -p tcp -j REDIRECT --to-ports "$P" || return 1; iptables -t nat -A PREROUTING -j "$NPRE" || return 1; fi
 }
 install_redirect6(){
   P="$1"; M="$2"; TCP="$3"; S="$4"; UIDS="$5"; SHARE="$6"; CIDRS="$7"; IFACES="$8"; v6active || return 0; [ "$TCP" = 1 ] || return 0; case "$M" in redirect|enhance) ;; *) return 0;; esac
-  ip6tables -t nat -N "$NOUT" || return 1; ip6tables -t nat -A "$NOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_out ip6tables nat "$NOUT" "$IFACES" || return 1; blacklist_returns ip6tables nat "$NOUT" "$S" "$UIDS" || return 1; bypass6 "$NOUT" nat "$CIDRS" || return 1; scoped_redirect ip6tables nat "$NOUT" "$S" "$UIDS" tcp "" "$P" || return 1; ip6tables -t nat -A OUTPUT -j "$NOUT" || return 1
+  ip6tables -t nat -N "$NOUT" || return 1; ip6tables -t nat -A "$NOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; ip6tables -t nat -A "$NOUT" -m owner --uid-owner 0 -j RETURN || return 1; iface_out ip6tables nat "$NOUT" "$IFACES" || return 1; blacklist_returns ip6tables nat "$NOUT" "$S" "$UIDS" || return 1; bypass6 "$NOUT" nat "$CIDRS" || return 1; scoped_redirect ip6tables nat "$NOUT" "$S" "$UIDS" tcp "" "$P" || return 1; ip6tables -t nat -A OUTPUT -j "$NOUT" || return 1
   if [ "$SHARE" = 1 ]; then ip6tables -t nat -N "$NPRE" || return 1; ip6tables -t nat -A "$NPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in ip6tables nat "$NPRE" "$IFACES" || return 1; bypass6 "$NPRE" nat "$CIDRS" || return 1; ip6tables -t nat -A "$NPRE" -p tcp -j REDIRECT --to-ports "$P" || return 1; ip6tables -t nat -A PREROUTING -j "$NPRE" || return 1; fi
 }
 
 install_dns_redirect4(){
-  P="$1"; S="$2"; UIDS="$3"; SHARE="$4"; IFACES="$5"; iptables -t nat -N "$DNSOUT" || return 1; iptables -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_out iptables nat "$DNSOUT" "$IFACES" || return 1; blacklist_returns iptables nat "$DNSOUT" "$S" "$UIDS" || return 1
+  P="$1"; S="$2"; UIDS="$3"; SHARE="$4"; IFACES="$5"; iptables -t nat -N "$DNSOUT" || return 1; iptables -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iptables -t nat -A "$DNSOUT" -m owner --uid-owner 0 -j RETURN || return 1; iface_out iptables nat "$DNSOUT" "$IFACES" || return 1; blacklist_returns iptables nat "$DNSOUT" "$S" "$UIDS" || return 1
   for X in tcp udp; do scoped_redirect iptables nat "$DNSOUT" "$S" "$UIDS" "$X" 53 "$P" || return 1; done; iptables -t nat -I OUTPUT 1 -j "$DNSOUT" || return 1
   if [ "$SHARE" = 1 ]; then iptables -t nat -N "$DNSPRE" || return 1; iface_in iptables nat "$DNSPRE" "$IFACES" || return 1; for X in tcp udp; do iptables -t nat -A "$DNSPRE" -p "$X" --dport 53 -j REDIRECT --to-ports "$P" || return 1; done; iptables -t nat -I PREROUTING 1 -j "$DNSPRE" || return 1; fi
 }
 install_dns_redirect6(){
-  P="$1"; S="$2"; UIDS="$3"; SHARE="$4"; IFACES="$5"; v6active || return 0; ip6tables -t nat -N "$DNSOUT" || return 1; ip6tables -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_out ip6tables nat "$DNSOUT" "$IFACES" || return 1; blacklist_returns ip6tables nat "$DNSOUT" "$S" "$UIDS" || return 1
+  P="$1"; S="$2"; UIDS="$3"; SHARE="$4"; IFACES="$5"; v6active || return 0; ip6tables -t nat -N "$DNSOUT" || return 1; ip6tables -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; ip6tables -t nat -A "$DNSOUT" -m owner --uid-owner 0 -j RETURN || return 1; iface_out ip6tables nat "$DNSOUT" "$IFACES" || return 1; blacklist_returns ip6tables nat "$DNSOUT" "$S" "$UIDS" || return 1
   for X in tcp udp; do scoped_redirect ip6tables nat "$DNSOUT" "$S" "$UIDS" "$X" 53 "$P" || return 1; done; ip6tables -t nat -I OUTPUT 1 -j "$DNSOUT" || return 1
   if [ "$SHARE" = 1 ]; then ip6tables -t nat -N "$DNSPRE" || return 1; iface_in ip6tables nat "$DNSPRE" "$IFACES" || return 1; for X in tcp udp; do ip6tables -t nat -A "$DNSPRE" -p "$X" --dport 53 -j REDIRECT --to-ports "$P" || return 1; done; ip6tables -t nat -I PREROUTING 1 -j "$DNSPRE" || return 1; fi
 }
 
 install_quic4(){
-  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; iptables -t filter -N "$QUICOUT" || return 1; iptables -t filter -A "$QUICOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_out iptables filter "$QUICOUT" "$IFACES" || return 1; blacklist_returns iptables filter "$QUICOUT" "$S" "$UIDS" || return 1; bypass4 "$QUICOUT" filter "$CIDRS" || return 1; scoped_drop_quic iptables "$QUICOUT" "$S" "$UIDS" || return 1; iptables -t filter -A OUTPUT -j "$QUICOUT" || return 1
+  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; iptables -t filter -N "$QUICOUT" || return 1; iptables -t filter -A "$QUICOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iptables -t filter -A "$QUICOUT" -m owner --uid-owner 0 -j RETURN || return 1; iface_out iptables filter "$QUICOUT" "$IFACES" || return 1; blacklist_returns iptables filter "$QUICOUT" "$S" "$UIDS" || return 1; bypass4 "$QUICOUT" filter "$CIDRS" || return 1; scoped_drop_quic iptables "$QUICOUT" "$S" "$UIDS" || return 1; iptables -t filter -A OUTPUT -j "$QUICOUT" || return 1
   if [ "$SHARE" = 1 ]; then iptables -t filter -N "$QUICFWD" || return 1; iface_in iptables filter "$QUICFWD" "$IFACES" || return 1; bypass4 "$QUICFWD" filter "$CIDRS" || return 1; iptables -t filter -A "$QUICFWD" -p udp --dport 443 -j DROP || return 1; iptables -t filter -A FORWARD -j "$QUICFWD" || return 1; fi
 }
 install_quic6(){
-  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; v6active || return 0; ip6tables -t filter -N "$QUICOUT" || return 1; ip6tables -t filter -A "$QUICOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_out ip6tables filter "$QUICOUT" "$IFACES" || return 1; blacklist_returns ip6tables filter "$QUICOUT" "$S" "$UIDS" || return 1; bypass6 "$QUICOUT" filter "$CIDRS" || return 1; scoped_drop_quic ip6tables "$QUICOUT" "$S" "$UIDS" || return 1; ip6tables -t filter -A OUTPUT -j "$QUICOUT" || return 1
+  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; v6active || return 0; ip6tables -t filter -N "$QUICOUT" || return 1; ip6tables -t filter -A "$QUICOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; ip6tables -t filter -A "$QUICOUT" -m owner --uid-owner 0 -j RETURN || return 1; iface_out ip6tables filter "$QUICOUT" "$IFACES" || return 1; blacklist_returns ip6tables filter "$QUICOUT" "$S" "$UIDS" || return 1; bypass6 "$QUICOUT" filter "$CIDRS" || return 1; scoped_drop_quic ip6tables "$QUICOUT" "$S" "$UIDS" || return 1; ip6tables -t filter -A OUTPUT -j "$QUICOUT" || return 1
   if [ "$SHARE" = 1 ]; then ip6tables -t filter -N "$QUICFWD" || return 1; iface_in ip6tables filter "$QUICFWD" "$IFACES" || return 1; bypass6 "$QUICFWD" filter "$CIDRS" || return 1; ip6tables -t filter -A "$QUICFWD" -p udp --dport 443 -j DROP || return 1; ip6tables -t filter -A FORWARD -j "$QUICFWD" || return 1; fi
 }
 

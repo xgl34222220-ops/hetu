@@ -137,7 +137,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
     var panelTab by rememberSaveable { mutableStateOf(RefPanelTab.Overview) }
     var panelSearchRequest by rememberSaveable { mutableIntStateOf(0) }
     var panelDetailVisible by rememberSaveable { mutableStateOf(false) }
-    var state by remember { mutableStateOf(ProxyComposeState()) }
+    var state by remember { mutableStateOf(ProxyComposeState(running = prefs.getBoolean("proxyRootWanted", false))) }
     var runtime by remember { mutableStateOf(ProxyRuntimeSnapshot()) }
     var providers by remember { mutableStateOf<List<DashboardProviderUi>>(emptyList()) }
     var siteDelays by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
@@ -285,8 +285,10 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
     }
 
     LaunchedEffect(Unit) {
-        runCatching { repo.ensureIcons() }
+        // Runtime state is more important than decorative icon downloads. Reopening the app
+        // must not show a false "已停止" card while network icon assets are being fetched.
         refresh()
+        launch { runCatching { repo.ensureIcons() } }
         while (true) {
             delay(2200)
             refresh()
@@ -863,9 +865,9 @@ private fun RefActionText(
     val shape = CircleShape
     val background = when {
         danger && dark -> Color(0xFF4C1724).copy(alpha = .78f)
-        danger -> Color(0xFFFFF1F2).copy(alpha = .94f)
+        danger -> Color(0xFFFFF1F2).copy(alpha = .82f)
         dark -> Color.White.copy(alpha = .075f)
-        else -> Color.White.copy(alpha = .92f)
+        else -> Color.White.copy(alpha = .76f)
     }
     val borderColor = when {
         danger && dark -> Color(0xFFFB7185).copy(alpha = .18f)
@@ -876,9 +878,9 @@ private fun RefActionText(
     val shadowColor = if (danger) Color(0xFFF43F5E).copy(alpha = .12f) else Color(0xFF0F172A).copy(alpha = .055f)
     Row(
         modifier
-            .height(40.dp)
+            .height(42.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .86f else if (enabled) 1f else .50f }
-            .shadow(5.dp, shape, clip = false, ambientColor = shadowColor, spotColor = shadowColor)
+            .shadow(7.dp, shape, clip = false, ambientColor = shadowColor, spotColor = shadowColor)
             .background(background, shape)
             .border(.7.dp, borderColor, shape)
             .clip(shape)
@@ -1003,12 +1005,24 @@ private fun RefPanel(
     var selectedGroupName by rememberSaveable { mutableStateOf<String?>(null) }
     val selectedLocal = remember { mutableStateMapOf<String, String>() }
     val testing = remember { mutableStateMapOf<String, Boolean>() }
+    val providerRefreshing = remember { mutableStateMapOf<String, Boolean>() }
+    val ruleSetRefreshing = remember { mutableStateMapOf<String, Boolean>() }
+    var capsuleText by remember { mutableStateOf("") }
+    var capsuleError by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
     var searchOpen by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     var connectionView by rememberSaveable { mutableStateOf("active") }
     val closedConnections = remember { mutableStateListOf<ProxyConnectionUi>() }
     var previousConnections by remember { mutableStateOf<List<ProxyConnectionUi>>(emptyList()) }
+
+    LaunchedEffect(capsuleText) {
+        if (capsuleText.isNotBlank()) {
+            delay(2500)
+            capsuleText = ""
+            capsuleError = false
+        }
+    }
 
     DisposableEffect(Unit) {
         onDispose { onDetailVisibleChanged(false) }
@@ -1085,8 +1099,9 @@ private fun RefPanel(
         onDetailVisibleChanged(false)
     }
 
-    PullToRefreshBox(isRefreshing = refreshing, onRefresh = ::refresh, modifier = Modifier.fillMaxSize()) {
-        LazyColumn(
+    Box(Modifier.fillMaxSize()) {
+        PullToRefreshBox(isRefreshing = refreshing, onRefresh = ::refresh, modifier = Modifier.fillMaxSize()) {
+            LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
                 start = 16.dp,
@@ -1130,10 +1145,24 @@ private fun RefPanel(
                                         selected = selected,
                                         expanded = selectedGroupName == group.name,
                                         delay = delays[selected] ?: group.nodes.firstOrNull { it.name == selected }?.lastDelay,
+                                        testing = selected.isNotBlank() && testing[selected] == true,
                                         modifier = Modifier.weight(1f),
                                         onClick = {
                                             view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                                             selectedGroupName = if (selectedGroupName == group.name) null else group.name
+                                        },
+                                        onDelay = {
+                                            if (selected.isNotBlank() && testing[selected] != true) scope.launch {
+                                                testing[selected] = true
+                                                try {
+                                                    delays[selected] = repo.delay(selected)
+                                                    view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                                } catch (_: Exception) {
+                                                    delays[selected] = -1L
+                                                } finally {
+                                                    testing.remove(selected)
+                                                }
+                                            }
                                         },
                                     )
                                 }
@@ -1205,10 +1234,21 @@ private fun RefPanel(
                 RefPanelTab.Subscriptions -> items(providers, key = { it.name }) { item ->
                     RefProviderRow(
                         item = item,
+                        refreshing = providerRefreshing[item.name] == true,
                         onRefresh = {
-                            scope.launch {
-                                repo.refreshProvider(item.name)?.let { updated ->
-                                    providers = providers.map { if (it.name == updated.name) updated else it }
+                            if (providerRefreshing[item.name] != true) scope.launch {
+                                providerRefreshing[item.name] = true
+                                try {
+                                    val updated = repo.refreshProvider(item.name)
+                                    if (updated != null) providers = providers.map { if (it.name == updated.name) updated else it }
+                                    capsuleError = false
+                                    capsuleText = "订阅更新成功"
+                                    view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                                } catch (e: Exception) {
+                                    capsuleError = true
+                                    capsuleText = e.message ?: "订阅更新失败，请检查网络"
+                                } finally {
+                                    providerRefreshing.remove(item.name)
                                 }
                             }
                         },
@@ -1233,13 +1273,73 @@ private fun RefPanel(
                 }
                 RefPanelTab.Rules -> items(rules, key = { it.index }) { RefRuleRow(it) }
                 RefPanelTab.RuleSets -> items(ruleSets, key = { it.name }) { item ->
-                    RefRuleSetRow(item) { scope.launch { ruleSets = repo.refreshRuleSets() } }
+                    RefRuleSetRow(item, refreshing = ruleSetRefreshing[item.name] == true) {
+                        if (ruleSetRefreshing[item.name] != true) scope.launch {
+                            ruleSetRefreshing[item.name] = true
+                            try {
+                                val updated = repo.refreshRuleSet(item.name)
+                                if (updated != null) ruleSets = ruleSets.map { if (it.name == updated.name) updated else it }
+                                capsuleError = false
+                                capsuleText = "规则集更新完成"
+                                view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                            } catch (e: Exception) {
+                                capsuleError = true
+                                capsuleText = e.message ?: "规则集更新失败，请检查网络"
+                            } finally {
+                                ruleSetRefreshing.remove(item.name)
+                            }
+                        }
+                    }
                 }
             }
+            }
+        }
+        androidx.compose.animation.AnimatedVisibility(
+            visible = capsuleText.isNotBlank(),
+            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp),
+            enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(160)) +
+                androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(190)) { -it / 2 },
+            exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(150)) +
+                androidx.compose.animation.slideOutVertically(androidx.compose.animation.core.tween(170)) { -it / 3 },
+        ) {
+            RefFloatingCapsule(capsuleText, capsuleError)
         }
     }
 
 
+}
+
+
+@Composable
+private fun RefFloatingCapsule(text: String, error: Boolean) {
+    val pulse = androidx.compose.animation.core.rememberInfiniteTransition(label = "capsulePulse")
+    val dotAlpha by pulse.animateFloat(
+        initialValue = .58f,
+        targetValue = 1f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = androidx.compose.animation.core.tween(720),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
+        ),
+        label = "capsulePulseAlpha",
+    )
+    Surface(
+        shape = CircleShape,
+        color = Color(0xFF0F172A).copy(alpha = .88f),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = .10f)),
+        shadowElevation = 12.dp,
+    ) {
+        Row(
+            Modifier.padding(horizontal = 15.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(
+                Modifier.size(7.dp).graphicsLayer { alpha = dotAlpha }
+                    .background(if (error) Color(0xFFFB7185) else Color(0xFF34D399), CircleShape),
+            )
+            Text(text, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        }
+    }
 }
 
 @Composable
@@ -1780,7 +1880,7 @@ private fun RefPanelOverview(state: ProxyComposeState, delays: Map<String, Long>
 }
 
 @Composable
-private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolean, delay: Long?, modifier: Modifier, onClick: () -> Unit) {
+private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolean, delay: Long?, testing: Boolean, modifier: Modifier, onClick: () -> Unit, onDelay: () -> Unit) {
     val t = LocalBichenTokens.current
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
@@ -1833,17 +1933,7 @@ private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolea
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f).padding(end = 5.dp),
             )
-            Surface(shape = RoundedCornerShape(999.dp), color = Color(0xFFEFF6FF)) {
-                Text(
-                    refDelay(delay),
-                    Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                    color = Color(0xFF2563EB),
-                    fontSize = 10.sp,
-                    lineHeight = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                )
-            }
+            RefDelayBadge(delay, testing, onDelay)
         }
     }
 }
@@ -1860,18 +1950,18 @@ private fun RefInlineGroupExpansion(
 ) {
     val t = LocalBichenTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val shape = RoundedCornerShape(20.dp)
+    val shape = RoundedCornerShape(22.dp)
     val trayBrush = if (dark) {
-        Brush.verticalGradient(listOf(Color.White.copy(alpha = .055f), t.elevatedCardBackground, t.elevatedCardBackground))
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = .065f), t.elevatedCardBackground, t.cardBackground))
     } else {
-        Brush.verticalGradient(listOf(Color(0xFFEFF4F8), Color(0xFFF8FAFC), Color(0xFFF8FAFC)))
+        Brush.verticalGradient(listOf(Color(0xFFE2E8F0).copy(alpha = .46f), Color(0xFFF8FAFC).copy(alpha = .94f), Color.White.copy(alpha = .86f)))
     }
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = shape,
         color = Color.Transparent,
-        border = BorderStroke(1.dp, if (dark) t.outline.copy(alpha = .44f) else Color(0xFFE2E8F0)),
-        shadowElevation = 0.dp,
+        border = BorderStroke(.8.dp, if (dark) Color.White.copy(alpha = .10f) else Color.White.copy(alpha = .88f)),
+        shadowElevation = 1.dp,
     ) {
         Column(
             Modifier.fillMaxWidth().background(trayBrush, shape).padding(12.dp),
@@ -2298,9 +2388,15 @@ private fun RefRateCard(title: String, value: Long, icon: ImageVector, color: Co
 }
 
 @Composable
-private fun RefProviderRow(item: DashboardProviderUi, onRefresh: () -> Unit, onClick: () -> Unit) {
+private fun RefProviderRow(item: DashboardProviderUi, refreshing: Boolean, onRefresh: () -> Unit, onClick: () -> Unit) {
     val t = LocalBichenTokens.current
     val scheme = MaterialTheme.colorScheme
+    val spinTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "providerRefreshSpin${item.name}")
+    val spin by spinTransition.animateFloat(
+        initialValue = 0f, targetValue = 360f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(760, easing = androidx.compose.animation.core.LinearEasing)),
+        label = "providerRefreshRotation${item.name}",
+    )
     val source = remember(item.name) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) .98f else 1f, spring(dampingRatio = .78f, stiffness = 520f), label = "provider${item.name}")
@@ -2319,10 +2415,10 @@ private fun RefProviderRow(item: DashboardProviderUi, onRefresh: () -> Unit, onC
         Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(item.name, color = t.textPrimary, fontSize = 17.sp, lineHeight = 21.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                Surface(onClick = onRefresh, shape = RoundedCornerShape(999.dp), color = Color(0xFFEBF3FF)) {
+                Surface(onClick = { if (!refreshing) onRefresh() }, shape = RoundedCornerShape(999.dp), color = Color(0xFFEFF6FF), border = BorderStroke(1.dp, Color(0xFFDBEAFE))) {
                     Row(Modifier.padding(horizontal = 9.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(if (item.hasSubscriptionInfo) "$remainingPercent%" else "同步", color = scheme.primary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        Icon(Icons.Rounded.Sync, "同步更新", tint = scheme.primary, modifier = Modifier.size(14.dp))
+                        Icon(Icons.Rounded.Sync, "同步更新", tint = scheme.primary, modifier = Modifier.size(14.dp).graphicsLayer { rotationZ = if (refreshing) spin else 0f })
                     }
                 }
             }
@@ -2348,10 +2444,10 @@ private fun RefProviderRow(item: DashboardProviderUi, onRefresh: () -> Unit, onC
                         Text(refBytes(item.download), color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
                         Text("已下载", color = Color(0xFF94A3B8), fontSize = 10.sp)
                     }
-                    Surface(modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp), color = Color(0xFFEDF4FF)) {
+                    Surface(modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp), color = Color(0xFFEFF6FF), border = BorderStroke(1.dp, Color(0xFFDBEAFE))) {
                         Column(Modifier.padding(horizontal = 7.dp, vertical = 7.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(refBytes(item.remaining), color = scheme.primary, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
-                            Text("剩余流量", color = scheme.primary, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                            Text(refBytes(item.remaining), color = Color(0xFF2563EB), fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
+                            Text("剩余流量", color = Color(0xFF2563EB), fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -2419,9 +2515,15 @@ private fun RefRuleRow(item: ProxyRuleUi) {
 }
 
 @Composable
-private fun RefRuleSetRow(item: DashboardRuleSetUi, onRefresh: () -> Unit) {
+private fun RefRuleSetRow(item: DashboardRuleSetUi, refreshing: Boolean, onRefresh: () -> Unit) {
     val t = LocalBichenTokens.current
     val scheme = MaterialTheme.colorScheme
+    val spinTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "ruleSetRefreshSpin${item.name}")
+    val spin by spinTransition.animateFloat(
+        initialValue = 0f, targetValue = 360f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(760, easing = androidx.compose.animation.core.LinearEasing)),
+        label = "ruleSetRefreshRotation${item.name}",
+    )
     Surface(shape = RoundedCornerShape(20.dp), color = t.cardBackground, shadowElevation = 1.dp) {
         Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -2442,8 +2544,8 @@ private fun RefRuleSetRow(item: DashboardRuleSetUi, onRefresh: () -> Unit) {
                 Text(listOf(item.behavior, item.format, item.vehicleType).filter { it.isNotBlank() }.joinToString(" / "), color = Color(0xFF64748B), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(refUpdatedAt(item.updatedAt), color = Color(0xFF94A3B8), fontSize = 11.sp, maxLines = 1)
             }
-            IconButton(onClick = onRefresh, modifier = Modifier.size(38.dp)) {
-                Icon(Icons.Rounded.Download, "远端更新", tint = scheme.primary, modifier = Modifier.size(20.dp))
+            IconButton(onClick = { if (!refreshing) onRefresh() }, modifier = Modifier.size(38.dp)) {
+                Icon(Icons.Rounded.Download, "远端更新", tint = scheme.primary, modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = if (refreshing) spin else 0f })
             }
         }
     }

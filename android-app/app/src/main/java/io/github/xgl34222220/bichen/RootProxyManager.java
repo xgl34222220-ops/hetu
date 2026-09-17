@@ -159,7 +159,13 @@ final class RootProxyManager {
             JSONObject state=status();
             if(!state.optBoolean("running",false))
                 throw new IOException("启动命令已返回，但核心未保持运行"+(diagnostics().isEmpty()?"":"："+diagnostics()));
-            new MihomoControllerClient(context).waitReady(4500);
+            MihomoControllerClient controller=new MihomoControllerClient(context);
+            if(!controller.waitReady(4500))throw new IOException("Mihomo 控制接口未在启动窗口内就绪");
+            try{controller.delay("DIRECT","https://connectivitycheck.platform.hicloud.com/generate_204","200-399");}
+            catch(Exception firstProbe){
+                try{controller.delay("DIRECT","https://www.gstatic.com/generate_204","200-399");}
+                catch(Exception secondProbe){throw new IOException("Mihomo 已启动，但 DIRECT 出站不可用；已回滚网络规则",secondProbe);}
+            }
         }catch(Exception verify){
             try{stop();}catch(Exception ignored){}
             throw new IOException("核心启动后健康检查失败，网络已回滚："+(verify.getMessage()==null?"控制接口不可用":verify.getMessage()),verify);

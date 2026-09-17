@@ -169,10 +169,22 @@ internal class ProxyComposeController(context: Context) {
         if (!configs.hasConfiguredSubscription(selected)) {
             error("当前是辟尘内置占位配置，尚未填写真实订阅。请打开「面板 → 订阅」添加订阅，或导入一份完整可运行的 YAML 配置。")
         }
-        root.start(profile) { onProgress(it) }
+        val previousOwner = prefs.getString("proxyRootSessionOwner", "").orEmpty()
+        prefs.edit().putString("proxyRootSessionOwner", "manual").apply()
+        try {
+            root.start(profile) { onProgress(it) }
+        } catch (error: Exception) {
+            if (previousOwner.isBlank()) prefs.edit().remove("proxyRootSessionOwner").apply()
+            else prefs.edit().putString("proxyRootSessionOwner", previousOwner).apply()
+            throw error
+        }
     }
 
-    suspend fun stop(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) { root.stop { onProgress(it) } }
+    suspend fun stop(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
+        val result = root.stop { onProgress(it) }
+        prefs.edit().remove("proxyRootSessionOwner").apply()
+        result
+    }
     suspend fun select(group: String, node: String) = withContext(Dispatchers.IO) { api.select(group, node) }
     suspend fun delay(node: String): Long = withContext(Dispatchers.IO) { api.delay(node) }
     suspend fun closeAll() = withContext(Dispatchers.IO) { api.closeAll() }

@@ -222,10 +222,13 @@ suspend fun delay(node: String): Long = withContext(Dispatchers.IO) {
     }
 
     suspend fun refreshProvider(name: String): DashboardProviderUi? = withContext(Dispatchers.IO) {
-        try { api.updateProxyProvider(name) }
-        catch (cancel: CancellationException) { throw cancel }
-        catch (_: Exception) { }
+        api.updateProxyProvider(name)
         remoteProviders(api.proxyProviders()).firstOrNull { it.name == name }
+    }
+
+    suspend fun refreshRuleSet(name: String): DashboardRuleSetUi? = withContext(Dispatchers.IO) {
+        api.updateRuleProvider(name)
+        parseRuleSets(api.ruleProviders()).firstOrNull { it.name == name }
     }
 
     private fun measureSiteLatency(url: String): Long {

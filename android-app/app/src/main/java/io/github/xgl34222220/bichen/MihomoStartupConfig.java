@@ -118,7 +118,8 @@ final class MihomoStartupConfig {
         // runtime, so enabling wildcard ingress does not expose the user's former 7890 proxy.
         override.append("allow-lan: true\n");
         override.append("bind-address: '*'\n");
-        override.append("routing-mark: ").append(OUTBOUND_ROUTING_MARK).append('\n');
+        // Android netd owns the socket fwmark/netId. Do not overwrite the full SO_MARK here;
+        // the Root controller exempts the root-owned Mihomo process from OUTPUT interception.
         override.append("find-process-mode: strict\n");
         override.append("external-controller: 127.0.0.1:").append(CONTROLLER_PORT).append('\n');
         override.append("secret: '").append(controllerSecret.replace("'","''")).append("'\n");
