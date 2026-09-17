@@ -1,1 +1,1 @@
-2026-09-17 test45 retry: scoped header haptic patch; keep latency motion, staggered nodes, native haptics and topbar polish
+2026-09-17 test45 final build retry after Compose animateFloat import fix
