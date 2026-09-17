@@ -18,22 +18,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Apply test48 Root startup fix and native dashboard polish
-        run: |
-          python3 scripts/run_native_dashboard_test47.py
-          python3 scripts/fix_test47_scoped_terminal_and_imports.py
-          python3 scripts/fix_test48_root_shell_scope.py
+      - name: Apply test48 Root startup fix
+        run: python3 scripts/fix_test48_root_shell_scope.py
 
       - name: Commit test48 runtime fix
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add \
-            android-app/app/src/main/assets/proxy-root-v3.sh \
-            android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt \
-            android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxySubscriptionActivity.kt
+          git add android-app/app/src/main/assets/proxy-root-v3.sh
           if ! git diff --cached --quiet; then
-            git commit -m 'Fix Bichen Root launch scope and keep dashboard polish'
+            git commit -m 'Fix Bichen Root launch scope'
             git push
           fi
 
