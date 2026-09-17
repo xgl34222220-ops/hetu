@@ -366,6 +366,10 @@ write(net_path, net)
 
 adv_path = "android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAdvancedSettingsActivity.kt"
 adv = read(adv_path)
+if 'import androidx.compose.foundation.BorderStroke' not in adv:
+    adv = adv.replace('import androidx.compose.foundation.background\n', 'import androidx.compose.foundation.BorderStroke\nimport androidx.compose.foundation.background\n')
+if 'import androidx.compose.foundation.horizontalScroll' not in adv:
+    adv = adv.replace('import androidx.compose.foundation.layout.*\n', 'import androidx.compose.foundation.layout.*\nimport androidx.compose.foundation.horizontalScroll\nimport androidx.compose.foundation.verticalScroll\n')
 old_adv_editor = '''@Composable
 private fun SetEditorDialog(state: SetEditorState, onDismiss: () -> Unit, onSave: (String) -> Unit) {
     var text by remember(state) { mutableStateOf(state.value) }
@@ -592,6 +596,8 @@ write(adv_path, adv)
 
 adb_path = "android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAdblockChainActivity.kt"
 adb = read(adb_path)
+if 'import androidx.compose.animation.core.animateFloat' not in adb:
+    adb = adb.replace('import androidx.compose.foundation.background\n', 'import androidx.compose.animation.core.animateFloat\nimport androidx.compose.foundation.background\n')
 adb = replace_once(
     adb,
     '    val scope = rememberCoroutineScope()\n',
