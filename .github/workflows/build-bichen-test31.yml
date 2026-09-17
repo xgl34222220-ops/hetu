@@ -1,0 +1,125 @@
+name: Build Bichen test.31 unified Compose settings
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  build:
+    if: github.event.issue.title == '[BUILD] Bichen 0.4.0-test.31'
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Checkout frozen test.31 branch
+        uses: actions/checkout@v4
+        with:
+          ref: release/bichen-0.4.0-test.31
+          fetch-depth: 0
+      - name: Apply unified Compose settings migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/apply_test31_compose_settings.py
+          git diff --check
+          sh -n android-app/app/src/main/assets/proxy-root-v3.sh
+          grep -q 'versionCode = 431' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.4.0-test.31"' android-app/app/build.gradle.kts
+          grep -q 'ProxyAdvancedSettingsActivity' android-app/app/src/main/AndroidManifest.xml
+          grep -q 'ProxyNetworkAutomationActivity' android-app/app/src/main/AndroidManifest.xml
+          grep -q 'ProxyAdvancedSettingsActivity::class.java' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
+          grep -q 'ProxyNetworkAutomationActivity::class.java' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
+          ! grep -q 'Intent(context, RootTproxyActivity::class.java)' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
+          ! grep -q 'Intent(context, ProxyNetworkMatchActivity::class.java)' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
+          grep -q '严格 IPv4 防泄漏' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
+          grep -q 'proxyRootWanted' android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java
+      - name: Checkout pinned Mihomo
+        uses: actions/checkout@v4
+        with:
+          repository: MetaCubeX/mihomo
+          ref: ac017cdd246ce8bd547653d927e7bf77d7ee73d5
+          path: .upstream
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache-dependency-path: .upstream/go.sum
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+          cache-read-only: false
+      - name: Run Java host regression
+        run: python3 tools/test_java.py
+      - name: Compile Android source
+        working-directory: android-app
+        run: gradle :app:compileDebugKotlin :app:compileDebugJavaWithJavac --stacktrace
+      - name: Ensure NDK
+        run: |
+          if [ ! -x "$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang" ]; then
+            sdkmanager 'ndk;28.2.13676358'
+          fi
+      - name: Build pinned Mihomo runtime
+        run: |
+          set -euo pipefail
+          cp -r native/bridge .upstream/bichenbridge
+          cd .upstream
+          go test -tags with_gvisor -v ./bichenbridge
+          NDK="$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          mkdir -p ../android-app/app/src/main/jniLibs/arm64-v8a ../android-app/app/src/main/jniLibs/x86_64
+          mkdir -p ../android-app/app/src/main/assets/mihomo-root/arm64-v8a ../android-app/app/src/main/assets/mihomo-root/x86_64
+          CGO_ENABLED=1 GOOS=android GOARCH=arm64 CC="$NDK/aarch64-linux-android26-clang" go build -tags with_gvisor -trimpath -buildmode=c-shared -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' -o ../android-app/app/src/main/jniLibs/arm64-v8a/libbichen_core.so ./bichenbridge
+          CGO_ENABLED=1 GOOS=android GOARCH=amd64 CC="$NDK/x86_64-linux-android26-clang" go build -tags with_gvisor -trimpath -buildmode=c-shared -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' -o ../android-app/app/src/main/jniLibs/x86_64/libbichen_core.so ./bichenbridge
+          CGO_ENABLED=1 GOOS=android GOARCH=arm64 CC="$NDK/aarch64-linux-android26-clang" go build -tags with_gvisor -trimpath -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' -o ../android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo .
+          CGO_ENABLED=1 GOOS=android GOARCH=amd64 CC="$NDK/x86_64-linux-android26-clang" go build -tags with_gvisor -trimpath -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' -o ../android-app/app/src/main/assets/mihomo-root/x86_64/mihomo .
+          cp LICENSE ../android-app/app/src/main/assets/MIHOMO-LICENSE
+          git rev-parse HEAD > ../android-app/app/src/main/assets/mihomo-revision.txt
+      - name: Build test.31 APK
+        working-directory: android-app
+        run: gradle :app:assembleDebug --stacktrace
+      - name: Verify APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=android-app/app/build/outputs/apk/debug/app-debug.apk
+          test -f "$APK"
+          AAPT=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n 1)
+          "$AAPT" dump badging "$APK" | tee apk-badging.txt
+          unzip -t "$APK" >/dev/null
+          unzip -l "$APK" | tee apk-files.txt >/dev/null
+          grep -q "versionCode='431'" apk-badging.txt
+          grep -q "versionName='0.4.0-test.31-preview'" apk-badging.txt
+          grep -q 'assets/proxy-root-v3.sh' apk-files.txt
+          grep -q 'assets/cnip/bichen-cn-v4.txt' apk-files.txt
+          grep -q 'assets/cnip/bichen-cn-v6.txt' apk-files.txt
+          sha256sum "$APK" | tee apk-sha256.txt
+      - name: Upload verified test.31 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Bichen-0.4.0-test.31-unified-compose
+          path: |
+            android-app/app/build/outputs/apk/debug/app-debug.apk
+            apk-badging.txt
+            apk-files.txt
+            apk-sha256.txt
+          if-no-files-found: error
+          retention-days: 14
+      - name: Commit verified test.31 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .upstream android-app/app/src/main/jniLibs android-app/app/src/main/assets/mihomo-root android-app/app/src/main/assets/MIHOMO-LICENSE android-app/app/src/main/assets/mihomo-revision.txt
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -u android-app
+          git diff --cached --check
+          if ! git diff --cached --quiet; then
+            git commit -m 'Unify proxy settings UI for Bichen 0.4.0-test.31'
+            git push origin HEAD:release/bichen-0.4.0-test.31
+          fi
