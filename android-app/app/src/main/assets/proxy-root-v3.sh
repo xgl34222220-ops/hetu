@@ -384,46 +384,46 @@ watchdog(){
 start_watchdog(){ COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS="$6"; IFACES="$7"; stopwatchdog; "$0" watchdog "$COREPID" "$KILL" "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" >/dev/null 2>&1 & }
 
 start(){
-  BIN="$1"; CFG="$2"; M="$3"; TP="$4"; RP="$5"; V6="$6"; TCP="$7"; UDP="$8"; DNS="$9"; QUIC="${10}"; DP="${11}"; CP="${12}"; S="${13}"; UIDS="${14}"; SHARE="${15}"; KILL="${16}"; CIDRS="${17}"; IFACES="${18}"
-  preflight "$M" "$TP" "$RP" "$V6" "$TCP" "$UDP" "$DNS" "$QUIC" "$DP" "$CP" "$S" "$UIDS" "$SHARE" "$KILL" "$CIDRS" "$IFACES" >/dev/null
-  [ -x "$BIN" ] || fail "核心文件不存在或不可执行"; [ -r "$CFG" ] || fail "启动配置不存在"; mkdir -p "$RUN" || fail "无法创建运行目录"; validatecfg "$BIN" "$CFG" || fail "Mihomo 配置校验失败，当前网络未被接管"; acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
+  START_BIN="$1"; START_CFG="$2"; START_MODE="$3"; START_TP="$4"; START_RP="$5"; START_V6="$6"; START_TCP="$7"; START_UDP="$8"; START_DNS="$9"; START_QUIC="${10}"; START_DP="${11}"; START_CP="${12}"; START_SCOPE="${13}"; START_UIDS="${14}"; START_SHARE="${15}"; START_KILL="${16}"; START_CIDRS="${17}"; START_IFACES="${18}"
+  preflight "$START_MODE" "$START_TP" "$START_RP" "$START_V6" "$START_TCP" "$START_UDP" "$START_DNS" "$START_QUIC" "$START_DP" "$START_CP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_KILL" "$START_CIDRS" "$START_IFACES" >/dev/null
+  [ -x "$START_BIN" ] || fail "核心文件不存在或不可执行"; [ -r "$START_CFG" ] || fail "启动配置不存在"; mkdir -p "$RUN" || fail "无法创建运行目录"; validatecfg "$START_BIN" "$START_CFG" || fail "Mihomo 配置校验失败，当前网络未被接管"; acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
   stopwatchdog; cleanup; restorev6; stopcore; rm -f "$CRASH_STATE" "$SESSION"
   markused "$BYPASS_MARK" && fail "安全出站 mark 已被其他网络规则占用，未接管网络"
-  NEED_TP=0; case "$M" in tproxy) if [ "$TCP" = 1 ] || [ "$UDP" = 1 ]; then NEED_TP=1; fi;; enhance) [ "$UDP" = 1 ] && NEED_TP=1;; esac; [ "$DNS" = tproxy ] && NEED_TP=1
+  NEED_TP=0; case "$START_MODE" in tproxy) if [ "$START_TCP" = 1 ] || [ "$START_UDP" = 1 ]; then NEED_TP=1; fi;; enhance) [ "$START_UDP" = 1 ] && NEED_TP=1;; esac; [ "$START_DNS" = tproxy ] && NEED_TP=1
   if [ "$NEED_TP" = 1 ]; then allocnet || { cleanup; fail "找不到安全的 fwmark/路由表/规则优先级，已保持直连"; }; fi
-  if [ "$V6" = disable ]; then disablev6 || { cleanup; fail "禁用系统 IPv6 失败，已恢复原状态"; }; fi
+  if [ "$START_V6" = disable ]; then disablev6 || { cleanup; fail "禁用系统 IPv6 失败，已恢复原状态"; }; fi
 
-  : > "$LOG"; "$BIN" -d "$RUN" -f "$CFG" >>"$LOG" 2>&1 & P=$!; printf '%s\n' "$P" > "$PIDFILE"; printf '%s\n' "$M" > "$MODEFILE"; write_session "$M" "$V6" "$S" "$SHARE" "$KILL"
-  if ! wait_ready "$P" "$M" "$TP" "$RP" "$TCP" "$UDP" "$DNS" "$DP" "$CP"; then stopcore; cleanup; restorev6; rm -f "$SESSION"; fail "核心进程已启动但透明代理/DNS/API 监听未就绪，网络未被接管"; fi
+  : > "$LOG"; "$START_BIN" -d "$RUN" -f "$START_CFG" >>"$LOG" 2>&1 & START_PID=$!; printf '%s\n' "$START_PID" > "$PIDFILE"; printf '%s\n' "$START_MODE" > "$MODEFILE"; write_session "$START_MODE" "$START_V6" "$START_SCOPE" "$START_SHARE" "$START_KILL"
+  if ! wait_ready "$START_PID" "$START_MODE" "$START_TP" "$START_RP" "$START_TCP" "$START_UDP" "$START_DNS" "$START_DP" "$START_CP"; then stopcore; cleanup; restorev6; rm -f "$SESSION"; fail "核心进程已启动但透明代理/DNS/API 监听未就绪，网络未被接管"; fi
 
-  install_mangle4 "$TP" "$M" "$TCP" "$UDP" "$DNS" "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 TPROXY 规则安装失败，已回滚"; }
-  install_redirect4 "$RP" "$M" "$TCP" "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 Redirect 规则安装失败，已回滚"; }
-  [ "$DNS" != redirect ] || install_dns_redirect4 "$DP" "$S" "$UIDS" "$SHARE" "$IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 DNS 劫持安装失败，已回滚"; }
-  [ "$QUIC" = 0 ] || install_quic4 "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 QUIC 策略安装失败，已回滚"; }
-  if [ "$V6" = enable ]; then
-    install_mangle6 "$TP" "$M" "$TCP" "$UDP" "$DNS" "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 TPROXY 规则安装失败，已回滚"; }
-    install_redirect6 "$RP" "$M" "$TCP" "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 Redirect 规则安装失败，已回滚"; }
-    [ "$DNS" != redirect ] || install_dns_redirect6 "$DP" "$S" "$UIDS" "$SHARE" "$IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 DNS 劫持安装失败，已回滚"; }
-    [ "$QUIC" = 0 ] || install_quic6 "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 QUIC 策略安装失败，已回滚"; }
-  elif [ "$V6" = strict ]; then install_v6_strict "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "严格 IPv4 防泄漏规则安装失败，已回滚"; }; fi
+  install_mangle4 "$START_TP" "$START_MODE" "$START_TCP" "$START_UDP" "$START_DNS" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 TPROXY 规则安装失败，已回滚"; }
+  install_redirect4 "$START_RP" "$START_MODE" "$START_TCP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 Redirect 规则安装失败，已回滚"; }
+  [ "$START_DNS" != redirect ] || install_dns_redirect4 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 DNS 劫持安装失败，已回滚"; }
+  [ "$START_QUIC" = 0 ] || install_quic4 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 QUIC 策略安装失败，已回滚"; }
+  if [ "$START_V6" = enable ]; then
+    install_mangle6 "$START_TP" "$START_MODE" "$START_TCP" "$START_UDP" "$START_DNS" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 TPROXY 规则安装失败，已回滚"; }
+    install_redirect6 "$START_RP" "$START_MODE" "$START_TCP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 Redirect 规则安装失败，已回滚"; }
+    [ "$START_DNS" != redirect ] || install_dns_redirect6 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 DNS 劫持安装失败，已回滚"; }
+    [ "$START_QUIC" = 0 ] || install_quic6 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 QUIC 策略安装失败，已回滚"; }
+  elif [ "$START_V6" = strict ]; then install_v6_strict "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "严格 IPv4 防泄漏规则安装失败，已回滚"; }; fi
 
-  start_watchdog "$P" "$KILL" "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES"
-  DESC="tcp=$TCP,udp=$UDP,dns=$DNS,ipv6=$V6,scope=$S,share=$SHARE,kill=$KILL,quicBlock=$QUIC"
-  if [ -n "$MARK" ]; then ok "Root $M 已启动（$DESC，mark=$MARK，table=$TABLE）"; else ok "Root $M 已启动（$DESC）"; fi
+  start_watchdog "$START_PID" "$START_KILL" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES"
+  DESC="tcp=$START_TCP,udp=$START_UDP,dns=$START_DNS,ipv6=$START_V6,scope=$START_SCOPE,share=$START_SHARE,kill=$START_KILL,quicBlock=$START_QUIC"
+  if [ -n "$MARK" ]; then ok "Root $START_MODE 已启动（$DESC，mark=$MARK，table=$TABLE）"; else ok "Root $START_MODE 已启动（$DESC）"; fi
 }
 
 status(){
-  root; R=false; P=0
-  if [ -f "$PIDFILE" ]; then X=$(cat "$PIDFILE" 2>/dev/null || true); case "$X" in ''|*[!0-9]*) ;; *) if pidcore "$X" && kill -0 "$X" >/dev/null 2>&1; then R=true; P="$X"; fi;; esac; fi
-  M=$(cat "$MODEFILE" 2>/dev/null || echo none); T4=false; T6=false; K4=false; K6=false
+  root; STATUS_RUNNING=false; STATUS_PID=0
+  if [ -f "$PIDFILE" ]; then X=$(cat "$PIDFILE" 2>/dev/null || true); case "$X" in ''|*[!0-9]*) ;; *) if pidcore "$X" && kill -0 "$X" >/dev/null 2>&1; then STATUS_RUNNING=true; STATUS_PID="$X"; fi;; esac; fi
+  STATUS_MODE=$(cat "$MODEFILE" 2>/dev/null || echo none); T4=false; T6=false; K4=false; K6=false
   for SPEC in "mangle OUTPUT $MOUT" "nat OUTPUT $NOUT" "nat OUTPUT $DNSOUT" "filter OUTPUT $QUICOUT"; do set -- $SPEC; iptables -t "$1" -C "$2" -j "$3" >/dev/null 2>&1 && T4=true; done; iptables -t filter -C OUTPUT -j "$KOUT" >/dev/null 2>&1 && K4=true
   if has ip6tables; then for SPEC in "mangle OUTPUT $MOUT" "nat OUTPUT $NOUT" "nat OUTPUT $DNSOUT" "filter OUTPUT $QUICOUT" "filter OUTPUT $V6OUT"; do set -- $SPEC; ip6tables -t "$1" -C "$2" -j "$3" >/dev/null 2>&1 && T6=true; done; ip6tables -t filter -C OUTPUT -j "$KOUT" >/dev/null 2>&1 && K6=true; fi
   V6OFF=false; [ -f "$IPV6_STATE" ] && V6OFF=true; RECOVERED=false
-  if [ "$R" = false ] && [ "$K4" = false ] && [ "$K6" = false ] && { [ "$T4" = true ] || [ "$T6" = true ] || [ "$V6OFF" = true ]; }; then if acquire_lock; then cleanup; restorev6; rm -f "$PIDFILE" "$MODEFILE" "$SESSION"; M=none; T4=false; T6=false; V6OFF=false; RECOVERED=true; fi; fi
+  if [ "$STATUS_RUNNING" = false ] && [ "$K4" = false ] && [ "$K6" = false ] && { [ "$T4" = true ] || [ "$T6" = true ] || [ "$V6OFF" = true ]; }; then if acquire_lock; then cleanup; restorev6; rm -f "$PIDFILE" "$MODEFILE" "$SESSION"; STATUS_MODE=none; T4=false; T6=false; V6OFF=false; RECOVERED=true; fi; fi
   WD=false; W=$(cat "$WATCHDOG_PID" 2>/dev/null || true); case "$W" in ''|*[!0-9]*) ;; *) kill -0 "$W" >/dev/null 2>&1 && WD=true;; esac
   SM=""; ST=""; if loadnet >/dev/null 2>&1; then SM="$MARK"; ST="$TABLE"; fi
   SCOPEV=$(sed -n 's/^APP_SCOPE=//p' "$SESSION" 2>/dev/null | head -n 1); SHAREV=$(sed -n 's/^SHARE=//p' "$SESSION" 2>/dev/null | head -n 1); KILLV=$(sed -n 's/^KILL=//p' "$SESSION" 2>/dev/null | head -n 1)
-  printf '{"ok":true,"running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"killSwitchActive":%s,"ipv6DisabledByBichen":%s,"watchdog":%s,"recoveredStaleRules":%s,"mark":"%s","table":"%s","appScope":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","log":"%s","configCheckLog":"%s"}\n' "$R" "$P" "$M" "$T4" "$T6" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$RECOVERED" "$SM" "$ST" "$SCOPEV" "$SHAREV" "$KILLV" "$LOG" "$CHECKLOG"
+  printf '{"ok":true,"running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"killSwitchActive":%s,"ipv6DisabledByBichen":%s,"watchdog":%s,"recoveredStaleRules":%s,"mark":"%s","table":"%s","appScope":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","log":"%s","configCheckLog":"%s"}\n' "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$T4" "$T6" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$RECOVERED" "$SM" "$ST" "$SCOPEV" "$SHAREV" "$KILLV" "$LOG" "$CHECKLOG"
 }
 
 case "${1:-status}" in
