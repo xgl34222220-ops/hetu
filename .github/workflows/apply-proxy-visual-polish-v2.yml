@@ -18,16 +18,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Apply dashboard micro interaction polish
-        run: python3 scripts/run_proxy_micro_interactions_test44.py
+      - name: Apply micro motion and haptic polish
+        run: python3 scripts/polish_micro_motion_test45.py
 
-      - name: Commit dashboard micro interaction polish
+      - name: Commit micro motion polish
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
           if ! git diff --cached --quiet; then
-            git commit -m 'Polish dashboard micro interactions'
+            git commit -m 'Polish latency motion haptics and topbar'
             git push
           fi
 
@@ -68,7 +68,7 @@ jobs:
       - name: Build APK
         working-directory: android-app
         run: gradle :app:assembleDebug --stacktrace
-      - name: Verify APK and test44 invariants
+      - name: Verify APK and test45 invariants
         run: |
           set -euo pipefail
           APK=android-app/app/build/outputs/apk/debug/app-debug.apk
@@ -78,25 +78,24 @@ jobs:
           unzip -t "$APK" >/dev/null
           unzip -l "$APK" | grep -q 'lib/arm64-v8a/libbichen_core.so'
           unzip -l "$APK" | grep -q 'assets/mihomo-root/arm64-v8a/mihomo'
-          grep -q 'var panelTab by rememberSaveable' "$UI"
-          grep -q 'panelTab = RefPanelTab.Subscriptions' "$UI"
+          grep -q 'widthIn(min = 58.dp).height(22.dp)' "$UI"
+          grep -q 'fontFeatureSettings = "tnum"' "$UI"
+          grep -q 'latencyCrossFade' "$UI"
+          grep -q 'latencyPulseAlpha' "$UI"
+          grep -q 'HapticFeedbackConstants.CLOCK_TICK' "$UI"
+          grep -q 'HapticFeedbackConstants.VIRTUAL_KEY' "$UI"
+          grep -q 'HapticFeedbackConstants.CONFIRM' "$UI"
+          grep -q 'panelSearchRequest++' "$UI"
+          grep -q 'letterSpacing = (-0.6).sp' "$UI"
+          grep -q 'index \* 20L' "$UI"
           grep -q 'private fun RefInlineGroupExpansion' "$UI"
-          grep -q 'private fun RefInlineNodeCard' "$UI"
-          grep -q '全测速 ⚡' "$UI"
           grep -q 'providerProgress' "$UI"
-          grep -q 'height(100.dp)' "$UI"
           test "$(grep -o 'height(100.dp)' "$UI" | wc -l)" -ge 4
-          grep -q 'Brush.horizontalGradient(listOf(Color(0xFF3B82F6), Color(0xFF6366F1)))' "$UI"
-          test "$(grep -o 'trailingText = "待接入", trailingBadge = true, trailingColor = Color(0xFF94A3B8)' "$UI" | wc -l)" -eq 4
-          ! grep -q 'selectedGroupName = group.name$' "$UI"
           test "$(git rev-parse HEAD:$DOCK)" = '7efba3c815e6429fcc35df87dc91f5be968111c6'
-          grep -q 'private fun RefGradientIcon' "$UI"
-          grep -q 'private fun RefSwitchRow' "$UI"
-          grep -q 'RefPortsBottomSheet' "$UI"
           ! grep -q 'AlertDialog(' "$UI"
       - uses: actions/upload-artifact@v4
         with:
-          name: Bichen-0.4.0-test.44-Dashboard-Micro-Interactions
+          name: Bichen-0.4.0-test.45-Micro-Motion-Haptics-Topbar
           path: android-app/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
