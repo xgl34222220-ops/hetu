@@ -290,12 +290,17 @@ final class RootProxyManager {
             cn6=new File(stage,"bichen-cn-v6.txt");copyAsset("cnip/bichen-cn-v6.txt",cn6,false);
         }
         if(includeConfig)Files.write(cfg.toPath(),p.startup.getBytes(StandardCharsets.UTF_8));
+        String deploySuffix=".new."+Long.toHexString(System.nanoTime());
+        String scriptTmp=SCRIPT+deploySuffix;
+        String binTmp=BIN+deploySuffix;
         StringBuilder cmd=new StringBuilder("set -e; mkdir -p ")
                 .append(RootBridge.quote(ROOT+"/bin")).append(' ').append(RootBridge.quote(ROOT+"/run/state")).append(' ').append(RootBridge.quote(ROOT+"/run/ruleset"))
-                .append("; cp ").append(RootBridge.quote(script.getAbsolutePath())).append(' ').append(RootBridge.quote(SCRIPT))
-                .append("; chmod 700 ").append(RootBridge.quote(SCRIPT)).append("; chown 0:0 ").append(RootBridge.quote(SCRIPT))
-                .append("; cp ").append(RootBridge.quote(binary.getAbsolutePath())).append(' ').append(RootBridge.quote(BIN))
-                .append("; chmod 700 ").append(RootBridge.quote(BIN)).append("; chown 0:0 ").append(RootBridge.quote(BIN));
+                .append("; cp ").append(RootBridge.quote(script.getAbsolutePath())).append(' ').append(RootBridge.quote(scriptTmp))
+                .append("; chmod 700 ").append(RootBridge.quote(scriptTmp)).append("; chown 0:0 ").append(RootBridge.quote(scriptTmp))
+                .append("; mv -f ").append(RootBridge.quote(scriptTmp)).append(' ').append(RootBridge.quote(SCRIPT))
+                .append("; cp ").append(RootBridge.quote(binary.getAbsolutePath())).append(' ').append(RootBridge.quote(binTmp))
+                .append("; chmod 700 ").append(RootBridge.quote(binTmp)).append("; chown 0:0 ").append(RootBridge.quote(binTmp))
+                .append("; mv -f ").append(RootBridge.quote(binTmp)).append(' ').append(RootBridge.quote(BIN));
         if(adblock!=null){
             String dst=ROOT+"/run/ruleset/bichen-adblock.txt",tmp=dst+".new";
             cmd.append("; cp ").append(RootBridge.quote(adblock.getAbsolutePath())).append(' ').append(RootBridge.quote(tmp))
@@ -307,8 +312,12 @@ final class RootProxyManager {
             cmd.append("; if [ ! -s ").append(RootBridge.quote(dst4)).append(" ]; then cp ").append(RootBridge.quote(cn4.getAbsolutePath())).append(' ').append(RootBridge.quote(dst4)).append("; chmod 600 ").append(RootBridge.quote(dst4)).append("; chown 0:0 ").append(RootBridge.quote(dst4)).append("; fi")
                     .append("; if [ ! -s ").append(RootBridge.quote(dst6)).append(" ]; then cp ").append(RootBridge.quote(cn6.getAbsolutePath())).append(' ').append(RootBridge.quote(dst6)).append("; chmod 600 ").append(RootBridge.quote(dst6)).append("; chown 0:0 ").append(RootBridge.quote(dst6)).append("; fi");
         }
-        if(includeConfig)cmd.append("; cp ").append(RootBridge.quote(cfg.getAbsolutePath())).append(' ').append(RootBridge.quote(CONFIG))
-                .append("; chmod 600 ").append(RootBridge.quote(CONFIG)).append("; chown 0:0 ").append(RootBridge.quote(CONFIG));
+        if(includeConfig){
+            String configTmp=CONFIG+deploySuffix;
+            cmd.append("; cp ").append(RootBridge.quote(cfg.getAbsolutePath())).append(' ').append(RootBridge.quote(configTmp))
+                    .append("; chmod 600 ").append(RootBridge.quote(configTmp)).append("; chown 0:0 ").append(RootBridge.quote(configTmp))
+                    .append("; mv -f ").append(RootBridge.quote(configTmp)).append(' ').append(RootBridge.quote(CONFIG));
+        }
         RootBridge.Result r=RootBridge.rootShell(context,cmd.toString(),45000L);
         if(!r.ok())throw new IOException("无法安装 Root 运行文件："+r.output.trim());
     }
