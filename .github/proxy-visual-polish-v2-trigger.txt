@@ -1,1 +1,1 @@
-2026-09-17 test45 final build retry after Compose animateFloat import fix
+2026-09-17 test46: clean Home header, dashboard ghost icons, 62dp latency spinner, semantic latency colors, spring checks, recessed tray, terminal log
