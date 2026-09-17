@@ -112,18 +112,19 @@ final class RootProxyManager {
                 profile.mode!=ProxyRuntimeProfile.Mode.TUN&&profile.mode!=ProxyRuntimeProfile.Mode.EBPF)
             throw new IOException(profile.mode.label+" 的统一 Root 后端还未接入");
 
-        RootProxyPolicy policy=RootProxyPolicy.load(context,prefs,profile);
         ProxyConfigLibrary.Entry selected=configs.selected(profile.core);
         if(selected==null)throw new IOException("请先为 "+profile.core.label+" 选择配置文件");
         String source=configs.read(selected);
         if(source==null||source.trim().isEmpty())throw new IOException("源配置为空");
         if(source.getBytes(StandardCharsets.UTF_8).length>4*1024*1024)throw new IOException("配置超过 4 MiB");
+        Set<String> directPatterns=MihomoStartupConfig.extractDirectProcessPackages(source);
+        RootProxyPolicy policy=RootProxyPolicy.load(context,prefs,profile,directPatterns);
         ProxyAdblockRules.Snapshot adblock=profile.adblockChain?ProxyAdblockRules.export(context):null;
         if(profile.adblockChain&&adblock.count<=0)throw new IOException("代理串联去广告已开启，但当前没有有效广告规则；请先启用或更新规则源");
         int controllerPort=chooseControllerPort();
         String ebpfInterface=profile.mode==ProxyRuntimeProfile.Mode.EBPF?detectDefaultInterface():"";
         Set<String> tunPackages=profile.mode==ProxyRuntimeProfile.Mode.TUN?selectedTunPackages():Collections.emptySet();
-        MihomoStartupConfig.Result generated=MihomoStartupConfig.generate(source,profile,controllerSecret(),controllerPort,profile.appScope,tunPackages,ebpfInterface);
+        MihomoStartupConfig.Result generated=MihomoStartupConfig.generate(source,profile,controllerSecret(),controllerPort,profile.appScope,tunPackages,policy.directPackages,ebpfInterface);
         writeStartupCopy(generated.yaml);
         return new Prepared(profile,selected,policy,adblock,generated.yaml,generated.tproxyPort,generated.redirectPort,controllerPort);
     }
@@ -135,7 +136,7 @@ final class RootProxyManager {
                 p.profile.mode.id,String.valueOf(p.tproxyPort),String.valueOf(p.redirectPort),p.profile.ipv6.id,
                 bit(p.profile.tcp),bit(p.profile.udp),p.profile.dnsHijack.id,bit(p.profile.quicBlocked),
                 String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(p.controllerPort),
-                policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces);
+                policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges);
     }
 
     JSONObject start(ProxyRuntimeProfile p)throws Exception{return start(p,null);}
@@ -188,7 +189,7 @@ final class RootProxyManager {
                 profile.mode.id,String.valueOf(p.tproxyPort),String.valueOf(p.redirectPort),profile.ipv6.id,
                 bit(profile.tcp),bit(profile.udp),profile.dnsHijack.id,bit(profile.quicBlocked),
                 String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(p.controllerPort),
-                policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces);
+                policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges);
         if(!pre.optBoolean("ok"))throw new IOException(pre.optString("message","Root 代理预检失败"));
 
         boolean adblockCoordinatorEntered=false;
@@ -203,7 +204,7 @@ final class RootProxyManager {
                 BIN,CONFIG,profile.mode.id,String.valueOf(p.tproxyPort),String.valueOf(p.redirectPort),profile.ipv6.id,
                 bit(profile.tcp),bit(profile.udp),profile.dnsHijack.id,bit(profile.quicBlocked),
                 String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(p.controllerPort),
-                policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces);
+                policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges);
             if(!result.optBoolean("ok"))throw new IOException(result.optString("message","Root 代理启动失败"));
         }catch(Exception startFailure){if(adblockCoordinatorEntered)ProxyAdblockCoordinator.exit(context);throw startFailure;}
 
@@ -250,6 +251,8 @@ final class RootProxyManager {
                 .put("ipv6",profile.ipv6.id)
                 .put("appScope",policy.appScope)
                 .put("uidRanges",policy.uidRanges)
+                .put("directUidRanges",policy.directUidRanges)
+                .put("directPackageCount",policy.directPackages.size())
                 .put("sharedNetwork",policy.sharedNetwork)
                 .put("killSwitch",policy.killSwitch)
                 .put("cnIpDirect",profile.cnIpDirect)
@@ -260,7 +263,13 @@ final class RootProxyManager {
                 .put("bypassCidrs",policy.cidrs)
                 .put("bypassInterfaces",policy.interfaces);
         if(!warning.isEmpty())result.put("warning",warning);
-        prefs.edit().putBoolean("proxyRootWanted",true).apply();
+        prefs.edit()
+                .putBoolean("proxyRootWanted",true)
+                .putInt("proxyAutoDirectPackageCount",policy.directPackages.size())
+                .putBoolean("proxyAdblockLastEffective",profile.adblockChain)
+                .putInt("proxyAdblockLastRuleCount",p.adblock==null?0:p.adblock.count)
+                .putString("proxyAdblockLastRevision",p.adblock==null?"":p.adblock.revision)
+                .apply();
         ensureContinuityService(true);
         return result;
         }finally{
