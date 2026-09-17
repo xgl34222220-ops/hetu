@@ -1,0 +1,140 @@
+name: Build Bichen test.36 startup recovery
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  build:
+    if: github.event.issue.title == '[BUILD] Bichen 0.4.0-test.36'
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Checkout fused test.35 source
+        uses: actions/checkout@v4
+        with:
+          ref: release/bichen-0.4.0-test.36
+          fetch-depth: 0
+
+      - name: Apply and audit startup recovery
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/apply_test36_startup_recovery.py
+          git diff --check
+          grep -q 'versionCode = 436' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.4.0-test.36"' android-app/app/build.gradle.kts
+          grep -q 'startupError' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
+          grep -q 'title = "启动失败"' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
+          grep -q '旧版本遗留的不可用核心/模式' android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyComposeController.kt
+          grep -q '当前是辟尘内置占位配置' android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyComposeController.kt
+          grep -q 'withoutAdblock' android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java
+          grep -q 'proxyAdblockLastError' android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java
+          grep -q '串联广告配置校验失败' android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java
+          grep -A3 '<activity android:name=".ReferenceProxyActivity"' android-app/app/src/main/AndroidManifest.xml | grep -q 'android:exported="true"'
+          grep -A3 '<activity android:name=".ReferenceProxyActivity"' android-app/app/src/main/AndroidManifest.xml | grep -q 'android.intent.action.MAIN'
+          ! grep -A3 '<activity android:name=".CompactMainActivity"' android-app/app/src/main/AndroidManifest.xml | grep -q 'android.intent.action.MAIN'
+          ! grep -q '后端尚未接入' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
+          sh -n android-app/app/src/main/assets/proxy-root-v3.sh
+
+      - name: Checkout pinned Mihomo
+        uses: actions/checkout@v4
+        with:
+          repository: MetaCubeX/mihomo
+          ref: ac017cdd246ce8bd547653d927e7bf77d7ee73d5
+          path: .upstream
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache-dependency-path: .upstream/go.sum
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+          cache-read-only: false
+
+      - name: Run Java host regression
+        run: python3 tools/test_java.py
+
+      - name: Compile startup recovery UI and backend
+        working-directory: android-app
+        run: gradle :app:compileDebugKotlin :app:compileDebugJavaWithJavac --stacktrace
+
+      - name: Ensure NDK
+        run: |
+          if [ ! -x "$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang" ]; then
+            sdkmanager 'ndk;28.2.13676358'
+          fi
+
+      - name: Build pinned Mihomo runtime
+        run: |
+          set -euo pipefail
+          cp -r native/bridge .upstream/bichenbridge
+          cd .upstream
+          go test -tags with_gvisor -v ./bichenbridge
+          NDK="$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          mkdir -p ../android-app/app/src/main/jniLibs/arm64-v8a ../android-app/app/src/main/jniLibs/x86_64
+          mkdir -p ../android-app/app/src/main/assets/mihomo-root/arm64-v8a ../android-app/app/src/main/assets/mihomo-root/x86_64
+          CGO_ENABLED=1 GOOS=android GOARCH=arm64 CC="$NDK/aarch64-linux-android26-clang" go build -tags with_gvisor -trimpath -buildmode=c-shared -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' -o ../android-app/app/src/main/jniLibs/arm64-v8a/libbichen_core.so ./bichenbridge
+          CGO_ENABLED=1 GOOS=android GOARCH=amd64 CC="$NDK/x86_64-linux-android26-clang" go build -tags with_gvisor -trimpath -buildmode=c-shared -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' -o ../android-app/app/src/main/jniLibs/x86_64/libbichen_core.so ./bichenbridge
+          CGO_ENABLED=1 GOOS=android GOARCH=arm64 CC="$NDK/aarch64-linux-android26-clang" go build -tags with_gvisor -trimpath -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' -o ../android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo .
+          CGO_ENABLED=1 GOOS=android GOARCH=amd64 CC="$NDK/x86_64-linux-android26-clang" go build -tags with_gvisor -trimpath -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' -o ../android-app/app/src/main/assets/mihomo-root/x86_64/mihomo .
+          cp LICENSE ../android-app/app/src/main/assets/MIHOMO-LICENSE
+          git rev-parse HEAD > ../android-app/app/src/main/assets/mihomo-revision.txt
+
+      - name: Build test.36 APK
+        working-directory: android-app
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Verify test.36 APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=android-app/app/build/outputs/apk/debug/app-debug.apk
+          test -f "$APK"
+          AAPT=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n 1)
+          "$AAPT" dump badging "$APK" | tee apk-badging.txt
+          unzip -t "$APK" >/dev/null
+          unzip -l "$APK" | tee apk-files.txt >/dev/null
+          grep -q "versionCode='436'" apk-badging.txt
+          grep -q "versionName='0.4.0-test.36-preview'" apk-badging.txt
+          grep -q "launchable-activity: name='io.github.xgl34222220.bichen.ReferenceProxyActivity'" apk-badging.txt
+          grep -q 'assets/proxy-root-v3.sh' apk-files.txt
+          grep -q 'assets/cnip/bichen-cn-v4.txt' apk-files.txt
+          grep -q 'assets/cnip/bichen-cn-v6.txt' apk-files.txt
+          sha256sum "$APK" | tee apk-sha256.txt
+
+      - name: Upload verified test.36 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Bichen-0.4.0-test.36-startup-recovery
+          path: |
+            android-app/app/build/outputs/apk/debug/app-debug.apk
+            apk-badging.txt
+            apk-files.txt
+            apk-sha256.txt
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Commit verified test.36 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .upstream android-app/build android-app/app/build android-app/app/src/main/jniLibs android-app/app/src/main/assets/mihomo-root android-app/app/src/main/assets/MIHOMO-LICENSE android-app/app/src/main/assets/mihomo-revision.txt
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A android-app tests tools
+          git diff --cached --check
+          if ! git diff --cached --quiet; then
+            git commit -m 'Harden proxy startup and adblock fallback for 0.4.0-test.36'
+            git push origin HEAD:release/bichen-0.4.0-test.36
+          fi
