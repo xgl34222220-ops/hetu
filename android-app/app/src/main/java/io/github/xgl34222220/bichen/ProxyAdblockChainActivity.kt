@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -25,9 +26,7 @@ import io.github.xgl34222220.bichen.ui.LocalBichenTokens
 import io.github.xgl34222220.bichen.ui.RuleSourceItem
 import io.github.xgl34222220.bichen.ui.RulesSnapshot
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class ProxyAdblockChainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
