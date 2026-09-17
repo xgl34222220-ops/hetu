@@ -1,1 +1,1 @@
-2026-09-17 test41 remove panel Haze backdrop sampling completely
+2026-09-17 test41 retry after validation-scope fix
