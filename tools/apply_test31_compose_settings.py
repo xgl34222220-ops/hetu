@@ -46,14 +46,10 @@ replace_once(manifest,
     '        <activity android:name=".ProxyNetworkAutomationActivity" android:label="网络匹配" android:exported="false" />\n'
     '        <activity android:name=".RootTproxyActivity" android:label="基础代理配置（旧）" android:exported="false" />')
 
-# Root desired-running state belongs in the control plane, not in one particular UI.
-manager = 'android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java'
-replace_once(manager,
-    '        if(!warning.isEmpty())result.put("warning",warning);\n        return result;',
-    '        if(!warning.isEmpty())result.put("warning",warning);\n        prefs.edit().putBoolean("proxyRootWanted",true).remove("proxyRootBootError").apply();\n        return result;')
-replace_once(manager,
-    '        stage(progress,"网络规则与临时 IPv6 状态已恢复");\n        return r;',
-    '        prefs.edit().putBoolean("proxyRootWanted",false).apply();\n        stage(progress,"网络规则与临时 IPv6 状态已恢复");\n        return r;')
+# test.30 already moved proxyRootWanted into RootProxyManager, so test.31 only verifies it.
+manager_text = (ROOT / 'android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java').read_text(encoding='utf-8')
+if 'putBoolean("proxyRootWanted",true)' not in manager_text or 'putBoolean("proxyRootWanted",false)' not in manager_text:
+    raise SystemExit('test.30 Root desired-running state is missing')
 
 # Do not expose preferences that are not yet wired into the shared-network data plane.
 advanced = 'android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAdvancedSettingsActivity.kt'
