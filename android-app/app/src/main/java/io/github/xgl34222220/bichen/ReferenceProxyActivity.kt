@@ -1367,13 +1367,12 @@ private fun RefPanelGlassHeader(
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
     val runtimeLiquid = backdrop != null && isRuntimeShaderSupported()
-    val headerSurfaceBackdrop = rememberLayerBackdrop()
     val shape = RoundedCornerShape(28.dp)
-    val shellTint = if (dark) scheme.surface.copy(alpha = .37f) else Color.White.copy(alpha = .38f)
+    val shellTint = if (dark) scheme.surface.copy(alpha = .35f) else Color.White.copy(alpha = .36f)
     val fallbackBrush = if (dark) {
-        Brush.verticalGradient(listOf(Color.White.copy(alpha = .095f), Color.White.copy(alpha = .035f)))
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = .10f), Color.White.copy(alpha = .035f)))
     } else {
-        Brush.verticalGradient(listOf(Color.White.copy(alpha = .24f), Color.White.copy(alpha = .10f)))
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = .23f), Color.White.copy(alpha = .085f)))
     }
     val hazeModifier = if (!runtimeLiquid) {
         Modifier.hazeEffect(state = hazeState, style = HazeMaterials.ultraThin()) {
@@ -1382,6 +1381,8 @@ private fun RefPanelGlassHeader(
         }
     } else Modifier
     val liquidShellModifier = if (runtimeLiquid) {
+        // One RuntimeShader layer only. The previous build nested another backdrop for
+        // both action bubbles and the moving tab lens, which can crash some OEM GPUs.
         Modifier.drawBackdrop(
             backdrop = requireNotNull(backdrop),
             shape = { shape },
@@ -1427,7 +1428,6 @@ private fun RefPanelGlassHeader(
             .fillMaxWidth()
             .shadow(14.dp, shape, clip = false)
             .squircleClip(28.dp)
-            .then(if (runtimeLiquid) Modifier.layerBackdrop(headerSurfaceBackdrop) else Modifier)
             .then(liquidShellModifier)
             .border(
                 if (runtimeLiquid) .45.dp else .7.dp,
@@ -1455,20 +1455,17 @@ private fun RefPanelGlassHeader(
                     icon = if (searchOpen) Icons.Rounded.Close else Icons.Rounded.Search,
                     contentDescription = if (searchOpen) "关闭搜索" else "搜索",
                     active = searchOpen,
-                    backdrop = headerSurfaceBackdrop.takeIf { runtimeLiquid },
                     onClick = onSearchToggle,
                 )
                 Spacer(Modifier.width(8.dp))
                 RefPanelHeaderAction(
                     icon = Icons.Rounded.Settings,
                     contentDescription = "设置",
-                    backdrop = headerSurfaceBackdrop.takeIf { runtimeLiquid },
                     onClick = onOpenSettings,
                 )
             }
             RefPanelTabs(
                 selected = selected,
-                indicatorBackdrop = headerSurfaceBackdrop.takeIf { runtimeLiquid },
                 liquidGlass = true,
                 onSelect = onSelect,
             )
@@ -1499,7 +1496,6 @@ private fun RefPanelHeaderAction(
     icon: ImageVector,
     contentDescription: String,
     active: Boolean = false,
-    backdrop: LayerBackdrop? = null,
     onClick: () -> Unit,
 ) {
     val t = LocalBichenTokens.current
@@ -1513,39 +1509,21 @@ private fun RefPanelHeaderAction(
         label = "panelHeaderAction$contentDescription",
     )
     val shape = CircleShape
-    val liquid = backdrop != null && isRuntimeShaderSupported()
-    val fill = if (dark) Color.White.copy(alpha = .07f) else Color.White.copy(alpha = .17f)
-    val glassModifier = if (liquid) {
-        Modifier.drawBackdrop(
-            backdrop = requireNotNull(backdrop),
-            shape = { shape },
-            effects = {
-                padding = maxOf(padding, 18.dp.toPx())
-                colorControls(brightness = .015f, contrast = 1.05f, saturation = 1.30f)
-                blur(3.dp.toPx(), 3.dp.toPx())
-                liquidGlassLens(
-                    refractionHeight = 10.dp.toPx(),
-                    refractionAmount = 8.dp.toPx(),
-                    depthEffect = true,
-                    chromaticAberration = .05f,
-                )
-            },
-            highlight = {
-                (if (dark) Highlight.GlassStrokeSmallDark else Highlight.GlassStrokeSmallLight)
-                    .copy(alpha = .80f)
-            },
-            onDrawSurface = { drawRect(fill) },
-        )
-    } else {
-        Modifier.background(fill, shape)
-    }
+    val bubbleBrush = Brush.radialGradient(
+        colors = if (dark) {
+            listOf(Color.White.copy(alpha = .13f), Color.White.copy(alpha = .055f))
+        } else {
+            listOf(Color.White.copy(alpha = .34f), Color.White.copy(alpha = .14f))
+        },
+        center = Offset(.28f, .12f),
+    )
     Box(
         Modifier.size(36.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .88f else 1f }
             .shadow(2.dp, shape, clip = false)
-            .clip(shape)
-            .then(glassModifier)
+            .background(bubbleBrush, shape)
             .border(.55.dp, Color.White.copy(alpha = if (dark) .12f else .34f), shape)
+            .clip(shape)
             .clickable(interactionSource = source, indication = null, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -1561,7 +1539,6 @@ private fun RefPanelHeaderAction(
 @Composable
 private fun RefPanelTabs(
     selected: RefPanelTab,
-    indicatorBackdrop: LayerBackdrop? = null,
     liquidGlass: Boolean = false,
     onSelect: (RefPanelTab) -> Unit,
 ) {
@@ -1569,12 +1546,17 @@ private fun RefPanelTabs(
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
     val tabs = RefPanelTab.entries
-    val activeLens = liquidGlass && indicatorBackdrop != null && isRuntimeShaderSupported()
-    val trackFill = if (dark) Color.White.copy(alpha = .045f) else Color.White.copy(alpha = .10f)
+    val trackBrush = Brush.verticalGradient(
+        if (dark) {
+            listOf(Color.White.copy(alpha = .075f), Color.White.copy(alpha = .028f))
+        } else {
+            listOf(Color.White.copy(alpha = .18f), Color.White.copy(alpha = .065f))
+        },
+    )
     val trackBorder = if (dark) Color.White.copy(alpha = .085f) else Color.White.copy(alpha = .24f)
     BoxWithConstraints(
         Modifier.fillMaxWidth().height(38.dp)
-            .background(trackFill, CircleShape)
+            .background(trackBrush, CircleShape)
             .border(.5.dp, trackBorder, CircleShape)
             .padding(3.dp),
     ) {
@@ -1603,47 +1585,20 @@ private fun RefPanelTabs(
         val indicatorStart = indicatorX - if (direction < 0f) extra else 0.dp
         val indicatorShape = RoundedCornerShape(18.dp)
         val indicatorTint = scheme.primary.copy(alpha = if (dark) .22f else .13f)
-        val lensModifier = if (activeLens) {
-            Modifier.drawBackdrop(
-                backdrop = requireNotNull(indicatorBackdrop),
-                shape = { indicatorShape },
-                effects = {
-                    val s = stretch.value
-                    padding = maxOf(padding, 18.dp.toPx())
-                    colorControls(brightness = .018f, contrast = 1.055f, saturation = 1.30f)
-                    blur(2.5.dp.toPx(), 2.5.dp.toPx())
-                    liquidGlassLens(
-                        refractionHeight = (10.dp + 3.dp * s).toPx(),
-                        refractionAmount = (11.dp + 4.dp * s).toPx(),
-                        depthEffect = true,
-                        chromaticAberration = .055f + .07f * s,
-                    )
-                },
-                highlight = {
-                    (if (dark) Highlight.GlassStrokeSmallDark else Highlight.GlassStrokeSmallLight)
-                        .copy(alpha = .84f)
-                },
-                layerBlock = { scaleY = 1f - .035f * stretch.value },
-                onDrawSurface = { drawRect(indicatorTint) },
-            )
-        } else {
-            Modifier.background(
-                Brush.verticalGradient(
-                    listOf(
-                        indicatorTint.copy(alpha = (indicatorTint.alpha * 1.18f).coerceAtMost(1f)),
-                        indicatorTint.copy(alpha = indicatorTint.alpha * .72f),
-                    ),
-                ),
-                indicatorShape,
-            )
-        }
+        val lensBrush = Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = if (dark) .09f else .30f),
+                indicatorTint.copy(alpha = (indicatorTint.alpha * 1.08f).coerceAtMost(1f)),
+                indicatorTint.copy(alpha = indicatorTint.alpha * .66f),
+            ),
+        )
         Box(
             Modifier.offset(x = indicatorStart)
                 .width(itemWidth + extra)
                 .fillMaxHeight()
-                .shadow(if (activeLens) 4.dp else 2.dp, indicatorShape, clip = false)
-                .squircleClip(18.dp)
-                .then(lensModifier)
+                .graphicsLayer { scaleY = 1f - .035f * stretch.value }
+                .shadow(3.dp, indicatorShape, clip = false)
+                .background(lensBrush, indicatorShape)
                 .border(.6.dp, Color.White.copy(alpha = if (dark) .14f else .38f), indicatorShape),
         )
         Row(Modifier.fillMaxSize()) {
