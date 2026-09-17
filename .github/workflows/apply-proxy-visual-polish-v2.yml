@@ -19,7 +19,7 @@ jobs:
           fetch-depth: 0
 
       - name: Apply micro motion and haptic polish
-        run: python3 scripts/polish_micro_motion_test45.py
+        run: python3 scripts/run_micro_motion_test45.py
 
       - name: Commit micro motion polish
         run: |
