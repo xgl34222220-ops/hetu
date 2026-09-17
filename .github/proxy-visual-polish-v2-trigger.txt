@@ -1,1 +1,1 @@
-2026-09-17 test43 tools settings native commercial polish
+2026-09-17 test44 dashboard micro interactions: fixed 100dp home cards, subscription routing/progress, inline strategy accordion, stable segmented tabs, neutral pending badges
