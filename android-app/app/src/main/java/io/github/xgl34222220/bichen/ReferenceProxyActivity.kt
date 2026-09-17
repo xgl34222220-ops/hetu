@@ -50,6 +50,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.luminance
@@ -148,16 +149,16 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
         mutableStateOf(
             ProxyComposeState(
                 running = prefs.getBoolean("proxyUiLastRunning", prefs.getBoolean("proxyRootWanted", false)),
-                core = startupProfile.core.label,
-                mode = startupProfile.mode.label,
+                core = prefs.getString("proxyUiLastCore", startupProfile.core.label) ?: startupProfile.core.label,
+                mode = prefs.getString("proxyUiLastMode", startupProfile.mode.label) ?: startupProfile.mode.label,
                 ipv6 = startupProfile.ipv6.id,
                 autoOverwrite = startupProfile.autoOverwrite,
-                config = startupConfig,
+                config = prefs.getString("proxyUiLastConfig", startupConfig) ?: startupConfig,
             ),
         )
     }
     var runtime by remember { mutableStateOf(ProxyRuntimeSnapshot(
-        running = prefs.getBoolean("proxyUiLastRunning", false),
+        running = prefs.getBoolean("proxyUiLastRunning", prefs.getBoolean("proxyRootWanted", false)),
         elapsedSeconds = prefs.getLong("proxyUiLastElapsed", 0L),
         rssBytes = prefs.getLong("proxyUiLastRss", 0L),
         lanAddress = prefs.getString("proxyUiLastLan", "—") ?: "—",
@@ -172,6 +173,8 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
         total = prefs.getLong("proxyUiLastSubTotal", 0L),
         count = prefs.getInt("proxyUiLastSubCount", 0),
     )) }
+    var cachedConnectionCount by remember { mutableIntStateOf(prefs.getInt("proxyUiLastConnectionCount", 0)) }
+    val coldStartAt = remember { SystemClock.elapsedRealtime() }
     var siteDelays by remember { mutableStateOf(mapOf(
         "Baidu" to prefs.getLong("proxyUiLastDelayBaidu", -2L),
         "Cloudflare" to prefs.getLong("proxyUiLastDelayCloudflare", -2L),
@@ -196,6 +199,12 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
         try {
             val next = repo.state()
             val now = SystemClock.elapsedRealtime()
+            val transientColdGap = state.running && !next.running &&
+                prefs.getBoolean("proxyRootWanted", false) && now - coldStartAt < 2500L
+            if (transientColdGap) {
+                message = next.message
+                return
+            }
             if (lastAt > 0L && now > lastAt && next.uploadTotal >= lastUp && next.downloadTotal >= lastDown) {
                 val elapsed = now - lastAt
                 upRate = ((next.uploadTotal - lastUp) * 1000L / elapsed).coerceAtLeast(0L)
@@ -221,7 +230,16 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                 val tracked = providers.filter { it.hasSubscriptionInfo && it.total > 0L }
                 cachedSubscription = RefSubscriptionCache(tracked.sumOf { it.used }, tracked.sumOf { it.total }, providers.size)
             }
-            state = next
+            if (next.panelReady) cachedConnectionCount = next.connections.size
+            state = if (next.running && !next.panelReady) {
+                next.copy(
+                    groups = state.groups,
+                    connections = state.connections,
+                    downloadTotal = if (state.downloadTotal > 0L) state.downloadTotal else next.downloadTotal,
+                    uploadTotal = if (state.uploadTotal > 0L) state.uploadTotal else next.uploadTotal,
+                    memoryBytes = if (state.memoryBytes > 0L) state.memoryBytes else next.memoryBytes,
+                )
+            } else next
             prefs.edit()
                 .putBoolean("proxyUiLastRunning", next.running)
                 .putString("proxyUiLastCore", next.core)
@@ -240,11 +258,15 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                 .putLong("proxyUiLastSubUsed", cachedSubscription.used)
                 .putLong("proxyUiLastSubTotal", cachedSubscription.total)
                 .putInt("proxyUiLastSubCount", cachedSubscription.count)
+                .putInt("proxyUiLastConnectionCount", cachedConnectionCount)
+                .putBoolean("proxyUiSnapshotValid", true)
                 .apply()
             message = next.message
-            lastAt = now
-            lastUp = next.uploadTotal
-            lastDown = next.downloadTotal
+            if (next.panelReady) {
+                lastAt = now
+                lastUp = next.uploadTotal
+                lastDown = next.downloadTotal
+            }
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (error: Exception) {
@@ -355,7 +377,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
         // First frame must never wait for Root shell + controller API + provider/CPU probes.
         // Paint the persisted snapshot first, then reconcile the live state asynchronously.
         launch {
-            delay(34)
+            delay(320)
             refresh()
         }
         launch {
@@ -452,6 +474,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                     runtime = runtime,
                     providers = providers,
                     cachedSubscription = cachedSubscription,
+                    cachedConnections = cachedConnectionCount,
                     siteDelays = siteDelays,
                     upRate = upRate,
                     downRate = downRate,
@@ -527,6 +550,7 @@ private fun RefHome(
     runtime: ProxyRuntimeSnapshot,
     providers: List<DashboardProviderUi>,
     cachedSubscription: RefSubscriptionCache,
+    cachedConnections: Int,
     siteDelays: Map<String, Long>,
     upRate: Long,
     downRate: Long,
@@ -708,7 +732,7 @@ private fun RefHome(
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                RefNetworkIdentityCard(runtime, state.connections.size, Modifier.weight(1f))
+                RefNetworkIdentityCard(runtime, if (state.panelReady) state.connections.size else cachedConnections, Modifier.weight(1f))
                 RefSpeedCard(upRate, downRate, Modifier.weight(1f))
             }
         }
@@ -786,31 +810,45 @@ private fun RefLatencyColumn(label: String, value: Long?, testing: Boolean, modi
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            Text(
-                when {
-                    value == null -> "--"
-                    value <= 0L -> "超时"
-                    else -> value.toString()
-                },
-                color = valueColor,
-                fontSize = if (value != null && value > 0L) 18.sp else 14.sp,
-                lineHeight = 21.sp,
-                fontWeight = FontWeight.Black,
-                maxLines = 1,
-                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                modifier = Modifier.alignByBaseline(),
-            )
-            if (value != null && value > 0L) {
-                Text(
-                    "ms",
-                    color = Color(0xFF94A3B8),
-                    fontSize = 10.sp,
-                    lineHeight = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                    modifier = Modifier.alignByBaseline(),
-                )
+            Box(Modifier.width(46.dp), contentAlignment = Alignment.CenterEnd) {
+                androidx.compose.animation.AnimatedContent(
+                    targetState = value,
+                    transitionSpec = {
+                        androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(180))
+                            .togetherWith(androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(120)))
+                    },
+                    label = "latencyValueFade${label}",
+                ) { shown ->
+                    Text(
+                        when {
+                            shown == null -> "--"
+                            shown <= 0L -> "超时"
+                            else -> shown.toString()
+                        },
+                        color = when {
+                            shown == null -> Color(0xFF94A3B8)
+                            shown <= 0L -> Color(0xFFF43F5E)
+                            shown < 100L -> Color(0xFF10B981)
+                            shown <= 300L -> Color(0xFFF59E0B)
+                            else -> Color(0xFFF43F5E)
+                        },
+                        fontSize = if (shown != null && shown > 0L) 18.sp else 14.sp,
+                        lineHeight = 21.sp,
+                        fontWeight = FontWeight.Black,
+                        maxLines = 1,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                    )
+                }
             }
+            Text(
+                if (value != null && value > 0L) "ms" else "",
+                color = Color(0xFF94A3B8),
+                fontSize = 10.sp,
+                lineHeight = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                modifier = Modifier.width(14.dp),
+            )
         }
     }
 }
@@ -1373,12 +1411,12 @@ private fun RefPanel(
                                 visible = expandedGroup != null,
                                 enter = androidx.compose.animation.expandVertically(
                                     expandFrom = Alignment.Top,
-                                    animationSpec = spring(dampingRatio = .78f, stiffness = 420f),
+                                    animationSpec = spring(dampingRatio = .66f, stiffness = 300f),
                                     clip = false,
                                 ) + androidx.compose.animation.fadeIn(),
                                 exit = androidx.compose.animation.shrinkVertically(
                                     shrinkTowards = Alignment.Top,
-                                    animationSpec = spring(dampingRatio = .86f, stiffness = 520f),
+                                    animationSpec = spring(dampingRatio = .80f, stiffness = 420f),
                                     clip = false,
                                 ) + androidx.compose.animation.fadeOut(),
                             ) {
@@ -2113,9 +2151,9 @@ private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolea
     Column(
         modifier
             .height(86.dp)
-            .zIndex(1f)
+            .zIndex(2f)
             .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .95f else 1f }
-            .shadow(if (expanded) 4.dp else 2.dp, shape, clip = false)
+            .shadow(if (expanded) 2.dp else 1.dp, shape, clip = false)
             .background(premiumBrush, shape)
             .border(
                 if (expanded) 1.25.dp else .8.dp,
@@ -2148,7 +2186,10 @@ private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolea
                 Icons.Rounded.KeyboardArrowDown,
                 if (expanded) "收起" else "展开",
                 tint = if (expanded) Color(0xFF002FA7) else Color(0xFF94A3B8),
-                modifier = Modifier.size(15.dp).graphicsLayer { rotationZ = arrowRotation },
+                modifier = Modifier.size(15.dp).graphicsLayer {
+                    transformOrigin = TransformOrigin.Center
+                    rotationZ = arrowRotation
+                },
             )
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -2196,7 +2237,7 @@ private fun RefInlineGroupExpansion(
         Brush.verticalGradient(listOf(Color(0xFFE7EDF4), wellColor, Color(0xFFF2F5F8)))
     }
     Surface(
-        modifier = Modifier.padding(top = 8.dp, bottom = 16.dp).fillMaxWidth().zIndex(0f),
+        modifier = Modifier.padding(top = 6.dp, bottom = 18.dp).fillMaxWidth().zIndex(0f),
         shape = shape,
         color = Color.Transparent,
         border = BorderStroke(.8.dp, wellBorder),
@@ -2204,7 +2245,7 @@ private fun RefInlineGroupExpansion(
         tonalElevation = 0.dp,
     ) {
         Column(
-            Modifier.fillMaxWidth().background(wellBrush, shape).padding(start = 14.dp, top = 16.dp, end = 14.dp, bottom = 18.dp),
+            Modifier.fillMaxWidth().background(wellBrush, shape).padding(start = 14.dp, top = 16.dp, end = 14.dp, bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(9.dp),
         ) {
             // A thin top compression line gives the well a visual inset without a second white shell.
@@ -2311,7 +2352,7 @@ private fun RefInlineNodeCard(
                 Modifier.fillMaxSize()
                     .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .90f else 1f }
                     .shadow(
-                        if (active) 3.dp else 1.dp,
+                        0.dp,
                         shape,
                         clip = false,
                         ambientColor = if (active) Color(0xFF2563EB).copy(alpha = .07f) else Color(0xFF0F172A).copy(alpha = .035f),
@@ -2565,12 +2606,20 @@ private fun RefTrafficOverview(state: ProxyComposeState) {
             val elapsed = now - lastAt
             upRate = ((state.uploadTotal - lastUpload) * 1000L / elapsed).coerceAtLeast(0L)
             downRate = ((state.downloadTotal - lastDownload) * 1000L / elapsed).coerceAtLeast(0L)
-            history += Triple(now, upRate, downRate)
-            while (history.isNotEmpty() && history.first().first < now - 60_000L) history.removeAt(0)
+            // The 1s ticker below owns chart sampling so the graph keeps moving even at 0 B/s.
         }
         lastAt = now
         lastUpload = state.uploadTotal
         lastDownload = state.downloadTotal
+    }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1000)
+            val now = SystemClock.elapsedRealtime()
+            history += Triple(now, upRate, downRate)
+            while (history.isNotEmpty() && history.first().first < now - 60_000L) history.removeAt(0)
+        }
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
