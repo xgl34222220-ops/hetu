@@ -46,6 +46,11 @@ private data class ChainSnapshot(
     val rules: RulesSnapshot = RulesSnapshot(),
     val running: Boolean = false,
     val hitCount: Long = 0L,
+    val startupInjected: Boolean = false,
+    val controllerLoaded: Boolean = false,
+    val persistedEffective: Boolean = false,
+    val effective: Boolean = false,
+    val lastError: String = "",
     val vpnFallbackRunning: Boolean = false,
     val hostsFallbackRunning: Boolean = false,
     val message: String = "",
@@ -57,6 +62,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
     val prefs = remember { context.getSharedPreferences("bichen", 0) }
     val adController = remember { BichenComposeController(context) }
     val proxyController = remember { ProxyComposeController(context) }
+    val rootManager = remember { RootProxyManager(context) }
     val scope = rememberCoroutineScope()
     val updateView = androidx.compose.ui.platform.LocalView.current
     val updateSpinTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "adblockUpdateSpin")
@@ -104,15 +110,28 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
         }
         val state = runCatching { proxyController.state() }.getOrNull()
         val independent = runCatching { adController.homeSnapshot() }.getOrNull()
-        val hits = if (state?.running == true) runCatching {
-            proxyController.rules().firstOrNull {
-                it.proxy.equals("REJECT", true) && it.payload.contains(ProxyAdblockRules.PROVIDER_NAME, true)
-            }?.hitCount ?: 0L
-        }.getOrDefault(0L) else 0L
+        val startup = runCatching { rootManager.startupConfig() }.getOrDefault("")
+        val startupInjected = startup.contains("${ProxyAdblockRules.PROVIDER_NAME}:") &&
+            startup.contains("RULE-SET,${ProxyAdblockRules.PROVIDER_NAME},REJECT")
+        val liveRules = if (state?.running == true) runCatching { proxyController.rules() }.getOrDefault(emptyList()) else emptyList()
+        val adRule = liveRules.firstOrNull {
+            it.payload.contains(ProxyAdblockRules.PROVIDER_NAME, true) ||
+                it.type.contains(ProxyAdblockRules.PROVIDER_NAME, true)
+        }
+        val controllerLoaded = adRule != null
+        val hits = adRule?.hitCount ?: 0L
+        val persistedEffective = prefs.getBoolean("proxyAdblockLastEffective", false)
+        val lastError = prefs.getString("proxyAdblockLastError", "").orEmpty()
+        val effective = chainEnabled && state?.running == true && persistedEffective && startupInjected && controllerLoaded
         value = ChainSnapshot(
             rules = rules,
             running = state?.running == true,
             hitCount = hits,
+            startupInjected = startupInjected,
+            controllerLoaded = controllerLoaded,
+            persistedEffective = persistedEffective,
+            effective = effective,
+            lastError = lastError,
             vpnFallbackRunning = independent?.vpnRunning == true,
             hostsFallbackRunning = independent?.moduleEnabled == true,
             message = listOfNotNull(state?.message?.takeIf { it.isNotBlank() }, rulesResult.exceptionOrNull()?.message).joinToString("；"),
@@ -218,7 +237,16 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             Text("随代理串联过滤", color = t.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                            Text(if (chainEnabled) "尊重用户显式规则；广告规则只在最终兜底前拦截" else "代理仅负责转发，不执行辟尘广告规则", color = t.textSecondary, fontSize = 11.sp)
+                            Text(
+                                when {
+                                    snapshot.effective -> "已生效 · Mihomo 当前已加载辟尘广告规则链"
+                                    chainEnabled && snapshot.running -> "已开启 · 正在验证当前运行链"
+                                    chainEnabled -> "已开启 · 启动 Root 代理后自动验证"
+                                    else -> "代理仅负责转发，不执行辟尘广告规则"
+                                },
+                                color = if (snapshot.effective) Color(0xFF059669) else t.textSecondary,
+                                fontSize = 11.sp,
+                            )
                         }
                         Switch(
                             checked = chainEnabled,
@@ -240,6 +268,66 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
             }
         }
 
+
+        item("runtime-verify") {
+            val statusText = when {
+                snapshot.effective -> "广告过滤已生效"
+                !chainEnabled -> "广告串联已关闭"
+                !snapshot.running -> "等待代理启动"
+                snapshot.lastError.isNotBlank() -> "本次运行已降级"
+                else -> "已开启，但运行链未完整加载"
+            }
+            val statusColor = when {
+                snapshot.effective -> Color(0xFF059669)
+                snapshot.lastError.isNotBlank() -> Color(0xFFF59E0B)
+                else -> Color(0xFF64748B)
+            }
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = if (dark) t.elevatedCardBackground else Color.White,
+                shadowElevation = if (dark) 0.dp else 2.dp,
+            ) {
+                Column(Modifier.fillMaxWidth().padding(15.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            Modifier.size(38.dp).background(statusColor.copy(alpha = .10f), RoundedCornerShape(12.dp)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                if (snapshot.effective) Icons.Rounded.VerifiedUser else Icons.Rounded.FactCheck,
+                                null,
+                                tint = statusColor,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("运行链验证", color = t.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Text(statusText, color = statusColor, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                        TextButton(onClick = { if (!busy) revision++ }) { Text("重新检测", fontSize = 11.sp) }
+                    }
+                    HorizontalDivider(color = if (dark) t.outline.copy(alpha = .35f) else Color(0xFFF1F5F9))
+                    ChainVerifyRow("本地规则库", snapshot.rules.count > 0, if (snapshot.rules.count > 0) "${snapshot.rules.count} 条有效规则" else "没有可用规则")
+                    ChainVerifyRow("启动配置注入", snapshot.startupInjected, if (snapshot.startupInjected) "bichen-adblock 已写入运行副本" else "当前启动副本没有广告 provider")
+                    ChainVerifyRow("Mihomo 规则链", snapshot.controllerLoaded, if (snapshot.controllerLoaded) "Controller 已看到 REJECT 规则" else "当前 Controller 未看到广告规则")
+                    if (snapshot.running) {
+                        ChainVerifyRow("实时命中", snapshot.hitCount > 0L, if (snapshot.hitCount > 0L) "${snapshot.hitCount} 次 REJECT 命中" else "暂未记录命中；不代表规则未加载", allowNeutral = true)
+                    }
+                    if (snapshot.lastError.isNotBlank()) {
+                        Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFFF59E0B).copy(alpha = .10f)) {
+                            Text(
+                                "最近一次降级原因：${snapshot.lastError}",
+                                Modifier.fillMaxWidth().padding(10.dp),
+                                color = Color(0xFFB45309),
+                                fontSize = 10.sp,
+                                lineHeight = 15.sp,
+                            )
+                        }
+                    }
+                }
+            }
+        }
 
         item("profile") {
             Surface(shape = RoundedCornerShape(20.dp), color = if (dark) t.elevatedCardBackground else Color.White, shadowElevation = if (dark) 0.dp else 1.dp) {
@@ -364,72 +452,57 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
         }
 
         item("update") {
-            BoxWithConstraints(
-                modifier = Modifier.fillMaxWidth().height(54.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                val targetWidth = if (updatingRules) 44.dp else maxWidth
-                val buttonWidth by androidx.compose.animation.core.animateDpAsState(
-                    targetValue = targetWidth,
-                    animationSpec = androidx.compose.animation.core.spring(dampingRatio = .72f, stiffness = 430f),
-                    label = "adblockUpdateMorphWidth",
-                )
-                val container = if (updateSuccess) Color(0xFF10B981) else MaterialTheme.colorScheme.primary
-                Button(
-                    onClick = {
-                        if (busy) return@Button
-                        scope.launch {
-                            busy = true
-                            updatingRules = true
-                            updateSuccess = false
-                            val startedAt = android.os.SystemClock.elapsedRealtime()
-                            val result = runCatching { adController.updateRules() }
-                            val elapsed = android.os.SystemClock.elapsedRealtime() - startedAt
-                            if (elapsed < 650L) kotlinx.coroutines.delay(650L - elapsed)
-                            updatingRules = false
-                            result
-                                .onSuccess {
-                                    notice = "$it；代理运行中时请重启代理应用新快照"
-                                    revision++
-                                    updateSuccess = true
-                                    updateView.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
-                                    kotlinx.coroutines.delay(1100)
-                                    updateSuccess = false
-                                }
-                                .onFailure { notice = it.message ?: "规则更新失败" }
-                            busy = false
-                        }
-                    },
-                    enabled = !busy,
-                    modifier = Modifier.width(buttonWidth).height(44.dp),
-                    shape = CircleShape,
-                    contentPadding = PaddingValues(horizontal = if (updatingRules) 0.dp else 16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = container,
-                        contentColor = Color.White,
-                        disabledContainerColor = container,
-                        disabledContentColor = Color.White,
-                    ),
-                ) {
-                    when {
-                        updatingRules -> Icon(
-                            Icons.Rounded.Sync,
-                            "正在更新",
-                            modifier = Modifier.size(19.dp).graphicsLayer { rotationZ = updateSpin },
-                            tint = Color.White,
-                        )
-                        updateSuccess -> {
-                            Icon(Icons.Rounded.Check, null, modifier = Modifier.size(19.dp))
-                            Spacer(Modifier.width(7.dp))
-                            Text("已是最新", fontWeight = FontWeight.Bold)
-                        }
-                        else -> {
-                            Icon(Icons.Rounded.Sync, null, modifier = Modifier.size(19.dp))
-                            Spacer(Modifier.width(7.dp))
-                            Text("更新广告规则", fontWeight = FontWeight.Bold)
-                        }
+            val container = if (updateSuccess) Color(0xFF10B981) else MaterialTheme.colorScheme.primary
+            Button(
+                onClick = {
+                    if (busy) return@Button
+                    scope.launch {
+                        busy = true
+                        updatingRules = true
+                        updateSuccess = false
+                        val startedAt = android.os.SystemClock.elapsedRealtime()
+                        val result = runCatching { adController.updateRules() }
+                        val elapsed = android.os.SystemClock.elapsedRealtime() - startedAt
+                        if (elapsed < 650L) kotlinx.coroutines.delay(650L - elapsed)
+                        updatingRules = false
+                        result
+                            .onSuccess {
+                                notice = "$it；代理运行中时请重启代理应用新快照"
+                                revision++
+                                updateSuccess = true
+                                updateView.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
+                                kotlinx.coroutines.delay(1100)
+                                updateSuccess = false
+                            }
+                            .onFailure { notice = it.message ?: "规则更新失败" }
+                        busy = false
                     }
-                }
+                },
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(17.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = container,
+                    contentColor = Color.White,
+                    disabledContainerColor = container,
+                    disabledContentColor = Color.White,
+                ),
+            ) {
+                Icon(
+                    if (updateSuccess) Icons.Rounded.Check else Icons.Rounded.Sync,
+                    if (updatingRules) "正在更新" else null,
+                    modifier = Modifier.size(19.dp).graphicsLayer { rotationZ = if (updatingRules) updateSpin else 0f },
+                    tint = Color.White,
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    when {
+                        updatingRules -> "正在更新…"
+                        updateSuccess -> "已是最新"
+                        else -> "更新广告规则"
+                    },
+                    fontWeight = FontWeight.Bold,
+                )
             }
         }
 
@@ -440,6 +513,42 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ChainVerifyRow(label: String, ok: Boolean, detail: String, allowNeutral: Boolean = false) {
+    val t = LocalBichenTokens.current
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier.size(20.dp).background(
+                when {
+                    ok -> Color(0xFF10B981).copy(alpha = .12f)
+                    allowNeutral -> Color(0xFF94A3B8).copy(alpha = .12f)
+                    else -> Color(0xFFF59E0B).copy(alpha = .12f)
+                },
+                CircleShape,
+            ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                when {
+                    ok -> Icons.Rounded.Check
+                    allowNeutral -> Icons.Rounded.Remove
+                    else -> Icons.Rounded.PriorityHigh
+                },
+                null,
+                tint = when {
+                    ok -> Color(0xFF059669)
+                    allowNeutral -> Color(0xFF64748B)
+                    else -> Color(0xFFD97706)
+                },
+                modifier = Modifier.size(13.dp),
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        Text(label, color = t.textPrimary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(88.dp))
+        Text(detail, color = t.textSecondary, fontSize = 10.sp, lineHeight = 14.sp, modifier = Modifier.weight(1f))
     }
 }
 
