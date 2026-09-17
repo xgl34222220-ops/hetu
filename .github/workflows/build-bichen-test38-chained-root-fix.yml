@@ -1,0 +1,130 @@
+name: Build Bichen 0.4.0-test.38 chained root fix
+
+on:
+  push:
+    branches: ['release/bichen-0.4.0-test.38']
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  build:
+    if: github.event.head_commit.message == 'Build Bichen 0.4.0-test.38 chained root fix'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply chained adblock Root runtime fix
+        run: python3 tools/apply_test38_chained_root_runtime_fix.py
+
+      - name: Verify source patch before build
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT=android-app/app/src/main/assets/proxy-root-v3.sh
+          MGR=android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java
+          BUILD=android-app/app/build.gradle.kts
+          sh -n "$ROOT"
+          grep -q 'versionCode = 438' "$BUILD"
+          grep -q 'versionName = "0.4.0-test.38"' "$BUILD"
+          grep -q 'ProxyAdblockCoordinator.enter(context)' "$MGR"
+          grep -q 'profile.adblockChain' "$MGR"
+          grep -q 'String binTmp=BIN+deploySuffix;' "$MGR"
+          grep -q 'RootBridge.quote(binTmp)' "$MGR"
+          grep -q 'START_BIN="$1"; START_CFG="$2"; START_MODE="$3"' "$ROOT"
+          grep -q '"$START_BIN" -d "$RUN" -f "$START_CFG"' "$ROOT"
+          grep -q 'STATUS_RUNNING=false; STATUS_PID=0' "$ROOT"
+          grep -q '\*"$BASE/bin/core"\*' "$ROOT"
+          grep -q 'Mihomo 初始化超过 90 秒' "$ROOT"
+
+      - name: Commit generated test.38 sources
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            android-app/app/build.gradle.kts \
+            android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java \
+            android-app/app/src/main/assets/proxy-root-v3.sh
+          if ! git diff --cached --quiet; then
+            git commit -m 'Fix chained adblock Root runtime for 0.4.0-test.38'
+            git push
+          fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+          cache-read-only: false
+
+      - name: Reuse verified Mihomo runtime
+        uses: actions/download-artifact@v4
+        with:
+          name: Bichen-0.4.0-test.35-Fullscreen-Strategy-Page
+          path: previous-artifact
+          github-token: ${{ github.token }}
+          repository: xgl34222220-ops/pichen
+          run-id: 35170170620
+
+      - name: Restore native runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          PREV=$(find previous-artifact -name '*.apk' -type f | head -n 1)
+          test -n "$PREV"
+          mkdir -p android-app/app/src/main/jniLibs/arm64-v8a android-app/app/src/main/jniLibs/x86_64
+          mkdir -p android-app/app/src/main/assets/mihomo-root/arm64-v8a android-app/app/src/main/assets/mihomo-root/x86_64
+          unzip -p "$PREV" lib/arm64-v8a/libbichen_core.so > android-app/app/src/main/jniLibs/arm64-v8a/libbichen_core.so
+          unzip -p "$PREV" lib/x86_64/libbichen_core.so > android-app/app/src/main/jniLibs/x86_64/libbichen_core.so
+          unzip -p "$PREV" assets/mihomo-root/arm64-v8a/mihomo > android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo
+          unzip -p "$PREV" assets/mihomo-root/x86_64/mihomo > android-app/app/src/main/assets/mihomo-root/x86_64/mihomo
+          unzip -p "$PREV" assets/MIHOMO-LICENSE > android-app/app/src/main/assets/MIHOMO-LICENSE
+          unzip -p "$PREV" assets/mihomo-revision.txt > android-app/app/src/main/assets/mihomo-revision.txt
+          test -s android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo
+
+      - name: Build debug APK
+        working-directory: android-app
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Verify test.38 APK invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=android-app/app/build/outputs/apk/debug/app-debug.apk
+          ROOT=android-app/app/src/main/assets/proxy-root-v3.sh
+          MGR=android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java
+          BUILD=android-app/app/build.gradle.kts
+          test -f "$APK"
+          unzip -t "$APK" >/dev/null
+          unzip -l "$APK" | grep -q 'lib/arm64-v8a/libbichen_core.so'
+          unzip -l "$APK" | grep -q 'assets/mihomo-root/arm64-v8a/mihomo'
+          grep -q 'versionName = "0.4.0-test.38"' "$BUILD"
+          grep -q 'ProxyAdblockCoordinator.enter(context)' "$MGR"
+          grep -q 'profile.adblockChain' "$MGR"
+          grep -q 'String binTmp=BIN+deploySuffix;' "$MGR"
+          grep -q 'RootBridge.quote(binTmp)' "$MGR"
+          grep -q 'START_BIN="$1"; START_CFG="$2"; START_MODE="$3"' "$ROOT"
+          grep -q '"$START_BIN" -d "$RUN" -f "$START_CFG"' "$ROOT"
+          grep -q 'STATUS_RUNNING=false; STATUS_PID=0' "$ROOT"
+          grep -q '\*"$BASE/bin/core"\*' "$ROOT"
+          grep -q 'Mihomo 初始化超过 90 秒' "$ROOT"
+          grep -q 'ProxyAdblockRules' android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAdblockChainActivity.kt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Bichen-0.4.0-test.38-Chained-Adblock-Root-Fix
+          path: android-app/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
