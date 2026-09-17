@@ -1,1 +1,1 @@
-2026-09-17 test36 panel header polish: safe area concise title circular actions lightweight tabs
+2026-09-17 test36 panel header verifier retry
