@@ -9,7 +9,6 @@ import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
-import java.util.regex.*;
 import java.util.concurrent.locks.ReentrantLock;
 
 /** Root transparent-proxy control plane plus private localhost Clash API bootstrap. */
@@ -269,11 +268,22 @@ final class RootProxyManager {
         // Root startup config is authoritative because preflight does not replace CONFIG.
         try{
             RootBridge.Result result=RootBridge.rootShell(context,"cat "+RootBridge.quote(CONFIG)+" 2>/dev/null || true",4000L);
-            Matcher matcher=Pattern.compile("(?m)^\s*external-controller:\s*127\.0\.0\.1:(\d+)\s*$").matcher(result.output==null?"":result.output);
+            String output=result.output==null?"":result.output;
             int found=0;
-            while(matcher.find()){
-                int candidate=Integer.parseInt(matcher.group(1));
-                if(candidate>=29090&&candidate<=29149)found=candidate;
+            try(BufferedReader reader=new BufferedReader(new StringReader(output))){
+                String line;
+                while((line=reader.readLine())!=null){
+                    String trimmed=line.trim();
+                    String prefix="external-controller:";
+                    if(!trimmed.startsWith(prefix))continue;
+                    String endpoint=trimmed.substring(prefix.length()).trim();
+                    String host="127.0.0.1:";
+                    if(!endpoint.startsWith(host))continue;
+                    try{
+                        int candidate=Integer.parseInt(endpoint.substring(host.length()).trim());
+                        if(candidate>=29090&&candidate<=29149)found=candidate;
+                    }catch(NumberFormatException ignored){ }
+                }
             }
             return found;
         }catch(Exception ignored){return 0;}
