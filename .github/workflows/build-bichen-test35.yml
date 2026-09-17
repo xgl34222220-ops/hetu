@@ -162,7 +162,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf .upstream android-app/app/src/main/jniLibs android-app/app/src/main/assets/mihomo-root android-app/app/src/main/assets/MIHOMO-LICENSE android-app/app/src/main/assets/mihomo-revision.txt
+          rm -rf .upstream android-app/build android-app/app/build android-app/app/src/main/jniLibs android-app/app/src/main/assets/mihomo-root android-app/app/src/main/assets/MIHOMO-LICENSE android-app/app/src/main/assets/mihomo-revision.txt
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add -A android-app tests tools
