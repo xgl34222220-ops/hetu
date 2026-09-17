@@ -553,7 +553,7 @@ private fun RefHome(
             start = 16.dp,
             top = 8.dp,
             end = 16.dp,
-            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 148.dp,
+            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 164.dp,
         ),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -818,38 +818,81 @@ private fun RefLatencyColumn(label: String, value: Long?, testing: Boolean, modi
 private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: Int, modifier: Modifier) {
     val t = LocalBichenTokens.current
     val view = LocalView.current
-    var showLan by rememberSaveable { mutableStateOf(true) }
+    val scope = rememberCoroutineScope()
+    val density = androidx.compose.ui.platform.LocalDensity.current.density
+    var renderedLan by rememberSaveable { mutableStateOf(true) }
+    var flipping by remember { mutableStateOf(false) }
+    val flip = remember { Animatable(0f) }
     val source = remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) .97f else 1f, spring(dampingRatio = .74f, stiffness = 560f), label = "networkCardPress")
     val shape = RoundedCornerShape(20.dp)
     val valueColor = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A)
+
     Surface(
-        modifier = modifier.height(112.dp).graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .94f else 1f }
-            .clip(shape).clickable(interactionSource = source, indication = null) {
-                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK); showLan = !showLan
+        modifier = modifier.height(112.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .94f else 1f }
+            .clip(shape)
+            .clickable(interactionSource = source, indication = null) {
+                if (!flipping) {
+                    view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                    scope.launch {
+                        flipping = true
+                        flip.animateTo(90f, androidx.compose.animation.core.tween(105, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                        renderedLan = !renderedLan
+                        flip.snapTo(-90f)
+                        flip.animateTo(0f, spring(dampingRatio = .72f, stiffness = 520f))
+                        flipping = false
+                    }
+                }
             },
-        shape = shape, color = t.cardBackground, shadowElevation = 1.dp,
+        shape = shape,
+        color = t.cardBackground,
+        shadowElevation = 1.dp,
     ) {
-        Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.SpaceBetween) {
+        Column(
+            Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
             Row(Modifier.fillMaxWidth().height(24.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(if (showLan) "LAN" else "WAN", color = Color(0xFF64748B), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                Box(Modifier.size(24.dp).background(Color(0xFFF1F5F9), CircleShape).border(.6.dp, Color.White.copy(alpha = .90f), CircleShape), contentAlignment = Alignment.Center) {
+                Text(if (renderedLan) "LAN" else "WAN", color = Color(0xFF64748B), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Box(
+                    Modifier.size(24.dp).background(Color(0xFFF1F5F9), CircleShape)
+                        .border(.6.dp, Color.White.copy(alpha = .90f), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
                     Icon(Icons.Rounded.SwapHoriz, "切换 LAN/WAN", tint = Color(0xFF2563EB), modifier = Modifier.size(14.dp))
                 }
             }
-            androidx.compose.animation.AnimatedContent(
-                targetState = showLan,
-                transitionSpec = {
-                    (androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(220)) { fullHeight -> (fullHeight * .08f).toInt().coerceAtLeast(4) } + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(180)) + androidx.compose.animation.scaleIn(initialScale = .98f))
-                        .togetherWith(androidx.compose.animation.slideOutVertically(androidx.compose.animation.core.tween(160)) { fullHeight -> -(fullHeight * .08f).toInt().coerceAtLeast(4) } + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(120)))
+            Column(
+                Modifier.fillMaxWidth().graphicsLayer {
+                    rotationY = flip.value
+                    cameraDistance = 18f * density
+                    alpha = .94f + .06f * (1f - kotlin.math.abs(flip.value) / 90f)
                 },
-                label = "lanWanMetricSwap",
-            ) { lan ->
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(if (lan) runtime.lanAddress else runtime.wanAddress, color = valueColor, fontSize = 15.sp, lineHeight = 18.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.height(20.dp))
-                    Text(if (lan) "${runtime.lanInterface} · $connections 连接" else "${countryEmoji(runtime.wanCountryCode)} ${runtime.wanRegion}", color = Color(0xFF64748B), fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.height(18.dp))
-                }
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    if (renderedLan) runtime.lanAddress else runtime.wanAddress,
+                    color = valueColor,
+                    fontSize = 15.sp,
+                    lineHeight = 18.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.height(20.dp),
+                )
+                Text(
+                    if (renderedLan) "\${runtime.lanInterface} · $connections 连接"
+                    else "\${countryEmoji(runtime.wanCountryCode)} \${runtime.wanRegion}",
+                    color = Color(0xFF64748B),
+                    fontSize = 11.sp,
+                    lineHeight = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.height(18.dp),
+                )
             }
         }
     }
@@ -1259,7 +1302,7 @@ private fun RefPanel(
                 start = 16.dp,
                 top = 8.dp,
                 end = 16.dp,
-                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 148.dp,
+                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 164.dp,
             ),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -1325,10 +1368,12 @@ private fun RefPanel(
                                 enter = androidx.compose.animation.expandVertically(
                                     expandFrom = Alignment.Top,
                                     animationSpec = spring(dampingRatio = .78f, stiffness = 420f),
+                                    clip = false,
                                 ) + androidx.compose.animation.fadeIn(),
                                 exit = androidx.compose.animation.shrinkVertically(
                                     shrinkTowards = Alignment.Top,
                                     animationSpec = spring(dampingRatio = .86f, stiffness = 520f),
+                                    clip = false,
                                 ) + androidx.compose.animation.fadeOut(),
                             ) {
                                 expandedGroup?.let { group ->
@@ -1362,14 +1407,20 @@ private fun RefPanel(
                                         onTestAll = {
                                             val pending = group.nodes.filter { testing[it.name] != true }
                                             if (pending.isNotEmpty()) scope.launch {
-                                                pending.forEach { testing[it.name] = true }
                                                 try {
-                                                    pending.map { node ->
+                                                    val wave = pending.mapIndexed { index, node ->
                                                         async {
-                                                            try { delays[node.name] = repo.delay(node.name) }
-                                                            catch (_: Exception) { delays[node.name] = -1L }
+                                                            delay(index * 30L)
+                                                            testing[node.name] = true
+                                                            try { repo.delay(node.name) }
+                                                            catch (_: Exception) { -1L }
                                                         }
-                                                    }.awaitAll()
+                                                    }
+                                                    pending.forEachIndexed { index, node ->
+                                                        delays[node.name] = wave[index].await()
+                                                        delay(32L)
+                                                        testing.remove(node.name)
+                                                    }
                                                     view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
                                                 } finally {
                                                     pending.forEach { testing.remove(it.name) }
@@ -2048,14 +2099,14 @@ private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolea
     val source = remember(group.name) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) .97f else 1f, spring(dampingRatio = .74f, stiffness = 580f), label = "group${group.name}")
-    val shape = RoundedCornerShape(18.dp)
+    val shape = RoundedCornerShape(20.dp)
     val nodeName = selected.ifBlank { "未选择" }
     val nodeFlag = refNodeFlag(nodeName)
     val premiumBrush = if (dark) Brush.verticalGradient(listOf(t.elevatedCardBackground, t.cardBackground))
     else Brush.verticalGradient(listOf(Color.White, Color(0xFFFAFBFD)))
     Column(
         modifier
-            .height(84.dp)
+            .height(86.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .95f else 1f }
             .shadow(if (expanded) 5.dp else 3.dp, shape, clip = false)
             .background(premiumBrush, shape)
@@ -2065,11 +2116,11 @@ private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolea
                 shape,
             )
             .clip(shape)
-            .padding(horizontal = 11.dp, vertical = 9.dp),
+            .padding(start = 14.dp, top = 11.dp, end = 13.dp, bottom = 10.dp),
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
         Row(
-            Modifier.fillMaxWidth().height(40.dp).clip(RoundedCornerShape(10.dp))
+            Modifier.fillMaxWidth().height(36.dp).clip(RoundedCornerShape(10.dp))
                 .clickable(interactionSource = source, indication = null, onClick = onClick),
             verticalAlignment = Alignment.Top,
         ) {
@@ -2096,7 +2147,7 @@ private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolea
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                Modifier.weight(1f).height(24.dp).clip(RoundedCornerShape(8.dp))
+                Modifier.weight(1f).height(22.dp).clip(RoundedCornerShape(8.dp))
                     .clickable(interactionSource = source, indication = null, onClick = onClick)
                     .padding(end = 5.dp),
                 contentAlignment = Alignment.CenterStart,
@@ -2139,7 +2190,7 @@ private fun RefInlineGroupExpansion(
         Brush.verticalGradient(listOf(Color(0xFFE7EDF4), wellColor, Color(0xFFF2F5F8)))
     }
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.padding(top = 8.dp, bottom = 12.dp).fillMaxWidth(),
         shape = shape,
         color = Color.Transparent,
         border = BorderStroke(.8.dp, wellBorder),
@@ -2147,7 +2198,7 @@ private fun RefInlineGroupExpansion(
         tonalElevation = 0.dp,
     ) {
         Column(
-            Modifier.fillMaxWidth().background(wellBrush, shape).padding(12.dp),
+            Modifier.fillMaxWidth().background(wellBrush, shape).padding(start = 14.dp, top = 16.dp, end = 14.dp, bottom = 14.dp),
             verticalArrangement = Arrangement.spacedBy(9.dp),
         ) {
             // A thin top compression line gives the well a visual inset without a second white shell.
@@ -2165,9 +2216,9 @@ private fun RefInlineGroupExpansion(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                    Text("切换落地节点", color = if (dark) t.textSecondary else Color(0xFF64748B), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text("切换落地节点", color = if (dark) t.textSecondary else Color(0xFF64748B), fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.width(6.dp))
-                    Text("· 点击即生效", color = Color(0xFF94A3B8), fontSize = 10.sp, fontWeight = FontWeight.Normal)
+                    Text("· 点击即生效", color = Color(0xFF94A3B8), fontSize = 11.sp, lineHeight = 16.sp, fontWeight = FontWeight.Normal)
                 }
                 val allTestSource = remember(group.name) { MutableInteractionSource() }
                 val allPressed by allTestSource.collectIsPressedAsState()
@@ -2243,7 +2294,7 @@ private fun RefInlineNodeCard(
         active -> Color(0xFFBFDBFE)
         else -> Color.White.copy(alpha = .88f)
     }
-    Box(modifier.height(62.dp)) {
+    Box(modifier.height(64.dp)) {
         androidx.compose.animation.AnimatedVisibility(
             visible = revealed,
             modifier = Modifier.fillMaxSize(),
@@ -2266,7 +2317,7 @@ private fun RefInlineNodeCard(
                     .clickable(interactionSource = source, indication = null, onClick = onSelect),
             ) {
                 Column(
-                    Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 8.dp),
+                    Modifier.fillMaxSize().padding(horizontal = 11.dp, vertical = 9.dp),
                     verticalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -2921,7 +2972,7 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
             start = 16.dp,
             top = 8.dp,
             end = 16.dp,
-            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 148.dp,
+            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 164.dp,
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -3015,7 +3066,7 @@ private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
             start = 16.dp,
             top = 8.dp,
             end = 16.dp,
-            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 148.dp,
+            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 164.dp,
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -3301,14 +3352,14 @@ private fun RefInfoBottomSheet(
         },
     ) {
         Column(
-            Modifier.fillMaxWidth().fillMaxHeight(.78f).navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
+            Modifier.fillMaxWidth().fillMaxHeight(.80f).navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(title, color = if (terminal) Color(0xFFF8FAFC) else t.textPrimary, fontSize = 20.sp, lineHeight = 25.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                 IconButton(
                     onClick = onDismiss,
-                    modifier = Modifier.size(34.dp).background(if (terminal) Color.White.copy(alpha = .07f) else t.controlBackground.copy(alpha = .72f), CircleShape),
+                    modifier = Modifier.size(width = 38.dp, height = 30.dp).background(if (terminal) Color.White.copy(alpha = .07f) else t.controlBackground.copy(alpha = .72f), RoundedCornerShape(12.dp)),
                 ) {
                     Icon(Icons.Rounded.Close, "关闭", tint = if (terminal) Color(0xFFCBD5E1) else t.textSecondary, modifier = Modifier.size(17.dp))
                 }
@@ -3316,9 +3367,8 @@ private fun RefInfoBottomSheet(
             Box(
                 Modifier.fillMaxWidth()
                     .weight(1f)
-                    .background(if (terminal) Color(0xFF0F172A) else t.controlBackground.copy(alpha = .54f), RoundedCornerShape(16.dp))
-                    .border(if (terminal) .8.dp else 0.dp, if (terminal) Color(0xFF334155) else Color.Transparent, RoundedCornerShape(16.dp))
-                    .padding(14.dp)
+                    .background(if (terminal) Color.Transparent else t.controlBackground.copy(alpha = .54f), if (terminal) RoundedCornerShape(0.dp) else RoundedCornerShape(16.dp))
+                    .padding(if (terminal) 4.dp else 14.dp)
                     .verticalScroll(rememberScrollState()),
             ) {
                 if (terminal) {

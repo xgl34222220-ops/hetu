@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -23,11 +24,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -75,8 +78,18 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val pageBg = if (dark) t.pageBackground else Color(0xFFF1F5F9)
     val shimmer = androidx.compose.animation.core.rememberInfiniteTransition(label = "appSkeletonShimmer")
-    val shimmerX by shimmer.animateFloat(initialValue = -1f, targetValue = 2f, animationSpec = androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(1500, easing = androidx.compose.animation.core.LinearEasing)), label = "appSkeletonShimmerX")
-    val shimmerBrush = Brush.horizontalGradient(listOf(t.controlBackground.copy(alpha = .46f), if (dark) Color.White.copy(alpha = .11f) else Color.White.copy(alpha = .92f), t.controlBackground.copy(alpha = .46f)), startX = shimmerX * 360f, endX = (shimmerX + 1f) * 360f)
+    val shimmerX by shimmer.animateFloat(initialValue = -1f, targetValue = 2f, animationSpec = androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(1200, easing = androidx.compose.animation.core.LinearEasing)), label = "appSkeletonShimmerX")
+    val shimmerBrush = Brush.linearGradient(
+        listOf(t.controlBackground.copy(alpha = .46f), if (dark) Color.White.copy(alpha = .11f) else Color.White.copy(alpha = .92f), t.controlBackground.copy(alpha = .46f)),
+        start = Offset(shimmerX * 420f, -120f),
+        end = Offset((shimmerX + 1f) * 420f, 260f),
+    )
+    val listReveal by animateFloatAsState(
+        targetValue = if (apps.isEmpty()) 0f else 1f,
+        animationSpec = androidx.compose.animation.core.tween(200),
+        label = "appListReveal",
+    )
+    val revealOffsetPx = with(LocalDensity.current) { 8.dp.toPx() }
 
     val scopeTitle = when (profile.appScope) {
         ProxyRuntimeProfile.AppScope.BLACKLIST -> "所选应用直连"
@@ -98,7 +111,7 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(pageBg),
-        contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 28.dp),
+        contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 40.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item("header") {
@@ -154,8 +167,13 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
             }
         }
 
-        if (loadingApps && apps.isEmpty()) {
-            item("loading-skeleton") {
+        item("loading-skeleton") {
+            androidx.compose.animation.AnimatedVisibility(
+                visible = loadingApps && apps.isEmpty(),
+                enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(120)),
+                exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(200)) +
+                    androidx.compose.animation.shrinkVertically(androidx.compose.animation.core.tween(200)),
+            ) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     repeat(6) { index ->
                         Surface(
@@ -179,11 +197,16 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
             }
         }
 
-        items(visible, key = { it.packageName }) { app ->
+        itemsIndexed(visible, key = { _, app -> app.packageName }) { index, app ->
             val checked = app.packageName in selected
             val icon by produceState(initialValue = app.icon, app.packageName) { value = controller.appIcon(app.packageName) }
             Surface(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).clickable {
+                modifier = Modifier.fillMaxWidth()
+                    .graphicsLayer {
+                        alpha = listReveal
+                        translationY = (1f - listReveal) * revealOffsetPx * (1f + (index.coerceAtMost(6) * .03f))
+                    }
+                    .clip(RoundedCornerShape(18.dp)).clickable {
                     setProxyApp(app.packageName, !checked)
                     selected = proxyApps()
                 },

@@ -432,6 +432,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                     val editorState = androidx.compose.foundation.text.input.rememberTextFieldState(yamlText)
                     val editorText = editorState.text.toString()
                     val lineCount = remember(editorText) { maxOf(1, editorText.count { it == '\n' } + 1) }
+                    val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
                     LaunchedEffect(editorState) {
                         snapshotFlow { editorState.text.toString() }.collect {
                             if (yamlError.isNotBlank()) yamlError = ""
@@ -496,7 +497,14 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                             modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp),
                         )
                     }
-                    Surface(
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = !imeVisible,
+                        enter = androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(180)) { it / 2 } +
+                            androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(160)),
+                        exit = androidx.compose.animation.slideOutVertically(androidx.compose.animation.core.tween(140)) { it / 2 } +
+                            androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(120)),
+                    ) {
+                        Surface(
                         modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp)
                             .shadow(18.dp, RoundedCornerShape(28.dp), clip = false, ambientColor = Color(0xFF0F172A).copy(alpha = .10f), spotColor = Color(0xFF0F172A).copy(alpha = .14f)),
                         shape = RoundedCornerShape(28.dp),
@@ -542,6 +550,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                                 else Text("保存", fontWeight = FontWeight.Bold)
                             }
                         }
+                    }
                     }
                 }
             }

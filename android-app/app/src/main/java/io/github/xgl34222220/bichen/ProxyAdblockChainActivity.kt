@@ -60,6 +60,8 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
     val pageBg = if (dark) t.pageBackground else Color(0xFFF1F5F9)
     var revision by remember { mutableIntStateOf(0) }
     var busy by remember { mutableStateOf(false) }
+    var updatingRules by remember { mutableStateOf(false) }
+    var updateSuccess by remember { mutableStateOf(false) }
     var notice by remember { mutableStateOf("") }
     var chainEnabled by remember(revision) { mutableStateOf(prefs.getBoolean("proxyAdblockChain", true)) }
     var fallbackEnabled by remember(revision) {
@@ -170,7 +172,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
             start = 16.dp,
             top = 8.dp,
             end = 16.dp,
-            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 64.dp,
+            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 80.dp,
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -349,25 +351,63 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
         }
 
         item("update") {
-            Button(
-                onClick = {
-                    if (busy) return@Button
-                    scope.launch {
-                        busy = true
-                        runCatching { adController.updateRules() }
-                            .onSuccess { notice = "$it；代理运行中时请重启代理应用新快照"; revision++ }
-                            .onFailure { notice = it.message ?: "规则更新失败" }
-                        busy = false
-                    }
-                },
-                enabled = !busy,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                shape = RoundedCornerShape(17.dp),
+            BoxWithConstraints(
+                modifier = Modifier.fillMaxWidth().height(54.dp),
+                contentAlignment = Alignment.Center,
             ) {
-                if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                else Icon(Icons.Rounded.Sync, null, modifier = Modifier.size(19.dp))
-                Spacer(Modifier.width(7.dp))
-                Text(if (busy) "处理中" else "更新广告规则")
+                val targetWidth = if (updatingRules) 44.dp else maxWidth
+                val buttonWidth by androidx.compose.animation.core.animateDpAsState(
+                    targetValue = targetWidth,
+                    animationSpec = androidx.compose.animation.core.spring(dampingRatio = .72f, stiffness = 430f),
+                    label = "adblockUpdateMorphWidth",
+                )
+                val container = if (updateSuccess) Color(0xFF10B981) else MaterialTheme.colorScheme.primary
+                Button(
+                    onClick = {
+                        if (busy) return@Button
+                        scope.launch {
+                            busy = true
+                            updatingRules = true
+                            updateSuccess = false
+                            val result = runCatching { adController.updateRules() }
+                            updatingRules = false
+                            result
+                                .onSuccess {
+                                    notice = "$it；代理运行中时请重启代理应用新快照"
+                                    revision++
+                                    updateSuccess = true
+                                    kotlinx.coroutines.delay(900)
+                                    updateSuccess = false
+                                }
+                                .onFailure { notice = it.message ?: "规则更新失败" }
+                            busy = false
+                        }
+                    },
+                    enabled = !busy,
+                    modifier = Modifier.width(buttonWidth).height(44.dp),
+                    shape = CircleShape,
+                    contentPadding = PaddingValues(horizontal = if (updatingRules) 0.dp else 16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = container,
+                        contentColor = Color.White,
+                        disabledContainerColor = container,
+                        disabledContentColor = Color.White,
+                    ),
+                ) {
+                    when {
+                        updatingRules -> CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
+                        updateSuccess -> {
+                            Icon(Icons.Rounded.Check, null, modifier = Modifier.size(19.dp))
+                            Spacer(Modifier.width(7.dp))
+                            Text("更新完成", fontWeight = FontWeight.Bold)
+                        }
+                        else -> {
+                            Icon(Icons.Rounded.Sync, null, modifier = Modifier.size(19.dp))
+                            Spacer(Modifier.width(7.dp))
+                            Text("更新广告规则", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
             }
         }
 
@@ -385,17 +425,13 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
 private fun ChainMetric(label: String, value: String, modifier: Modifier = Modifier) {
     val t = LocalBichenTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val accent = when (label) {
-        "规则源" -> Color(0xFF059669)
-        "本次命中" -> Color(0xFF2563EB)
-        else -> Color(0xFF002FA7)
-    }
+    val accent = if (dark) Color(0xFF60A5FA) else Color(0xFF2563EB)
     Surface(
         modifier = modifier.height(70.dp),
         shape = RoundedCornerShape(16.dp),
-        color = if (dark) t.controlBackground.copy(alpha = .72f) else Color(0xFFF8FAFC),
+        color = if (dark) t.controlBackground.copy(alpha = .72f) else Color.White,
         tonalElevation = 0.dp,
-        shadowElevation = if (dark) 0.dp else 1.dp,
+        shadowElevation = if (dark) 0.dp else 3.dp,
     ) {
         Column(
             Modifier.fillMaxSize().padding(horizontal = 11.dp, vertical = 10.dp),

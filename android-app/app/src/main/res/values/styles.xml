@@ -8,6 +8,7 @@
         <item name="android:windowLightNavigationBar">true</item>
         <item name="android:windowActionModeOverlay">true</item>
         <item name="android:windowBackground">#F1F5F9</item>
+        <item name="android:windowAnimationStyle">@style/BichenSharedAxisWindowAnimation</item>
     </style>
     <style name="AppThemeDark" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:fontFamily">sans-serif</item>
@@ -18,5 +19,12 @@
         <item name="android:windowLightNavigationBar">false</item>
         <item name="android:windowActionModeOverlay">true</item>
         <item name="android:windowBackground">#121714</item>
+        <item name="android:windowAnimationStyle">@style/BichenSharedAxisWindowAnimation</item>
+    </style>
+    <style name="BichenSharedAxisWindowAnimation">
+        <item name="android:activityOpenEnterAnimation">@anim/bichen_route_open_enter</item>
+        <item name="android:activityOpenExitAnimation">@anim/bichen_route_open_exit</item>
+        <item name="android:activityCloseEnterAnimation">@anim/bichen_route_close_enter</item>
+        <item name="android:activityCloseExitAnimation">@anim/bichen_route_close_exit</item>
     </style>
 </resources>

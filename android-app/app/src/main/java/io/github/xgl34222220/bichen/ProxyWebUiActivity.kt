@@ -19,6 +19,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.core.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Build
@@ -26,7 +27,11 @@ import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -70,6 +75,26 @@ private fun ProxyWebUiScreen(onClose: () -> Unit) {
     var progress by remember { mutableIntStateOf(0) }
     var generation by remember { mutableIntStateOf(0) }
     var forceRepair by remember { mutableStateOf(false) }
+    val skeletonTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "webSkeletonShimmer")
+    val skeletonX by skeletonTransition.animateFloat(
+        initialValue = -1f,
+        targetValue = 2f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            androidx.compose.animation.core.tween(1200, easing = androidx.compose.animation.core.LinearEasing),
+        ),
+        label = "webSkeletonShimmerX",
+    )
+    val skeletonBrush = Brush.linearGradient(
+        listOf(tokens.controlBackground.copy(alpha = .52f), Color.White.copy(alpha = .78f), tokens.controlBackground.copy(alpha = .52f)),
+        start = Offset(skeletonX * 460f, -140f),
+        end = Offset((skeletonX + 1f) * 460f, 280f),
+    )
+    val webReady = !preparing && progress >= 100 && pageError.isBlank()
+    val webReveal by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (webReady) 1f else 0f,
+        animationSpec = androidx.compose.animation.core.tween(200),
+        label = "webContentReveal",
+    )
 
     val webView = remember {
         WebView(context).apply {
@@ -229,28 +254,35 @@ private fun ProxyWebUiScreen(onClose: () -> Unit) {
         Box(Modifier.fillMaxSize()) {
             AndroidView(
                 factory = { webView },
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().graphicsLayer {
+                    alpha = webReveal
+                    translationY = (1f - webReveal) * 8f
+                },
             )
 
-            if ((preparing || progress < 100) && pageError.isBlank()) {
+            androidx.compose.animation.AnimatedVisibility(
+                visible = (preparing || progress < 100) && pageError.isBlank(),
+                enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(120)),
+                exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(200)),
+            ) {
                 Column(
                     Modifier.fillMaxSize().background(tokens.pageBackground).padding(18.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Surface(shape = RoundedCornerShape(20.dp), color = tokens.cardBackground) {
                         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Box(Modifier.fillMaxWidth(.42f).height(14.dp).background(tokens.controlBackground, RoundedCornerShape(7.dp)))
-                            Box(Modifier.fillMaxWidth(.74f).height(10.dp).background(tokens.controlBackground.copy(alpha = .72f), RoundedCornerShape(5.dp)))
+                            Box(Modifier.fillMaxWidth(.42f).height(14.dp).background(skeletonBrush, RoundedCornerShape(7.dp)))
+                            Box(Modifier.fillMaxWidth(.74f).height(10.dp).background(skeletonBrush, RoundedCornerShape(5.dp)))
                         }
                     }
                     repeat(4) { index ->
                         Surface(shape = RoundedCornerShape(18.dp), color = tokens.cardBackground) {
                             Row(Modifier.fillMaxWidth().height(66.dp).padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Box(Modifier.size(36.dp).background(tokens.controlBackground, RoundedCornerShape(11.dp)))
+                                Box(Modifier.size(36.dp).background(skeletonBrush, RoundedCornerShape(11.dp)))
                                 Spacer(Modifier.width(12.dp))
                                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                                    Box(Modifier.fillMaxWidth(if (index % 2 == 0) .56f else .70f).height(11.dp).background(tokens.controlBackground, RoundedCornerShape(6.dp)))
-                                    Box(Modifier.fillMaxWidth(.82f).height(8.dp).background(tokens.controlBackground.copy(alpha = .64f), RoundedCornerShape(4.dp)))
+                                    Box(Modifier.fillMaxWidth(if (index % 2 == 0) .56f else .70f).height(11.dp).background(skeletonBrush, RoundedCornerShape(6.dp)))
+                                    Box(Modifier.fillMaxWidth(.82f).height(8.dp).background(skeletonBrush, RoundedCornerShape(4.dp)))
                                 }
                             }
                         }
