@@ -18,16 +18,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Replace strategy sheet with full-screen page
-        run: python3 scripts/replace_group_sheet_with_page_test35.py
+      - name: Polish panel header and segmented tabs
+        run: python3 scripts/polish_panel_header_test36.py
 
-      - name: Commit strategy interaction refactor
+      - name: Commit panel header polish
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
           if ! git diff --cached --quiet; then
-            git commit -m 'Replace strategy sheet with instant full-screen page'
+            git commit -m 'Polish panel header and lightweight tabs'
             git push
           fi
 
@@ -46,11 +46,11 @@ jobs:
       - name: Reuse verified Mihomo runtime
         uses: actions/download-artifact@v4
         with:
-          name: Bichen-0.4.0-test.34-BoxProxy-Page-Parity
+          name: Bichen-0.4.0-test.35-Fullscreen-Strategy-Page
           path: previous-artifact
           github-token: ${{ github.token }}
           repository: xgl34222220-ops/pichen
-          run-id: 35169473176
+          run-id: 35170170620
       - name: Restore native runtime
         shell: bash
         run: |
@@ -68,7 +68,7 @@ jobs:
       - name: Build APK
         working-directory: android-app
         run: gradle :app:assembleDebug --stacktrace
-      - name: Verify APK and strategy page invariants
+      - name: Verify APK and panel header invariants
         run: |
           APK=android-app/app/build/outputs/apk/debug/app-debug.apk
           UI=android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
@@ -76,22 +76,20 @@ jobs:
           unzip -t "$APK" >/dev/null
           unzip -l "$APK" | grep -q 'lib/arm64-v8a/libbichen_core.so'
           unzip -l "$APK" | grep -q 'assets/mihomo-root/arm64-v8a/mihomo'
-          ! grep -q 'groupSheetState' "$UI"
-          ! grep -q 'pendingNode' "$UI"
-          ! grep -q 'private fun RefNodeSheet' "$UI"
-          ! grep -q 'onConfirm = {' "$UI"
+          ! grep -q 'Text("代理面板"' "$UI"
+          ! grep -q '个策略组", color = t.textSecondary' "$UI"
+          grep -q 'Text("面板"' "$UI"
+          grep -q 'FontWeight.Black' "$UI"
+          grep -q 'private fun RefPanelHeaderAction' "$UI"
+          grep -q 'Modifier.fillMaxWidth().height(38.dp).background(track, CircleShape).padding(3.dp)' "$UI"
+          grep -q 'Icons.Rounded.Settings' "$UI"
+          grep -q 'onOpenSettings = { page = RefProxyPage.Settings }' "$UI"
           grep -q 'private fun RefGroupDetailPage' "$UI"
-          grep -q 'private fun RefDetailNodeCard' "$UI"
-          grep -q 'Icons.Rounded.RocketLaunch' "$UI"
-          grep -q 'height(68.dp)' "$UI"
-          grep -q 'onDetailVisibleChanged(true)' "$UI"
           grep -q 'if (!panelDetailVisible)' "$UI"
-          grep -q 'repo.select(selectedGroup.name, node)' "$UI"
-          grep -q 'BackHandler(onBack = onBack)' "$UI"
           grep -q 'homeSnapshotCache' android-app/app/src/main/java/io/github/xgl34222220/bichen/BichenMainActivity.kt
       - uses: actions/upload-artifact@v4
         with:
-          name: Bichen-0.4.0-test.35-Fullscreen-Strategy-Page
+          name: Bichen-0.4.0-test.36-Panel-Header-Polish
           path: android-app/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
