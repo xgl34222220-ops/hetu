@@ -1,0 +1,1 @@
+2026-09-17 preserve proxy and ad-block home state across resume/navigation
