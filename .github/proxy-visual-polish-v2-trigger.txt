@@ -1,1 +1,1 @@
-2026-09-17 test45 micro motion: latency fixed-width crossfade pulse, staggered accordion nodes, native haptics, premium BoxProxy topbar
+2026-09-17 test45 retry: scoped header haptic patch; keep latency motion, staggered nodes, native haptics and topbar polish
