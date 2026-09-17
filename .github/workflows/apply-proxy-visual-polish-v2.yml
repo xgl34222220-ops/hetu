@@ -19,7 +19,9 @@ jobs:
           fetch-depth: 0
 
       - name: Refine proxy native UI
-        run: python3 scripts/refine_proxy_ui_test31.py
+        run: |
+          python3 scripts/refine_proxy_ui_test31.py
+          python3 scripts/fix_test31_ports_string.py
 
       - name: Commit proxy UI refinement
         run: |
