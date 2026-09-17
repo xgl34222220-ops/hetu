@@ -527,6 +527,8 @@ write(yaml_path, yaml)
 
 adb_path = "android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAdblockChainActivity.kt"
 adb = read(adb_path)
+if 'import androidx.compose.foundation.shape.CircleShape' not in adb:
+    adb = adb.replace('import androidx.compose.foundation.shape.RoundedCornerShape\\n', 'import androidx.compose.foundation.shape.CircleShape\\nimport androidx.compose.foundation.shape.RoundedCornerShape\\n')
 adb = replace_once(
     adb,
     '    var busy by remember { mutableStateOf(false) }\n    var notice by remember { mutableStateOf("") }\n',
