@@ -1,0 +1,173 @@
+name: Build Bichen test.35 latest UI fusion
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  build:
+    if: github.event.issue.title == '[BUILD] Bichen 0.4.0-test.35'
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Checkout frozen latest UI test.35
+        uses: actions/checkout@v4
+        with:
+          ref: release/bichen-0.4.0-test.35
+          fetch-depth: 0
+
+      - name: Merge verified test.34 backend into latest UI
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout origin/release/bichen-0.4.0-test.34 -- \
+            android-app/app/build.gradle.kts \
+            android-app/app/src/main/AndroidManifest.xml \
+            android-app/app/src/main/assets/cnip/bichen-cn-v4.txt \
+            android-app/app/src/main/assets/cnip/bichen-cn-v6.txt \
+            android-app/app/src/main/java/io/github/xgl34222220/bichen/BootReceiver.java \
+            android-app/app/src/main/java/io/github/xgl34222220/bichen/DnsVpnService.java \
+            android-app/app/src/main/java/io/github/xgl34222220/bichen/MihomoStartupConfig.java \
+            android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAdblockChainActivity.kt \
+            android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAdblockCoordinator.java \
+            android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAdblockRules.java \
+            android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAdvancedSettingsActivity.kt \
+            android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAppSelectionActivity.kt \
+            android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyCoreActivity.kt \
+            android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyNetworkAutomationActivity.kt \
+            android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyNetworkMatchActivity.java \
+            android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyNetworkMatchService.java \
+            android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyRuntimeProfile.java \
+            android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java \
+            android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyPolicy.java \
+            android-app/app/src/main/java/io/github/xgl34222220/bichen/RootTproxyActivity.java \
+            tests/MihomoStartupConfigTest.java \
+            tools/test_java.py
+          python3 tools/apply_test35_latest_ui_fusion.py
+          git diff --check
+
+          # Version + launcher hard audit.
+          grep -q 'versionCode = 435' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.4.0-test.35"' android-app/app/build.gradle.kts
+          grep -A3 '<activity android:name=".ReferenceProxyActivity"' android-app/app/src/main/AndroidManifest.xml | grep -q 'android.intent.action.MAIN'
+          ! grep -A3 '<activity android:name=".CompactMainActivity"' android-app/app/src/main/AndroidManifest.xml | grep -q 'android.intent.action.MAIN'
+
+          # Latest UI must remain present; backend must be real, not placeholders.
+          grep -q 'panelSearchRequest' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
+          grep -q 'latencyAutoRefreshSeconds' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
+          grep -q 'ProxyAdblockChainActivity::class.java' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
+          grep -q 'ProxyNetworkAutomationActivity::class.java' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
+          grep -q 'ProxyAppSelectionActivity::class.java' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
+          grep -q 'proxyRootAutoStart' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
+          ! grep -q 'CompactMainActivity::class.java' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
+          ! grep -q '后端尚未接入' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
+
+          # test.34 runtime capabilities must survive the UI fusion.
+          grep -q 'ProxyAdblockRules.export' android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java
+          grep -q 'ProxyAdblockCoordinator.enter' android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java
+          grep -q 'proxyAppPackages' android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyPolicy.java
+          grep -q 'ProxyRuntimeProfile.Ipv6.STRICT' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
+          sh -n android-app/app/src/main/assets/proxy-root-v3.sh
+
+      - name: Checkout pinned Mihomo
+        uses: actions/checkout@v4
+        with:
+          repository: MetaCubeX/mihomo
+          ref: ac017cdd246ce8bd547653d927e7bf77d7ee73d5
+          path: .upstream
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache-dependency-path: .upstream/go.sum
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+          cache-read-only: false
+
+      - name: Run Java host regression
+        run: python3 tools/test_java.py
+
+      - name: Compile latest UI and Android backend
+        working-directory: android-app
+        run: gradle :app:compileDebugKotlin :app:compileDebugJavaWithJavac --stacktrace
+
+      - name: Ensure NDK
+        run: |
+          if [ ! -x "$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang" ]; then
+            sdkmanager 'ndk;28.2.13676358'
+          fi
+
+      - name: Build pinned Mihomo runtime
+        run: |
+          set -euo pipefail
+          cp -r native/bridge .upstream/bichenbridge
+          cd .upstream
+          go test -tags with_gvisor -v ./bichenbridge
+          NDK="$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          mkdir -p ../android-app/app/src/main/jniLibs/arm64-v8a ../android-app/app/src/main/jniLibs/x86_64
+          mkdir -p ../android-app/app/src/main/assets/mihomo-root/arm64-v8a ../android-app/app/src/main/assets/mihomo-root/x86_64
+          CGO_ENABLED=1 GOOS=android GOARCH=arm64 CC="$NDK/aarch64-linux-android26-clang" go build -tags with_gvisor -trimpath -buildmode=c-shared -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' -o ../android-app/app/src/main/jniLibs/arm64-v8a/libbichen_core.so ./bichenbridge
+          CGO_ENABLED=1 GOOS=android GOARCH=amd64 CC="$NDK/x86_64-linux-android26-clang" go build -tags with_gvisor -trimpath -buildmode=c-shared -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' -o ../android-app/app/src/main/jniLibs/x86_64/libbichen_core.so ./bichenbridge
+          CGO_ENABLED=1 GOOS=android GOARCH=arm64 CC="$NDK/aarch64-linux-android26-clang" go build -tags with_gvisor -trimpath -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' -o ../android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo .
+          CGO_ENABLED=1 GOOS=android GOARCH=amd64 CC="$NDK/x86_64-linux-android26-clang" go build -tags with_gvisor -trimpath -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' -o ../android-app/app/src/main/assets/mihomo-root/x86_64/mihomo .
+          cp LICENSE ../android-app/app/src/main/assets/MIHOMO-LICENSE
+          git rev-parse HEAD > ../android-app/app/src/main/assets/mihomo-revision.txt
+
+      - name: Build test.35 APK
+        working-directory: android-app
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Verify APK and proxy-first launcher
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=android-app/app/build/outputs/apk/debug/app-debug.apk
+          test -f "$APK"
+          AAPT=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n 1)
+          "$AAPT" dump badging "$APK" | tee apk-badging.txt
+          unzip -t "$APK" >/dev/null
+          unzip -l "$APK" | tee apk-files.txt >/dev/null
+          grep -q "versionCode='435'" apk-badging.txt
+          grep -q "versionName='0.4.0-test.35-preview'" apk-badging.txt
+          grep -q "launchable-activity: name='io.github.xgl34222220.bichen.ReferenceProxyActivity'" apk-badging.txt
+          ! grep -q "launchable-activity: name='io.github.xgl34222220.bichen.CompactMainActivity'" apk-badging.txt
+          grep -q 'assets/proxy-root-v3.sh' apk-files.txt
+          grep -q 'assets/cnip/bichen-cn-v4.txt' apk-files.txt
+          grep -q 'assets/cnip/bichen-cn-v6.txt' apk-files.txt
+          sha256sum "$APK" | tee apk-sha256.txt
+
+      - name: Upload verified test.35 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Bichen-0.4.0-test.35-latest-ui-fusion
+          path: |
+            android-app/app/build/outputs/apk/debug/app-debug.apk
+            apk-badging.txt
+            apk-files.txt
+            apk-sha256.txt
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Commit verified test.35 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .upstream android-app/app/src/main/jniLibs android-app/app/src/main/assets/mihomo-root android-app/app/src/main/assets/MIHOMO-LICENSE android-app/app/src/main/assets/mihomo-revision.txt
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A android-app tests tools
+          git diff --cached --check
+          if ! git diff --cached --quiet; then
+            git commit -m 'Fuse latest LuoShu UI with Bichen test.34 backend for 0.4.0-test.35'
+            git push origin HEAD:release/bichen-0.4.0-test.35
+          fi
