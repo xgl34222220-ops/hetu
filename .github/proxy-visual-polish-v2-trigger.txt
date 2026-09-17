@@ -1,1 +1,1 @@
-2026-09-17 test32 anti-flicker retry: preserve proxy/ad-block home state
+2026-09-17 test33 layout polish: cold-gray canvas, unclipped metrics, compact strategy cards, bottom-sheet port details
