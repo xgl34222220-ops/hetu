@@ -234,7 +234,7 @@ private fun RefRuleGroupCard(items: List<ProxyRuleUi>) {
                                     androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(150))
                                         .togetherWith(androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(90)))
                                 },
-                                label = "ruleExpressionExpand\${index}",
+                                label = "ruleExpressionExpand${index}",
                             ) { open ->
                                 Text(
                                     expression,
@@ -250,7 +250,7 @@ private fun RefRuleGroupCard(items: List<ProxyRuleUi>) {
                             }
                         }
                         Text(
-                            if (composite) "\${item.type} · 点击\${if (expanded) "收起" else "展开"}" else item.type,
+                            if (composite) "${item.type} · 点击${if (expanded) "收起" else "展开"}" else item.type,
                             color = Color(0xFF94A3B8),
                             fontSize = 10.sp,
                             lineHeight = 13.sp,
@@ -691,7 +691,7 @@ web = replace_once(
     web,
     '''                override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
-                    if (!url.isNullOrBlank() && url.startsWith("http://127.0.0.1:\${MihomoStartupConfig.CONTROLLER_PORT}/ui/")) {''',
+                    if (!url.isNullOrBlank() && url.startsWith("http://127.0.0.1:${MihomoStartupConfig.CONTROLLER_PORT}/ui/")) {''',
     '''                override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
                     super.doUpdateVisitedHistory(view, url, isReload)
                     canGoBack = view?.canGoBack() == true
@@ -700,7 +700,7 @@ web = replace_once(
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
                     canGoBack = view?.canGoBack() == true
-                    if (!url.isNullOrBlank() && url.startsWith("http://127.0.0.1:\${MihomoStartupConfig.CONTROLLER_PORT}/ui/")) {''',
+                    if (!url.isNullOrBlank() && url.startsWith("http://127.0.0.1:${MihomoStartupConfig.CONTROLLER_PORT}/ui/")) {''',
     'web history callback',
 )
 old_back = '''    DisposableEffect(webView) {
