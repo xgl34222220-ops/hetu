@@ -33,7 +33,9 @@
         <activity android:name=".ProxyCoreActivity" android:label="内核管理" android:exported="false" />
         <activity android:name=".ProxySubscriptionActivity" android:label="订阅与配置" android:exported="false" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".ProxyActivity" android:label="代理（旧界面）" android:exported="false" />
-        <activity android:name=".RootTproxyActivity" android:label="基础代理配置" android:exported="false" />
+        <activity android:name=".ProxyAdvancedSettingsActivity" android:label="高级代理配置" android:exported="false" />
+        <activity android:name=".ProxyNetworkAutomationActivity" android:label="网络匹配" android:exported="false" />
+        <activity android:name=".RootTproxyActivity" android:label="基础代理配置（旧）" android:exported="false" />
         <activity android:name=".ProxyNetworkMatchActivity" android:label="网络匹配" android:exported="false" />
         <service android:name=".ProxyNetworkMatchService" android:exported="false" android:foregroundServiceType="specialUse">
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User enabled network environment matching for Root proxy automation" />

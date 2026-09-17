@@ -2083,11 +2083,11 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
         item { RefSectionLabel("网络与共享") }
         item {
             RefGroup {
-                RefToolRow(Icons.Rounded.Wifi, Color(0xFF0EA5E9), "网络匹配", "Wi‑Fi / SSID / 移动网络自动启停") { context.startActivity(Intent(context, ProxyNetworkMatchActivity::class.java)) }
+                RefToolRow(Icons.Rounded.Wifi, Color(0xFF0EA5E9), "网络匹配", "Wi‑Fi / SSID / 移动网络自动启停") { context.startActivity(Intent(context, ProxyNetworkAutomationActivity::class.java)) }
                 RefDivider()
-                RefToolRow(Icons.Rounded.WifiTethering, Color(0xFF10B981), "共享网络", "热点与局域网共享 · Root 规则") { context.startActivity(Intent(context, RootTproxyActivity::class.java).putExtra("focus", "sharing")) }
+                RefToolRow(Icons.Rounded.WifiTethering, Color(0xFF10B981), "共享网络", "热点与局域网共享 · Root 规则") { context.startActivity(Intent(context, ProxyAdvancedSettingsActivity::class.java).putExtra("focus", "sharing")) }
                 RefDivider()
-                RefToolRow(Icons.Rounded.AltRoute, Color(0xFFEF4444), "绕过规则", "CIDR 与接口绕过 · Root 规则") { context.startActivity(Intent(context, RootTproxyActivity::class.java).putExtra("focus", "bypass")) }
+                RefToolRow(Icons.Rounded.AltRoute, Color(0xFFEF4444), "绕过规则", "CIDR 与接口绕过 · Root 规则") { context.startActivity(Intent(context, ProxyAdvancedSettingsActivity::class.java).putExtra("focus", "bypass")) }
             }
         }
         item { RefSectionLabel("订阅与数据") }
@@ -2095,7 +2095,7 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
             RefGroup {
                 RefToolRow(Icons.Rounded.CloudDownload, Color(0xFF3B82F6), "订阅管理", state.config) { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) }
                 RefDivider()
-                RefToolRow(Icons.Rounded.Public, Color(0xFFF59E0B), "CNIP 设置", "国内 IPv4/IPv6 自动直连") { context.startActivity(Intent(context, RootTproxyActivity::class.java).putExtra("focus", "cnip")) }
+                RefToolRow(Icons.Rounded.Public, Color(0xFFF59E0B), "CNIP 设置", "国内 IPv4/IPv6 自动直连") { context.startActivity(Intent(context, ProxyAdvancedSettingsActivity::class.java).putExtra("focus", "cnip")) }
             }
         }
         item { RefSectionLabel("维护") }
@@ -2148,7 +2148,7 @@ private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
                 RefDivider()
                 RefValueRow("当前配置", state.config, Icons.Rounded.Description, Color(0xFF8B5CF6)) { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) }
                 RefDivider()
-                RefValueRow("高级代理配置", "应用范围 · DNS · QUIC · CNIP · 共享 · 绕过", Icons.Rounded.SettingsEthernet, Color(0xFF14B8A6)) { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }
+                RefValueRow("高级代理配置", "应用范围 · DNS · QUIC · CNIP · 共享 · 绕过", Icons.Rounded.SettingsEthernet, Color(0xFF14B8A6)) { context.startActivity(Intent(context, ProxyAdvancedSettingsActivity::class.java)) }
             }
         }
         item { RefSectionLabel("界面") }
@@ -2191,6 +2191,7 @@ private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
         val values = listOf(
             ProxyRuntimeProfile.Ipv6.ENABLE to "启用 IPv6",
             ProxyRuntimeProfile.Ipv6.BYPASS to "IPv6 不进核心",
+            ProxyRuntimeProfile.Ipv6.STRICT to "严格 IPv4 防泄漏",
             ProxyRuntimeProfile.Ipv6.DISABLE to "禁用系统 IPv6",
         )
         RefChoiceBottomSheet(

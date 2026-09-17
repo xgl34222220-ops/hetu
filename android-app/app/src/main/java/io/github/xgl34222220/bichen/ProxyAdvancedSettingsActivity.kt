@@ -204,14 +204,7 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
         item {
             AdvancedGroup {
                 AdvancedSwitchRow(Icons.Rounded.WifiTethering, Color(0xFF10B981), "接管共享网络", "将热点/USB 转发流量纳入 Root 透明代理", prefs.getBoolean("proxySharedNetwork", false)) { putBool("proxySharedNetwork", it) }
-                AdvancedDivider()
-                AdvancedValueRow(Icons.Rounded.Router, Color(0xFF0EA5E9), "共享接口", setSummary("proxySharedInterfaces")) {
-                    editSet("proxySharedInterfaces", "共享接口", "每行一个热点/USB 接口，例如 ap+、wlan1、rndis0。留空表示自动识别。")
-                }
-                AdvancedDivider()
-                AdvancedValueRow(Icons.Rounded.Devices, Color(0xFF8B5CF6), "客户端 MAC", setSummary("proxySharedMacs")) {
-                    editSet("proxySharedMacs", "客户端 MAC", "每行一个 MAC 地址，例如 AA:BB:CC:DD:EE:FF。test.31 仅保存策略，MAC 数据面在下一阶段接入前不会假报已过滤。")
-                }
+                AdvancedInfoRow(Icons.Rounded.Router, Color(0xFF0EA5E9), "当前接管方式", "自动处理进入 PREROUTING 的共享流量；接口/MAC 精细过滤尚未开放")
             }
         }
 
