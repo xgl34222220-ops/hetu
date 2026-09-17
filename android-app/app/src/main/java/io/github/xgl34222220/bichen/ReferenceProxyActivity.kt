@@ -841,8 +841,8 @@ private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: I
             androidx.compose.animation.AnimatedContent(
                 targetState = showLan,
                 transitionSpec = {
-                    (androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(220)) { 4.dp.roundToPx() } + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(180)) + androidx.compose.animation.scaleIn(initialScale = .98f))
-                        .togetherWith(androidx.compose.animation.slideOutVertically(androidx.compose.animation.core.tween(160)) { -4.dp.roundToPx() } + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(120)))
+                    (androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(220)) { fullHeight -> (fullHeight * .08f).toInt().coerceAtLeast(4) } + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(180)) + androidx.compose.animation.scaleIn(initialScale = .98f))
+                        .togetherWith(androidx.compose.animation.slideOutVertically(androidx.compose.animation.core.tween(160)) { fullHeight -> -(fullHeight * .08f).toInt().coerceAtLeast(4) } + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(120)))
                 },
                 label = "lanWanMetricSwap",
             ) { lan ->
