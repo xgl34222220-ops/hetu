@@ -5,6 +5,7 @@ import android.content.SharedPreferences;
 import android.os.Build;
 import org.json.JSONObject;
 import java.io.*;
+import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
@@ -27,9 +28,9 @@ final class RootProxyManager {
         final RootProxyPolicy policy;
         final ProxyAdblockRules.Snapshot adblock;
         final String startup;
-        final int tproxyPort,redirectPort;
-        Prepared(ProxyRuntimeProfile p,ProxyConfigLibrary.Entry s,RootProxyPolicy policy,ProxyAdblockRules.Snapshot adblock,String y,int tp,int rp){
-            profile=p;source=s;this.policy=policy;this.adblock=adblock;startup=y;tproxyPort=tp;redirectPort=rp;
+        final int tproxyPort,redirectPort,controllerPort;
+        Prepared(ProxyRuntimeProfile p,ProxyConfigLibrary.Entry s,RootProxyPolicy policy,ProxyAdblockRules.Snapshot adblock,String y,int tp,int rp,int cp){
+            profile=p;source=s;this.policy=policy;this.adblock=adblock;startup=y;tproxyPort=tp;redirectPort=rp;controllerPort=cp;
         }
     }
 
@@ -62,6 +63,22 @@ final class RootProxyManager {
         return s;
     }
 
+    private int chooseControllerPort()throws IOException{
+        int preferred=prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT);
+        LinkedHashSet<Integer> candidates=new LinkedHashSet<>();
+        if(preferred>=29090&&preferred<=29149)candidates.add(preferred);
+        for(int port=29090;port<=29149;port++)candidates.add(port);
+        for(int port:candidates){
+            try(ServerSocket socket=new ServerSocket()){
+                socket.setReuseAddress(false);
+                socket.bind(new InetSocketAddress(InetAddress.getByName("127.0.0.1"),port));
+                prefs.edit().putInt("proxyControllerPort",port).commit();
+                return port;
+            }catch(IOException occupied){ }
+        }
+        throw new IOException("辟尘控制接口动态端口 29090-29149 均被占用，请关闭冲突代理后重试");
+    }
+
     Prepared prepare(ProxyRuntimeProfile profile)throws Exception{
         RootBridge.requireWorkerThread();
         if(profile.core!=ProxyRuntimeProfile.Core.MIHOMO&&profile.core!=ProxyRuntimeProfile.Core.MIHOMO_SMART)
@@ -79,9 +96,10 @@ final class RootProxyManager {
         if(source.getBytes(StandardCharsets.UTF_8).length>4*1024*1024)throw new IOException("配置超过 4 MiB");
         ProxyAdblockRules.Snapshot adblock=profile.adblockChain?ProxyAdblockRules.export(context):null;
         if(profile.adblockChain&&adblock.count<=0)throw new IOException("代理串联去广告已开启，但当前没有有效广告规则；请先启用或更新规则源");
-        MihomoStartupConfig.Result generated=MihomoStartupConfig.generate(source,profile,controllerSecret());
+        int controllerPort=chooseControllerPort();
+        MihomoStartupConfig.Result generated=MihomoStartupConfig.generate(source,profile,controllerSecret(),controllerPort);
         writeStartupCopy(generated.yaml);
-        return new Prepared(profile,selected,policy,adblock,generated.yaml,generated.tproxyPort,generated.redirectPort);
+        return new Prepared(profile,selected,policy,adblock,generated.yaml,generated.tproxyPort,generated.redirectPort,controllerPort);
     }
 
     JSONObject preflight(Prepared p)throws Exception{
@@ -90,7 +108,7 @@ final class RootProxyManager {
         return runJson("preflight",
                 p.profile.mode.id,String.valueOf(p.tproxyPort),String.valueOf(p.redirectPort),p.profile.ipv6.id,
                 bit(p.profile.tcp),bit(p.profile.udp),p.profile.dnsHijack.id,bit(p.profile.quicBlocked),
-                String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(MihomoStartupConfig.CONTROLLER_PORT),
+                String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(p.controllerPort),
                 policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces);
     }
 
@@ -134,7 +152,7 @@ final class RootProxyManager {
         JSONObject pre=runJson("preflight",
                 profile.mode.id,String.valueOf(p.tproxyPort),String.valueOf(p.redirectPort),profile.ipv6.id,
                 bit(profile.tcp),bit(profile.udp),profile.dnsHijack.id,bit(profile.quicBlocked),
-                String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(MihomoStartupConfig.CONTROLLER_PORT),
+                String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(p.controllerPort),
                 policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces);
         if(!pre.optBoolean("ok"))throw new IOException(pre.optString("message","Root 代理预检失败"));
 
@@ -149,7 +167,7 @@ final class RootProxyManager {
         try{result=runJsonWithTimeout(125000L,"start",
                 BIN,CONFIG,profile.mode.id,String.valueOf(p.tproxyPort),String.valueOf(p.redirectPort),profile.ipv6.id,
                 bit(profile.tcp),bit(profile.udp),profile.dnsHijack.id,bit(profile.quicBlocked),
-                String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(MihomoStartupConfig.CONTROLLER_PORT),
+                String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(p.controllerPort),
                 policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces);
             if(!result.optBoolean("ok"))throw new IOException(result.optString("message","Root 代理启动失败"));
         }catch(Exception startFailure){if(adblockCoordinatorEntered)ProxyAdblockCoordinator.exit(context);throw startFailure;}
@@ -200,6 +218,7 @@ final class RootProxyManager {
                 .put("cnIpDirect",profile.cnIpDirect)
                 .put("adblockChain",profile.adblockChain)
                 .put("adblockRuleCount",p.adblock==null?0:p.adblock.count)
+                .put("controllerPort",p.controllerPort)
                 .put("adblockRevision",p.adblock==null?"":p.adblock.revision)
                 .put("bypassCidrs",policy.cidrs)
                 .put("bypassInterfaces",policy.interfaces);

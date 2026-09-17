@@ -11,7 +11,6 @@ import java.util.concurrent.Semaphore;
 
 /** Authenticated localhost-only Mihomo Clash API client for strategy, delay, providers, rules and connections UI. */
 final class MihomoControllerClient {
-    private static final int PORT=MihomoStartupConfig.CONTROLLER_PORT;
     private static final int LIMIT=6*1024*1024;
     private static final Semaphore DELAY_SLOTS=new Semaphore(3,true);
     private static final String[] DEFAULT_DELAY_URLS={
@@ -26,6 +25,11 @@ final class MihomoControllerClient {
         String value=context.getSharedPreferences("bichen",0).getString("proxyControllerSecret","");
         if(value==null||value.isEmpty())throw new IOException("策略控制接口尚未初始化");
         return value;
+    }
+
+    private int port(){
+        int value=context.getSharedPreferences("bichen",0).getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT);
+        return value>=1024&&value<=65535?value:MihomoStartupConfig.CONTROLLER_PORT;
     }
 
     JSONObject proxies()throws Exception{
@@ -150,14 +154,15 @@ final class MihomoControllerClient {
 
     private JSONObject request(String method,String path,JSONObject body,int socketTimeoutMs)throws Exception{
         byte[] payload=body==null?new byte[0]:body.toString().getBytes(StandardCharsets.UTF_8);
+        int port=port();
         Socket socket=new Socket();
         try{
-            socket.connect(new InetSocketAddress(InetAddress.getByName("127.0.0.1"),PORT),2200);
+            socket.connect(new InetSocketAddress(InetAddress.getByName("127.0.0.1"),port),2200);
             socket.setSoTimeout(socketTimeoutMs);
             OutputStream raw=socket.getOutputStream();
             StringBuilder head=new StringBuilder();
             head.append(method).append(' ').append(path).append(" HTTP/1.1\r\n")
-                .append("Host: 127.0.0.1:").append(PORT).append("\r\n")
+                .append("Host: 127.0.0.1:").append(port).append("\r\n")
                 .append("Authorization: Bearer ").append(secret()).append("\r\n")
                 .append("Accept: application/json\r\n")
                 .append("Connection: close\r\n");

@@ -27,12 +27,17 @@ final class MihomoStartupConfig {
     }
 
     static Result generate(String source,ProxyRuntimeProfile profile)throws IOException{
-        return generate(source,profile,"bichen-test-controller");
+        return generate(source,profile,"bichen-test-controller",CONTROLLER_PORT);
     }
 
     static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret)throws IOException{
+        return generate(source,profile,controllerSecret,CONTROLLER_PORT);
+    }
+
+    static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret,int controllerPort)throws IOException{
         if(source==null||source.trim().isEmpty())throw new IOException("源配置为空");
         if(controllerSecret==null||controllerSecret.trim().isEmpty())throw new IOException("控制接口密钥为空");
+        if(controllerPort<1024||controllerPort>65535)throw new IOException("控制接口端口无效");
         if(profile.core!=ProxyRuntimeProfile.Core.MIHOMO&&profile.core!=ProxyRuntimeProfile.Core.MIHOMO_SMART)
             throw new IOException("当前启动配置生成器只支持 Mihomo / Mihomo Smart");
         ProxyRuntimeProfile.Capability capability=profile.capability();
@@ -122,7 +127,7 @@ final class MihomoStartupConfig {
         // Android netd owns the socket fwmark/netId. Do not overwrite the full SO_MARK here;
         // the Root controller exempts the root-owned Mihomo process from OUTPUT interception.
         override.append("find-process-mode: strict\n");
-        override.append("external-controller: 127.0.0.1:").append(CONTROLLER_PORT).append('\n');
+        override.append("external-controller: 127.0.0.1:").append(controllerPort).append('\n');
         override.append("secret: '").append(controllerSecret.replace("'","''")).append("'\n");
         override.append("external-ui: /data/adb/bichen/proxy/run/").append(EXTERNAL_UI_DIR).append('\n');
         override.append("external-ui-url: '").append(EXTERNAL_UI_URL).append("'\n");
