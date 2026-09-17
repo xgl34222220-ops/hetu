@@ -18,16 +18,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Apply micro motion and haptic polish
-        run: python3 scripts/run_micro_motion_test45.py
+      - name: Fix Compose animation import
+        run: python3 scripts/fix_test45_animate_float_import.py
 
-      - name: Commit micro motion polish
+      - name: Commit test45 compile fix
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
           if ! git diff --cached --quiet; then
-            git commit -m 'Polish latency motion haptics and topbar'
+            git commit -m 'Fix test45 Compose animation import'
             git push
           fi
 
@@ -78,6 +78,7 @@ jobs:
           unzip -t "$APK" >/dev/null
           unzip -l "$APK" | grep -q 'lib/arm64-v8a/libbichen_core.so'
           unzip -l "$APK" | grep -q 'assets/mihomo-root/arm64-v8a/mihomo'
+          grep -q 'import androidx.compose.animation.core.animateFloat' "$UI"
           grep -q 'widthIn(min = 58.dp).height(22.dp)' "$UI"
           grep -q 'fontFeatureSettings = "tnum"' "$UI"
           grep -q 'latencyCrossFade' "$UI"
