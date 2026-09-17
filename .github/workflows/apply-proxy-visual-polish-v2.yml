@@ -18,18 +18,20 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Refine proxy native UI
+      - name: Refine proxy native UI and remove home flicker
         run: |
           python3 scripts/refine_proxy_ui_test31.py
           python3 scripts/fix_test31_ports_string.py
+          python3 scripts/fix_home_flicker_test32.py
 
-      - name: Commit proxy UI refinement
+      - name: Commit UI and state fixes
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
+          git add android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt \
+                  android-app/app/src/main/java/io/github/xgl34222220/bichen/BichenMainActivity.kt
           if ! git diff --cached --quiet; then
-            git commit -m 'Refine BoxProxy layout and bottom sheets'
+            git commit -m 'Preserve home state across navigation and resume'
             git push
           fi
 
@@ -48,11 +50,11 @@ jobs:
       - name: Reuse verified Mihomo runtime
         uses: actions/download-artifact@v4
         with:
-          name: Bichen-0.4.0-test.23-compose
+          name: Bichen-0.4.0-test.31-Native-UI-Refine
           path: previous-artifact
           github-token: ${{ github.token }}
           repository: xgl34222220-ops/pichen
-          run-id: 35035986825
+          run-id: 35167093620
       - name: Restore native runtime
         shell: bash
         run: |
@@ -70,7 +72,7 @@ jobs:
       - name: Build APK
         working-directory: android-app
         run: gradle :app:assembleDebug --stacktrace
-      - name: Verify APK
+      - name: Verify APK and anti-flicker invariants
         run: |
           APK=android-app/app/build/outputs/apk/debug/app-debug.apk
           test -f "$APK"
@@ -78,9 +80,12 @@ jobs:
           unzip -l "$APK" | grep -q 'lib/arm64-v8a/libbichen_core.so'
           unzip -l "$APK" | grep -q 'assets/mihomo-root/arm64-v8a/mihomo'
           ! grep -q 'AlertDialog(' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
+          ! grep -q 'key(uiRevision)' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
+          grep -q 'homeSnapshotCache' android-app/app/src/main/java/io/github/xgl34222220/bichen/BichenMainActivity.kt
+          grep -q 'snapshotReady' android-app/app/src/main/java/io/github/xgl34222220/bichen/BichenMainActivity.kt
       - uses: actions/upload-artifact@v4
         with:
-          name: Bichen-0.4.0-test.31-Native-UI-Refine
+          name: Bichen-0.4.0-test.32-Home-Flicker-Fix
           path: android-app/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
