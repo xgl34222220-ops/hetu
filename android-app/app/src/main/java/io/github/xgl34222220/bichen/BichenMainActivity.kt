@@ -59,6 +59,7 @@ private fun BichenMainApp(actionScope: CoroutineScope) {
     val backdrop = rememberLayerBackdrop()
     val liquid = isRuntimeShaderSupported()
     var page by rememberSaveable { mutableStateOf(MainPage.Home) }
+    var homeSnapshotCache by remember { mutableStateOf<HomeSnapshot?>(null) }
     val dockItems = remember {
         listOf(
             DockItem("首页", Icons.Rounded.Home),
@@ -76,7 +77,12 @@ private fun BichenMainApp(actionScope: CoroutineScope) {
                 .padding(bottom = 106.dp),
         ) {
             when (page) {
-                MainPage.Home -> HomePage(controller, actionScope)
+                MainPage.Home -> HomePage(
+                    controller = controller,
+                    actionScope = actionScope,
+                    cachedSnapshot = homeSnapshotCache,
+                    onSnapshot = { homeSnapshotCache = it },
+                )
                 MainPage.Apps -> AppsPage(controller)
                 MainPage.Rules -> RulesPage(controller, actionScope)
                 MainPage.Activity -> ActivityPage(controller)
@@ -94,12 +100,18 @@ private fun BichenMainApp(actionScope: CoroutineScope) {
 }
 
 @Composable
-private fun HomePage(controller: BichenComposeController, actionScope: CoroutineScope) {
+private fun HomePage(
+    controller: BichenComposeController,
+    actionScope: CoroutineScope,
+    cachedSnapshot: HomeSnapshot?,
+    onSnapshot: (HomeSnapshot) -> Unit,
+) {
     val context = LocalContext.current
     val tokens = LocalBichenTokens.current
     val scheme = MaterialTheme.colorScheme
     var revision by remember { mutableIntStateOf(0) }
-    var snapshot by remember { mutableStateOf(HomeSnapshot()) }
+    var snapshot by remember { mutableStateOf(cachedSnapshot ?: HomeSnapshot()) }
+    var snapshotReady by remember { mutableStateOf(cachedSnapshot != null) }
     var busy by remember { mutableStateOf(false) }
     var operationMessage by remember { mutableStateOf("") }
 
@@ -112,7 +124,10 @@ private fun HomePage(controller: BichenComposeController, actionScope: Coroutine
 
     LaunchedEffect(revision) {
         try {
-            snapshot = controller.homeSnapshot()
+            val next = controller.homeSnapshot()
+            snapshot = next
+            snapshotReady = true
+            onSnapshot(next)
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (error: Exception) {
@@ -122,8 +137,12 @@ private fun HomePage(controller: BichenComposeController, actionScope: Coroutine
     LaunchedEffect(Unit) {
         while (true) {
             delay(5000)
-            try { snapshot = controller.homeSnapshot() }
-            catch (cancel: CancellationException) { throw cancel }
+            try {
+                val next = controller.homeSnapshot()
+                snapshot = next
+                snapshotReady = true
+                onSnapshot(next)
+            } catch (cancel: CancellationException) { throw cancel }
             catch (_: Exception) { }
         }
     }
@@ -141,15 +160,15 @@ private fun HomePage(controller: BichenComposeController, actionScope: Coroutine
                 Column(Modifier.fillMaxWidth().padding(22.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         StatusPill(
-                            if (snapshot.moduleEnabled || snapshot.vpnRunning) "去广告已开启" else "去广告未开启",
-                            if (snapshot.moduleEnabled || snapshot.vpnRunning) tokens.success else tokens.warning,
+                            if (!snapshotReady) "正在读取状态" else if (snapshot.moduleEnabled || snapshot.vpnRunning) "去广告已开启" else "去广告未开启",
+                            if (!snapshotReady) tokens.textMuted else if (snapshot.moduleEnabled || snapshot.vpnRunning) tokens.success else tokens.warning,
                         )
                         Spacer(Modifier.weight(1f))
                         Text(if (controller.preferredVpnMode()) "DNS VPN" else "模块保护", color = tokens.textSecondary, style = MaterialTheme.typography.labelMedium)
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         Text(
-                            if (snapshot.moduleEnabled || snapshot.vpnRunning) "正在保护" else "准备就绪",
+                            if (!snapshotReady) "正在同步" else if (snapshot.moduleEnabled || snapshot.vpnRunning) "正在保护" else "准备就绪",
                             color = tokens.textPrimary,
                             fontSize = 30.sp,
                             lineHeight = 36.sp,

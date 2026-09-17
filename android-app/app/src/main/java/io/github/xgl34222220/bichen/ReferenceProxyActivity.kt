@@ -74,19 +74,23 @@ import kotlinx.coroutines.launch
  */
 @OptIn(ExperimentalMaterial3Api::class)
 class ReferenceProxyActivity : ComponentActivity() {
-    private var uiRevision by mutableIntStateOf(0)
+    private var resumeRevision by mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            key(uiRevision) { BichenTheme { RefProxyShell { finish() } } }
+            // Re-read theme preferences on resume without destroying the Compose tree.
+            // The previous forced wrapper recreated RefProxyShell and briefly exposed
+            // default/empty runtime state before the async refresh completed.
+            val revision = resumeRevision
+            BichenTheme { RefProxyShell(resumeRevision = revision) { finish() } }
         }
     }
 
     override fun onResume() {
         super.onResume()
-        uiRevision++
+        resumeRevision++
     }
 }
 
@@ -96,7 +100,7 @@ private enum class RefPanelTab(val label: String) {
 }
 
 @Composable
-private fun RefProxyShell(onBack: () -> Unit) {
+private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
     val context = LocalContext.current
     val controller = remember { ProxyComposeController(context) }
     val repo = remember { ProxyDashboardRepository(context) }
@@ -245,6 +249,12 @@ private fun RefProxyShell(onBack: () -> Unit) {
             delay(2200)
             refresh()
         }
+    }
+
+    // Returning from Theme/secondary activities should refresh data in place. Never
+    // replace the composition or reset state/runtime/providers to their empty defaults.
+    LaunchedEffect(resumeRevision) {
+        if (resumeRevision > 1) refresh()
     }
 
     LaunchedEffect(state.running) {
