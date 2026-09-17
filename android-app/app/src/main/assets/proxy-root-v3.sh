@@ -15,6 +15,8 @@ NET_STATE="$RUN/net.state"
 WATCHDOG_PID="$RUN/watchdog.pid"
 WATCHDOG_LOG="$RUN/watchdog.log"
 CRASH_STATE="$RUN/last-crash"
+START_STATE="$RUN/start-state"
+START_ERROR="$RUN/last-start-error"
 LOCK_DIR="$RUN/.txn.lock"
 
 BYPASS_MARK=0x08000000
@@ -46,7 +48,8 @@ KOUT=BICHEN_KOUT
 KFWD=BICHEN_KFWD
 
 ok(){ printf '{"ok":true,"message":"%s"}\n' "$1"; }
-fail(){ printf '{"ok":false,"message":"%s"}\n' "$1"; exit 1; }
+start_stage(){ mkdir -p "$RUN" >/dev/null 2>&1 || true; printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$1" > "$START_STATE" 2>/dev/null || true; }
+fail(){ MSG="$1"; mkdir -p "$RUN" >/dev/null 2>&1 || true; printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$MSG" > "$START_ERROR" 2>/dev/null || true; printf '{"ok":false,"message":"%s"}\n' "$MSG"; exit 1; }
 root(){ [ "$(id -u)" = 0 ] || fail "需要 Root 权限"; }
 has(){ command -v "$1" >/dev/null 2>&1; }
 port(){ case "${1:-}" in ''|*[!0-9]*) return 1;; esac; [ "$1" -ge 1 ] && [ "$1" -le 65535 ]; }
@@ -156,6 +159,13 @@ pidcore(){
   CMD=$(tr '\000' ' ' < "/proc/$P/cmdline" 2>/dev/null || true)
   EXE=$(readlink "/proc/$P/exe" 2>/dev/null || true)
   case "$CMD $EXE" in *"$BASE/bin/core"*) return 0;; *) return 1;; esac
+}
+findcorepid(){
+  for PROC in /proc/[0-9]*; do
+    CAND=${PROC#/proc/}; case "$CAND" in ''|*[!0-9]*) continue;; esac
+    if pidcore "$CAND" && kill -0 "$CAND" >/dev/null 2>&1; then printf '%s\n' "$CAND"; return 0; fi
+  done
+  return 1
 }
 stopwatchdog(){
   [ -f "$WATCHDOG_PID" ] || return 0; W=$(cat "$WATCHDOG_PID" 2>/dev/null || true)
@@ -435,7 +445,7 @@ wait_ready(){
 write_session(){ M="$1"; V6="$2"; S="$3"; SHARE="$4"; KILL="$5"; { printf 'MODE=%s\n' "$M"; printf 'IPV6=%s\n' "$V6"; printf 'APP_SCOPE=%s\n' "$S"; printf 'SHARE=%s\n' "$SHARE"; printf 'KILL=%s\n' "$KILL"; } > "$SESSION.new.$$" && mv -f "$SESSION.new.$$" "$SESSION"; }
 watchdog(){
   COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS="$6"; IFACES="$7"
-  mkdir -p "$RUN" || exit 0; printf '%s\n' "$$" > "$WATCHDOG_PID"; while pidcore "$COREPID" && kill -0 "$COREPID" >/dev/null 2>&1; do sleep 2; done; acquire_lock || exit 0
+  mkdir -p "$RUN" || exit 0; printf '%s\n' "$$" > "$WATCHDOG_PID"; MISS=0; while [ "$MISS" -lt 3 ]; do if pidcore "$COREPID" && kill -0 "$COREPID" >/dev/null 2>&1; then MISS=0; sleep 2; else MISS=$((MISS+1)); sleep 0.20; fi; done; acquire_lock || exit 0
   REC=$(cat "$PIDFILE" 2>/dev/null || true)
   if [ "$REC" = "$COREPID" ]; then
     cleanup; restorev6; rm -f "$PIDFILE"
@@ -449,6 +459,7 @@ start_watchdog(){ COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS=
 
 start(){
   START_BIN="$1"; START_CFG="$2"; START_MODE="$3"; START_TP="$4"; START_RP="$5"; START_V6="$6"; START_TCP="$7"; START_UDP="$8"; START_DNS="$9"; START_QUIC="${10}"; START_DP="${11}"; START_CP="${12}"; START_SCOPE="${13}"; START_UIDS="${14}"; START_SHARE="${15}"; START_KILL="${16}"; START_CIDRS="${17}"; START_IFACES="${18}"
+  rm -f "$START_ERROR"; start_stage "preflight"
   preflight "$START_MODE" "$START_TP" "$START_RP" "$START_V6" "$START_TCP" "$START_UDP" "$START_DNS" "$START_QUIC" "$START_DP" "$START_CP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_KILL" "$START_CIDRS" "$START_IFACES" >/dev/null
   [ -x "$START_BIN" ] || fail "核心文件不存在或不可执行"; [ -r "$START_CFG" ] || fail "启动配置不存在"; mkdir -p "$RUN" || fail "无法创建运行目录"; validatecfg "$START_BIN" "$START_CFG" || fail "Mihomo 配置校验失败，当前网络未被接管"; acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
   stopwatchdog; cleanup; restorev6; stopcore; sleep 0.20; rm -f "$CRASH_STATE" "$SESSION"
@@ -459,17 +470,24 @@ start(){
   if [ "$START_V6" = disable ]; then disablev6 || { cleanup; fail "禁用系统 IPv6 失败，已恢复原状态"; }; fi
 
   mkdir -p "$RUN/rules" "$RUN/proxy_provider" "$RUN/ruleset" "$RUN/ui" || { cleanup; restorev6; rm -f "$SESSION"; fail "无法创建 Mihomo 运行缓存目录"; }
+  start_stage "launch-core"
   : > "$LOG"; "$START_BIN" -d "$RUN" -f "$START_CFG" >>"$LOG" 2>&1 & START_PID=$!; printf '%s\n' "$START_PID" > "$PIDFILE"; printf '%s\n' "$START_MODE" > "$MODEFILE"; write_session "$START_MODE" "$START_V6" "$START_SCOPE" "$START_SHARE" "$START_KILL"
+  start_stage "wait-listeners"
   wait_ready "$START_PID" "$START_MODE" "$START_TP" "$START_RP" "$START_TCP" "$START_UDP" "$START_DNS" "$START_DP" "$START_CP"; READY_RC=$?
   if [ "$READY_RC" -ne 0 ]; then
     if [ "$READY_RC" -eq 2 ]; then READY_MSG="Mihomo 启动后提前退出，请查看核心日志"; else READY_MSG="Mihomo 初始化超过 90 秒，透明代理/DNS/API 监听仍未就绪；首次加载大量远程订阅或规则时请检查网络与核心日志"; fi
     stopcore; cleanup; restorev6; rm -f "$SESSION"; fail "$READY_MSG"
   fi
 
+  start_stage "install-ipv4-tproxy"
   install_mangle4 "$START_TP" "$START_MODE" "$START_TCP" "$START_UDP" "$START_DNS" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 TPROXY 规则安装失败，已回滚"; }
+  start_stage "install-ipv4-redirect"
   install_redirect4 "$START_RP" "$START_MODE" "$START_TCP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 Redirect 规则安装失败，已回滚"; }
+  start_stage "install-ipv4-dns"
   [ "$START_DNS" = off ] || install_dns_redirect4 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 DNS 劫持安装失败，已回滚"; }
+  start_stage "install-ipv4-quic"
   [ "$START_QUIC" = 0 ] || install_quic4 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 QUIC 策略安装失败，已回滚"; }
+  start_stage "install-ipv6"
   if [ "$START_V6" = enable ]; then
     install_mangle6 "$START_TP" "$START_MODE" "$START_TCP" "$START_UDP" "$START_DNS" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 TPROXY 规则安装失败，已回滚"; }
     install_redirect6 "$START_RP" "$START_MODE" "$START_TCP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 Redirect 规则安装失败，已回滚"; }
@@ -477,7 +495,9 @@ start(){
     [ "$START_QUIC" = 0 ] || install_quic6 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 QUIC 策略安装失败，已回滚"; }
   elif [ "$START_V6" = strict ]; then install_v6_strict "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "严格 IPv4 防泄漏规则安装失败，已回滚"; }; fi
 
+  start_stage "start-watchdog"
   start_watchdog "$START_PID" "$START_KILL" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES"
+  rm -f "$START_ERROR"; start_stage "running"
   DESC="tcp=$START_TCP,udp=$START_UDP,dns=$START_DNS,ipv6=$START_V6,scope=$START_SCOPE,share=$START_SHARE,kill=$START_KILL,quicBlock=$START_QUIC"
   if [ -n "$MARK" ]; then ok "Root $START_MODE 已启动（$DESC，mark=$MARK，table=$TABLE）"; else ok "Root $START_MODE 已启动（$DESC）"; fi
 }
@@ -485,6 +505,7 @@ start(){
 status(){
   root; STATUS_RUNNING=false; STATUS_PID=0
   if [ -f "$PIDFILE" ]; then X=$(cat "$PIDFILE" 2>/dev/null || true); case "$X" in ''|*[!0-9]*) ;; *) if pidcore "$X" && kill -0 "$X" >/dev/null 2>&1; then STATUS_RUNNING=true; STATUS_PID="$X"; fi;; esac; fi
+  if [ "$STATUS_RUNNING" = false ]; then RECOVER_PID=$(findcorepid 2>/dev/null || true); case "$RECOVER_PID" in ''|*[!0-9]*) ;; *) STATUS_RUNNING=true; STATUS_PID="$RECOVER_PID"; printf '%s\n' "$RECOVER_PID" > "$PIDFILE" 2>/dev/null || true;; esac; fi
   STATUS_MODE=$(cat "$MODEFILE" 2>/dev/null || echo none); T4=false; T6=false; K4=false; K6=false
   for SPEC in "mangle OUTPUT $MOUT" "nat OUTPUT $NOUT" "nat OUTPUT $DNSOUT" "filter OUTPUT $QUICOUT"; do set -- $SPEC; iptables -t "$1" -C "$2" -j "$3" >/dev/null 2>&1 && T4=true; done; iptables -t filter -C OUTPUT -j "$KOUT" >/dev/null 2>&1 && K4=true
   if has ip6tables; then for SPEC in "mangle OUTPUT $MOUT" "nat OUTPUT $NOUT" "nat OUTPUT $DNSOUT" "filter OUTPUT $QUICOUT" "filter OUTPUT $V6OUT"; do set -- $SPEC; ip6tables -t "$1" -C "$2" -j "$3" >/dev/null 2>&1 && T6=true; done; ip6tables -t filter -C OUTPUT -j "$KOUT" >/dev/null 2>&1 && K6=true; fi

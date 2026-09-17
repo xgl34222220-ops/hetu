@@ -155,12 +155,15 @@ final class RootProxyManager {
         }catch(Exception startFailure){if(adblockCoordinatorEntered)ProxyAdblockCoordinator.exit(context);throw startFailure;}
 
         stage(progress,"确认策略控制接口、守护与回滚状态…");
-        try{
-            JSONObject state=status();
-            if(!state.optBoolean("running",false))
-                throw new IOException("启动命令已返回，但核心未保持运行"+(diagnostics().isEmpty()?"":"："+diagnostics()));
-            MihomoControllerClient controller=new MihomoControllerClient(context);
-            if(!controller.waitReady(4500))throw new IOException("Mihomo 控制接口未在启动窗口内就绪");
+        JSONObject state=status();
+        if(!state.optBoolean("running",false)){
+            if(adblockCoordinatorEntered)ProxyAdblockCoordinator.exit(context);
+            throw new IOException("启动命令已返回，但未检测到辟尘私有核心进程"+(diagnostics().isEmpty()?"":"："+diagnostics()));
+        }
+        MihomoControllerClient controller=new MihomoControllerClient(context);
+        if(!controller.waitReady(12000)){
+            prefs.edit().putString("proxyRootEgressWarning","Root 代理核心已运行；本地控制接口仍在初始化，面板数据可能稍后出现").apply();
+        }else{
             try{
                 controller.delay("DIRECT","https://connectivitycheck.platform.hicloud.com/generate_204","200-399");
                 prefs.edit().remove("proxyRootEgressWarning").apply();
@@ -173,9 +176,6 @@ final class RootProxyManager {
                     prefs.edit().putString("proxyRootEgressWarning","核心已保持运行，但启动联网探测失败："+detail).apply();
                 }
             }
-        }catch(Exception verify){
-            try{stop();}catch(Exception ignored){}
-            throw new IOException("核心启动后健康检查失败，网络已回滚："+(verify.getMessage()==null?"控制接口不可用":verify.getMessage()),verify);
         }
 
         String warning=policy.warning();
