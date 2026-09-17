@@ -21,6 +21,7 @@ jobs:
       - name: Apply test50 commercial UI polish
         run: |
           python3 tools/apply_test50_commercial_polish.py
+          python3 tools/fix_test50_yaml_escape.py
           # Keep the resource-card header roomy enough for the 22dp CPU ring.
           python3 - <<'PY'
           from pathlib import Path
@@ -56,6 +57,8 @@ jobs:
           grep -q 'Color(0xFFF8FAFC)' "$AD"
           grep -q 'BasicTextField' "$SUB"
           grep -q 'lineCount = remember(yamlText)' "$SUB"
+          grep -Fq "yamlText.count { it == '\\n' }" "$SUB"
+          grep -Fq 'joinToString("\\n")' "$SUB"
           grep -q 'Root 数据面 · 修改后重启代理生效' "$ADV"
 
       - name: Commit generated test50 sources
