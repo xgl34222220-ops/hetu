@@ -52,6 +52,11 @@ final class MihomoStartupConfig {
         yaml=removeTopLevelScalar(yaml,"mixed-port");
         yaml=removeTopLevelScalar(yaml,"socks-port");
         yaml=removeTopLevelScalar(yaml,"port");
+        // Root TPROXY must listen on a wildcard transparent socket. The source config may
+        // deliberately bind ordinary HTTP/SOCKS listeners to loopback; do not inherit that
+        // restriction into Bichen's private transparent runtime.
+        yaml=removeTopLevelScalar(yaml,"allow-lan");
+        yaml=removeTopLevelScalar(yaml,"bind-address");
         yaml=removeTopLevelBlock(yaml,"tun");
         yaml=removeTopLevelScalar(yaml,"routing-mark");
         yaml=removeTopLevelScalar(yaml,"external-controller");
@@ -64,7 +69,10 @@ final class MihomoStartupConfig {
         yaml=removeTopLevelScalar(yaml,"external-ui-url");
         yaml=removeTopLevelScalar(yaml,"find-process-mode");
 
-        if(profile.dnsHijack==ProxyRuntimeProfile.DnsHijack.REDIRECT)
+        // Both Root DNS modes terminate DNS in Mihomo's private built-in resolver.
+        // This preserves fake-ip / respect-rules and prevents plaintext DNS from being sent
+        // as an ordinary transparent UDP flow. The source's 1053 listener is never reused.
+        if(profile.dnsHijack!=ProxyRuntimeProfile.DnsHijack.OFF)
             yaml=ensureDnsListener(yaml,DNS_PORT);
         if(profile.cnIpDirect)
             yaml=ensureCnIpDirect(yaml);
@@ -105,6 +113,11 @@ final class MihomoStartupConfig {
         }
         // Mihomo marks its own outbound sockets. Root netfilter returns this bit before interception,
         // so Root/system UID traffic no longer needs to be blanket-bypassed just to avoid a core loop.
+        // The transparent listener must accept packets re-routed to loopback while retaining
+        // their original destination. No HTTP/SOCKS/Mixed listener is present in this private
+        // runtime, so enabling wildcard ingress does not expose the user's former 7890 proxy.
+        override.append("allow-lan: true\n");
+        override.append("bind-address: '*'\n");
         override.append("routing-mark: ").append(OUTBOUND_ROUTING_MARK).append('\n');
         override.append("find-process-mode: strict\n");
         override.append("external-controller: 127.0.0.1:").append(CONTROLLER_PORT).append('\n');

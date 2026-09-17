@@ -275,8 +275,10 @@ preflight(){
 
   NEED_TP=0; NEED_RP=0
   case "$M" in tproxy) if [ "$TCP" = 1 ] || [ "$UDP" = 1 ]; then NEED_TP=1; fi;; redirect) [ "$TCP" = 1 ] && NEED_RP=1;; enhance) [ "$TCP" = 1 ] && NEED_RP=1; [ "$UDP" = 1 ] && NEED_TP=1;; esac
-  [ "$DNS" = tproxy ] && NEED_TP=1
-  [ "$DNS" = redirect ] && { probered4 "$DP" tcp || fail "当前 iptables 不支持 TCP DNS REDIRECT"; probered4 "$DP" udp || fail "当前 iptables 不支持 UDP DNS REDIRECT"; }
+  if [ "$DNS" = tproxy ] || [ "$DNS" = redirect ]; then
+    probered4 "$DP" tcp || fail "当前 iptables 不支持 TCP DNS REDIRECT"
+    probered4 "$DP" udp || fail "当前 iptables 不支持 UDP DNS REDIRECT"
+  fi
   [ "$NEED_TP" = 1 ] && { port "$TP" || fail "TPROXY 端口无效"; probetp4 "$TP" || fail "当前内核或 iptables 不支持 TPROXY"; }
   [ "$NEED_RP" = 1 ] && { port "$RP" || fail "Redirect 端口无效"; probered4 "$RP" tcp || fail "当前 iptables 不支持 REDIRECT"; }
   if [ "$NEED_TP" = 0 ] && [ "$NEED_RP" = 0 ] && [ "$DNS" = off ]; then fail "TCP、UDP 与 DNS 接管均已关闭，代理没有可接管流量"; fi
@@ -284,7 +286,7 @@ preflight(){
   if [ "$V6" = enable ] && v6active; then
     [ "$NEED_TP" = 0 ] || probetp6 "$TP" || fail "IPv6 TPROXY 不可用，可改用严格 IPv4 或 IPv6 不进核心"
     [ "$NEED_RP" = 0 ] || probered6 "$RP" tcp || fail "IPv6 REDIRECT 不可用，可改用严格 IPv4 或 IPv6 不进核心"
-    if [ "$DNS" = redirect ]; then probered6 "$DP" tcp || fail "IPv6 TCP DNS REDIRECT 不可用"; probered6 "$DP" udp || fail "IPv6 UDP DNS REDIRECT 不可用"; fi
+    if [ "$DNS" = tproxy ] || [ "$DNS" = redirect ]; then probered6 "$DP" tcp || fail "IPv6 TCP DNS REDIRECT 不可用"; probered6 "$DP" udp || fail "IPv6 UDP DNS REDIRECT 不可用"; fi
   fi
   if [ "$V6" = strict ] && v6active; then has ip6tables || fail "严格 IPv4 需要 ip6tables"; fi
   if [ "$V6" = disable ]; then TESTED=0; for P in /proc/sys/net/ipv6/conf/*/disable_ipv6; do [ -w "$P" ] && TESTED=1 && break; done; [ "$TESTED" = 1 ] || fail "系统不允许临时禁用 IPv6"; fi
@@ -296,12 +298,13 @@ route6(){ ip -6 route replace local ::/0 dev lo table "$TABLE" || return 1; ip -
 
 install_mangle4(){
   P="$1"; M="$2"; TCP="$3"; UDP="$4"; DNS="$5"; S="$6"; UIDS="$7"; SHARE="$8"; CIDRS="$9"; IFACES="${10}"
-  NEED=0; case "$M" in tproxy) if [ "$TCP" = 1 ] || [ "$UDP" = 1 ]; then NEED=1; fi;; enhance) [ "$UDP" = 1 ] && NEED=1;; esac; [ "$DNS" = tproxy ] && NEED=1; [ "$NEED" = 1 ] || return 0
+  NEED=0; case "$M" in tproxy) if [ "$TCP" = 1 ] || [ "$UDP" = 1 ]; then NEED=1; fi;; enhance) [ "$UDP" = 1 ] && NEED=1;; esac; [ "$NEED" = 1 ] || return 0
   route4 || return 1; iptables -t mangle -N "$MOUT" || return 1; iptables -t mangle -N "$MPRE" || return 1
   iptables -t mangle -A "$MOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_out iptables mangle "$MOUT" "$IFACES" || return 1; blacklist_returns iptables mangle "$MOUT" "$S" "$UIDS" || return 1
   iptables -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in iptables mangle "$MPRE" "$IFACES" || return 1
-  if [ "$DNS" = tproxy ]; then
-    for X in tcp udp; do scoped_mark iptables mangle "$MOUT" "$S" "$UIDS" "$X" 53 "$MARK/$MASK" || return 1; if [ "$SHARE" = 1 ]; then iptables -t mangle -A "$MPRE" -p "$X" --dport 53 -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else iptables -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p "$X" --dport 53 -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; done
+  if [ "$DNS" = tproxy ] || [ "$DNS" = redirect ]; then
+    iptables -t mangle -A "$MOUT" -p tcp --dport 53 -j RETURN || return 1
+    iptables -t mangle -A "$MOUT" -p udp --dport 53 -j RETURN || return 1
   fi
   bypass4 "$MOUT" mangle "$CIDRS" || return 1; bypass4 "$MPRE" mangle "$CIDRS" || return 1
   if [ "$M" = tproxy ]; then
@@ -313,11 +316,14 @@ install_mangle4(){
 
 install_mangle6(){
   P="$1"; M="$2"; TCP="$3"; UDP="$4"; DNS="$5"; S="$6"; UIDS="$7"; SHARE="$8"; CIDRS="$9"; IFACES="${10}"; v6active || return 0
-  NEED=0; case "$M" in tproxy) if [ "$TCP" = 1 ] || [ "$UDP" = 1 ]; then NEED=1; fi;; enhance) [ "$UDP" = 1 ] && NEED=1;; esac; [ "$DNS" = tproxy ] && NEED=1; [ "$NEED" = 1 ] || return 0
+  NEED=0; case "$M" in tproxy) if [ "$TCP" = 1 ] || [ "$UDP" = 1 ]; then NEED=1; fi;; enhance) [ "$UDP" = 1 ] && NEED=1;; esac; [ "$NEED" = 1 ] || return 0
   route6 || return 1; ip6tables -t mangle -N "$MOUT" || return 1; ip6tables -t mangle -N "$MPRE" || return 1
   ip6tables -t mangle -A "$MOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_out ip6tables mangle "$MOUT" "$IFACES" || return 1; blacklist_returns ip6tables mangle "$MOUT" "$S" "$UIDS" || return 1
   ip6tables -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in ip6tables mangle "$MPRE" "$IFACES" || return 1
-  if [ "$DNS" = tproxy ]; then for X in tcp udp; do scoped_mark ip6tables mangle "$MOUT" "$S" "$UIDS" "$X" 53 "$MARK/$MASK" || return 1; if [ "$SHARE" = 1 ]; then ip6tables -t mangle -A "$MPRE" -p "$X" --dport 53 -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else ip6tables -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p "$X" --dport 53 -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; done; fi
+  if [ "$DNS" = tproxy ] || [ "$DNS" = redirect ]; then
+    ip6tables -t mangle -A "$MOUT" -p tcp --dport 53 -j RETURN || return 1
+    ip6tables -t mangle -A "$MOUT" -p udp --dport 53 -j RETURN || return 1
+  fi
   bypass6 "$MOUT" mangle "$CIDRS" || return 1; bypass6 "$MPRE" mangle "$CIDRS" || return 1
   if [ "$M" = tproxy ]; then
     [ "$TCP" = 0 ] || { scoped_mark ip6tables mangle "$MOUT" "$S" "$UIDS" tcp "" "$MARK/$MASK" || return 1; if [ "$SHARE" = 1 ]; then ip6tables -t mangle -A "$MPRE" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else ip6tables -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
@@ -378,7 +384,7 @@ udp_listen(){ P="$1"; if has ss && ss -lnu 2>/dev/null | grep -Eq "[:.]${P}([[:s
 ready(){
   PID="$1"; M="$2"; TP="$3"; RP="$4"; TCP="$5"; UDP="$6"; DNS="$7"; DP="$8"; CP="$9"; pidcore "$PID" && kill -0 "$PID" >/dev/null 2>&1 || return 1; tcp_listen "$CP" || return 1
   case "$M" in tproxy) [ "$TCP" = 0 ] || tcp_listen "$TP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; redirect) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1;; enhance) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; esac
-  if [ "$DNS" = tproxy ]; then tcp_listen "$TP" || return 1; udp_listen "$TP" || return 1; fi; if [ "$DNS" = redirect ]; then tcp_listen "$DP" || return 1; udp_listen "$DP" || return 1; fi; return 0
+  if [ "$DNS" = tproxy ] || [ "$DNS" = redirect ]; then tcp_listen "$DP" || return 1; udp_listen "$DP" || return 1; fi; return 0
 }
 check_start_ports(){
   M="$1"; TP="$2"; RP="$3"; TCP="$4"; UDP="$5"; DNS="$6"; DP="$7"; CP="$8"
@@ -396,10 +402,7 @@ check_start_ports(){
       [ "$UDP" = 0 ] || { udp_listen "$TP" && fail "TPROXY UDP 端口 $TP 已被其他程序占用"; }
     ;;
   esac
-  if [ "$DNS" = tproxy ]; then
-    tcp_listen "$TP" && fail "DNS/TPROXY TCP 端口 $TP 已被其他程序占用"
-    udp_listen "$TP" && fail "DNS/TPROXY UDP 端口 $TP 已被其他程序占用"
-  elif [ "$DNS" = redirect ]; then
+  if [ "$DNS" = tproxy ] || [ "$DNS" = redirect ]; then
     tcp_listen "$DP" && fail "DNS TCP 端口 $DP 已被其他程序占用"
     udp_listen "$DP" && fail "DNS UDP 端口 $DP 已被其他程序占用"
   fi
@@ -458,12 +461,12 @@ start(){
 
   install_mangle4 "$START_TP" "$START_MODE" "$START_TCP" "$START_UDP" "$START_DNS" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 TPROXY 规则安装失败，已回滚"; }
   install_redirect4 "$START_RP" "$START_MODE" "$START_TCP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 Redirect 规则安装失败，已回滚"; }
-  [ "$START_DNS" != redirect ] || install_dns_redirect4 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 DNS 劫持安装失败，已回滚"; }
+  [ "$START_DNS" = off ] || install_dns_redirect4 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 DNS 劫持安装失败，已回滚"; }
   [ "$START_QUIC" = 0 ] || install_quic4 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 QUIC 策略安装失败，已回滚"; }
   if [ "$START_V6" = enable ]; then
     install_mangle6 "$START_TP" "$START_MODE" "$START_TCP" "$START_UDP" "$START_DNS" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 TPROXY 规则安装失败，已回滚"; }
     install_redirect6 "$START_RP" "$START_MODE" "$START_TCP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 Redirect 规则安装失败，已回滚"; }
-    [ "$START_DNS" != redirect ] || install_dns_redirect6 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 DNS 劫持安装失败，已回滚"; }
+    [ "$START_DNS" = off ] || install_dns_redirect6 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 DNS 劫持安装失败，已回滚"; }
     [ "$START_QUIC" = 0 ] || install_quic6 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 QUIC 策略安装失败，已回滚"; }
   elif [ "$START_V6" = strict ]; then install_v6_strict "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "严格 IPv4 防泄漏规则安装失败，已回滚"; }; fi
 
