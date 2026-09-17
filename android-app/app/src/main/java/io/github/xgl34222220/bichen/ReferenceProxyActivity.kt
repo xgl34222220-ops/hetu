@@ -249,21 +249,27 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
         }
     }
 
+    suspend fun measureSitesInternal(reportError: Boolean) {
+        if (!state.running || testing) return
+        testing = true
+        try {
+            val measured = repo.siteLatencies()
+            if (measured.isNotEmpty()) siteDelays = measured
+            if (reportError && measured.values.none { it > 0L }) {
+                message = "关键站点测速失败，请检查当前网络"
+            }
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (error: Exception) {
+            if (reportError) message = error.message ?: "测速失败"
+        } finally {
+            testing = false
+        }
+    }
+
     fun measureSites() {
         if (!state.running || testing) return
-        scope.launch {
-            testing = true
-            try {
-                siteDelays = repo.siteLatencies()
-                if (siteDelays.values.none { it > 0L }) message = "关键站点测速失败，请检查当前网络"
-            } catch (cancel: CancellationException) {
-                throw cancel
-            } catch (error: Exception) {
-                message = error.message ?: "测速失败"
-            } finally {
-                testing = false
-            }
-        }
+        scope.launch { measureSitesInternal(reportError = true) }
     }
 
     LaunchedEffect(Unit) {
@@ -275,18 +281,32 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
         }
     }
 
-    // Returning from Theme/secondary activities should refresh data in place. Never
-    // replace the composition or reset state/runtime/providers to their empty defaults.
+    // Returning from a secondary activity refreshes runtime state and silently
+    // measures the three Home endpoints without clearing the previous values.
     LaunchedEffect(resumeRevision) {
-        if (resumeRevision > 1) refresh()
+        if (resumeRevision > 1) {
+            refresh()
+            if (state.running) measureSitesInternal(reportError = false)
+        }
     }
 
+    // Start transition triggers one silent measurement immediately. The optional
+    // heartbeat is user controlled: off / 30 s / 60 s. Keep the previous numbers
+    // on screen while testing so there is no layout flash.
     LaunchedEffect(state.running) {
-        if (!state.running) { siteDelays = emptyMap(); return@LaunchedEffect }
-        siteDelays = runCatching { repo.siteLatencies() }.getOrDefault(siteDelays)
+        if (!state.running) {
+            siteDelays = emptyMap()
+            return@LaunchedEffect
+        }
+        measureSitesInternal(reportError = false)
         while (true) {
-            delay(15_000)
-            siteDelays = runCatching { repo.siteLatencies() }.getOrDefault(siteDelays)
+            val seconds = prefs.getInt("latencyAutoRefreshSeconds", 60).takeIf { it == 0 || it == 30 || it == 60 } ?: 60
+            if (seconds <= 0) {
+                delay(1_000)
+                continue
+            }
+            delay(seconds * 1_000L)
+            measureSitesInternal(reportError = false)
         }
     }
 
@@ -361,12 +381,6 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                         panelTab = RefPanelTab.Subscriptions
                         page = RefProxyPage.Panel
                     },
-                    onSearch = {
-                        panelTab = RefPanelTab.Overview
-                        panelSearchRequest++
-                        page = RefProxyPage.Panel
-                    },
-                    onSettings = { page = RefProxyPage.Settings },
                 )
                 RefProxyPage.Panel -> RefPanel(
                     state = state,
@@ -430,8 +444,6 @@ private fun RefHome(
     onWebUi: () -> Unit,
     onLog: () -> Unit,
     onSubscription: () -> Unit,
-    onSearch: () -> Unit,
-    onSettings: () -> Unit,
 ) {
     val t = LocalBichenTokens.current
     val scheme = MaterialTheme.colorScheme
@@ -448,18 +460,34 @@ private fun RefHome(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {
-            Box(
+            Row(
                 Modifier.fillMaxWidth().statusBarsPadding().padding(top = 16.dp, bottom = 10.dp).height(44.dp),
-                contentAlignment = Alignment.CenterStart,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    "BoxProxy",
+                    "辟尘",
                     color = if (scheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A),
-                    fontSize = 26.sp,
-                    lineHeight = 32.sp,
+                    fontSize = 24.sp,
+                    lineHeight = 30.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = (-0.6).sp,
+                    letterSpacing = (-0.45).sp,
                 )
+                Spacer(Modifier.width(8.dp))
+                Surface(
+                    shape = CircleShape,
+                    color = if (scheme.background.luminance() < .5f) Color.White.copy(alpha = .07f) else Color(0xFFE2E8F0).copy(alpha = .62f),
+                    tonalElevation = 0.dp,
+                ) {
+                    Text(
+                        "Mihomo Core",
+                        Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        color = Color(0xFF94A3B8),
+                        fontSize = 9.sp,
+                        lineHeight = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = .2.sp,
+                    )
+                }
             }
         }
         item {
@@ -518,11 +546,19 @@ private fun RefHome(
                         }
                     }
                     HorizontalDivider(color = scheme.primary.copy(alpha = .10f))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         val neutralAction = if (scheme.background.luminance() < .5f) Color(0xFFE2E8F0) else Color(0xFF334155)
-                        RefActionText("重载", state.running && operation.isBlank(), onReload, Modifier.weight(1f), neutralAction)
-                        RefActionText(if (state.running) "停止" else "启动", operation.isBlank(), onToggle, Modifier.weight(1f), Color(0xFFEF4444))
-                        RefActionText("重启", state.running && operation.isBlank(), onRestart, Modifier.weight(1f), neutralAction)
+                        RefActionText("重载", state.running && operation.isBlank(), onReload, Modifier.weight(1f), neutralAction, Icons.Rounded.Refresh)
+                        RefActionText(
+                            if (state.running) "停止" else "启动",
+                            operation.isBlank(),
+                            onToggle,
+                            Modifier.weight(1f),
+                            if (state.running) Color(0xFFE11D48) else Color(0xFF2563EB),
+                            if (state.running) null else Icons.Rounded.PlayArrow,
+                            danger = state.running,
+                        )
+                        RefActionText("重启", state.running && operation.isBlank(), onRestart, Modifier.weight(1f), neutralAction, Icons.Rounded.RestartAlt)
                     }
                 }
             }
@@ -571,9 +607,25 @@ private fun RefLatencyPanel(baidu: Long?, cloudflare: Long?, google: Long?, test
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("延迟", color = t.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                val spinner = androidx.compose.animation.core.rememberInfiniteTransition(label = "homeLatencyRefresh")
+                val rotation by spinner.animateFloat(
+                    initialValue = 0f,
+                    targetValue = 360f,
+                    animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                        animation = androidx.compose.animation.core.tween(900, easing = androidx.compose.animation.core.LinearEasing),
+                    ),
+                    label = "homeLatencyRefreshRotation",
+                )
                 IconButton(onClick = onClick, enabled = !testing, modifier = Modifier.size(32.dp)) {
-                    if (testing) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                    else Icon(Icons.Rounded.Refresh, "全部测速", tint = t.textSecondary, modifier = Modifier.size(18.dp))
+                    Icon(
+                        Icons.Rounded.Refresh,
+                        "全部测速",
+                        tint = t.textSecondary,
+                        modifier = Modifier.size(18.dp).graphicsLayer {
+                            rotationZ = if (testing) rotation else 0f
+                            alpha = if (testing) .62f else 1f
+                        },
+                    )
                 }
                 Icon(Icons.Rounded.Tune, null, tint = t.textSecondary, modifier = Modifier.size(17.dp))
             }
@@ -722,6 +774,14 @@ private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, modifier: M
                 }
             }
             Text(if (total > 0L) refBytes(used) else "—", color = valueColor, fontSize = 16.sp, lineHeight = 19.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
+            Box(Modifier.fillMaxWidth().height(4.dp).background(Color(0xFFEFF3F8), CircleShape)) {
+                if (total > 0L && ratio > 0f) {
+                    Box(
+                        Modifier.fillMaxWidth(ratio.coerceIn(.001f, 1f)).fillMaxHeight()
+                            .background(Brush.horizontalGradient(listOf(Color(0xFF3B82F6), Color(0xFF6366F1))), CircleShape),
+                    )
+                }
+            }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("已用流量", color = Color(0xFF94A3B8), fontSize = 11.sp, modifier = Modifier.weight(1f))
                 Text(if (total > 0L) "总 ${refBytes(total)}" else "${items.size} 个订阅", color = Color(0xFF64748B), fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1)
@@ -761,26 +821,73 @@ private fun countryEmoji(code: String): String {
 }
 
 @Composable
-private fun RefActionText(text: String, enabled: Boolean, onClick: () -> Unit, modifier: Modifier, color: Color = LocalBichenTokens.current.textPrimary) {
+private fun RefActionText(
+    text: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier,
+    color: Color = LocalBichenTokens.current.textPrimary,
+    icon: ImageVector? = null,
+    danger: Boolean = false,
+) {
     val t = LocalBichenTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val view = LocalView.current
     val source = remember(text) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .95f else 1f, spring(dampingRatio = .72f, stiffness = 620f), label = "heroAction$text")
-    Box(
+    val scale by animateFloatAsState(
+        if (pressed) .95f else 1f,
+        spring(dampingRatio = .68f, stiffness = 650f),
+        label = "heroAction$text",
+    )
+    val shape = CircleShape
+    val background = when {
+        danger && dark -> Color(0xFF4C1724).copy(alpha = .78f)
+        danger -> Color(0xFFFFF1F2).copy(alpha = .94f)
+        dark -> Color.White.copy(alpha = .075f)
+        else -> Color.White.copy(alpha = .92f)
+    }
+    val borderColor = when {
+        danger && dark -> Color(0xFFFB7185).copy(alpha = .18f)
+        danger -> Color(0xFFFFE4E6)
+        dark -> Color.White.copy(alpha = .09f)
+        else -> Color.White.copy(alpha = .90f)
+    }
+    val shadowColor = if (danger) Color(0xFFF43F5E).copy(alpha = .12f) else Color(0xFF0F172A).copy(alpha = .055f)
+    Row(
         modifier
-            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .90f else 1f }
-            .height(38.dp)
-            .clip(CircleShape)
-            .background(if (dark) t.elevatedCardBackground.copy(alpha = .82f) else Color.White.copy(alpha = .84f))
+            .height(40.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .86f else if (enabled) 1f else .50f }
+            .shadow(5.dp, shape, clip = false, ambientColor = shadowColor, spotColor = shadowColor)
+            .background(background, shape)
+            .border(.7.dp, borderColor, shape)
+            .clip(shape)
             .clickable(enabled = enabled, interactionSource = source, indication = null) {
                 view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                 onClick()
-            },
-        contentAlignment = Alignment.Center,
+            }
+            .padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
     ) {
-        Text(text, color = if (enabled) color else t.textSecondary.copy(alpha = .42f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        if (danger) {
+            val pulse = androidx.compose.animation.core.rememberInfiniteTransition(label = "stopPulse")
+            val dotAlpha by pulse.animateFloat(
+                initialValue = .52f,
+                targetValue = 1f,
+                animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                    animation = androidx.compose.animation.core.tween(760),
+                    repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
+                ),
+                label = "stopPulseAlpha",
+            )
+            Box(Modifier.size(6.dp).graphicsLayer { alpha = dotAlpha }.background(Color(0xFFF43F5E), CircleShape))
+            Spacer(Modifier.width(6.dp))
+        } else if (icon != null) {
+            Icon(icon, null, tint = color.copy(alpha = .68f), modifier = Modifier.size(14.dp))
+            Spacer(Modifier.width(6.dp))
+        }
+        Text(text, color = color, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
     }
 }
 
@@ -1487,12 +1594,6 @@ private fun RefPanelGlassHeader(
                 active = searchOpen,
                 onClick = onSearchToggle,
             )
-            Spacer(Modifier.width(8.dp))
-            RefPanelHeaderAction(
-                icon = Icons.Rounded.MoreHoriz,
-                contentDescription = "更多设置",
-                onClick = onOpenSettings,
-            )
         }
         RefPanelTabs(
             selected = selected,
@@ -1800,72 +1901,94 @@ private fun RefInlineNodeCard(
 ) {
     val t = LocalBichenTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val shape = RoundedCornerShape(14.dp)
+    val shape = RoundedCornerShape(16.dp)
     val source = remember(node.name) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .96f else 1f, spring(dampingRatio = .74f, stiffness = 560f), label = "inlineNode${node.name}")
+    val scale by animateFloatAsState(if (pressed) .96f else 1f, spring(dampingRatio = .72f, stiffness = 580f), label = "inlineNode${node.name}")
     var revealed by remember(node.name) { mutableStateOf(false) }
     LaunchedEffect(node.name) {
         delay((index * 20L).coerceAtMost(260L))
         revealed = true
     }
-    val background = when {
-        dark && active -> Color(0xFF172554)
-        dark -> t.cardBackground
-        active -> Color(0xFFF8FBFF)
-        else -> Color.White
+    val backgroundBrush = when {
+        dark && active -> Brush.verticalGradient(listOf(Color(0xFF172554), Color(0xFF111C38)))
+        dark -> Brush.verticalGradient(listOf(t.elevatedCardBackground, t.cardBackground))
+        active -> Brush.verticalGradient(listOf(Color.White, Color(0xFFF3F7FF)))
+        else -> Brush.verticalGradient(listOf(Color.White, Color(0xFFFAFCFF)))
     }
-    Box(modifier.height(50.dp)) {
+    Box(modifier.height(66.dp)) {
         androidx.compose.animation.AnimatedVisibility(
             visible = revealed,
             modifier = Modifier.fillMaxSize(),
             enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(180)) +
                 androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(220)) { it / 3 },
         ) {
-            Row(
+            Column(
                 Modifier.fillMaxSize()
-                    .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .88f else 1f }
-                    .shadow(if (active) 3.dp else 1.dp, shape, clip = false)
-                    .background(background, shape)
-                    .border(if (active) 1.3.dp else .7.dp, if (active) Color(0xFF2563EB) else Color(0xFFE2E8F0), shape)
+                    .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .86f else 1f }
+                    .shadow(if (active) 4.dp else 2.dp, shape, clip = false)
+                    .background(backgroundBrush, shape)
+                    .border(
+                        if (active) 1.4.dp else .8.dp,
+                        if (active) Color(0xFF2563EB) else if (dark) Color.White.copy(alpha = .08f) else Color.White.copy(alpha = .90f),
+                        shape,
+                    )
                     .clip(shape)
                     .clickable(interactionSource = source, indication = null, onClick = onSelect)
-                    .padding(horizontal = 9.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.SpaceBetween,
             ) {
-                val flag = refNodeFlag(node.name)
-                if (flag.isNotBlank()) {
-                    Text(flag, fontSize = 13.sp)
-                    Spacer(Modifier.width(4.dp))
-                }
-                Text(
-                    node.name,
-                    color = if (active) Color(0xFF1E3A8A) else t.textPrimary,
-                    fontSize = 11.sp,
-                    fontWeight = if (active) FontWeight.Bold else FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f).padding(end = 4.dp),
-                )
-                Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) {
-                    androidx.compose.animation.AnimatedVisibility(
-                        visible = active,
-                        enter = androidx.compose.animation.scaleIn(
-                            initialScale = .05f,
-                            animationSpec = spring(dampingRatio = .52f, stiffness = 500f),
-                        ) + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(130)),
-                        exit = androidx.compose.animation.scaleOut(targetScale = .45f) + androidx.compose.animation.fadeOut(),
-                    ) {
-                        Box(
-                            Modifier.size(15.dp).background(Color(0xFF2563EB), CircleShape),
-                            contentAlignment = Alignment.Center,
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    val flag = refNodeFlag(node.name)
+                    if (flag.isNotBlank()) {
+                        Text(flag, fontSize = 14.sp, modifier = Modifier.width(20.dp))
+                        Spacer(Modifier.width(4.dp))
+                    }
+                    Text(
+                        node.name,
+                        color = if (active) Color(0xFF1E3A8A) else t.textPrimary,
+                        fontSize = 12.sp,
+                        lineHeight = 15.sp,
+                        fontWeight = if (active) FontWeight.Bold else FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Box(Modifier.size(17.dp), contentAlignment = Alignment.Center) {
+                        androidx.compose.animation.AnimatedVisibility(
+                            visible = active,
+                            enter = androidx.compose.animation.scaleIn(
+                                initialScale = .05f,
+                                animationSpec = spring(dampingRatio = .50f, stiffness = 520f),
+                            ) + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(130)),
+                            exit = androidx.compose.animation.scaleOut(targetScale = .45f) + androidx.compose.animation.fadeOut(),
                         ) {
-                            Icon(Icons.Rounded.Check, "已选择", tint = Color.White, modifier = Modifier.size(10.dp))
+                            Box(Modifier.size(16.dp).background(Color(0xFF2563EB), CircleShape), contentAlignment = Alignment.Center) {
+                                Icon(Icons.Rounded.Check, "已选择", tint = Color.White, modifier = Modifier.size(11.dp))
+                            }
                         }
                     }
                 }
-                Spacer(Modifier.width(4.dp))
-                RefDelayBadge(delay, testing, onDelay)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        shape = RoundedCornerShape(7.dp),
+                        color = if (dark) Color.White.copy(alpha = .055f) else Color(0xFFF8FAFC),
+                        tonalElevation = 0.dp,
+                    ) {
+                        Text(
+                            refNodeProtocol(node),
+                            Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            color = Color(0xFF94A3B8),
+                            fontSize = 9.sp,
+                            lineHeight = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            maxLines = 1,
+                        )
+                    }
+                    Spacer(Modifier.weight(1f))
+                    RefDelayBadge(delay, testing, onDelay)
+                }
             }
         }
     }
@@ -2400,9 +2523,11 @@ private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
     val prefs = remember { context.getSharedPreferences("bichen", 0) }
     var modePicker by remember { mutableStateOf(false) }
     var ipv6Picker by remember { mutableStateOf(false) }
+    var latencyPicker by remember { mutableStateOf(false) }
     var portsInfo by remember { mutableStateOf(false) }
     var autoStart by remember { mutableStateOf(prefs.getBoolean("autoStartVpn", false)) }
     var blurEnabled by remember { mutableStateOf(prefs.getBoolean("enableBlur", true)) }
+    var latencyInterval by remember { mutableIntStateOf(prefs.getInt("latencyAutoRefreshSeconds", 60).takeIf { it == 0 || it == 30 || it == 60 } ?: 60) }
 
     val t = LocalBichenTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
@@ -2443,6 +2568,14 @@ private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
         item { RefSectionLabel("网络与配置") }
         item {
             RefGroup {
+                RefValueRow(
+                    "延迟自动刷新",
+                    if (latencyInterval <= 0) "关闭" else "${latencyInterval} 秒",
+                    Icons.Rounded.Speed,
+                    Color(0xFF2563EB),
+                    highlightValue = latencyInterval > 0,
+                ) { latencyPicker = true }
+                RefDivider()
                 RefValueRow(
                     "端口细则",
                     "${MihomoStartupConfig.TPROXY_PORT} / ${MihomoStartupConfig.REDIRECT_PORT}",
@@ -2534,6 +2667,21 @@ private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
                     if (state.running) "IPv6 设置已保存，重启代理后生效" else "IPv6 设置已保存",
                     android.widget.Toast.LENGTH_SHORT,
                 ).show()
+                onChanged()
+            },
+        )
+    }
+
+    if (latencyPicker) {
+        val intervals = listOf(0 to "关闭", 30 to "30 秒", 60 to "60 秒")
+        RefChoiceBottomSheet(
+            title = "延迟自动刷新间隔",
+            options = intervals.map { (seconds, label) -> label to (latencyInterval == seconds) },
+            onDismiss = { latencyPicker = false },
+            onSelect = { index ->
+                latencyInterval = intervals[index].first
+                prefs.edit().putInt("latencyAutoRefreshSeconds", latencyInterval).apply()
+                latencyPicker = false
                 onChanged()
             },
         )
@@ -2678,17 +2826,22 @@ private fun RefInfoBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
-        containerColor = t.elevatedCardBackground,
-        contentColor = t.textPrimary,
+        containerColor = if (terminal) Color(0xFF0B1220) else t.elevatedCardBackground,
+        contentColor = if (terminal) Color(0xFFE2E8F0) else t.textPrimary,
         tonalElevation = 0.dp,
-        scrimColor = Color.Black.copy(alpha = .35f),
-        dragHandle = { RefSheetDragHandle() },
+        scrimColor = Color.Black.copy(alpha = if (terminal) .48f else .35f),
+        dragHandle = {
+            Box(
+                Modifier.padding(top = 10.dp, bottom = 6.dp).size(width = 36.dp, height = 4.dp)
+                    .background(if (terminal) Color(0xFF334155) else Color(0xFFCBD5E1), CircleShape),
+            )
+        },
     ) {
         Column(
             Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(title, color = t.textPrimary, fontSize = 20.sp, lineHeight = 25.sp, fontWeight = FontWeight.Bold)
+            Text(title, color = if (terminal) Color(0xFFF8FAFC) else t.textPrimary, fontSize = 20.sp, lineHeight = 25.sp, fontWeight = FontWeight.Bold)
             Box(
                 Modifier.fillMaxWidth()
                     .heightIn(max = 430.dp)

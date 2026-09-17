@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -19,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
@@ -27,6 +29,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import io.github.xgl34222220.bichen.ui.BichenTheme
 import io.github.xgl34222220.bichen.ui.LocalBichenTokens
 import kotlinx.coroutines.launch
@@ -354,40 +358,93 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
     }
 
     if (yamlOpen) {
-        AlertDialog(
+        Dialog(
             onDismissRequest = { if (!yamlSaving) yamlOpen = false },
-            title = { Text("编辑当前 YAML") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("直接修改源配置；运行中的代理不会被热改，保存后下次重启代理生效。", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            val editorShape = RoundedCornerShape(18.dp)
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = tokens.pageBackground,
+            ) {
+                Column(Modifier.fillMaxSize()) {
+                    Row(
+                        Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp).height(48.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        IconButton(onClick = { if (!yamlSaving) yamlOpen = false }, enabled = !yamlSaving) {
+                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回")
+                        }
+                        Column(Modifier.weight(1f)) {
+                            Text("编辑当前 YAML", color = tokens.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+                            Text("保存后重启代理生效", color = tokens.textSecondary, fontSize = 10.sp)
+                        }
+                    }
                     OutlinedTextField(
                         value = yamlText,
                         onValueChange = { yamlText = it; yamlError = "" },
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 360.dp, max = 520.dp),
-                        textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 16.dp, vertical = 8.dp),
+                        textStyle = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 13.sp,
+                            lineHeight = 20.sp,
+                        ),
+                        shape = editorShape,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = tokens.cardBackground,
+                            unfocusedContainerColor = tokens.cardBackground,
+                            focusedBorderColor = scheme.primary.copy(alpha = .34f),
+                            unfocusedBorderColor = tokens.outline.copy(alpha = .55f),
+                        ),
                     )
-                    if (yamlError.isNotBlank()) Text(yamlError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        yamlSaving = true
-                        scope.launch {
-                            runCatching { controller.saveConfigText(yamlText) }
-                                .onSuccess { yamlOpen = false; revision++; message = "YAML 已保存；重启代理后生效" }
-                                .onFailure { yamlError = it.message ?: "保存失败" }
-                            yamlSaving = false
+                    if (yamlError.isNotBlank()) {
+                        Text(
+                            yamlError,
+                            color = scheme.error,
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp),
+                        )
+                    }
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp)
+                            .shadow(10.dp, RoundedCornerShape(26.dp), clip = false),
+                        shape = RoundedCornerShape(26.dp),
+                        color = if (dark) tokens.elevatedCardBackground.copy(alpha = .96f) else Color.White.copy(alpha = .94f),
+                        border = BorderStroke(.7.dp, if (dark) tokens.outline.copy(alpha = .55f) else Color.White.copy(alpha = .92f)),
+                        tonalElevation = 0.dp,
+                    ) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            FilledTonalButton(
+                                onClick = { yamlOpen = false },
+                                enabled = !yamlSaving,
+                                modifier = Modifier.weight(1f).height(44.dp),
+                                shape = CircleShape,
+                            ) { Text("取消", fontWeight = FontWeight.Bold) }
+                            Button(
+                                onClick = {
+                                    yamlSaving = true
+                                    scope.launch {
+                                        runCatching { controller.saveConfigText(yamlText) }
+                                            .onSuccess { yamlOpen = false; revision++; message = "YAML 已保存；重启代理后生效" }
+                                            .onFailure { yamlError = it.message ?: "保存失败" }
+                                        yamlSaving = false
+                                    }
+                                },
+                                enabled = !yamlSaving,
+                                modifier = Modifier.weight(1f).height(44.dp),
+                                shape = CircleShape,
+                            ) {
+                                if (yamlSaving) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                                else Text("保存", fontWeight = FontWeight.Bold)
+                            }
                         }
-                    },
-                    enabled = !yamlSaving,
-                ) {
-                    if (yamlSaving) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Text("保存")
+                    }
                 }
-            },
-            dismissButton = { TextButton(onClick = { yamlOpen = false }, enabled = !yamlSaving) { Text("取消") } },
-        )
+            }
+        }
     }
 }
 
