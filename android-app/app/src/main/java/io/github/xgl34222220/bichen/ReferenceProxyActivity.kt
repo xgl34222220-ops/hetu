@@ -132,12 +132,27 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
     val liquid = isRuntimeShaderSupported()
     val prefs = remember { context.getSharedPreferences("bichen", 0) }
     val showPanelTab = prefs.getBoolean("showPanelTab", true)
+    val startupProfile = remember { ProxyRuntimeProfile.load(prefs) }
+    val startupConfig = remember(startupProfile.core) {
+        prefs.getString("proxySelectedConfig.${startupProfile.core.id}", "").orEmpty().ifBlank { "尚未选择配置" }
+    }
 
     var page by rememberSaveable { mutableStateOf(RefProxyPage.Home) }
     var panelTab by rememberSaveable { mutableStateOf(RefPanelTab.Overview) }
     var panelSearchRequest by rememberSaveable { mutableIntStateOf(0) }
     var panelDetailVisible by rememberSaveable { mutableStateOf(false) }
-    var state by remember { mutableStateOf(ProxyComposeState(running = prefs.getBoolean("proxyRootWanted", false))) }
+    var state by remember {
+        mutableStateOf(
+            ProxyComposeState(
+                running = prefs.getBoolean("proxyUiLastRunning", prefs.getBoolean("proxyRootWanted", false)),
+                core = startupProfile.core.label,
+                mode = startupProfile.mode.label,
+                ipv6 = startupProfile.ipv6.id,
+                autoOverwrite = startupProfile.autoOverwrite,
+                config = startupConfig,
+            ),
+        )
+    }
     var runtime by remember { mutableStateOf(ProxyRuntimeSnapshot()) }
     var providers by remember { mutableStateOf<List<DashboardProviderUi>>(emptyList()) }
     var siteDelays by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
@@ -182,6 +197,12 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
             runtime = sampled
             providers = if (next.running) runCatching { repo.providers() }.getOrDefault(providers) else emptyList()
             state = next
+            prefs.edit()
+                .putBoolean("proxyUiLastRunning", next.running)
+                .putString("proxyUiLastCore", next.core)
+                .putString("proxyUiLastMode", next.mode)
+                .putString("proxyUiLastConfig", next.config)
+                .apply()
             message = next.message
             lastAt = now
             lastUp = next.uploadTotal
@@ -286,10 +307,16 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
     }
 
     LaunchedEffect(Unit) {
-        // Runtime state is more important than decorative icon downloads. Reopening the app
-        // must not show a false "已停止" card while network icon assets are being fetched.
-        refresh()
-        launch { runCatching { repo.ensureIcons() } }
+        // First frame must never wait for Root shell + controller API + provider/CPU probes.
+        // Paint the persisted snapshot first, then reconcile the live state asynchronously.
+        launch {
+            delay(34)
+            refresh()
+        }
+        launch {
+            delay(420)
+            runCatching { repo.ensureIcons() }
+        }
         while (true) {
             delay(2200)
             if (operation.isBlank()) refresh()
@@ -313,7 +340,9 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
             siteDelays = emptyMap()
             return@LaunchedEffect
         }
-        measureSitesInternal(reportError = false)
+        // Avoid competing with the first visible frame and first live state reconciliation.
+        delay(520)
+        if (state.running) measureSitesInternal(reportError = false)
         while (true) {
             val seconds = prefs.getInt("latencyAutoRefreshSeconds", 60).takeIf { it == 0 || it == 30 || it == 60 } ?: 60
             if (seconds <= 0) {
@@ -478,7 +507,7 @@ private fun RefHome(
             start = 16.dp,
             top = 8.dp,
             end = 16.dp,
-            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 132.dp,
+            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 148.dp,
         ),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -490,25 +519,28 @@ private fun RefHome(
                 Text(
                     "辟尘",
                     color = if (scheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A),
-                    fontSize = 24.sp,
+                    fontSize = 25.sp,
                     lineHeight = 30.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = (-0.45).sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = (-0.70).sp,
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(10.dp))
                 Surface(
                     shape = CircleShape,
-                    color = if (scheme.background.luminance() < .5f) Color.White.copy(alpha = .07f) else Color(0xFFE2E8F0).copy(alpha = .62f),
+                    color = if (scheme.background.luminance() < .5f) Color(0xFF1D4ED8).copy(alpha = .16f) else Color(0xFFEAF2FF).copy(alpha = .90f),
+                    border = BorderStroke(.7.dp, if (scheme.background.luminance() < .5f) Color(0xFF60A5FA).copy(alpha = .18f) else Color(0xFFBFDBFE).copy(alpha = .72f)),
+                    shadowElevation = 1.dp,
                     tonalElevation = 0.dp,
                 ) {
                     Text(
                         "Mihomo Core",
                         Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                        color = Color(0xFF94A3B8),
-                        fontSize = 9.sp,
-                        lineHeight = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = .2.sp,
+                        color = if (scheme.background.luminance() < .5f) Color(0xFF93C5FD) else Color(0xFF2563EB),
+                        fontSize = 10.sp,
+                        lineHeight = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        letterSpacing = .15.sp,
                     )
                 }
             }
@@ -523,23 +555,45 @@ private fun RefHome(
                     Row(verticalAlignment = Alignment.Top) {
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(Modifier.size(9.dp).background(if (state.running) scheme.primary else t.danger, CircleShape))
+                                val statusPulse = androidx.compose.animation.core.rememberInfiniteTransition(label = "heroStatusPulse")
+                                val statusAlpha by statusPulse.animateFloat(
+                                    initialValue = .52f,
+                                    targetValue = 1f,
+                                    animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                                        animation = androidx.compose.animation.core.tween(820),
+                                        repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
+                                    ),
+                                    label = "heroStatusAlpha",
+                                )
+                                Box(
+                                    Modifier.size(9.dp)
+                                        .graphicsLayer { alpha = if (state.running) statusAlpha else 1f }
+                                        .background(if (state.running) Color(0xFF002FA7) else t.danger, CircleShape),
+                                )
                                 Spacer(Modifier.width(9.dp))
-                                Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                                    Text(
-                                        if (state.running) "运行中" else "已停止",
-                                        color = t.textPrimary,
-                                        fontSize = 20.sp,
-                                        lineHeight = 24.sp,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        maxLines = 1,
-                                    )
+                                Text(
+                                    if (state.running) "运行中" else "已停止",
+                                    color = t.textPrimary,
+                                    fontSize = 20.sp,
+                                    lineHeight = 24.sp,
+                                    fontWeight = FontWeight.Black,
+                                    maxLines = 1,
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Surface(
+                                    shape = CircleShape,
+                                    color = if (scheme.background.luminance() < .5f) Color.White.copy(alpha = .08f) else Color.White.copy(alpha = .82f),
+                                    border = BorderStroke(.6.dp, if (scheme.background.luminance() < .5f) Color.White.copy(alpha = .08f) else Color(0xFFE2E8F0).copy(alpha = .78f)),
+                                    tonalElevation = 0.dp,
+                                ) {
                                     Text(
                                         if (state.running) refDuration(runtime.elapsedSeconds) else "等待启动",
+                                        Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                                         color = t.textMuted,
                                         fontSize = 11.sp,
-                                        lineHeight = 15.sp,
+                                        lineHeight = 14.sp,
                                         fontWeight = FontWeight.Medium,
+                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                                         maxLines = 1,
                                     )
                                 }
@@ -551,11 +605,11 @@ private fun RefHome(
                             Modifier
                                 .size(56.dp)
                                 .shadow(
-                                    if (state.running) 12.dp else 0.dp,
+                                    if (state.running) 16.dp else 0.dp,
                                     CircleShape,
                                     clip = false,
-                                    ambientColor = scheme.primary.copy(alpha = .26f),
-                                    spotColor = scheme.primary.copy(alpha = .38f),
+                                    ambientColor = Color(0xFF002FA7).copy(alpha = .28f),
+                                    spotColor = Color(0xFF002FA7).copy(alpha = .42f),
                                 )
                                 .background(if (state.running) scheme.primary else t.controlBackground, CircleShape),
                             contentAlignment = Alignment.Center,
@@ -677,16 +731,37 @@ private fun RefLatencyColumn(label: String, value: Long?, testing: Boolean, modi
     )
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(label, color = Color(0xFF64748B), fontSize = 11.sp, lineHeight = 15.sp, maxLines = 1)
-        Text(
-            refDelay(value),
-            color = valueColor,
-            fontSize = 17.sp,
-            lineHeight = 21.sp,
-            fontWeight = FontWeight.ExtraBold,
-            maxLines = 1,
-            style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
-            modifier = Modifier.graphicsLayer { this.alpha = alpha },
-        )
+        Row(
+            Modifier.graphicsLayer { this.alpha = alpha },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                when {
+                    value == null -> "--"
+                    value <= 0L -> "超时"
+                    else -> value.toString()
+                },
+                color = valueColor,
+                fontSize = if (value != null && value > 0L) 18.sp else 14.sp,
+                lineHeight = 21.sp,
+                fontWeight = FontWeight.Black,
+                maxLines = 1,
+                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                modifier = Modifier.alignByBaseline(),
+            )
+            if (value != null && value > 0L) {
+                Text(
+                    "ms",
+                    color = Color(0xFF94A3B8),
+                    fontSize = 10.sp,
+                    lineHeight = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                    modifier = Modifier.alignByBaseline(),
+                )
+            }
+        }
     }
 }
 
@@ -715,7 +790,14 @@ private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: I
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(if (lanMode) "LAN" else "WAN", color = Color(0xFF64748B), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                Icon(Icons.Rounded.SwapHoriz, "切换 LAN/WAN", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(15.dp))
+                Box(
+                    Modifier.size(24.dp)
+                        .background(if (MaterialTheme.colorScheme.background.luminance() < .5f) Color.White.copy(alpha = .07f) else Color(0xFFF1F5F9), CircleShape)
+                        .border(.6.dp, if (MaterialTheme.colorScheme.background.luminance() < .5f) Color.White.copy(alpha = .08f) else Color.White.copy(alpha = .90f), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Rounded.SwapHoriz, "切换 LAN/WAN", tint = Color(0xFF2563EB), modifier = Modifier.size(14.dp))
+                }
             }
             Text(
                 if (lanMode) runtime.lanAddress else runtime.wanAddress,
@@ -816,13 +898,28 @@ private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, modifier: M
 @Composable
 private fun RefResourceCard(memory: Long, cpuPercent: Float, modifier: Modifier) {
     val t = LocalBichenTokens.current
-    val valueColor = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A)
+    val scheme = MaterialTheme.colorScheme
+    val valueColor = if (scheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A)
+    val progress = (cpuPercent / 100f).coerceIn(0f, 1f)
     Surface(modifier = modifier.height(100.dp), shape = RoundedCornerShape(20.dp), color = t.cardBackground, shadowElevation = 1.dp) {
         Column(
             Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text("资源占用", color = Color(0xFF64748B), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("资源占用", color = Color(0xFF64748B), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Canvas(Modifier.size(22.dp)) {
+                    drawCircle(Color(0xFFE2E8F0).copy(alpha = .64f), style = Stroke(width = 2.dp.toPx()))
+                    drawArc(
+                        color = Color(0xFF002FA7).copy(alpha = .68f),
+                        startAngle = -90f,
+                        sweepAngle = 360f * progress,
+                        useCenter = false,
+                        style = Stroke(width = 2.2.dp.toPx()),
+                    )
+                    drawCircle(Color(0xFF2563EB).copy(alpha = if (progress > .02f) .22f else .10f), radius = 2.4.dp.toPx())
+                }
+            }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("内存", color = Color(0xFF94A3B8), fontSize = 11.sp, modifier = Modifier.weight(1f))
                 Text(refBytes(memory), color = valueColor, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
@@ -1108,7 +1205,7 @@ private fun RefPanel(
                 start = 16.dp,
                 top = 8.dp,
                 end = 16.dp,
-                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 132.dp,
+                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 148.dp,
             ),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -1272,7 +1369,9 @@ private fun RefPanel(
                         RefConnectionRow(c, if (connectionView == "active") ({ scope.launch { repo.closeConnection(c.id); onRefreshState() } }) else null)
                     }
                 }
-                RefPanelTab.Rules -> items(rules, key = { it.index }) { RefRuleRow(it) }
+                RefPanelTab.Rules -> itemsIndexed(rules.chunked(12), key = { index, _ -> "rule-group-$index" }) { _, batch ->
+                    RefRuleGroupCard(batch)
+                }
                 RefPanelTab.RuleSets -> items(ruleSets, key = { it.name }) { item ->
                     RefRuleSetRow(item, refreshing = ruleSetRefreshing[item.name] == true) {
                         if (ruleSetRefreshing[item.name] != true) scope.launch {
@@ -1592,7 +1691,7 @@ private fun RefDetailNodeCard(
         Brush.verticalGradient(listOf(Color.White, Color(0xFFFAFBFD)))
     }
     Column(
-        modifier.height(68.dp)
+        modifier.height(64.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .94f else 1f }
             .shadow(if (active) 5.dp else 3.dp, shape, clip = false)
             .background(premiumBrush, shape)
@@ -1887,7 +1986,7 @@ private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolea
     val dark = scheme.background.luminance() < .5f
     val source = remember(group.name) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .96f else 1f, spring(dampingRatio = .72f, stiffness = 580f), label = "group${group.name}")
+    val scale by animateFloatAsState(if (pressed) .97f else 1f, spring(dampingRatio = .74f, stiffness = 580f), label = "group${group.name}")
     val shape = RoundedCornerShape(18.dp)
     val nodeName = selected.ifBlank { "未选择" }
     val nodeFlag = refNodeFlag(nodeName)
@@ -1895,21 +1994,24 @@ private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolea
     else Brush.verticalGradient(listOf(Color.White, Color(0xFFFAFBFD)))
     Column(
         modifier
-            .height(82.dp)
-            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .94f else 1f }
+            .height(84.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .95f else 1f }
             .shadow(if (expanded) 5.dp else 3.dp, shape, clip = false)
             .background(premiumBrush, shape)
             .border(
                 if (expanded) 1.4.dp else .8.dp,
-                if (expanded) Color(0xFF2563EB).copy(alpha = .72f) else Color.White.copy(alpha = if (dark) .10f else .92f),
+                if (expanded) Color(0xFF002FA7).copy(alpha = .64f) else Color.White.copy(alpha = if (dark) .10f else .92f),
                 shape,
             )
             .clip(shape)
-            .clickable(interactionSource = source, indication = null, onClick = onClick)
             .padding(horizontal = 11.dp, vertical = 9.dp),
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+        Row(
+            Modifier.fillMaxWidth().height(40.dp).clip(RoundedCornerShape(10.dp))
+                .clickable(interactionSource = source, indication = null, onClick = onClick),
+            verticalAlignment = Alignment.Top,
+        ) {
             Column(Modifier.weight(1f).padding(end = 5.dp), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 Text(group.name, color = t.textPrimary, fontSize = 14.sp, lineHeight = 17.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text("${refGroupTypeCompact(group.type).uppercase()} 0/${group.nodes.size}", color = Color(0xFF94A3B8), fontSize = 10.sp, lineHeight = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1)
@@ -1919,21 +2021,29 @@ private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolea
             Icon(
                 if (expanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
                 if (expanded) "收起" else "展开",
-                tint = if (expanded) Color(0xFF2563EB) else Color(0xFF94A3B8),
+                tint = if (expanded) Color(0xFF002FA7) else Color(0xFF94A3B8),
                 modifier = Modifier.size(15.dp),
             )
         }
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
-            Text(
-                if (nodeFlag.isBlank()) nodeName else "$nodeFlag $nodeName",
-                color = if (dark) t.textSecondary else Color(0xFF475569),
-                fontSize = 11.sp,
-                lineHeight = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f).padding(end = 5.dp),
-            )
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.weight(1f).height(24.dp).clip(RoundedCornerShape(8.dp))
+                    .clickable(interactionSource = source, indication = null, onClick = onClick)
+                    .padding(end = 5.dp),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Text(
+                    if (nodeFlag.isBlank()) nodeName else "$nodeFlag $nodeName",
+                    color = if (dark) t.textSecondary else Color(0xFF475569),
+                    fontSize = 11.sp,
+                    lineHeight = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            // This button is a sibling, not a child of the accordion click target.
+            // Ping can therefore never toggle expansion.
             RefDelayBadge(delay, testing, onDelay)
         }
     }
@@ -1953,16 +2063,16 @@ private fun RefInlineGroupExpansion(
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val shape = RoundedCornerShape(22.dp)
     val trayBrush = if (dark) {
-        Brush.verticalGradient(listOf(Color.White.copy(alpha = .065f), t.elevatedCardBackground, t.cardBackground))
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = .075f), t.elevatedCardBackground.copy(alpha = .94f), t.cardBackground.copy(alpha = .90f)))
     } else {
-        Brush.verticalGradient(listOf(Color(0xFFE2E8F0).copy(alpha = .46f), Color(0xFFF8FAFC).copy(alpha = .94f), Color.White.copy(alpha = .86f)))
+        Brush.verticalGradient(listOf(Color(0xFFE2E8F0).copy(alpha = .40f), Color(0xFFF1F5F9).copy(alpha = .74f), Color.White.copy(alpha = .68f)))
     }
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = shape,
         color = Color.Transparent,
         border = BorderStroke(.8.dp, if (dark) Color.White.copy(alpha = .10f) else Color.White.copy(alpha = .88f)),
-        shadowElevation = 1.dp,
+        shadowElevation = 2.dp,
     ) {
         Column(
             Modifier.fillMaxWidth().background(trayBrush, shape).padding(12.dp),
@@ -2018,87 +2128,89 @@ private fun RefInlineNodeCard(
     val scale by animateFloatAsState(if (pressed) .96f else 1f, spring(dampingRatio = .72f, stiffness = 580f), label = "inlineNode${node.name}")
     var revealed by remember(node.name) { mutableStateOf(false) }
     LaunchedEffect(node.name) {
-        delay((index * 20L).coerceAtMost(260L))
+        delay((index * 18L).coerceAtMost(220L))
         revealed = true
     }
     val backgroundBrush = when {
         dark && active -> Brush.verticalGradient(listOf(Color(0xFF172554), Color(0xFF111C38)))
         dark -> Brush.verticalGradient(listOf(t.elevatedCardBackground, t.cardBackground))
         active -> Brush.verticalGradient(listOf(Color.White, Color(0xFFF3F7FF)))
-        else -> Brush.verticalGradient(listOf(Color.White, Color(0xFFFAFCFF)))
+        else -> Brush.verticalGradient(listOf(Color.White.copy(alpha = .94f), Color(0xFFFAFCFF).copy(alpha = .90f)))
     }
-    Box(modifier.height(66.dp)) {
+    Box(modifier.height(64.dp)) {
         androidx.compose.animation.AnimatedVisibility(
             visible = revealed,
             modifier = Modifier.fillMaxSize(),
-            enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(180)) +
-                androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(220)) { it / 3 },
+            enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(170)) +
+                androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(210)) { it / 3 },
         ) {
-            Column(
+            Box(
                 Modifier.fillMaxSize()
-                    .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .86f else 1f }
+                    .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .88f else 1f }
                     .shadow(if (active) 4.dp else 2.dp, shape, clip = false)
                     .background(backgroundBrush, shape)
                     .border(
-                        if (active) 1.4.dp else .8.dp,
-                        if (active) Color(0xFF2563EB) else if (dark) Color.White.copy(alpha = .08f) else Color.White.copy(alpha = .90f),
+                        if (active) 1.35.dp else .7.dp,
+                        if (active) Color(0xFF002FA7) else if (dark) Color.White.copy(alpha = .08f) else Color.White.copy(alpha = .90f),
                         shape,
                     )
                     .clip(shape)
-                    .clickable(interactionSource = source, indication = null, onClick = onSelect)
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.SpaceBetween,
+                    .clickable(interactionSource = source, indication = null, onClick = onSelect),
             ) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    val flag = refNodeFlag(node.name)
-                    if (flag.isNotBlank()) {
-                        Text(flag, fontSize = 14.sp, modifier = Modifier.width(20.dp))
-                        Spacer(Modifier.width(4.dp))
-                    }
-                    Text(
-                        node.name,
-                        color = if (active) Color(0xFF1E3A8A) else t.textPrimary,
-                        fontSize = 12.sp,
-                        lineHeight = 15.sp,
-                        fontWeight = if (active) FontWeight.Bold else FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Box(Modifier.size(17.dp), contentAlignment = Alignment.Center) {
-                        androidx.compose.animation.AnimatedVisibility(
-                            visible = active,
-                            enter = androidx.compose.animation.scaleIn(
-                                initialScale = .05f,
-                                animationSpec = spring(dampingRatio = .50f, stiffness = 520f),
-                            ) + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(130)),
-                            exit = androidx.compose.animation.scaleOut(targetScale = .45f) + androidx.compose.animation.fadeOut(),
-                        ) {
-                            Box(Modifier.size(16.dp).background(Color(0xFF2563EB), CircleShape), contentAlignment = Alignment.Center) {
-                                Icon(Icons.Rounded.Check, "已选择", tint = Color.White, modifier = Modifier.size(11.dp))
-                            }
+                Column(
+                    Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        val flag = refNodeFlag(node.name)
+                        if (flag.isNotBlank()) {
+                            Text(flag, fontSize = 14.sp)
+                            Spacer(Modifier.width(4.dp))
                         }
-                    }
-                }
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Surface(
-                        shape = RoundedCornerShape(7.dp),
-                        color = if (dark) Color.White.copy(alpha = .055f) else Color(0xFFF8FAFC),
-                        tonalElevation = 0.dp,
-                    ) {
                         Text(
-                            refNodeProtocol(node),
-                            Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            color = Color(0xFF94A3B8),
-                            fontSize = 9.sp,
-                            lineHeight = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            node.name,
+                            color = if (active && !dark) Color(0xFF1E3A8A) else t.textPrimary,
+                            fontSize = 12.sp,
+                            lineHeight = 15.sp,
+                            fontWeight = if (active) FontWeight.Bold else FontWeight.SemiBold,
                             maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
                         )
                     }
-                    Spacer(Modifier.weight(1f))
-                    RefDelayBadge(delay, testing, onDelay)
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            shape = RoundedCornerShape(7.dp),
+                            color = if (active) Color(0xFFEFF6FF).copy(alpha = if (dark) .12f else .92f) else if (dark) Color.White.copy(alpha = .055f) else Color(0xFFF1F5F9),
+                            tonalElevation = 0.dp,
+                        ) {
+                            Text(
+                                refNodeProtocol(node),
+                                Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                color = if (active) Color(0xFF2563EB) else Color(0xFF64748B),
+                                fontSize = 9.sp,
+                                lineHeight = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                maxLines = 1,
+                            )
+                        }
+                        Spacer(Modifier.weight(1f))
+                        RefDelayBadge(delay, testing, onDelay)
+                    }
+                }
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = active,
+                    modifier = Modifier.align(Alignment.TopEnd).offset(x = 3.dp, y = (-3).dp),
+                    enter = androidx.compose.animation.scaleIn(initialScale = .15f, animationSpec = spring(dampingRatio = .56f, stiffness = 520f)) + androidx.compose.animation.fadeIn(),
+                    exit = androidx.compose.animation.scaleOut(targetScale = .45f) + androidx.compose.animation.fadeOut(),
+                ) {
+                    Box(
+                        Modifier.size(17.dp).shadow(4.dp, CircleShape, clip = false).background(Color(0xFF002FA7), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Rounded.Check, "已选择", tint = Color.White, modifier = Modifier.size(11.dp))
+                    }
                 }
             }
         }
@@ -2213,16 +2325,16 @@ private fun RefDelayBadge(value: Long?, testing: Boolean, onClick: (() -> Unit)?
     val text = refDelay(value)
     val (background, textColor) = when {
         value == null -> Color(0xFFF1F5F9) to Color(0xFF64748B)
-        value <= 0L -> Color(0xFFFFF1F2) to Color(0xFFF43F5E)
-        value < 100L -> Color(0xFFECFDF5) to Color(0xFF10B981)
-        value <= 300L -> Color(0xFFFFFBEB) to Color(0xFFF59E0B)
-        else -> Color(0xFFFFF1F2) to Color(0xFFF43F5E)
+        value <= 0L -> Color(0xFFFFF1F2) to Color(0xFFE11D48)
+        value < 100L -> Color(0xFFECFDF5) to Color(0xFF059669)
+        value <= 300L -> Color(0xFFFFFBEB) to Color(0xFFD97706)
+        else -> Color(0xFFFFF1F2) to Color(0xFFE11D48)
     }
     val source = remember(onClick) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
-    val infinite = androidx.compose.animation.core.rememberInfiniteTransition(label = "latencyPulse")
-    val pulse by infinite.animateFloat(
-        initialValue = .68f,
+    val pulseTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "latencyPulse")
+    val pulse by pulseTransition.animateFloat(
+        initialValue = .62f,
         targetValue = 1f,
         animationSpec = androidx.compose.animation.core.infiniteRepeatable(
             animation = androidx.compose.animation.core.tween(620),
@@ -2230,48 +2342,44 @@ private fun RefDelayBadge(value: Long?, testing: Boolean, onClick: (() -> Unit)?
         ),
         label = "latencyPulseAlpha",
     )
-    var revealTarget by remember { mutableFloatStateOf(1f) }
-    LaunchedEffect(text) {
-        revealTarget = .95f
-        delay(28)
-        revealTarget = 1f
-    }
-    val reveal by animateFloatAsState(revealTarget, spring(dampingRatio = .58f, stiffness = 520f), label = "latencyReveal")
-    val pressScale by animateFloatAsState(if (pressed) .96f else 1f, spring(dampingRatio = .70f, stiffness = 620f), label = "latencyPress")
-    Box(
-        Modifier.width(62.dp).height(22.dp)
+    val pressScale by animateFloatAsState(if (pressed) .90f else 1f, spring(dampingRatio = .68f, stiffness = 680f), label = "latencyPress")
+    val shape = CircleShape
+    Row(
+        Modifier.width(if (onClick != null) 68.dp else 62.dp).height(22.dp)
             .graphicsLayer {
-                scaleX = reveal * pressScale
-                scaleY = reveal * pressScale
-                this.alpha = if (pressed) .85f else if (testing) .78f + .22f * pulse else 1f
+                scaleX = pressScale
+                scaleY = pressScale
+                alpha = if (pressed) .84f else if (testing) .76f + .24f * pulse else 1f
             }
-            .background(if (testing) background.copy(alpha = .78f) else background, CircleShape)
-            .border(.7.dp, if (testing) textColor.copy(alpha = .20f + .24f * pulse) else Color.Transparent, CircleShape)
-            .then(if (onClick != null) Modifier.clickable(enabled = !testing, interactionSource = source, indication = null, onClick = onClick) else Modifier),
-        contentAlignment = Alignment.Center,
+            .shadow(if (onClick != null) 2.dp else 0.dp, shape, clip = false, ambientColor = textColor.copy(alpha = .10f), spotColor = textColor.copy(alpha = .12f))
+            .background(if (testing) background.copy(alpha = .78f) else background, shape)
+            .border(.7.dp, if (testing) textColor.copy(alpha = .22f + .22f * pulse) else textColor.copy(alpha = if (onClick != null) .10f else .04f), shape)
+            .then(if (onClick != null) Modifier.clickable(enabled = !testing, interactionSource = source, indication = null, onClick = onClick) else Modifier)
+            .padding(horizontal = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
     ) {
-        androidx.compose.animation.Crossfade(
-            targetState = text,
-            animationSpec = androidx.compose.animation.core.tween(220),
-            label = "latencyCrossFade",
-        ) { shown ->
-            Text(
-                shown,
-                color = textColor,
-                fontSize = 11.sp,
-                lineHeight = 14.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
-            )
-        }
-        if (testing) {
-            CircularProgressIndicator(
-                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 5.dp).size(9.dp),
-                strokeWidth = 1.25.dp,
-                color = textColor,
-                trackColor = textColor.copy(alpha = .14f),
-            )
+        Text(
+            text,
+            color = textColor,
+            fontSize = 10.sp,
+            lineHeight = 13.sp,
+            fontWeight = FontWeight.ExtraBold,
+            maxLines = 1,
+            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+        )
+        if (onClick != null) {
+            Spacer(Modifier.width(3.dp))
+            if (testing) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(9.dp),
+                    strokeWidth = 1.25.dp,
+                    color = textColor,
+                    trackColor = textColor.copy(alpha = .14f),
+                )
+            } else {
+                Icon(Icons.Rounded.Bolt, "单独测速", tint = textColor.copy(alpha = .86f), modifier = Modifier.size(10.dp))
+            }
         }
     }
 }
@@ -2361,6 +2469,20 @@ private fun RefTrafficOverview(state: ProxyComposeState) {
                         drawPath(smooth(download, true), brush = Brush.verticalGradient(listOf(scheme.primary.copy(alpha = .20f), Color.Transparent), 0f, size.height))
                         drawPath(smooth(upload, false), color = t.success, style = Stroke(width = 2.25.dp.toPx()))
                         drawPath(smooth(download, false), color = scheme.primary, style = Stroke(width = 2.25.dp.toPx()))
+                    } else {
+                        val y = size.height - 5.dp.toPx()
+                        drawLine(
+                            color = scheme.primary.copy(alpha = .10f),
+                            start = Offset(0f, y),
+                            end = Offset(size.width, y),
+                            strokeWidth = 7.dp.toPx(),
+                        )
+                        drawLine(
+                            brush = Brush.horizontalGradient(listOf(t.success.copy(alpha = .34f), scheme.primary.copy(alpha = .48f))),
+                            start = Offset(0f, y),
+                            end = Offset(size.width, y),
+                            strokeWidth = 2.dp.toPx(),
+                        )
                     }
                 }
             }
@@ -2494,23 +2616,76 @@ private fun RefConnectionRow(item: ProxyConnectionUi, onClose: (() -> Unit)?) {
 }
 
 @Composable
-private fun RefRuleRow(item: ProxyRuleUi) {
+private fun RefRuleGroupCard(items: List<ProxyRuleUi>) {
     val t = LocalBichenTokens.current
-    val scheme = MaterialTheme.colorScheme
-    Surface(shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 1.dp) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(item.type, color = t.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                Text(item.payload.ifBlank { "—" }, color = t.textSecondary, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
+    val shape = RoundedCornerShape(22.dp)
+    Surface(
+        shape = shape,
+        color = t.cardBackground,
+        border = BorderStroke(.7.dp, if (dark) t.outline.copy(alpha = .36f) else Color.White.copy(alpha = .92f)),
+        shadowElevation = if (dark) 0.dp else 3.dp,
+    ) {
+        Column(Modifier.fillMaxWidth()) {
+            items.forEachIndexed { index, item ->
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            item.payload.ifBlank { item.type },
+                            color = t.textPrimary,
+                            fontSize = 12.sp,
+                            lineHeight = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            item.type,
+                            color = Color(0xFF94A3B8),
+                            fontSize = 10.sp,
+                            lineHeight = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                        )
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    val reject = item.proxy.equals("REJECT", true) || item.proxy.startsWith("REJECT-", true)
+                    val direct = item.proxy.equals("DIRECT", true)
+                    val badgeBg = when {
+                        reject -> Color(0xFFFFF1F2)
+                        direct -> Color(0xFFEFF6FF)
+                        else -> Color(0xFFF1F5F9)
+                    }
+                    val badgeText = when {
+                        reject -> Color(0xFFE11D48)
+                        direct -> Color(0xFF2563EB)
+                        else -> Color(0xFF64748B)
+                    }
+                    Surface(shape = RoundedCornerShape(6.dp), color = badgeBg, tonalElevation = 0.dp) {
+                        Text(
+                            item.proxy,
+                            Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            color = badgeText,
+                            fontSize = 11.sp,
+                            lineHeight = 13.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            maxLines = 1,
+                        )
+                    }
+                }
+                if (index != items.lastIndex) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 14.dp),
+                        thickness = 1.dp,
+                        color = if (dark) t.outline.copy(alpha = .30f) else Color(0xFFF1F5F9),
+                    )
+                }
             }
-            Spacer(Modifier.width(10.dp))
-            Text(
-                item.proxy,
-                color = if (item.proxy.equals("REJECT", true)) Color(0xFF334155) else scheme.primary,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.ExtraBold,
-                maxLines = 1,
-            )
         }
     }
 }
@@ -2567,7 +2742,7 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
             start = 16.dp,
             top = 8.dp,
             end = 16.dp,
-            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 132.dp,
+            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 148.dp,
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -2661,7 +2836,7 @@ private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
             start = 16.dp,
             top = 8.dp,
             end = 16.dp,
-            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 132.dp,
+            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 148.dp,
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -3118,9 +3293,9 @@ private fun RefToolRow(
                     }
                 }
             } else {
-                Text(trailingText, color = trailingColor, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 92.dp))
-                Spacer(Modifier.width(3.dp))
-                Icon(Icons.Rounded.ChevronRight, null, tint = trailingColor.copy(alpha = .78f), modifier = Modifier.size(15.dp))
+                Text(trailingText, color = Color(0xFF94A3B8), fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 110.dp))
+                Spacer(Modifier.width(4.dp))
+                Icon(Icons.Rounded.ChevronRight, null, tint = Color(0xFFCBD5E1), modifier = Modifier.size(15.dp))
             }
         } else {
             Icon(Icons.Rounded.ChevronRight, null, tint = Color(0xFFCBD5E1), modifier = Modifier.size(17.dp))
@@ -3154,9 +3329,9 @@ private fun RefValueRow(
         if (value.isNotBlank()) {
             Text(
                 value,
-                color = if (highlightValue) Color(0xFF2563EB) else Color(0xFF64748B),
-                fontSize = 11.sp,
-                fontWeight = if (highlightValue) FontWeight.Bold else FontWeight.Medium,
+                color = Color(0xFF94A3B8),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.widthIn(max = 138.dp),
@@ -3164,7 +3339,7 @@ private fun RefValueRow(
         }
         if (onClick != null) {
             Spacer(Modifier.width(5.dp))
-            Icon(Icons.Rounded.ChevronRight, null, tint = if (highlightValue) Color(0xFF2563EB).copy(alpha = .78f) else Color(0xFFCBD5E1), modifier = Modifier.size(16.dp))
+            Icon(Icons.Rounded.ChevronRight, null, tint = Color(0xFFCBD5E1), modifier = Modifier.size(16.dp))
         }
     }
 }

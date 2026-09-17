@@ -407,10 +407,10 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                     }
                     Surface(
                         modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp)
-                            .shadow(10.dp, RoundedCornerShape(26.dp), clip = false),
-                        shape = RoundedCornerShape(26.dp),
-                        color = if (dark) tokens.elevatedCardBackground.copy(alpha = .96f) else Color.White.copy(alpha = .94f),
-                        border = BorderStroke(.7.dp, if (dark) tokens.outline.copy(alpha = .55f) else Color.White.copy(alpha = .92f)),
+                            .shadow(18.dp, RoundedCornerShape(28.dp), clip = false, ambientColor = Color(0xFF0F172A).copy(alpha = .10f), spotColor = Color(0xFF0F172A).copy(alpha = .14f)),
+                        shape = RoundedCornerShape(28.dp),
+                        color = if (dark) tokens.elevatedCardBackground.copy(alpha = .88f) else Color.White.copy(alpha = .84f),
+                        border = BorderStroke(.8.dp, if (dark) Color.White.copy(alpha = .10f) else Color.White.copy(alpha = .96f)),
                         tonalElevation = 0.dp,
                     ) {
                         Row(
@@ -422,6 +422,10 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                                 enabled = !yamlSaving,
                                 modifier = Modifier.weight(1f).height(44.dp),
                                 shape = CircleShape,
+                                colors = ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = if (dark) Color.White.copy(alpha = .08f) else Color(0xFFF1F5F9),
+                                    contentColor = if (dark) Color(0xFFE2E8F0) else Color(0xFF64748B),
+                                ),
                             ) { Text("取消", fontWeight = FontWeight.Bold) }
                             Button(
                                 onClick = {
@@ -434,10 +438,16 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                                     }
                                 },
                                 enabled = !yamlSaving,
-                                modifier = Modifier.weight(1f).height(44.dp),
+                                modifier = Modifier.weight(1f).height(44.dp)
+                                    .shadow(9.dp, CircleShape, clip = false, ambientColor = Color(0xFF002FA7).copy(alpha = .22f), spotColor = Color(0xFF002FA7).copy(alpha = .30f)),
                                 shape = CircleShape,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF002FA7),
+                                    contentColor = Color.White,
+                                    disabledContainerColor = Color(0xFF002FA7).copy(alpha = .46f),
+                                ),
                             ) {
-                                if (yamlSaving) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                                if (yamlSaving) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
                                 else Text("保存", fontWeight = FontWeight.Bold)
                             }
                         }

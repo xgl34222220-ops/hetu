@@ -3,11 +3,11 @@
         <item name="android:fontFamily">sans-serif</item>
         <item name="android:colorAccent">#317C70</item>
         <item name="android:windowLightStatusBar">true</item>
-        <item name="android:statusBarColor">#F4F5F2</item>
-        <item name="android:navigationBarColor">#F4F5F2</item>
+        <item name="android:statusBarColor">#F1F5F9</item>
+        <item name="android:navigationBarColor">#F1F5F9</item>
         <item name="android:windowLightNavigationBar">true</item>
         <item name="android:windowActionModeOverlay">true</item>
-        <item name="android:windowBackground">#F4F5F2</item>
+        <item name="android:windowBackground">#F1F5F9</item>
     </style>
     <style name="AppThemeDark" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:fontFamily">sans-serif</item>
