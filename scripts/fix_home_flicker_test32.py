@@ -30,7 +30,7 @@ new = '''class ReferenceProxyActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             // Re-read theme preferences on resume without destroying the Compose tree.
-            // The previous key(uiRevision) recreated RefProxyShell and briefly exposed
+            // The previous forced wrapper recreated RefProxyShell and briefly exposed
             // default/empty runtime state before the async refresh completed.
             val revision = resumeRevision
             BichenTheme { RefProxyShell(resumeRevision = revision) { finish() } }
@@ -62,7 +62,7 @@ anchor = '''    LaunchedEffect(Unit) {
     }
 '''
 addition = anchor + '''
-    // Returning from Theme/secondary activities should refresh data in place.  Never
+    // Returning from Theme/secondary activities should refresh data in place. Never
     // replace the composition or reset state/runtime/providers to their empty defaults.
     LaunchedEffect(resumeRevision) {
         if (resumeRevision > 1) refresh()
@@ -187,8 +187,8 @@ proxy_path.write_text(proxy, encoding='utf-8')
 main_path.write_text(main, encoding='utf-8')
 
 # Guardrails: the two old flicker sources must be gone.
-if 'key(uiRevision)' in proxy:
-    raise SystemExit('key(uiRevision) still present')
+if 'key(uiRevision) {' in proxy:
+    raise SystemExit('forced root recreation still present')
 if 'var snapshot by remember { mutableStateOf(HomeSnapshot()) }' in main:
     raise SystemExit('uncached HomeSnapshot reset still present')
 print('test32 home flicker fix applied')
