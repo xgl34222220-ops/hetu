@@ -285,7 +285,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
     val shellBackground = if (MaterialTheme.colorScheme.background.luminance() < .5f) {
         LocalBichenTokens.current.pageBackground
     } else {
-        Color(0xFFF4F6F9)
+        Color(0xFFF1F5F9)
     }
     Box(Modifier.fillMaxSize().background(shellBackground)) {
         Box(
@@ -415,8 +415,7 @@ private fun RefHome(
             Surface(
                 shape = RoundedCornerShape(26.dp),
                 color = t.heroBackground,
-                border = BorderStroke(.7.dp, scheme.primary.copy(alpha = .10f)),
-                shadowElevation = 0.dp,
+                shadowElevation = 1.dp,
             ) {
                 Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Row(verticalAlignment = Alignment.Top) {
@@ -424,14 +423,14 @@ private fun RefHome(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Box(Modifier.size(9.dp).background(if (state.running) t.success else t.danger, CircleShape))
                                 Spacer(Modifier.width(9.dp))
-                                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                                     Text(
                                         if (state.running) "运行中" else "已停止",
                                         color = t.textPrimary,
                                         fontSize = 20.sp,
                                         lineHeight = 24.sp,
                                         fontWeight = FontWeight.ExtraBold,
-                                        modifier = Modifier.alignByBaseline(),
+                                        maxLines = 1,
                                     )
                                     Text(
                                         if (state.running) refDuration(runtime.elapsedSeconds) else "等待启动",
@@ -439,7 +438,7 @@ private fun RefHome(
                                         fontSize = 11.sp,
                                         lineHeight = 15.sp,
                                         fontWeight = FontWeight.Medium,
-                                        modifier = Modifier.alignByBaseline(),
+                                        maxLines = 1,
                                     )
                                 }
                             }
@@ -507,7 +506,7 @@ private fun RefHome(
 @Composable
 private fun RefLatencyPanel(baidu: Long?, cloudflare: Long?, google: Long?, testing: Boolean, onClick: () -> Unit) {
     val t = LocalBichenTokens.current
-    Surface(onClick = onClick, enabled = !testing, shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+    Surface(onClick = onClick, enabled = !testing, shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 1.dp) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 13.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
   Row(verticalAlignment = Alignment.CenterVertically) {
       Text("延迟", color = t.textPrimary, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
@@ -560,13 +559,13 @@ private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: I
     val shape = RoundedCornerShape(18.dp)
     Surface(
         modifier = modifier
-            .height(96.dp)
+            .heightIn(min = 100.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .90f else 1f }
             .clip(shape)
             .clickable(interactionSource = source, indication = null) { lanMode = !lanMode },
         shape = shape,
         color = t.cardBackground,
-        shadowElevation = 0.dp,
+        shadowElevation = 1.dp,
     ) {
         Column(
             Modifier.fillMaxSize().padding(13.dp),
@@ -598,7 +597,7 @@ private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: I
 private fun RefSpeedCard(up: Long, down: Long, modifier: Modifier) {
     val t = LocalBichenTokens.current
     val valueColor = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A)
-    Surface(modifier = modifier.height(96.dp), shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+    Surface(modifier = modifier.heightIn(min = 100.dp), shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 1.dp) {
         Column(Modifier.fillMaxSize().padding(13.dp), verticalArrangement = Arrangement.SpaceBetween) {
             Text("网速", color = Color(0xFF94A3B8), fontSize = 12.sp, fontWeight = FontWeight.Medium)
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -626,7 +625,7 @@ private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, modifier: M
     val used = tracked.sumOf { it.used }
     val total = tracked.sumOf { it.total }
     val ratio = if (total <= 0L) 0f else (used.toDouble() / total.toDouble()).toFloat().coerceIn(0f, 1f)
-    Surface(modifier = modifier.height(96.dp), shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+    Surface(modifier = modifier.heightIn(min = 100.dp), shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 1.dp) {
         Column(Modifier.fillMaxSize().padding(13.dp), verticalArrangement = Arrangement.SpaceBetween) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("订阅", color = Color(0xFF94A3B8), fontSize = 12.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
@@ -651,7 +650,7 @@ private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, modifier: M
 private fun RefResourceCard(memory: Long, cpuPercent: Float, modifier: Modifier) {
     val t = LocalBichenTokens.current
     val valueColor = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A)
-    Surface(modifier = modifier.height(96.dp), shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+    Surface(modifier = modifier.heightIn(min = 100.dp), shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 1.dp) {
         Column(Modifier.fillMaxSize().padding(13.dp), verticalArrangement = Arrangement.SpaceBetween) {
             Text("资源占用", color = Color(0xFF94A3B8), fontSize = 12.sp, fontWeight = FontWeight.Medium)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -1228,13 +1227,13 @@ private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolea
     val nodeFlag = refNodeFlag(nodeName)
     Column(
         modifier
-            .height(92.dp)
+            .height(86.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .90f else 1f }
             .shadow(if (expanded) 3.dp else 1.dp, shape, clip = false)
             .background(if (expanded) t.selectionBackground else t.cardBackground, shape)
             .clip(shape)
             .clickable(interactionSource = source, indication = null, onClick = onClick)
-            .padding(horizontal = 11.dp, vertical = 9.dp),
+            .padding(horizontal = 11.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1584,7 +1583,7 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     var unavailable by remember { mutableStateOf<String?>(null) }
     LazyColumn(
-        Modifier.fillMaxSize().background(if (dark) t.pageBackground else Color(0xFFF4F6F9)),
+        Modifier.fillMaxSize().background(if (dark) t.pageBackground else Color(0xFFF1F5F9)),
         contentPadding = PaddingValues(
             start = 16.dp,
             top = 8.dp,
@@ -1653,7 +1652,7 @@ private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
     val t = LocalBichenTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     LazyColumn(
-        Modifier.fillMaxSize().background(if (dark) t.pageBackground else Color(0xFFF4F6F9)),
+        Modifier.fillMaxSize().background(if (dark) t.pageBackground else Color(0xFFF1F5F9)),
         contentPadding = PaddingValues(
             start = 16.dp,
             top = 8.dp,
@@ -1834,8 +1833,16 @@ private fun RefInfoBottomSheet(
             ) {
                 Text(text, color = t.textSecondary, fontSize = 13.sp, lineHeight = 20.sp)
             }
-            Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(14.dp)) {
-                Text(actionLabel, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            FilledTonalButton(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = t.controlBackground,
+                    contentColor = t.textPrimary,
+                ),
+            ) {
+                Text(actionLabel, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }
