@@ -84,8 +84,11 @@ s = s.replace(
     1,
 )
 
-# Hard guards for this regression.
-block = s[s.index('private fun RefPanelGlassHeader('):s.index('private fun RefPanelOverview(')]
+# Hard guards for this regression: only inspect the header itself. Other composables may
+# legitimately still use the material Haze preset.
+a = s.index('private fun RefPanelGlassHeader(')
+b = s.index('@Composable\nprivate fun RefPanelHeaderAction', a)
+block = s[a:b]
 assert 'HazeMaterials.ultraThin()' not in block
 assert 'HazeStyle(' in block and 'HazeTint(panelTint)' in block
 assert 'Modifier.drawBackdrop(' not in block
