@@ -41,6 +41,7 @@ final class MihomoStartupConfig {
         int sourceTp=detectScalarPort(source,"tproxy-port");
         int sourceRp=detectScalarPort(source,"redir-port");
         String yaml=normalize(source);
+        yaml=normalizeDeprecatedEncryptedDns(yaml);
         // Runtime mode is authoritative. The selected source config remains byte-for-byte untouched.
         yaml=removeTopLevelKey(yaml,"listeners");
         yaml=removeTopLevelScalar(yaml,"global-client-fingerprint");
@@ -127,6 +128,17 @@ final class MihomoStartupConfig {
         override.append("external-ui-url: '").append(EXTERNAL_UI_URL).append("'\n");
         override.append("# --- end Bichen runtime isolation ---\n");
         return new Result(yaml+override,tp,rp);
+    }
+
+    /**
+     * Runtime-only compatibility for public DNS providers that retired raw-IP DoH access.
+     * The user's selected YAML remains byte-for-byte unchanged. Using 223.6.6.6 here keeps
+     * bootstrap encrypted without creating a resolver-domain bootstrap loop.
+     */
+    private static String normalizeDeprecatedEncryptedDns(String source){
+        return source
+                .replace("https://1.12.12.12/dns-query","https://223.6.6.6/dns-query")
+                .replace("https://120.53.53.53/dns-query","https://223.6.6.6/dns-query");
     }
 
     /** Merge the local effective Bichen ad-block snapshot into the private startup copy. */

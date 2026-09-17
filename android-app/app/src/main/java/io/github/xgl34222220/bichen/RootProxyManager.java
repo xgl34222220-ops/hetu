@@ -161,10 +161,17 @@ final class RootProxyManager {
                 throw new IOException("启动命令已返回，但核心未保持运行"+(diagnostics().isEmpty()?"":"："+diagnostics()));
             MihomoControllerClient controller=new MihomoControllerClient(context);
             if(!controller.waitReady(4500))throw new IOException("Mihomo 控制接口未在启动窗口内就绪");
-            try{controller.delay("DIRECT","https://connectivitycheck.platform.hicloud.com/generate_204","200-399");}
-            catch(Exception firstProbe){
-                try{controller.delay("DIRECT","https://www.gstatic.com/generate_204","200-399");}
-                catch(Exception secondProbe){throw new IOException("Mihomo 已启动，但 DIRECT 出站不可用；已回滚网络规则",secondProbe);}
+            try{
+                controller.delay("DIRECT","https://connectivitycheck.platform.hicloud.com/generate_204","200-399");
+                prefs.edit().remove("proxyRootEgressWarning").apply();
+            }catch(Exception firstProbe){
+                try{
+                    controller.delay("DIRECT","https://cp.cloudflare.com/generate_204","200-399");
+                    prefs.edit().remove("proxyRootEgressWarning").apply();
+                }catch(Exception secondProbe){
+                    String detail=secondProbe.getMessage()==null?secondProbe.getClass().getSimpleName():secondProbe.getMessage();
+                    prefs.edit().putString("proxyRootEgressWarning","核心已保持运行，但启动联网探测失败："+detail).apply();
+                }
             }
         }catch(Exception verify){
             try{stop();}catch(Exception ignored){}
@@ -172,6 +179,8 @@ final class RootProxyManager {
         }
 
         String warning=policy.warning();
+        String egressWarning=prefs.getString("proxyRootEgressWarning","");
+        if(egressWarning!=null&&!egressWarning.isEmpty())warning=(warning.isEmpty()?"":warning+"；")+egressWarning;
         String adblockFallbackReason=prefs.getString("proxyAdblockLastError","");
         if(!profile.adblockChain&&adblockFallbackReason!=null&&!adblockFallbackReason.isEmpty()){
             warning=(warning.isEmpty()?"":warning+"；")+"代理已启动，但广告串联本次降级："+adblockFallbackReason;
