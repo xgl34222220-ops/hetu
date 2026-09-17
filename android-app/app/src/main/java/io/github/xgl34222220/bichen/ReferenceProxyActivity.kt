@@ -2900,7 +2900,7 @@ private fun RefRuleSetRow(item: DashboardRuleSetUi, refreshing: Boolean, success
                 Text(refUpdatedAt(item.updatedAt), color = Color(0xFF94A3B8), fontSize = 11.sp, maxLines = 1)
             }
             IconButton(onClick = { if (!refreshing) onRefresh() }, modifier = Modifier.size(38.dp)) {
-                Icon(Icons.Rounded.Download, "远端更新", tint = if (success) Color(0xFF10B981) else scheme.primary, modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = if (refreshing) spin else 0f })
+                Icon(if (success) Icons.Rounded.CheckCircle else Icons.Rounded.Download, if (success) "更新完成" else "远端更新", tint = if (success) Color(0xFF10B981) else scheme.primary, modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = if (refreshing) spin else 0f })
             }
         }
     }

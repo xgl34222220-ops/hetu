@@ -96,7 +96,7 @@ final class RootProxyManager {
 
     private String detectDefaultInterface()throws IOException{
         RootBridge.Result result=RootBridge.rootShell(context,
-                "ip route get 1.1.1.1 2>/dev/null | sed -n 's/.* dev \([^ ]*\).*/\1/p' | head -n 1",5000L);
+                "set -- $(ip route get 1.1.1.1 2>/dev/null); while [ \"$#\" -gt 1 ]; do if [ \"$1\" = dev ]; then printf '%s' \"$2\"; break; fi; shift; done",5000L);
         String iface=result.output==null?"":result.output.trim();
         if(!iface.matches("[A-Za-z0-9_.:@-]{1,32}"))throw new IOException("eBPF 无法识别当前默认出口接口");
         return iface;
