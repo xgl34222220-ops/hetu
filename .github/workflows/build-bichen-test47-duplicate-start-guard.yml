@@ -1,0 +1,114 @@
+name: Build Bichen 0.4.0-test.47 duplicate start guard
+
+on:
+  push:
+    branches: ['release/bichen-0.4.0-test.47']
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  build:
+    if: github.event.head_commit.message == 'Build Bichen 0.4.0-test.47 duplicate start guard'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply test47 duplicate-start guard
+        run: python3 tools/apply_test47_duplicate_start_guard.py
+
+      - name: Verify source patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD=android-app/app/build.gradle.kts
+          MGR=android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java
+          ROOT=android-app/app/src/main/assets/proxy-root-v3.sh
+          grep -q 'versionCode = 447' "$BUILD"
+          grep -q 'versionName = "0.4.0-test.47"' "$BUILD"
+          grep -q 'ReentrantLock CONTROL_LOCK' "$MGR"
+          grep -q 'JSONObject existing=status();' "$MGR"
+          grep -q 'alreadyRunning' "$MGR"
+          grep -q 'Math.abs(System.nanoTime())%span' "$MGR"
+          grep -q 'iptables -w 15' "$ROOT"
+          sh -n "$ROOT"
+
+      - name: Commit generated test47 sources
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add android-app/app/build.gradle.kts android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java
+          if ! git diff --cached --quiet; then
+            git commit -m 'Guard duplicate Root starts in 0.4.0-test.47'
+            git push
+          fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+          cache-read-only: false
+
+      - name: Reuse verified Mihomo runtime
+        uses: actions/download-artifact@v4
+        with:
+          name: Bichen-0.4.0-test.35-Fullscreen-Strategy-Page
+          path: previous-artifact
+          github-token: ${{ github.token }}
+          repository: xgl34222220-ops/pichen
+          run-id: 35170170620
+
+      - name: Restore native runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          PREV=$(find previous-artifact -name '*.apk' -type f | head -n 1)
+          test -n "$PREV"
+          mkdir -p android-app/app/src/main/jniLibs/arm64-v8a android-app/app/src/main/jniLibs/x86_64
+          mkdir -p android-app/app/src/main/assets/mihomo-root/arm64-v8a android-app/app/src/main/assets/mihomo-root/x86_64
+          unzip -p "$PREV" lib/arm64-v8a/libbichen_core.so > android-app/app/src/main/jniLibs/arm64-v8a/libbichen_core.so
+          unzip -p "$PREV" lib/x86_64/libbichen_core.so > android-app/app/src/main/jniLibs/x86_64/libbichen_core.so
+          unzip -p "$PREV" assets/mihomo-root/arm64-v8a/mihomo > android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo
+          unzip -p "$PREV" assets/mihomo-root/x86_64/mihomo > android-app/app/src/main/assets/mihomo-root/x86_64/mihomo
+          unzip -p "$PREV" assets/MIHOMO-LICENSE > android-app/app/src/main/assets/MIHOMO-LICENSE
+          unzip -p "$PREV" assets/mihomo-revision.txt > android-app/app/src/main/assets/mihomo-revision.txt
+
+      - name: Build debug APK
+        working-directory: android-app
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Verify APK and chained runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=android-app/app/build/outputs/apk/debug/app-debug.apk
+          MGR=android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java
+          ROOT=android-app/app/src/main/assets/proxy-root-v3.sh
+          test -f "$APK"
+          unzip -t "$APK" >/dev/null
+          unzip -l "$APK" | grep -q 'assets/mihomo-root/arm64-v8a/mihomo'
+          grep -q 'ProxyAdblockCoordinator.enter(context)' "$MGR"
+          grep -q 'profile.adblockChain' "$MGR"
+          grep -q 'alreadyRunning' "$MGR"
+          grep -q 'ReentrantLock CONTROL_LOCK' "$MGR"
+          grep -q 'iptables -w 15' "$ROOT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Bichen-0.4.0-test.47-Duplicate-Start-Guard
+          path: android-app/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
