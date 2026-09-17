@@ -319,7 +319,7 @@ ref = replace_once(ref, old_domino, new_domino, 'domino full latency wave')
 log_start, log_end, log_sheet = section(
     ref,
     '@OptIn(ExperimentalMaterial3Api::class)\n@Composable\nprivate fun RefInfoBottomSheet',
-    '\nprivate fun refFormatElapsed',
+    '\n@Composable\nprivate fun RefSheetDragHandle',
 )
 log_sheet = log_sheet.replace('.fillMaxHeight(.78f)', '.fillMaxHeight(.80f)', 1)
 log_sheet = log_sheet.replace(
@@ -405,6 +405,8 @@ write(apps_path, apps)
 
 web_path = "android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyWebUiActivity.kt"
 web = read(web_path)
+if 'import androidx.compose.animation.core.*' not in web:
+    web = web.replace('import androidx.compose.foundation.shape.RoundedCornerShape\n', 'import androidx.compose.foundation.shape.RoundedCornerShape\nimport androidx.compose.animation.core.*\n')
 if 'import androidx.compose.ui.geometry.Offset' not in web:
     web = web.replace('import androidx.compose.ui.Alignment\n', 'import androidx.compose.ui.Alignment\nimport androidx.compose.ui.geometry.Offset\n')
 if 'import androidx.compose.ui.graphics.Brush' not in web:
@@ -550,7 +552,7 @@ new_update = r'''        item("update") {
                 val targetWidth = if (updatingRules) 44.dp else maxWidth
                 val buttonWidth by androidx.compose.animation.core.animateDpAsState(
                     targetValue = targetWidth,
-                    animationSpec = spring(dampingRatio = .72f, stiffness = 430f),
+                    animationSpec = androidx.compose.animation.core.spring(dampingRatio = .72f, stiffness = 430f),
                     label = "adblockUpdateMorphWidth",
                 )
                 val container = if (updateSuccess) Color(0xFF10B981) else MaterialTheme.colorScheme.primary
@@ -568,7 +570,7 @@ new_update = r'''        item("update") {
                                     notice = "$it；代理运行中时请重启代理应用新快照"
                                     revision++
                                     updateSuccess = true
-                                    delay(900)
+                                    kotlinx.coroutines.delay(900)
                                     updateSuccess = false
                                 }
                                 .onFailure { notice = it.message ?: "规则更新失败" }
