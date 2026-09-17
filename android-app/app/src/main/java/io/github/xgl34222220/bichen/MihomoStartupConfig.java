@@ -40,6 +40,11 @@ final class MihomoStartupConfig {
 
     static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret,int controllerPort,
             ProxyRuntimeProfile.AppScope appScope,Set<String> appPackages,String ebpfInterface)throws IOException{
+        return generate(source,profile,controllerSecret,controllerPort,appScope,appPackages,Collections.emptySet(),ebpfInterface);
+    }
+
+    static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret,int controllerPort,
+            ProxyRuntimeProfile.AppScope appScope,Set<String> appPackages,Set<String> directPackages,String ebpfInterface)throws IOException{
         if(source==null||source.trim().isEmpty())throw new IOException("源配置为空");
         if(controllerSecret==null||controllerSecret.trim().isEmpty())throw new IOException("控制接口密钥为空");
         if(controllerPort<1024||controllerPort>65535)throw new IOException("控制接口端口无效");
@@ -119,12 +124,12 @@ final class MihomoStartupConfig {
                 break;
             case TUN:
                 override.append("tproxy-port: 0\nredir-port: 0\n");
-                appendTun(override,profile,appScope,appPackages,true,true);
+                appendTun(override,profile,appScope,appPackages,directPackages,true,true);
                 break;
             case EBPF:
                 if(ebpfInterface==null||ebpfInterface.isEmpty())throw new IOException("eBPF 未找到可用默认出口接口");
                 override.append("tproxy-port: 0\nredir-port: 0\n");
-                appendTun(override,profile,ProxyRuntimeProfile.AppScope.CORE,Collections.emptySet(),false,false);
+                appendTun(override,profile,ProxyRuntimeProfile.AppScope.CORE,Collections.emptySet(),Collections.emptySet(),false,false);
                 override.append("ebpf:\n  redirect-to-tun:\n    - '").append(yamlQuote(ebpfInterface)).append("'\n");
                 break;
             case MIXED:
@@ -149,7 +154,7 @@ final class MihomoStartupConfig {
     }
 
     private static void appendTun(StringBuilder out,ProxyRuntimeProfile profile,ProxyRuntimeProfile.AppScope scope,
-            Set<String> packages,boolean autoRoute,boolean packageFilter){
+            Set<String> packages,Set<String> directPackages,boolean autoRoute,boolean packageFilter){
         out.append("tun:\n");
         out.append("  enable: true\n");
         out.append("  device: bichen0\n");
@@ -164,12 +169,38 @@ final class MihomoStartupConfig {
         if(profile.dnsHijack!=ProxyRuntimeProfile.DnsHijack.OFF){
             out.append("  dns-hijack:\n    - any:53\n    - tcp://any:53\n");
         }
-        if(packageFilter&&packages!=null&&!packages.isEmpty()){
-            if(scope==ProxyRuntimeProfile.AppScope.WHITELIST)out.append("  include-package:\n");
-            else if(scope==ProxyRuntimeProfile.AppScope.BLACKLIST)out.append("  exclude-package:\n");
-            else return;
-            for(String name:new TreeSet<>(packages))out.append("    - '").append(yamlQuote(name)).append("'\n");
+        if(packageFilter){
+            TreeSet<String> selected=new TreeSet<>();
+            if(packages!=null)selected.addAll(packages);
+            TreeSet<String> direct=new TreeSet<>();
+            if(directPackages!=null)direct.addAll(directPackages);
+            if(scope==ProxyRuntimeProfile.AppScope.WHITELIST){
+                selected.removeAll(direct);
+                if(selected.isEmpty())throw new IllegalArgumentException("TUN 仅所选应用代理模式被 DIRECT 规则全部排除");
+                out.append("  include-package:\n");
+                for(String name:selected)out.append("    - '").append(yamlQuote(name)).append("'\n");
+            }else{
+                selected.addAll(direct);
+                if(!selected.isEmpty()){
+                    out.append("  exclude-package:\n");
+                    for(String name:selected)out.append("    - '").append(yamlQuote(name)).append("'\n");
+                }
+            }
         }
+    }
+
+    static Set<String> extractDirectProcessPackages(String source){
+        TreeSet<String> out=new TreeSet<>();
+        if(source==null||source.isEmpty())return out;
+        Pattern p=Pattern.compile("(?m)^\\s*-\\s*(?:PROCESS-NAME|PROCESS-NAME-WILDCARD)\\s*,\\s*([^,#]+?)\\s*,\\s*DIRECT(?:\\s*,[^#]*)?(?:\\s*#.*)?$");
+        Matcher m=p.matcher(normalize(source));
+        Pattern safe=Pattern.compile("[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)+(?:\\*)?");
+        while(m.find()){
+            String value=m.group(1).trim();
+            if((value.startsWith("'")&&value.endsWith("'"))||(value.startsWith("\"")&&value.endsWith("\"")))value=value.substring(1,value.length()-1).trim();
+            if(safe.matcher(value).matches())out.add(value);
+        }
+        return out;
     }
 
     private static String yamlQuote(String value){return value==null?"":value.replace("'","''");}
