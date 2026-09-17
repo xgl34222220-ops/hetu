@@ -19,11 +19,14 @@ jobs:
           fetch-depth: 0
 
       - name: Apply test50 commercial UI polish
+        shell: bash
         run: |
-          python3 tools/apply_test50_commercial_polish.py
-          python3 tools/fix_test50_yaml_escape.py
-          # Keep the resource-card header roomy enough for the 22dp CPU ring.
-          python3 - <<'PY'
+          set -euo pipefail
+          BUILD=android-app/app/build.gradle.kts
+          if grep -q 'versionCode = 449' "$BUILD"; then
+            python3 tools/apply_test50_commercial_polish.py
+            # Keep the resource-card header roomy enough for the 22dp CPU ring.
+            python3 - <<'PY'
           from pathlib import Path
           p = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt')
           s = p.read_text()
@@ -34,6 +37,11 @@ jobs:
           s = s[:start] + block + s[end:]
           p.write_text(s)
           PY
+          elif ! grep -q 'versionCode = 450' "$BUILD"; then
+            echo 'Unexpected version baseline' >&2
+            exit 1
+          fi
+          python3 tools/fix_test50_yaml_escape.py
 
       - name: Verify generated sources
         shell: bash
