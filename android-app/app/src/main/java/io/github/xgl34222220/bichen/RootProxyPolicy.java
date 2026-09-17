@@ -50,7 +50,7 @@ final class RootProxyPolicy {
         TreeSet<Integer> uids = new TreeSet<>();
         TreeSet<String> missing = new TreeSet<>();
         TreeSet<String> skipped = new TreeSet<>();
-        Set<String> selected = prefs.getStringSet("bypassApps", Collections.emptySet());
+        Set<String> selected = prefs.getStringSet("proxyAppPackages", Collections.emptySet());
         if (selected == null) selected = Collections.emptySet();
 
         if (profile.appScope != ProxyRuntimeProfile.AppScope.CORE) {

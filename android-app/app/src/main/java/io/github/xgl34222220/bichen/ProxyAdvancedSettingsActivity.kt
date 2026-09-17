@@ -134,6 +134,13 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
         item { AdvancedSectionLabel("流量接管") }
         item {
             AdvancedGroup {
+                AdvancedValueRow(Icons.Rounded.Memory, Color(0xFF334155), "运行核心", profile.core.label) {
+                    showChoices("运行核心", "proxyBaseCore", listOf(
+                        AdvancedChoice("Mihomo", "mihomo"),
+                        AdvancedChoice("Mihomo Smart", "mihomo-smart"),
+                    ))
+                }
+                AdvancedDivider()
                 AdvancedValueRow(Icons.Rounded.Apps, Color(0xFFF97316), "应用范围", when (profile.appScope) {
                     ProxyRuntimeProfile.AppScope.WHITELIST -> "仅所选应用代理"
                     ProxyRuntimeProfile.AppScope.BLACKLIST -> "所选应用直连"
@@ -147,7 +154,7 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
                 }
                 AdvancedDivider()
                 AdvancedValueRow(Icons.Rounded.Checklist, Color(0xFF8B5CF6), "应用名单", "选择需要直连/代理的应用") {
-                    context.startActivity(Intent(context, CompactMainActivity::class.java))
+                    context.startActivity(Intent(context, ProxyAppSelectionActivity::class.java))
                 }
                 AdvancedDivider()
                 AdvancedSwitchRow(Icons.Rounded.SwapHoriz, Color(0xFF2563EB), "TCP 接管", "透明代理 TCP 流量", prefs.getBoolean("proxyTcp", true)) { putBool("proxyTcp", it) }
@@ -269,6 +276,7 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
     val currentChoiceKey = choiceKey
     if (choiceTitle != null && currentChoiceKey != null) {
         val current = when (currentChoiceKey) {
+            "proxyBaseCore" -> profile.core.id
             "proxyAppScope" -> profile.appScope.id
             "proxyDnsHijack" -> profile.dnsHijack.id
             "proxyBaseIpv6" -> profile.ipv6.id

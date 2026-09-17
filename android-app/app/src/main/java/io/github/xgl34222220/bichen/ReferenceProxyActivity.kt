@@ -2073,11 +2073,11 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
         item { RefSectionLabel("系统服务") }
         item {
             RefGroup {
-                RefToolRow(Icons.Rounded.Terminal, Color(0xFF2563EB), "脚本", "启动配置与运行文件") { context.startActivity(Intent(context, ReferenceFileManagerActivity::class.java)) }
+                RefToolRow(Icons.Rounded.Terminal, Color(0xFF2563EB), "运行文件", "启动配置与运行文件") { context.startActivity(Intent(context, ReferenceFileManagerActivity::class.java)) }
                 RefDivider()
                 RefToolRow(Icons.Rounded.Article, Color(0xFF8B5CF6), "日志查看", "实时查看 Mihomo stdout / stderr") { scope.launch { onLog(runCatching { inspector.runtimeLog() }.getOrElse { it.message ?: "日志读取失败" }) } }
                 RefDivider()
-                RefToolRow(Icons.Rounded.Apps, Color(0xFFF97316), "应用管理", "分应用放行与代理相关应用列表") { context.startActivity(Intent(context, CompactMainActivity::class.java)) }
+                RefToolRow(Icons.Rounded.Apps, Color(0xFFF97316), "应用名单", "Root 分应用代理范围") { context.startActivity(Intent(context, ProxyAppSelectionActivity::class.java)) }
             }
         }
         item { RefSectionLabel("网络与共享") }
@@ -2101,9 +2101,9 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
         item { RefSectionLabel("维护") }
         item {
             RefGroup {
-                RefToolRow(Icons.Rounded.Language, Color(0xFF6366F1), "更新 WebUI", "Zashboard · MetaCubeXD") { context.startActivity(Intent(context, ProxyWebUiActivity::class.java)) }
+                RefToolRow(Icons.Rounded.Language, Color(0xFF6366F1), "WebUI 管理", "Zashboard · 本机面板与修复") { context.startActivity(Intent(context, ProxyWebUiActivity::class.java)) }
                 RefDivider()
-                RefToolRow(Icons.Rounded.Memory, Color(0xFF334155), "更新核心", state.core) { context.startActivity(Intent(context, ProxyCoreActivity::class.java)) }
+                RefToolRow(Icons.Rounded.Memory, Color(0xFF334155), "内核管理", state.core) { context.startActivity(Intent(context, ProxyCoreActivity::class.java)) }
             }
         }
     }
@@ -2134,7 +2134,7 @@ private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
         item { RefSectionLabel("核心与运行") }
         item {
             RefGroup {
-                RefValueRow("核心选择", state.core, Icons.Rounded.Memory, Color(0xFF334155)) { context.startActivity(Intent(context, ProxyCoreActivity::class.java)) }
+                RefValueRow("内核管理", state.core, Icons.Rounded.Memory, Color(0xFF334155)) { context.startActivity(Intent(context, ProxyCoreActivity::class.java)) }
                 RefDivider()
                 RefValueRow("运行模式", state.mode, Icons.Rounded.Tune, Color(0xFF2563EB)) { modePicker = true }
                 RefDivider()

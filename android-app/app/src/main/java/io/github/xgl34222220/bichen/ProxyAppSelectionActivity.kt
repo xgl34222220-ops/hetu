@@ -53,10 +53,16 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
         catch (cancel: CancellationException) { throw cancel }
         catch (_: Exception) { controller.cachedApps() }
     }
+    fun proxyApps(): Set<String> = prefs.getStringSet("proxyAppPackages", emptySet()).orEmpty().toSet()
+    fun setProxyApp(packageName: String, enabled: Boolean) {
+        val next = proxyApps().toMutableSet()
+        if (enabled) next.add(packageName) else next.remove(packageName)
+        prefs.edit().putStringSet("proxyAppPackages", next).apply()
+    }
     var query by rememberSaveable { mutableStateOf("") }
     var showSystem by rememberSaveable { mutableStateOf(false) }
     var selectedOnly by rememberSaveable { mutableStateOf(false) }
-    var selected by remember { mutableStateOf(controller.bypassApps()) }
+    var selected by remember { mutableStateOf(proxyApps()) }
     val profile = remember(selected, reload) { ProxyRuntimeProfile.load(prefs) }
     val t = LocalBichenTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
@@ -154,8 +160,8 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
             val icon by produceState(initialValue = app.icon, app.packageName) { value = controller.appIcon(app.packageName) }
             Surface(
                 modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).clickable {
-                    controller.setBypass(app.packageName, !checked)
-                    selected = controller.bypassApps()
+                    setProxyApp(app.packageName, !checked)
+                    selected = proxyApps()
                 },
                 shape = RoundedCornerShape(18.dp),
                 color = if (checked) t.selectionBackground else if (dark) t.elevatedCardBackground else Color.White,
@@ -172,8 +178,8 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
                         Text(app.packageName, color = t.textSecondary, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     Checkbox(checked = checked, onCheckedChange = { value ->
-                        controller.setBypass(app.packageName, value)
-                        selected = controller.bypassApps()
+                        setProxyApp(app.packageName, value)
+                        selected = proxyApps()
                     })
                 }
             }
