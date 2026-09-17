@@ -18,16 +18,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Polish panel header and segmented tabs
-        run: python3 scripts/polish_panel_header_test36.py
+      - name: Apply panel liquid glass header and tabs
+        run: python3 scripts/polish_panel_glass_test37.py
 
-      - name: Commit panel header polish
+      - name: Commit panel liquid glass polish
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
           if ! git diff --cached --quiet; then
-            git commit -m 'Polish panel header and lightweight tabs'
+            git commit -m 'Add liquid glass panel header and tabs'
             git push
           fi
 
@@ -68,28 +68,30 @@ jobs:
       - name: Build APK
         working-directory: android-app
         run: gradle :app:assembleDebug --stacktrace
-      - name: Verify APK and panel header invariants
+      - name: Verify APK and panel liquid glass invariants
         run: |
           APK=android-app/app/build/outputs/apk/debug/app-debug.apk
           UI=android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
+          DOCK=android-app/app/src/main/java/io/github/xgl34222220/bichen/ui/BichenGlassDock.kt
           test -f "$APK"
           unzip -t "$APK" >/dev/null
           unzip -l "$APK" | grep -q 'lib/arm64-v8a/libbichen_core.so'
           unzip -l "$APK" | grep -q 'assets/mihomo-root/arm64-v8a/mihomo'
-          ! grep -q 'Text("代理面板"' "$UI"
-          ! grep -q '个策略组", color = t.textSecondary' "$UI"
-          grep -q '"面板"' "$UI"
-          grep -q 'FontWeight.Black' "$UI"
-          grep -q 'private fun RefPanelHeaderAction' "$UI"
-          grep -q 'Modifier.fillMaxWidth().height(38.dp).background(track, CircleShape).padding(3.dp)' "$UI"
-          grep -q 'Icons.Rounded.Settings' "$UI"
-          grep -q 'onOpenSettings = { page = RefProxyPage.Settings }' "$UI"
+          grep -q 'private fun RefPanelGlassHeader' "$UI"
+          grep -q 'hazeState: HazeState' "$UI"
+          grep -q 'backdrop: LayerBackdrop?' "$UI"
+          grep -q 'panelLiquidTabIndicator' "$UI"
+          grep -q 'liquidGlassLens(' "$UI"
+          grep -q 'indicatorBackdrop = headerSurfaceBackdrop.takeIf { runtimeLiquid }' "$UI"
+          grep -q 'drawBackdrop(' "$UI"
+          grep -q 'HazeMaterials.ultraThin()' "$UI"
           grep -q 'private fun RefGroupDetailPage' "$UI"
           grep -q 'if (!panelDetailVisible)' "$UI"
+          grep -q 'Shared MIUIX floating dock' "$DOCK"
           grep -q 'homeSnapshotCache' android-app/app/src/main/java/io/github/xgl34222220/bichen/BichenMainActivity.kt
       - uses: actions/upload-artifact@v4
         with:
-          name: Bichen-0.4.0-test.36-Panel-Header-Polish
+          name: Bichen-0.4.0-test.37-Panel-Liquid-Glass
           path: android-app/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
