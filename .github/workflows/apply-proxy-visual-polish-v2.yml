@@ -18,16 +18,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Apply premium panel polish
-        run: python3 scripts/polish_panel_premium_test42.py
+      - name: Apply tools and settings native polish
+        run: python3 scripts/polish_tools_settings_test43.py
 
-      - name: Commit premium panel polish
+      - name: Commit tools and settings polish
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
           if ! git diff --cached --quiet; then
-            git commit -m 'Polish panel premium visual system'
+            git commit -m 'Polish tools and settings native controls'
             git push
           fi
 
@@ -68,39 +68,30 @@ jobs:
       - name: Build APK
         working-directory: android-app
         run: gradle :app:assembleDebug --stacktrace
-      - name: Verify APK and premium panel invariants
+      - name: Verify APK and tools/settings invariants
         run: |
           set -euo pipefail
           APK=android-app/app/build/outputs/apk/debug/app-debug.apk
           UI=android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
+          BOOT=android-app/app/src/main/java/io/github/xgl34222220/bichen/BootReceiver.java
           DOCK=android-app/app/src/main/java/io/github/xgl34222220/bichen/ui/BichenGlassDock.kt
           test -f "$APK"
           unzip -t "$APK" >/dev/null
           unzip -l "$APK" | grep -q 'lib/arm64-v8a/libbichen_core.so'
           unzip -l "$APK" | grep -q 'assets/mihomo-root/arm64-v8a/mihomo'
-          python3 - <<'PY'
-          from pathlib import Path
-          s = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt').read_text()
-          a = s.index('private fun RefPanelGlassHeader(')
-          b = s.index('private fun RefPanelHeaderAction(', a)
-          header = s[a:b]
-          assert 'Modifier.background(shellBrush)' not in header
-          assert '.shadow(7.dp, shape' not in header
-          assert 'RefPanelTabs(' in header
-          detail = s[s.index('private fun RefDetailNodeCard('):s.index('private fun refNodeProtocol(')]
-          assert 'if (active) 1.8.dp else .8.dp' in detail
-          assert 'Color(0xFFEFF6FF)' in detail
-          assert 'Color(0xFF2563EB)' in detail
-          assert 'Modifier.size(26.dp).clip(CircleShape)' not in detail
-          assert 'Brush.verticalGradient(listOf(Color.White, Color(0xFFFAFBFD)))' in s
-          PY
-          grep -q 'private fun RefGroupDetailPage' "$UI"
-          grep -q 'if (!panelDetailVisible)' "$UI"
-          grep -q 'Shared MIUIX floating dock' "$DOCK"
+          grep -q 'private fun RefGradientIcon' "$UI"
+          grep -q 'private fun RefSwitchRow' "$UI"
+          grep -q 'putBoolean("autoStartVpn"' "$UI"
+          grep -q 'putBoolean("enableBlur"' "$UI"
+          grep -q 'RefPortsBottomSheet' "$UI"
+          grep -q 'android.widget.Toast.makeText' "$UI"
+          grep -q 'autoStartVpn' "$BOOT"
+          ! grep -q 'AlertDialog(' "$UI"
+          test "$(git rev-parse HEAD:$DOCK)" = '7efba3c815e6429fcc35df87dc91f5be968111c6'
           grep -q 'homeSnapshotCache' android-app/app/src/main/java/io/github/xgl34222220/bichen/BichenMainActivity.kt
       - uses: actions/upload-artifact@v4
         with:
-          name: Bichen-0.4.0-test.42-Premium-Panel-Visual-System
+          name: Bichen-0.4.0-test.43-Tools-Settings-Native-Polish
           path: android-app/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
