@@ -4,6 +4,9 @@
     <uses-sdk tools:overrideLibrary="top.yukonga.miuix.kmp.blur" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
@@ -31,6 +34,10 @@
         <activity android:name=".ProxySubscriptionActivity" android:label="订阅与配置" android:exported="false" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".ProxyActivity" android:label="代理（旧界面）" android:exported="false" />
         <activity android:name=".RootTproxyActivity" android:label="基础代理配置" android:exported="false" />
+        <activity android:name=".ProxyNetworkMatchActivity" android:label="网络匹配" android:exported="false" />
+        <service android:name=".ProxyNetworkMatchService" android:exported="false" android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User enabled network environment matching for Root proxy automation" />
+        </service>
         <service android:name=".DnsVpnService" android:permission="android.permission.BIND_VPN_SERVICE" android:exported="true" android:foregroundServiceType="specialUse">
             <intent-filter><action android:name="android.net.VpnService" /></intent-filter>
             <meta-data android:name="android.net.VpnService.SUPPORTS_ALWAYS_ON" android:value="false" />

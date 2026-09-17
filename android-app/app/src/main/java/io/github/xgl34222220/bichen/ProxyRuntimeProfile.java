@@ -40,10 +40,10 @@ final class ProxyRuntimeProfile {
         Capability(boolean available,boolean tcp,boolean udp,boolean dnsHijack,boolean appFilter,boolean sharedNetwork,boolean cidrBypass,boolean interfaceBypass,boolean quicControl,String reason){this.available=available;this.tcp=tcp;this.udp=udp;this.dnsHijack=dnsHijack;this.appFilter=appFilter;this.sharedNetwork=sharedNetwork;this.cidrBypass=cidrBypass;this.interfaceBypass=interfaceBypass;this.quicControl=quicControl;this.reason=reason==null?"":reason;}
     }
 
-    final Core core;final Mode mode;final Ipv6 ipv6;final AppScope appScope;final DnsHijack dnsHijack;final boolean autoOverwrite,tcp,udp,quicBlocked;
-    ProxyRuntimeProfile(Core core,Mode mode,Ipv6 ipv6,AppScope appScope,DnsHijack dnsHijack,boolean autoOverwrite,boolean tcp,boolean udp,boolean quicBlocked){this.core=core;this.mode=mode;this.ipv6=ipv6;this.appScope=appScope;this.dnsHijack=dnsHijack;this.autoOverwrite=autoOverwrite;this.tcp=tcp;this.udp=udp;this.quicBlocked=quicBlocked;}
+    final Core core;final Mode mode;final Ipv6 ipv6;final AppScope appScope;final DnsHijack dnsHijack;final boolean autoOverwrite,tcp,udp,quicBlocked,cnIpDirect;
+    ProxyRuntimeProfile(Core core,Mode mode,Ipv6 ipv6,AppScope appScope,DnsHijack dnsHijack,boolean autoOverwrite,boolean tcp,boolean udp,boolean quicBlocked,boolean cnIpDirect){this.core=core;this.mode=mode;this.ipv6=ipv6;this.appScope=appScope;this.dnsHijack=dnsHijack;this.autoOverwrite=autoOverwrite;this.tcp=tcp;this.udp=udp;this.quicBlocked=quicBlocked;this.cnIpDirect=cnIpDirect;}
 
-    static ProxyRuntimeProfile load(SharedPreferences p){return new ProxyRuntimeProfile(Core.from(p.getString("proxyBaseCore","mihomo")),Mode.from(p.getString("proxyBaseMode","tproxy")),Ipv6.from(p.getString("proxyBaseIpv6","enable")),AppScope.from(p.getString("proxyAppScope","blacklist")),DnsHijack.from(p.getString("proxyDnsHijack","tproxy")),p.getBoolean("proxyBaseAutoOverwrite",true),p.getBoolean("proxyTcp",true),p.getBoolean("proxyUdp",true),p.getBoolean("proxyQuicBlocked",false));}
+    static ProxyRuntimeProfile load(SharedPreferences p){return new ProxyRuntimeProfile(Core.from(p.getString("proxyBaseCore","mihomo")),Mode.from(p.getString("proxyBaseMode","tproxy")),Ipv6.from(p.getString("proxyBaseIpv6","enable")),AppScope.from(p.getString("proxyAppScope","blacklist")),DnsHijack.from(p.getString("proxyDnsHijack","tproxy")),p.getBoolean("proxyBaseAutoOverwrite",true),p.getBoolean("proxyTcp",true),p.getBoolean("proxyUdp",true),p.getBoolean("proxyQuicBlocked",false),p.getBoolean("proxyCnIpDirect",false));}
 
     Capability capability(){return capability(core,mode);}
     static Capability capability(Core core,Mode mode){

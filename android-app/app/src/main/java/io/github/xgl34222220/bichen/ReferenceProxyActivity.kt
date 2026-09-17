@@ -2059,7 +2059,6 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
     val scope = rememberCoroutineScope()
     val t = LocalBichenTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    var unavailable by remember { mutableStateOf<String?>(null) }
     LazyColumn(
         Modifier.fillMaxSize().background(if (dark) t.pageBackground else Color(0xFFF1F5F9)),
         contentPadding = PaddingValues(
@@ -2084,11 +2083,11 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
         item { RefSectionLabel("网络与共享") }
         item {
             RefGroup {
-                RefToolRow(Icons.Rounded.Wifi, Color(0xFF0EA5E9), "网络匹配", "按 Wi‑Fi / SSID 自动匹配") { unavailable = "网络匹配目前只有规格，没有真实 SSID 自动切换后端。我已取消错误的基础代理跳转，接入完成前不会假装可用。" }
+                RefToolRow(Icons.Rounded.Wifi, Color(0xFF0EA5E9), "网络匹配", "Wi‑Fi / SSID / 移动网络自动启停") { context.startActivity(Intent(context, ProxyNetworkMatchActivity::class.java)) }
                 RefDivider()
-                RefToolRow(Icons.Rounded.WifiTethering, Color(0xFF10B981), "共享网络", "热点与局域网共享") { unavailable = "共享网络开关目前没有独立后端控制。我已取消错误跳转，避免看起来能设置但实际无效。" }
+                RefToolRow(Icons.Rounded.WifiTethering, Color(0xFF10B981), "共享网络", "热点与局域网共享 · Root 规则") { context.startActivity(Intent(context, RootTproxyActivity::class.java).putExtra("focus", "sharing")) }
                 RefDivider()
-                RefToolRow(Icons.Rounded.AltRoute, Color(0xFFEF4444), "绕过规则", "CIDR 与接口绕过") { unavailable = "自定义 CIDR/接口绕过还没有接入运行时规则生成器，因此不再把你带到基础代理页。" }
+                RefToolRow(Icons.Rounded.AltRoute, Color(0xFFEF4444), "绕过规则", "CIDR 与接口绕过 · Root 规则") { context.startActivity(Intent(context, RootTproxyActivity::class.java).putExtra("focus", "bypass")) }
             }
         }
         item { RefSectionLabel("订阅与数据") }
@@ -2096,7 +2095,7 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
             RefGroup {
                 RefToolRow(Icons.Rounded.CloudDownload, Color(0xFF3B82F6), "订阅管理", state.config) { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) }
                 RefDivider()
-                RefToolRow(Icons.Rounded.Public, Color(0xFFF59E0B), "CNIP 设置", "国内 IP 数据与分流") { unavailable = "CNIP 下载源和运行时应用后端尚未接入；当前不再提供假入口。" }
+                RefToolRow(Icons.Rounded.Public, Color(0xFFF59E0B), "CNIP 设置", "国内 IPv4/IPv6 自动直连") { context.startActivity(Intent(context, RootTproxyActivity::class.java).putExtra("focus", "cnip")) }
             }
         }
         item { RefSectionLabel("维护") }
@@ -2107,14 +2106,6 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
                 RefToolRow(Icons.Rounded.Memory, Color(0xFF334155), "更新核心", state.core) { context.startActivity(Intent(context, ProxyCoreActivity::class.java)) }
             }
         }
-    }
-    unavailable?.let { text ->
-        RefInfoBottomSheet(
-            title = "功能尚未接入",
-            text = text,
-            actionLabel = "知道了",
-            onDismiss = { unavailable = null },
-        )
     }
 }
 
@@ -2156,6 +2147,8 @@ private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
                 RefValueRow("端口细则", "TProxy ${MihomoStartupConfig.TPROXY_PORT} · Redir ${MihomoStartupConfig.REDIRECT_PORT}", Icons.Rounded.Hub, Color(0xFFF97316)) { portsInfo = true }
                 RefDivider()
                 RefValueRow("当前配置", state.config, Icons.Rounded.Description, Color(0xFF8B5CF6)) { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) }
+                RefDivider()
+                RefValueRow("高级代理配置", "应用范围 · DNS · QUIC · CNIP · 共享 · 绕过", Icons.Rounded.SettingsEthernet, Color(0xFF14B8A6)) { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }
             }
         }
         item { RefSectionLabel("界面") }
