@@ -29,6 +29,14 @@ public final class MihomoStartupConfigTest {
   check(cn.yaml.contains("bichen-cn-v4:")&&cn.yaml.contains("bichen-cn-v6:"),"CNIP providers injected");
   check(cn.yaml.contains("RULE-SET,bichen-cn-v4,DIRECT,no-resolve")&&cn.yaml.indexOf("RULE-SET,bichen-cn-v4")<cn.yaml.indexOf("MATCH,DIRECT"),"CNIP direct rules precede source fallback");
   check(cn.yaml.contains("./ruleset/bichen-cn-v4.txt")&&cn.yaml.contains("interval: 86400"),"CNIP cache path and refresh interval configured");
+  ProxyRuntimeProfile adProfile=new ProxyRuntimeProfile(ProxyRuntimeProfile.Core.MIHOMO,ProxyRuntimeProfile.Mode.TPROXY,ProxyRuntimeProfile.Ipv6.BYPASS,ProxyRuntimeProfile.AppScope.BLACKLIST,ProxyRuntimeProfile.DnsHijack.TPROXY,true,true,true,false,false,true);
+  MihomoStartupConfig.Result ad=MihomoStartupConfig.generate(cnSource,adProfile);
+  check(ad.yaml.contains("bichen-adblock:")&&ad.yaml.contains("type: file")&&ad.yaml.contains("behavior: domain")&&ad.yaml.contains("format: text"),"adblock local domain provider injected");
+  check(ad.yaml.contains("path: ./ruleset/bichen-adblock.txt"),"adblock provider stays inside Mihomo HomeDir");
+  check(ad.yaml.contains("RULE-SET,bichen-adblock,REJECT")&&ad.yaml.indexOf("RULE-SET,bichen-adblock")<ad.yaml.indexOf("MATCH,DIRECT"),"adblock REJECT precedes source routing");
+  ProxyRuntimeProfile bothProfile=new ProxyRuntimeProfile(ProxyRuntimeProfile.Core.MIHOMO,ProxyRuntimeProfile.Mode.TPROXY,ProxyRuntimeProfile.Ipv6.BYPASS,ProxyRuntimeProfile.AppScope.BLACKLIST,ProxyRuntimeProfile.DnsHijack.TPROXY,true,true,true,false,true,true);
+  MihomoStartupConfig.Result both=MihomoStartupConfig.generate(cnSource,bothProfile);
+  check(both.yaml.indexOf("RULE-SET,bichen-adblock")<both.yaml.indexOf("RULE-SET,bichen-cn-v4")&&both.yaml.indexOf("RULE-SET,bichen-cn-v4")<both.yaml.indexOf("MATCH,DIRECT"),"adblock executes before CNIP and source fallback");
   boolean denied=false;try{MihomoStartupConfig.generate(source,p(ProxyRuntimeProfile.Mode.EBPF,true));}catch(Exception expected){denied=true;}check(denied,"unsupported eBPF is not faked");
   System.out.println("MihomoStartupConfigTest passed: "+checks);
  }

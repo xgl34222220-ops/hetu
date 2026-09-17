@@ -36,6 +36,7 @@
         <activity android:name=".ProxyAdvancedSettingsActivity" android:label="高级代理配置" android:exported="false" />
         <activity android:name=".ProxyNetworkAutomationActivity" android:label="网络匹配" android:exported="false" />
         <activity android:name=".ProxyAppSelectionActivity" android:label="代理应用名单" android:exported="false" />
+        <activity android:name=".ProxyAdblockChainActivity" android:label="代理广告过滤" android:exported="false" />
         <activity android:name=".RootTproxyActivity" android:label="基础代理配置（旧）" android:exported="false" />
         <activity android:name=".ProxyNetworkMatchActivity" android:label="网络匹配" android:exported="false" />
         <service android:name=".ProxyNetworkMatchService" android:exported="false" android:foregroundServiceType="specialUse">

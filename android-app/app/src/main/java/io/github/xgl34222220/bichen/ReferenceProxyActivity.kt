@@ -2095,6 +2095,8 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
             RefGroup {
                 RefToolRow(Icons.Rounded.CloudDownload, Color(0xFF3B82F6), "订阅管理", state.config) { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) }
                 RefDivider()
+                RefToolRow(Icons.Rounded.Shield, Color(0xFF2563EB), "广告过滤", "代理串联 · AdAway / 秋风 / HaGeZi / 用户规则") { context.startActivity(Intent(context, ProxyAdblockChainActivity::class.java)) }
+                RefDivider()
                 RefToolRow(Icons.Rounded.Public, Color(0xFFF59E0B), "CNIP 设置", "国内 IPv4/IPv6 自动直连") { context.startActivity(Intent(context, ProxyAdvancedSettingsActivity::class.java).putExtra("focus", "cnip")) }
             }
         }
@@ -2147,6 +2149,8 @@ private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
                 RefValueRow("端口细则", "TProxy ${MihomoStartupConfig.TPROXY_PORT} · Redir ${MihomoStartupConfig.REDIRECT_PORT}", Icons.Rounded.Hub, Color(0xFFF97316)) { portsInfo = true }
                 RefDivider()
                 RefValueRow("当前配置", state.config, Icons.Rounded.Description, Color(0xFF8B5CF6)) { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) }
+                RefDivider()
+                RefValueRow("广告过滤", if (prefs.getBoolean("proxyAdblockChain", true)) "随代理串联" else "关闭", Icons.Rounded.Shield, Color(0xFF2563EB)) { context.startActivity(Intent(context, ProxyAdblockChainActivity::class.java)) }
                 RefDivider()
                 RefValueRow("高级代理配置", "应用范围 · DNS · QUIC · CNIP · 共享 · 绕过", Icons.Rounded.SettingsEthernet, Color(0xFF14B8A6)) { context.startActivity(Intent(context, ProxyAdvancedSettingsActivity::class.java)) }
             }

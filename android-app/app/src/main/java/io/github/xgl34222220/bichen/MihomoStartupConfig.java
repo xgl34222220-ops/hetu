@@ -18,6 +18,7 @@ final class MihomoStartupConfig {
     static final String CNIP_V6_URL="https://raw.githubusercontent.com/gaoyifan/china-operator-ip/ip-lists/china6.txt";
     static final String CNIP_V4_PATH="./ruleset/bichen-cn-v4.txt";
     static final String CNIP_V6_PATH="./ruleset/bichen-cn-v6.txt";
+    static final String ADBLOCK_PATH=ProxyAdblockRules.PROVIDER_PATH;
 
     static final class Result {
         final String yaml;
@@ -61,6 +62,9 @@ final class MihomoStartupConfig {
             yaml=ensureDnsListener(yaml,DNS_PORT);
         if(profile.cnIpDirect)
             yaml=ensureCnIpDirect(yaml);
+        // Apply ad blocking last so its REJECT rule stays ahead of CNIP and all source routing.
+        if(profile.adblockChain)
+            yaml=ensureAdblock(yaml);
 
         int tp=0,rp=0;
         StringBuilder override=new StringBuilder();
@@ -103,6 +107,48 @@ final class MihomoStartupConfig {
         override.append("external-ui-url: '").append(EXTERNAL_UI_URL).append("'\n");
         override.append("# --- end Bichen runtime isolation ---\n");
         return new Result(yaml+override,tp,rp);
+    }
+
+    /** Merge the local effective Bichen ad-block snapshot into the private startup copy. */
+    private static String ensureAdblock(String source)throws IOException{
+        String yaml=normalize(source);
+        yaml=injectAdblockProvider(yaml);
+        yaml=prependAdblockRule(yaml);
+        return yaml;
+    }
+
+    private static String injectAdblockProvider(String source)throws IOException{
+        String[] lines=normalize(source).split("\n",-1);
+        int index=-1;Matcher found=null;Pattern top=Pattern.compile("^rule-providers\\s*:(.*)$");
+        for(int i=0;i<lines.length;i++){if(indent(lines[i])!=0)continue;Matcher m=top.matcher(lines[i]);if(m.find()){index=i;found=m;break;}}
+        String providerBlock=
+                "  "+ProxyAdblockRules.PROVIDER_NAME+":\n"+
+                "    type: file\n"+
+                "    behavior: domain\n"+
+                "    format: text\n"+
+                "    path: "+ADBLOCK_PATH+"\n";
+        if(index<0){String base=trimOne(source);return base+(base.isEmpty()?"":"\n")+"rule-providers:\n"+providerBlock;}
+        String rest=found.group(1).trim();
+        if(!rest.isEmpty()&&!rest.equals("{}"))throw new IOException("代理串联去广告需要普通 rule-providers: 配置块；当前源配置使用行内写法");
+        int end=lines.length;
+        for(int i=index+1;i<lines.length;i++){String t=lines[i].trim();if(t.isEmpty()||t.startsWith("#"))continue;if(indent(lines[i])==0){end=i;break;}}
+        for(int i=index+1;i<end;i++)if(lines[i].trim().startsWith(ProxyAdblockRules.PROVIDER_NAME+":"))throw new IOException("源配置占用了辟尘保留的广告 provider 名称");
+        StringBuilder out=new StringBuilder();
+        for(int i=0;i<lines.length;i++){if(i==index){out.append("rule-providers:\n").append(providerBlock);continue;}out.append(lines[i]).append('\n');}
+        return trimOne(out.toString());
+    }
+
+    private static String prependAdblockRule(String source)throws IOException{
+        String[] lines=normalize(source).split("\n",-1);
+        int index=-1;Matcher found=null;Pattern top=Pattern.compile("^rules\\s*:(.*)$");
+        for(int i=0;i<lines.length;i++){if(indent(lines[i])!=0)continue;Matcher m=top.matcher(lines[i]);if(m.find()){index=i;found=m;break;}}
+        String rule="  - RULE-SET,"+ProxyAdblockRules.PROVIDER_NAME+",REJECT\n";
+        if(index<0){String base=trimOne(source);return base+(base.isEmpty()?"":"\n")+"rules:\n"+rule;}
+        String rest=found.group(1).trim();
+        if(!rest.isEmpty()&&!rest.equals("[]"))throw new IOException("代理串联去广告需要普通 rules: 列表；当前源配置使用行内 rules 写法");
+        StringBuilder out=new StringBuilder();
+        for(int i=0;i<lines.length;i++){if(i==index){out.append("rules:\n").append(rule);continue;}out.append(lines[i]).append('\n');}
+        return trimOne(out.toString());
     }
 
     /** Merge Bichen CN IP providers into the private startup copy without editing the subscription. */

@@ -96,9 +96,10 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
 
     LaunchedEffect(focus) {
         val index = when (focus) {
-            "sharing" -> 6
-            "cnip" -> 8
-            "bypass" -> 10
+            "adblock" -> 4
+            "sharing" -> 10
+            "cnip" -> 12
+            "bypass" -> 14
             else -> 0
         }
         if (index > 0) listState.animateScrollToItem(index)
@@ -160,6 +161,17 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
                 AdvancedSwitchRow(Icons.Rounded.SwapHoriz, Color(0xFF2563EB), "TCP 接管", "透明代理 TCP 流量", prefs.getBoolean("proxyTcp", true)) { putBool("proxyTcp", it) }
                 AdvancedDivider()
                 AdvancedSwitchRow(Icons.Rounded.Bolt, Color(0xFF0EA5E9), "UDP 接管", "游戏、VoIP 与 QUIC 等 UDP", prefs.getBoolean("proxyUdp", true)) { putBool("proxyUdp", it) }
+            }
+        }
+
+        item { AdvancedSectionLabel("广告过滤") }
+        item {
+            AdvancedGroup {
+                AdvancedSwitchRow(Icons.Rounded.Shield, Color(0xFF2563EB), "随代理串联去广告", "广告规则先 REJECT，剩余流量再进入代理分流", profile.adblockChain) { putBool("proxyAdblockChain", it) }
+                AdvancedDivider()
+                AdvancedActionRow(Icons.Rounded.FilterAlt, Color(0xFF8B5CF6), "广告规则与命中", "规则源 · 有效规则 · Mihomo REJECT 命中") {
+                    context.startActivity(Intent(context, ProxyAdblockChainActivity::class.java))
+                }
             }
         }
 
