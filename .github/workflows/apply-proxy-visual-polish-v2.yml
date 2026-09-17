@@ -18,16 +18,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Fix panel Haze white block
-        run: python3 scripts/fix_panel_haze_white_block_test40.py
+      - name: Remove panel Haze sampling surface
+        run: python3 scripts/fix_panel_remove_haze_test41.py
 
-      - name: Commit panel glass tint fix
+      - name: Commit stable no-Haze panel glass
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
           if ! git diff --cached --quiet; then
-            git commit -m 'Fix panel Haze white block'
+            git commit -m 'Remove panel Haze sampling white block'
             git push
           fi
 
@@ -68,7 +68,7 @@ jobs:
       - name: Build APK
         working-directory: android-app
         run: gradle :app:assembleDebug --stacktrace
-      - name: Verify APK and panel glass tint invariants
+      - name: Verify APK and no-backdrop panel invariants
         run: |
           set -euo pipefail
           APK=android-app/app/build/outputs/apk/debug/app-debug.apk
@@ -79,23 +79,22 @@ jobs:
           unzip -l "$APK" | grep -q 'lib/arm64-v8a/libbichen_core.so'
           unzip -l "$APK" | grep -q 'assets/mihomo-root/arm64-v8a/mihomo'
           grep -q 'private fun RefPanelGlassHeader' "$UI"
-          grep -q 'HazeStyle(' "$UI"
-          grep -q 'HazeTint(panelTint)' "$UI"
-          grep -q 'backgroundColor = panelBase' "$UI"
+          grep -q 'Modifier.background(shellBrush)' "$UI"
           grep -q 'backdrop = null' "$UI"
-          grep -q 'page == RefProxyPage.Panel' "$UI"
           grep -q 'panelLiquidTabIndicator' "$UI"
           python3 - <<'PY'
           from pathlib import Path
           s = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt').read_text()
           a = s.index('private fun RefPanelGlassHeader(')
-          b = s.index('private fun RefPanelOverview(', a)
+          b = s.index('private fun RefPanelHeaderAction(', a)
           panel = s[a:b]
-          assert 'HazeMaterials.ultraThin()' not in panel
+          assert 'hazeEffect(' not in panel
+          assert 'HazeStyle(' not in panel
+          assert 'HazeTint(' not in panel
           assert 'drawBackdrop(' not in panel
           assert 'liquidGlassLens(' not in panel
-          assert 'HazeStyle(' in panel
-          assert 'HazeTint(panelTint)' in panel
+          assert 'page == RefProxyPage.Panel' not in s
+          assert 'Modifier.background(shellBrush)' in panel
           PY
           grep -q 'private fun RefGroupDetailPage' "$UI"
           grep -q 'if (!panelDetailVisible)' "$UI"
@@ -103,7 +102,7 @@ jobs:
           grep -q 'homeSnapshotCache' android-app/app/src/main/java/io/github/xgl34222220/bichen/BichenMainActivity.kt
       - uses: actions/upload-artifact@v4
         with:
-          name: Bichen-0.4.0-test.40-Panel-Glass-No-White-Block
+          name: Bichen-0.4.0-test.41-Panel-No-Haze-White-Block
           path: android-app/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
