@@ -1276,20 +1276,24 @@ private fun RefDetailNodeCard(
     val pressed by source.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) .98f else 1f, label = "detailNode${node.name}")
     val shape = RoundedCornerShape(16.dp)
-    val background = when {
-        active && dark -> scheme.primary.copy(alpha = .18f)
-        active -> Color(0xFFEFF6FF)
-        else -> t.cardBackground
+    val premiumBrush = if (dark) {
+        Brush.verticalGradient(listOf(t.elevatedCardBackground, t.cardBackground))
+    } else {
+        Brush.verticalGradient(listOf(Color.White, Color(0xFFFAFBFD)))
     }
-    val borderColor = if (active) scheme.primary.copy(alpha = .32f) else Color(0xFFF1F5F9)
     Column(
         modifier.height(68.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .94f else 1f }
-            .background(background, shape)
-            .border(.8.dp, borderColor, shape)
+            .shadow(if (active) 5.dp else 3.dp, shape, clip = false)
+            .background(premiumBrush, shape)
+            .border(
+                if (active) 1.8.dp else .8.dp,
+                if (active) Color(0xFF2563EB) else Color.White.copy(alpha = if (dark) .10f else .92f),
+                shape,
+            )
             .clip(shape)
             .clickable(interactionSource = source, indication = null, onClick = onSelect)
-            .padding(horizontal = 11.dp, vertical = 9.dp),
+            .padding(horizontal = 11.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
         val flag = refNodeFlag(node.name)
@@ -1300,7 +1304,7 @@ private fun RefDetailNodeCard(
             }
             Text(
                 node.name,
-                color = if (active && !dark) Color(0xFF1E3A8A) else t.textPrimary,
+                color = t.textPrimary,
                 fontSize = 13.sp,
                 lineHeight = 16.sp,
                 fontWeight = FontWeight.Bold,
@@ -1308,16 +1312,24 @@ private fun RefDetailNodeCard(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
+            if (active) {
+                Box(
+                    Modifier.size(16.dp).background(Color(0xFF2563EB), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Rounded.Check, "已选择", tint = Color.White, modifier = Modifier.size(11.dp))
+                }
+            }
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Surface(
                 shape = RoundedCornerShape(6.dp),
-                color = if (active) scheme.primary.copy(alpha = .10f) else Color(0xFFF1F5F9),
+                color = if (active) Color(0xFFEFF6FF) else Color(0xFFF1F5F9),
             ) {
                 Text(
                     refNodeProtocol(node),
                     Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                    color = if (active) scheme.primary else Color(0xFF64748B),
+                    color = if (active) Color(0xFF2563EB) else Color(0xFF64748B),
                     fontSize = 9.sp,
                     lineHeight = 12.sp,
                     fontWeight = FontWeight.Medium,
@@ -1325,14 +1337,31 @@ private fun RefDetailNodeCard(
                 )
             }
             Spacer(Modifier.weight(1f))
-            Box(
-                Modifier.size(26.dp).clip(CircleShape).clickable(onClick = onDelay),
-                contentAlignment = Alignment.Center,
+            val delayBg = when {
+                testing -> Color(0xFFEFF6FF)
+                delay == null -> Color(0xFFF1F5F9)
+                delay <= 0L -> Color(0xFFFEF2F2)
+                delay > 200L -> Color(0xFFFFF7ED)
+                else -> Color(0xFFEFF6FF)
+            }
+            val delayColor = when {
+                testing -> Color(0xFF2563EB)
+                delay == null -> Color(0xFF64748B)
+                delay <= 0L -> Color(0xFFDC2626)
+                delay > 200L -> Color(0xFFD97706)
+                else -> Color(0xFF2563EB)
+            }
+            Surface(
+                shape = CircleShape,
+                color = delayBg,
+                modifier = Modifier.clickable(enabled = !testing, onClick = onDelay),
             ) {
-                when {
-                    testing -> CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
-                    delay != null && delay > 0L -> Text(refDelay(delay), color = scheme.primary, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
-                    else -> Icon(Icons.Rounded.Bolt, "测速", tint = Color(0xFF94A3B8), modifier = Modifier.size(15.dp))
+                Box(
+                    Modifier.height(24.dp).padding(horizontal = 8.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (testing) CircularProgressIndicator(Modifier.size(13.dp), strokeWidth = 2.dp, color = delayColor)
+                    else Text(refDelay(delay), color = delayColor, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
                 }
             }
         }
@@ -1368,92 +1397,60 @@ private fun RefPanelGlassHeader(
     val t = LocalBichenTokens.current
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
-    // Panel header intentionally avoids both RuntimeShader and Haze on affected OEM GPUs.
-    // The glass look is drawn from transparent layered highlights only, so no rectangular
-    // backdrop sampling surface can leak through as a giant white block.
-    val runtimeLiquid = false
-    val shape = RoundedCornerShape(28.dp)
-    val shellBrush = if (dark) {
-        Brush.verticalGradient(
-            listOf(
-                scheme.surface.copy(alpha = .34f),
-                Color.White.copy(alpha = .035f),
-                scheme.surface.copy(alpha = .18f),
-            ),
-        )
-    } else {
-        Brush.verticalGradient(
-            listOf(
-                Color.White.copy(alpha = .20f),
-                Color(0xFFDCE8F5).copy(alpha = .085f),
-                Color.White.copy(alpha = .035f),
-            ),
-        )
-    }
-    val edgeColor = if (dark) Color.White.copy(alpha = .09f) else Color.White.copy(alpha = .24f)
-    val liquidShellModifier = Modifier.background(shellBrush)
 
-
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .shadow(7.dp, shape, clip = false)
-            .squircleClip(28.dp)
-            .then(liquidShellModifier)
-            .border(.7.dp, edgeColor, shape),
+    // Keep the header structurally transparent. Previous full-width glass shells created
+    // an oversized white slab on some OEM renderers. Only the compact controls carry glass.
+    Column(
+        Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Column(
-            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 11.dp),
-            verticalArrangement = Arrangement.spacedBy(9.dp),
+        Row(
+            Modifier.fillMaxWidth().height(44.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                Modifier.fillMaxWidth().height(44.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    "面板",
-                    color = t.textPrimary,
-                    fontSize = 26.sp,
-                    lineHeight = 32.sp,
-                    fontWeight = FontWeight.Black,
-                    modifier = Modifier.weight(1f),
-                )
-                RefPanelHeaderAction(
-                    icon = if (searchOpen) Icons.Rounded.Close else Icons.Rounded.Search,
-                    contentDescription = if (searchOpen) "关闭搜索" else "搜索",
-                    active = searchOpen,
-                    onClick = onSearchToggle,
-                )
-                Spacer(Modifier.width(8.dp))
-                RefPanelHeaderAction(
-                    icon = Icons.Rounded.Settings,
-                    contentDescription = "设置",
-                    onClick = onOpenSettings,
-                )
-            }
-            RefPanelTabs(
-                selected = selected,
-                liquidGlass = true,
-                onSelect = onSelect,
+            Text(
+                "面板",
+                color = t.textPrimary,
+                fontSize = 26.sp,
+                lineHeight = 32.sp,
+                fontWeight = FontWeight.Black,
+                modifier = Modifier.weight(1f),
             )
-            if (searchOpen) {
-                TextField(
-                    value = query,
-                    onValueChange = onQueryChange,
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    placeholder = { Text("搜索策略组或节点") },
-                    leadingIcon = { Icon(Icons.Rounded.Search, null, Modifier.size(18.dp)) },
-                    shape = RoundedCornerShape(18.dp),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.White.copy(alpha = if (dark) .07f else .18f),
-                        unfocusedContainerColor = Color.White.copy(alpha = if (dark) .05f else .13f),
-                        disabledContainerColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
-                    ),
-                )
-            }
+            RefPanelHeaderAction(
+                icon = if (searchOpen) Icons.Rounded.Close else Icons.Rounded.Search,
+                contentDescription = if (searchOpen) "关闭搜索" else "搜索",
+                active = searchOpen,
+                onClick = onSearchToggle,
+            )
+            Spacer(Modifier.width(8.dp))
+            RefPanelHeaderAction(
+                icon = Icons.Rounded.Settings,
+                contentDescription = "设置",
+                onClick = onOpenSettings,
+            )
+        }
+        RefPanelTabs(
+            selected = selected,
+            liquidGlass = true,
+            onSelect = onSelect,
+        )
+        if (searchOpen) {
+            TextField(
+                value = query,
+                onValueChange = onQueryChange,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                placeholder = { Text("搜索策略组或节点") },
+                leadingIcon = { Icon(Icons.Rounded.Search, null, Modifier.size(18.dp)) },
+                shape = RoundedCornerShape(18.dp),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = if (dark) Color.White.copy(alpha = .07f) else Color.White.copy(alpha = .82f),
+                    unfocusedContainerColor = if (dark) Color.White.copy(alpha = .05f) else Color.White.copy(alpha = .72f),
+                    disabledContainerColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                ),
+            )
         }
     }
 }
@@ -1478,18 +1475,18 @@ private fun RefPanelHeaderAction(
     val shape = CircleShape
     val bubbleBrush = Brush.radialGradient(
         colors = if (dark) {
-            listOf(Color.White.copy(alpha = .13f), Color.White.copy(alpha = .055f))
-        } else {
             listOf(Color.White.copy(alpha = .16f), Color.White.copy(alpha = .055f))
+        } else {
+            listOf(Color.White.copy(alpha = .88f), Color(0xFFF8FAFC).copy(alpha = .72f))
         },
-        center = Offset(.28f, .12f),
+        center = Offset(.24f, .10f),
     )
     Box(
         Modifier.size(36.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .88f else 1f }
-            .shadow(2.dp, shape, clip = false)
+            .shadow(4.dp, shape, clip = false)
             .background(bubbleBrush, shape)
-            .border(.55.dp, Color.White.copy(alpha = if (dark) .10f else .22f), shape)
+            .border(.55.dp, Color.White.copy(alpha = if (dark) .12f else .92f), shape)
             .clip(shape)
             .clickable(interactionSource = source, indication = null, onClick = onClick),
         contentAlignment = Alignment.Center,
@@ -1515,12 +1512,12 @@ private fun RefPanelTabs(
     val tabs = RefPanelTab.entries
     val trackBrush = Brush.verticalGradient(
         if (dark) {
-            listOf(Color.White.copy(alpha = .075f), Color.White.copy(alpha = .028f))
+            listOf(Color.White.copy(alpha = .085f), Color.White.copy(alpha = .035f))
         } else {
-            listOf(Color.White.copy(alpha = .085f), Color.White.copy(alpha = .028f))
+            listOf(Color(0xFFE2E8F0).copy(alpha = .58f), Color.White.copy(alpha = .46f))
         },
     )
-    val trackBorder = if (dark) Color.White.copy(alpha = .075f) else Color.White.copy(alpha = .15f)
+    val trackBorder = if (dark) Color.White.copy(alpha = .08f) else Color.White.copy(alpha = .82f)
     BoxWithConstraints(
         Modifier.fillMaxWidth().height(38.dp)
             .background(trackBrush, CircleShape)
@@ -1551,13 +1548,13 @@ private fun RefPanelTabs(
         val extra = if (liquidGlass) 8.dp * stretch.value else 0.dp
         val indicatorStart = indicatorX - if (direction < 0f) extra else 0.dp
         val indicatorShape = RoundedCornerShape(18.dp)
-        val indicatorTint = scheme.primary.copy(alpha = if (dark) .22f else .13f)
+        val indicatorTint = Color(0xFF2563EB)
         val lensBrush = Brush.verticalGradient(
-            listOf(
-                Color.White.copy(alpha = if (dark) .07f else .16f),
-                indicatorTint.copy(alpha = (indicatorTint.alpha * 1.08f).coerceAtMost(1f)),
-                indicatorTint.copy(alpha = indicatorTint.alpha * .66f),
-            ),
+            if (dark) {
+                listOf(Color.White.copy(alpha = .10f), indicatorTint.copy(alpha = .20f))
+            } else {
+                listOf(Color.White.copy(alpha = .98f), Color(0xFFF8FAFC).copy(alpha = .94f))
+            },
         )
         Box(
             Modifier.offset(x = indicatorStart)
@@ -1566,7 +1563,7 @@ private fun RefPanelTabs(
                 .graphicsLayer { scaleY = 1f - .035f * stretch.value }
                 .shadow(3.dp, indicatorShape, clip = false)
                 .background(lensBrush, indicatorShape)
-                .border(.6.dp, Color.White.copy(alpha = if (dark) .12f else .24f), indicatorShape),
+                .border(.6.dp, Color.White.copy(alpha = if (dark) .14f else .96f), indicatorShape),
         )
         Row(Modifier.fillMaxSize()) {
             tabs.forEach { tab ->
@@ -1591,7 +1588,7 @@ private fun RefPanelTabs(
                 ) {
                     Text(
                         tab.label,
-                        color = if (active) scheme.primary else if (dark) t.textSecondary else Color(0xFF64748B),
+                        color = if (active) Color(0xFF2563EB) else if (dark) t.textSecondary else Color(0xFF64748B),
                         fontSize = 12.sp,
                         fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
                         maxLines = 1,
@@ -1623,18 +1620,29 @@ private fun RefPanelOverview(state: ProxyComposeState, delays: Map<String, Long>
 private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolean, delay: Long?, modifier: Modifier, onClick: () -> Unit) {
     val t = LocalBichenTokens.current
     val scheme = MaterialTheme.colorScheme
+    val dark = scheme.background.luminance() < .5f
     val source = remember(group.name) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) .98f else 1f, spring(dampingRatio = .76f, stiffness = 560f), label = "group${group.name}")
     val shape = RoundedCornerShape(18.dp)
     val nodeName = selected.ifBlank { "未选择" }
     val nodeFlag = refNodeFlag(nodeName)
+    val premiumBrush = if (dark) {
+        Brush.verticalGradient(listOf(t.elevatedCardBackground, t.cardBackground))
+    } else {
+        Brush.verticalGradient(listOf(Color.White, Color(0xFFFAFBFD)))
+    }
     Column(
         modifier
             .height(82.dp)
-            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .92f else 1f }
-            .shadow(if (expanded) 3.dp else 1.dp, shape, clip = false)
-            .background(if (expanded) t.selectionBackground else t.cardBackground, shape)
+            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .94f else 1f }
+            .shadow(if (expanded) 5.dp else 3.dp, shape, clip = false)
+            .background(premiumBrush, shape)
+            .border(
+                if (expanded) 1.4.dp else .8.dp,
+                if (expanded) Color(0xFF2563EB).copy(alpha = .72f) else Color.White.copy(alpha = if (dark) .10f else .92f),
+                shape,
+            )
             .clip(shape)
             .clickable(interactionSource = source, indication = null, onClick = onClick)
             .padding(horizontal = 11.dp, vertical = 9.dp),
@@ -1650,7 +1658,7 @@ private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolea
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
             Text(
                 if (nodeFlag.isBlank()) nodeName else "$nodeFlag $nodeName",
-                color = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textSecondary else Color(0xFF475569),
+                color = if (dark) t.textSecondary else Color(0xFF475569),
                 fontSize = 11.sp,
                 lineHeight = 14.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -1658,11 +1666,11 @@ private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolea
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f).padding(end = 5.dp),
             )
-            Surface(shape = RoundedCornerShape(999.dp), color = Color(0xFFE0F2FE)) {
+            Surface(shape = RoundedCornerShape(999.dp), color = Color(0xFFEFF6FF)) {
                 Text(
                     refDelay(delay),
-                    Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
-                    color = Color(0xFF0284C7),
+                    Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                    color = Color(0xFF2563EB),
                     fontSize = 10.sp,
                     lineHeight = 13.sp,
                     fontWeight = FontWeight.Bold,
@@ -1781,11 +1789,11 @@ private fun RefDelayBadge(value: Long?, testing: Boolean, onClick: (() -> Unit)?
     val scheme = MaterialTheme.colorScheme
     val text = if (testing) "…" else refDelay(value)
     val (background, textColor) = when {
-        testing -> scheme.primary.copy(alpha = .12f) to scheme.primary
-        value == null -> Color(0x1F94A3B8) to Color(0xFF64748B)
-        value <= 0L || value > 300L -> Color(0x1FEF4444) to Color(0xFFDC2626)
-        value < 100L -> Color(0x1F10B981) to Color(0xFF059669)
-        else -> Color(0x1FF59E0B) to Color(0xFFD97706)
+        testing -> Color(0xFFEFF6FF) to Color(0xFF2563EB)
+        value == null -> Color(0xFFF1F5F9) to Color(0xFF64748B)
+        value <= 0L -> Color(0xFFFEF2F2) to Color(0xFFDC2626)
+        value > 200L -> Color(0xFFFFF7ED) to Color(0xFFD97706)
+        else -> Color(0xFFEFF6FF) to Color(0xFF2563EB)
     }
     val source = remember(text, onClick) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
