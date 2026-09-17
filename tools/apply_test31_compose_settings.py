@@ -70,4 +70,13 @@ replace_once(advanced,
 '''                AdvancedSwitchRow(Icons.Rounded.WifiTethering, Color(0xFF10B981), "接管共享网络", "将热点/USB 转发流量纳入 Root 透明代理", prefs.getBoolean("proxySharedNetwork", false)) { putBool("proxySharedNetwork", it) }
                 AdvancedInfoRow(Icons.Rounded.Router, Color(0xFF0EA5E9), "当前接管方式", "自动处理进入 PREROUTING 的共享流量；接口/MAC 精细过滤尚未开放")''')
 
+# The network page is a new standalone Compose file; keep it dependency-light and explicit.
+network = 'android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyNetworkAutomationActivity.kt'
+replace_once(network,
+    'import androidx.compose.foundation.layout.*\nimport androidx.compose.foundation.shape.RoundedCornerShape',
+    'import androidx.compose.foundation.layout.*\nimport androidx.compose.foundation.lazy.LazyColumn\nimport androidx.compose.foundation.shape.RoundedCornerShape')
+replace_once(network, 'import androidx.core.content.ContextCompat\n', '')
+replace_once(network, 'ContextCompat.checkSelfPermission(context, Manifest.permission.NEARBY_WIFI_DEVICES)', 'context.checkSelfPermission(Manifest.permission.NEARBY_WIFI_DEVICES)')
+replace_once(network, 'ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)', 'context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)')
+
 print('test.31 Compose settings migration applied')
