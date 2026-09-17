@@ -18,17 +18,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Fix destructive proxy layout issues
-        run: |
-          python3 scripts/fix_proxy_layout_test33.py
+      - name: Align pages with BoxProxy reference
+        run: python3 scripts/polish_proxy_ui_test34.py
 
-      - name: Commit proxy layout polish
+      - name: Commit BoxProxy page parity
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
           if ! git diff --cached --quiet; then
-            git commit -m 'Polish proxy layout hierarchy'
+            git commit -m 'Align proxy pages with BoxProxy reference'
             git push
           fi
 
@@ -69,24 +68,26 @@ jobs:
       - name: Build APK
         working-directory: android-app
         run: gradle :app:assembleDebug --stacktrace
-      - name: Verify APK and layout invariants
+      - name: Verify APK and page parity invariants
         run: |
           APK=android-app/app/build/outputs/apk/debug/app-debug.apk
+          UI=android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
           test -f "$APK"
           unzip -t "$APK" >/dev/null
           unzip -l "$APK" | grep -q 'lib/arm64-v8a/libbichen_core.so'
           unzip -l "$APK" | grep -q 'assets/mihomo-root/arm64-v8a/mihomo'
-          ! grep -q 'AlertDialog(' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
-          ! grep -q 'key(uiRevision)' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
-          ! grep -q '\.height(96.dp)' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
-          grep -q 'Color(0xFFF1F5F9)' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
-          grep -q '\.height(86.dp)' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
-          grep -q 'RefInfoBottomSheet' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
+          ! grep -q 'AlertDialog(' "$UI"
+          ! grep -q '个策略组 · 点击卡片选择节点' "$UI"
+          ! grep -q 'Text("#${item.index}"' "$UI"
+          grep -q 'height(82.dp)' "$UI"
+          grep -q 'RefGroupCornerVisual' "$UI"
+          grep -q 'Icons.Rounded.Download' "$UI"
+          grep -q 'title = "端口细则"' "$UI"
+          grep -q 'Color(0xFFF1F5F9)' "$UI"
           grep -q 'homeSnapshotCache' android-app/app/src/main/java/io/github/xgl34222220/bichen/BichenMainActivity.kt
-          grep -q 'snapshotReady' android-app/app/src/main/java/io/github/xgl34222220/bichen/BichenMainActivity.kt
       - uses: actions/upload-artifact@v4
         with:
-          name: Bichen-0.4.0-test.33-Layout-Polish
+          name: Bichen-0.4.0-test.34-BoxProxy-Page-Parity
           path: android-app/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
