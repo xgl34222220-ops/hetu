@@ -62,6 +62,8 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
     var editor by remember { mutableStateOf<SetEditorState?>(null) }
     var infoTitle by remember { mutableStateOf<String?>(null) }
     var infoText by remember { mutableStateOf<String?>(null) }
+    var preflightText by remember { mutableStateOf<String?>(null) }
+    var preflightPassed by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     val profile = remember(revision) { ProxyRuntimeProfile.load(prefs) }
     val t = LocalBichenTokens.current
@@ -91,6 +93,31 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
             busy = false
             infoTitle = title
             infoText = text.ifBlank { "完成" }
+        }
+    }
+
+    fun runPreflight() {
+        if (busy) return
+        scope.launch {
+            busy = true
+            val result = runCatching {
+                withContext(Dispatchers.IO) {
+                    val prepared = root.prepare(ProxyRuntimeProfile.load(prefs))
+                    root.preflight(prepared)
+                }
+            }
+            busy = false
+            result.onSuccess { json ->
+                preflightPassed = json.optBoolean("ok", false)
+                preflightText = if (preflightPassed) {
+                    "预检通过：当前设备支持这组 Root 代理设置"
+                } else {
+                    json.optString("message", "预检未通过")
+                }
+            }.onFailure { error ->
+                preflightPassed = false
+                preflightText = error.message ?: "预检执行失败"
+            }
         }
     }
 
@@ -268,11 +295,7 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
         item {
             AdvancedGroup {
                 AdvancedActionRow(Icons.Rounded.HealthAndSafety, Color(0xFF10B981), "运行预检", "验证 Root / TPROXY / UID / IPv6 / 绕过规则") {
-                    runRoot("运行预检") {
-                        val prepared = root.prepare(ProxyRuntimeProfile.load(prefs))
-                        val result = root.preflight(prepared)
-                        if (result.optBoolean("ok", false)) "预检通过：当前设备支持这组 Root 代理设置" else result.optString("message", "预检失败")
-                    }
+                    runPreflight()
                 }
                 AdvancedDivider()
                 AdvancedActionRow(Icons.Rounded.Description, Color(0xFF3B82F6), "查看启动配置", "查看最终运行副本，不修改源配置") {
@@ -331,8 +354,81 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
         )
     }
 
+    preflightText?.let { text ->
+        AdvancedPreflightSheet(
+            passed = preflightPassed,
+            text = text,
+            onDismiss = { preflightText = null },
+        )
+    }
+
     if (infoTitle != null && infoText != null) {
         AdvancedInfoSheet(infoTitle!!, infoText!!, onDismiss = { infoTitle = null; infoText = null })
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AdvancedPreflightSheet(passed: Boolean, text: String, onDismiss: () -> Unit) {
+    val t = LocalBichenTokens.current
+    val pulseTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "preflightShieldPulse")
+    val pulse by pulseTransition.animateFloat(
+        initialValue = .94f,
+        targetValue = 1.06f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = androidx.compose.animation.core.tween(850),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
+        ),
+        label = "preflightShieldScale",
+    )
+    val accent = if (passed) Color(0xFF10B981) else Color(0xFFF59E0B)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = t.elevatedCardBackground,
+        tonalElevation = 0.dp,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        dragHandle = {
+            Box(
+                Modifier.padding(top = 10.dp, bottom = 5.dp).size(width = 36.dp, height = 4.dp)
+                    .background(Color(0xFFCBD5E1), CircleShape),
+            )
+        },
+    ) {
+        Column(
+            Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 20.dp, end = 20.dp, bottom = 22.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(
+                Modifier.size(62.dp).graphicsLayer { scaleX = pulse; scaleY = pulse }
+                    .background(accent.copy(alpha = .11f), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    if (passed) Icons.Rounded.VerifiedUser else Icons.Rounded.HealthAndSafety,
+                    null,
+                    tint = accent,
+                    modifier = Modifier.size(31.dp),
+                )
+            }
+            Text(
+                if (passed) "预检通过" else "预检结果",
+                color = t.textPrimary,
+                fontSize = 20.sp,
+                lineHeight = 25.sp,
+                fontWeight = FontWeight.ExtraBold,
+            )
+            Surface(shape = RoundedCornerShape(18.dp), color = t.controlBackground.copy(alpha = .52f)) {
+                Text(
+                    text,
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                    color = t.textSecondary,
+                    fontSize = 12.sp,
+                    lineHeight = 19.sp,
+                )
+            }
+            Text("下滑即可关闭", color = Color(0xFF94A3B8), fontSize = 10.sp, fontWeight = FontWeight.Medium)
+        }
     }
 }
 

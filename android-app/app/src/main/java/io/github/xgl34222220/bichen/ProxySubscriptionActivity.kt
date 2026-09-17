@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.input.OutputTransformation
+import androidx.compose.foundation.text.input.TextFieldBuffer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -23,6 +25,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -59,37 +62,35 @@ class ProxySubscriptionActivity : ComponentActivity() {
 }
 
 
-private object YamlSyntaxHighlightTransformation : VisualTransformation {
+private object YamlSyntaxHighlightOutputTransformation : OutputTransformation {
     private val keyRegex = Regex("(?m)^[\\t -]*([A-Za-z0-9_.-]+)(?=\\s*:)")
     private val scalarRegex = Regex("(?<![A-Za-z0-9_.-])(?:true|false|null|-?\\d+(?:\\.\\d+)?)(?![A-Za-z0-9_.-])", RegexOption.IGNORE_CASE)
     private val commentRegex = Regex("(?m)#.*$")
 
-    override fun filter(text: AnnotatedString): TransformedText {
-        val source = text.text
-        val builder = AnnotatedString.Builder(source)
+    override fun TextFieldBuffer.transformOutput() {
+        val source = asCharSequence().toString()
         keyRegex.findAll(source).forEach { match ->
             val group = match.groups[1] ?: return@forEach
-            builder.addStyle(
+            addStyle(
                 SpanStyle(color = Color(0xFF0E7490), fontWeight = FontWeight.SemiBold),
                 group.range.first,
                 group.range.last + 1,
             )
         }
         scalarRegex.findAll(source).forEach { match ->
-            builder.addStyle(
+            addStyle(
                 SpanStyle(color = Color(0xFF6366F1), fontWeight = FontWeight.Medium),
                 match.range.first,
                 match.range.last + 1,
             )
         }
         commentRegex.findAll(source).forEach { match ->
-            builder.addStyle(
+            addStyle(
                 SpanStyle(color = Color(0xFF64748B)),
                 match.range.first,
                 match.range.last + 1,
             )
         }
-        return TransformedText(builder.toAnnotatedString(), OffsetMapping.Identity)
     }
 }
 
@@ -428,7 +429,14 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                     }
                     val editorScroll = rememberScrollState()
                     val editorHorizontalScroll = rememberScrollState()
-                    val lineCount = remember(yamlText) { maxOf(1, yamlText.count { it == '\n' } + 1) }
+                    val editorState = androidx.compose.foundation.text.input.rememberTextFieldState(yamlText)
+                    val editorText = editorState.text.toString()
+                    val lineCount = remember(editorText) { maxOf(1, editorText.count { it == '\n' } + 1) }
+                    LaunchedEffect(editorState) {
+                        snapshotFlow { editorState.text.toString() }.collect {
+                            if (yamlError.isNotBlank()) yamlError = ""
+                        }
+                    }
                     Surface(
                         modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 16.dp, vertical = 8.dp),
                         shape = editorShape,
@@ -436,25 +444,26 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                         border = BorderStroke(.7.dp, if (dark) tokens.outline.copy(alpha = .42f) else Color(0xFFE2E8F0)),
                         tonalElevation = 0.dp,
                     ) {
-                        Row(
-                            Modifier.fillMaxSize().verticalScroll(editorScroll),
-                            verticalAlignment = Alignment.Top,
-                        ) {
-                            Text(
-                                (1..lineCount).joinToString("\n"),
-                                modifier = Modifier.width(44.dp)
-                                    .background(if (dark) Color.White.copy(alpha = .035f) else Color(0xFFF1F5F9))
-                                    .padding(top = 12.dp, end = 9.dp, bottom = 12.dp),
-                                color = if (dark) tokens.textMuted else Color(0xFF94A3B8),
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 11.sp,
-                                lineHeight = 21.sp,
-                                textAlign = TextAlign.End,
-                            )
+                        Row(Modifier.fillMaxSize()) {
+                            Box(
+                                Modifier.width(46.dp).fillMaxHeight().clipToBounds()
+                                    .background(if (dark) Color.White.copy(alpha = .035f) else Color(0xFFF1F5F9)),
+                            ) {
+                                Text(
+                                    (1..lineCount).joinToString("\n"),
+                                    modifier = Modifier.fillMaxWidth()
+                                        .graphicsLayer { translationY = -editorScroll.value.toFloat() }
+                                        .padding(top = 12.dp, end = 9.dp, bottom = 12.dp),
+                                    color = if (dark) tokens.textMuted else Color(0xFFB0BAC8),
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp,
+                                    lineHeight = 21.sp,
+                                    textAlign = TextAlign.End,
+                                )
+                            }
                             BasicTextField(
-                                value = yamlText,
-                                onValueChange = { yamlText = it; yamlError = "" },
-                                modifier = Modifier.weight(1f)
+                                state = editorState,
+                                modifier = Modifier.weight(1f).fillMaxHeight()
                                     .horizontalScroll(editorHorizontalScroll)
                                     .drawBehind {
                                         val guideColor = if (dark) Color.White.copy(alpha = .04f) else Color(0xFFE2E8F0).copy(alpha = .86f)
@@ -472,10 +481,12 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                                     lineHeight = 21.sp,
                                 ),
                                 cursorBrush = SolidColor(scheme.primary),
-                                visualTransformation = YamlSyntaxHighlightTransformation,
+                                outputTransformation = YamlSyntaxHighlightOutputTransformation,
+                                scrollState = editorScroll,
                             )
                         }
                     }
+
                     if (yamlError.isNotBlank()) {
                         Text(
                             yamlError,
@@ -510,7 +521,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                                 onClick = {
                                     yamlSaving = true
                                     scope.launch {
-                                        runCatching { controller.saveConfigText(yamlText) }
+                                        runCatching { controller.saveConfigText(editorState.text.toString()) }
                                             .onSuccess { yamlOpen = false; revision++; message = "YAML 已保存；重启代理后生效" }
                                             .onFailure { yamlError = it.message ?: "保存失败" }
                                         yamlSaving = false
