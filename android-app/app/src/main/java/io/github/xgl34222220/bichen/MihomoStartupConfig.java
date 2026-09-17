@@ -150,7 +150,7 @@ final class MihomoStartupConfig {
     private static String ensureAdblock(String source)throws IOException{
         String yaml=normalize(source);
         yaml=injectAdblockProvider(yaml);
-        yaml=prependAdblockRule(yaml);
+        yaml=insertAdblockRuleRespectingUserPolicy(yaml);
         return yaml;
     }
 
@@ -176,17 +176,34 @@ final class MihomoStartupConfig {
         return trimOne(out.toString());
     }
 
-    private static String prependAdblockRule(String source)throws IOException{
+    private static String insertAdblockRuleRespectingUserPolicy(String source)throws IOException{
         String[] lines=normalize(source).split("\n",-1);
-        int index=-1;Matcher found=null;Pattern top=Pattern.compile("^rules\\s*:(.*)$");
+        int index=-1;Matcher found=null;Pattern top=Pattern.compile("^rules\s*:(.*)$");
         for(int i=0;i<lines.length;i++){if(indent(lines[i])!=0)continue;Matcher m=top.matcher(lines[i]);if(m.find()){index=i;found=m;break;}}
         String rule="  - RULE-SET,"+ProxyAdblockRules.PROVIDER_NAME+",REJECT\n";
         if(index<0){String base=trimOne(source);return base+(base.isEmpty()?"":"\n")+"rules:\n"+rule;}
         String rest=found.group(1).trim();
         if(rest.startsWith("#"))rest="";
         if(!rest.isEmpty()&&!rest.equals("[]"))throw new IOException("代理串联去广告需要普通 rules: 列表；当前源配置使用行内 rules 写法");
+        int end=lines.length;
+        for(int i=index+1;i<lines.length;i++){
+            String t=lines[i].trim();
+            if(t.isEmpty()||t.startsWith("#"))continue;
+            if(indent(lines[i])==0){end=i;break;}
+        }
+        int insert=end;
+        for(int i=index+1;i<end;i++){
+            String t=lines[i].trim();
+            if(t.startsWith("- MATCH,")||t.equals("- MATCH")||t.startsWith("- FINAL,")||t.equals("- FINAL")){
+                insert=i;break;
+            }
+        }
         StringBuilder out=new StringBuilder();
-        for(int i=0;i<lines.length;i++){if(i==index){out.append("rules:\n").append(rule);continue;}out.append(lines[i]).append('\n');}
+        for(int i=0;i<lines.length;i++){
+            if(i==insert)out.append(rule);
+            out.append(lines[i]).append('\n');
+        }
+        if(insert==lines.length)out.append(rule);
         return trimOne(out.toString());
     }
 

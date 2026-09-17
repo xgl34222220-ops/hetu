@@ -1,6 +1,7 @@
 package io.github.xgl34222220.bichen;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Build;
 import org.json.JSONObject;
@@ -124,6 +125,7 @@ final class RootProxyManager {
             JSONObject existing=status();
             if(existing.optBoolean("running",false)){
                 prefs.edit().putBoolean("proxyRootWanted",true).apply();
+                ensureContinuityService(true);
                 existing.put("ok",true).put("alreadyRunning",true).put("message","Root 代理已在运行，已忽略重复启动请求");
                 return existing;
             }
@@ -239,6 +241,7 @@ final class RootProxyManager {
                 .put("bypassInterfaces",policy.interfaces);
         if(!warning.isEmpty())result.put("warning",warning);
         prefs.edit().putBoolean("proxyRootWanted",true).apply();
+        ensureContinuityService(true);
         return result;
         }finally{
             CONTROL_LOCK.unlock();
@@ -254,6 +257,7 @@ final class RootProxyManager {
             ProxyAdblockCoordinator.exit(context);
             stage(progress,"网络规则、广告过滤接管与临时 IPv6 状态已恢复");
             prefs.edit().putBoolean("proxyRootWanted",false).apply();
+            ensureContinuityService(false);
             return r;
         }finally{
             CONTROL_LOCK.unlock();
@@ -297,6 +301,17 @@ final class RootProxyManager {
             state.put("controllerPort",livePort);
         }
         return state;
+    }
+
+    private void ensureContinuityService(boolean running){
+        try{
+            Intent intent=new Intent(context,ProxyNetworkMatchService.class);
+            if(running){
+                if(Build.VERSION.SDK_INT>=26)context.startForegroundService(intent);else context.startService(intent);
+            }else if(!prefs.getBoolean("networkMatchEnabled",false)){
+                context.stopService(intent);
+            }
+        }catch(Exception ignored){}
     }
 
     String diagnostics(){

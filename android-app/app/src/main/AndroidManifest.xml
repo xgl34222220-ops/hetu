@@ -40,7 +40,7 @@
         <activity android:name=".RootTproxyActivity" android:label="基础代理配置（旧）" android:exported="false" />
         <activity android:name=".ProxyNetworkMatchActivity" android:label="网络匹配" android:exported="false" />
         <service android:name=".ProxyNetworkMatchService" android:exported="false" android:foregroundServiceType="specialUse">
-            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User enabled network environment matching for Root proxy automation" />
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="Root proxy default-network continuity and optional environment matching" />
         </service>
         <service android:name=".DnsVpnService" android:permission="android.permission.BIND_VPN_SERVICE" android:exported="true" android:foregroundServiceType="specialUse">
             <intent-filter><action android:name="android.net.VpnService" /></intent-filter>
