@@ -9,6 +9,7 @@ import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
+import java.util.regex.*;
 import java.util.concurrent.locks.ReentrantLock;
 
 /** Root transparent-proxy control plane plus private localhost Clash API bootstrap. */
@@ -68,15 +69,16 @@ final class RootProxyManager {
     private int chooseControllerPort()throws IOException{
         int preferred=prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT);
         LinkedHashSet<Integer> candidates=new LinkedHashSet<>();
+        // Prefer the last successful port when it is free. Preparing/preflighting must
+        // never publish a candidate port to the dashboard client.
+        if(preferred>=29090&&preferred<=29149)candidates.add(preferred);
         int span=60;
         int start=(int)(Math.abs(System.nanoTime())%span);
         for(int offset=0;offset<span;offset++)candidates.add(29090+((start+offset)%span));
-        if(preferred>=29090&&preferred<=29149)candidates.add(preferred);
         for(int port:candidates){
             try(ServerSocket socket=new ServerSocket()){
                 socket.setReuseAddress(false);
                 socket.bind(new InetSocketAddress(InetAddress.getByName("127.0.0.1"),port));
-                prefs.edit().putInt("proxyControllerPort",port).commit();
                 return port;
             }catch(IOException occupied){ }
         }
@@ -190,6 +192,8 @@ final class RootProxyManager {
             if(adblockCoordinatorEntered)ProxyAdblockCoordinator.exit(context);
             throw new IOException("启动命令已返回，但未检测到辟尘私有核心进程"+(diagnostics().isEmpty()?"":"："+diagnostics()));
         }
+        // Publish only the port of a successfully running core.
+        prefs.edit().putInt("proxyControllerPort",p.controllerPort).commit();
         MihomoControllerClient controller=new MihomoControllerClient(context);
         if(!controller.waitReady(12000)){
             prefs.edit().putString("proxyRootEgressWarning","Root 代理核心已运行；本地控制接口仍在初始化，面板数据可能稍后出现").apply();
@@ -256,8 +260,33 @@ final class RootProxyManager {
             CONTROL_LOCK.unlock();
         }
     }
+    private int liveControllerPort(JSONObject state){
+        int port=state.optInt("controllerPort",0);
+        if(port>=29090&&port<=29149)return port;
+        if(!state.optBoolean("running",false))return 0;
+        // Recovery for old sessions: test.45-test.52 preflight could overwrite prefs
+        // while the live Mihomo still listened on the old controller port. The deployed
+        // Root startup config is authoritative because preflight does not replace CONFIG.
+        try{
+            RootBridge.Result result=RootBridge.rootShell(context,"cat "+RootBridge.quote(CONFIG)+" 2>/dev/null || true",4000L);
+            Matcher matcher=Pattern.compile("(?m)^\s*external-controller:\s*127\.0\.0\.1:(\d+)\s*$").matcher(result.output==null?"":result.output);
+            int found=0;
+            while(matcher.find()){
+                int candidate=Integer.parseInt(matcher.group(1));
+                if(candidate>=29090&&candidate<=29149)found=candidate;
+            }
+            return found;
+        }catch(Exception ignored){return 0;}
+    }
+
     JSONObject status()throws Exception{
-        return runJsonAllowMissing("status",new JSONObject().put("ok",true).put("running",false).put("state","idle").put("message","尚未启动"));
+        JSONObject state=runJsonAllowMissing("status",new JSONObject().put("ok",true).put("running",false).put("state","idle").put("message","尚未启动"));
+        int livePort=liveControllerPort(state);
+        if(livePort>0&&prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT)!=livePort){
+            prefs.edit().putInt("proxyControllerPort",livePort).apply();
+            state.put("controllerPort",livePort);
+        }
+        return state;
     }
 
     String diagnostics(){
