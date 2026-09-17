@@ -93,8 +93,11 @@ jobs:
           assert 'HazeTint(' not in panel
           assert 'drawBackdrop(' not in panel
           assert 'liquidGlassLens(' not in panel
-          assert 'page == RefProxyPage.Panel' not in s
           assert 'Modifier.background(shellBrush)' in panel
+          old_root = '.then(if (!liquid || page == RefProxyPage.Panel) Modifier.hazeSource(haze) else Modifier)'
+          new_root = '.then(if (!liquid) Modifier.hazeSource(haze) else Modifier)'
+          assert old_root not in s
+          assert new_root in s
           PY
           grep -q 'private fun RefGroupDetailPage' "$UI"
           grep -q 'if (!panelDetailVisible)' "$UI"
