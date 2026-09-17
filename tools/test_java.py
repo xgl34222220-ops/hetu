@@ -18,7 +18,7 @@ PROTOCOL_CLASSES = (
 )
 ANDROID_HOST_TESTS = ('ProxyRuntimeProfileTest', 'MihomoStartupConfigTest')
 ANDROID_HOST_CLASSES = (
-    'ProxyRuntimeProfile', 'MihomoStartupConfig', 'RuleStore',
+    'ProxyRuntimeProfile', 'MihomoStartupConfig', 'ProxyAdblockRules', 'RuleStore',
     'RootBridge', 'RootShellCommand',
 )
 
