@@ -18,20 +18,17 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Refine proxy native UI and remove home flicker
+      - name: Fix destructive proxy layout issues
         run: |
-          python3 scripts/refine_proxy_ui_test31.py
-          python3 scripts/fix_test31_ports_string.py
-          python3 scripts/fix_home_flicker_test32.py
+          python3 scripts/fix_proxy_layout_test33.py
 
-      - name: Commit UI and state fixes
+      - name: Commit proxy layout polish
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt \
-                  android-app/app/src/main/java/io/github/xgl34222220/bichen/BichenMainActivity.kt
+          git add android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
           if ! git diff --cached --quiet; then
-            git commit -m 'Preserve home state across navigation and resume'
+            git commit -m 'Polish proxy layout hierarchy'
             git push
           fi
 
@@ -72,7 +69,7 @@ jobs:
       - name: Build APK
         working-directory: android-app
         run: gradle :app:assembleDebug --stacktrace
-      - name: Verify APK and anti-flicker invariants
+      - name: Verify APK and layout invariants
         run: |
           APK=android-app/app/build/outputs/apk/debug/app-debug.apk
           test -f "$APK"
@@ -81,11 +78,15 @@ jobs:
           unzip -l "$APK" | grep -q 'assets/mihomo-root/arm64-v8a/mihomo'
           ! grep -q 'AlertDialog(' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
           ! grep -q 'key(uiRevision)' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
+          ! grep -q '\.height(96.dp)' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
+          grep -q 'Color(0xFFF1F5F9)' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
+          grep -q '\.height(86.dp)' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
+          grep -q 'RefInfoBottomSheet' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
           grep -q 'homeSnapshotCache' android-app/app/src/main/java/io/github/xgl34222220/bichen/BichenMainActivity.kt
           grep -q 'snapshotReady' android-app/app/src/main/java/io/github/xgl34222220/bichen/BichenMainActivity.kt
       - uses: actions/upload-artifact@v4
         with:
-          name: Bichen-0.4.0-test.32-Home-Flicker-Fix
+          name: Bichen-0.4.0-test.33-Layout-Polish
           path: android-app/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
