@@ -1,1 +1,1 @@
-2026-09-17 test46: clean Home header, dashboard ghost icons, 62dp latency spinner, semantic latency colors, spring checks, recessed tray, terminal log
+2026-09-17 test47: Bichen title, lifecycle latency refresh, frosted action pills, 66dp inline nodes, dark terminal sheet, full-screen YAML editor
