@@ -88,4 +88,39 @@ replace_once(
     'context.startActivity(Intent(context, ProxyAdvancedSettingsActivity::class.java))',
 )
 
-print('test.32 proxy click mapping patch applied')
+# Proxy app selection must be independent from the ad-block/VPN bypass list.
+appsel = 'android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAppSelectionActivity.kt'
+replace_once(
+    appsel,
+    '    var query by rememberSaveable { mutableStateOf("") }\n    var showSystem by rememberSaveable { mutableStateOf(false) }\n    var selectedOnly by rememberSaveable { mutableStateOf(false) }\n    var selected by remember { mutableStateOf(controller.bypassApps()) }',
+    '''    fun proxyApps(): Set<String> = prefs.getStringSet("proxyAppPackages", emptySet()).orEmpty().toSet()
+    fun setProxyApp(packageName: String, enabled: Boolean) {
+        val next = proxyApps().toMutableSet()
+        if (enabled) next.add(packageName) else next.remove(packageName)
+        prefs.edit().putStringSet("proxyAppPackages", next).apply()
+    }
+    var query by rememberSaveable { mutableStateOf("") }
+    var showSystem by rememberSaveable { mutableStateOf(false) }
+    var selectedOnly by rememberSaveable { mutableStateOf(false) }
+    var selected by remember { mutableStateOf(proxyApps()) }''',
+)
+replace_once(
+    appsel,
+    '                    controller.setBypass(app.packageName, !checked)\n                    selected = controller.bypassApps()',
+    '                    setProxyApp(app.packageName, !checked)\n                    selected = proxyApps()',
+)
+replace_once(
+    appsel,
+    '                        controller.setBypass(app.packageName, value)\n                        selected = controller.bypassApps()',
+    '                        setProxyApp(app.packageName, value)\n                        selected = proxyApps()',
+)
+
+# Root transparent-proxy policy reads its own package set; ad-block keeps using bypassApps.
+policy = 'android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyPolicy.java'
+replace_once(
+    policy,
+    'Set<String> selected = prefs.getStringSet("bypassApps", Collections.emptySet());',
+    'Set<String> selected = prefs.getStringSet("proxyAppPackages", Collections.emptySet());',
+)
+
+print('test.32 proxy click mapping and app-scope separation patch applied')
