@@ -18,16 +18,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Fix panel liquid glass crash
-        run: python3 scripts/fix_panel_liquid_crash_test38.py
+      - name: Replace panel RuntimeShader with Haze glass
+        run: python3 scripts/fix_panel_haze_test39.py
 
-      - name: Commit safe panel liquid glass
+      - name: Commit stable panel glass
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
           if ! git diff --cached --quiet; then
-            git commit -m 'Use single-layer panel liquid glass'
+            git commit -m 'Use Haze-only stable panel glass'
             git push
           fi
 
@@ -68,7 +68,7 @@ jobs:
       - name: Build APK
         working-directory: android-app
         run: gradle :app:assembleDebug --stacktrace
-      - name: Verify APK and safe panel glass invariants
+      - name: Verify APK and Haze-only panel invariants
         run: |
           set -euo pipefail
           APK=android-app/app/build/outputs/apk/debug/app-debug.apk
@@ -79,15 +79,22 @@ jobs:
           unzip -l "$APK" | grep -q 'lib/arm64-v8a/libbichen_core.so'
           unzip -l "$APK" | grep -q 'assets/mihomo-root/arm64-v8a/mihomo'
           grep -q 'private fun RefPanelGlassHeader' "$UI"
-          grep -q 'One RuntimeShader layer only' "$UI"
-          grep -q 'panelLiquidTabIndicator' "$UI"
+          grep -q 'val runtimeLiquid = false' "$UI"
+          grep -q 'Modifier.hazeEffect' "$UI"
           grep -q 'HazeMaterials.ultraThin()' "$UI"
-          ! grep -q 'headerSurfaceBackdrop' "$UI"
+          grep -q 'backdrop = null' "$UI"
+          grep -q 'page == RefProxyPage.Panel' "$UI"
+          grep -q 'panelLiquidTabIndicator' "$UI"
           python3 - <<'PY'
           from pathlib import Path
           s = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt').read_text()
-          b = s[s.index('private fun RefPanelGlassHeader('):s.index('private fun RefPanelOverview(')]
-          assert b.count('Modifier.drawBackdrop(') == 1, b.count('Modifier.drawBackdrop(')
+          a = s.index('private fun RefPanelGlassHeader(')
+          b = s.index('@Composable\nprivate fun RefPanelHeaderAction', a)
+          panel = s[a:b]
+          assert 'drawBackdrop(' not in panel
+          assert 'liquidGlassLens(' not in panel
+          assert 'layerBackdrop(' not in panel
+          assert 'Modifier.hazeEffect' in panel
           PY
           grep -q 'private fun RefGroupDetailPage' "$UI"
           grep -q 'if (!panelDetailVisible)' "$UI"
@@ -95,7 +102,7 @@ jobs:
           grep -q 'homeSnapshotCache' android-app/app/src/main/java/io/github/xgl34222220/bichen/BichenMainActivity.kt
       - uses: actions/upload-artifact@v4
         with:
-          name: Bichen-0.4.0-test.38-Safe-Panel-Liquid-Glass
+          name: Bichen-0.4.0-test.39-Haze-Panel-No-Crash
           path: android-app/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
