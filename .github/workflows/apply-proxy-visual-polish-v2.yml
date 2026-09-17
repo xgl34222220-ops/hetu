@@ -20,7 +20,7 @@ jobs:
 
       - name: Apply test47 native dashboard polish
         run: |
-          python3 scripts/polish_native_dashboard_test47.py
+          python3 scripts/run_native_dashboard_test47.py
           python3 scripts/fix_test47_scoped_terminal_and_imports.py
 
       - name: Commit test47 polish
