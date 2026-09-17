@@ -1,1 +1,1 @@
-2026-09-17 rerun Home dock white flash fix after pipeline correction
+2026-09-17 LuoShu exact dock + commercial compact proxy UI test.29
