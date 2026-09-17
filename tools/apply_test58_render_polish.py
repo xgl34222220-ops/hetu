@@ -673,4 +673,61 @@ if 'import androidx.compose.ui.graphics.graphicsLayer' not in adb:
     )
 write(adb_path, adb)
 
+
+# WebUI: only intercept back when the embedded dashboard has history. Otherwise the
+# activity back event stays with Android so predictive cross-activity back can render.
+web_path = "android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyWebUiActivity.kt"
+web = read(web_path)
+web = web.replace('import androidx.activity.OnBackPressedCallback\n', '')
+if 'import androidx.activity.compose.BackHandler' not in web:
+    web = web.replace('import androidx.activity.compose.setContent\n', 'import androidx.activity.compose.BackHandler\nimport androidx.activity.compose.setContent\n')
+web = replace_once(
+    web,
+    '    var forceRepair by remember { mutableStateOf(false) }\n',
+    '    var forceRepair by remember { mutableStateOf(false) }\n    var canGoBack by remember { mutableStateOf(false) }\n',
+    'web back history state',
+)
+web = replace_once(
+    web,
+    '''                override fun onPageFinished(view: WebView?, url: String?) {
+                    super.onPageFinished(view, url)
+                    if (!url.isNullOrBlank() && url.startsWith("http://127.0.0.1:\${MihomoStartupConfig.CONTROLLER_PORT}/ui/")) {''',
+    '''                override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
+                    super.doUpdateVisitedHistory(view, url, isReload)
+                    canGoBack = view?.canGoBack() == true
+                }
+
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    super.onPageFinished(view, url)
+                    canGoBack = view?.canGoBack() == true
+                    if (!url.isNullOrBlank() && url.startsWith("http://127.0.0.1:\${MihomoStartupConfig.CONTROLLER_PORT}/ui/")) {''',
+    'web history callback',
+)
+old_back = '''    DisposableEffect(webView) {
+        val callback = object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (webView.canGoBack()) webView.goBack() else onClose()
+            }
+        }
+        (context as? ComponentActivity)?.onBackPressedDispatcher?.addCallback(callback)
+        onDispose {
+            callback.remove()
+            webView.stopLoading()
+            webView.destroy()
+        }
+    }
+'''
+new_back = '''    BackHandler(enabled = canGoBack) {
+        webView.goBack()
+    }
+    DisposableEffect(webView) {
+        onDispose {
+            webView.stopLoading()
+            webView.destroy()
+        }
+    }
+'''
+web = replace_once(web, old_back, new_back, 'web predictive back delegation')
+write(web_path, web)
+
 print("test58 patch applied")
