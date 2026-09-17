@@ -18,16 +18,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Apply tools and settings native polish
-        run: python3 scripts/polish_tools_settings_test43.py
+      - name: Apply dashboard micro interaction polish
+        run: python3 scripts/patch_proxy_micro_interactions_test44.py
 
-      - name: Commit tools and settings polish
+      - name: Commit dashboard micro interaction polish
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
           if ! git diff --cached --quiet; then
-            git commit -m 'Polish tools and settings native controls'
+            git commit -m 'Polish dashboard micro interactions'
             git push
           fi
 
@@ -68,30 +68,35 @@ jobs:
       - name: Build APK
         working-directory: android-app
         run: gradle :app:assembleDebug --stacktrace
-      - name: Verify APK and tools/settings invariants
+      - name: Verify APK and test44 invariants
         run: |
           set -euo pipefail
           APK=android-app/app/build/outputs/apk/debug/app-debug.apk
           UI=android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
-          BOOT=android-app/app/src/main/java/io/github/xgl34222220/bichen/BootReceiver.java
           DOCK=android-app/app/src/main/java/io/github/xgl34222220/bichen/ui/BichenGlassDock.kt
           test -f "$APK"
           unzip -t "$APK" >/dev/null
           unzip -l "$APK" | grep -q 'lib/arm64-v8a/libbichen_core.so'
           unzip -l "$APK" | grep -q 'assets/mihomo-root/arm64-v8a/mihomo'
+          grep -q 'var panelTab by rememberSaveable' "$UI"
+          grep -q 'panelTab = RefPanelTab.Subscriptions' "$UI"
+          grep -q 'private fun RefInlineGroupExpansion' "$UI"
+          grep -q 'private fun RefInlineNodeCard' "$UI"
+          grep -q '全测速 ⚡' "$UI"
+          grep -q 'providerProgress' "$UI"
+          grep -q 'height(100.dp)' "$UI"
+          test "$(grep -o 'height(100.dp)' "$UI" | wc -l)" -ge 4
+          grep -q 'Brush.horizontalGradient(listOf(Color(0xFF3B82F6), Color(0xFF6366F1)))' "$UI"
+          test "$(grep -o 'trailingText = "待接入", trailingBadge = true, trailingColor = Color(0xFF94A3B8)' "$UI" | wc -l)" -eq 4
+          ! grep -q 'selectedGroupName = group.name$' "$UI"
+          test "$(git rev-parse HEAD:$DOCK)" = '7efba3c815e6429fcc35df87dc91f5be968111c6'
           grep -q 'private fun RefGradientIcon' "$UI"
           grep -q 'private fun RefSwitchRow' "$UI"
-          grep -q 'putBoolean("autoStartVpn"' "$UI"
-          grep -q 'putBoolean("enableBlur"' "$UI"
           grep -q 'RefPortsBottomSheet' "$UI"
-          grep -q 'android.widget.Toast.makeText' "$UI"
-          grep -q 'autoStartVpn' "$BOOT"
           ! grep -q 'AlertDialog(' "$UI"
-          test "$(git rev-parse HEAD:$DOCK)" = '7efba3c815e6429fcc35df87dc91f5be968111c6'
-          grep -q 'homeSnapshotCache' android-app/app/src/main/java/io/github/xgl34222220/bichen/BichenMainActivity.kt
       - uses: actions/upload-artifact@v4
         with:
-          name: Bichen-0.4.0-test.43-Tools-Settings-Native-Polish
+          name: Bichen-0.4.0-test.44-Dashboard-Micro-Interactions
           path: android-app/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
