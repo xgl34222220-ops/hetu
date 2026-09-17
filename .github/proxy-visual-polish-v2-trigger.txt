@@ -1,1 +1,1 @@
-2026-09-17 test40 final retry after comment collision fix
+2026-09-17 test41 remove panel Haze backdrop sampling completely
