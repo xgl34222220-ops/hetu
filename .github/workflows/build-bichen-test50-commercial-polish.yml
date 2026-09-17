@@ -25,7 +25,6 @@ jobs:
           BUILD=android-app/app/build.gradle.kts
           if grep -q 'versionCode = 449' "$BUILD"; then
             python3 tools/apply_test50_commercial_polish.py
-            # Keep the resource-card header roomy enough for the 22dp CPU ring.
             python3 - <<'PY'
           from pathlib import Path
           p = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt')
@@ -44,30 +43,7 @@ jobs:
           python3 tools/fix_test50_yaml_escape.py
 
       - name: Verify generated sources
-        shell: bash
-        run: |
-          set -euo pipefail
-          BUILD=android-app/app/build.gradle.kts
-          UI=android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
-          AD=android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAdblockChainActivity.kt
-          SUB=android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxySubscriptionActivity.kt
-          ADV=android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAdvancedSettingsActivity.kt
-          grep -q 'versionCode = 450' "$BUILD"
-          grep -q 'versionName = "0.4.0-test.50"' "$BUILD"
-          grep -q 'groupArrow' "$UI"
-          grep -q 'Color(0xFFE7EDF4)' "$UI"
-          grep -q 'modifier.height(62.dp)' "$UI"
-          grep -q '连接协议' "$UI"
-          grep -q '分流命中' "$UI"
-          grep -q 'closeConnectionPress' "$UI"
-          grep -q 'thickness = .5.dp' "$UI"
-          grep -q 'rules.chunked(18)' "$UI"
-          grep -q 'Color(0xFFF8FAFC)' "$AD"
-          grep -q 'BasicTextField' "$SUB"
-          grep -q 'lineCount = remember(yamlText)' "$SUB"
-          grep -Fq "yamlText.count { it == '\\n' }" "$SUB"
-          grep -Fq 'joinToString("\\n")' "$SUB"
-          grep -q 'Root 数据面 · 修改后重启代理生效' "$ADV"
+        run: python3 tools/verify_test50_sources.py
 
       - name: Commit generated test50 sources
         run: |
