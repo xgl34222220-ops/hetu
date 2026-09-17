@@ -154,10 +154,20 @@ internal class ProxyComposeController(context: Context) {
     }
 
     suspend fun start(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
-        val profile = ProxyRuntimeProfile.load(prefs)
+        var profile = ProxyRuntimeProfile.load(prefs)
+        if (!profile.capability().available) {
+            onProgress("检测到旧版本遗留的不可用核心/模式，回退到 Mihomo · TPROXY…")
+            prefs.edit().putString("proxyBaseCore", "mihomo").putString("proxyBaseMode", "tproxy").apply()
+            profile = ProxyRuntimeProfile.load(prefs)
+        }
+        if (profile.core == ProxyRuntimeProfile.Core.MIHOMO_SMART && !ProxyCoreStore(app).installed(profile.core)) {
+            onProgress("Mihomo Smart 尚未安装，先使用内置 Mihomo 启动…")
+            prefs.edit().putString("proxyBaseCore", "mihomo").apply()
+            profile = ProxyRuntimeProfile.load(prefs)
+        }
         val selected = configs.selected(profile.core) ?: error("尚未选择配置")
         if (!configs.hasConfiguredSubscription(selected)) {
-            error("默认配置不内置私人订阅，请先到「订阅」添加或编辑自己的订阅")
+            error("当前是辟尘内置占位配置，尚未填写真实订阅。请打开「面板 → 订阅」添加订阅，或导入一份完整可运行的 YAML 配置。")
         }
         root.start(profile) { onProgress(it) }
     }

@@ -129,6 +129,7 @@ final class MihomoStartupConfig {
                 "    path: "+ADBLOCK_PATH+"\n";
         if(index<0){String base=trimOne(source);return base+(base.isEmpty()?"":"\n")+"rule-providers:\n"+providerBlock;}
         String rest=found.group(1).trim();
+        if(rest.startsWith("#"))rest="";
         if(!rest.isEmpty()&&!rest.equals("{}"))throw new IOException("代理串联去广告需要普通 rule-providers: 配置块；当前源配置使用行内写法");
         int end=lines.length;
         for(int i=index+1;i<lines.length;i++){String t=lines[i].trim();if(t.isEmpty()||t.startsWith("#"))continue;if(indent(lines[i])==0){end=i;break;}}
@@ -145,6 +146,7 @@ final class MihomoStartupConfig {
         String rule="  - RULE-SET,"+ProxyAdblockRules.PROVIDER_NAME+",REJECT\n";
         if(index<0){String base=trimOne(source);return base+(base.isEmpty()?"":"\n")+"rules:\n"+rule;}
         String rest=found.group(1).trim();
+        if(rest.startsWith("#"))rest="";
         if(!rest.isEmpty()&&!rest.equals("[]"))throw new IOException("代理串联去广告需要普通 rules: 列表；当前源配置使用行内 rules 写法");
         StringBuilder out=new StringBuilder();
         for(int i=0;i<lines.length;i++){if(i==index){out.append("rules:\n").append(rule);continue;}out.append(lines[i]).append('\n');}

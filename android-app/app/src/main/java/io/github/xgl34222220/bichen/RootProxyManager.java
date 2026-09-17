@@ -41,6 +41,18 @@ final class RootProxyManager {
     }
     private static void stage(Progress p,String text){if(p!=null)p.onStage(text);}
     private static String bit(boolean value){return value?"1":"0";}
+    private static ProxyRuntimeProfile withoutAdblock(ProxyRuntimeProfile p){
+        return new ProxyRuntimeProfile(p.core,p.mode,p.ipv6,p.appScope,p.dnsHijack,p.autoOverwrite,p.tcp,p.udp,p.quicBlocked,p.cnIpDirect,false);
+    }
+    private static boolean adblockPreparationFailure(Exception error){
+        String m=error==null||error.getMessage()==null?"":error.getMessage();
+        return m.contains("代理串联去广告")||m.contains("广告 provider")||m.contains("广告规则")||m.contains("bichen-adblock");
+    }
+    private void rememberAdblockFallback(Exception error){
+        String m=error==null||error.getMessage()==null?"广告串联与当前配置不兼容":error.getMessage();
+        if(m.length()>600)m=m.substring(0,600)+"…";
+        prefs.edit().putString("proxyAdblockLastError",m).apply();
+    }
     String controllerSecret(){
         String s=prefs.getString("proxyControllerSecret","");
         if(s==null||s.isEmpty()){
@@ -85,12 +97,39 @@ final class RootProxyManager {
     JSONObject start(ProxyRuntimeProfile p)throws Exception{return start(p,null);}
     JSONObject start(ProxyRuntimeProfile profile,Progress progress)throws Exception{
         stage(progress,"检查配置、应用范围与绕过策略…");
-        Prepared p=prepare(profile);
+        Prepared p;
+        try{
+            p=prepare(profile);
+        }catch(Exception prepareFailure){
+            if(!profile.adblockChain||!adblockPreparationFailure(prepareFailure))throw prepareFailure;
+            rememberAdblockFallback(prepareFailure);
+            stage(progress,"广告串联与当前 YAML 结构不兼容，先保留原配置启动代理…");
+            profile=withoutAdblock(profile);
+            p=prepare(profile);
+        }
         RootProxyPolicy policy=p.policy;
         stage(progress,"部署 Root 核心与事务控制器…");
         installRuntimeFiles(p,true);
         stage(progress,"用 Mihomo 校验最终启动配置…");
-        validateRuntimeConfig();
+        try{
+            validateRuntimeConfig();
+            if(profile.adblockChain)prefs.edit().remove("proxyAdblockLastError").apply();
+        }catch(Exception fullFailure){
+            if(!profile.adblockChain)throw fullFailure;
+            stage(progress,"串联广告配置校验失败，尝试不修改源 YAML 启动代理…");
+            ProxyRuntimeProfile fallbackProfile=withoutAdblock(profile);
+            Prepared fallback=prepare(fallbackProfile);
+            installRuntimeFiles(fallback,true);
+            try{validateRuntimeConfig();}
+            catch(Exception fallbackFailure){
+                throw new IOException((fullFailure.getMessage()==null?"最终配置校验失败":fullFailure.getMessage())+"；关闭广告串联后仍失败："+(fallbackFailure.getMessage()==null?"未知错误":fallbackFailure.getMessage()),fullFailure);
+            }
+            rememberAdblockFallback(fullFailure);
+            profile=fallbackProfile;
+            p=fallback;
+            policy=p.policy;
+            stage(progress,"代理配置可用；本次仅关闭串联广告过滤继续启动…");
+        }
         stage(progress,"检查 TPROXY / Redirect / UID / IPv6 能力…");
         JSONObject pre=runJson("preflight",
                 profile.mode.id,String.valueOf(p.tproxyPort),String.valueOf(p.redirectPort),profile.ipv6.id,
@@ -101,7 +140,7 @@ final class RootProxyManager {
 
         boolean adblockCoordinatorEntered=false;
         boolean independentFallback=prefs.getBoolean("proxyAdblockFallbackEnabled",false);
-        if(profile.adblockChain||independentFallback){
+        if(profile.adblockChain||independentFallback||DnsVpnService.running){
             stage(progress,profile.adblockChain?"切换到代理串联去广告，暂停独立 DNS / hosts 过滤…":"暂停独立广告过滤，避免与 Root 代理并行…");
             ProxyAdblockCoordinator.enter(context);adblockCoordinatorEntered=true;
         }
@@ -127,6 +166,10 @@ final class RootProxyManager {
         }
 
         String warning=policy.warning();
+        String adblockFallbackReason=prefs.getString("proxyAdblockLastError","");
+        if(!profile.adblockChain&&adblockFallbackReason!=null&&!adblockFallbackReason.isEmpty()){
+            warning=(warning.isEmpty()?"":warning+"；")+"代理已启动，但广告串联本次降级："+adblockFallbackReason;
+        }
         result.put("sourceConfig",p.source.name)
                 .put("core",profile.core.id)
                 .put("mode",profile.mode.id)

@@ -154,6 +154,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
     var message by remember { mutableStateOf("") }
     var testing by remember { mutableStateOf(false) }
     var logText by remember { mutableStateOf<String?>(null) }
+    var startupError by remember { mutableStateOf<String?>(null) }
 
     suspend fun refresh() {
         try {
@@ -203,7 +204,18 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                message = error.message ?: "操作失败"
+                val reason = error.message ?: "操作失败"
+                message = reason
+                if (!state.running) {
+                    val diagnostics = runCatching { controller.diagnostics() }.getOrDefault("").trim()
+                    startupError = buildString {
+                        append(reason)
+                        if (diagnostics.isNotBlank()) {
+                            append("\n\n--- Root / Mihomo 诊断 ---\n")
+                            append(diagnostics)
+                        }
+                    }
+                }
             } finally {
                 operation = ""
             }
@@ -419,6 +431,14 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
             text = text,
             actionLabel = "关闭",
             onDismiss = { logText = null },
+        )
+    }
+    startupError?.let { text ->
+        RefInfoBottomSheet(
+            title = "启动失败",
+            text = text,
+            actionLabel = "关闭",
+            onDismiss = { startupError = null },
         )
     }
 }
