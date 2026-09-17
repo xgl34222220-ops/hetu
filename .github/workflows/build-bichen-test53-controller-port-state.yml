@@ -31,6 +31,9 @@ jobs:
             echo 'Unexpected version baseline' >&2
             exit 1
           fi
+          if grep -q 'Pattern.compile' android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java; then
+            python3 tools/fix_test53_controller_config_parser.py
+          fi
 
       - name: Verify generated sources
         shell: bash
@@ -42,8 +45,10 @@ jobs:
           grep -q 'versionCode = 453' "$BUILD"
           grep -q 'versionName = "0.4.0-test.53"' "$BUILD"
           grep -q 'liveControllerPort' "$ROOT"
+          grep -q 'BufferedReader reader=new BufferedReader' "$ROOT"
           grep -q 'putInt("proxyControllerPort",p.controllerPort).commit()' "$ROOT"
           ! grep -q 'prefs.edit().putInt("proxyControllerPort",port).commit()' "$ROOT"
+          ! grep -q 'Pattern.compile' "$ROOT"
           grep -q 'CONTROLLER_PORT=%s' "$SH"
           grep -q '"controllerPort":%s' "$SH"
 
