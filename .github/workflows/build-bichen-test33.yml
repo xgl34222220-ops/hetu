@@ -21,6 +21,14 @@ jobs:
         run: |
           set -euo pipefail
           python3 tools/apply_test33_proxy_adblock_chain.py
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/MihomoStartupConfig.java')
+          text = path.read_text(encoding='utf-8')
+          text = text.replace('Pattern.compile("^rule-providers\\s*:(.*)$")', 'Pattern.compile("^rule-providers\\\\s*:(.*)$")')
+          text = text.replace('Pattern.compile("^rules\\s*:(.*)$")', 'Pattern.compile("^rules\\\\s*:(.*)$")')
+          path.write_text(text, encoding='utf-8')
+          PY
           git diff --check
           sh -n android-app/app/src/main/assets/proxy-root-v3.sh
           grep -q 'versionCode = 433' android-app/app/build.gradle.kts
@@ -30,6 +38,8 @@ jobs:
           grep -q 'RULE-SET,"+ProxyAdblockRules.PROVIDER_NAME+",REJECT' android-app/app/src/main/java/io/github/xgl34222220/bichen/MihomoStartupConfig.java
           grep -q 'type: file' android-app/app/src/main/java/io/github/xgl34222220/bichen/MihomoStartupConfig.java
           grep -q 'behavior: domain' android-app/app/src/main/java/io/github/xgl34222220/bichen/MihomoStartupConfig.java
+          grep -Fq 'Pattern.compile("^rule-providers\\s*:(.*)$")' android-app/app/src/main/java/io/github/xgl34222220/bichen/MihomoStartupConfig.java
+          grep -Fq 'Pattern.compile("^rules\\s*:(.*)$")' android-app/app/src/main/java/io/github/xgl34222220/bichen/MihomoStartupConfig.java
           grep -q 'ProxyAdblockRules.export' android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java
           grep -q 'bichen-adblock.txt' android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java
           grep -q 'ProxyAdblockCoordinator.enter' android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java
