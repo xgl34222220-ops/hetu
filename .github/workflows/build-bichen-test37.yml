@@ -1,0 +1,137 @@
+name: Build Bichen test.37 cold-start readiness
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  build:
+    if: github.event.issue.title == '[BUILD] Bichen 0.4.0-test.37'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout verified test.36 source
+        uses: actions/checkout@v4
+        with:
+          ref: release/bichen-0.4.0-test.37
+          fetch-depth: 0
+
+      - name: Apply and audit cold-start readiness fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/apply_test37_cold_start.py
+          git diff --check
+          grep -q 'versionCode = 437' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.4.0-test.37"' android-app/app/build.gradle.kts
+          grep -q 'while \[ "$N" -lt 900 \]' android-app/app/src/main/assets/proxy-root-v3.sh
+          grep -q 'READY_RC=\$?' android-app/app/src/main/assets/proxy-root-v3.sh
+          grep -q 'Mihomo 初始化超过 90 秒' android-app/app/src/main/assets/proxy-root-v3.sh
+          grep -q '"\$RUN/proxy_provider"' android-app/app/src/main/assets/proxy-root-v3.sh
+          grep -q 'runJsonWithTimeout(125000L,"start"' android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java
+          grep -q '首次可能较慢' android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java
+          grep -q 'private JSONObject runJsonWithTimeout(long timeoutMs' android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java
+          grep -q 'title = "启动失败"' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
+          grep -A3 '<activity android:name=".ReferenceProxyActivity"' android-app/app/src/main/AndroidManifest.xml | grep -q 'android:exported="true"'
+          grep -A3 '<activity android:name=".ReferenceProxyActivity"' android-app/app/src/main/AndroidManifest.xml | grep -q 'android.intent.action.MAIN'
+          sh -n android-app/app/src/main/assets/proxy-root-v3.sh
+
+      - name: Checkout pinned Mihomo
+        uses: actions/checkout@v4
+        with:
+          repository: MetaCubeX/mihomo
+          ref: ac017cdd246ce8bd547653d927e7bf77d7ee73d5
+          path: .upstream
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache-dependency-path: .upstream/go.sum
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+          cache-read-only: false
+
+      - name: Run Java host regression
+        run: python3 tools/test_java.py
+
+      - name: Compile cold-start readiness UI and backend
+        working-directory: android-app
+        run: gradle :app:compileDebugKotlin :app:compileDebugJavaWithJavac --stacktrace
+
+      - name: Ensure NDK
+        run: |
+          if [ ! -x "$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang" ]; then
+            sdkmanager 'ndk;28.2.13676358'
+          fi
+
+      - name: Build pinned Mihomo runtime
+        run: |
+          set -euo pipefail
+          cp -r native/bridge .upstream/bichenbridge
+          cd .upstream
+          go test -tags with_gvisor -v ./bichenbridge
+          NDK="$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          mkdir -p ../android-app/app/src/main/jniLibs/arm64-v8a ../android-app/app/src/main/jniLibs/x86_64
+          mkdir -p ../android-app/app/src/main/assets/mihomo-root/arm64-v8a ../android-app/app/src/main/assets/mihomo-root/x86_64
+          CGO_ENABLED=1 GOOS=android GOARCH=arm64 CC="$NDK/aarch64-linux-android26-clang" go build -tags with_gvisor -trimpath -buildmode=c-shared -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' -o ../android-app/app/src/main/jniLibs/arm64-v8a/libbichen_core.so ./bichenbridge
+          CGO_ENABLED=1 GOOS=android GOARCH=amd64 CC="$NDK/x86_64-linux-android26-clang" go build -tags with_gvisor -trimpath -buildmode=c-shared -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' -o ../android-app/app/src/main/jniLibs/x86_64/libbichen_core.so ./bichenbridge
+          CGO_ENABLED=1 GOOS=android GOARCH=arm64 CC="$NDK/aarch64-linux-android26-clang" go build -tags with_gvisor -trimpath -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' -o ../android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo .
+          CGO_ENABLED=1 GOOS=android GOARCH=amd64 CC="$NDK/x86_64-linux-android26-clang" go build -tags with_gvisor -trimpath -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' -o ../android-app/app/src/main/assets/mihomo-root/x86_64/mihomo .
+          cp LICENSE ../android-app/app/src/main/assets/MIHOMO-LICENSE
+          git rev-parse HEAD > ../android-app/app/src/main/assets/mihomo-revision.txt
+
+      - name: Build test.37 APK
+        working-directory: android-app
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Verify test.37 APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=android-app/app/build/outputs/apk/debug/app-debug.apk
+          test -f "$APK"
+          AAPT=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n 1)
+          "$AAPT" dump badging "$APK" | tee apk-badging.txt
+          unzip -t "$APK" >/dev/null
+          unzip -l "$APK" | tee apk-files.txt >/dev/null
+          grep -q "versionCode='437'" apk-badging.txt
+          grep -q "versionName='0.4.0-test.37-preview'" apk-badging.txt
+          grep -q "launchable-activity: name='io.github.xgl34222220.bichen.ReferenceProxyActivity'" apk-badging.txt
+          grep -q 'assets/proxy-root-v3.sh' apk-files.txt
+          sha256sum "$APK" | tee apk-sha256.txt
+
+      - name: Upload verified test.37 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Bichen-0.4.0-test.37-cold-start-readiness
+          path: |
+            android-app/app/build/outputs/apk/debug/app-debug.apk
+            apk-badging.txt
+            apk-files.txt
+            apk-sha256.txt
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Commit verified test.37 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .upstream android-app/build android-app/app/build android-app/app/src/main/jniLibs android-app/app/src/main/assets/mihomo-root android-app/app/src/main/assets/MIHOMO-LICENSE android-app/app/src/main/assets/mihomo-revision.txt
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A android-app tests tools
+          git diff --cached --check
+          if ! git diff --cached --quiet; then
+            git commit -m 'Allow slow cold provider initialization for 0.4.0-test.37'
+            git push origin HEAD:release/bichen-0.4.0-test.37
+          fi
