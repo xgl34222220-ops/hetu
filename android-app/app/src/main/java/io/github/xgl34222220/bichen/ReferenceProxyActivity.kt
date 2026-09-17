@@ -2437,9 +2437,6 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
     val t = LocalBichenTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
 
-    fun unavailable(message: String) {
-        android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
-    }
 
     LazyColumn(
         Modifier.fillMaxSize().background(if (dark) t.pageBackground else Color(0xFFF1F5F9)),
@@ -2458,8 +2455,8 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
                 RefToolRow(
                     Icons.Rounded.Terminal,
                     Color(0xFF2563EB),
-                    "脚本",
-                    "服务脚本管理与执行",
+                    "运行文件",
+                    "启动配置与运行文件",
                     trailingText = if (state.running) "运行中" else "待机",
                     trailingBadge = true,
                     trailingColor = if (state.running) Color(0xFF059669) else Color(0xFF64748B),
@@ -2469,24 +2466,24 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
                     scope.launch { onLog(runCatching { inspector.runtimeLog() }.getOrElse { it.message ?: "日志读取失败" }) }
                 }
                 RefDivider()
-                RefToolRow(Icons.Rounded.Apps, Color(0xFFF97316), "应用管理", "分应用放行与代理相关应用", trailingText = "管理", trailingColor = Color(0xFF2563EB)) {
-                    context.startActivity(Intent(context, CompactMainActivity::class.java))
+                RefToolRow(Icons.Rounded.Apps, Color(0xFFF97316), "应用名单", "Root 分应用代理范围", trailingText = "管理", trailingColor = Color(0xFF2563EB)) {
+                    context.startActivity(Intent(context, ProxyAppSelectionActivity::class.java))
                 }
             }
         }
         item { RefSectionLabel("网络与共享") }
         item {
             RefGroup {
-                RefToolRow(Icons.Rounded.Wifi, Color(0xFF0EA5E9), "网络匹配", "按 Wi‑Fi / SSID 自动匹配", trailingText = "待接入", trailingBadge = true, trailingColor = Color(0xFF94A3B8)) {
-                    unavailable("网络匹配后端尚未接入")
+                RefToolRow(Icons.Rounded.Wifi, Color(0xFF0EA5E9), "网络匹配", "Wi‑Fi / SSID / 移动网络自动启停", trailingText = "自动化", trailingColor = Color(0xFF2563EB)) {
+                    context.startActivity(Intent(context, ProxyNetworkAutomationActivity::class.java))
                 }
                 RefDivider()
-                RefToolRow(Icons.Rounded.WifiTethering, Color(0xFF10B981), "共享网络", "热点与局域网共享", trailingText = "待接入", trailingBadge = true, trailingColor = Color(0xFF94A3B8)) {
-                    unavailable("共享网络控制后端尚未接入")
+                RefToolRow(Icons.Rounded.WifiTethering, Color(0xFF10B981), "共享网络", "热点与局域网共享 · Root 规则", trailingText = "设置", trailingColor = Color(0xFF2563EB)) {
+                    context.startActivity(Intent(context, ProxyAdvancedSettingsActivity::class.java).putExtra("focus", "sharing"))
                 }
                 RefDivider()
-                RefToolRow(Icons.Rounded.AltRoute, Color(0xFFEF4444), "绕过规则", "CIDR 与接口绕过", trailingText = "待接入", trailingBadge = true, trailingColor = Color(0xFF94A3B8)) {
-                    unavailable("自定义绕过规则后端尚未接入")
+                RefToolRow(Icons.Rounded.AltRoute, Color(0xFFEF4444), "绕过规则", "CIDR 与接口绕过 · Root 规则", trailingText = "设置", trailingColor = Color(0xFF2563EB)) {
+                    context.startActivity(Intent(context, ProxyAdvancedSettingsActivity::class.java).putExtra("focus", "bypass"))
                 }
             }
         }
@@ -2497,19 +2494,23 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
                     context.startActivity(Intent(context, ProxySubscriptionActivity::class.java))
                 }
                 RefDivider()
-                RefToolRow(Icons.Rounded.Public, Color(0xFFF97316), "CNIP 设置", "国内 IP 数据与分流", trailingText = "待接入", trailingBadge = true, trailingColor = Color(0xFF94A3B8)) {
-                    unavailable("CNIP 下载源和运行时应用后端尚未接入")
+                RefToolRow(Icons.Rounded.Shield, Color(0xFF2563EB), "广告过滤", "代理串联 · 规则 REJECT · 独立兜底", trailingText = "管理", trailingColor = Color(0xFF2563EB)) {
+                    context.startActivity(Intent(context, ProxyAdblockChainActivity::class.java))
+                }
+                RefDivider()
+                RefToolRow(Icons.Rounded.Public, Color(0xFFF59E0B), "CNIP 设置", "国内 IPv4/IPv6 自动直连", trailingText = "设置", trailingColor = Color(0xFF2563EB)) {
+                    context.startActivity(Intent(context, ProxyAdvancedSettingsActivity::class.java).putExtra("focus", "cnip"))
                 }
             }
         }
         item { RefSectionLabel("核心与更新") }
         item {
             RefGroup {
-                RefToolRow(Icons.Rounded.Language, Color(0xFF2563EB), "更新 WebUI", "Zashboard · MetaCubeXD", trailingText = "更新", trailingColor = Color(0xFF2563EB)) {
+                RefToolRow(Icons.Rounded.Language, Color(0xFF2563EB), "WebUI 管理", "Zashboard · 本机面板与修复", trailingText = "管理", trailingColor = Color(0xFF2563EB)) {
                     context.startActivity(Intent(context, ProxyWebUiActivity::class.java))
                 }
                 RefDivider()
-                RefToolRow(Icons.Rounded.Memory, Color(0xFF334155), "更新核心", "下载并安装内核二进制", trailingText = state.core.ifBlank { "Mihomo" }, trailingColor = Color(0xFF2563EB)) {
+                RefToolRow(Icons.Rounded.Memory, Color(0xFF334155), "内核管理", "下载、更新与维护内核", trailingText = state.core.ifBlank { "Mihomo" }, trailingColor = Color(0xFF2563EB)) {
                     context.startActivity(Intent(context, ProxyCoreActivity::class.java))
                 }
             }
@@ -2525,7 +2526,7 @@ private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
     var ipv6Picker by remember { mutableStateOf(false) }
     var latencyPicker by remember { mutableStateOf(false) }
     var portsInfo by remember { mutableStateOf(false) }
-    var autoStart by remember { mutableStateOf(prefs.getBoolean("autoStartVpn", false)) }
+    var autoStart by remember { mutableStateOf(prefs.getBoolean("proxyRootAutoStart", false)) }
     var blurEnabled by remember { mutableStateOf(prefs.getBoolean("enableBlur", true)) }
     var latencyInterval by remember { mutableIntStateOf(prefs.getInt("latencyAutoRefreshSeconds", 60).takeIf { it == 0 || it == 30 || it == 60 } ?: 60) }
 
@@ -2545,8 +2546,8 @@ private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
         item { RefSectionLabel("核心与运行") }
         item {
             RefGroup {
-                RefValueRow("核心选择", state.core, Icons.Rounded.Memory, Color(0xFF334155), highlightValue = true) {
-                    context.startActivity(Intent(context, ProxyCoreActivity::class.java))
+                RefValueRow("运行核心", state.core, Icons.Rounded.Memory, Color(0xFF334155), highlightValue = true) {
+                    context.startActivity(Intent(context, ProxyAdvancedSettingsActivity::class.java).putExtra("focus", "core"))
                 }
                 RefDivider()
                 RefValueRow("运行模式", state.mode, Icons.Rounded.Tune, Color(0xFF2563EB), highlightValue = true) { modePicker = true }
@@ -2561,7 +2562,7 @@ private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
                     checked = autoStart,
                 ) { enabled ->
                     autoStart = enabled
-                    prefs.edit().putBoolean("autoStartVpn", enabled).apply()
+                    prefs.edit().putBoolean("proxyRootAutoStart", enabled).apply()
                 }
             }
         }
@@ -2586,6 +2587,10 @@ private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
                 RefDivider()
                 RefValueRow("当前配置", state.config, Icons.Rounded.Description, Color(0xFF8B5CF6), highlightValue = true) {
                     context.startActivity(Intent(context, ProxySubscriptionActivity::class.java))
+                }
+                RefDivider()
+                RefValueRow("高级代理配置", "应用范围 · DNS · QUIC · CNIP · 共享 · 绕过", Icons.Rounded.Tune, Color(0xFF0EA5E9), highlightValue = true) {
+                    context.startActivity(Intent(context, ProxyAdvancedSettingsActivity::class.java))
                 }
             }
         }
@@ -2652,6 +2657,7 @@ private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
         val values = listOf(
             ProxyRuntimeProfile.Ipv6.ENABLE to "启用 IPv6",
             ProxyRuntimeProfile.Ipv6.BYPASS to "IPv6 不进核心",
+            ProxyRuntimeProfile.Ipv6.STRICT to "严格 IPv4 防泄漏",
             ProxyRuntimeProfile.Ipv6.DISABLE to "禁用系统 IPv6",
         )
         RefChoiceBottomSheet(

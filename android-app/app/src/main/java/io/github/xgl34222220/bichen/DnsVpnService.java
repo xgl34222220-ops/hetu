@@ -52,6 +52,7 @@ public final class DnsVpnService extends VpnService {
     public static final String ACTION_STOP = "io.github.xgl34222220.bichen.VPN_STOP";
     public static final String ACTION_RESTART = "io.github.xgl34222220.bichen.VPN_RESTART";
     public static final String ACTION_RELOAD = "io.github.xgl34222220.bichen.VPN_RELOAD";
+    public static final String ACTION_PAUSE_FOR_PROXY = "io.github.xgl34222220.bichen.VPN_PAUSE_FOR_PROXY";
     public static volatile boolean running;
     private static final Object MODE_LOCK = new Object();
     private static final Object LOGS_LOCK = new Object();
@@ -127,6 +128,17 @@ public final class DnsVpnService extends VpnService {
         String action = intent == null ? (prefs.getBoolean("vpnWanted", false) ? ACTION_START : ACTION_STOP) : intent.getAction();
         int command = ACTION_RELOAD.equals(action) ? commandSequence.get() : commandSequence.incrementAndGet();
         showForeground("正在准备 DNS 防护…");
+        if (ACTION_PAUSE_FOR_PROXY.equals(action)) {
+            final boolean wanted = prefs.getBoolean("vpnWanted", false);
+            requestedStop = true;
+            prefs.edit().putBoolean("proxyResumeDnsAfterChain", wanted).putBoolean("vpnWanted", wanted).apply();
+            closeNetwork();
+            submit(() -> { synchronized (MODE_LOCK) {
+                if (latestInstance == this) prefs.edit().putBoolean("vpnWanted", wanted).apply();
+                if (stopSelfResult(startId)) stopForeground(STOP_FOREGROUND_REMOVE);
+            }});
+            return START_NOT_STICKY;
+        }
         if (ACTION_STOP.equals(action)) {
             requestedStop = true;
             prefs.edit().putBoolean("vpnWanted", false).commit();
@@ -678,7 +690,7 @@ public final class DnsVpnService extends VpnService {
         submit(() -> {
             synchronized (MODE_LOCK) {
                 // A newer service instance owns the persisted restore intent now.
-                if (latestInstance == this) { String error = restoreHosts(); if (error != null) setError(error); }
+                if (latestInstance == this && !prefs.getBoolean("proxyAdblockChainActive", false)) { String error = restoreHosts(); if (error != null) setError(error); }
             }
         });
         lifecycle.shutdown(); super.onDestroy();

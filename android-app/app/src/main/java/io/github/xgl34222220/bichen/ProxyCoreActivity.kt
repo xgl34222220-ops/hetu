@@ -126,7 +126,7 @@ private fun CoreManagerScreen(onBack: () -> Unit) {
                     }
                     Text("Mihomo 没有下载更新时自动回退到 App 内置版本；下载更新后优先使用下载版。其他核心先完成下载与版本管理，运行后端未接入时不会假报可用。", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
                     OutlinedButton(
-                        onClick = { context.startActivity(Intent(context, RootTproxyActivity::class.java)) },
+                        onClick = { context.startActivity(Intent(context, ProxyAdvancedSettingsActivity::class.java)) },
                         modifier = Modifier.fillMaxWidth().height(46.dp),
                         shape = RoundedCornerShape(17.dp),
                     ) {

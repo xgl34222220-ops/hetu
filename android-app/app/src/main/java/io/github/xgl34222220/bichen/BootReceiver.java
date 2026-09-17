@@ -11,6 +11,18 @@ public final class BootReceiver extends BroadcastReceiver {
     @Override public void onReceive(Context context, Intent intent) {
         if (!Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) return;
         SharedPreferences prefs = context.getSharedPreferences("bichen", Context.MODE_PRIVATE);
+        if (prefs.getBoolean("proxyRootAutoStart", false) && prefs.getBoolean("proxyRootWanted", false)) {
+            final PendingResult pending = goAsync();
+            new Thread(() -> {
+                try {
+                    new RootProxyManager(context.getApplicationContext()).start(ProxyRuntimeProfile.load(prefs));
+                } catch (Exception e) {
+                    prefs.edit().putString("proxyRootBootError", "Root 代理开机恢复失败：" + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage())).apply();
+                } finally { pending.finish(); }
+            }, "bichen-root-boot").start();
+            return;
+        }
+
         boolean autoStart = prefs.getBoolean("autoStartVpn", false);
         boolean authorized = VpnService.prepare(context) == null;
 
