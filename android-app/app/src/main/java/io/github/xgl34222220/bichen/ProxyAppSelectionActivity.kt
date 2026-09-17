@@ -37,6 +37,7 @@ import kotlinx.coroutines.CancellationException
 class ProxyAppSelectionActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.rgb(241, 245, 249)))
         enableEdgeToEdge()
         setContent { BichenTheme { ProxyAppSelectionPage(onBack = { finish() }) } }
     }
@@ -48,10 +49,13 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
     val prefs = remember { context.getSharedPreferences("bichen", 0) }
     val controller = remember { BichenComposeController(context) }
     var reload by remember { mutableIntStateOf(0) }
+    var loadingApps by remember { mutableStateOf(controller.cachedApps().isEmpty()) }
     val apps by produceState(initialValue = controller.cachedApps(), reload) {
+        loadingApps = true
         value = try { controller.loadApps(forceRefresh = reload > 0) }
         catch (cancel: CancellationException) { throw cancel }
         catch (_: Exception) { controller.cachedApps() }
+        finally { loadingApps = false }
     }
     fun proxyApps(): Set<String> = prefs.getStringSet("proxyAppPackages", emptySet()).orEmpty().toSet()
     fun setProxyApp(packageName: String, enabled: Boolean) {
@@ -144,12 +148,26 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
             }
         }
 
-        if (apps.isEmpty()) {
-            item("loading") {
-                Box(Modifier.fillMaxWidth().padding(vertical = 34.dp), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 2.dp)
-                        Text("正在读取本机应用…", color = t.textSecondary, fontSize = 12.sp)
+        if (loadingApps && apps.isEmpty()) {
+            item("loading-skeleton") {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    repeat(6) { index ->
+                        Surface(
+                            modifier = Modifier.fillMaxWidth().height(64.dp),
+                            shape = RoundedCornerShape(18.dp),
+                            color = if (dark) t.elevatedCardBackground else Color.White,
+                            shadowElevation = if (dark) 0.dp else 1.dp,
+                        ) {
+                            Row(Modifier.fillMaxSize().padding(horizontal = 13.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Box(Modifier.size(42.dp).background(t.controlBackground.copy(alpha = .72f), RoundedCornerShape(12.dp)))
+                                Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                                    Box(Modifier.fillMaxWidth(if (index % 2 == 0) .52f else .66f).height(12.dp).background(t.controlBackground.copy(alpha = .76f), CircleShape))
+                                    Box(Modifier.fillMaxWidth(if (index % 3 == 0) .72f else .58f).height(8.dp).background(t.controlBackground.copy(alpha = .50f), CircleShape))
+                                }
+                                Box(Modifier.size(22.dp).background(t.controlBackground.copy(alpha = .62f), CircleShape))
+                            }
+                        }
                     }
                 }
             }

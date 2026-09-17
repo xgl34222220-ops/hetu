@@ -51,6 +51,7 @@ private fun localDashboardUrl(secret: String): String {
 class ProxyWebUiActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.rgb(241, 245, 249)))
         enableEdgeToEdge()
         setContent { BichenTheme { ProxyWebUiScreen { finish() } } }
     }
@@ -120,6 +121,8 @@ private fun ProxyWebUiScreen(onClose: () -> Unit) {
                     super.onPageFinished(view, url)
                     if (!url.isNullOrBlank() && url.startsWith("http://127.0.0.1:${MihomoStartupConfig.CONTROLLER_PORT}/ui/")) {
                         pageError = ""
+                        progress = 100
+                        preparing = false
                     }
                 }
             }
@@ -143,7 +146,6 @@ private fun ProxyWebUiScreen(onClose: () -> Unit) {
             webView.loadUrl(localDashboardUrl(secret))
         } catch (error: Exception) {
             pageError = error.message ?: "Zashboard 准备失败"
-        } finally {
             preparing = false
         }
     }
@@ -224,21 +226,41 @@ private fun ProxyWebUiScreen(onClose: () -> Unit) {
             )
         }
 
-        when {
-            preparing -> {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        CircularProgressIndicator(Modifier.size(30.dp), strokeWidth = 2.5.dp)
-                        Text("正在准备本机 Zashboard…", color = tokens.textSecondary)
+        Box(Modifier.fillMaxSize()) {
+            AndroidView(
+                factory = { webView },
+                modifier = Modifier.fillMaxSize(),
+            )
+
+            if ((preparing || progress < 100) && pageError.isBlank()) {
+                Column(
+                    Modifier.fillMaxSize().background(tokens.pageBackground).padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Surface(shape = RoundedCornerShape(20.dp), color = tokens.cardBackground) {
+                        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Box(Modifier.fillMaxWidth(.42f).height(14.dp).background(tokens.controlBackground, RoundedCornerShape(7.dp)))
+                            Box(Modifier.fillMaxWidth(.74f).height(10.dp).background(tokens.controlBackground.copy(alpha = .72f), RoundedCornerShape(5.dp)))
+                        }
                     }
+                    repeat(4) { index ->
+                        Surface(shape = RoundedCornerShape(18.dp), color = tokens.cardBackground) {
+                            Row(Modifier.fillMaxWidth().height(66.dp).padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Box(Modifier.size(36.dp).background(tokens.controlBackground, RoundedCornerShape(11.dp)))
+                                Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                                    Box(Modifier.fillMaxWidth(if (index % 2 == 0) .56f else .70f).height(11.dp).background(tokens.controlBackground, RoundedCornerShape(6.dp)))
+                                    Box(Modifier.fillMaxWidth(.82f).height(8.dp).background(tokens.controlBackground.copy(alpha = .64f), RoundedCornerShape(4.dp)))
+                                }
+                            }
+                        }
+                    }
+                    Text("正在准备本机 Zashboard…", color = tokens.textSecondary, fontSize = 11.sp, modifier = Modifier.padding(start = 4.dp, top = 2.dp))
                 }
             }
 
-            pageError.isNotBlank() -> {
-                Box(Modifier.fillMaxSize().padding(22.dp), contentAlignment = Alignment.Center) {
+            if (pageError.isNotBlank()) {
+                Box(Modifier.fillMaxSize().background(tokens.pageBackground).padding(22.dp), contentAlignment = Alignment.Center) {
                     Surface(
                         shape = RoundedCornerShape(18.dp),
                         color = tokens.cardBackground,
@@ -263,13 +285,7 @@ private fun ProxyWebUiScreen(onClose: () -> Unit) {
                     }
                 }
             }
-
-            else -> {
-                AndroidView(
-                    factory = { webView },
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
         }
+
     }
 }

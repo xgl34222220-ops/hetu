@@ -349,21 +349,23 @@ private fun ChainMetric(label: String, value: String, modifier: Modifier = Modif
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val accent = when (label) {
         "规则源" -> Color(0xFF059669)
+        "本次命中" -> Color(0xFF2563EB)
         else -> Color(0xFF002FA7)
     }
     Surface(
-        modifier = modifier.height(64.dp),
+        modifier = modifier.height(70.dp),
         shape = RoundedCornerShape(16.dp),
         color = if (dark) t.controlBackground.copy(alpha = .72f) else Color(0xFFF8FAFC),
         tonalElevation = 0.dp,
-        shadowElevation = 0.dp,
+        shadowElevation = if (dark) 0.dp else 1.dp,
     ) {
         Column(
-            Modifier.fillMaxSize().padding(horizontal = 11.dp, vertical = 9.dp),
+            Modifier.fillMaxSize().padding(horizontal = 11.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.Center,
         ) {
-            Text(value, color = accent, fontSize = 18.sp, lineHeight = 21.sp, fontWeight = FontWeight.Black, maxLines = 1)
-            Text(label, color = t.textSecondary, fontSize = 10.sp, lineHeight = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+            Text(value, color = accent, fontSize = 20.sp, lineHeight = 23.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
+            Spacer(Modifier.height(2.dp))
+            Text(label, color = Color(0xFF94A3B8), fontSize = 10.sp, lineHeight = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1)
         }
     }
 }

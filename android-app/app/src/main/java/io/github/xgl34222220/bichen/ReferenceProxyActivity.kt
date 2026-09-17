@@ -37,6 +37,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -588,11 +589,11 @@ private fun RefHome(
                                 ) {
                                     Text(
                                         if (state.running) refDuration(runtime.elapsedSeconds) else "等待启动",
-                                        Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                        color = t.textMuted,
+                                        Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
+                                        color = if (scheme.background.luminance() < .5f) Color(0xFFCBD5E1) else Color(0xFF64748B),
                                         fontSize = 11.sp,
                                         lineHeight = 14.sp,
-                                        fontWeight = FontWeight.Medium,
+                                        fontWeight = FontWeight.SemiBold,
                                         fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                                         maxLines = 1,
                                     )
@@ -770,6 +771,7 @@ private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: I
     var lanMode by rememberSaveable { mutableStateOf(true) }
     val source = remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
+    val view = LocalView.current
     val scale by animateFloatAsState(if (pressed) .96f else 1f, spring(dampingRatio = .74f, stiffness = 560f), label = "networkCardPress")
     val shape = RoundedCornerShape(20.dp)
     val valueColor = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A)
@@ -778,7 +780,10 @@ private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: I
             .height(106.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .92f else 1f }
             .clip(shape)
-            .clickable(interactionSource = source, indication = null) { lanMode = !lanMode },
+            .clickable(interactionSource = source, indication = null) {
+                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                lanMode = !lanMode
+            },
         shape = shape,
         color = t.cardBackground,
         shadowElevation = 1.dp,
@@ -798,25 +803,43 @@ private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: I
                     Icon(Icons.Rounded.SwapHoriz, "切换 LAN/WAN", tint = Color(0xFF2563EB), modifier = Modifier.size(14.dp))
                 }
             }
-            Text(
-                if (lanMode) runtime.lanAddress else runtime.wanAddress,
-                color = valueColor,
-                fontSize = 15.sp,
-                lineHeight = 18.sp,
-                fontWeight = FontWeight.ExtraBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.height(20.dp),
-            )
-            Text(
-                if (lanMode) "${runtime.lanInterface} · $connections 连接" else "${countryEmoji(runtime.wanCountryCode)} ${runtime.wanRegion}",
-                color = Color(0xFF64748B),
-                fontSize = 11.sp,
-                lineHeight = 14.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            androidx.compose.animation.AnimatedContent(
+                targetState = lanMode,
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                transitionSpec = {
+                    val enter = androidx.compose.animation.slideInHorizontally(
+                        animationSpec = androidx.compose.animation.core.tween(300),
+                    ) { full -> if (targetState) -full / 4 else full / 4 } + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(190))
+                    val exit = androidx.compose.animation.slideOutHorizontally(
+                        animationSpec = androidx.compose.animation.core.tween(230),
+                    ) { full -> if (targetState) full / 4 else -full / 4 } + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(150))
+                    enter.togetherWith(exit)
+                },
+                label = "lanWanSlide",
+            ) { isLan ->
+                Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
+                    Text(
+                        if (isLan) runtime.lanAddress else runtime.wanAddress,
+                        color = valueColor,
+                        fontSize = 15.sp,
+                        lineHeight = 18.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.height(20.dp),
+                    )
+                    Text(
+                        if (isLan) "${runtime.lanInterface} · $connections 连接" else "${countryEmoji(runtime.wanCountryCode)} ${runtime.wanRegion}",
+                        color = Color(0xFF64748B),
+                        fontSize = 11.sp,
+                        lineHeight = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.height(18.dp),
+                    )
+                }
+            }
         }
     }
 }
@@ -857,7 +880,7 @@ private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, modifier: M
     val scale by animateFloatAsState(if (pressed) .96f else 1f, spring(dampingRatio = .74f, stiffness = 560f), label = "subscriptionCompactPress")
     val shape = RoundedCornerShape(20.dp)
     Surface(
-        modifier = modifier.height(106.dp)
+        modifier = modifier.height(112.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .92f else 1f }
             .clip(shape)
             .clickable(interactionSource = source, indication = null) {
@@ -869,10 +892,10 @@ private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, modifier: M
         shadowElevation = 1.dp,
     ) {
         Column(
-            Modifier.fillMaxSize().padding(14.dp),
+            Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().height(20.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("订阅", color = Color(0xFF64748B), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                 if (total > 0L) Surface(shape = RoundedCornerShape(999.dp), color = Color(0xFFEBF3FF)) {
                     Text("剩余 ${((1f - ratio) * 100f).toInt()}%", Modifier.padding(horizontal = 7.dp, vertical = 2.dp), color = MaterialTheme.colorScheme.primary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
@@ -901,23 +924,35 @@ private fun RefResourceCard(memory: Long, cpuPercent: Float, modifier: Modifier)
     val scheme = MaterialTheme.colorScheme
     val valueColor = if (scheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A)
     val progress = (cpuPercent / 100f).coerceIn(0f, 1f)
-    Surface(modifier = modifier.height(106.dp), shape = RoundedCornerShape(20.dp), color = t.cardBackground, shadowElevation = 1.dp) {
+    val pulseTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "resourceCpuPulse")
+    val pulse by pulseTransition.animateFloat(
+        initialValue = .42f,
+        targetValue = 1f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = androidx.compose.animation.core.tween(1200),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
+        ),
+        label = "resourceCpuPulseAlpha",
+    )
+    Surface(modifier = modifier.height(112.dp), shape = RoundedCornerShape(20.dp), color = t.cardBackground, shadowElevation = 1.dp) {
         Column(
-            Modifier.fillMaxSize().padding(14.dp),
+            Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().height(24.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("资源占用", color = Color(0xFF64748B), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                Canvas(Modifier.size(22.dp)) {
-                    drawCircle(Color(0xFFE2E8F0).copy(alpha = .64f), style = Stroke(width = 2.dp.toPx()))
+                Canvas(Modifier.size(24.dp)) {
+                    val halo = 10.3.dp.toPx() + 1.2.dp.toPx() * pulse
+                    drawCircle(Color(0xFF2563EB).copy(alpha = .035f + .055f * pulse), radius = halo, style = Stroke(width = 1.dp.toPx()))
+                    drawCircle(Color(0xFFE2E8F0).copy(alpha = .68f), style = Stroke(width = 2.dp.toPx()))
                     drawArc(
-                        color = Color(0xFF002FA7).copy(alpha = .68f),
+                        color = Color(0xFF002FA7).copy(alpha = .62f + .18f * pulse),
                         startAngle = -90f,
                         sweepAngle = 360f * progress,
                         useCenter = false,
                         style = Stroke(width = 2.2.dp.toPx()),
                     )
-                    drawCircle(Color(0xFF2563EB).copy(alpha = if (progress > .02f) .22f else .10f), radius = 2.4.dp.toPx())
+                    drawCircle(Color(0xFF2563EB).copy(alpha = if (progress > .02f) .18f + .12f * pulse else .08f), radius = 2.5.dp.toPx())
                 }
             }
             Row(Modifier.fillMaxWidth().height(20.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1232,7 +1267,7 @@ private fun RefPanel(
                 item { RefNotice("代理未运行") }
             } else when (tab) {
                 RefPanelTab.Overview -> {
-                    itemsIndexed(filteredGroups.chunked(2), key = { index, _ -> "groups-$index" }) { _, pair ->
+                    itemsIndexed(filteredGroups.chunked(2), key = { index, _ -> "${tab.name}-groups-$index" }, contentType = { _, _ -> "group-row" }) { _, pair ->
                         val expandedGroup = pair.firstOrNull { it.name == selectedGroupName }
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1328,8 +1363,8 @@ private fun RefPanel(
                         }
                     }
                 }
-                RefPanelTab.Nodes -> item { RefTrafficOverview(state) }
-                RefPanelTab.Subscriptions -> items(providers, key = { it.name }) { item ->
+                RefPanelTab.Nodes -> item(key = "${tab.name}-traffic-overview", contentType = "traffic-overview") { RefTrafficOverview(state) }
+                RefPanelTab.Subscriptions -> items(providers, key = { "${tab.name}-provider-${it.name}" }, contentType = { "subscription-provider" }) { item ->
                     RefProviderRow(
                         item = item,
                         refreshing = providerRefreshing[item.name] == true,
@@ -1342,6 +1377,8 @@ private fun RefPanel(
                                     capsuleError = false
                                     capsuleText = "订阅更新成功"
                                     view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                                    delay(70)
+                                    view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                                 } catch (e: Exception) {
                                     capsuleError = true
                                     capsuleText = e.message ?: "订阅更新失败，请检查网络"
@@ -1365,14 +1402,14 @@ private fun RefPanel(
                         }
                     }
                     val shown = if (connectionView == "active") state.connections else closedConnections
-                    items(shown, key = { (if (connectionView == "active") "a-" else "c-") + it.id }) { c ->
+                    items(shown, key = { "${tab.name}-" + (if (connectionView == "active") "a-" else "c-") + it.id }, contentType = { "connection-row" }) { c ->
                         RefConnectionRow(c, if (connectionView == "active") ({ scope.launch { repo.closeConnection(c.id); onRefreshState() } }) else null)
                     }
                 }
-                RefPanelTab.Rules -> itemsIndexed(rules.chunked(18), key = { index, _ -> "rule-group-$index" }) { _, batch ->
+                RefPanelTab.Rules -> itemsIndexed(rules.chunked(18), key = { index, _ -> "${tab.name}-rule-group-$index" }, contentType = { _, _ -> "rule-group" }) { _, batch ->
                     RefRuleGroupCard(batch)
                 }
-                RefPanelTab.RuleSets -> items(ruleSets, key = { it.name }) { item ->
+                RefPanelTab.RuleSets -> items(ruleSets, key = { "${tab.name}-ruleset-${it.name}" }, contentType = { "ruleset-row" }) { item ->
                     RefRuleSetRow(item, refreshing = ruleSetRefreshing[item.name] == true) {
                         if (ruleSetRefreshing[item.name] != true) scope.launch {
                             ruleSetRefreshing[item.name] = true
@@ -1382,6 +1419,8 @@ private fun RefPanel(
                                 capsuleError = false
                                 capsuleText = "规则集更新完成"
                                 view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                                delay(70)
+                                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                             } catch (e: Exception) {
                                 capsuleError = true
                                 capsuleText = e.message ?: "规则集更新失败，请检查网络"
@@ -2020,7 +2059,7 @@ private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolea
             Spacer(Modifier.width(3.dp))
             val arrowRotation by animateFloatAsState(
                 targetValue = if (expanded) 180f else 0f,
-                animationSpec = spring(dampingRatio = .76f, stiffness = 420f),
+                animationSpec = spring(dampingRatio = .58f, stiffness = 250f),
                 label = "groupArrow${group.name}",
             )
             Icon(
@@ -2238,11 +2277,11 @@ private fun RefInlineNodeCard(
                 }
                 androidx.compose.animation.AnimatedVisibility(
                     visible = active,
-                    modifier = Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 6.dp),
+                    modifier = Modifier.align(Alignment.TopEnd).padding(top = 5.dp, end = 5.dp),
                     enter = androidx.compose.animation.scaleIn(initialScale = .15f, animationSpec = spring(dampingRatio = .56f, stiffness = 520f)) + androidx.compose.animation.fadeIn(),
                     exit = androidx.compose.animation.scaleOut(targetScale = .45f) + androidx.compose.animation.fadeOut(),
                 ) {
-                    Icon(Icons.Rounded.Check, "已选择", tint = Color(0xFF2563EB), modifier = Modifier.size(15.dp))
+                    Icon(Icons.Rounded.Check, "已选择", tint = Color(0xFF2563EB), modifier = Modifier.size(13.dp).graphicsLayer { alpha = .92f })
                 }
             }
         }
@@ -2508,7 +2547,7 @@ private fun RefTrafficOverview(state: ProxyComposeState) {
                     }
 
                     val peak = points.maxOfOrNull { maxOf(it.second, it.third) } ?: 0L
-                    val simulate = points.size < 2 || peak < 1024L
+                    val simulate = points.size < 2 || peak < 4096L
                     if (!simulate) {
                         val maxRate = peak.coerceAtLeast(1L).toFloat()
                         val end = points.last().first
@@ -2533,8 +2572,8 @@ private fun RefTrafficOverview(state: ProxyComposeState) {
                             val y = size.height * base - (kotlin.math.sin(angle.toDouble()).toFloat() + harmonic) * size.height * amplitude
                             Offset(size.width * ratio, y)
                         }
-                        val upload = wave(0f, .81f, .018f)
-                        val download = wave(1.18f, .86f, .024f)
+                        val upload = wave(0f, .76f, .028f)
+                        val download = wave(1.18f, .82f, .036f)
                         drawPath(closeArea(upload), brush = Brush.verticalGradient(listOf(t.success.copy(alpha = .18f), Color.Transparent), size.height * .68f, size.height))
                         drawPath(closeArea(download), brush = Brush.verticalGradient(listOf(scheme.primary.copy(alpha = .20f), Color.Transparent), size.height * .70f, size.height))
                         drawPath(smooth(upload, false), color = t.success.copy(alpha = .78f), style = Stroke(width = 1.8.dp.toPx()))
@@ -3257,13 +3296,21 @@ private fun RefInfoBottomSheet(
         },
     ) {
         Column(
-            Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
+            Modifier.fillMaxWidth().fillMaxHeight(.78f).navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(title, color = if (terminal) Color(0xFFF8FAFC) else t.textPrimary, fontSize = 20.sp, lineHeight = 25.sp, fontWeight = FontWeight.Bold)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(title, color = if (terminal) Color(0xFFF8FAFC) else t.textPrimary, fontSize = 20.sp, lineHeight = 25.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.size(34.dp).background(if (terminal) Color.White.copy(alpha = .07f) else t.controlBackground.copy(alpha = .72f), CircleShape),
+                ) {
+                    Icon(Icons.Rounded.Close, "关闭", tint = if (terminal) Color(0xFFCBD5E1) else t.textSecondary, modifier = Modifier.size(17.dp))
+                }
+            }
             Box(
                 Modifier.fillMaxWidth()
-                    .heightIn(max = 430.dp)
+                    .weight(1f)
                     .background(if (terminal) Color(0xFF0F172A) else t.controlBackground.copy(alpha = .54f), RoundedCornerShape(16.dp))
                     .border(if (terminal) .8.dp else 0.dp, if (terminal) Color(0xFF334155) else Color.Transparent, RoundedCornerShape(16.dp))
                     .padding(14.dp)
@@ -3288,17 +3335,6 @@ private fun RefInfoBottomSheet(
                 } else {
                     Text(renderedText, color = t.textSecondary, fontSize = 13.sp, lineHeight = 20.sp)
                 }
-            }
-            FilledTonalButton(
-                onClick = onDismiss,
-                modifier = Modifier.fillMaxWidth().height(48.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = if (terminal) Color(0xFF1E293B) else t.controlBackground,
-                    contentColor = if (terminal) Color(0xFFE2E8F0) else t.textPrimary,
-                ),
-            ) {
-                Text(actionLabel, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -3469,6 +3505,7 @@ private fun RefSwitchRow(
     onCheckedChange: (Boolean) -> Unit,
 ) {
     val t = LocalBichenTokens.current
+    val view = LocalView.current
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -3482,7 +3519,10 @@ private fun RefSwitchRow(
         Spacer(Modifier.width(10.dp))
         Switch(
             checked = checked,
-            onCheckedChange = onCheckedChange,
+            onCheckedChange = { value ->
+                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                onCheckedChange(value)
+            },
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Color.White,
                 checkedTrackColor = Color(0xFF2563EB),

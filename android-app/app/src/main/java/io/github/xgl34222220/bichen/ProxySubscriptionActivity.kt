@@ -29,7 +29,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
@@ -50,6 +55,41 @@ class ProxySubscriptionActivity : ComponentActivity() {
                 ProxySubscriptionScreen(onBack = { finish() })
             }
         }
+    }
+}
+
+
+private object YamlSyntaxHighlightTransformation : VisualTransformation {
+    private val keyRegex = Regex("(?m)^[\\t -]*([A-Za-z0-9_.-]+)(?=\\s*:)")
+    private val scalarRegex = Regex("(?<![A-Za-z0-9_.-])(?:true|false|null|-?\\d+(?:\\.\\d+)?)(?![A-Za-z0-9_.-])", RegexOption.IGNORE_CASE)
+    private val commentRegex = Regex("(?m)#.*$")
+
+    override fun filter(text: AnnotatedString): TransformedText {
+        val source = text.text
+        val builder = AnnotatedString.Builder(source)
+        keyRegex.findAll(source).forEach { match ->
+            val group = match.groups[1] ?: return@forEach
+            builder.addStyle(
+                SpanStyle(color = Color(0xFF0E7490), fontWeight = FontWeight.SemiBold),
+                group.range.first,
+                group.range.last + 1,
+            )
+        }
+        scalarRegex.findAll(source).forEach { match ->
+            builder.addStyle(
+                SpanStyle(color = Color(0xFF6366F1), fontWeight = FontWeight.Medium),
+                match.range.first,
+                match.range.last + 1,
+            )
+        }
+        commentRegex.findAll(source).forEach { match ->
+            builder.addStyle(
+                SpanStyle(color = Color(0xFF64748B)),
+                match.range.first,
+                match.range.last + 1,
+            )
+        }
+        return TransformedText(builder.toAnnotatedString(), OffsetMapping.Identity)
     }
 }
 
@@ -416,6 +456,14 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                                 onValueChange = { yamlText = it; yamlError = "" },
                                 modifier = Modifier.weight(1f)
                                     .horizontalScroll(editorHorizontalScroll)
+                                    .drawBehind {
+                                        val guideColor = if (dark) Color.White.copy(alpha = .04f) else Color(0xFFE2E8F0).copy(alpha = .86f)
+                                        val step = 16.dp.toPx()
+                                        for (index in 1..5) {
+                                            val x = index * step
+                                            drawLine(guideColor, Offset(x, 0f), Offset(x, size.height), strokeWidth = .5.dp.toPx())
+                                        }
+                                    }
                                     .padding(horizontal = 12.dp, vertical = 12.dp),
                                 textStyle = MaterialTheme.typography.bodySmall.copy(
                                     color = tokens.textPrimary,
@@ -424,6 +472,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                                     lineHeight = 21.sp,
                                 ),
                                 cursorBrush = SolidColor(scheme.primary),
+                                visualTransformation = YamlSyntaxHighlightTransformation,
                             )
                         }
                     }
