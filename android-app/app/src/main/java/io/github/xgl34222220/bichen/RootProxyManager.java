@@ -99,10 +99,11 @@ final class RootProxyManager {
                 policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces);
         if(!pre.optBoolean("ok"))throw new IOException(pre.optString("message","Root 代理预检失败"));
 
-        boolean chainEntered=false;
-        if(profile.adblockChain){
-            stage(progress,"切换到代理串联去广告，暂停独立 DNS / hosts 过滤…");
-            ProxyAdblockCoordinator.enter(context);chainEntered=true;
+        boolean adblockCoordinatorEntered=false;
+        boolean independentFallback=prefs.getBoolean("proxyAdblockFallbackEnabled",false);
+        if(profile.adblockChain||independentFallback){
+            stage(progress,profile.adblockChain?"切换到代理串联去广告，暂停独立 DNS / hosts 过滤…":"暂停独立广告过滤，避免与 Root 代理并行…");
+            ProxyAdblockCoordinator.enter(context);adblockCoordinatorEntered=true;
         }
         stage(progress,"启动核心并等待监听端口就绪…");
         JSONObject result;
@@ -112,7 +113,7 @@ final class RootProxyManager {
                 String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(MihomoStartupConfig.CONTROLLER_PORT),
                 policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces);
             if(!result.optBoolean("ok"))throw new IOException(result.optString("message","Root 代理启动失败"));
-        }catch(Exception startFailure){if(chainEntered)ProxyAdblockCoordinator.exit(context);throw startFailure;}
+        }catch(Exception startFailure){if(adblockCoordinatorEntered)ProxyAdblockCoordinator.exit(context);throw startFailure;}
 
         stage(progress,"确认策略控制接口、守护与回滚状态…");
         try{

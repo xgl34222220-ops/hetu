@@ -57,9 +57,37 @@ final class ProxyAdblockCoordinator {
         boolean active = prefs.getBoolean("proxyAdblockChainActive", false);
         boolean resumeDns = prefs.getBoolean("proxyResumeDnsAfterChain", false);
         boolean restoreHosts = prefs.getBoolean("proxyRestoreHostsAfterChain", false);
-        if (!active && !resumeDns && !restoreHosts) return;
+        boolean fallbackConfigured = prefs.contains("proxyAdblockFallbackEnabled");
+        boolean fallbackEnabled = prefs.getBoolean("proxyAdblockFallbackEnabled", false);
+        String fallbackMode = prefs.getString("proxyAdblockFallbackMode", "vpn");
+        if (!active && !resumeDns && !restoreHosts && !fallbackEnabled) return;
 
         prefs.edit().putBoolean("proxyAdblockChainActive", false).apply();
+
+        if (fallbackConfigured) {
+            if (fallbackEnabled && "vpn".equals(fallbackMode)) {
+                if (VpnService.prepare(app) == null) {
+                    try {
+                        prefs.edit().putBoolean("vpnWanted", true).remove("vpnError").apply();
+                        Intent start = new Intent(app, DnsVpnService.class).setAction(DnsVpnService.ACTION_START);
+                        if (Build.VERSION.SDK_INT >= 26) app.startForegroundService(start); else app.startService(start);
+                    } catch (Exception e) {
+                        prefs.edit().putString("vpnError", "独立 DNS 去广告恢复失败：" + e.getClass().getSimpleName()).apply();
+                    }
+                } else {
+                    prefs.edit().putString("vpnError", "独立 DNS 去广告需要重新确认 VPN 授权").apply();
+                }
+            } else if (fallbackEnabled && "module".equals(fallbackMode)) {
+                try {
+                    JSONObject before = RootBridge.status(app);
+                    boolean disabled = before.optBoolean("moduleDisabled", false) || before.optBoolean("moduleRemovalPending", false);
+                    if (before.optBoolean("installed", false) && !disabled) RootBridge.run(app, "enable");
+                } catch (Exception ignored) { }
+            }
+            prefs.edit().remove("proxyResumeDnsAfterChain").remove("proxyRestoreHostsAfterChain").apply();
+            return;
+        }
+
         if (resumeDns && prefs.getBoolean("vpnWanted", false) && VpnService.prepare(app) == null) {
             try {
                 Intent start = new Intent(app, DnsVpnService.class).setAction(DnsVpnService.ACTION_START);

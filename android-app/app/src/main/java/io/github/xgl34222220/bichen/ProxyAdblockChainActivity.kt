@@ -1,8 +1,11 @@
 package io.github.xgl34222220.bichen
 
+import android.app.Activity
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -40,6 +43,8 @@ private data class ChainSnapshot(
     val rules: RulesSnapshot = RulesSnapshot(),
     val running: Boolean = false,
     val hitCount: Long = 0L,
+    val vpnFallbackRunning: Boolean = false,
+    val hostsFallbackRunning: Boolean = false,
     val message: String = "",
 )
 
@@ -57,11 +62,29 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
     var busy by remember { mutableStateOf(false) }
     var notice by remember { mutableStateOf("") }
     var chainEnabled by remember(revision) { mutableStateOf(prefs.getBoolean("proxyAdblockChain", true)) }
+    var fallbackEnabled by remember(revision) {
+        mutableStateOf(prefs.getBoolean("proxyAdblockFallbackEnabled", prefs.getBoolean("vpnWanted", false)))
+    }
+    var fallbackMode by remember(revision) {
+        mutableStateOf((prefs.getString("proxyAdblockFallbackMode", adController.protectionMode()) ?: "vpn").let { if (it == "module") "module" else "vpn" })
+    }
+    val vpnPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK && prefs.getBoolean("proxyAdblockFallbackEnabled", false)) {
+            adController.startVpn()
+            notice = "独立 DNS 去广告已启用"
+            revision++
+        } else if (result.resultCode != Activity.RESULT_OK) {
+            prefs.edit().putBoolean("proxyAdblockFallbackEnabled", false).apply()
+            notice = "未获得 VPN 授权，独立去广告保持关闭"
+            revision++
+        }
+    }
 
     val snapshot by produceState(initialValue = ChainSnapshot(), revision) {
         value = try {
             val rules = adController.rulesSnapshot()
             val state = proxyController.state()
+            val independent = adController.homeSnapshot()
             val hits = if (state.running) {
                 runCatching {
                     proxyController.rules().firstOrNull {
@@ -69,11 +92,60 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                     }?.hitCount ?: 0L
                 }.getOrDefault(0L)
             } else 0L
-            ChainSnapshot(rules, state.running, hits, state.message)
+            ChainSnapshot(rules, state.running, hits, independent.vpnRunning, independent.moduleEnabled, state.message)
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (error: Exception) {
             ChainSnapshot(message = error.message ?: "读取广告过滤状态失败")
+        }
+    }
+
+    fun applyFallback(enabled: Boolean, mode: String) {
+        if (busy) return
+        prefs.edit()
+            .putBoolean("proxyAdblockFallbackEnabled", enabled)
+            .putString("proxyAdblockFallbackMode", mode)
+            .putBoolean("autoStartVpn", enabled && mode == "vpn")
+            .apply()
+        fallbackEnabled = enabled
+        fallbackMode = mode
+        if (snapshot.running) {
+            notice = if (enabled) "已保存；Root 代理停止后自动恢复${if (mode == "vpn") "独立 DNS 去广告" else "Root hosts 去广告"}" else "已关闭代理停止后的独立去广告"
+            revision++
+            return
+        }
+        scope.launch {
+            busy = true
+            try {
+                if (!enabled) {
+                    if (snapshot.vpnFallbackRunning || prefs.getBoolean("vpnWanted", false)) adController.stopVpn()
+                    if (snapshot.hostsFallbackRunning) adController.toggleModuleProtection(true)
+                    notice = "独立去广告已关闭"
+                } else if (mode == "vpn") {
+                    if (snapshot.hostsFallbackRunning) adController.toggleModuleProtection(true)
+                    val prepare = adController.prepareVpn()
+                    if (prepare != null) {
+                        busy = false
+                        vpnPermissionLauncher.launch(prepare)
+                        return@launch
+                    }
+                    adController.startVpn()
+                    notice = "独立 DNS 去广告已启用；代理启动时会自动暂停"
+                } else {
+                    if (snapshot.vpnFallbackRunning || prefs.getBoolean("vpnWanted", false)) adController.stopVpn()
+                    if (!snapshot.hostsFallbackRunning) adController.toggleModuleProtection(false)
+                    notice = "Root hosts 去广告已启用；代理启动时会自动暂停"
+                }
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) {
+                notice = error.message ?: "独立去广告切换失败"
+                prefs.edit().putBoolean("proxyAdblockFallbackEnabled", false).apply()
+                fallbackEnabled = false
+            } finally {
+                busy = false
+                revision++
+            }
         }
     }
 
@@ -155,6 +227,53 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                     Text("执行顺序", color = t.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     Text("应用流量 → Root TPROXY / Redirect → 广告 RULE-SET → REJECT → CNIP / 用户规则 / 策略组 → 节点或 DIRECT", color = t.textSecondary, fontSize = 11.sp, lineHeight = 17.sp)
                     Text("代理串联开启时，独立 DNS 去广告会暂停；代理停止后会按原状态恢复。", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+
+        item("fallback") {
+            Surface(shape = RoundedCornerShape(22.dp), color = if (dark) t.elevatedCardBackground else Color.White, shadowElevation = if (dark) 0.dp else 1.dp) {
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(42.dp).background(MaterialTheme.colorScheme.secondary.copy(alpha = .10f), RoundedCornerShape(13.dp)), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Rounded.Dns, null, tint = MaterialTheme.colorScheme.secondary)
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("代理关闭后的独立去广告", color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                            val fallbackState = when {
+                                snapshot.running && fallbackEnabled -> "代理运行中 · 独立模式已暂停"
+                                !fallbackEnabled -> "关闭"
+                                fallbackMode == "vpn" && snapshot.vpnFallbackRunning -> "DNS VPN 正在运行"
+                                fallbackMode == "module" && snapshot.hostsFallbackRunning -> "Root hosts 正在运行"
+                                else -> "已启用 · 等待恢复"
+                            }
+                            Text(fallbackState, color = t.textSecondary, fontSize = 11.sp)
+                        }
+                        Switch(checked = fallbackEnabled, onCheckedChange = { applyFallback(it, fallbackMode) }, enabled = !busy)
+                    }
+                    if (fallbackEnabled) {
+                        HorizontalDivider(color = if (dark) t.outline else Color(0xFFF1F5F9))
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(
+                                selected = fallbackMode == "vpn",
+                                onClick = { if (fallbackMode != "vpn") applyFallback(true, "vpn") },
+                                label = { Text("DNS VPN") },
+                                leadingIcon = { Icon(Icons.Rounded.Dns, null, Modifier.size(16.dp)) },
+                                modifier = Modifier.weight(1f),
+                                enabled = !busy,
+                            )
+                            FilterChip(
+                                selected = fallbackMode == "module",
+                                onClick = { if (fallbackMode != "module") applyFallback(true, "module") },
+                                label = { Text("Root hosts") },
+                                leadingIcon = { Icon(Icons.Rounded.AdminPanelSettings, null, Modifier.size(16.dp)) },
+                                modifier = Modifier.weight(1f),
+                                enabled = !busy,
+                            )
+                        }
+                        Text("只在代理停止时运行；启动 Root 代理会自动暂停，停止代理后按这里的选择恢复。", color = t.textSecondary, fontSize = 10.sp, lineHeight = 15.sp)
+                    }
                 }
             }
         }

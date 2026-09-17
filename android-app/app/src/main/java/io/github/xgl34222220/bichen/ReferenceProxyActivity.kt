@@ -430,7 +430,7 @@ private fun RefHome(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    "BoxProxy",
+                    "辟尘",
                     color = t.textPrimary,
                     fontSize = 22.sp,
                     lineHeight = 28.sp,
