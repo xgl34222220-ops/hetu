@@ -59,6 +59,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.HazeStyle
+import dev.chrisbanes.haze.HazeTint
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
@@ -1369,30 +1371,34 @@ private fun RefPanelGlassHeader(
     // Panel header deliberately uses Haze only. RuntimeShader here crashes on some OEM GPUs.
     val runtimeLiquid = false
     val shape = RoundedCornerShape(28.dp)
-    val shellTint = if (dark) scheme.surface.copy(alpha = .35f) else Color.White.copy(alpha = .36f)
-    val fallbackBrush = if (dark) {
-        Brush.verticalGradient(listOf(Color.White.copy(alpha = .10f), Color.White.copy(alpha = .035f)))
+    // Use a custom page-matched blur style here. The material preset adds too much white tint
+    // on this very light page and turns the whole header into a large white slab.
+    val panelBase = if (dark) scheme.background else Color(0xFFF1F5F9)
+    val panelTint = if (dark) Color.White.copy(alpha = .025f) else Color.White.copy(alpha = .035f)
+    val panelGlassStyle = HazeStyle(
+        backgroundColor = panelBase,
+        tint = HazeTint(panelTint),
+        blurRadius = 22.dp,
+        noiseFactor = .008f,
+    )
+    val glassSheen = if (dark) {
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = .055f), Color.Transparent))
     } else {
-        Brush.verticalGradient(listOf(Color.White.copy(alpha = .23f), Color.White.copy(alpha = .085f)))
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = .075f), Color.Transparent))
     }
-    val hazeModifier = if (!runtimeLiquid) {
-        Modifier.hazeEffect(state = hazeState, style = HazeMaterials.ultraThin()) {
-            blurRadius = 28.dp
-            noiseFactor = .016f
-        }
-    } else Modifier
-    val liquidShellModifier = Modifier.then(hazeModifier).background(fallbackBrush)
+    val hazeModifier = Modifier.hazeEffect(state = hazeState, style = panelGlassStyle)
+    val liquidShellModifier = Modifier.then(hazeModifier).background(glassSheen)
 
 
     Box(
         Modifier
             .fillMaxWidth()
-            .shadow(14.dp, shape, clip = false)
+            .shadow(9.dp, shape, clip = false)
             .squircleClip(28.dp)
             .then(liquidShellModifier)
             .border(
                 if (runtimeLiquid) .45.dp else .7.dp,
-                if (dark) Color.White.copy(alpha = .11f) else Color.White.copy(alpha = .30f),
+                if (dark) Color.White.copy(alpha = .09f) else Color.White.copy(alpha = .20f),
                 shape,
             ),
     ) {
@@ -1474,7 +1480,7 @@ private fun RefPanelHeaderAction(
         colors = if (dark) {
             listOf(Color.White.copy(alpha = .13f), Color.White.copy(alpha = .055f))
         } else {
-            listOf(Color.White.copy(alpha = .34f), Color.White.copy(alpha = .14f))
+            listOf(Color.White.copy(alpha = .16f), Color.White.copy(alpha = .055f))
         },
         center = Offset(.28f, .12f),
     )
@@ -1483,7 +1489,7 @@ private fun RefPanelHeaderAction(
             .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .88f else 1f }
             .shadow(2.dp, shape, clip = false)
             .background(bubbleBrush, shape)
-            .border(.55.dp, Color.White.copy(alpha = if (dark) .12f else .34f), shape)
+            .border(.55.dp, Color.White.copy(alpha = if (dark) .10f else .22f), shape)
             .clip(shape)
             .clickable(interactionSource = source, indication = null, onClick = onClick),
         contentAlignment = Alignment.Center,
@@ -1511,10 +1517,10 @@ private fun RefPanelTabs(
         if (dark) {
             listOf(Color.White.copy(alpha = .075f), Color.White.copy(alpha = .028f))
         } else {
-            listOf(Color.White.copy(alpha = .18f), Color.White.copy(alpha = .065f))
+            listOf(Color.White.copy(alpha = .085f), Color.White.copy(alpha = .028f))
         },
     )
-    val trackBorder = if (dark) Color.White.copy(alpha = .085f) else Color.White.copy(alpha = .24f)
+    val trackBorder = if (dark) Color.White.copy(alpha = .075f) else Color.White.copy(alpha = .15f)
     BoxWithConstraints(
         Modifier.fillMaxWidth().height(38.dp)
             .background(trackBrush, CircleShape)
@@ -1548,7 +1554,7 @@ private fun RefPanelTabs(
         val indicatorTint = scheme.primary.copy(alpha = if (dark) .22f else .13f)
         val lensBrush = Brush.verticalGradient(
             listOf(
-                Color.White.copy(alpha = if (dark) .09f else .30f),
+                Color.White.copy(alpha = if (dark) .07f else .16f),
                 indicatorTint.copy(alpha = (indicatorTint.alpha * 1.08f).coerceAtMost(1f)),
                 indicatorTint.copy(alpha = indicatorTint.alpha * .66f),
             ),
@@ -1560,7 +1566,7 @@ private fun RefPanelTabs(
                 .graphicsLayer { scaleY = 1f - .035f * stretch.value }
                 .shadow(3.dp, indicatorShape, clip = false)
                 .background(lensBrush, indicatorShape)
-                .border(.6.dp, Color.White.copy(alpha = if (dark) .14f else .38f), indicatorShape),
+                .border(.6.dp, Color.White.copy(alpha = if (dark) .12f else .24f), indicatorShape),
         )
         Row(Modifier.fillMaxSize()) {
             tabs.forEach { tab ->
