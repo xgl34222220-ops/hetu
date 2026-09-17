@@ -704,7 +704,6 @@ private fun RefLatencyPanel(baidu: Long?, cloudflare: Long?, google: Long?, test
                         },
                     )
                 }
-                Icon(Icons.Rounded.Tune, null, tint = t.textSecondary, modifier = Modifier.size(17.dp))
             }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 RefLatencyColumn("Baidu", baidu, testing, Modifier.weight(1f))
@@ -732,7 +731,7 @@ private fun RefLatencyColumn(label: String, value: Long?, testing: Boolean, modi
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(label, color = Color(0xFF64748B), fontSize = 11.sp, lineHeight = 15.sp, maxLines = 1)
         Row(
-            Modifier.graphicsLayer { this.alpha = alpha },
+            Modifier.height(22.dp).graphicsLayer { this.alpha = alpha },
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(2.dp),
         ) {
@@ -776,7 +775,7 @@ private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: I
     val valueColor = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A)
     Surface(
         modifier = modifier
-            .height(100.dp)
+            .height(106.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .92f else 1f }
             .clip(shape)
             .clickable(interactionSource = source, indication = null) { lanMode = !lanMode },
@@ -785,7 +784,7 @@ private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: I
         shadowElevation = 1.dp,
     ) {
         Column(
-            Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 12.dp),
+            Modifier.fillMaxSize().padding(14.dp),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -807,6 +806,7 @@ private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: I
                 fontWeight = FontWeight.ExtraBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.height(20.dp),
             )
             Text(
                 if (lanMode) "${runtime.lanInterface} · $connections 连接" else "${countryEmoji(runtime.wanCountryCode)} ${runtime.wanRegion}",
@@ -825,17 +825,17 @@ private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: I
 private fun RefSpeedCard(up: Long, down: Long, modifier: Modifier) {
     val t = LocalBichenTokens.current
     val valueColor = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A)
-    Surface(modifier = modifier.height(100.dp), shape = RoundedCornerShape(20.dp), color = t.cardBackground, shadowElevation = 1.dp) {
+    Surface(modifier = modifier.height(106.dp), shape = RoundedCornerShape(20.dp), color = t.cardBackground, shadowElevation = 1.dp) {
         Column(
-            Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 12.dp),
+            Modifier.fillMaxSize().padding(14.dp),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Text("实时网速", color = Color(0xFF64748B), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().height(20.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("↑ 上行", color = Color(0xFF059669), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                 Text(refSpeed(up), color = valueColor, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
             }
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().height(20.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("↓ 下行", color = Color(0xFF2563EB), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                 Text(refSpeed(down), color = valueColor, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
             }
@@ -857,7 +857,7 @@ private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, modifier: M
     val scale by animateFloatAsState(if (pressed) .96f else 1f, spring(dampingRatio = .74f, stiffness = 560f), label = "subscriptionCompactPress")
     val shape = RoundedCornerShape(20.dp)
     Surface(
-        modifier = modifier.height(100.dp)
+        modifier = modifier.height(106.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .92f else 1f }
             .clip(shape)
             .clickable(interactionSource = source, indication = null) {
@@ -869,7 +869,7 @@ private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, modifier: M
         shadowElevation = 1.dp,
     ) {
         Column(
-            Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 12.dp),
+            Modifier.fillMaxSize().padding(14.dp),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -878,7 +878,7 @@ private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, modifier: M
                     Text("剩余 ${((1f - ratio) * 100f).toInt()}%", Modifier.padding(horizontal = 7.dp, vertical = 2.dp), color = MaterialTheme.colorScheme.primary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
             }
-            Text(if (total > 0L) refBytes(used) else "—", color = valueColor, fontSize = 16.sp, lineHeight = 19.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
+            Text(if (total > 0L) refBytes(used) else "—", color = valueColor, fontSize = 16.sp, lineHeight = 19.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, modifier = Modifier.height(20.dp))
             Box(Modifier.fillMaxWidth().height(4.dp).background(Color(0xFFEFF3F8), CircleShape)) {
                 if (total > 0L && ratio > 0f) {
                     Box(
@@ -887,7 +887,7 @@ private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, modifier: M
                     )
                 }
             }
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().height(18.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("已用流量", color = Color(0xFF94A3B8), fontSize = 11.sp, modifier = Modifier.weight(1f))
                 Text(if (total > 0L) "总 ${refBytes(total)}" else "${items.size} 个订阅", color = Color(0xFF64748B), fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1)
             }
@@ -901,9 +901,9 @@ private fun RefResourceCard(memory: Long, cpuPercent: Float, modifier: Modifier)
     val scheme = MaterialTheme.colorScheme
     val valueColor = if (scheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A)
     val progress = (cpuPercent / 100f).coerceIn(0f, 1f)
-    Surface(modifier = modifier.height(100.dp), shape = RoundedCornerShape(20.dp), color = t.cardBackground, shadowElevation = 1.dp) {
+    Surface(modifier = modifier.height(106.dp), shape = RoundedCornerShape(20.dp), color = t.cardBackground, shadowElevation = 1.dp) {
         Column(
-            Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 12.dp),
+            Modifier.fillMaxSize().padding(14.dp),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -920,11 +920,11 @@ private fun RefResourceCard(memory: Long, cpuPercent: Float, modifier: Modifier)
                     drawCircle(Color(0xFF2563EB).copy(alpha = if (progress > .02f) .22f else .10f), radius = 2.4.dp.toPx())
                 }
             }
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().height(20.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("内存", color = Color(0xFF94A3B8), fontSize = 11.sp, modifier = Modifier.weight(1f))
                 Text(refBytes(memory), color = valueColor, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
             }
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().height(20.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("CPU", color = Color(0xFF94A3B8), fontSize = 11.sp, modifier = Modifier.weight(1f))
                 Text(String.format(java.util.Locale.US, "%.1f%%", cpuPercent), color = valueColor, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
             }
@@ -2018,11 +2018,16 @@ private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolea
             }
             RefGroupCornerVisual(group, Modifier.size(27.dp))
             Spacer(Modifier.width(3.dp))
+            val arrowRotation by animateFloatAsState(
+                targetValue = if (expanded) 180f else 0f,
+                animationSpec = spring(dampingRatio = .76f, stiffness = 420f),
+                label = "groupArrow${group.name}",
+            )
             Icon(
-                if (expanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
+                Icons.Rounded.KeyboardArrowDown,
                 if (expanded) "收起" else "展开",
                 tint = if (expanded) Color(0xFF002FA7) else Color(0xFF94A3B8),
-                modifier = Modifier.size(15.dp),
+                modifier = Modifier.size(15.dp).graphicsLayer { rotationZ = arrowRotation },
             )
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -2063,25 +2068,30 @@ private fun RefInlineGroupExpansion(
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val shape = RoundedCornerShape(22.dp)
     val wellColor = if (dark) Color(0xFF18212E) else Color(0xFFEEF2F6)
-    val wellBorder = if (dark) Color.White.copy(alpha = .08f) else Color(0xFFCBD5E1).copy(alpha = .52f)
+    val wellBorder = if (dark) Color.White.copy(alpha = .08f) else Color(0xFFCBD5E1).copy(alpha = .62f)
+    val wellBrush = if (dark) {
+        Brush.verticalGradient(listOf(Color(0xFF141C27), wellColor, Color(0xFF202A37)))
+    } else {
+        Brush.verticalGradient(listOf(Color(0xFFE7EDF4), wellColor, Color(0xFFF2F5F8)))
+    }
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = shape,
-        color = wellColor,
+        color = Color.Transparent,
         border = BorderStroke(.8.dp, wellBorder),
         shadowElevation = 0.dp,
         tonalElevation = 0.dp,
     ) {
         Column(
-            Modifier.fillMaxWidth().padding(12.dp),
+            Modifier.fillMaxWidth().background(wellBrush, shape).padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(9.dp),
         ) {
             // A thin top compression line gives the well a visual inset without a second white shell.
             Box(
-                Modifier.fillMaxWidth().height(2.dp)
+                Modifier.fillMaxWidth().height(3.dp)
                     .background(
                         Brush.horizontalGradient(
-                            listOf(Color.Transparent, Color(0xFF0F172A).copy(alpha = if (dark) .18f else .07f), Color.Transparent),
+                            listOf(Color.Transparent, Color(0xFF0F172A).copy(alpha = if (dark) .20f else .10f), Color.Transparent),
                         ),
                         CircleShape,
                     ),
@@ -2160,7 +2170,7 @@ private fun RefInlineNodeCard(
     val backgroundBrush = when {
         dark && active -> Brush.verticalGradient(listOf(Color(0xFF172554), Color(0xFF111C38)))
         dark -> Brush.verticalGradient(listOf(Color(0xFF242E3C), Color(0xFF202936)))
-        active -> Brush.verticalGradient(listOf(Color(0xFFF8FBFF), Color(0xFFEEF6FF)))
+        active -> Brush.verticalGradient(listOf(Color(0xFFF7FBFF), Color(0xFFEFF6FF)))
         else -> Brush.verticalGradient(listOf(Color.White, Color.White))
     }
     val borderColor = when {
@@ -2169,7 +2179,7 @@ private fun RefInlineNodeCard(
         active -> Color(0xFFBFDBFE)
         else -> Color.White.copy(alpha = .88f)
     }
-    Box(modifier.height(64.dp)) {
+    Box(modifier.height(62.dp)) {
         androidx.compose.animation.AnimatedVisibility(
             visible = revealed,
             modifier = Modifier.fillMaxSize(),
@@ -2533,6 +2543,48 @@ private fun RefTrafficOverview(state: ProxyComposeState) {
                 }
             }
         }
+        val tcpCount = state.connections.count { it.network.contains("tcp", ignoreCase = true) }
+        val udpCount = state.connections.count { it.network.contains("udp", ignoreCase = true) }
+        val protocolCount = tcpCount + udpCount
+        val tcpPercent = if (protocolCount > 0) (tcpCount * 100 / protocolCount) else 0
+        val udpPercent = if (protocolCount > 0) (udpCount * 100 / protocolCount) else 0
+        val tcpRatio = if (protocolCount > 0) tcpCount.toFloat() / protocolCount.toFloat() else 0f
+        val inboundCount = state.connections.count { it.inbound.isNotBlank() }
+        val routedHits = state.connections.count { it.rule.isNotBlank() || it.chain.isNotBlank() }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Surface(
+                modifier = Modifier.weight(1f).height(92.dp),
+                shape = RoundedCornerShape(18.dp),
+                color = t.cardBackground,
+                shadowElevation = 1.dp,
+            ) {
+                Column(Modifier.fillMaxSize().padding(13.dp), verticalArrangement = Arrangement.SpaceBetween) {
+                    Text("连接协议", color = Color(0xFF94A3B8), fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                    Text("TCP $tcpPercent%  ·  UDP $udpPercent%", color = t.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
+                    Box(Modifier.fillMaxWidth().height(5.dp).background(Color(0xFFE2E8F0), CircleShape)) {
+                        if (protocolCount > 0) {
+                            Row(Modifier.fillMaxSize().clip(CircleShape)) {
+                                if (tcpCount > 0) Box(Modifier.weight(tcpRatio.coerceAtLeast(.01f)).fillMaxHeight().background(Color(0xFF2563EB)))
+                                if (udpCount > 0) Box(Modifier.weight((1f - tcpRatio).coerceAtLeast(.01f)).fillMaxHeight().background(Color(0xFF10B981)))
+                            }
+                        }
+                    }
+                }
+            }
+            Surface(
+                modifier = Modifier.weight(1f).height(92.dp),
+                shape = RoundedCornerShape(18.dp),
+                color = t.cardBackground,
+                shadowElevation = 1.dp,
+            ) {
+                Column(Modifier.fillMaxSize().padding(13.dp), verticalArrangement = Arrangement.SpaceBetween) {
+                    Text("活动会话", color = Color(0xFF94A3B8), fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                    Text(state.connections.size.toString(), color = Color(0xFF002FA7), fontSize = 22.sp, lineHeight = 25.sp, fontWeight = FontWeight.Black)
+                    Text("入站 $inboundCount  ·  分流命中 $routedHits", color = Color(0xFF64748B), fontSize = 10.sp, lineHeight = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+                }
+            }
+        }
+
     }
 }
 
@@ -2648,15 +2700,40 @@ private fun refExpireDate(expire: Long): String {
 @Composable
 private fun RefConnectionRow(item: ProxyConnectionUi, onClose: (() -> Unit)?) {
     val t = LocalBichenTokens.current
+    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
+    val closeSource = remember(item.id) { MutableInteractionSource() }
+    val closePressed by closeSource.collectIsPressedAsState()
+    val closeScale by animateFloatAsState(
+        targetValue = if (closePressed) .88f else 1f,
+        animationSpec = spring(dampingRatio = .70f, stiffness = 650f),
+        label = "closeConnectionPress${item.id}",
+    )
     Surface(shape = RoundedCornerShape(16.dp), color = t.cardBackground, shadowElevation = 0.dp) {
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-  Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-      Text(item.host, color = t.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-      Text(listOf(item.network, item.inbound).filter { it.isNotBlank() }.joinToString(" · "), color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1)
-      Text(item.chain.ifBlank { item.rule.ifBlank { "DIRECT" } }, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-      Text("↑ ${refBytes(item.upload)}   ↓ ${refBytes(item.download)}", color = t.textMuted, style = MaterialTheme.typography.labelSmall)
-  }
-  if (onClose != null) IconButton(onClick = onClose) { Icon(Icons.Rounded.Close, "终止连接", tint = t.danger) }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(item.host, color = t.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(listOf(item.network, item.inbound).filter { it.isNotBlank() }.joinToString(" · "), color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                Text(item.chain.ifBlank { item.rule.ifBlank { "DIRECT" } }, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("↑ ${refBytes(item.upload)}   ↓ ${refBytes(item.download)}", color = t.textMuted, style = MaterialTheme.typography.labelSmall)
+            }
+            if (onClose != null) {
+                Spacer(Modifier.width(8.dp))
+                Box(
+                    Modifier.size(28.dp)
+                        .graphicsLayer { scaleX = closeScale; scaleY = closeScale }
+                        .background(if (dark) Color.White.copy(alpha = .07f) else Color(0xFFF1F5F9).copy(alpha = .82f), CircleShape)
+                        .clip(CircleShape)
+                        .clickable(interactionSource = closeSource, indication = null, onClick = onClose),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Rounded.Close,
+                        "终止连接",
+                        tint = if (closePressed) t.danger else Color(0xFF64748B),
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
         }
     }
 }
@@ -2670,7 +2747,7 @@ private fun RefRuleGroupCard(items: List<ProxyRuleUi>) {
         shape = shape,
         color = t.cardBackground,
         border = BorderStroke(.7.dp, if (dark) t.outline.copy(alpha = .32f) else Color(0xFFF1F5F9)),
-        shadowElevation = if (dark) 0.dp else 3.dp,
+        shadowElevation = if (dark) 0.dp else 1.dp,
     ) {
         Column(Modifier.fillMaxWidth()) {
             items.forEachIndexed { index, item ->
@@ -2719,7 +2796,7 @@ private fun RefRuleGroupCard(items: List<ProxyRuleUi>) {
                 if (index != items.lastIndex) {
                     HorizontalDivider(
                         modifier = Modifier.padding(horizontal = 14.dp),
-                        thickness = 1.dp,
+                        thickness = .5.dp,
                         color = if (dark) t.outline.copy(alpha = .28f) else Color(0xFFF1F5F9).copy(alpha = .84f),
                     )
                 }

@@ -8,6 +8,10 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -24,9 +28,11 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -380,23 +386,47 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                             Text("保存后重启代理生效", color = tokens.textSecondary, fontSize = 10.sp)
                         }
                     }
-                    OutlinedTextField(
-                        value = yamlText,
-                        onValueChange = { yamlText = it; yamlError = "" },
+                    val editorScroll = rememberScrollState()
+                    val editorHorizontalScroll = rememberScrollState()
+                    val lineCount = remember(yamlText) { maxOf(1, yamlText.count { it == '\n' } + 1) }
+                    Surface(
                         modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 16.dp, vertical = 8.dp),
-                        textStyle = MaterialTheme.typography.bodySmall.copy(
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 13.sp,
-                            lineHeight = 20.sp,
-                        ),
                         shape = editorShape,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = tokens.cardBackground,
-                            unfocusedContainerColor = tokens.cardBackground,
-                            focusedBorderColor = scheme.primary.copy(alpha = .34f),
-                            unfocusedBorderColor = tokens.outline.copy(alpha = .55f),
-                        ),
-                    )
+                        color = if (dark) tokens.cardBackground else Color(0xFFF8FAFC),
+                        border = BorderStroke(.7.dp, if (dark) tokens.outline.copy(alpha = .42f) else Color(0xFFE2E8F0)),
+                        tonalElevation = 0.dp,
+                    ) {
+                        Row(
+                            Modifier.fillMaxSize().verticalScroll(editorScroll),
+                            verticalAlignment = Alignment.Top,
+                        ) {
+                            Text(
+                                (1..lineCount).joinToString("\n"),
+                                modifier = Modifier.width(44.dp)
+                                    .background(if (dark) Color.White.copy(alpha = .035f) else Color(0xFFF1F5F9))
+                                    .padding(top = 12.dp, end = 9.dp, bottom = 12.dp),
+                                color = if (dark) tokens.textMuted else Color(0xFF94A3B8),
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
+                                lineHeight = 21.sp,
+                                textAlign = TextAlign.End,
+                            )
+                            BasicTextField(
+                                value = yamlText,
+                                onValueChange = { yamlText = it; yamlError = "" },
+                                modifier = Modifier.weight(1f)
+                                    .horizontalScroll(editorHorizontalScroll)
+                                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                                textStyle = MaterialTheme.typography.bodySmall.copy(
+                                    color = tokens.textPrimary,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 13.sp,
+                                    lineHeight = 21.sp,
+                                ),
+                                cursorBrush = SolidColor(scheme.primary),
+                            )
+                        }
+                    }
                     if (yamlError.isNotBlank()) {
                         Text(
                             yamlError,

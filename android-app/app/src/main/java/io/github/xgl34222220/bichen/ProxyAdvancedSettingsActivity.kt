@@ -125,16 +125,31 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
                     Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回", tint = t.textPrimary)
                 }
                 Spacer(Modifier.width(4.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("高级代理配置", color = t.textPrimary, fontSize = 24.sp, lineHeight = 30.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("Root 数据面 · 修改后重启代理生效", color = t.textSecondary, fontSize = 11.sp)
-                }
+                Text(
+                    "高级代理配置",
+                    color = t.textPrimary,
+                    fontSize = 22.sp,
+                    lineHeight = 28.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
 
         item { AdvancedSectionLabel("流量接管") }
         item {
             AdvancedGroup {
+                Text(
+                    "Root 数据面 · 修改后重启代理生效",
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+                    color = t.textSecondary,
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+                AdvancedDivider()
                 AdvancedValueRow(Icons.Rounded.Memory, Color(0xFF334155), "运行核心", profile.core.label) {
                     showChoices("运行核心", "proxyBaseCore", listOf(
                         AdvancedChoice("Mihomo", "mihomo"),

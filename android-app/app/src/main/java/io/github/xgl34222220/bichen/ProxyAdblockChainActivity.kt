@@ -346,9 +346,25 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
 @Composable
 private fun ChainMetric(label: String, value: String, modifier: Modifier = Modifier) {
     val t = LocalBichenTokens.current
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(value, color = t.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-        Text(label, color = t.textSecondary, fontSize = 10.sp)
+    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
+    val accent = when (label) {
+        "规则源" -> Color(0xFF059669)
+        else -> Color(0xFF002FA7)
+    }
+    Surface(
+        modifier = modifier.height(64.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = if (dark) t.controlBackground.copy(alpha = .72f) else Color(0xFFF8FAFC),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+    ) {
+        Column(
+            Modifier.fillMaxSize().padding(horizontal = 11.dp, vertical = 9.dp),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(value, color = accent, fontSize = 18.sp, lineHeight = 21.sp, fontWeight = FontWeight.Black, maxLines = 1)
+            Text(label, color = t.textSecondary, fontSize = 10.sp, lineHeight = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+        }
     }
 }
 
