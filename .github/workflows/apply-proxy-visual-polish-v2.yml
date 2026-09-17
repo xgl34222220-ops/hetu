@@ -18,20 +18,22 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Apply test47 native dashboard polish
+      - name: Apply test48 Root startup fix and native dashboard polish
         run: |
           python3 scripts/run_native_dashboard_test47.py
           python3 scripts/fix_test47_scoped_terminal_and_imports.py
+          python3 scripts/fix_test48_root_shell_scope.py
 
-      - name: Commit test47 polish
+      - name: Commit test48 runtime fix
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add \
+            android-app/app/src/main/assets/proxy-root-v3.sh \
             android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt \
             android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxySubscriptionActivity.kt
           if ! git diff --cached --quiet; then
-            git commit -m 'Polish Bichen dashboard lifecycle and YAML editor'
+            git commit -m 'Fix Bichen Root launch scope and keep dashboard polish'
             git push
           fi
 
@@ -72,13 +74,14 @@ jobs:
       - name: Build APK
         working-directory: android-app
         run: gradle :app:assembleDebug --stacktrace
-      - name: Verify APK and test47 invariants
+      - name: Verify APK and test48 invariants
         run: |
           set -euo pipefail
           APK=android-app/app/build/outputs/apk/debug/app-debug.apk
           UI=android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
           SUB=android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxySubscriptionActivity.kt
           DOCK=android-app/app/src/main/java/io/github/xgl34222220/bichen/ui/BichenGlassDock.kt
+          ROOT=android-app/app/src/main/assets/proxy-root-v3.sh
           test -f "$APK"
           unzip -t "$APK" >/dev/null
           unzip -l "$APK" | grep -q 'lib/arm64-v8a/libbichen_core.so'
@@ -105,10 +108,18 @@ jobs:
           grep -q 'lineHeight = 20.sp' "$SUB"
           grep -q 'navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp)' "$SUB"
 
+          sh -n "$ROOT"
+          grep -q 'START_BIN="$1"; START_CFG="$2"; START_MODE="$3"' "$ROOT"
+          grep -q '"$START_BIN" -d "$RUN" -f "$START_CFG"' "$ROOT"
+          grep -q 'wait_ready "$START_PID" "$START_MODE"' "$ROOT"
+          grep -q 'start_watchdog "$START_PID"' "$ROOT"
+          grep -q 'STATUS_RUNNING=false; STATUS_PID=0' "$ROOT"
+          grep -q 'STATUS_MODE=$(cat "$MODEFILE"' "$ROOT"
+
           test "$(git rev-parse HEAD:$DOCK)" = '7efba3c815e6429fcc35df87dc91f5be968111c6'
       - uses: actions/upload-artifact@v4
         with:
-          name: Bichen-0.4.0-test.47-Bichen-Native-Dashboard
+          name: Bichen-0.4.0-test.48-Root-Startup-Fix
           path: android-app/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
