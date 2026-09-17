@@ -1,1 +1,1 @@
-2026-09-17 test33 layout polish: cold-gray canvas, unclipped metrics, compact strategy cards, bottom-sheet port details
+2026-09-17 test34 BoxProxy full page parity: home proxies overview subscriptions rules rule-sets tools settings
