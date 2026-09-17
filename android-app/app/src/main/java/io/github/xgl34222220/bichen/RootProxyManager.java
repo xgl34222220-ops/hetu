@@ -9,6 +9,7 @@ import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
+import java.util.concurrent.locks.ReentrantLock;
 
 /** Root transparent-proxy control plane plus private localhost Clash API bootstrap. */
 final class RootProxyManager {
@@ -16,6 +17,7 @@ final class RootProxyManager {
     private static final String BIN=ROOT+"/bin/core";
     private static final String CONFIG=ROOT+"/run/state/startup-config";
     private static final String SCRIPT=ROOT+"/proxy-root.sh";
+    private static final ReentrantLock CONTROL_LOCK=new ReentrantLock(true);
     private final Context context;
     private final SharedPreferences prefs;
     private final ProxyCoreStore cores;
@@ -66,8 +68,10 @@ final class RootProxyManager {
     private int chooseControllerPort()throws IOException{
         int preferred=prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT);
         LinkedHashSet<Integer> candidates=new LinkedHashSet<>();
+        int span=60;
+        int start=(int)(Math.abs(System.nanoTime())%span);
+        for(int offset=0;offset<span;offset++)candidates.add(29090+((start+offset)%span));
         if(preferred>=29090&&preferred<=29149)candidates.add(preferred);
-        for(int port=29090;port<=29149;port++)candidates.add(port);
         for(int port:candidates){
             try(ServerSocket socket=new ServerSocket()){
                 socket.setReuseAddress(false);
@@ -114,7 +118,15 @@ final class RootProxyManager {
 
     JSONObject start(ProxyRuntimeProfile p)throws Exception{return start(p,null);}
     JSONObject start(ProxyRuntimeProfile profile,Progress progress)throws Exception{
-        stage(progress,"检查配置、应用范围与绕过策略…");
+        CONTROL_LOCK.lock();
+        try{
+            JSONObject existing=status();
+            if(existing.optBoolean("running",false)){
+                prefs.edit().putBoolean("proxyRootWanted",true).apply();
+                existing.put("ok",true).put("alreadyRunning",true).put("message","Root 代理已在运行，已忽略重复启动请求");
+                return existing;
+            }
+            stage(progress,"检查配置、应用范围与绕过策略…");
         Prepared p;
         try{
             p=prepare(profile);
@@ -225,16 +237,24 @@ final class RootProxyManager {
         if(!warning.isEmpty())result.put("warning",warning);
         prefs.edit().putBoolean("proxyRootWanted",true).apply();
         return result;
+        }finally{
+            CONTROL_LOCK.unlock();
+        }
     }
 
     JSONObject stop()throws Exception{return stop(null);}
     JSONObject stop(Progress progress)throws Exception{
-        stage(progress,"停止守护、Kill Switch、核心并回滚透明代理规则…");
-        JSONObject r=runJsonAllowMissing("stop",new JSONObject().put("ok",true).put("running",false).put("state","idle").put("message","Root 代理未运行"));
-        ProxyAdblockCoordinator.exit(context);
-        stage(progress,"网络规则、广告过滤接管与临时 IPv6 状态已恢复");
-        prefs.edit().putBoolean("proxyRootWanted",false).apply();
-        return r;
+        CONTROL_LOCK.lock();
+        try{
+            stage(progress,"停止守护、Kill Switch、核心并回滚透明代理规则…");
+            JSONObject r=runJsonAllowMissing("stop",new JSONObject().put("ok",true).put("running",false).put("state","idle").put("message","Root 代理未运行"));
+            ProxyAdblockCoordinator.exit(context);
+            stage(progress,"网络规则、广告过滤接管与临时 IPv6 状态已恢复");
+            prefs.edit().putBoolean("proxyRootWanted",false).apply();
+            return r;
+        }finally{
+            CONTROL_LOCK.unlock();
+        }
     }
     JSONObject status()throws Exception{
         return runJsonAllowMissing("status",new JSONObject().put("ok",true).put("running",false).put("state","idle").put("message","尚未启动"));

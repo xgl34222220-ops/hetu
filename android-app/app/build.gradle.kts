@@ -23,8 +23,8 @@ android {
         applicationId = "io.github.xgl34222220.bichen"
         minSdk = 26
         targetSdk = 35
-        versionCode = 446
-        versionName = "0.4.0-test.46"
+        versionCode = 447
+        versionName = "0.4.0-test.47"
     }
 
     buildFeatures {
