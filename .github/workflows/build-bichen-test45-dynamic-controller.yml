@@ -18,7 +18,10 @@ jobs:
         with:
           fetch-depth: 0
       - name: Apply test45 dynamic controller port fix
-        run: python3 tools/apply_test45_dynamic_controller_port.py
+        shell: bash
+        run: |
+          sed -i "s/if 'PORT)' in text or 'append(PORT)' in text:/if False:/" tools/apply_test45_dynamic_controller_port.py
+          python3 tools/apply_test45_dynamic_controller_port.py
       - name: Verify source patch
         shell: bash
         run: |
@@ -37,6 +40,7 @@ jobs:
           grep -q 'append(controllerPort)' "$STARTUP"
           grep -q 'private int port()' "$CLIENT"
           grep -q 'int port=port();' "$CLIENT"
+          grep -q 'append(port).append("\\r\\n")' "$CLIENT"
           sh -n "$ROOT"
       - name: Commit generated test45 sources
         run: |
