@@ -5,9 +5,12 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -140,7 +143,7 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
             start = 16.dp,
             top = 8.dp,
             end = 16.dp,
-            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 28.dp,
+            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 40.dp,
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -518,34 +521,184 @@ private fun AdvancedChoiceSheet(title: String, values: List<AdvancedChoice>, cur
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SetEditorDialog(state: SetEditorState, onDismiss: () -> Unit, onSave: (String) -> Unit) {
     var text by remember(state) { mutableStateOf(state.value) }
-    AlertDialog(
+    val t = LocalBichenTokens.current
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        title = { Text(state.title) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(state.hint, color = LocalBichenTokens.current.textSecondary, fontSize = 12.sp)
-                OutlinedTextField(value = text, onValueChange = { text = it }, modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp, max = 320.dp), minLines = 6)
-            }
+        containerColor = t.elevatedCardBackground,
+        tonalElevation = 0.dp,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        dragHandle = {
+            Box(
+                Modifier.padding(top = 10.dp, bottom = 6.dp).size(width = 36.dp, height = 4.dp)
+                    .background(Color(0xFFCBD5E1), CircleShape),
+            )
         },
-        confirmButton = { TextButton(onClick = { onSave(text) }) { Text("保存") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
-    )
+    ) {
+        Column(
+            Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(state.title, color = t.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+            Text(state.hint, color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 190.dp, max = 360.dp),
+                minLines = 7,
+                shape = RoundedCornerShape(18.dp),
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                FilledTonalButton(onClick = onDismiss, modifier = Modifier.weight(1f).height(44.dp), shape = CircleShape) {
+                    Text("取消", fontWeight = FontWeight.Bold)
+                }
+                Button(onClick = { onSave(text) }, modifier = Modifier.weight(1f).height(44.dp), shape = CircleShape) {
+                    Text("保存", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
 }
+
+private fun advancedYamlPreview(text: String): androidx.compose.ui.text.AnnotatedString =
+    androidx.compose.ui.text.buildAnnotatedString {
+        val cyan = Color(0xFF38BDF8)
+        val lime = Color(0xFFA3E635)
+        val comment = Color(0xFF64748B)
+        val normal = Color(0xFFE2E8F0)
+        val lines = text.lines()
+        lines.forEachIndexed { index, line ->
+            val trimmed = line.trimStart()
+            val indent = line.take(line.length - trimmed.length)
+            append(indent)
+            when {
+                trimmed.startsWith("#") -> {
+                    pushStyle(androidx.compose.ui.text.SpanStyle(color = comment))
+                    append(trimmed)
+                    pop()
+                }
+                trimmed.startsWith("- ") -> {
+                    pushStyle(androidx.compose.ui.text.SpanStyle(color = normal))
+                    append("- ")
+                    pop()
+                    val hash = trimmed.indexOf('#', 2)
+                    val value = if (hash >= 0) trimmed.substring(2, hash) else trimmed.substring(2)
+                    pushStyle(androidx.compose.ui.text.SpanStyle(color = lime))
+                    append(value)
+                    pop()
+                    if (hash >= 0) {
+                        pushStyle(androidx.compose.ui.text.SpanStyle(color = comment))
+                        append(trimmed.substring(hash))
+                        pop()
+                    }
+                }
+                ':' in trimmed -> {
+                    val colon = trimmed.indexOf(':')
+                    pushStyle(androidx.compose.ui.text.SpanStyle(color = cyan))
+                    append(trimmed.substring(0, colon + 1))
+                    pop()
+                    val rest = trimmed.substring(colon + 1)
+                    val hash = rest.indexOf('#')
+                    val value = if (hash >= 0) rest.substring(0, hash) else rest
+                    pushStyle(androidx.compose.ui.text.SpanStyle(color = lime))
+                    append(value)
+                    pop()
+                    if (hash >= 0) {
+                        pushStyle(androidx.compose.ui.text.SpanStyle(color = comment))
+                        append(rest.substring(hash))
+                        pop()
+                    }
+                }
+                else -> {
+                    pushStyle(androidx.compose.ui.text.SpanStyle(color = normal))
+                    append(trimmed)
+                    pop()
+                }
+            }
+            if (index != lines.lastIndex) append('\n')
+        }
+    }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AdvancedInfoSheet(title: String, text: String, onDismiss: () -> Unit) {
     val t = LocalBichenTokens.current
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = t.elevatedCardBackground, tonalElevation = 0.dp, shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(title, color = t.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            Surface(shape = RoundedCornerShape(16.dp), color = t.controlBackground.copy(alpha = .55f)) {
-                Text(text, Modifier.fillMaxWidth().padding(14.dp), color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+    val codePreview = title == "启动配置"
+    val highlighted = remember(text, codePreview) { if (codePreview) advancedYamlPreview(text) else null }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = if (codePreview) Color(0xFF0B1220) else t.elevatedCardBackground,
+        contentColor = if (codePreview) Color(0xFFE2E8F0) else t.textPrimary,
+        tonalElevation = 0.dp,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        dragHandle = {
+            Box(
+                Modifier.padding(top = 10.dp, bottom = 6.dp).size(width = 36.dp, height = 4.dp)
+                    .background(if (codePreview) Color(0xFF334155) else Color(0xFFCBD5E1), CircleShape),
+            )
+        },
+    ) {
+        Column(
+            Modifier.fillMaxWidth().fillMaxHeight(if (codePreview) .82f else .62f)
+                .navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(title, color = if (codePreview) Color(0xFFF8FAFC) else t.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            if (codePreview) {
+                val lines = remember(text) { maxOf(1, text.count { it == '\n' } + 1) }
+                val vScroll = androidx.compose.foundation.rememberScrollState()
+                Surface(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    shape = RoundedCornerShape(18.dp),
+                    color = Color(0xFF0F172A),
+                    border = BorderStroke(.7.dp, Color(0xFF334155)),
+                ) {
+                    Row(Modifier.fillMaxSize().verticalScroll(vScroll)) {
+                        Text(
+                            (1..lines).joinToString("\n"),
+                            modifier = Modifier.width(44.dp).background(Color(0xFF111827))
+                                .padding(top = 12.dp, end = 8.dp, bottom = 12.dp),
+                            color = Color(0xFF475569),
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            fontSize = 10.sp,
+                            lineHeight = 18.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                        )
+                        Box(Modifier.width(1.dp).fillMaxHeight().background(Color(0xFF334155)))
+                        Text(
+                            highlighted ?: androidx.compose.ui.text.AnnotatedString(text),
+                            modifier = Modifier.weight(1f)
+                                .horizontalScroll(androidx.compose.foundation.rememberScrollState())
+                                .padding(horizontal = 12.dp, vertical = 12.dp),
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            lineHeight = 18.sp,
+                            softWrap = false,
+                        )
+                    }
+                }
+            } else {
+                Surface(shape = RoundedCornerShape(16.dp), color = t.controlBackground.copy(alpha = .55f)) {
+                    Text(
+                        text,
+                        Modifier.fillMaxWidth().padding(14.dp)
+                            .verticalScroll(androidx.compose.foundation.rememberScrollState()),
+                        color = t.textSecondary,
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp,
+                    )
+                }
             }
-            Text("下滑即可关闭", color = Color(0xFF94A3B8), fontSize = 10.sp, fontWeight = FontWeight.Medium, modifier = Modifier.align(Alignment.CenterHorizontally))
+            Text(
+                "下滑即可关闭",
+                color = Color(0xFF94A3B8),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            )
         }
     }
 }

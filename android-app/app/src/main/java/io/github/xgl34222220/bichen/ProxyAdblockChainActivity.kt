@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -56,6 +58,16 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
     val adController = remember { BichenComposeController(context) }
     val proxyController = remember { ProxyComposeController(context) }
     val scope = rememberCoroutineScope()
+    val updateView = androidx.compose.ui.platform.LocalView.current
+    val updateSpinTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "adblockUpdateSpin")
+    val updateSpin by updateSpinTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            androidx.compose.animation.core.tween(760, easing = androidx.compose.animation.core.LinearEasing),
+        ),
+        label = "adblockUpdateSpinValue",
+    )
     val t = LocalBichenTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val pageBg = if (dark) t.pageBackground else Color(0xFFF1F5F9)
@@ -370,14 +382,18 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                             busy = true
                             updatingRules = true
                             updateSuccess = false
+                            val startedAt = android.os.SystemClock.elapsedRealtime()
                             val result = runCatching { adController.updateRules() }
+                            val elapsed = android.os.SystemClock.elapsedRealtime() - startedAt
+                            if (elapsed < 650L) kotlinx.coroutines.delay(650L - elapsed)
                             updatingRules = false
                             result
                                 .onSuccess {
                                     notice = "$it；代理运行中时请重启代理应用新快照"
                                     revision++
                                     updateSuccess = true
-                                    kotlinx.coroutines.delay(900)
+                                    updateView.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
+                                    kotlinx.coroutines.delay(1100)
                                     updateSuccess = false
                                 }
                                 .onFailure { notice = it.message ?: "规则更新失败" }
@@ -396,11 +412,16 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                     ),
                 ) {
                     when {
-                        updatingRules -> CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
+                        updatingRules -> Icon(
+                            Icons.Rounded.Sync,
+                            "正在更新",
+                            modifier = Modifier.size(19.dp).graphicsLayer { rotationZ = updateSpin },
+                            tint = Color.White,
+                        )
                         updateSuccess -> {
                             Icon(Icons.Rounded.Check, null, modifier = Modifier.size(19.dp))
                             Spacer(Modifier.width(7.dp))
-                            Text("更新完成", fontWeight = FontWeight.Bold)
+                            Text("已是最新", fontWeight = FontWeight.Bold)
                         }
                         else -> {
                             Icon(Icons.Rounded.Sync, null, modifier = Modifier.size(19.dp))

@@ -13,7 +13,7 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
-import androidx.activity.OnBackPressedCallback
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
@@ -75,6 +75,7 @@ private fun ProxyWebUiScreen(onClose: () -> Unit) {
     var progress by remember { mutableIntStateOf(0) }
     var generation by remember { mutableIntStateOf(0) }
     var forceRepair by remember { mutableStateOf(false) }
+    var canGoBack by remember { mutableStateOf(false) }
     val skeletonTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "webSkeletonShimmer")
     val skeletonX by skeletonTransition.animateFloat(
         initialValue = -1f,
@@ -142,8 +143,14 @@ private fun ProxyWebUiScreen(onClose: () -> Unit) {
                     }
                 }
 
+                override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
+                    super.doUpdateVisitedHistory(view, url, isReload)
+                    canGoBack = view?.canGoBack() == true
+                }
+
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
+                    canGoBack = view?.canGoBack() == true
                     if (!url.isNullOrBlank() && url.startsWith("http://127.0.0.1:${MihomoStartupConfig.CONTROLLER_PORT}/ui/")) {
                         pageError = ""
                         progress = 100
@@ -175,15 +182,11 @@ private fun ProxyWebUiScreen(onClose: () -> Unit) {
         }
     }
 
+    BackHandler(enabled = canGoBack) {
+        webView.goBack()
+    }
     DisposableEffect(webView) {
-        val callback = object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                if (webView.canGoBack()) webView.goBack() else onClose()
-            }
-        }
-        (context as? ComponentActivity)?.onBackPressedDispatcher?.addCallback(callback)
         onDispose {
-            callback.remove()
             webView.stopLoading()
             webView.destroy()
         }

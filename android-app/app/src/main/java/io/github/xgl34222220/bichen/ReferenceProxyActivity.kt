@@ -62,6 +62,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.HazeTint
@@ -864,14 +865,18 @@ private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: I
                     Icon(Icons.Rounded.SwapHoriz, "切换 LAN/WAN", tint = Color(0xFF2563EB), modifier = Modifier.size(14.dp))
                 }
             }
-            Column(
-                Modifier.fillMaxWidth().graphicsLayer {
-                    rotationY = flip.value
-                    cameraDistance = 18f * density
-                    alpha = .94f + .06f * (1f - kotlin.math.abs(flip.value) / 90f)
-                },
-                verticalArrangement = Arrangement.spacedBy(2.dp),
+            Box(
+                Modifier.fillMaxWidth().height(42.dp),
+                contentAlignment = Alignment.CenterStart,
             ) {
+                Column(
+                    Modifier.fillMaxWidth().widthIn(min = 130.dp).graphicsLayer {
+                        rotationY = flip.value
+                        cameraDistance = 18f * density
+                        alpha = .94f + .06f * (1f - kotlin.math.abs(flip.value) / 90f)
+                    },
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
                 Text(
                     if (renderedLan) runtime.lanAddress else runtime.wanAddress,
                     color = valueColor,
@@ -880,7 +885,7 @@ private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: I
                     fontWeight = FontWeight.ExtraBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.height(20.dp),
+                    modifier = Modifier.fillMaxWidth().height(20.dp),
                 )
                 Text(
                     if (renderedLan) "${runtime.lanInterface} · $connections 连接"
@@ -891,8 +896,9 @@ private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: I
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.height(18.dp),
+                    modifier = Modifier.fillMaxWidth().height(18.dp),
                 )
+                }
             }
         }
     }
@@ -2107,16 +2113,16 @@ private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolea
     Column(
         modifier
             .height(86.dp)
+            .zIndex(1f)
             .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .95f else 1f }
-            .shadow(if (expanded) 5.dp else 3.dp, shape, clip = false)
+            .shadow(if (expanded) 4.dp else 2.dp, shape, clip = false)
             .background(premiumBrush, shape)
             .border(
-                if (expanded) 1.4.dp else .8.dp,
-                if (expanded) Color(0xFF002FA7).copy(alpha = .64f) else Color.White.copy(alpha = if (dark) .10f else .92f),
+                if (expanded) 1.25.dp else .8.dp,
+                if (expanded) Color(0xFF002FA7).copy(alpha = .58f) else Color.White.copy(alpha = if (dark) .10f else .92f),
                 shape,
             )
-            .clip(shape)
-            .padding(start = 14.dp, top = 11.dp, end = 13.dp, bottom = 10.dp),
+            .padding(start = 15.dp, top = 12.dp, end = 14.dp, bottom = 11.dp),
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
         Row(
@@ -2190,7 +2196,7 @@ private fun RefInlineGroupExpansion(
         Brush.verticalGradient(listOf(Color(0xFFE7EDF4), wellColor, Color(0xFFF2F5F8)))
     }
     Surface(
-        modifier = Modifier.padding(top = 8.dp, bottom = 12.dp).fillMaxWidth(),
+        modifier = Modifier.padding(top = 8.dp, bottom = 16.dp).fillMaxWidth().zIndex(0f),
         shape = shape,
         color = Color.Transparent,
         border = BorderStroke(.8.dp, wellBorder),
@@ -2198,7 +2204,7 @@ private fun RefInlineGroupExpansion(
         tonalElevation = 0.dp,
     ) {
         Column(
-            Modifier.fillMaxWidth().background(wellBrush, shape).padding(start = 14.dp, top = 16.dp, end = 14.dp, bottom = 14.dp),
+            Modifier.fillMaxWidth().background(wellBrush, shape).padding(start = 14.dp, top = 16.dp, end = 14.dp, bottom = 18.dp),
             verticalArrangement = Arrangement.spacedBy(9.dp),
         ) {
             // A thin top compression line gives the well a visual inset without a second white shell.
@@ -2305,7 +2311,7 @@ private fun RefInlineNodeCard(
                 Modifier.fillMaxSize()
                     .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .90f else 1f }
                     .shadow(
-                        if (active) 5.dp else 3.dp,
+                        if (active) 3.dp else 1.dp,
                         shape,
                         clip = false,
                         ambientColor = if (active) Color(0xFF2563EB).copy(alpha = .07f) else Color(0xFF0F172A).copy(alpha = .035f),
@@ -2866,23 +2872,50 @@ private fun RefRuleGroupCard(items: List<ProxyRuleUi>) {
     ) {
         Column(Modifier.fillMaxWidth()) {
             items.forEachIndexed { index, item ->
+                val expression = item.payload.ifBlank { item.type }
+                val composite = expression.contains("&&") || expression.contains("||") ||
+                    expression.count { it == '(' } >= 2
+                var expanded by remember(item.type, item.payload, item.proxy) { mutableStateOf(false) }
                 Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+                    Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 9.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth()
+                                .clip(RoundedCornerShape(7.dp))
+                                .clickable(
+                                    enabled = composite,
+                                    indication = null,
+                                    interactionSource = remember(item.type, item.payload) { MutableInteractionSource() },
+                                ) { expanded = !expanded },
+                            shape = RoundedCornerShape(7.dp),
+                            color = if (dark) Color.White.copy(alpha = .045f) else Color(0xFFF1F5F9),
+                            tonalElevation = 0.dp,
+                        ) {
+                            androidx.compose.animation.AnimatedContent(
+                                targetState = expanded,
+                                transitionSpec = {
+                                    androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(150))
+                                        .togetherWith(androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(90)))
+                                },
+                                label = "ruleExpressionExpand${index}",
+                            ) { open ->
+                                Text(
+                                    expression,
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 7.dp, vertical = 4.dp),
+                                    color = if (dark) Color(0xFFCBD5E1) else Color(0xFF475569),
+                                    fontSize = 11.sp,
+                                    lineHeight = 15.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                    maxLines = if (open) 5 else 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
                         Text(
-                            item.payload.ifBlank { item.type },
-                            color = t.textPrimary,
-                            fontSize = 13.sp,
-                            lineHeight = 16.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            item.type,
+                            if (composite) "${item.type} · 点击${if (expanded) "收起" else "展开"}" else item.type,
                             color = Color(0xFF94A3B8),
                             fontSize = 10.sp,
                             lineHeight = 13.sp,

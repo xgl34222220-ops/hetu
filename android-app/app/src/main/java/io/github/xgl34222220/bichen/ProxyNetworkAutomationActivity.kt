@@ -108,7 +108,7 @@ private fun ProxyNetworkAutomationPage(onBack: () -> Unit) {
             start = 16.dp,
             top = 8.dp,
             end = 16.dp,
-            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 28.dp,
+            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 40.dp,
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -269,19 +269,48 @@ private fun NetworkChoiceSheet(title: String, values: List<NetworkChoice>, curre
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NetworkSetEditor(state: NetworkEditor, onDismiss: () -> Unit, onSave: (String) -> Unit) {
     var text by remember(state) { mutableStateOf(state.value) }
-    AlertDialog(
+    val t = LocalBichenTokens.current
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        title = { Text(state.title) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(state.hint, color = LocalBichenTokens.current.textSecondary, fontSize = 12.sp)
-                OutlinedTextField(value = text, onValueChange = { text = it }, modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp, max = 320.dp), minLines = 6)
-            }
+        containerColor = t.elevatedCardBackground,
+        tonalElevation = 0.dp,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        dragHandle = {
+            Box(
+                Modifier.padding(top = 10.dp, bottom = 6.dp).size(width = 36.dp, height = 4.dp)
+                    .background(Color(0xFFCBD5E1), RoundedCornerShape(999.dp)),
+            )
         },
-        confirmButton = { TextButton(onClick = { onSave(text) }) { Text("保存") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
-    )
+    ) {
+        Column(
+            Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(state.title, color = t.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+            Text(state.hint, color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 190.dp, max = 360.dp),
+                minLines = 7,
+                shape = RoundedCornerShape(18.dp),
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                FilledTonalButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f).height(44.dp),
+                    shape = RoundedCornerShape(999.dp),
+                ) { Text("取消", fontWeight = FontWeight.Bold) }
+                Button(
+                    onClick = { onSave(text) },
+                    modifier = Modifier.weight(1f).height(44.dp),
+                    shape = RoundedCornerShape(999.dp),
+                ) { Text("保存", fontWeight = FontWeight.Bold) }
+            }
+        }
+    }
 }
