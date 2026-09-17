@@ -1,1 +1,1 @@
-2026-09-17 test35 full-screen strategy page: instant switch two-column nodes rocket search filters
+2026-09-17 test36 panel header polish: safe area concise title circular actions lightweight tabs
