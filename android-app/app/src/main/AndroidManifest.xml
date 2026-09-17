@@ -33,6 +33,10 @@
         <activity android:name=".ProxyCoreActivity" android:label="内核管理" android:exported="false" />
         <activity android:name=".ProxySubscriptionActivity" android:label="订阅与配置" android:exported="false" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".ProxyActivity" android:label="代理（旧界面）" android:exported="false" />
+        <activity android:name=".ProxyRuntimeCoreSettingsActivity" android:label="运行核心" android:exported="false" />
+        <activity android:name=".ProxySharedNetworkSettingsActivity" android:label="共享网络" android:exported="false" />
+        <activity android:name=".ProxyCnIpSettingsActivity" android:label="CNIP 设置" android:exported="false" />
+        <activity android:name=".ProxyBypassRulesActivity" android:label="绕过规则" android:exported="false" />
         <activity android:name=".ProxyAdvancedSettingsActivity" android:label="高级代理配置" android:exported="false" />
         <activity android:name=".ProxyNetworkAutomationActivity" android:label="网络匹配" android:exported="false" />
         <activity android:name=".ProxyAppSelectionActivity" android:label="代理应用名单" android:exported="false" />

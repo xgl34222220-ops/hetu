@@ -2972,11 +2972,11 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
                 }
                 RefDivider()
                 RefToolRow(Icons.Rounded.WifiTethering, Color(0xFF10B981), "共享网络", "热点与局域网共享 · Root 规则", trailingText = "设置", trailingColor = Color(0xFF2563EB)) {
-                    context.startActivity(Intent(context, ProxyAdvancedSettingsActivity::class.java).putExtra("focus", "sharing"))
+                    context.startActivity(Intent(context, ProxySharedNetworkSettingsActivity::class.java))
                 }
                 RefDivider()
                 RefToolRow(Icons.Rounded.AltRoute, Color(0xFFEF4444), "绕过规则", "CIDR 与接口绕过 · Root 规则", trailingText = "设置", trailingColor = Color(0xFF2563EB)) {
-                    context.startActivity(Intent(context, ProxyAdvancedSettingsActivity::class.java).putExtra("focus", "bypass"))
+                    context.startActivity(Intent(context, ProxyBypassRulesActivity::class.java))
                 }
             }
         }
@@ -2992,7 +2992,7 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
                 }
                 RefDivider()
                 RefToolRow(Icons.Rounded.Public, Color(0xFFF59E0B), "CNIP 设置", "国内 IPv4/IPv6 自动直连", trailingText = "设置", trailingColor = Color(0xFF2563EB)) {
-                    context.startActivity(Intent(context, ProxyAdvancedSettingsActivity::class.java).putExtra("focus", "cnip"))
+                    context.startActivity(Intent(context, ProxyCnIpSettingsActivity::class.java))
                 }
             }
         }
@@ -3040,7 +3040,7 @@ private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
         item {
             RefGroup {
                 RefValueRow("运行核心", state.core, Icons.Rounded.Memory, Color(0xFF334155), highlightValue = true) {
-                    context.startActivity(Intent(context, ProxyAdvancedSettingsActivity::class.java).putExtra("focus", "core"))
+                    context.startActivity(Intent(context, ProxyRuntimeCoreSettingsActivity::class.java))
                 }
                 RefDivider()
                 RefValueRow("运行模式", state.mode, Icons.Rounded.Tune, Color(0xFF2563EB), highlightValue = true) { modePicker = true }
