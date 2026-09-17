@@ -1369,7 +1369,7 @@ private fun RefPanel(
                         RefConnectionRow(c, if (connectionView == "active") ({ scope.launch { repo.closeConnection(c.id); onRefreshState() } }) else null)
                     }
                 }
-                RefPanelTab.Rules -> itemsIndexed(rules.chunked(12), key = { index, _ -> "rule-group-$index" }) { _, batch ->
+                RefPanelTab.Rules -> itemsIndexed(rules.chunked(18), key = { index, _ -> "rule-group-$index" }) { _, batch ->
                     RefRuleGroupCard(batch)
                 }
                 RefPanelTab.RuleSets -> items(ruleSets, key = { it.name }) { item ->
@@ -2062,29 +2062,55 @@ private fun RefInlineGroupExpansion(
     val t = LocalBichenTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val shape = RoundedCornerShape(22.dp)
-    val trayBrush = if (dark) {
-        Brush.verticalGradient(listOf(Color.White.copy(alpha = .075f), t.elevatedCardBackground.copy(alpha = .94f), t.cardBackground.copy(alpha = .90f)))
-    } else {
-        Brush.verticalGradient(listOf(Color(0xFFE2E8F0).copy(alpha = .40f), Color(0xFFF1F5F9).copy(alpha = .74f), Color.White.copy(alpha = .68f)))
-    }
+    val wellColor = if (dark) Color(0xFF18212E) else Color(0xFFEEF2F6)
+    val wellBorder = if (dark) Color.White.copy(alpha = .08f) else Color(0xFFCBD5E1).copy(alpha = .52f)
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = shape,
-        color = Color.Transparent,
-        border = BorderStroke(.8.dp, if (dark) Color.White.copy(alpha = .10f) else Color.White.copy(alpha = .88f)),
-        shadowElevation = 2.dp,
+        color = wellColor,
+        border = BorderStroke(.8.dp, wellBorder),
+        shadowElevation = 0.dp,
+        tonalElevation = 0.dp,
     ) {
         Column(
-            Modifier.fillMaxWidth().background(trayBrush, shape).padding(12.dp),
+            Modifier.fillMaxWidth().padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(9.dp),
         ) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("切换落地节点", color = t.textSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Text("${group.nodes.size} 个节点 · 点击即生效", color = Color(0xFF94A3B8), fontSize = 10.sp)
+            // A thin top compression line gives the well a visual inset without a second white shell.
+            Box(
+                Modifier.fillMaxWidth().height(2.dp)
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(Color.Transparent, Color(0xFF0F172A).copy(alpha = if (dark) .18f else .07f), Color.Transparent),
+                        ),
+                        CircleShape,
+                    ),
+            )
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                    Text("切换落地节点", color = if (dark) t.textSecondary else Color(0xFF64748B), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.width(6.dp))
+                    Text("· 点击即生效", color = Color(0xFF94A3B8), fontSize = 10.sp, fontWeight = FontWeight.Normal)
                 }
-                TextButton(onClick = onTestAll, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)) {
-                    Text("全测速 ⚡", color = Color(0xFF2563EB), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                val allTestSource = remember(group.name) { MutableInteractionSource() }
+                val allPressed by allTestSource.collectIsPressedAsState()
+                val allScale by animateFloatAsState(if (allPressed) .95f else 1f, label = "allDelay${group.name}")
+                Row(
+                    Modifier.graphicsLayer { scaleX = allScale; scaleY = allScale }
+                        .shadow(2.dp, CircleShape, clip = false, ambientColor = Color(0xFF0F172A).copy(alpha = .04f), spotColor = Color(0xFF0F172A).copy(alpha = .05f))
+                        .background(if (dark) Color.White.copy(alpha = .08f) else Color.White.copy(alpha = .92f), CircleShape)
+                        .border(.6.dp, if (dark) Color.White.copy(alpha = .08f) else Color.White.copy(alpha = .92f), CircleShape)
+                        .clip(CircleShape)
+                        .clickable(interactionSource = allTestSource, indication = null, onClick = onTestAll)
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text("全测速", color = Color(0xFF2563EB), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                    Text("⚡", color = Color(0xFFF59E0B), fontSize = 10.sp)
                 }
             }
             group.nodes.withIndex().toList().chunked(2).forEach { pair ->
@@ -2122,38 +2148,46 @@ private fun RefInlineNodeCard(
 ) {
     val t = LocalBichenTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(14.dp)
     val source = remember(node.name) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .96f else 1f, spring(dampingRatio = .72f, stiffness = 580f), label = "inlineNode${node.name}")
+    val scale by animateFloatAsState(if (pressed) .97f else 1f, spring(dampingRatio = .72f, stiffness = 580f), label = "inlineNode${node.name}")
     var revealed by remember(node.name) { mutableStateOf(false) }
     LaunchedEffect(node.name) {
-        delay((index * 18L).coerceAtMost(220L))
+        delay((index * 22L).coerceAtMost(260L))
         revealed = true
     }
     val backgroundBrush = when {
         dark && active -> Brush.verticalGradient(listOf(Color(0xFF172554), Color(0xFF111C38)))
-        dark -> Brush.verticalGradient(listOf(t.elevatedCardBackground, t.cardBackground))
-        active -> Brush.verticalGradient(listOf(Color.White, Color(0xFFF3F7FF)))
-        else -> Brush.verticalGradient(listOf(Color.White.copy(alpha = .94f), Color(0xFFFAFCFF).copy(alpha = .90f)))
+        dark -> Brush.verticalGradient(listOf(Color(0xFF242E3C), Color(0xFF202936)))
+        active -> Brush.verticalGradient(listOf(Color(0xFFF8FBFF), Color(0xFFEEF6FF)))
+        else -> Brush.verticalGradient(listOf(Color.White, Color.White))
+    }
+    val borderColor = when {
+        dark && active -> Color(0xFF60A5FA).copy(alpha = .44f)
+        dark -> Color.White.copy(alpha = .08f)
+        active -> Color(0xFFBFDBFE)
+        else -> Color.White.copy(alpha = .88f)
     }
     Box(modifier.height(64.dp)) {
         androidx.compose.animation.AnimatedVisibility(
             visible = revealed,
             modifier = Modifier.fillMaxSize(),
-            enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(170)) +
-                androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(210)) { it / 3 },
+            enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(180)) +
+                androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(230)) { it / 3 },
         ) {
             Box(
                 Modifier.fillMaxSize()
-                    .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .88f else 1f }
-                    .shadow(if (active) 4.dp else 2.dp, shape, clip = false)
-                    .background(backgroundBrush, shape)
-                    .border(
-                        if (active) 1.35.dp else .7.dp,
-                        if (active) Color(0xFF002FA7) else if (dark) Color.White.copy(alpha = .08f) else Color.White.copy(alpha = .90f),
+                    .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .90f else 1f }
+                    .shadow(
+                        if (active) 5.dp else 3.dp,
                         shape,
+                        clip = false,
+                        ambientColor = if (active) Color(0xFF2563EB).copy(alpha = .07f) else Color(0xFF0F172A).copy(alpha = .035f),
+                        spotColor = if (active) Color(0xFF2563EB).copy(alpha = .10f) else Color(0xFF0F172A).copy(alpha = .05f),
                     )
+                    .background(backgroundBrush, shape)
+                    .border(if (active) 1.dp else .7.dp, borderColor, shape)
                     .clip(shape)
                     .clickable(interactionSource = source, indication = null, onClick = onSelect),
             ) {
@@ -2165,52 +2199,40 @@ private fun RefInlineNodeCard(
                         val flag = refNodeFlag(node.name)
                         if (flag.isNotBlank()) {
                             Text(flag, fontSize = 14.sp)
-                            Spacer(Modifier.width(4.dp))
+                            Spacer(Modifier.width(5.dp))
                         }
                         Text(
                             node.name,
-                            color = if (active && !dark) Color(0xFF1E3A8A) else t.textPrimary,
+                            color = if (active && !dark) Color(0xFF2563EB) else t.textPrimary,
                             fontSize = 12.sp,
                             lineHeight = 15.sp,
-                            fontWeight = if (active) FontWeight.Bold else FontWeight.SemiBold,
+                            fontWeight = if (active) FontWeight.ExtraBold else FontWeight.Bold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f),
                         )
                     }
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Surface(
-                            shape = RoundedCornerShape(7.dp),
-                            color = if (active) Color(0xFFEFF6FF).copy(alpha = if (dark) .12f else .92f) else if (dark) Color.White.copy(alpha = .055f) else Color(0xFFF1F5F9),
-                            tonalElevation = 0.dp,
-                        ) {
-                            Text(
-                                refNodeProtocol(node),
-                                Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                color = if (active) Color(0xFF2563EB) else Color(0xFF64748B),
-                                fontSize = 9.sp,
-                                lineHeight = 11.sp,
-                                fontWeight = FontWeight.Medium,
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                                maxLines = 1,
-                            )
-                        }
+                        Text(
+                            refNodeProtocol(node),
+                            color = if (active) Color(0xFF60A5FA) else Color(0xFF94A3B8),
+                            fontSize = 10.sp,
+                            lineHeight = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            maxLines = 1,
+                        )
                         Spacer(Modifier.weight(1f))
-                        RefDelayBadge(delay, testing, onDelay)
+                        RefDelayBadge(delay, testing, onDelay, selected = active)
                     }
                 }
                 androidx.compose.animation.AnimatedVisibility(
                     visible = active,
-                    modifier = Modifier.align(Alignment.TopEnd).offset(x = 3.dp, y = (-3).dp),
+                    modifier = Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 6.dp),
                     enter = androidx.compose.animation.scaleIn(initialScale = .15f, animationSpec = spring(dampingRatio = .56f, stiffness = 520f)) + androidx.compose.animation.fadeIn(),
                     exit = androidx.compose.animation.scaleOut(targetScale = .45f) + androidx.compose.animation.fadeOut(),
                 ) {
-                    Box(
-                        Modifier.size(17.dp).shadow(4.dp, CircleShape, clip = false).background(Color(0xFF002FA7), CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(Icons.Rounded.Check, "已选择", tint = Color.White, modifier = Modifier.size(11.dp))
-                    }
+                    Icon(Icons.Rounded.Check, "已选择", tint = Color(0xFF2563EB), modifier = Modifier.size(15.dp))
                 }
             }
         }
@@ -2321,7 +2343,7 @@ private fun refNodeFlag(name: String): String {
 }
 
 @Composable
-private fun RefDelayBadge(value: Long?, testing: Boolean, onClick: (() -> Unit)?) {
+private fun RefDelayBadge(value: Long?, testing: Boolean, onClick: (() -> Unit)?, selected: Boolean = false) {
     val text = refDelay(value)
     val (background, textColor) = when {
         value == null -> Color(0xFFF1F5F9) to Color(0xFF64748B)
@@ -2344,6 +2366,8 @@ private fun RefDelayBadge(value: Long?, testing: Boolean, onClick: (() -> Unit)?
     )
     val pressScale by animateFloatAsState(if (pressed) .90f else 1f, spring(dampingRatio = .68f, stiffness = 680f), label = "latencyPress")
     val shape = CircleShape
+    val finalBackground = if (selected) Color.White else background
+    val finalTextColor = if (selected) Color(0xFF2563EB) else textColor
     Row(
         Modifier.width(if (onClick != null) 68.dp else 62.dp).height(22.dp)
             .graphicsLayer {
@@ -2351,9 +2375,9 @@ private fun RefDelayBadge(value: Long?, testing: Boolean, onClick: (() -> Unit)?
                 scaleY = pressScale
                 alpha = if (pressed) .84f else if (testing) .76f + .24f * pulse else 1f
             }
-            .shadow(if (onClick != null) 2.dp else 0.dp, shape, clip = false, ambientColor = textColor.copy(alpha = .10f), spotColor = textColor.copy(alpha = .12f))
-            .background(if (testing) background.copy(alpha = .78f) else background, shape)
-            .border(.7.dp, if (testing) textColor.copy(alpha = .22f + .22f * pulse) else textColor.copy(alpha = if (onClick != null) .10f else .04f), shape)
+            .shadow(if (onClick != null) 2.dp else 0.dp, shape, clip = false, ambientColor = finalTextColor.copy(alpha = .10f), spotColor = finalTextColor.copy(alpha = .12f))
+            .background(if (testing) finalBackground.copy(alpha = .82f) else finalBackground, shape)
+            .border(.7.dp, if (selected) Color(0xFFDBEAFE) else if (testing) finalTextColor.copy(alpha = .22f + .22f * pulse) else finalTextColor.copy(alpha = if (onClick != null) .10f else .04f), shape)
             .then(if (onClick != null) Modifier.clickable(enabled = !testing, interactionSource = source, indication = null, onClick = onClick) else Modifier)
             .padding(horizontal = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -2361,7 +2385,7 @@ private fun RefDelayBadge(value: Long?, testing: Boolean, onClick: (() -> Unit)?
     ) {
         Text(
             text,
-            color = textColor,
+            color = finalTextColor,
             fontSize = 10.sp,
             lineHeight = 13.sp,
             fontWeight = FontWeight.ExtraBold,
@@ -2374,11 +2398,11 @@ private fun RefDelayBadge(value: Long?, testing: Boolean, onClick: (() -> Unit)?
                 CircularProgressIndicator(
                     modifier = Modifier.size(9.dp),
                     strokeWidth = 1.25.dp,
-                    color = textColor,
-                    trackColor = textColor.copy(alpha = .14f),
+                    color = finalTextColor,
+                    trackColor = finalTextColor.copy(alpha = .14f),
                 )
             } else {
-                Icon(Icons.Rounded.Bolt, "单独测速", tint = textColor.copy(alpha = .86f), modifier = Modifier.size(10.dp))
+                Icon(Icons.Rounded.Bolt, "单独测速", tint = finalTextColor.copy(alpha = .86f), modifier = Modifier.size(10.dp))
             }
         }
     }
@@ -2394,6 +2418,15 @@ private fun RefTrafficOverview(state: ProxyComposeState) {
     var lastAt by remember { mutableLongStateOf(0L) }
     var upRate by remember { mutableLongStateOf(0L) }
     var downRate by remember { mutableLongStateOf(0L) }
+    val pulse = androidx.compose.animation.core.rememberInfiniteTransition(label = "trafficIdlePulse")
+    val idlePhase by pulse.animateFloat(
+        initialValue = 0f,
+        targetValue = 6.2831855f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = androidx.compose.animation.core.tween(3200, easing = androidx.compose.animation.core.LinearEasing),
+        ),
+        label = "trafficIdlePhase",
+    )
 
     LaunchedEffect(state.uploadTotal, state.downloadTotal) {
         val now = SystemClock.elapsedRealtime()
@@ -2433,8 +2466,41 @@ private fun RefTrafficOverview(state: ProxyComposeState) {
                 }
                 val points = history.toList()
                 Canvas(Modifier.fillMaxWidth().height(138.dp)) {
-                    if (points.size > 1) {
-                        val maxRate = points.maxOf { maxOf(it.second, it.third) }.coerceAtLeast(1L).toFloat()
+                    fun closeArea(coords: List<Offset>): Path {
+                        val path = Path()
+                        if (coords.isEmpty()) return path
+                        path.moveTo(coords.first().x, coords.first().y)
+                        coords.drop(1).forEach { path.lineTo(it.x, it.y) }
+                        path.lineTo(coords.last().x, size.height)
+                        path.lineTo(coords.first().x, size.height)
+                        path.close()
+                        return path
+                    }
+                    fun smooth(coords: List<Offset>, area: Boolean): Path {
+                        val path = Path()
+                        if (coords.isEmpty()) return path
+                        path.moveTo(coords.first().x, coords.first().y)
+                        for (i in 0 until coords.lastIndex) {
+                            val p0 = if (i == 0) coords[i] else coords[i - 1]
+                            val p1 = coords[i]
+                            val p2 = coords[i + 1]
+                            val p3 = if (i + 2 < coords.size) coords[i + 2] else p2
+                            val c1 = Offset(p1.x + (p2.x - p0.x) / 6f, p1.y + (p2.y - p0.y) / 6f)
+                            val c2 = Offset(p2.x - (p3.x - p1.x) / 6f, p2.y - (p3.y - p1.y) / 6f)
+                            path.cubicTo(c1.x, c1.y, c2.x, c2.y, p2.x, p2.y)
+                        }
+                        if (area) {
+                            path.lineTo(coords.last().x, size.height)
+                            path.lineTo(coords.first().x, size.height)
+                            path.close()
+                        }
+                        return path
+                    }
+
+                    val peak = points.maxOfOrNull { maxOf(it.second, it.third) } ?: 0L
+                    val simulate = points.size < 2 || peak < 1024L
+                    if (!simulate) {
+                        val maxRate = peak.coerceAtLeast(1L).toFloat()
                         val end = points.last().first
                         val start = end - 60_000L
                         fun series(index: Int): List<Offset> = points.map { point ->
@@ -2443,46 +2509,26 @@ private fun RefTrafficOverview(state: ProxyComposeState) {
                             val y = size.height - (value.toFloat() / maxRate * size.height * .86f)
                             Offset(x, y)
                         }
-                        fun smooth(coords: List<Offset>, closeArea: Boolean): Path {
-                            val path = Path()
-                            if (coords.isEmpty()) return path
-                            path.moveTo(coords.first().x, coords.first().y)
-                            for (i in 0 until coords.lastIndex) {
-                                val p0 = if (i == 0) coords[i] else coords[i - 1]
-                                val p1 = coords[i]
-                                val p2 = coords[i + 1]
-                                val p3 = if (i + 2 < coords.size) coords[i + 2] else p2
-                                val c1 = Offset(p1.x + (p2.x - p0.x) / 6f, p1.y + (p2.y - p0.y) / 6f)
-                                val c2 = Offset(p2.x - (p3.x - p1.x) / 6f, p2.y - (p3.y - p1.y) / 6f)
-                                path.cubicTo(c1.x, c1.y, c2.x, c2.y, p2.x, p2.y)
-                            }
-                            if (closeArea) {
-                                path.lineTo(coords.last().x, size.height)
-                                path.lineTo(coords.first().x, size.height)
-                                path.close()
-                            }
-                            return path
-                        }
                         val upload = series(1)
                         val download = series(2)
-                        drawPath(smooth(upload, true), brush = Brush.verticalGradient(listOf(t.success.copy(alpha = .16f), Color.Transparent), 0f, size.height))
+                        drawPath(smooth(upload, true), brush = Brush.verticalGradient(listOf(t.success.copy(alpha = .20f), Color.Transparent), 0f, size.height))
                         drawPath(smooth(download, true), brush = Brush.verticalGradient(listOf(scheme.primary.copy(alpha = .20f), Color.Transparent), 0f, size.height))
-                        drawPath(smooth(upload, false), color = t.success, style = Stroke(width = 2.25.dp.toPx()))
-                        drawPath(smooth(download, false), color = scheme.primary, style = Stroke(width = 2.25.dp.toPx()))
+                        drawPath(smooth(upload, false), color = t.success, style = Stroke(width = 2.15.dp.toPx()))
+                        drawPath(smooth(download, false), color = scheme.primary, style = Stroke(width = 2.15.dp.toPx()))
                     } else {
-                        val y = size.height - 5.dp.toPx()
-                        drawLine(
-                            color = scheme.primary.copy(alpha = .10f),
-                            start = Offset(0f, y),
-                            end = Offset(size.width, y),
-                            strokeWidth = 7.dp.toPx(),
-                        )
-                        drawLine(
-                            brush = Brush.horizontalGradient(listOf(t.success.copy(alpha = .34f), scheme.primary.copy(alpha = .48f))),
-                            start = Offset(0f, y),
-                            end = Offset(size.width, y),
-                            strokeWidth = 2.dp.toPx(),
-                        )
+                        fun wave(phaseOffset: Float, base: Float, amplitude: Float): List<Offset> = (0..28).map { i ->
+                            val ratio = i / 28f
+                            val angle = ratio * 8.2f + idlePhase + phaseOffset
+                            val harmonic = kotlin.math.sin((angle * 1.67f).toDouble()).toFloat() * .34f
+                            val y = size.height * base - (kotlin.math.sin(angle.toDouble()).toFloat() + harmonic) * size.height * amplitude
+                            Offset(size.width * ratio, y)
+                        }
+                        val upload = wave(0f, .81f, .018f)
+                        val download = wave(1.18f, .86f, .024f)
+                        drawPath(closeArea(upload), brush = Brush.verticalGradient(listOf(t.success.copy(alpha = .18f), Color.Transparent), size.height * .68f, size.height))
+                        drawPath(closeArea(download), brush = Brush.verticalGradient(listOf(scheme.primary.copy(alpha = .20f), Color.Transparent), size.height * .70f, size.height))
+                        drawPath(smooth(upload, false), color = t.success.copy(alpha = .78f), style = Stroke(width = 1.8.dp.toPx()))
+                        drawPath(smooth(download, false), color = scheme.primary.copy(alpha = .84f), style = Stroke(width = 1.8.dp.toPx()))
                     }
                 }
             }
@@ -2623,7 +2669,7 @@ private fun RefRuleGroupCard(items: List<ProxyRuleUi>) {
     Surface(
         shape = shape,
         color = t.cardBackground,
-        border = BorderStroke(.7.dp, if (dark) t.outline.copy(alpha = .36f) else Color.White.copy(alpha = .92f)),
+        border = BorderStroke(.7.dp, if (dark) t.outline.copy(alpha = .32f) else Color(0xFFF1F5F9)),
         shadowElevation = if (dark) 0.dp else 3.dp,
     ) {
         Column(Modifier.fillMaxWidth()) {
@@ -2636,9 +2682,9 @@ private fun RefRuleGroupCard(items: List<ProxyRuleUi>) {
                         Text(
                             item.payload.ifBlank { item.type },
                             color = t.textPrimary,
-                            fontSize = 12.sp,
-                            lineHeight = 15.sp,
-                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            lineHeight = 16.sp,
+                            fontWeight = FontWeight.ExtraBold,
                             fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -2652,37 +2698,29 @@ private fun RefRuleGroupCard(items: List<ProxyRuleUi>) {
                             maxLines = 1,
                         )
                     }
-                    Spacer(Modifier.width(10.dp))
+                    Spacer(Modifier.width(12.dp))
                     val reject = item.proxy.equals("REJECT", true) || item.proxy.startsWith("REJECT-", true)
                     val direct = item.proxy.equals("DIRECT", true)
-                    val badgeBg = when {
-                        reject -> Color(0xFFFFF1F2)
-                        direct -> Color(0xFFEFF6FF)
-                        else -> Color(0xFFF1F5F9)
-                    }
-                    val badgeText = when {
-                        reject -> Color(0xFFE11D48)
-                        direct -> Color(0xFF2563EB)
-                        else -> Color(0xFF64748B)
-                    }
-                    Surface(shape = RoundedCornerShape(6.dp), color = badgeBg, tonalElevation = 0.dp) {
-                        Text(
-                            item.proxy,
-                            Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                            color = badgeText,
-                            fontSize = 11.sp,
-                            lineHeight = 13.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                            maxLines = 1,
-                        )
-                    }
+                    Text(
+                        item.proxy,
+                        color = when {
+                            reject -> Color(0xFFF43F5E)
+                            direct -> Color(0xFF2563EB)
+                            else -> Color(0xFF64748B)
+                        },
+                        fontSize = 12.sp,
+                        lineHeight = 15.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        letterSpacing = .45.sp,
+                        maxLines = 1,
+                    )
                 }
                 if (index != items.lastIndex) {
                     HorizontalDivider(
                         modifier = Modifier.padding(horizontal = 14.dp),
                         thickness = 1.dp,
-                        color = if (dark) t.outline.copy(alpha = .30f) else Color(0xFFF1F5F9),
+                        color = if (dark) t.outline.copy(alpha = .28f) else Color(0xFFF1F5F9).copy(alpha = .84f),
                     )
                 }
             }
@@ -2808,7 +2846,7 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
                     context.startActivity(Intent(context, ProxyWebUiActivity::class.java))
                 }
                 RefDivider()
-                RefToolRow(Icons.Rounded.Memory, Color(0xFF334155), "内核管理", "下载、更新与维护内核", trailingText = state.core.ifBlank { "Mihomo" }, trailingColor = Color(0xFF2563EB)) {
+                RefToolRow(Icons.Rounded.Memory, Color(0xFF334155), "内核管理", "下载、更新与维护内核", trailingText = state.core.ifBlank { "Mihomo" }, trailingBadge = true, trailingColor = Color(0xFF2563EB)) {
                     context.startActivity(Intent(context, ProxyCoreActivity::class.java))
                 }
             }

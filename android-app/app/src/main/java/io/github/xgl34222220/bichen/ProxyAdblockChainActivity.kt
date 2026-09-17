@@ -166,7 +166,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
             start = 16.dp,
             top = 8.dp,
             end = 16.dp,
-            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 28.dp,
+            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 64.dp,
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
