@@ -18,16 +18,17 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Fix Home dock white flash
+      - name: Apply LuoShu dock parity and commercial proxy UI
         run: python3 scripts/fix_proxy_dock_flash.py
 
-      - name: Commit dock fix
+      - name: Commit rebuilt proxy UI
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add android-app/app/src/main/java/io/github/xgl34222220/bichen/ui/BichenGlassDock.kt
+          git add android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt \
+                  android-app/app/src/main/java/io/github/xgl34222220/bichen/ui/BichenGlassDock.kt
           if ! git diff --cached --quiet; then
-            git commit -m 'Fix proxy dock white flash on Home transition'
+            git commit -m 'Match LuoShu dock and compact proxy UI'
             git push
           fi
 
@@ -77,7 +78,7 @@ jobs:
           unzip -l "$APK" | grep -q 'assets/mihomo-root/arm64-v8a/mihomo'
       - uses: actions/upload-artifact@v4
         with:
-          name: Bichen-0.4.0-test.28-Home-Dock-Flash-Fix
+          name: Bichen-0.4.0-test.29-LuoShu-Commercial-UI
           path: android-app/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
