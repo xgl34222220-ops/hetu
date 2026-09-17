@@ -144,9 +144,9 @@ final class RootProxyManager {
             stage(progress,profile.adblockChain?"切换到代理串联去广告，暂停独立 DNS / hosts 过滤…":"暂停独立广告过滤，避免与 Root 代理并行…");
             ProxyAdblockCoordinator.enter(context);adblockCoordinatorEntered=true;
         }
-        stage(progress,"启动核心并等待监听端口就绪…");
+        stage(progress,"启动核心并等待订阅、规则与监听就绪（首次可能较慢）…");
         JSONObject result;
-        try{result=runJson("start",
+        try{result=runJsonWithTimeout(125000L,"start",
                 BIN,CONFIG,profile.mode.id,String.valueOf(p.tproxyPort),String.valueOf(p.redirectPort),profile.ipv6.id,
                 bit(profile.tcp),bit(profile.udp),profile.dnsHijack.id,bit(profile.quicBlocked),
                 String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(MihomoStartupConfig.CONTROLLER_PORT),
@@ -262,11 +262,12 @@ final class RootProxyManager {
         return j;
     }
 
-    private JSONObject runJson(String...args)throws Exception{
+    private JSONObject runJson(String...args)throws Exception{return runJsonWithTimeout(55000L,args);}
+    private JSONObject runJsonWithTimeout(long timeoutMs,String...args)throws Exception{
         RootBridge.requireWorkerThread();
         StringBuilder cmd=new StringBuilder("exec ").append(RootBridge.quote(SCRIPT));
         for(String a:args)cmd.append(' ').append(RootBridge.quote(a==null?"":a));
-        RootBridge.Result r=RootBridge.rootShell(context,cmd.toString(),55000L);
+        RootBridge.Result r=RootBridge.rootShell(context,cmd.toString(),timeoutMs);
         JSONObject j;
         try{j=RootBridge.parseObject(r.output.trim());}
         catch(Exception e){throw new IOException(r.output.isEmpty()?"Root 控制器没有返回状态":r.output);}

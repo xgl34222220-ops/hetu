@@ -366,7 +366,22 @@ ready(){
   case "$M" in tproxy) [ "$TCP" = 0 ] || tcp_listen "$TP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; redirect) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1;; enhance) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; esac
   if [ "$DNS" = tproxy ]; then tcp_listen "$TP" || return 1; udp_listen "$TP" || return 1; fi; if [ "$DNS" = redirect ]; then tcp_listen "$DP" || return 1; udp_listen "$DP" || return 1; fi; return 0
 }
-wait_ready(){ PID="$1"; M="$2"; TP="$3"; RP="$4"; TCP="$5"; UDP="$6"; DNS="$7"; DP="$8"; CP="$9"; N=0; while [ "$N" -lt 80 ]; do ready "$PID" "$M" "$TP" "$RP" "$TCP" "$UDP" "$DNS" "$DP" "$CP" && return 0; pidcore "$PID" && kill -0 "$PID" >/dev/null 2>&1 || return 1; sleep 0.1; N=$((N+1)); done; return 1; }
+wait_ready(){
+  PID="$1"; M="$2"; TP="$3"; RP="$4"; TCP="$5"; UDP="$6"; DNS="$7"; DP="$8"; CP="$9"
+  # A real user config may have dozens of remote proxy/rule providers. On the first
+  # run inside Bichen's private HomeDir their caches are cold; Mihomo keeps the process
+  # alive while initial configuration is still loading. Do not mistake that for a dead
+  # listener after only 8 seconds. Keep network rules detached until every required
+  # listener is actually ready, so a slow cold start cannot black-hole traffic.
+  N=0
+  while [ "$N" -lt 900 ]; do
+    ready "$PID" "$M" "$TP" "$RP" "$TCP" "$UDP" "$DNS" "$DP" "$CP" && return 0
+    pidcore "$PID" && kill -0 "$PID" >/dev/null 2>&1 || return 2
+    sleep 0.1
+    N=$((N+1))
+  done
+  return 3
+}
 
 write_session(){ M="$1"; V6="$2"; S="$3"; SHARE="$4"; KILL="$5"; { printf 'MODE=%s\n' "$M"; printf 'IPV6=%s\n' "$V6"; printf 'APP_SCOPE=%s\n' "$S"; printf 'SHARE=%s\n' "$SHARE"; printf 'KILL=%s\n' "$KILL"; } > "$SESSION.new.$$" && mv -f "$SESSION.new.$$" "$SESSION"; }
 watchdog(){
@@ -393,8 +408,13 @@ start(){
   if [ "$NEED_TP" = 1 ]; then allocnet || { cleanup; fail "找不到安全的 fwmark/路由表/规则优先级，已保持直连"; }; fi
   if [ "$V6" = disable ]; then disablev6 || { cleanup; fail "禁用系统 IPv6 失败，已恢复原状态"; }; fi
 
+  mkdir -p "$RUN/rules" "$RUN/proxy_provider" "$RUN/ruleset" "$RUN/ui" || { cleanup; restorev6; rm -f "$SESSION"; fail "无法创建 Mihomo 运行缓存目录"; }
   : > "$LOG"; "$BIN" -d "$RUN" -f "$CFG" >>"$LOG" 2>&1 & P=$!; printf '%s\n' "$P" > "$PIDFILE"; printf '%s\n' "$M" > "$MODEFILE"; write_session "$M" "$V6" "$S" "$SHARE" "$KILL"
-  if ! wait_ready "$P" "$M" "$TP" "$RP" "$TCP" "$UDP" "$DNS" "$DP" "$CP"; then stopcore; cleanup; restorev6; rm -f "$SESSION"; fail "核心进程已启动但透明代理/DNS/API 监听未就绪，网络未被接管"; fi
+  wait_ready "$P" "$M" "$TP" "$RP" "$TCP" "$UDP" "$DNS" "$DP" "$CP"; READY_RC=$?
+  if [ "$READY_RC" -ne 0 ]; then
+    if [ "$READY_RC" -eq 2 ]; then READY_MSG="Mihomo 启动后提前退出，请查看核心日志"; else READY_MSG="Mihomo 初始化超过 90 秒，透明代理/DNS/API 监听仍未就绪；首次加载大量远程订阅或规则时请检查网络与核心日志"; fi
+    stopcore; cleanup; restorev6; rm -f "$SESSION"; fail "$READY_MSG"
+  fi
 
   install_mangle4 "$TP" "$M" "$TCP" "$UDP" "$DNS" "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 TPROXY 规则安装失败，已回滚"; }
   install_redirect4 "$RP" "$M" "$TCP" "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 Redirect 规则安装失败，已回滚"; }
