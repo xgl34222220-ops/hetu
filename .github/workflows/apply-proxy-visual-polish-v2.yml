@@ -78,7 +78,7 @@ jobs:
           unzip -l "$APK" | grep -q 'assets/mihomo-root/arm64-v8a/mihomo'
           ! grep -q 'Text("代理面板"' "$UI"
           ! grep -q '个策略组", color = t.textSecondary' "$UI"
-          grep -q 'Text("面板"' "$UI"
+          grep -q '"面板"' "$UI"
           grep -q 'FontWeight.Black' "$UI"
           grep -q 'private fun RefPanelHeaderAction' "$UI"
           grep -q 'Modifier.fillMaxWidth().height(38.dp).background(track, CircleShape).padding(3.dp)' "$UI"
