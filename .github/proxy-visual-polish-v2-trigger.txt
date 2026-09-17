@@ -1,1 +1,1 @@
-2026-09-17 test38 safe single-layer panel liquid glass build
+2026-09-17 test39 Haze-only panel glass stability build
