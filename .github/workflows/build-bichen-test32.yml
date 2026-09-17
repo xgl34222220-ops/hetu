@@ -26,8 +26,11 @@ jobs:
           grep -q 'versionCode = 432' android-app/app/build.gradle.kts
           grep -q 'versionName = "0.4.0-test.32"' android-app/app/build.gradle.kts
           grep -q 'ProxyAppSelectionActivity' android-app/app/src/main/AndroidManifest.xml
-          grep -q 'controller.bypassApps()' android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAppSelectionActivity.kt
-          grep -q 'controller.setBypass' android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAppSelectionActivity.kt
+          grep -q 'proxyAppPackages' android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAppSelectionActivity.kt
+          grep -q 'proxyAppPackages' android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyPolicy.java
+          ! grep -q 'controller.bypassApps()' android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAppSelectionActivity.kt
+          ! grep -q 'controller.setBypass' android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAppSelectionActivity.kt
+          ! grep -q 'getStringSet("bypassApps"' android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyPolicy.java
           grep -q 'ProxyAppSelectionActivity::class.java' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
           grep -q 'ProxyAppSelectionActivity::class.java' android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAdvancedSettingsActivity.kt
           ! grep -q 'CompactMainActivity::class.java' android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
