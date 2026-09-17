@@ -305,7 +305,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
     Box(Modifier.fillMaxSize().background(shellBackground)) {
         Box(
             Modifier.fillMaxSize()
-                .then(if (!liquid) Modifier.hazeSource(haze) else Modifier)
+                .then(if (!liquid || page == RefProxyPage.Panel) Modifier.hazeSource(haze) else Modifier)
                 .then(if (liquid) Modifier.layerBackdrop(liquidBackdrop) else Modifier),
         ) {
             // Match LuoShu's backdrop architecture: the full-screen page backdrop must live
@@ -354,7 +354,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                     repo = repo,
                     delays = delays,
                     hazeState = haze,
-                    backdrop = liquidBackdrop.takeIf { liquid },
+                    backdrop = null,
                     onRefreshState = { scope.launch { refresh() } },
                     onOpenSettings = { page = RefProxyPage.Settings },
                     onDetailVisibleChanged = { panelDetailVisible = it },
@@ -1366,7 +1366,8 @@ private fun RefPanelGlassHeader(
     val t = LocalBichenTokens.current
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
-    val runtimeLiquid = backdrop != null && isRuntimeShaderSupported()
+    // Panel header deliberately uses Haze only. RuntimeShader here crashes on some OEM GPUs.
+    val runtimeLiquid = false
     val shape = RoundedCornerShape(28.dp)
     val shellTint = if (dark) scheme.surface.copy(alpha = .35f) else Color.White.copy(alpha = .36f)
     val fallbackBrush = if (dark) {
@@ -1380,48 +1381,8 @@ private fun RefPanelGlassHeader(
             noiseFactor = .016f
         }
     } else Modifier
-    val liquidShellModifier = if (runtimeLiquid) {
-        // One RuntimeShader layer only. The previous build nested another backdrop for
-        // both action bubbles and the moving tab lens, which can crash some OEM GPUs.
-        Modifier.drawBackdrop(
-            backdrop = requireNotNull(backdrop),
-            shape = { shape },
-            effects = {
-                padding = maxOf(padding, 28.dp.toPx())
-                colorControls(
-                    brightness = if (dark) -.012f else .022f,
-                    contrast = 1.045f,
-                    saturation = 1.34f,
-                )
-                blur(8.dp.toPx(), 8.dp.toPx())
-                liquidGlassLens(
-                    refractionHeight = 16.dp.toPx(),
-                    refractionAmount = 12.dp.toPx(),
-                    depthEffect = true,
-                    chromaticAberration = .04f,
-                )
-            },
-            highlight = {
-                (if (dark) Highlight.GlassStrokeSmallDark else Highlight.GlassStrokeSmallLight)
-                    .copy(alpha = if (dark) .70f else .84f)
-            },
-            onDrawSurface = {
-                drawRect(shellTint)
-                drawRect(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = if (dark) .055f else .18f),
-                            Color.Transparent,
-                        ),
-                        center = Offset(size.width * .14f, 0f),
-                        radius = size.width * .66f,
-                    ),
-                )
-            },
-        )
-    } else {
-        Modifier.then(hazeModifier).background(fallbackBrush)
-    }
+    val liquidShellModifier = Modifier.then(hazeModifier).background(fallbackBrush)
+
 
     Box(
         Modifier
