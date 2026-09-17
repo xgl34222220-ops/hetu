@@ -448,9 +448,9 @@ private fun RefHome(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {
-            Row(
-                Modifier.fillMaxWidth().statusBarsPadding().padding(top = 12.dp, bottom = 10.dp).height(44.dp),
-                verticalAlignment = Alignment.CenterVertically,
+            Box(
+                Modifier.fillMaxWidth().statusBarsPadding().padding(top = 16.dp, bottom = 10.dp).height(44.dp),
+                contentAlignment = Alignment.CenterStart,
             ) {
                 Text(
                     "BoxProxy",
@@ -459,18 +459,6 @@ private fun RefHome(
                     lineHeight = 32.sp,
                     fontWeight = FontWeight.ExtraBold,
                     letterSpacing = (-0.6).sp,
-                    modifier = Modifier.weight(1f),
-                )
-                RefPanelHeaderAction(
-                    icon = Icons.Rounded.Search,
-                    contentDescription = "搜索",
-                    onClick = onSearch,
-                )
-                Spacer(Modifier.width(8.dp))
-                RefPanelHeaderAction(
-                    icon = Icons.Rounded.Settings,
-                    contentDescription = "设置",
-                    onClick = onSettings,
                 )
             }
         }
@@ -511,7 +499,13 @@ private fun RefHome(
                         Box(
                             Modifier
                                 .size(56.dp)
-                                .shadow(if (state.running) 10.dp else 0.dp, CircleShape, clip = false)
+                                .shadow(
+                                    if (state.running) 12.dp else 0.dp,
+                                    CircleShape,
+                                    clip = false,
+                                    ambientColor = scheme.primary.copy(alpha = .26f),
+                                    spotColor = scheme.primary.copy(alpha = .38f),
+                                )
                                 .background(if (state.running) scheme.primary else t.controlBackground, CircleShape),
                             contentAlignment = Alignment.Center,
                         ) {
@@ -594,17 +588,29 @@ private fun RefLatencyPanel(baidu: Long?, cloudflare: Long?, google: Long?, test
 
 @Composable
 private fun RefLatencyColumn(label: String, value: Long?, testing: Boolean, modifier: Modifier) {
-    val t = LocalBichenTokens.current
-    val scheme = MaterialTheme.colorScheme
+    val valueColor = when {
+        value == null -> Color(0xFF94A3B8)
+        value <= 0L -> Color(0xFFF43F5E)
+        value < 100L -> Color(0xFF10B981)
+        value <= 300L -> Color(0xFFF59E0B)
+        else -> Color(0xFFF43F5E)
+    }
+    val alpha by animateFloatAsState(
+        targetValue = if (testing) .58f else 1f,
+        animationSpec = androidx.compose.animation.core.tween(180),
+        label = "homeLatencyTestingAlpha",
+    )
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(label, color = Color(0xFF64748B), fontSize = 11.sp, lineHeight = 15.sp, maxLines = 1)
         Text(
             refDelay(value),
-            color = if (value == null && !testing) Color(0xFF94A3B8) else scheme.primary,
+            color = valueColor,
             fontSize = 17.sp,
             lineHeight = 21.sp,
             fontWeight = FontWeight.ExtraBold,
             maxLines = 1,
+            style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
+            modifier = Modifier.graphicsLayer { this.alpha = alpha },
         )
     }
 }
@@ -615,7 +621,7 @@ private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: I
     var lanMode by rememberSaveable { mutableStateOf(true) }
     val source = remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .98f else 1f, spring(dampingRatio = .80f, stiffness = 520f), label = "networkCardPress")
+    val scale by animateFloatAsState(if (pressed) .96f else 1f, spring(dampingRatio = .74f, stiffness = 560f), label = "networkCardPress")
     val shape = RoundedCornerShape(20.dp)
     val valueColor = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A)
     Surface(
@@ -691,7 +697,7 @@ private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, modifier: M
     val valueColor = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A)
     val source = remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .98f else 1f, spring(dampingRatio = .78f, stiffness = 560f), label = "subscriptionCompactPress")
+    val scale by animateFloatAsState(if (pressed) .96f else 1f, spring(dampingRatio = .74f, stiffness = 560f), label = "subscriptionCompactPress")
     val shape = RoundedCornerShape(20.dp)
     Surface(
         modifier = modifier.height(100.dp)
@@ -799,7 +805,7 @@ private fun RefSmallTool(title: String, subtitle: String, icon: ImageVector, onC
     val t = LocalBichenTokens.current
     val source = remember(title) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .98f else 1f, spring(dampingRatio = .78f, stiffness = 520f), label = "smallTool$title")
+    val scale by animateFloatAsState(if (pressed) .96f else 1f, spring(dampingRatio = .74f, stiffness = 560f), label = "smallTool$title")
     val shape = RoundedCornerShape(18.dp)
     Surface(
         modifier = modifier
@@ -1350,7 +1356,7 @@ private fun RefDetailNodeCard(
     val dark = scheme.background.luminance() < .5f
     val source = remember(node.name) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .98f else 1f, label = "detailNode${node.name}")
+    val scale by animateFloatAsState(if (pressed) .96f else 1f, spring(dampingRatio = .72f, stiffness = 580f), label = "detailNode${node.name}")
     val shape = RoundedCornerShape(16.dp)
     val premiumBrush = if (dark) {
         Brush.verticalGradient(listOf(t.elevatedCardBackground, t.cardBackground))
@@ -1388,12 +1394,21 @@ private fun RefDetailNodeCard(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            if (active) {
-                Box(
-                    Modifier.size(16.dp).background(Color(0xFF2563EB), CircleShape),
-                    contentAlignment = Alignment.Center,
+            Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) {
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = active,
+                    enter = androidx.compose.animation.scaleIn(
+                        initialScale = .15f,
+                        animationSpec = spring(dampingRatio = .56f, stiffness = 520f),
+                    ) + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(140)),
+                    exit = androidx.compose.animation.scaleOut(targetScale = .45f) + androidx.compose.animation.fadeOut(),
                 ) {
-                    Icon(Icons.Rounded.Check, "已选择", tint = Color.White, modifier = Modifier.size(11.dp))
+                    Box(
+                        Modifier.size(16.dp).background(Color(0xFF2563EB), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Rounded.Check, "已选择", tint = Color.White, modifier = Modifier.size(11.dp))
+                    }
                 }
             }
         }
@@ -1413,33 +1428,7 @@ private fun RefDetailNodeCard(
                 )
             }
             Spacer(Modifier.weight(1f))
-            val delayBg = when {
-                testing -> Color(0xFFEFF6FF)
-                delay == null -> Color(0xFFF1F5F9)
-                delay <= 0L -> Color(0xFFFEF2F2)
-                delay > 200L -> Color(0xFFFFF7ED)
-                else -> Color(0xFFEFF6FF)
-            }
-            val delayColor = when {
-                testing -> Color(0xFF2563EB)
-                delay == null -> Color(0xFF64748B)
-                delay <= 0L -> Color(0xFFDC2626)
-                delay > 200L -> Color(0xFFD97706)
-                else -> Color(0xFF2563EB)
-            }
-            Surface(
-                shape = CircleShape,
-                color = delayBg,
-                modifier = Modifier.clickable(enabled = !testing, onClick = onDelay),
-            ) {
-                Box(
-                    Modifier.height(24.dp).padding(horizontal = 8.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (testing) CircularProgressIndicator(Modifier.size(13.dp), strokeWidth = 2.dp, color = delayColor)
-                    else Text(refDelay(delay), color = delayColor, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
-                }
-            }
+            RefDelayBadge(delay, testing, onDelay)
         }
     }
 }
@@ -1487,9 +1476,9 @@ private fun RefPanelGlassHeader(
             Text(
                 "面板",
                 color = t.textPrimary,
-                fontSize = 26.sp,
-                lineHeight = 32.sp,
-                fontWeight = FontWeight.Black,
+                fontSize = 24.sp,
+                lineHeight = 30.sp,
+                fontWeight = FontWeight.ExtraBold,
                 modifier = Modifier.weight(1f),
             )
             RefPanelHeaderAction(
@@ -1500,8 +1489,8 @@ private fun RefPanelGlassHeader(
             )
             Spacer(Modifier.width(8.dp))
             RefPanelHeaderAction(
-                icon = Icons.Rounded.Settings,
-                contentDescription = "设置",
+                icon = Icons.Rounded.MoreHoriz,
+                contentDescription = "更多设置",
                 onClick = onOpenSettings,
             )
         }
@@ -1510,7 +1499,18 @@ private fun RefPanelGlassHeader(
             liquidGlass = true,
             onSelect = onSelect,
         )
-        if (searchOpen) {
+        androidx.compose.animation.AnimatedVisibility(
+            visible = searchOpen,
+            enter = androidx.compose.animation.expandVertically(
+                expandFrom = Alignment.Top,
+                animationSpec = androidx.compose.animation.core.tween(240),
+            ) + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(180)) +
+                androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(220)) { -it / 4 },
+            exit = androidx.compose.animation.shrinkVertically(
+                shrinkTowards = Alignment.Top,
+                animationSpec = androidx.compose.animation.core.tween(190),
+            ) + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(140)),
+        ) {
             TextField(
                 value = query,
                 onValueChange = onQueryChange,
@@ -1545,26 +1545,16 @@ private fun RefPanelHeaderAction(
     val source = remember(contentDescription) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        if (pressed) .92f else 1f,
-        spring(dampingRatio = .72f, stiffness = 560f),
-        label = "panelHeaderAction$contentDescription",
+        if (pressed) .90f else 1f,
+        spring(dampingRatio = .68f, stiffness = 620f),
+        label = "test46GhostHeader",
     )
-    val shape = CircleShape
-    val bubbleBrush = Brush.radialGradient(
-        colors = if (dark) {
-            listOf(Color.White.copy(alpha = .16f), Color.White.copy(alpha = .055f))
-        } else {
-            listOf(Color.White.copy(alpha = .88f), Color(0xFFF8FAFC).copy(alpha = .72f))
-        },
-        center = Offset(.24f, .10f),
-    )
+    val pressFill = if (dark) Color.White.copy(alpha = .08f) else Color(0xFFE2E8F0).copy(alpha = .60f)
     Box(
         Modifier.size(36.dp)
-            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .88f else 1f }
-            .shadow(4.dp, shape, clip = false)
-            .background(bubbleBrush, shape)
-            .border(.55.dp, Color.White.copy(alpha = if (dark) .12f else .92f), shape)
-            .clip(shape)
+            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .84f else 1f }
+            .background(if (pressed) pressFill else Color.Transparent, CircleShape)
+            .clip(CircleShape)
             .clickable(interactionSource = source, indication = null) {
                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                 onClick()
@@ -1575,7 +1565,7 @@ private fun RefPanelHeaderAction(
             icon,
             contentDescription,
             tint = if (active) scheme.primary else if (dark) t.textSecondary else Color(0xFF64748B),
-            modifier = Modifier.size(17.dp),
+            modifier = Modifier.size(20.dp),
         )
     }
 }
@@ -1675,7 +1665,7 @@ private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolea
     val dark = scheme.background.luminance() < .5f
     val source = remember(group.name) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .98f else 1f, spring(dampingRatio = .76f, stiffness = 560f), label = "group${group.name}")
+    val scale by animateFloatAsState(if (pressed) .96f else 1f, spring(dampingRatio = .72f, stiffness = 580f), label = "group${group.name}")
     val shape = RoundedCornerShape(18.dp)
     val nodeName = selected.ifBlank { "未选择" }
     val nodeFlag = refNodeFlag(nodeName)
@@ -1750,13 +1740,22 @@ private fun RefInlineGroupExpansion(
     val t = LocalBichenTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val shape = RoundedCornerShape(20.dp)
+    val trayBrush = if (dark) {
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = .055f), t.elevatedCardBackground, t.elevatedCardBackground))
+    } else {
+        Brush.verticalGradient(listOf(Color(0xFFEFF4F8), Color(0xFFF8FAFC), Color(0xFFF8FAFC)))
+    }
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = shape,
-        color = if (dark) t.elevatedCardBackground else Color(0xFFF1F5F9),
+        color = Color.Transparent,
+        border = BorderStroke(1.dp, if (dark) t.outline.copy(alpha = .44f) else Color(0xFFE2E8F0)),
         shadowElevation = 0.dp,
     ) {
-        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        Column(
+            Modifier.fillMaxWidth().background(trayBrush, shape).padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(9.dp),
+        ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("切换落地节点", color = t.textSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
@@ -1848,6 +1847,24 @@ private fun RefInlineNodeCard(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f).padding(end = 4.dp),
                 )
+                Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) {
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = active,
+                        enter = androidx.compose.animation.scaleIn(
+                            initialScale = .05f,
+                            animationSpec = spring(dampingRatio = .52f, stiffness = 500f),
+                        ) + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(130)),
+                        exit = androidx.compose.animation.scaleOut(targetScale = .45f) + androidx.compose.animation.fadeOut(),
+                    ) {
+                        Box(
+                            Modifier.size(15.dp).background(Color(0xFF2563EB), CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(Icons.Rounded.Check, "已选择", tint = Color.White, modifier = Modifier.size(10.dp))
+                        }
+                    }
+                }
+                Spacer(Modifier.width(4.dp))
                 RefDelayBadge(delay, testing, onDelay)
             }
         }
@@ -1962,15 +1979,16 @@ private fun RefDelayBadge(value: Long?, testing: Boolean, onClick: (() -> Unit)?
     val text = refDelay(value)
     val (background, textColor) = when {
         value == null -> Color(0xFFF1F5F9) to Color(0xFF64748B)
-        value <= 0L -> Color(0xFFFEF2F2) to Color(0xFFDC2626)
-        value > 200L -> Color(0xFFFFF7ED) to Color(0xFFD97706)
-        else -> Color(0xFFEFF6FF) to Color(0xFF2563EB)
+        value <= 0L -> Color(0xFFFFF1F2) to Color(0xFFF43F5E)
+        value < 100L -> Color(0xFFECFDF5) to Color(0xFF10B981)
+        value <= 300L -> Color(0xFFFFFBEB) to Color(0xFFF59E0B)
+        else -> Color(0xFFFFF1F2) to Color(0xFFF43F5E)
     }
     val source = remember(onClick) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val infinite = androidx.compose.animation.core.rememberInfiniteTransition(label = "latencyPulse")
     val pulse by infinite.animateFloat(
-        initialValue = .66f,
+        initialValue = .68f,
         targetValue = 1f,
         animationSpec = androidx.compose.animation.core.infiniteRepeatable(
             animation = androidx.compose.animation.core.tween(620),
@@ -1980,20 +1998,22 @@ private fun RefDelayBadge(value: Long?, testing: Boolean, onClick: (() -> Unit)?
     )
     var revealTarget by remember { mutableFloatStateOf(1f) }
     LaunchedEffect(text) {
-        revealTarget = .94f
-        delay(26)
+        revealTarget = .95f
+        delay(28)
         revealTarget = 1f
     }
-    val reveal by animateFloatAsState(revealTarget, spring(dampingRatio = .64f, stiffness = 520f), label = "latencyReveal")
-    val pressScale by animateFloatAsState(if (pressed) .96f else 1f, spring(dampingRatio = .74f, stiffness = 620f), label = "latencyPress")
-    val alpha = if (testing) pulse else 1f
+    val reveal by animateFloatAsState(revealTarget, spring(dampingRatio = .58f, stiffness = 520f), label = "latencyReveal")
+    val pressScale by animateFloatAsState(if (pressed) .96f else 1f, spring(dampingRatio = .70f, stiffness = 620f), label = "latencyPress")
     Box(
-        Modifier.widthIn(min = 58.dp).height(22.dp)
-            .graphicsLayer { scaleX = reveal * pressScale; scaleY = reveal * pressScale; this.alpha = if (pressed) .86f else alpha }
-            .background(if (testing) background.copy(alpha = .72f) else background, CircleShape)
-            .border(.7.dp, if (testing) Color(0xFF2563EB).copy(alpha = .24f + .28f * pulse) else Color.Transparent, CircleShape)
-            .then(if (onClick != null) Modifier.clickable(enabled = !testing, interactionSource = source, indication = null, onClick = onClick) else Modifier)
-            .padding(horizontal = 6.dp),
+        Modifier.width(62.dp).height(22.dp)
+            .graphicsLayer {
+                scaleX = reveal * pressScale
+                scaleY = reveal * pressScale
+                this.alpha = if (pressed) .85f else if (testing) .78f + .22f * pulse else 1f
+            }
+            .background(if (testing) background.copy(alpha = .78f) else background, CircleShape)
+            .border(.7.dp, if (testing) textColor.copy(alpha = .20f + .24f * pulse) else Color.Transparent, CircleShape)
+            .then(if (onClick != null) Modifier.clickable(enabled = !testing, interactionSource = source, indication = null, onClick = onClick) else Modifier),
         contentAlignment = Alignment.Center,
     ) {
         androidx.compose.animation.Crossfade(
@@ -2009,6 +2029,14 @@ private fun RefDelayBadge(value: Long?, testing: Boolean, onClick: (() -> Unit)?
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
+            )
+        }
+        if (testing) {
+            CircularProgressIndicator(
+                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 5.dp).size(9.dp),
+                strokeWidth = 1.25.dp,
+                color = textColor,
+                trackColor = textColor.copy(alpha = .14f),
             )
         }
     }
@@ -2561,7 +2589,13 @@ private fun RefPortDetailRow(label: String, value: String, valueColor: Color = L
     val t = LocalBichenTokens.current
     Row(Modifier.fillMaxWidth().padding(vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(label, color = t.textSecondary, fontSize = 12.sp, modifier = Modifier.weight(1f))
-        Text(value, color = valueColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        Text(
+            value,
+            color = valueColor,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+        )
     }
 }
 
@@ -2616,6 +2650,31 @@ private fun RefInfoBottomSheet(
     onDismiss: () -> Unit,
 ) {
     val t = LocalBichenTokens.current
+    val terminal = title.contains("日志")
+    val renderedText = remember(text, terminal) {
+        if (!terminal) {
+            androidx.compose.ui.text.AnnotatedString(text)
+        } else {
+            androidx.compose.ui.text.buildAnnotatedString {
+                val lines = text.lines()
+                lines.forEachIndexed { index, line ->
+                    val lower = line.lowercase(java.util.Locale.ROOT)
+                    val color = when {
+                        "warning" in lower || "warn" in lower -> Color(0xFFFBBF24)
+                        "error" in lower || "fatal" in lower -> Color(0xFFFB7185)
+                        "direct" in lower -> Color(0xFF34D399)
+                        "[tcp]" in lower || " tcp " in lower -> Color(0xFF22D3EE)
+                        "[udp]" in lower || " udp " in lower -> Color(0xFFA78BFA)
+                        else -> Color(0xFFCBD5E1)
+                    }
+                    pushStyle(androidx.compose.ui.text.SpanStyle(color = color))
+                    append(line)
+                    pop()
+                    if (index != lines.lastIndex) append('\n')
+                }
+            }
+        }
+    }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
@@ -2633,19 +2692,38 @@ private fun RefInfoBottomSheet(
             Box(
                 Modifier.fillMaxWidth()
                     .heightIn(max = 430.dp)
-                    .background(t.controlBackground.copy(alpha = .54f), RoundedCornerShape(16.dp))
+                    .background(if (terminal) Color(0xFF0F172A) else t.controlBackground.copy(alpha = .54f), RoundedCornerShape(16.dp))
+                    .border(if (terminal) .8.dp else 0.dp, if (terminal) Color(0xFF334155) else Color.Transparent, RoundedCornerShape(16.dp))
                     .padding(14.dp)
                     .verticalScroll(rememberScrollState()),
             ) {
-                Text(text, color = t.textSecondary, fontSize = 13.sp, lineHeight = 20.sp)
+                if (terminal) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Box(Modifier.size(7.dp).background(Color(0xFFFB7185), CircleShape))
+                            Box(Modifier.size(7.dp).background(Color(0xFFFBBF24), CircleShape))
+                            Box(Modifier.size(7.dp).background(Color(0xFF34D399), CircleShape))
+                            Spacer(Modifier.width(3.dp))
+                            Text("runtime.log", color = Color(0xFF64748B), fontSize = 10.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                        }
+                        Text(
+                            renderedText,
+                            fontSize = 12.sp,
+                            lineHeight = 18.sp,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        )
+                    }
+                } else {
+                    Text(renderedText, color = t.textSecondary, fontSize = 13.sp, lineHeight = 20.sp)
+                }
             }
             FilledTonalButton(
                 onClick = onDismiss,
                 modifier = Modifier.fillMaxWidth().height(48.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = t.controlBackground,
-                    contentColor = t.textPrimary,
+                    containerColor = if (terminal) Color(0xFF1E293B) else t.controlBackground,
+                    contentColor = if (terminal) Color(0xFFE2E8F0) else t.textPrimary,
                 ),
             ) {
                 Text(actionLabel, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
