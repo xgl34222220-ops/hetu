@@ -883,8 +883,8 @@ private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: I
                     modifier = Modifier.height(20.dp),
                 )
                 Text(
-                    if (renderedLan) "\${runtime.lanInterface} · $connections 连接"
-                    else "\${countryEmoji(runtime.wanCountryCode)} \${runtime.wanRegion}",
+                    if (renderedLan) "${runtime.lanInterface} · $connections 连接"
+                    else "${countryEmoji(runtime.wanCountryCode)} ${runtime.wanRegion}",
                     color = Color(0xFF64748B),
                     fontSize = 11.sp,
                     lineHeight = 14.sp,
