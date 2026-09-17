@@ -264,6 +264,12 @@ internal class BichenComposeController(private val context: Context) {
         rules.setSource(id, enabled, moduleInstalled())
     }
 
+    suspend fun setRuleProfile(id: String) = withContext(Dispatchers.IO) {
+        val rules = RuleStore(app)
+        rules.reload()
+        rules.setProfile(id, moduleInstalled())
+    }
+
     suspend fun changeDomain(domain: String, allow: Boolean, add: Boolean) = withContext(Dispatchers.IO) {
         val rules = RuleStore(app)
         rules.reload()

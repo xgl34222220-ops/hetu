@@ -545,7 +545,7 @@ private fun AdvancedInfoSheet(title: String, text: String, onDismiss: () -> Unit
             Surface(shape = RoundedCornerShape(16.dp), color = t.controlBackground.copy(alpha = .55f)) {
                 Text(text, Modifier.fillMaxWidth().padding(14.dp), color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
             }
-            FilledTonalButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(15.dp)) { Text("关闭") }
+            Text("下滑即可关闭", color = Color(0xFF94A3B8), fontSize = 10.sp, fontWeight = FontWeight.Medium, modifier = Modifier.align(Alignment.CenterHorizontally))
         }
     }
 }

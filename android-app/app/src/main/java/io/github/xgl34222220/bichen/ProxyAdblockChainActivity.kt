@@ -80,24 +80,28 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
         }
     }
 
-    val snapshot by produceState(initialValue = ChainSnapshot(), revision) {
-        value = try {
-            val rules = adController.rulesSnapshot()
-            val state = proxyController.state()
-            val independent = adController.homeSnapshot()
-            val hits = if (state.running) {
-                runCatching {
-                    proxyController.rules().firstOrNull {
-                        it.proxy.equals("REJECT", true) && it.payload.contains(ProxyAdblockRules.PROVIDER_NAME, true)
-                    }?.hitCount ?: 0L
-                }.getOrDefault(0L)
-            } else 0L
-            ChainSnapshot(rules, state.running, hits, independent.vpnRunning, independent.moduleEnabled, state.message)
-        } catch (cancel: CancellationException) {
-            throw cancel
-        } catch (error: Exception) {
-            ChainSnapshot(message = error.message ?: "读取广告过滤状态失败")
+    val cachedRules = remember { RulesSnapshot(count = prefs.getInt("proxyAdblockUiRuleCount", 0), profile = prefs.getString("proxyAdblockUiProfile", "加载中") ?: "加载中") }
+    val snapshot by produceState(initialValue = ChainSnapshot(rules = cachedRules), revision) {
+        val rulesResult = runCatching { adController.rulesSnapshot() }
+        val rules = rulesResult.getOrDefault(cachedRules)
+        if (rules.count > 0 || rules.sources.isNotEmpty()) {
+            prefs.edit().putInt("proxyAdblockUiRuleCount", rules.count).putString("proxyAdblockUiProfile", rules.profile).apply()
         }
+        val state = runCatching { proxyController.state() }.getOrNull()
+        val independent = runCatching { adController.homeSnapshot() }.getOrNull()
+        val hits = if (state?.running == true) runCatching {
+            proxyController.rules().firstOrNull {
+                it.proxy.equals("REJECT", true) && it.payload.contains(ProxyAdblockRules.PROVIDER_NAME, true)
+            }?.hitCount ?: 0L
+        }.getOrDefault(0L) else 0L
+        value = ChainSnapshot(
+            rules = rules,
+            running = state?.running == true,
+            hitCount = hits,
+            vpnFallbackRunning = independent?.vpnRunning == true,
+            hostsFallbackRunning = independent?.moduleEnabled == true,
+            message = listOfNotNull(state?.message?.takeIf { it.isNotBlank() }, rulesResult.exceptionOrNull()?.message).joinToString("；"),
+        )
     }
 
     fun applyFallback(enabled: Boolean, mode: String) {
@@ -199,7 +203,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             Text("随代理串联过滤", color = t.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                            Text(if (chainEnabled) "广告规则会插在代理分流规则之前" else "代理仅负责转发，不执行辟尘广告规则", color = t.textSecondary, fontSize = 11.sp)
+                            Text(if (chainEnabled) "尊重用户显式规则；广告规则只在最终兜底前拦截" else "代理仅负责转发，不执行辟尘广告规则", color = t.textSecondary, fontSize = 11.sp)
                         }
                         Switch(
                             checked = chainEnabled,
@@ -221,11 +225,45 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
             }
         }
 
+
+        item("profile") {
+            Surface(shape = RoundedCornerShape(20.dp), color = if (dark) t.elevatedCardBackground else Color.White, shadowElevation = if (dark) 0.dp else 1.dp) {
+                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.Tune, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(19.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("保护强度", color = t.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        Text(snapshot.rules.profile, color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        listOf("lite" to "轻量", "balanced" to "均衡", "enhanced" to "加强").forEach { (id, label) ->
+                            FilterChip(
+                                selected = snapshot.rules.profile == label,
+                                onClick = {
+                                    if (!busy) scope.launch {
+                                        busy = true
+                                        runCatching { adController.setRuleProfile(id) }
+                                            .onSuccess { notice = "已切换到${label}保护；Root 代理运行中请重启以载入新快照"; revision++ }
+                                            .onFailure { notice = it.message ?: "保护强度切换失败" }
+                                        busy = false
+                                    }
+                                },
+                                label = { Text(label) },
+                                modifier = Modifier.weight(1f),
+                                enabled = !busy,
+                            )
+                        }
+                    }
+                    Text("轻量优先兼容；均衡适合日常；加强会启用更激进的 Hagezi 规则源。用户黑白名单始终保留。", color = t.textSecondary, fontSize = 10.sp, lineHeight = 15.sp)
+                }
+            }
+        }
+
         item("flow") {
             Surface(shape = RoundedCornerShape(18.dp), color = t.selectionBackground) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Text("执行顺序", color = t.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    Text("应用流量 → Root TPROXY / Redirect → 广告 RULE-SET → REJECT → CNIP / 用户规则 / 策略组 → 节点或 DIRECT", color = t.textSecondary, fontSize = 11.sp, lineHeight = 17.sp)
+                    Text("应用流量 → TUN / TPROXY / eBPF → 用户显式规则 → 广告 RULE-SET → 最终兜底 → 节点或 DIRECT", color = t.textSecondary, fontSize = 11.sp, lineHeight = 17.sp)
                     Text("代理串联开启时，独立 DNS 去广告会暂停；代理停止后会按原状态恢复。", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                 }
             }

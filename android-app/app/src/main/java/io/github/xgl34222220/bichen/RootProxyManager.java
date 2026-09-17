@@ -85,13 +85,31 @@ final class RootProxyManager {
         throw new IOException("辟尘控制接口动态端口 29090-29149 均被占用，请关闭冲突代理后重试");
     }
 
+    private Set<String> selectedTunPackages(){
+        Set<String> raw=prefs.getStringSet("proxyAppPackages",Collections.emptySet());
+        TreeSet<String> out=new TreeSet<>();
+        if(raw!=null)for(String value:raw){
+            if(value!=null&&value.length()<=255&&value.matches("[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*"))out.add(value);
+        }
+        return out;
+    }
+
+    private String detectDefaultInterface()throws IOException{
+        RootBridge.Result result=RootBridge.rootShell(context,
+                "ip route get 1.1.1.1 2>/dev/null | sed -n 's/.* dev \([^ ]*\).*/\1/p' | head -n 1",5000L);
+        String iface=result.output==null?"":result.output.trim();
+        if(!iface.matches("[A-Za-z0-9_.:@-]{1,32}"))throw new IOException("eBPF 无法识别当前默认出口接口");
+        return iface;
+    }
+
     Prepared prepare(ProxyRuntimeProfile profile)throws Exception{
         RootBridge.requireWorkerThread();
         if(profile.core!=ProxyRuntimeProfile.Core.MIHOMO&&profile.core!=ProxyRuntimeProfile.Core.MIHOMO_SMART)
             throw new IOException(profile.core.label+" 的运行后端还未接入");
         ProxyRuntimeProfile.Capability capability=profile.capability();
         if(!capability.available)throw new IOException(capability.reason.isEmpty()?profile.mode.label+" 暂不可用":capability.reason);
-        if(profile.mode!=ProxyRuntimeProfile.Mode.TPROXY&&profile.mode!=ProxyRuntimeProfile.Mode.REDIRECT&&profile.mode!=ProxyRuntimeProfile.Mode.ENHANCE)
+        if(profile.mode!=ProxyRuntimeProfile.Mode.TPROXY&&profile.mode!=ProxyRuntimeProfile.Mode.REDIRECT&&profile.mode!=ProxyRuntimeProfile.Mode.ENHANCE&&
+                profile.mode!=ProxyRuntimeProfile.Mode.TUN&&profile.mode!=ProxyRuntimeProfile.Mode.EBPF)
             throw new IOException(profile.mode.label+" 的统一 Root 后端还未接入");
 
         RootProxyPolicy policy=RootProxyPolicy.load(context,prefs,profile);
@@ -103,7 +121,9 @@ final class RootProxyManager {
         ProxyAdblockRules.Snapshot adblock=profile.adblockChain?ProxyAdblockRules.export(context):null;
         if(profile.adblockChain&&adblock.count<=0)throw new IOException("代理串联去广告已开启，但当前没有有效广告规则；请先启用或更新规则源");
         int controllerPort=chooseControllerPort();
-        MihomoStartupConfig.Result generated=MihomoStartupConfig.generate(source,profile,controllerSecret(),controllerPort);
+        String ebpfInterface=profile.mode==ProxyRuntimeProfile.Mode.EBPF?detectDefaultInterface():"";
+        Set<String> tunPackages=profile.mode==ProxyRuntimeProfile.Mode.TUN?selectedTunPackages():Collections.emptySet();
+        MihomoStartupConfig.Result generated=MihomoStartupConfig.generate(source,profile,controllerSecret(),controllerPort,profile.appScope,tunPackages,ebpfInterface);
         writeStartupCopy(generated.yaml);
         return new Prepared(profile,selected,policy,adblock,generated.yaml,generated.tproxyPort,generated.redirectPort,controllerPort);
     }
@@ -163,7 +183,7 @@ final class RootProxyManager {
             policy=p.policy;
             stage(progress,"代理配置可用；本次仅关闭串联广告过滤继续启动…");
         }
-        stage(progress,"检查 TPROXY / Redirect / UID / IPv6 能力…");
+        stage(progress,"检查 TUN / TPROXY / eBPF / UID / IPv6 能力…");
         JSONObject pre=runJson("preflight",
                 profile.mode.id,String.valueOf(p.tproxyPort),String.valueOf(p.redirectPort),profile.ipv6.id,
                 bit(profile.tcp),bit(profile.udp),profile.dnsHijack.id,bit(profile.quicBlocked),

@@ -54,8 +54,8 @@ final class ProxyRuntimeProfile {
             case TPROXY:return new Capability(true,true,true,true,true,true,true,true,true,"");
             case REDIRECT:return new Capability(true,true,false,true,true,true,true,true,true,"");
             case ENHANCE:return new Capability(true,true,true,true,true,true,true,true,true,"");
-            case TUN:return new Capability(false,true,true,true,false,false,false,true,true,"Root TUN 正在并入统一运行时；旧 VpnService 仍保留，但这里不再假报为 Root 模式可用");
-            case EBPF:return new Capability(false,false,false,false,false,false,false,false,false,"eBPF 必须完成 verifier/attach/map 能力探测并使用兼容核心；后端接通前不开放");
+            case TUN:return new Capability(true,true,true,true,true,false,true,true,true,"");
+            case EBPF:return new Capability(true,true,true,true,false,false,false,false,true,"");
             case MIXED:return new Capability(false,false,false,false,false,false,false,false,false,"Mixed 的 Root TUN + Redirect 事务后端正在接入，当前不开放");
             default:return new Capability(false,false,false,false,false,false,false,false,false,"未知运行模式");
         }

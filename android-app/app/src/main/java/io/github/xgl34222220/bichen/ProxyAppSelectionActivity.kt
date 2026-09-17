@@ -22,6 +22,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
@@ -71,6 +73,9 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
     val t = LocalBichenTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val pageBg = if (dark) t.pageBackground else Color(0xFFF1F5F9)
+    val shimmer = androidx.compose.animation.core.rememberInfiniteTransition(label = "appSkeletonShimmer")
+    val shimmerX by shimmer.animateFloat(initialValue = -1f, targetValue = 2f, animationSpec = androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(1500, easing = androidx.compose.animation.core.LinearEasing)), label = "appSkeletonShimmerX")
+    val shimmerBrush = Brush.horizontalGradient(listOf(t.controlBackground.copy(alpha = .46f), if (dark) Color.White.copy(alpha = .11f) else Color.White.copy(alpha = .92f), t.controlBackground.copy(alpha = .46f)), startX = shimmerX * 360f, endX = (shimmerX + 1f) * 360f)
 
     val scopeTitle = when (profile.appScope) {
         ProxyRuntimeProfile.AppScope.BLACKLIST -> "所选应用直连"
@@ -159,13 +164,13 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
                             shadowElevation = if (dark) 0.dp else 1.dp,
                         ) {
                             Row(Modifier.fillMaxSize().padding(horizontal = 13.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Box(Modifier.size(42.dp).background(t.controlBackground.copy(alpha = .72f), RoundedCornerShape(12.dp)))
+                                Box(Modifier.size(42.dp).background(shimmerBrush, RoundedCornerShape(12.dp)))
                                 Spacer(Modifier.width(12.dp))
                                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                                    Box(Modifier.fillMaxWidth(if (index % 2 == 0) .52f else .66f).height(12.dp).background(t.controlBackground.copy(alpha = .76f), CircleShape))
-                                    Box(Modifier.fillMaxWidth(if (index % 3 == 0) .72f else .58f).height(8.dp).background(t.controlBackground.copy(alpha = .50f), CircleShape))
+                                    Box(Modifier.fillMaxWidth(if (index % 2 == 0) .52f else .66f).height(12.dp).background(shimmerBrush, CircleShape))
+                                    Box(Modifier.fillMaxWidth(if (index % 3 == 0) .72f else .58f).height(8.dp).background(shimmerBrush, CircleShape))
                                 }
-                                Box(Modifier.size(22.dp).background(t.controlBackground.copy(alpha = .62f), CircleShape))
+                                Box(Modifier.size(22.dp).background(shimmerBrush, CircleShape))
                             }
                         }
                     }
@@ -195,10 +200,12 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
                         Text(app.label, color = t.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(app.packageName, color = t.textSecondary, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
-                    Checkbox(checked = checked, onCheckedChange = { value ->
-                        setProxyApp(app.packageName, value)
-                        selected = proxyApps()
-                    })
+                    val checkScale by animateFloatAsState(if (checked) 1f else .78f, spring(dampingRatio = .50f, stiffness = 620f), label = "appCheck${app.packageName}")
+                    Checkbox(
+                        checked = checked,
+                        onCheckedChange = { value -> setProxyApp(app.packageName, value); selected = proxyApps() },
+                        modifier = Modifier.graphicsLayer { scaleX = checkScale; scaleY = checkScale },
+                    )
                 }
             }
         }

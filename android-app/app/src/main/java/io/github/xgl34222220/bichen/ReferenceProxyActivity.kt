@@ -117,6 +117,7 @@ class ReferenceProxyActivity : ComponentActivity() {
 }
 
 private enum class RefProxyPage { Home, Panel, Tools, Settings }
+private data class RefSubscriptionCache(val used: Long = 0L, val total: Long = 0L, val count: Int = 0)
 private enum class RefPanelTab(val label: String) {
     Overview("节点"), Nodes("概览"), Subscriptions("订阅"), Connections("连接"), Rules("规则"), RuleSets("规则集")
 }
@@ -154,15 +155,33 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
             ),
         )
     }
-    var runtime by remember { mutableStateOf(ProxyRuntimeSnapshot()) }
+    var runtime by remember { mutableStateOf(ProxyRuntimeSnapshot(
+        running = prefs.getBoolean("proxyUiLastRunning", false),
+        elapsedSeconds = prefs.getLong("proxyUiLastElapsed", 0L),
+        rssBytes = prefs.getLong("proxyUiLastRss", 0L),
+        lanAddress = prefs.getString("proxyUiLastLan", "—") ?: "—",
+        lanInterface = prefs.getString("proxyUiLastLanIf", "—") ?: "—",
+        wanAddress = prefs.getString("proxyUiLastWan", "—") ?: "—",
+        wanCountryCode = prefs.getString("proxyUiLastWanCountry", "") ?: "",
+        wanRegion = prefs.getString("proxyUiLastWanRegion", "—") ?: "—",
+    )) }
     var providers by remember { mutableStateOf<List<DashboardProviderUi>>(emptyList()) }
-    var siteDelays by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
+    var cachedSubscription by remember { mutableStateOf(RefSubscriptionCache(
+        used = prefs.getLong("proxyUiLastSubUsed", 0L),
+        total = prefs.getLong("proxyUiLastSubTotal", 0L),
+        count = prefs.getInt("proxyUiLastSubCount", 0),
+    )) }
+    var siteDelays by remember { mutableStateOf(mapOf(
+        "Baidu" to prefs.getLong("proxyUiLastDelayBaidu", -2L),
+        "Cloudflare" to prefs.getLong("proxyUiLastDelayCloudflare", -2L),
+        "Google" to prefs.getLong("proxyUiLastDelayGoogle", -2L),
+    ).filterValues { it != -2L }) }
     val delays = remember { mutableStateMapOf<String, Long>() }
-    var cpuPercent by remember { mutableFloatStateOf(0f) }
+    var cpuPercent by remember { mutableFloatStateOf(prefs.getFloat("proxyUiLastCpu", 0f)) }
     var lastProcessTicks by remember { mutableLongStateOf(0L) }
     var lastSystemTicks by remember { mutableLongStateOf(0L) }
-    var upRate by remember { mutableLongStateOf(0L) }
-    var downRate by remember { mutableLongStateOf(0L) }
+    var upRate by remember { mutableLongStateOf(prefs.getLong("proxyUiLastUpRate", 0L)) }
+    var downRate by remember { mutableLongStateOf(prefs.getLong("proxyUiLastDownRate", 0L)) }
     var lastUp by remember { mutableLongStateOf(0L) }
     var lastDown by remember { mutableLongStateOf(0L) }
     var lastAt by remember { mutableLongStateOf(0L) }
@@ -197,12 +216,29 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
             lastSystemTicks = sampled.systemTicks
             runtime = sampled
             providers = if (next.running) runCatching { repo.providers() }.getOrDefault(providers) else emptyList()
+            if (providers.isNotEmpty()) {
+                val tracked = providers.filter { it.hasSubscriptionInfo && it.total > 0L }
+                cachedSubscription = RefSubscriptionCache(tracked.sumOf { it.used }, tracked.sumOf { it.total }, providers.size)
+            }
             state = next
             prefs.edit()
                 .putBoolean("proxyUiLastRunning", next.running)
                 .putString("proxyUiLastCore", next.core)
                 .putString("proxyUiLastMode", next.mode)
                 .putString("proxyUiLastConfig", next.config)
+                .putLong("proxyUiLastElapsed", sampled.elapsedSeconds)
+                .putLong("proxyUiLastRss", sampled.rssBytes)
+                .putString("proxyUiLastLan", sampled.lanAddress)
+                .putString("proxyUiLastLanIf", sampled.lanInterface)
+                .putString("proxyUiLastWan", sampled.wanAddress)
+                .putString("proxyUiLastWanCountry", sampled.wanCountryCode)
+                .putString("proxyUiLastWanRegion", sampled.wanRegion)
+                .putFloat("proxyUiLastCpu", cpuPercent)
+                .putLong("proxyUiLastUpRate", upRate)
+                .putLong("proxyUiLastDownRate", downRate)
+                .putLong("proxyUiLastSubUsed", cachedSubscription.used)
+                .putLong("proxyUiLastSubTotal", cachedSubscription.total)
+                .putInt("proxyUiLastSubCount", cachedSubscription.count)
                 .apply()
             message = next.message
             lastAt = now
@@ -289,7 +325,14 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
         testing = true
         try {
             val measured = repo.siteLatencies()
-            if (measured.isNotEmpty()) siteDelays = measured
+            if (measured.isNotEmpty()) {
+                siteDelays = measured
+                prefs.edit()
+                    .putLong("proxyUiLastDelayBaidu", measured["Baidu"] ?: -2L)
+                    .putLong("proxyUiLastDelayCloudflare", measured["Cloudflare"] ?: -2L)
+                    .putLong("proxyUiLastDelayGoogle", measured["Google"] ?: -2L)
+                    .apply()
+            }
             if (reportError && measured.values.none { it > 0L }) {
                 message = "关键站点测速失败，请检查当前网络"
             }
@@ -407,6 +450,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                     state = state,
                     runtime = runtime,
                     providers = providers,
+                    cachedSubscription = cachedSubscription,
                     siteDelays = siteDelays,
                     upRate = upRate,
                     downRate = downRate,
@@ -481,6 +525,7 @@ private fun RefHome(
     state: ProxyComposeState,
     runtime: ProxyRuntimeSnapshot,
     providers: List<DashboardProviderUi>,
+    cachedSubscription: RefSubscriptionCache,
     siteDelays: Map<String, Long>,
     upRate: Long,
     downRate: Long,
@@ -603,11 +648,14 @@ private fun RefHome(
                             Text("${state.core} · ${state.mode}", color = t.textSecondary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                             Text(state.config, color = t.textMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
+                        val checkPulse = androidx.compose.animation.core.rememberInfiniteTransition(label = "heroCheckGlow")
+                        val checkGlow by checkPulse.animateFloat(initialValue = 0f, targetValue = 1f, animationSpec = androidx.compose.animation.core.infiniteRepeatable(animation = androidx.compose.animation.core.tween(1500, easing = androidx.compose.animation.core.FastOutSlowInEasing), repeatMode = androidx.compose.animation.core.RepeatMode.Reverse), label = "heroCheckGlowValue")
                         Box(
                             Modifier
                                 .size(56.dp)
+                                .graphicsLayer { if (state.running) { scaleX = .99f + checkGlow * .018f; scaleY = .99f + checkGlow * .018f } }
                                 .shadow(
-                                    if (state.running) 16.dp else 0.dp,
+                                    if (state.running) (13f + checkGlow * 10f).dp else 0.dp,
                                     CircleShape,
                                     clip = false,
                                     ambientColor = Color(0xFF002FA7).copy(alpha = .28f),
@@ -665,7 +713,7 @@ private fun RefHome(
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                RefSubscriptionCompact(providers, Modifier.weight(1f), onSubscription)
+                RefSubscriptionCompact(providers, cachedSubscription, Modifier.weight(1f), onSubscription)
                 RefResourceCard(memory, cpuPercent, Modifier.weight(1f))
             }
         }
@@ -770,97 +818,39 @@ private fun RefLatencyColumn(label: String, value: Long?, testing: Boolean, modi
 private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: Int, modifier: Modifier) {
     val t = LocalBichenTokens.current
     val view = LocalView.current
-    val scope = rememberCoroutineScope()
     var showLan by rememberSaveable { mutableStateOf(true) }
-    var flipping by remember { mutableStateOf(false) }
-    val flipRotation = remember { Animatable(0f) }
     val source = remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) .97f else 1f, spring(dampingRatio = .74f, stiffness = 560f), label = "networkCardPress")
     val shape = RoundedCornerShape(20.dp)
     val valueColor = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A)
-
-    fun flipCard() {
-        if (flipping) return
-        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-        scope.launch {
-            flipping = true
-            try {
-                flipRotation.animateTo(
-                    89.5f,
-                    animationSpec = androidx.compose.animation.core.tween(
-                        durationMillis = 115,
-                        easing = androidx.compose.animation.core.FastOutSlowInEasing,
-                    ),
-                )
-                showLan = !showLan
-                flipRotation.snapTo(-89.5f)
-                flipRotation.animateTo(
-                    0f,
-                    animationSpec = androidx.compose.animation.core.tween(
-                        durationMillis = 155,
-                        easing = androidx.compose.animation.core.FastOutSlowInEasing,
-                    ),
-                )
-            } finally {
-                flipRotation.snapTo(0f)
-                flipping = false
-            }
-        }
-    }
-
     Surface(
-        modifier = modifier
-            .height(112.dp)
-            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .94f else 1f }
-            .clip(shape)
-            .clickable(enabled = !flipping, interactionSource = source, indication = null, onClick = ::flipCard),
-        shape = shape,
-        color = t.cardBackground,
-        shadowElevation = 1.dp,
+        modifier = modifier.height(112.dp).graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .94f else 1f }
+            .clip(shape).clickable(interactionSource = source, indication = null) {
+                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK); showLan = !showLan
+            },
+        shape = shape, color = t.cardBackground, shadowElevation = 1.dp,
     ) {
-        Column(
-            Modifier.fillMaxSize()
-                .graphicsLayer {
-                    rotationY = flipRotation.value
-                    val edge = kotlin.math.abs(flipRotation.value) / 90f
-                    alpha = 1f - edge * .10f
-                    scaleX = 1f - edge * .025f
-                }
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
+        Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.SpaceBetween) {
             Row(Modifier.fillMaxWidth().height(24.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(if (showLan) "LAN" else "WAN", color = Color(0xFF64748B), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                Box(
-                    Modifier.size(24.dp)
-                        .background(if (MaterialTheme.colorScheme.background.luminance() < .5f) Color.White.copy(alpha = .07f) else Color(0xFFF1F5F9), CircleShape)
-                        .border(.6.dp, if (MaterialTheme.colorScheme.background.luminance() < .5f) Color.White.copy(alpha = .08f) else Color.White.copy(alpha = .90f), CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
+                Box(Modifier.size(24.dp).background(Color(0xFFF1F5F9), CircleShape).border(.6.dp, Color.White.copy(alpha = .90f), CircleShape), contentAlignment = Alignment.Center) {
                     Icon(Icons.Rounded.SwapHoriz, "切换 LAN/WAN", tint = Color(0xFF2563EB), modifier = Modifier.size(14.dp))
                 }
             }
-            Text(
-                if (showLan) runtime.lanAddress else runtime.wanAddress,
-                color = valueColor,
-                fontSize = 15.sp,
-                lineHeight = 18.sp,
-                fontWeight = FontWeight.ExtraBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.height(20.dp),
-            )
-            Text(
-                if (showLan) "${runtime.lanInterface} · $connections 连接" else "${countryEmoji(runtime.wanCountryCode)} ${runtime.wanRegion}",
-                color = Color(0xFF64748B),
-                fontSize = 11.sp,
-                lineHeight = 14.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.height(18.dp),
-            )
+            androidx.compose.animation.AnimatedContent(
+                targetState = showLan,
+                transitionSpec = {
+                    (androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(220)) { 4.dp.roundToPx() } + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(180)) + androidx.compose.animation.scaleIn(initialScale = .98f))
+                        .togetherWith(androidx.compose.animation.slideOutVertically(androidx.compose.animation.core.tween(160)) { -4.dp.roundToPx() } + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(120)))
+                },
+                label = "lanWanMetricSwap",
+            ) { lan ->
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(if (lan) runtime.lanAddress else runtime.wanAddress, color = valueColor, fontSize = 15.sp, lineHeight = 18.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.height(20.dp))
+                    Text(if (lan) "${runtime.lanInterface} · $connections 连接" else "${countryEmoji(runtime.wanCountryCode)} ${runtime.wanRegion}", color = Color(0xFF64748B), fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.height(18.dp))
+                }
+            }
         }
     }
 }
@@ -888,12 +878,15 @@ private fun RefSpeedCard(up: Long, down: Long, modifier: Modifier) {
 }
 
 @Composable
-private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, modifier: Modifier, onClick: () -> Unit) {
+private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, cached: RefSubscriptionCache, modifier: Modifier, onClick: () -> Unit) {
     val t = LocalBichenTokens.current
     val haptic = LocalHapticFeedback.current
     val tracked = items.filter { it.hasSubscriptionInfo && it.total > 0L }
-    val used = tracked.sumOf { it.used }
-    val total = tracked.sumOf { it.total }
+    val liveUsed = tracked.sumOf { it.used }
+    val liveTotal = tracked.sumOf { it.total }
+    val used = if (liveTotal > 0L) liveUsed else cached.used
+    val total = if (liveTotal > 0L) liveTotal else cached.total
+    val itemCount = if (items.isNotEmpty()) items.size else cached.count
     val ratio = if (total <= 0L) 0f else (used.toDouble() / total.toDouble()).toFloat().coerceIn(0f, 1f)
     val valueColor = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A)
     val source = remember { MutableInteractionSource() }
@@ -933,7 +926,7 @@ private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, modifier: M
             }
             Row(Modifier.fillMaxWidth().height(18.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("已用流量", color = Color(0xFF94A3B8), fontSize = 11.sp, modifier = Modifier.weight(1f))
-                Text(if (total > 0L) "总 ${refBytes(total)}" else "${items.size} 个订阅", color = Color(0xFF64748B), fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+                Text(if (total > 0L) "总 ${refBytes(total)}" else "$itemCount 个订阅", color = Color(0xFF64748B), fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1)
             }
         }
     }
@@ -1152,7 +1145,6 @@ private fun RefPanel(
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
     val tab = selectedTab
-    val tabFade = remember { Animatable(1f) }
     var refreshing by remember { mutableStateOf(false) }
     var providers by remember { mutableStateOf<List<DashboardProviderUi>>(emptyList()) }
     var rules by remember { mutableStateOf<List<ProxyRuleUi>>(emptyList()) }
@@ -1162,6 +1154,7 @@ private fun RefPanel(
     val testing = remember { mutableStateMapOf<String, Boolean>() }
     val providerRefreshing = remember { mutableStateMapOf<String, Boolean>() }
     val ruleSetRefreshing = remember { mutableStateMapOf<String, Boolean>() }
+    val ruleSetSucceeded = remember { mutableStateMapOf<String, Boolean>() }
     var capsuleText by remember { mutableStateOf("") }
     var capsuleError by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
@@ -1247,16 +1240,6 @@ private fun RefPanel(
     }
 
     LaunchedEffect(tab, state.running) { loadTab() }
-    LaunchedEffect(tab) {
-        tabFade.snapTo(0f)
-        tabFade.animateTo(
-            1f,
-            animationSpec = androidx.compose.animation.core.tween(
-                durationMillis = 110,
-                easing = androidx.compose.animation.core.FastOutSlowInEasing,
-            ),
-        )
-    }
     LaunchedEffect(searchRequest) { if (searchRequest > 0) searchOpen = true }
 
     LaunchedEffect(tab) {
@@ -1265,11 +1248,10 @@ private fun RefPanel(
     }
 
     Box(Modifier.fillMaxSize()) {
-        key(tab) {
             PullToRefreshBox(
                 isRefreshing = refreshing,
                 onRefresh = ::refresh,
-                modifier = Modifier.fillMaxSize().graphicsLayer { alpha = tabFade.value },
+                modifier = Modifier.fillMaxSize(),
             ) {
             LazyColumn(
             Modifier.fillMaxSize(),
@@ -1447,7 +1429,7 @@ private fun RefPanel(
                     RefRuleGroupCard(batch)
                 }
                 RefPanelTab.RuleSets -> items(ruleSets, key = { "${tab.name}-ruleset-${it.name}" }, contentType = { "ruleset-row" }) { item ->
-                    RefRuleSetRow(item, refreshing = ruleSetRefreshing[item.name] == true) {
+                    RefRuleSetRow(item, refreshing = ruleSetRefreshing[item.name] == true, success = ruleSetSucceeded[item.name] == true) {
                         if (ruleSetRefreshing[item.name] != true) scope.launch {
                             ruleSetRefreshing[item.name] = true
                             try {
@@ -1455,9 +1437,12 @@ private fun RefPanel(
                                 if (updated != null) ruleSets = ruleSets.map { if (it.name == updated.name) updated else it }
                                 capsuleError = false
                                 capsuleText = "规则集更新完成"
+                                ruleSetSucceeded[item.name] = true
                                 view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
                                 delay(70)
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                delay(1200)
+                                ruleSetSucceeded.remove(item.name)
                             } catch (e: Exception) {
                                 capsuleError = true
                                 capsuleText = e.message ?: "规则集更新失败，请检查网络"
@@ -1469,7 +1454,6 @@ private fun RefPanel(
                 }
             }
             }
-        }
         }
         androidx.compose.animation.AnimatedVisibility(
             visible = capsuleText.isNotBlank(),
@@ -2641,11 +2625,11 @@ private fun RefTrafficOverview(state: ProxyComposeState) {
                 Column(Modifier.fillMaxSize().padding(13.dp), verticalArrangement = Arrangement.SpaceBetween) {
                     Text("连接协议", color = Color(0xFF94A3B8), fontSize = 11.sp, fontWeight = FontWeight.Medium)
                     Text("TCP $tcpPercent%  ·  UDP $udpPercent%", color = t.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
-                    Box(Modifier.fillMaxWidth().height(5.dp).background(Color(0xFFE2E8F0), CircleShape)) {
+                    Box(Modifier.fillMaxWidth().height(4.dp).background(Color(0xFFE2E8F0), CircleShape)) {
                         if (protocolCount > 0) {
                             Row(Modifier.fillMaxSize().clip(CircleShape)) {
                                 if (tcpCount > 0) Box(Modifier.weight(tcpRatio.coerceAtLeast(.01f)).fillMaxHeight().background(Color(0xFF2563EB)))
-                                if (udpCount > 0) Box(Modifier.weight((1f - tcpRatio).coerceAtLeast(.01f)).fillMaxHeight().background(Color(0xFF10B981)))
+                                if (udpCount > 0) Box(Modifier.weight((1f - tcpRatio).coerceAtLeast(.01f)).fillMaxHeight().background(Color(0xFFF59E0B)))
                             }
                         }
                     }
@@ -2886,7 +2870,7 @@ private fun RefRuleGroupCard(items: List<ProxyRuleUi>) {
 }
 
 @Composable
-private fun RefRuleSetRow(item: DashboardRuleSetUi, refreshing: Boolean, onRefresh: () -> Unit) {
+private fun RefRuleSetRow(item: DashboardRuleSetUi, refreshing: Boolean, success: Boolean, onRefresh: () -> Unit) {
     val t = LocalBichenTokens.current
     val scheme = MaterialTheme.colorScheme
     val spinTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "ruleSetRefreshSpin${item.name}")
@@ -2916,7 +2900,7 @@ private fun RefRuleSetRow(item: DashboardRuleSetUi, refreshing: Boolean, onRefre
                 Text(refUpdatedAt(item.updatedAt), color = Color(0xFF94A3B8), fontSize = 11.sp, maxLines = 1)
             }
             IconButton(onClick = { if (!refreshing) onRefresh() }, modifier = Modifier.size(38.dp)) {
-                Icon(Icons.Rounded.Download, "远端更新", tint = scheme.primary, modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = if (refreshing) spin else 0f })
+                Icon(Icons.Rounded.Download, "远端更新", tint = if (success) Color(0xFF10B981) else scheme.primary, modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = if (refreshing) spin else 0f })
             }
         }
     }
@@ -3078,10 +3062,6 @@ private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
                     highlightValue = true,
                 ) { portsInfo = true }
                 RefDivider()
-                RefValueRow("当前配置", state.config, Icons.Rounded.Description, Color(0xFF8B5CF6), highlightValue = true) {
-                    context.startActivity(Intent(context, ProxySubscriptionActivity::class.java))
-                }
-                RefDivider()
                 RefValueRow("高级代理配置", "应用范围 · DNS · QUIC · CNIP · 共享 · 绕过", Icons.Rounded.Tune, Color(0xFF0EA5E9), highlightValue = true) {
                     context.startActivity(Intent(context, ProxyAdvancedSettingsActivity::class.java))
                 }
@@ -3103,22 +3083,6 @@ private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
                 RefDivider()
                 RefValueRow("主题与界面", "Miuix · Monet · OLED", Icons.Rounded.Palette, Color(0xFFEC4899)) {
                     context.startActivity(Intent(context, ThemeSettingsActivity::class.java))
-                }
-                RefDivider()
-                RefValueRow("WebUI 面板", "本地", Icons.Rounded.Language, Color(0xFF2563EB), highlightValue = true) {
-                    context.startActivity(Intent(context, ProxyWebUiActivity::class.java))
-                }
-            }
-        }
-        item { RefSectionLabel("管理") }
-        item {
-            RefGroup {
-                RefValueRow("文件管理", "代理运行目录", Icons.Rounded.Folder, Color(0xFFF59E0B)) {
-                    context.startActivity(Intent(context, ReferenceFileManagerActivity::class.java))
-                }
-                RefDivider()
-                RefValueRow("订阅与配置", "链接 · 更新", Icons.Rounded.CloudDownload, Color(0xFF2563EB)) {
-                    context.startActivity(Intent(context, ProxySubscriptionActivity::class.java))
                 }
             }
         }

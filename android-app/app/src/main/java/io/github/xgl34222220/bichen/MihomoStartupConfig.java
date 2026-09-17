@@ -35,6 +35,11 @@ final class MihomoStartupConfig {
     }
 
     static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret,int controllerPort)throws IOException{
+        return generate(source,profile,controllerSecret,controllerPort,ProxyRuntimeProfile.AppScope.CORE,Collections.emptySet(),"");
+    }
+
+    static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret,int controllerPort,
+            ProxyRuntimeProfile.AppScope appScope,Set<String> appPackages,String ebpfInterface)throws IOException{
         if(source==null||source.trim().isEmpty())throw new IOException("源配置为空");
         if(controllerSecret==null||controllerSecret.trim().isEmpty())throw new IOException("控制接口密钥为空");
         if(controllerPort<1024||controllerPort>65535)throw new IOException("控制接口端口无效");
@@ -64,6 +69,7 @@ final class MihomoStartupConfig {
         yaml=removeTopLevelScalar(yaml,"allow-lan");
         yaml=removeTopLevelScalar(yaml,"bind-address");
         yaml=removeTopLevelBlock(yaml,"tun");
+        yaml=removeTopLevelBlock(yaml,"ebpf");
         yaml=removeTopLevelScalar(yaml,"routing-mark");
         yaml=removeTopLevelScalar(yaml,"external-controller");
         yaml=removeTopLevelScalar(yaml,"external-controller-tls");
@@ -112,10 +118,17 @@ final class MihomoStartupConfig {
                 override.append("tun:\n  enable: false\n");
                 break;
             case TUN:
-            case MIXED:
-                throw new IOException(profile.mode.label+" 的统一 Root 事务后端尚未接入，当前不假报支持");
+                override.append("tproxy-port: 0\nredir-port: 0\n");
+                appendTun(override,profile,appScope,appPackages,true,true);
+                break;
             case EBPF:
-                throw new IOException("eBPF 必须使用兼容核心和经过能力探测的 eBPF 入站，不能用普通 Mihomo 冒充");
+                if(ebpfInterface==null||ebpfInterface.isEmpty())throw new IOException("eBPF 未找到可用默认出口接口");
+                override.append("tproxy-port: 0\nredir-port: 0\n");
+                appendTun(override,profile,ProxyRuntimeProfile.AppScope.CORE,Collections.emptySet(),false,false);
+                override.append("ebpf:\n  redirect-to-tun:\n    - '").append(yamlQuote(ebpfInterface)).append("'\n");
+                break;
+            case MIXED:
+                throw new IOException(profile.mode.label+" 的统一 Root 事务后端尚未接入，当前不开放");
         }
         // Mihomo marks its own outbound sockets. Root netfilter returns this bit before interception,
         // so Root/system UID traffic no longer needs to be blanket-bypassed just to avoid a core loop.
@@ -134,6 +147,32 @@ final class MihomoStartupConfig {
         override.append("# --- end Bichen runtime isolation ---\n");
         return new Result(yaml+override,tp,rp);
     }
+
+    private static void appendTun(StringBuilder out,ProxyRuntimeProfile profile,ProxyRuntimeProfile.AppScope scope,
+            Set<String> packages,boolean autoRoute,boolean packageFilter){
+        out.append("tun:\n");
+        out.append("  enable: true\n");
+        out.append("  device: bichen0\n");
+        out.append("  stack: mixed\n");
+        out.append("  auto-route: ").append(autoRoute?"true":"false").append('\n');
+        out.append("  auto-redirect: false\n");
+        out.append("  auto-detect-interface: ").append(autoRoute?"true":"false").append('\n');
+        out.append("  strict-route: ").append(autoRoute?"true":"false").append('\n');
+        out.append("  exclude-uid-range:\n    - '0:9999'\n");
+        out.append("  route-exclude-address:\n");
+        out.append("    - 10.0.0.0/8\n    - 100.64.0.0/10\n    - 127.0.0.0/8\n    - 169.254.0.0/16\n    - 172.16.0.0/12\n    - 192.168.0.0/16\n    - fc00::/7\n    - fe80::/10\n");
+        if(profile.dnsHijack!=ProxyRuntimeProfile.DnsHijack.OFF){
+            out.append("  dns-hijack:\n    - any:53\n    - tcp://any:53\n");
+        }
+        if(packageFilter&&packages!=null&&!packages.isEmpty()){
+            if(scope==ProxyRuntimeProfile.AppScope.WHITELIST)out.append("  include-package:\n");
+            else if(scope==ProxyRuntimeProfile.AppScope.BLACKLIST)out.append("  exclude-package:\n");
+            else return;
+            for(String name:new TreeSet<>(packages))out.append("    - '").append(yamlQuote(name)).append("'\n");
+        }
+    }
+
+    private static String yamlQuote(String value){return value==null?"":value.replace("'","''");}
 
     /**
      * Runtime-only compatibility for public DNS providers that retired raw-IP DoH access.

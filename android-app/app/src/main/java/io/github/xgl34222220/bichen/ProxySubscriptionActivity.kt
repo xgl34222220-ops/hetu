@@ -461,6 +461,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                                     textAlign = TextAlign.End,
                                 )
                             }
+                            Box(Modifier.width(1.dp).fillMaxHeight().background(if (dark) Color.White.copy(alpha = .06f) else Color(0xFFE2E8F0)))
                             BasicTextField(
                                 state = editorState,
                                 modifier = Modifier.weight(1f).fillMaxHeight()
