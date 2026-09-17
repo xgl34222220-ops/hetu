@@ -58,15 +58,26 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
+import dev.chrisbanes.haze.materials.HazeMaterials
 import dev.chrisbanes.haze.rememberHazeState
+import top.yukonga.miuix.kmp.blur.LayerBackdrop
+import top.yukonga.miuix.kmp.blur.blur
+import top.yukonga.miuix.kmp.blur.colorControls
+import top.yukonga.miuix.kmp.blur.drawBackdrop
+import top.yukonga.miuix.kmp.blur.highlight.Highlight
 import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
+import top.yukonga.miuix.kmp.squircle.squircleClip
 import io.github.xgl34222220.bichen.ui.BichenGlassDock
 import io.github.xgl34222220.bichen.ui.BichenTheme
 import io.github.xgl34222220.bichen.ui.DockItem
 import io.github.xgl34222220.bichen.ui.LocalBichenTokens
+import io.github.xgl34222220.bichen.ui.glass.liquidGlassLens
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -342,6 +353,8 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                     state = state,
                     repo = repo,
                     delays = delays,
+                    hazeState = haze,
+                    backdrop = liquidBackdrop.takeIf { liquid },
                     onRefreshState = { scope.launch { refresh() } },
                     onOpenSettings = { page = RefProxyPage.Settings },
                     onDetailVisibleChanged = { panelDetailVisible = it },
@@ -776,12 +789,14 @@ private fun RefSubscriptionCard(items: List<DashboardProviderUi>) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalHazeMaterialsApi::class)
 @Composable
 private fun RefPanel(
     state: ProxyComposeState,
     repo: ProxyDashboardRepository,
     delays: MutableMap<String, Long>,
+    hazeState: HazeState,
+    backdrop: LayerBackdrop?,
     onRefreshState: () -> Unit,
     onOpenSettings: () -> Unit,
     onDetailVisibleChanged: (Boolean) -> Unit,
@@ -933,47 +948,21 @@ private fun RefPanel(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             item {
-                Column(
-                    Modifier.statusBarsPadding().padding(top = 14.dp, bottom = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Row(
-                        Modifier.fillMaxWidth().height(48.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            "面板",
-                            color = t.textPrimary,
-                            fontSize = 26.sp,
-                            lineHeight = 32.sp,
-                            fontWeight = FontWeight.Black,
-                            modifier = Modifier.weight(1f),
-                        )
-                        RefPanelHeaderAction(
-                            icon = if (searchOpen) Icons.Rounded.Close else Icons.Rounded.Search,
-                            contentDescription = if (searchOpen) "关闭搜索" else "搜索",
-                            active = searchOpen,
-                            onClick = { searchOpen = !searchOpen; if (!searchOpen) query = "" },
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        RefPanelHeaderAction(
-                            icon = Icons.Rounded.Settings,
-                            contentDescription = "设置",
-                            onClick = onOpenSettings,
-                        )
-                    }
-                    RefPanelTabs(tab) { tab = it }
-                    if (searchOpen) {
-                        OutlinedTextField(
-                            value = query,
-                            onValueChange = { query = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            placeholder = { Text("搜索策略组或节点") },
-                            leadingIcon = { Icon(Icons.Rounded.Search, null, Modifier.size(18.dp)) },
-                            shape = RoundedCornerShape(14.dp),
-                        )
-                    }
+                Box(Modifier.statusBarsPadding().padding(top = 14.dp, bottom = 4.dp)) {
+                    RefPanelGlassHeader(
+                        selected = tab,
+                        onSelect = { tab = it },
+                        searchOpen = searchOpen,
+                        query = query,
+                        onQueryChange = { query = it },
+                        onSearchToggle = {
+                            searchOpen = !searchOpen
+                            if (!searchOpen) query = ""
+                        },
+                        onOpenSettings = onOpenSettings,
+                        hazeState = hazeState,
+                        backdrop = backdrop,
+                    )
                 }
             }
             if (error.isNotBlank()) item { RefNotice(error) }
@@ -1361,11 +1350,156 @@ private fun refNodeFilterTags(nodes: List<ProxyNodeUi>): List<String> {
     }
 }
 
+@OptIn(ExperimentalHazeMaterialsApi::class)
+@Composable
+private fun RefPanelGlassHeader(
+    selected: RefPanelTab,
+    onSelect: (RefPanelTab) -> Unit,
+    searchOpen: Boolean,
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onSearchToggle: () -> Unit,
+    onOpenSettings: () -> Unit,
+    hazeState: HazeState,
+    backdrop: LayerBackdrop?,
+) {
+    val t = LocalBichenTokens.current
+    val scheme = MaterialTheme.colorScheme
+    val dark = scheme.background.luminance() < .5f
+    val runtimeLiquid = backdrop != null && isRuntimeShaderSupported()
+    val headerSurfaceBackdrop = rememberLayerBackdrop()
+    val shape = RoundedCornerShape(28.dp)
+    val shellTint = if (dark) scheme.surface.copy(alpha = .37f) else Color.White.copy(alpha = .38f)
+    val fallbackBrush = if (dark) {
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = .095f), Color.White.copy(alpha = .035f)))
+    } else {
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = .24f), Color.White.copy(alpha = .10f)))
+    }
+    val hazeModifier = if (!runtimeLiquid) {
+        Modifier.hazeEffect(state = hazeState, style = HazeMaterials.ultraThin()) {
+            blurRadius = 28.dp
+            noiseFactor = .016f
+        }
+    } else Modifier
+    val liquidShellModifier = if (runtimeLiquid) {
+        Modifier.drawBackdrop(
+            backdrop = requireNotNull(backdrop),
+            shape = { shape },
+            effects = {
+                padding = maxOf(padding, 28.dp.toPx())
+                colorControls(
+                    brightness = if (dark) -.012f else .022f,
+                    contrast = 1.045f,
+                    saturation = 1.34f,
+                )
+                blur(8.dp.toPx(), 8.dp.toPx())
+                liquidGlassLens(
+                    refractionHeight = 16.dp.toPx(),
+                    refractionAmount = 12.dp.toPx(),
+                    depthEffect = true,
+                    chromaticAberration = .04f,
+                )
+            },
+            highlight = {
+                (if (dark) Highlight.GlassStrokeSmallDark else Highlight.GlassStrokeSmallLight)
+                    .copy(alpha = if (dark) .70f else .84f)
+            },
+            onDrawSurface = {
+                drawRect(shellTint)
+                drawRect(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = if (dark) .055f else .18f),
+                            Color.Transparent,
+                        ),
+                        center = Offset(size.width * .14f, 0f),
+                        radius = size.width * .66f,
+                    ),
+                )
+            },
+        )
+    } else {
+        Modifier.then(hazeModifier).background(fallbackBrush)
+    }
+
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .shadow(14.dp, shape, clip = false)
+            .squircleClip(28.dp)
+            .then(if (runtimeLiquid) Modifier.layerBackdrop(headerSurfaceBackdrop) else Modifier)
+            .then(liquidShellModifier)
+            .border(
+                if (runtimeLiquid) .45.dp else .7.dp,
+                if (dark) Color.White.copy(alpha = .11f) else Color.White.copy(alpha = .30f),
+                shape,
+            ),
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 11.dp),
+            verticalArrangement = Arrangement.spacedBy(9.dp),
+        ) {
+            Row(
+                Modifier.fillMaxWidth().height(44.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "面板",
+                    color = t.textPrimary,
+                    fontSize = 26.sp,
+                    lineHeight = 32.sp,
+                    fontWeight = FontWeight.Black,
+                    modifier = Modifier.weight(1f),
+                )
+                RefPanelHeaderAction(
+                    icon = if (searchOpen) Icons.Rounded.Close else Icons.Rounded.Search,
+                    contentDescription = if (searchOpen) "关闭搜索" else "搜索",
+                    active = searchOpen,
+                    backdrop = headerSurfaceBackdrop.takeIf { runtimeLiquid },
+                    onClick = onSearchToggle,
+                )
+                Spacer(Modifier.width(8.dp))
+                RefPanelHeaderAction(
+                    icon = Icons.Rounded.Settings,
+                    contentDescription = "设置",
+                    backdrop = headerSurfaceBackdrop.takeIf { runtimeLiquid },
+                    onClick = onOpenSettings,
+                )
+            }
+            RefPanelTabs(
+                selected = selected,
+                indicatorBackdrop = headerSurfaceBackdrop.takeIf { runtimeLiquid },
+                liquidGlass = true,
+                onSelect = onSelect,
+            )
+            if (searchOpen) {
+                TextField(
+                    value = query,
+                    onValueChange = onQueryChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    placeholder = { Text("搜索策略组或节点") },
+                    leadingIcon = { Icon(Icons.Rounded.Search, null, Modifier.size(18.dp)) },
+                    shape = RoundedCornerShape(18.dp),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.White.copy(alpha = if (dark) .07f else .18f),
+                        unfocusedContainerColor = Color.White.copy(alpha = if (dark) .05f else .13f),
+                        disabledContainerColor = Color.Transparent,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                    ),
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun RefPanelHeaderAction(
     icon: ImageVector,
     contentDescription: String,
     active: Boolean = false,
+    backdrop: LayerBackdrop? = null,
     onClick: () -> Unit,
 ) {
     val t = LocalBichenTokens.current
@@ -1374,19 +1508,44 @@ private fun RefPanelHeaderAction(
     val source = remember(contentDescription) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        if (pressed) .94f else 1f,
-        spring(dampingRatio = .78f, stiffness = 560f),
+        if (pressed) .92f else 1f,
+        spring(dampingRatio = .72f, stiffness = 560f),
         label = "panelHeaderAction$contentDescription",
     )
-    val fill = if (dark) t.elevatedCardBackground.copy(alpha = .78f) else Color.White.copy(alpha = .82f)
-    val outline = if (dark) t.outline.copy(alpha = .38f) else Color(0xFFE2E8F0).copy(alpha = .62f)
+    val shape = CircleShape
+    val liquid = backdrop != null && isRuntimeShaderSupported()
+    val fill = if (dark) Color.White.copy(alpha = .07f) else Color.White.copy(alpha = .17f)
+    val glassModifier = if (liquid) {
+        Modifier.drawBackdrop(
+            backdrop = requireNotNull(backdrop),
+            shape = { shape },
+            effects = {
+                padding = maxOf(padding, 18.dp.toPx())
+                colorControls(brightness = .015f, contrast = 1.05f, saturation = 1.30f)
+                blur(3.dp.toPx(), 3.dp.toPx())
+                liquidGlassLens(
+                    refractionHeight = 10.dp.toPx(),
+                    refractionAmount = 8.dp.toPx(),
+                    depthEffect = true,
+                    chromaticAberration = .05f,
+                )
+            },
+            highlight = {
+                (if (dark) Highlight.GlassStrokeSmallDark else Highlight.GlassStrokeSmallLight)
+                    .copy(alpha = .80f)
+            },
+            onDrawSurface = { drawRect(fill) },
+        )
+    } else {
+        Modifier.background(fill, shape)
+    }
     Box(
         Modifier.size(36.dp)
-            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .90f else 1f }
-            .shadow(1.dp, CircleShape, clip = false)
-            .background(fill, CircleShape)
-            .border(.7.dp, outline, CircleShape)
-            .clip(CircleShape)
+            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .88f else 1f }
+            .shadow(2.dp, shape, clip = false)
+            .clip(shape)
+            .then(glassModifier)
+            .border(.55.dp, Color.White.copy(alpha = if (dark) .12f else .34f), shape)
             .clickable(interactionSource = source, indication = null, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -1400,28 +1559,92 @@ private fun RefPanelHeaderAction(
 }
 
 @Composable
-private fun RefPanelTabs(selected: RefPanelTab, onSelect: (RefPanelTab) -> Unit) {
+private fun RefPanelTabs(
+    selected: RefPanelTab,
+    indicatorBackdrop: LayerBackdrop? = null,
+    liquidGlass: Boolean = false,
+    onSelect: (RefPanelTab) -> Unit,
+) {
     val t = LocalBichenTokens.current
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
     val tabs = RefPanelTab.entries
-    val track = if (dark) t.controlBackground.copy(alpha = .68f) else Color(0xFFE2E8F0).copy(alpha = .60f)
-    val activeFill = if (dark) scheme.surfaceContainerHigh.copy(alpha = .90f) else Color.White.copy(alpha = .96f)
+    val activeLens = liquidGlass && indicatorBackdrop != null && isRuntimeShaderSupported()
+    val trackFill = if (dark) Color.White.copy(alpha = .045f) else Color.White.copy(alpha = .10f)
+    val trackBorder = if (dark) Color.White.copy(alpha = .085f) else Color.White.copy(alpha = .24f)
     BoxWithConstraints(
-        Modifier.fillMaxWidth().height(38.dp).background(track, CircleShape).padding(3.dp),
+        Modifier.fillMaxWidth().height(38.dp)
+            .background(trackFill, CircleShape)
+            .border(.5.dp, trackBorder, CircleShape)
+            .padding(3.dp),
     ) {
         val itemWidth = maxWidth / tabs.size.toFloat()
-        val index = tabs.indexOf(selected).coerceAtLeast(0)
+        val targetIndex = tabs.indexOf(selected).coerceAtLeast(0)
+        val stretch = remember { Animatable(0f) }
+        var direction by remember { mutableFloatStateOf(0f) }
+        var previousIndex by remember { mutableIntStateOf(targetIndex) }
+        LaunchedEffect(targetIndex) {
+            if (targetIndex != previousIndex) {
+                direction = if (targetIndex > previousIndex) 1f else -1f
+                previousIndex = targetIndex
+                stretch.snapTo(1f)
+                stretch.animateTo(
+                    0f,
+                    spring(dampingRatio = .56f, stiffness = Spring.StiffnessMediumLow),
+                )
+            }
+        }
         val indicatorX by animateDpAsState(
-            targetValue = itemWidth * index.toFloat(),
-            animationSpec = spring(dampingRatio = .84f, stiffness = 500f),
-            label = "panelSegmentIndicator",
+            targetValue = itemWidth * targetIndex.toFloat(),
+            animationSpec = spring(dampingRatio = .68f, stiffness = 310f),
+            label = "panelLiquidTabIndicator",
         )
+        val extra = if (liquidGlass) 8.dp * stretch.value else 0.dp
+        val indicatorStart = indicatorX - if (direction < 0f) extra else 0.dp
+        val indicatorShape = RoundedCornerShape(18.dp)
+        val indicatorTint = scheme.primary.copy(alpha = if (dark) .22f else .13f)
+        val lensModifier = if (activeLens) {
+            Modifier.drawBackdrop(
+                backdrop = requireNotNull(indicatorBackdrop),
+                shape = { indicatorShape },
+                effects = {
+                    val s = stretch.value
+                    padding = maxOf(padding, 18.dp.toPx())
+                    colorControls(brightness = .018f, contrast = 1.055f, saturation = 1.30f)
+                    blur(2.5.dp.toPx(), 2.5.dp.toPx())
+                    liquidGlassLens(
+                        refractionHeight = (10.dp + 3.dp * s).toPx(),
+                        refractionAmount = (11.dp + 4.dp * s).toPx(),
+                        depthEffect = true,
+                        chromaticAberration = .055f + .07f * s,
+                    )
+                },
+                highlight = {
+                    (if (dark) Highlight.GlassStrokeSmallDark else Highlight.GlassStrokeSmallLight)
+                        .copy(alpha = .84f)
+                },
+                layerBlock = { scaleY = 1f - .035f * stretch.value },
+                onDrawSurface = { drawRect(indicatorTint) },
+            )
+        } else {
+            Modifier.background(
+                Brush.verticalGradient(
+                    listOf(
+                        indicatorTint.copy(alpha = (indicatorTint.alpha * 1.18f).coerceAtMost(1f)),
+                        indicatorTint.copy(alpha = indicatorTint.alpha * .72f),
+                    ),
+                ),
+                indicatorShape,
+            )
+        }
         Box(
-            Modifier.offset(x = indicatorX).width(itemWidth).fillMaxHeight()
-                .shadow(2.dp, CircleShape, clip = false)
-                .clip(CircleShape)
-                .background(activeFill),
+            Modifier.offset(x = indicatorStart)
+                .width(itemWidth + extra)
+                .fillMaxHeight()
+                .shadow(if (activeLens) 4.dp else 2.dp, indicatorShape, clip = false)
+                .squircleClip(18.dp)
+                .then(lensModifier)
+                .border(.6.dp, Color.White.copy(alpha = if (dark) .14f else .38f), indicatorShape),
         )
         Row(Modifier.fillMaxSize()) {
             tabs.forEach { tab ->
@@ -1429,20 +1652,24 @@ private fun RefPanelTabs(selected: RefPanelTab, onSelect: (RefPanelTab) -> Unit)
                 val source = remember(tab) { MutableInteractionSource() }
                 val pressed by source.collectIsPressedAsState()
                 val scale by animateFloatAsState(
-                    if (pressed) .96f else 1f,
-                    spring(dampingRatio = .80f, stiffness = 580f),
+                    when {
+                        pressed -> .94f
+                        active && liquidGlass -> 1.025f
+                        else -> 1f
+                    },
+                    spring(dampingRatio = .68f, stiffness = 520f),
                     label = "tab${tab.name}",
                 )
                 Box(
                     Modifier.width(itemWidth).fillMaxHeight()
-                        .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .90f else 1f }
+                        .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .88f else 1f }
                         .clip(CircleShape)
-                        .clickable(interactionSource = source, indication = null) { onSelect(tab) },
+                        .clickable(interactionSource = source, indication = null) { if (!active) onSelect(tab) },
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         tab.label,
-                        color = if (active) (if (dark) scheme.onSurface else Color(0xFF0F172A)) else (if (dark) t.textSecondary else Color(0xFF64748B)),
+                        color = if (active) scheme.primary else if (dark) t.textSecondary else Color(0xFF64748B),
                         fontSize = 12.sp,
                         fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
                         maxLines = 1,
