@@ -46,6 +46,8 @@ private data class ChainSnapshot(
     val rules: RulesSnapshot = RulesSnapshot(),
     val running: Boolean = false,
     val hitCount: Long = 0L,
+    val hitCountSource: String = "",
+    val recentBlockedDomains: List<String> = emptyList(),
     val startupInjected: Boolean = false,
     val controllerLoaded: Boolean = false,
     val effective: Boolean = false,
@@ -62,6 +64,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
     val adController = remember { BichenComposeController(context) }
     val proxyController = remember { ProxyComposeController(context) }
     val rootManager = remember { RootProxyManager(context) }
+    val runtimeInspector = remember { ProxyRuntimeInspector(context) }
     val scope = rememberCoroutineScope()
     val updateView = androidx.compose.ui.platform.LocalView.current
     val updateSpinTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "adblockUpdateSpin")
@@ -118,13 +121,23 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                 it.type.contains(ProxyAdblockRules.PROVIDER_NAME, true)
         }
         val controllerLoaded = adRule != null
-        val hits = adRule?.hitCount ?: 0L
+        val apiHits = adRule?.hitCount ?: 0L
+        val logStats = if (state?.running == true) runCatching { runtimeInspector.adblockRuntimeStats() }.getOrDefault(AdblockRuntimeStats()) else AdblockRuntimeStats()
+        val hits = maxOf(apiHits, logStats.count)
+        val hitSource = when {
+            logStats.count > 0L -> "Mihomo 运行日志"
+            apiHits > 0L -> "Controller 规则计数"
+            logStats.logAvailable -> "运行日志已检查"
+            else -> ""
+        }
         val lastError = prefs.getString("proxyAdblockLastError", "").orEmpty()
         val effective = chainEnabled && state?.running == true && rules.count > 0 && startupInjected && controllerLoaded
         value = ChainSnapshot(
             rules = rules,
             running = state?.running == true,
             hitCount = hits,
+            hitCountSource = hitSource,
+            recentBlockedDomains = logStats.recentDomains,
             startupInjected = startupInjected,
             controllerLoaded = controllerLoaded,
             effective = effective,
@@ -259,7 +272,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         ChainMetric("有效规则", snapshot.rules.count.toString(), Modifier.weight(1f))
                         ChainMetric("规则源", snapshot.rules.sources.count { it.enabled }.toString(), Modifier.weight(1f))
-                        ChainMetric("本次命中", if (snapshot.running) snapshot.hitCount.toString() else "—", Modifier.weight(1f))
+                        ChainMetric("本次拦截", if (!snapshot.running) "—" else if (snapshot.hitCount > 0L) snapshot.hitCount.toString() else "0", Modifier.weight(1f))
                     }
                 }
             }
@@ -268,8 +281,8 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
 
         item("runtime-verify") {
             val statusText = when {
-                snapshot.effective && snapshot.hitCount > 0L -> "已生效 · 已拦截 ${snapshot.hitCount} 次"
-                snapshot.effective -> "已生效 · 当前暂未产生拦截命中"
+                snapshot.effective && snapshot.hitCount > 0L -> "已生效 · 已记录 ${snapshot.hitCount} 次实际拦截"
+                snapshot.effective -> "已生效 · 当前运行日志暂未记录到广告拦截"
                 !chainEnabled -> "广告串联已关闭"
                 !snapshot.running -> "等待代理启动"
                 snapshot.lastError.isNotBlank() -> "本次运行已降级"
@@ -310,7 +323,23 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                     ChainVerifyRow("启动配置注入", snapshot.startupInjected, if (snapshot.startupInjected) "bichen-adblock 已写入运行副本" else "当前启动副本没有广告 provider")
                     ChainVerifyRow("Mihomo 规则链", snapshot.controllerLoaded, if (snapshot.controllerLoaded) "Controller 已看到 REJECT 规则" else "当前 Controller 未看到广告规则")
                     if (snapshot.running) {
-                        ChainVerifyRow("实际拦截", snapshot.hitCount > 0L, if (snapshot.hitCount > 0L) "${snapshot.hitCount} 次 REJECT 命中" else "0 次 · 规则已加载，只是暂未碰到被拦截请求", allowNeutral = true)
+                        ChainVerifyRow(
+                            "实际拦截",
+                            snapshot.hitCount > 0L,
+                            if (snapshot.hitCount > 0L) "${snapshot.hitCount} 次 · ${snapshot.hitCountSource.ifBlank { "已记录" }}"
+                            else "0 次 · 已加载规则，但当前日志/API 尚未记录命中",
+                            allowNeutral = true,
+                        )
+                    }
+                    if (snapshot.recentBlockedDomains.isNotEmpty()) {
+                        Surface(shape = RoundedCornerShape(12.dp), color = if (dark) Color.White.copy(alpha = .04f) else Color(0xFFF8FAFC)) {
+                            Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text("最近拦截", color = t.textPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                snapshot.recentBlockedDomains.take(6).forEach { domain ->
+                                    Text(domain, color = t.textSecondary, fontSize = 10.sp, lineHeight = 14.sp)
+                                }
+                            }
+                        }
                     }
                     if (snapshot.lastError.isNotBlank()) {
                         Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFFF59E0B).copy(alpha = .10f)) {
@@ -355,7 +384,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                             )
                         }
                     }
-                    Text("轻量优先兼容；均衡适合日常；加强会启用更激进的 Hagezi 规则源。用户黑白名单始终保留。", color = t.textSecondary, fontSize = 10.sp, lineHeight = 15.sp)
+                    Text("轻量：国内纯广告；均衡：AdAway + 国内规则 + HaGeZi Light；加强：再加入隐私/追踪增强。旧均衡只有约 7k 规则，重新点“均衡”即可升级。用户黑白名单始终保留。", color = t.textSecondary, fontSize = 10.sp, lineHeight = 15.sp)
                 }
             }
         }
