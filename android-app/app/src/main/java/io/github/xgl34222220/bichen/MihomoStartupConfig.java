@@ -91,7 +91,7 @@ final class MihomoStartupConfig {
             yaml=ensureDnsListener(yaml,DNS_PORT);
         if(profile.cnIpDirect)
             yaml=ensureCnIpDirect(yaml);
-        // Apply ad blocking last so its REJECT rule stays ahead of CNIP and all source routing.
+        // Build serial ad blocking after runtime providers are prepared; the rule injector keeps explicit DIRECT whitelists first, then adblock, then broad routing.
         if(profile.adblockChain)
             yaml=ensureAdblock(yaml);
 
@@ -242,34 +242,71 @@ final class MihomoStartupConfig {
         return trimOne(out.toString());
     }
 
+    private static boolean isSpecificDirectWhitelist(String raw){
+        String t=raw==null?"":raw.trim();
+        if(!t.startsWith("-"))return false;
+        t=t.substring(1).trim();
+        String[] parts=t.split(",");
+        if(parts.length<3)return false;
+        String type=parts[0].trim().toUpperCase(Locale.ROOT);
+        boolean direct=false;
+        for(int i=2;i<parts.length;i++)if("DIRECT".equalsIgnoreCase(parts[i].trim())){direct=true;break;}
+        if(!direct)return false;
+        switch(type){
+            case "PROCESS-NAME":
+            case "PROCESS-NAME-WILDCARD":
+            case "PROCESS-PATH":
+            case "PROCESS-PATH-REGEX":
+            case "DOMAIN":
+            case "DOMAIN-SUFFIX":
+            case "DOMAIN-WILDCARD":
+                return true;
+            default:
+                return false;
+        }
+    }
+
     private static String insertAdblockRuleRespectingUserPolicy(String source)throws IOException{
         String[] lines=normalize(source).split("\n",-1);
-        int index=-1;Matcher found=null;Pattern top=Pattern.compile("^rules\s*:(.*)$");
-        for(int i=0;i<lines.length;i++){if(indent(lines[i])!=0)continue;Matcher m=top.matcher(lines[i]);if(m.find()){index=i;found=m;break;}}
+        int index=-1;Matcher found=null;Pattern top=Pattern.compile("^rules\\s*:(.*)$");
+        for(int i=0;i<lines.length;i++){
+            if(indent(lines[i])!=0)continue;
+            Matcher m=top.matcher(lines[i]);
+            if(m.find()){index=i;found=m;break;}
+        }
         String rule="  - RULE-SET,"+ProxyAdblockRules.PROVIDER_NAME+",REJECT\n";
-        if(index<0){String base=trimOne(source);return base+(base.isEmpty()?"":"\n")+"rules:\n"+rule;}
+        if(index<0){
+            String base=trimOne(source);
+            return base+(base.isEmpty()?"":"\n")+"rules:\n"+rule;
+        }
         String rest=found.group(1).trim();
         if(rest.startsWith("#"))rest="";
-        if(!rest.isEmpty()&&!rest.equals("[]"))throw new IOException("代理串联去广告需要普通 rules: 列表；当前源配置使用行内 rules 写法");
+        if(!rest.isEmpty()&&!rest.equals("[]"))
+            throw new IOException("代理串联去广告需要普通 rules: 列表；当前源配置使用行内 rules 写法");
+
         int end=lines.length;
         for(int i=index+1;i<lines.length;i++){
             String t=lines[i].trim();
             if(t.isEmpty()||t.startsWith("#"))continue;
             if(indent(lines[i])==0){end=i;break;}
         }
-        int insert=end;
+
+        // Duplicate only explicit, narrow DIRECT whitelists ahead of the adblock rule.
+        // Broad regional/rule-set routing (GEOSITE CN, RULE-SET CN, MATCH...) stays
+        // behind adblock so ads cannot escape merely because a general route matched first.
+        LinkedHashSet<String> priority=new LinkedHashSet<>();
         for(int i=index+1;i<end;i++){
-            String t=lines[i].trim();
-            if(t.startsWith("- MATCH,")||t.equals("- MATCH")||t.startsWith("- FINAL,")||t.equals("- FINAL")){
-                insert=i;break;
-            }
+            if(isSpecificDirectWhitelist(lines[i]))priority.add(lines[i]);
         }
+
         StringBuilder out=new StringBuilder();
         for(int i=0;i<lines.length;i++){
-            if(i==insert)out.append(rule);
             out.append(lines[i]).append('\n');
+            if(i==index){
+                for(String p:priority)out.append(p).append('\n');
+                out.append(rule);
+            }
         }
-        if(insert==lines.length)out.append(rule);
         return trimOne(out.toString());
     }
 
