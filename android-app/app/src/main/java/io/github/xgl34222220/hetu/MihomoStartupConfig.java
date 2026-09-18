@@ -225,6 +225,11 @@ final class MihomoStartupConfig {
         int index=-1;Matcher found=null;Pattern top=Pattern.compile("^rule-providers\\s*:(.*)$");
         for(int i=0;i<lines.length;i++){if(indent(lines[i])!=0)continue;Matcher m=top.matcher(lines[i]);if(m.find()){index=i;found=m;break;}}
         String providerBlock=
+                "  "+ProxyAdblockRules.ALLOW_PROVIDER_NAME+":\n"+
+                "    type: file\n"+
+                "    behavior: domain\n"+
+                "    format: text\n"+
+                "    path: "+ProxyAdblockRules.ALLOW_PROVIDER_PATH+"\n"+
                 "  "+ProxyAdblockRules.PROVIDER_NAME+":\n"+
                 "    type: file\n"+
                 "    behavior: domain\n"+
@@ -236,7 +241,11 @@ final class MihomoStartupConfig {
         if(!rest.isEmpty()&&!rest.equals("{}"))throw new IOException("代理串联去广告需要普通 rule-providers: 配置块；当前源配置使用行内写法");
         int end=lines.length;
         for(int i=index+1;i<lines.length;i++){String t=lines[i].trim();if(t.isEmpty()||t.startsWith("#"))continue;if(indent(lines[i])==0){end=i;break;}}
-        for(int i=index+1;i<end;i++)if(lines[i].trim().startsWith(ProxyAdblockRules.PROVIDER_NAME+":"))throw new IOException("源配置占用了河图保留的广告 provider 名称");
+        for(int i=index+1;i<end;i++){
+            String t=lines[i].trim();
+            if(t.startsWith(ProxyAdblockRules.PROVIDER_NAME+":")||t.startsWith(ProxyAdblockRules.ALLOW_PROVIDER_NAME+":"))
+                throw new IOException("源配置占用了河图保留的 DNS 过滤 provider 名称");
+        }
         StringBuilder out=new StringBuilder();
         for(int i=0;i<lines.length;i++){if(i==index){out.append("rule-providers:\n").append(providerBlock);continue;}out.append(lines[i]).append('\n');}
         return trimOne(out.toString());
@@ -274,10 +283,11 @@ final class MihomoStartupConfig {
             Matcher m=top.matcher(lines[i]);
             if(m.find()){index=i;found=m;break;}
         }
+        String allowRule="  - RULE-SET,"+ProxyAdblockRules.ALLOW_PROVIDER_NAME+",DIRECT\n";
         String rule="  - RULE-SET,"+ProxyAdblockRules.PROVIDER_NAME+",REJECT\n";
         if(index<0){
             String base=trimOne(source);
-            return base+(base.isEmpty()?"":"\n")+"rules:\n"+rule;
+            return base+(base.isEmpty()?"":"\n")+"rules:\n"+allowRule+rule;
         }
         String rest=found.group(1).trim();
         if(rest.startsWith("#"))rest="";
@@ -304,6 +314,7 @@ final class MihomoStartupConfig {
             out.append(lines[i]).append('\n');
             if(i==index){
                 for(String p:priority)out.append(p).append('\n');
+                out.append(allowRule);
                 out.append(rule);
             }
         }
