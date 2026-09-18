@@ -91,6 +91,9 @@ internal data class ProxyComposeState(
     val uploadTotal: Long = 0,
     val memoryBytes: Long = 0,
     val corePid: Int = 0,
+    val directUidRanges: String = "",
+    val selfUidBypassed: Boolean = false,
+    val runtimeRefreshPending: Boolean = false,
 )
 
 internal class ProxyComposeController(context: Context) {
@@ -135,6 +138,8 @@ internal class ProxyComposeController(context: Context) {
                 panelReady = true
             } catch (_: Exception) { }
         }
+        val directUidRanges = status.optString("directUidRanges", "")
+        val selfUid = app.applicationInfo.uid
         ProxyComposeState(
             running = running,
             core = profile.core.label,
@@ -150,6 +155,9 @@ internal class ProxyComposeController(context: Context) {
             uploadTotal = up,
             memoryBytes = memory,
             corePid = 0,
+            directUidRanges = directUidRanges,
+            selfUidBypassed = !running || uidInRanges(selfUid, directUidRanges),
+            runtimeRefreshPending = prefs.getBoolean("proxyRootRuntimeRefreshPending", false),
         )
     }
 
@@ -441,6 +449,19 @@ internal class ProxyComposeController(context: Context) {
             )
         }
         return out
+    }
+
+    private fun uidInRanges(uid: Int, encoded: String): Boolean {
+        if (uid <= 0 || encoded.isBlank()) return false
+        return encoded.split(',').any { token ->
+            val part = token.trim()
+            if (part.isEmpty()) false
+            else if ('-' in part) {
+                val start = part.substringBefore('-').toIntOrNull()
+                val end = part.substringAfter('-').toIntOrNull()
+                start != null && end != null && uid in start..end
+            } else part.toIntOrNull() == uid
+        }
     }
 
     private data class AppIdentity(val uid: Int, val packageName: String, val label: String, val icon: Bitmap?)
