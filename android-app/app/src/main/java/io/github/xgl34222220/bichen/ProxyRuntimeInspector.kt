@@ -10,6 +10,12 @@ import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.net.URL
 
+internal data class AdblockRuntimeStats(
+    val count: Long = 0L,
+    val recentDomains: List<String> = emptyList(),
+    val logAvailable: Boolean = false,
+)
+
 internal data class ProxyRuntimeSnapshot(
     val running: Boolean = false,
     val pid: Int = 0,
@@ -83,6 +89,41 @@ internal class ProxyRuntimeInspector(context: Context) {
         val result = RootBridge.rootShell(app, command, 10_000L)
         val text = result.output.trim()
         if (text.isBlank()) "暂无运行日志" else text.takeLast(24_000)
+    }
+
+    suspend fun adblockRuntimeStats(): AdblockRuntimeStats = withContext(Dispatchers.IO) {
+        val command = """
+            LOG=/data/adb/bichen/proxy/run/core.log
+            if [ ! -r "$LOG" ]; then
+              echo '__COUNT__=0'
+              exit 0
+            fi
+            C=$(grep -Eic 'bichen-adblock|RuleSet/bichen-adblock' "$LOG" 2>/dev/null || true)
+            echo "__COUNT__=$C"
+            grep -Ei 'bichen-adblock|RuleSet/bichen-adblock' "$LOG" 2>/dev/null | tail -n 24 || true
+        """.trimIndent()
+        val result = RootBridge.rootShell(app, command, 6_000L)
+        if (!result.ok()) return@withContext AdblockRuntimeStats()
+        val lines = result.output.lineSequence().toList()
+        val count = lines.firstOrNull { it.startsWith("__COUNT__=") }
+            ?.substringAfter('=')
+            ?.toLongOrNull()
+            ?: 0L
+        val target = Regex("""-->\s+([^\s"]+)""")
+        val recent = LinkedHashSet<String>()
+        for (line in lines.asReversed()) {
+            if (!line.contains("bichen-adblock", ignoreCase = true)) continue
+            val raw = target.find(line)?.groupValues?.getOrNull(1)?.trim().orEmpty()
+            if (raw.isBlank()) continue
+            val domain = raw.substringBeforeLast(':', raw).trim('[', ']')
+            if (domain.isNotBlank()) recent += domain
+            if (recent.size >= 8) break
+        }
+        AdblockRuntimeStats(
+            count = count.coerceAtLeast(0L),
+            recentDomains = recent.toList(),
+            logAvailable = true,
+        )
     }
 
     private fun localNetwork(): Pair<String, String> {
