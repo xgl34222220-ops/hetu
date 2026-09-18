@@ -14,9 +14,17 @@ TEXT_EXTS = {
     ".yaml", ".c", ".h", ".go"
 }
 SKIP_PARTS = {".git", ".gradle", "build", "out", ".upstream"}
+WORKFLOWS = ROOT / ".github/workflows"
+
+def under_workflows(path: Path) -> bool:
+    try:
+        path.relative_to(WORKFLOWS)
+        return True
+    except ValueError:
+        return False
 
 def is_text_file(path: Path) -> bool:
-    if path == SELF:
+    if path == SELF or under_workflows(path):
         return False
     if any(part in SKIP_PARTS for part in path.parts):
         return False
@@ -115,7 +123,10 @@ def remove_legacy_module_code() -> None:
         shutil.rmtree(downloads)
 
 def rename_brand_paths() -> None:
-    paths = [p for p in ROOT.rglob("*") if not any(part in SKIP_PARTS for part in p.parts)]
+    paths = [
+        p for p in ROOT.rglob("*")
+        if not any(part in SKIP_PARTS for part in p.parts) and not under_workflows(p)
+    ]
     for path in sorted(paths, key=lambda p: len(p.parts), reverse=True):
         if not path.exists():
             continue
