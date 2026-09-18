@@ -54,6 +54,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -1240,6 +1241,7 @@ private fun RefPanel(
     var searchOpen by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     var connectionView by rememberSaveable { mutableStateOf("active") }
+    val expandedConnectionApps = remember { mutableStateMapOf<String, Boolean>() }
     val closedConnections = remember { mutableStateListOf<ProxyConnectionUi>() }
     var previousConnections by remember { mutableStateOf<List<ProxyConnectionUi>>(emptyList()) }
 
@@ -1497,19 +1499,59 @@ private fun RefPanel(
                     )
                 }
                 RefPanelTab.Connections -> {
+                    val activeGroups = remember(state.connections) { refConnectionGroups(state.connections) }
+                    val closedGroups = remember(closedConnections.toList()) { refConnectionGroups(closedConnections) }
+                    val shownGroups = if (connectionView == "active") activeGroups else closedGroups
                     item {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            FilterChip(selected = connectionView == "active", onClick = { connectionView = "active" }, label = { Text("活跃 ${state.connections.size}") })
-                            FilterChip(selected = connectionView == "closed", onClick = { connectionView = "closed" }, label = { Text("已关闭 ${closedConnections.size}") })
-                            Spacer(Modifier.weight(1f))
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                FilterChip(
+                                    selected = connectionView == "active",
+                                    onClick = { connectionView = "active" },
+                                    label = { Text("应用 ${activeGroups.size} · 连接 ${state.connections.size}") },
+                                )
+                                FilterChip(
+                                    selected = connectionView == "closed",
+                                    onClick = { connectionView = "closed" },
+                                    label = { Text("已关闭 ${closedConnections.size}") },
+                                )
+                                Spacer(Modifier.weight(1f))
+                                if (connectionView == "active" && state.connections.isNotEmpty()) {
+                                    TextButton(onClick = { scope.launch { repo.closeAll(); onRefreshState() } }) {
+                                        Text("终止全部", color = t.danger)
+                                    }
+                                }
+                            }
                             if (connectionView == "active" && state.connections.isNotEmpty()) {
-                                TextButton(onClick = { scope.launch { repo.closeAll(); onRefreshState() } }) { Text("终止全部", color = t.danger) }
+                                Text(
+                                    "按应用聚合显示；点应用展开具体目标。一个应用同时访问多个域名时会产生多条底层连接。",
+                                    color = t.textMuted,
+                                    fontSize = 10.sp,
+                                    lineHeight = 14.sp,
+                                )
                             }
                         }
                     }
-                    val shown = if (connectionView == "active") state.connections else closedConnections
-                    items(shown, key = { "${tab.name}-" + (if (connectionView == "active") "a-" else "c-") + it.id }, contentType = { "connection-row" }) { c ->
-                        RefConnectionRow(c, if (connectionView == "active") ({ scope.launch { repo.closeConnection(c.id); onRefreshState() } }) else null)
+                    items(shownGroups, key = { "${tab.name}-app-" + it.key }, contentType = { "connection-app-group" }) { group ->
+                        RefConnectionAppCard(
+                            group = group,
+                            expanded = expandedConnectionApps[group.key] == true,
+                            onToggle = {
+                                expandedConnectionApps[group.key] = expandedConnectionApps[group.key] != true
+                            },
+                            onCloseAll = if (connectionView == "active") ({
+                                scope.launch {
+                                    group.connections.forEach { item -> runCatching { repo.closeConnection(item.id) } }
+                                    onRefreshState()
+                                }
+                            }) else null,
+                            onCloseConnection = if (connectionView == "active") ({ item ->
+                                scope.launch {
+                                    repo.closeConnection(item.id)
+                                    onRefreshState()
+                                }
+                            }) else null,
+                        )
                     }
                 }
                 RefPanelTab.Rules -> itemsIndexed(rules.chunked(15), key = { index, _ -> "${tab.name}-rule-group-$index" }, contentType = { _, _ -> "rule-group" }) { _, batch ->
@@ -2857,6 +2899,164 @@ private fun refExpireDate(expire: Long): String {
     if (expire <= 0L) return "—"
     val millis = if (expire < 10_000_000_000L) expire * 1000L else expire
     return runCatching { java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date(millis)) }.getOrDefault("—")
+}
+
+private data class RefConnectionAppGroup(
+    val key: String,
+    val title: String,
+    val subtitle: String,
+    val icon: android.graphics.Bitmap?,
+    val connections: List<ProxyConnectionUi>,
+) {
+    val upload: Long get() = connections.sumOf { it.upload }
+    val download: Long get() = connections.sumOf { it.download }
+}
+
+private fun refConnectionGroups(items: List<ProxyConnectionUi>): List<RefConnectionAppGroup> {
+    if (items.isEmpty()) return emptyList()
+    val buckets = LinkedHashMap<String, MutableList<ProxyConnectionUi>>()
+    items.forEach { item ->
+        val key = when {
+            item.packageName.isNotBlank() -> "pkg:" + item.packageName
+            item.uid > 0 -> "uid:" + item.uid
+            item.process.isNotBlank() -> "proc:" + item.process.substringAfterLast('/').substringBefore(':')
+            else -> "unknown"
+        }
+        buckets.getOrPut(key) { ArrayList() } += item
+    }
+    return buckets.map { (key, connections) ->
+        val first = connections.first()
+        val process = first.process.substringAfterLast('/').substringBefore(':')
+        val title = when {
+            first.appName.isNotBlank() -> first.appName
+            first.packageName.isNotBlank() -> first.packageName
+            process.isNotBlank() -> process
+            first.uid == 0 -> "系统服务"
+            first.uid > 0 -> "UID ${first.uid}"
+            else -> "未知应用"
+        }
+        val subtitle = when {
+            first.packageName.isNotBlank() -> first.packageName
+            first.uid > 0 -> "UID ${first.uid}" + if (process.isNotBlank()) " · $process" else ""
+            process.isNotBlank() -> process
+            else -> "无法从 Mihomo 元数据识别进程"
+        }
+        RefConnectionAppGroup(key, title, subtitle, first.appIcon, connections)
+    }.sortedWith(compareByDescending<RefConnectionAppGroup> { it.connections.size }.thenBy { it.title.lowercase() })
+}
+
+@Composable
+private fun RefConnectionAppCard(
+    group: RefConnectionAppGroup,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    onCloseAll: (() -> Unit)?,
+    onCloseConnection: ((ProxyConnectionUi) -> Unit)?,
+) {
+    val t = LocalHetuTokens.current
+    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = t.cardBackground,
+        shadowElevation = 0.dp,
+    ) {
+        Column(Modifier.fillMaxWidth()) {
+            Row(
+                Modifier.fillMaxWidth().clickable(onClick = onToggle).padding(13.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    Modifier.size(46.dp)
+                        .background(if (dark) Color.White.copy(alpha = .06f) else Color(0xFFF1F5F9), RoundedCornerShape(13.dp))
+                        .clip(RoundedCornerShape(13.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    val bitmap = group.icon
+                    if (bitmap != null) {
+                        Image(
+                            bitmap = bitmap.asImageBitmap(),
+                            contentDescription = group.title,
+                            modifier = Modifier.fillMaxSize().padding(5.dp),
+                            contentScale = ContentScale.Fit,
+                        )
+                    } else {
+                        Icon(
+                            if (group.key.startsWith("uid:0") || group.title == "系统服务") Icons.Rounded.Memory else Icons.Rounded.Apps,
+                            null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                }
+                Spacer(Modifier.width(11.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            group.title,
+                            color = t.textPrimary,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(999.dp),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = .10f),
+                        ) {
+                            Text(
+                                "${group.connections.size} 连接",
+                                color = MaterialTheme.colorScheme.primary,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            )
+                        }
+                    }
+                    Text(group.subtitle, color = t.textSecondary, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        "↑ ${refBytes(group.upload)}   ↓ ${refBytes(group.download)}",
+                        color = t.textMuted,
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                Icon(
+                    if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                    if (expanded) "收起连接" else "展开连接",
+                    tint = t.textMuted,
+                    modifier = Modifier.size(21.dp),
+                )
+            }
+            androidx.compose.animation.AnimatedVisibility(
+                visible = expanded,
+                enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+                exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut(),
+            ) {
+                Column(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    HorizontalDivider(color = t.outline.copy(alpha = .35f))
+                    if (onCloseAll != null && group.connections.size > 1) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            TextButton(onClick = onCloseAll) {
+                                Text("终止该应用全部连接", color = t.danger, fontSize = 11.sp)
+                            }
+                        }
+                    }
+                    group.connections.take(30).forEach { item ->
+                        RefConnectionRow(item, onCloseConnection?.let { action -> { action(item) } })
+                    }
+                    if (group.connections.size > 30) {
+                        Text(
+                            "还有 ${group.connections.size - 30} 条连接未展开，避免一次渲染过多。",
+                            color = t.textMuted,
+                            fontSize = 10.sp,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
