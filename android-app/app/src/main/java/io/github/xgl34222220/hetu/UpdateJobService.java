@@ -84,37 +84,22 @@ public final class UpdateJobService extends JobService {
 
     private void perform(Run run) {
         Exception failure=null;
-        String stage="确认模块状态";
+        String stage="更新 DNS 过滤规则";
         try {
             checkActive(run);
-            JSONObject status=RootBridge.status(this);
-            checkActive(run);
-            if(!status.optBoolean("ok",false) || !status.optBoolean("rootGranted",false) || !status.has("installed"))
-                throw new IOException(status.optString("error",status.optString("message","未能确认 Root 或模块状态；未执行更新")));
-            boolean installed=status.getBoolean("installed");
-            if(status.optBoolean("pendingReboot",false)) throw new IOException("模块正在等待重启，本次未更新规则");
-            if(installed) {
-                if(status.optBoolean("moduleDisabled",false)||status.optBoolean("moduleRemovalPending",false))
-                    throw new IOException("模块已禁用或等待卸载，本次未更新规则");
-                JSONArray capabilities=status.optJSONArray("capabilities");
-                if(!has(capabilities,"import-batch")||!has(capabilities,"export-config")||!has(capabilities,"export-domains"))
-                    throw new IOException("已安装模块不支持整批更新，请在应用中安装内置新版模块");
-            }
-            checkActive(run);
-            stage="下载与整批更新规则";
             RuleStore rules=new RuleStore(this);
-            rules.updateRules(installed);
+            rules.reload();
+            checkActive(run);
+            rules.updateRules(false);
             checkActive(run);
         } catch(Exception error) { failure=error; }
         synchronized(jobLock) {
-            // A stopped or superseded invocation must not replace a newer result.
             if(run.stopped || active!=run) return;
             active=null;
             SharedPreferences.Editor edit=getSharedPreferences("hetu",MODE_PRIVATE).edit().putBoolean("dailyUpdateRunning",false);
             if(failure==null) edit.putLong("dailyUpdateLastSuccess",System.currentTimeMillis()).remove("dailyUpdateError").remove("dailyUpdateErrorStage");
-            else edit.putString("dailyUpdateErrorStage",stage).putString("dailyUpdateError",stage+"失败："+message(failure)+"；等待下次每日调度，可在规则页手动重试");
+            else edit.putString("dailyUpdateErrorStage",stage).putString("dailyUpdateError",stage+"失败："+message(failure)+"；旧快照继续生效，等待下次每日调度");
             edit.apply();
-            // A failed source is left for the next daily opportunity; no tight retry loop.
             jobFinished(run.parameters,false);
         }
     }
