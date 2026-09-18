@@ -384,6 +384,10 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
             delay(420)
             runCatching { repo.ensureIcons() }
         }
+        launch {
+            delay(520)
+            runCatching { controller.ensureRuntimeFiles() }
+        }
         while (true) {
             delay(2200)
             if (operation.isBlank()) refresh()
