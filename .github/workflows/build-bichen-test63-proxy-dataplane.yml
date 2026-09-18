@@ -1,0 +1,111 @@
+name: Build Bichen 0.4.0-test.63 proxy dataplane
+
+on:
+  push:
+    branches: ['release/bichen-0.4.0-test.63']
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    if: github.event.head_commit.message == 'Build Bichen 0.4.0-test.63 proxy dataplane'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify test63 source invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD=android-app/app/build.gradle.kts
+          CTRL=android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyComposeController.kt
+          REF=android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
+          POLICY=android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyPolicy.java
+          SH=android-app/app/src/main/assets/proxy-root-v3.sh
+          MANIFEST=android-app/app/src/main/AndroidManifest.xml
+
+          grep -q 'versionCode = 463' "$BUILD"
+          grep -q 'versionName = "0.4.0-test.63"' "$BUILD"
+
+          grep -q 'directUidRanges: String' "$CTRL"
+          grep -q 'selfUidBypassed' "$CTRL"
+          grep -q 'runtimeRefreshPending' "$CTRL"
+          grep -q 'uidInRanges' "$CTRL"
+
+          grep -q '连接来源诊断' "$REF"
+          grep -q 'RefConnectionDiagnosticsCard' "$REF"
+          grep -q '系统 UID' "$REF"
+          grep -q '辟尘自身' "$REF"
+          grep -q '连接最多' "$REF"
+          grep -q '未识别应用' "$REF"
+
+          grep -q 'directUids.add(self.uid)' "$POLICY"
+          grep -q 'START_DIRECT_UIDS' "$SH"
+          grep -q 'direct_uid_returns' "$SH"
+          sh -n "$SH"
+
+          ! grep -q 'ProxyWebUiActivity' "$MANIFEST"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+          cache-read-only: false
+
+      - name: Reuse verified test62 native runtime
+        uses: actions/download-artifact@v4
+        with:
+          name: Bichen-0.4.0-test.62-Stop-Adblock-Telemetry
+          path: previous-artifact
+          github-token: ${{ github.token }}
+          repository: xgl34222220-ops/pichen
+          run-id: 35299998760
+
+      - name: Restore native runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          PREV=$(find previous-artifact -name '*.apk' -type f | head -n 1)
+          test -n "$PREV"
+          mkdir -p android-app/app/src/main/jniLibs/arm64-v8a android-app/app/src/main/jniLibs/x86_64
+          mkdir -p android-app/app/src/main/assets/mihomo-root/arm64-v8a android-app/app/src/main/assets/mihomo-root/x86_64
+          unzip -p "$PREV" lib/arm64-v8a/libbichen_core.so > android-app/app/src/main/jniLibs/arm64-v8a/libbichen_core.so
+          unzip -p "$PREV" lib/x86_64/libbichen_core.so > android-app/app/src/main/jniLibs/x86_64/libbichen_core.so
+          unzip -p "$PREV" assets/mihomo-root/arm64-v8a/mihomo > android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo
+          unzip -p "$PREV" assets/mihomo-root/x86_64/mihomo > android-app/app/src/main/assets/mihomo-root/x86_64/mihomo
+          unzip -p "$PREV" assets/MIHOMO-LICENSE > android-app/app/src/main/assets/MIHOMO-LICENSE
+          unzip -p "$PREV" assets/mihomo-revision.txt > android-app/app/src/main/assets/mihomo-revision.txt
+
+      - name: Build debug APK
+        working-directory: android-app
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Verify APK payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=android-app/app/build/outputs/apk/debug/app-debug.apk
+          test -f "$APK"
+          unzip -t "$APK" >/dev/null
+          unzip -l "$APK" | grep -q 'assets/proxy-root-v3.sh'
+          unzip -l "$APK" | grep -q 'assets/mihomo-root/arm64-v8a/mihomo'
+          unzip -p "$APK" assets/proxy-root-v3.sh | grep -q 'START_DIRECT_UIDS'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Bichen-0.4.0-test.63-Proxy-Dataplane
+          path: android-app/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
