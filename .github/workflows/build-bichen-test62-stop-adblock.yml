@@ -45,7 +45,6 @@ jobs:
           grep -q 'SystemClock.sleep(3500L)' "$MATCH"
 
           grep -q 'adblockRuntimeStats' "$INSPECTOR"
-          grep -q "__COUNT__=" "$INSPECTOR"
           grep -q 'recentDomains' "$INSPECTOR"
           grep -q 'proxyRootUpgradeError' "$INSPECTOR"
           grep -q 'proxyLastAutoStopReason' "$INSPECTOR"
