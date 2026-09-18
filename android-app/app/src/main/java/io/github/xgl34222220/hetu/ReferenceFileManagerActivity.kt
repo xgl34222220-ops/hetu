@@ -95,12 +95,18 @@ private fun ReferenceFileManagerScreen(onClose: () -> Unit) {
     var refresh by remember { mutableIntStateOf(0) }
     var previewTitle by remember { mutableStateOf<String?>(null) }
     var previewText by remember { mutableStateOf("") }
+    var loadError by remember { mutableStateOf("") }
     val items by produceState(initialValue = emptyList(), path, refresh) {
         value = try {
+            if (path == REF_FILE_ROOT) {
+                ProxyComposeController(context).ensureRuntimeFiles()
+            }
+            loadError = ""
             readDirectory(context, path)
         } catch (cancel: CancellationException) {
             throw cancel
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            loadError = error.message ?: "无法读取河图运行目录"
             emptyList()
         }
     }
@@ -132,7 +138,7 @@ private fun ReferenceFileManagerScreen(onClose: () -> Unit) {
             val relative = path.removePrefix(REF_FILE_ROOT).trim('/')
             Surface(shape = RoundedCornerShape(12.dp), color = t.selectionBackground) {
                 Text(
-                    if (relative.isBlank()) "proxy" else "proxy  ›  ${relative.replace("/", " › ")}",
+                    if (relative.isBlank()) "hetu" else "hetu  ›  ${relative.replace("/", " › ")}",
                     Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                     color = t.textSecondary,
                     style = MaterialTheme.typography.labelMedium,
@@ -145,7 +151,12 @@ private fun ReferenceFileManagerScreen(onClose: () -> Unit) {
             Surface(shape = RoundedCornerShape(16.dp), color = t.cardBackground) {
                 Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp)) {
                     if (items.isEmpty()) {
-                        Text("此目录为空或暂时无法读取", Modifier.padding(vertical = 18.dp), color = t.textSecondary, style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            loadError.ifBlank { "此目录暂无运行文件" },
+                            Modifier.padding(vertical = 18.dp),
+                            color = if (loadError.isBlank()) t.textSecondary else MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
                     } else {
                         items.forEachIndexed { index, item ->
                             Row(
