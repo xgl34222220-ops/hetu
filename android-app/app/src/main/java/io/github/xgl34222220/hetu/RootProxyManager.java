@@ -248,6 +248,7 @@ final class RootProxyManager {
         }
         stage(progress,"启动核心并等待订阅、规则与监听就绪（首次可能较慢）…");
         prefs.edit()
+                .putBoolean("proxyAdblockCounterArmed",false)
                 .putLong("proxyAdblockSessionHits",0L)
                 .putLong("proxyAdblockLogOffset",0L)
                 .putLong("proxyAdblockLastHitAt",0L)
@@ -326,6 +327,7 @@ final class RootProxyManager {
         prefs.edit()
                 .putBoolean("proxyRootWanted",true)
                 .putBoolean("proxyRootRuntimeRunning",true)
+                .putBoolean("proxyAdblockCounterArmed",profile.adblockChain)
                 .putInt("proxyAutoDirectPackageCount",policy.directPackages.size())
                 .putBoolean("proxyAdblockLastEffective",profile.adblockChain)
                 .putInt("proxyAdblockLastRuleCount",p.adblock==null?0:p.adblock.count)
@@ -350,6 +352,7 @@ final class RootProxyManager {
             prefs.edit()
                     .putBoolean("proxyRootWanted",false)
                     .putBoolean("proxyRootRuntimeRunning",false)
+                    .putBoolean("proxyAdblockCounterArmed",false)
                     .apply();
             ensureContinuityService(false);
             return r;
