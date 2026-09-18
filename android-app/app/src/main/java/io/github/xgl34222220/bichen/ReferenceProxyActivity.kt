@@ -390,28 +390,21 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
         }
     }
 
-    // Returning from a secondary activity refreshes runtime state and silently
-    // measures the three Home endpoints without clearing the previous values.
+    // Returning from a secondary activity refreshes local/runtime state only.
+    // Do not manufacture three WAN probe connections just because the user came back.
     LaunchedEffect(resumeRevision) {
-        if (resumeRevision > 1) {
-            refresh()
-            if (state.running) measureSitesInternal(reportError = false)
-        }
+        if (resumeRevision > 1) refresh()
     }
 
-    // Start transition triggers one silent measurement immediately. The optional
-    // heartbeat is user controlled: off / 30 s / 60 s. Keep the previous numbers
-    // on screen while testing so there is no layout flash.
+    // Auto site probes are opt-in. The default is off; manual refresh remains available.
+    // This prevents Bichen itself from constantly adding probe traffic to Mihomo.
     LaunchedEffect(state.running) {
         if (!state.running) {
             siteDelays = emptyMap()
             return@LaunchedEffect
         }
-        // Avoid competing with the first visible frame and first live state reconciliation.
-        delay(520)
-        if (state.running) measureSitesInternal(reportError = false)
         while (true) {
-            val seconds = prefs.getInt("latencyAutoRefreshSeconds", 60).takeIf { it == 0 || it == 30 || it == 60 } ?: 60
+            val seconds = prefs.getInt("latencyAutoRefreshSeconds", 0).takeIf { it == 0 || it == 30 || it == 60 } ?: 0
             if (seconds <= 0) {
                 delay(1_000)
                 continue
@@ -3129,7 +3122,7 @@ private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
     var portsInfo by remember { mutableStateOf(false) }
     var autoStart by remember { mutableStateOf(prefs.getBoolean("proxyRootAutoStart", false)) }
     var blurEnabled by remember { mutableStateOf(prefs.getBoolean("enableBlur", true)) }
-    var latencyInterval by remember { mutableIntStateOf(prefs.getInt("latencyAutoRefreshSeconds", 60).takeIf { it == 0 || it == 30 || it == 60 } ?: 60) }
+    var latencyInterval by remember { mutableIntStateOf(prefs.getInt("latencyAutoRefreshSeconds", 0).takeIf { it == 0 || it == 30 || it == 60 } ?: 0) }
 
     val t = LocalBichenTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
