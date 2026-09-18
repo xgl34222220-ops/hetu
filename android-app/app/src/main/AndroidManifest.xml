@@ -25,7 +25,6 @@
         <activity android:name=".LuoShuProxyV3Activity" android:label="代理（旧 V3）" android:exported="false" />
         <activity android:name=".LuoShuProxyV2Activity" android:label="代理（旧 V2）" android:exported="false" />
         <activity android:name=".ProMaxProxyActivity" android:label="代理（旧 Pro Max）" android:exported="false" />
-        <activity android:name=".ProxyWebUiActivity" android:label="WebUI" android:exported="false" />
         <activity android:name=".LuoShuProxyActivity" android:label="代理（旧洛书面板）" android:exported="false" />
         <activity android:name=".ProxyDashboardActivity" android:label="代理（旧面板）" android:exported="false" />
         <activity android:name=".ProxyWorkspaceActivity" android:label="代理（旧工作台）" android:exported="false" />
