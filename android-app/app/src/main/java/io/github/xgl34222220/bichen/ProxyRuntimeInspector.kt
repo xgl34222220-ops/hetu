@@ -116,7 +116,7 @@ internal class ProxyRuntimeInspector(context: Context) {
             ?.substringAfter('=')
             ?.toLongOrNull()
             ?: 0L
-        val target = Regex("""-->\\s+([^\\s"]+)""")
+        val target = Regex("""-->\s+([^\s"]+)""")
         val recent = LinkedHashSet<String>()
         for (line in lines.asReversed()) {
             if (!line.contains("bichen-adblock", ignoreCase = true)) continue
