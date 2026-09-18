@@ -488,7 +488,6 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                     onReload = ::reload,
                     onRestart = ::restart,
                     onDelay = ::measureSites,
-                    onWebUi = { context.startActivity(Intent(context, ProxyWebUiActivity::class.java)) },
                     onLog = { scope.launch { logText = runCatching { inspector.runtimeLog() }.getOrElse { it.message ?: "日志读取失败" } } },
                     onSubscription = {
                         panelTab = RefPanelTab.Subscriptions
@@ -564,7 +563,6 @@ private fun RefHome(
     onReload: () -> Unit,
     onRestart: () -> Unit,
     onDelay: () -> Unit,
-    onWebUi: () -> Unit,
     onLog: () -> Unit,
     onSubscription: () -> Unit,
 ) {
@@ -716,10 +714,7 @@ private fun RefHome(
             }
         }
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                RefSmallTool("WebUI", "Web 界面", Icons.Rounded.Language, onWebUi, Modifier.weight(1f))
-                RefSmallTool("日志", "查看", Icons.Rounded.Article, onLog, Modifier.weight(1f))
-            }
+            RefSmallTool("运行日志", "查看核心、Root 与网络事务日志", Icons.Rounded.Article, onLog, Modifier.fillMaxWidth())
         }
         item {
             RefLatencyPanel(
@@ -3116,10 +3111,6 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
         item { RefSectionLabel("核心与更新") }
         item {
             RefGroup {
-                RefToolRow(Icons.Rounded.Language, Color(0xFF2563EB), "WebUI 管理", "Zashboard · 本机面板与修复", trailingText = "管理", trailingColor = Color(0xFF2563EB)) {
-                    context.startActivity(Intent(context, ProxyWebUiActivity::class.java))
-                }
-                RefDivider()
                 RefToolRow(Icons.Rounded.Memory, Color(0xFF334155), "内核管理", "下载、更新与维护内核", trailingText = state.core.ifBlank { "Mihomo" }, trailingBadge = true, trailingColor = Color(0xFF2563EB)) {
                     context.startActivity(Intent(context, ProxyCoreActivity::class.java))
                 }
