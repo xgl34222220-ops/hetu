@@ -17,7 +17,8 @@ final class RootProxyManager {
     private static final String ROOT="/data/adb/hetu";
     private static final String BIN=ROOT+"/bin/core";
     private static final String CONFIG=ROOT+"/run/state/startup-config";
-    private static final String SCRIPT=ROOT+"/proxy-root.sh";
+    private static final String SCRIPT=ROOT+"/hetu-root.sh";
+    private static final String OLD_HETU_SCRIPT=ROOT+"/proxy-root.sh";
     private static final String LEGACY_ROOT="/data/adb/bichen/proxy";
     private static final String LEGACY_MODULE="/data/adb/modules/bichen";
     private static final String LEGACY_MODULE_UPDATE="/data/adb/modules_update/bichen";
@@ -131,6 +132,7 @@ final class RootProxyManager {
                 .append(RootBridge.quote(binary.getAbsolutePath())).append(' ').append(RootBridge.quote(binTmp))
                 .append("; chmod 700 ").append(RootBridge.quote(binTmp)).append("; chown 0:0 ").append(RootBridge.quote(binTmp))
                 .append("; mv -f ").append(RootBridge.quote(binTmp)).append(' ').append(RootBridge.quote(BIN)).append("; fi")
+                .append("; rm -f ").append(RootBridge.quote(OLD_HETU_SCRIPT))
                 .append("; printf %s ").append(RootBridge.quote(infoText)).append(" > ").append(RootBridge.quote(info))
                 .append("; chmod 600 ").append(RootBridge.quote(info)).append("; chown 0:0 ").append(RootBridge.quote(info));
         RootBridge.Result r=RootBridge.rootShell(context,cmd.toString(),45000L);
@@ -404,7 +406,7 @@ final class RootProxyManager {
                     "echo '--- cnip cache ---'; ls -lh "+RootBridge.quote(ROOT+"/run/ruleset")+" 2>&1 || true; "+
                     "echo '--- sockets ---'; (ss -lntup 2>/dev/null || netstat -lntup 2>/dev/null || true) | tail -n 35; "+
                     "echo '--- policy ---'; ip rule show 2>/dev/null | tail -n 30; ip -6 rule show 2>/dev/null | tail -n 20; "+
-                    "echo '--- hetu chains ---'; iptables-save 2>/dev/null | grep BICHEN | tail -n 70; ip6tables-save 2>/dev/null | grep BICHEN | tail -n 55; "+
+                    "echo '--- hetu chains ---'; iptables-save 2>/dev/null | grep -E 'HETU|BICHEN' | tail -n 70; ip6tables-save 2>/dev/null | grep -E 'HETU|BICHEN' | tail -n 55; "+
                     "echo '--- crash ---'; cat "+RootBridge.quote(ROOT+"/run/last-crash")+" 2>/dev/null || true; "+
                     "echo '--- log ---'; tail -n 55 "+RootBridge.quote(ROOT+"/run/core.log")+" 2>&1 || true";
             RootBridge.Result r=RootBridge.rootShell(context,cmd,12000L);
@@ -465,13 +467,27 @@ final class RootProxyManager {
         return j;
     }
 
-    private void quiesceLegacyRuntime(Progress progress)throws IOException{
-        RootBridge.requireWorkerThread();
-        String legacyScript=LEGACY_ROOT+"/proxy-root.sh";
-        String cmd="set +e; legacy=0; if [ -e "+RootBridge.quote(LEGACY_ROOT)+" ]; then legacy=1; if [ -x "+RootBridge.quote(legacyScript)+" ]; then "+RootBridge.quote(legacyScript)+" stop >/dev/null 2>&1 || true; fi; fi; echo legacy=$legacy; exit 0";
-        RootBridge.Result r=RootBridge.rootShell(context,cmd,20000L);
-        if(!r.ok())throw new IOException("无法停止旧运行环境："+r.output.trim());
-        if(r.output!=null&&r.output.contains("legacy=1"))stage(progress,"已停止旧运行环境，准备由河图接管网络…");
+    private void quiesceLegacyRuntime(Progress progress){
+        try{
+            RootBridge.requireWorkerThread();
+            String legacyBin=LEGACY_ROOT+"/bin/core";
+            String legacyWatchdog=LEGACY_ROOT+"/run/watchdog.pid";
+            String cmd="set +e; legacy=0; "
+                    +"if [ -d "+RootBridge.quote(LEGACY_ROOT)+" ]; then legacy=1; "
+                    +"if [ -f "+RootBridge.quote(legacyWatchdog)+" ]; then w=$(cat "+RootBridge.quote(legacyWatchdog)+" 2>/dev/null); case \"$w\" in ''|*[!0-9]*) ;; *) kill \"$w\" >/dev/null 2>&1 || true;; esac; fi; "
+                    +"for p in /proc/[0-9]*; do [ -r \"$p/cmdline\" ] || continue; pid=$(basename \"$p\"); cmdline=$(tr '\\000' ' ' < \"$p/cmdline\" 2>/dev/null); exe=$(readlink \"$p/exe\" 2>/dev/null); "
+                    +"case \"$cmdline $exe\" in *"+RootBridge.quote(legacyBin)+"*) kill \"$pid\" >/dev/null 2>&1 || true;; esac; done; "
+                    +"rm -f "+RootBridge.quote(LEGACY_ROOT+"/run/core.pid")+" "+RootBridge.quote(legacyWatchdog)+" >/dev/null 2>&1 || true; fi; "
+                    +"printf 'legacy=%s\\n' \"$legacy\"; exit 0";
+            RootBridge.Result r=RootBridge.rootShell(context,cmd,5000L);
+            if(r.ok()&&r.output!=null&&r.output.contains("legacy=1")){
+                stage(progress,"已隔离旧辟尘运行进程，继续由河图接管…");
+            }else if(!r.ok()){
+                prefs.edit().putString("hetuLegacyCleanupWarning","旧辟尘进程清理未完成，将由河图启动事务继续回收").apply();
+            }
+        }catch(Exception ignored){
+            prefs.edit().putString("hetuLegacyCleanupWarning","旧辟尘进程清理未完成，将由河图启动事务继续回收").apply();
+        }
     }
 
     private void retireLegacyInstallation(Progress progress){
@@ -506,7 +522,7 @@ final class RootProxyManager {
         RootBridge.requireWorkerThread();
         File stage=new File(context.getCacheDir(),"hetu-root-stage");
         if(!stage.isDirectory()&&!stage.mkdirs())throw new IOException("无法创建 Root 代理临时目录");
-        File script=new File(stage,"proxy-root.sh");
+        File script=new File(stage,"hetu-root.sh");
         copyAsset("proxy-root-v3.sh",script,true);
         File binary=coreFile(p.profile.core,stage);
         File cfg=new File(stage,"startup-config");
@@ -525,6 +541,7 @@ final class RootProxyManager {
                 .append("; cp ").append(RootBridge.quote(script.getAbsolutePath())).append(' ').append(RootBridge.quote(scriptTmp))
                 .append("; chmod 700 ").append(RootBridge.quote(scriptTmp)).append("; chown 0:0 ").append(RootBridge.quote(scriptTmp))
                 .append("; mv -f ").append(RootBridge.quote(scriptTmp)).append(' ').append(RootBridge.quote(SCRIPT))
+                .append("; rm -f ").append(RootBridge.quote(OLD_HETU_SCRIPT))
                 .append("; cp ").append(RootBridge.quote(binary.getAbsolutePath())).append(' ').append(RootBridge.quote(binTmp))
                 .append("; chmod 700 ").append(RootBridge.quote(binTmp)).append("; chown 0:0 ").append(RootBridge.quote(binTmp))
                 .append("; mv -f ").append(RootBridge.quote(binTmp)).append(' ').append(RootBridge.quote(BIN));
