@@ -60,7 +60,7 @@ jobs:
           grep -q 'System.loadLibrary("hetu_core")' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoNative.java
           grep -q 'Java_io_github_xgl34222220_hetu_MihomoNative_invoke' native/bridge/jni_android.c
           grep -q 'Java_io_github_xgl34222220_hetu_preview_MihomoNative_invoke' native/bridge/jni_android.c
-          grep -q 'versionName = "0.4.0-test.64"' android-app/app/build.gradle.kts
+          grep -Eq 'versionName = "0.4.0-test.6(4|5)"' android-app/app/build.gradle.kts
           test -f android-app/app/src/main/java/io/github/xgl34222220/hetu/LegacyAppMigrator.java
           grep -q 'LegacyAppMigrator.migrateIfNeeded(app)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
           grep -q 'controller.restart { operation = it }' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
@@ -70,6 +70,14 @@ jobs:
           grep -q "printf 'DNS_PORT=%s" android-app/app/src/main/assets/hetu-root.sh
           grep -q 'dataPlaneHealthy' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
           grep -q 'default-network-stable-2500ms' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
+          grep -q 'getBoolean("floatingBottomBar", true)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
+          grep -q 'getBoolean("enableBlur", true)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
+          grep -q 'getBoolean("liquidGlass", true)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
+          ! grep -q 'val floating = true' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
+          ! grep -q 'val enableBlur = true' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
+          ! grep -q 'val activeGlass = true' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
+          ! grep -q 'topBarBlurStyle' android-app/app/src/main/java/io/github/xgl34222220/hetu/ThemeSettingsActivity.kt
+          ! grep -q 'predictiveBack' android-app/app/src/main/java/io/github/xgl34222220/hetu/ThemeSettingsActivity.kt
           grep -q 'head -c \$((END-START+1))' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
           test ! -f android-app/app/src/main/java/io/github/xgl34222220/hetu/LuoShuProxyV3Activity.kt
           test ! -f android-app/app/src/main/java/io/github/xgl34222220/hetu/LuoShuProxyV2Activity.kt
