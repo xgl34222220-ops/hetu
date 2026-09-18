@@ -135,6 +135,15 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
     val haze = rememberHazeState()
     val liquidBackdrop = rememberLayerBackdrop()
     val prefs = remember { context.getSharedPreferences("hetu", 0) }
+    var uiPrefsRevision by remember { mutableIntStateOf(0) }
+    DisposableEffect(prefs) {
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == "enableBlur" || key == "liquidGlass" || key == "showPanelTab") uiPrefsRevision++
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+    uiPrefsRevision
     val blurEnabled = prefs.getBoolean("enableBlur", true)
     val liquidGlassEnabled = prefs.getBoolean("liquidGlass", true)
     val liquid = blurEnabled && liquidGlassEnabled && isRuntimeShaderSupported()
