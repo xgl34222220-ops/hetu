@@ -50,7 +50,10 @@ jobs:
           grep -q 'copyAsset("hetu-root.sh",script,true)' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
           grep -q 'uniqueName(d,requested)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyConfigLibrary.java
           grep -q 'Text("配置库"' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          grep -q           test -f android-app/app/src/main/assets/rules/adaway.txt
+          grep -q '^adguard[[:space:]]' android-app/app/src/main/assets/sources.tsv
+          grep -q 'filterExceptions' android-app/app/src/main/java/io/github/xgl34222220/hetu/RuleStore.java
+          grep -q 'effectiveAllowDomains' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockRules.java
+          test -f android-app/app/src/main/assets/rules/adaway.txt
           test -f android-app/app/src/main/assets/rules/china.txt
           test -f android-app/app/src/main/assets/rules/tracking.txt
           test -f android-app/app/src/main/assets/rules/hagezi.txt
