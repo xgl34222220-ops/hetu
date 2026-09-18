@@ -94,6 +94,17 @@ internal data class ProxyComposeState(
     val directUidRanges: String = "",
     val selfUidBypassed: Boolean = false,
     val runtimeRefreshPending: Boolean = false,
+    val runtimeSchema: Int = 0,
+    val ipv4Rules: Boolean = false,
+    val ipv6Rules: Boolean = false,
+    val dnsMode: String = "",
+    val dnsIpv4Rule: Boolean = false,
+    val dnsIpv6Rule: Boolean = false,
+    val dnsListenerReady: Boolean = false,
+    val tcpEnabled: Boolean = true,
+    val udpEnabled: Boolean = true,
+    val quicBlocked: Boolean = false,
+    val watchdog: Boolean = false,
 )
 
 internal class ProxyComposeController(context: Context) {
@@ -158,6 +169,17 @@ internal class ProxyComposeController(context: Context) {
             directUidRanges = directUidRanges,
             selfUidBypassed = !running || uidInRanges(selfUid, directUidRanges),
             runtimeRefreshPending = prefs.getBoolean("proxyRootRuntimeRefreshPending", false),
+            runtimeSchema = status.optInt("runtimeSchema", 0),
+            ipv4Rules = status.optBoolean("ipv4Rules", false),
+            ipv6Rules = status.optBoolean("ipv6Rules", false),
+            dnsMode = status.optString("dnsMode", ""),
+            dnsIpv4Rule = status.optBoolean("dnsIpv4Rule", false),
+            dnsIpv6Rule = status.optBoolean("dnsIpv6Rule", false),
+            dnsListenerReady = status.optBoolean("dnsListenerReady", false),
+            tcpEnabled = status.optString("tcpEnabled", "1") != "0",
+            udpEnabled = status.optString("udpEnabled", "1") != "0",
+            quicBlocked = status.optString("quicBlocked", "0") == "1",
+            watchdog = status.optBoolean("watchdog", false),
         )
     }
 
