@@ -328,9 +328,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
         scope.launch {
             operation = "正在重启…"
             try {
-                controller.stop { operation = it }
-                delay(160)
-                controller.start { operation = it }
+                controller.restart { operation = it }
                 delay(250)
                 refresh()
             } catch (cancel: CancellationException) {
