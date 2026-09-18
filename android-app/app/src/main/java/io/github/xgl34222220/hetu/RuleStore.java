@@ -699,25 +699,106 @@ public final class RuleStore {
     }
     static Set<String> parseRules(InputStream in,boolean emptyAllowed) throws IOException {
         byte[] bytes=readBytes(in,emptyAllowed?MAX_COMBINED_BYTES:MAX_SOURCE_BYTES); String text;
-        try { text=StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT).onUnmappableCharacter(CodingErrorAction.REPORT).decode(java.nio.ByteBuffer.wrap(bytes)).toString(); }
-        catch(CharacterCodingException e) { throw new IOException("规则不是有效 UTF-8 文本",e); }
+        try {
+            text=StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    .decode(java.nio.ByteBuffer.wrap(bytes)).toString();
+        } catch(CharacterCodingException e) {
+            throw new IOException("规则不是有效 UTF-8 文本",e);
+        }
         Set<String> rules=new HashSet<>(); int lineNumber=0;
         try(BufferedReader reader=new BufferedReader(new StringReader(text))) {
             String line;
             while((line=reader.readLine())!=null) {
                 checkInterrupted();
-                if(++lineNumber>1200000 || line.length()>8192) throw new IOException("规则行数或单行长度超过限制");
+                if(++lineNumber>1600000 || line.length()>8192) throw new IOException("规则行数或单行长度超过限制");
                 if(lineNumber==1 && line.startsWith("\uFEFF")) line=line.substring(1);
                 line=line.trim();
                 if(line.isEmpty() || line.startsWith("!") || line.startsWith("#") || line.startsWith("[")) continue;
 
-                // AdGuard Home compatible core DNS syntax:
-                // ||example.org^ blocks the domain tree; @@||example.org^ is an exception.
+                // Core AdGuard DNS syntax: ||example.org^ blocks the domain tree;
+                // @@||example.org^ is an exception. Modifiers after ^ are ignored here.
                 boolean exception=line.startsWith("@@");
                 String adblock=exception?line.substring(2):line;
                 if(adblock.startsWith("||")) {
                     int endMarker=adblock.indexOf('^',2);
-                    if(endMarker<0)endMarker=adblock.indexOf('
+                    if(endMarker<0) endMarker=adblock.indexOf('(String address,File target,long batchDeadline) throws Exception {
+        URL url=new URL(address);
+        final long deadline=Math.min(batchDeadline,System.nanoTime()+TimeUnit.SECONDS.toNanos(90));
+        final Thread owner=Thread.currentThread();
+        for(int hop=0;hop<6;hop++) {
+            checkDownloadDeadline(deadline);
+            if(!url.getProtocol().equals("https"))throw new IOException("订阅及跳转必须使用 HTTPS");
+            final HttpsURLConnection connection=(HttpsURLConnection)url.openConnection();
+            connection.setInstanceFollowRedirects(false);connection.setConnectTimeout(timeout(deadline,8000));connection.setReadTimeout(timeout(deadline,15000));
+            connection.setRequestProperty("User-Agent","Hetu/1.0 (Android; dns-filter)");connection.setRequestProperty("Accept-Encoding","identity");
+            // Interrupting a Future does not interrupt a blocking HTTPS read. Close
+            // the socket as well, so stopped background jobs release their worker.
+            ScheduledFuture<?> cancellation=DOWNLOAD_WATCHDOG.scheduleWithFixedDelay(() -> {
+                if(owner.isInterrupted()||System.nanoTime()>=deadline)connection.disconnect();
+            },250,250,TimeUnit.MILLISECONDS);
+            try {
+                int status=connection.getResponseCode();
+                checkDownloadDeadline(deadline);
+                if(status==301||status==302||status==303||status==307||status==308) {
+                    String location=connection.getHeaderField("Location");if(location==null)throw new IOException("订阅跳转地址缺失");url=new URL(url,location);continue;
+                }
+                if(status!=200)throw new IOException("规则下载失败：HTTP "+status);
+                long expected=connection.getContentLengthLong();if(expected>MAX_SOURCE_BYTES)throw new IOException("订阅超过 8 MiB");
+                String encoding=connection.getContentEncoding();if(encoding!=null&&!encoding.equalsIgnoreCase("identity"))throw new IOException("订阅返回不支持的压缩传输");
+                byte[] data;
+                try(InputStream input=connection.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()) {
+                    byte[] buffer=new byte[16384];int length,total=0;
+                    while(true) {
+                        checkInterrupted();
+                        long left=(deadline-System.nanoTime())/1000000;
+                        if(left<=0)throw new IOException("规则镜像下载超时；已尝试备用地址，保留该来源旧快照");
+                        connection.setReadTimeout((int)Math.min(25000,Math.max(1,left)));
+                        length=input.read(buffer);if(length<0)break;
+                        checkInterrupted();
+                        total+=length;if(total>MAX_SOURCE_BYTES)throw new IOException("订阅超过 8 MiB");
+                        out.write(buffer,0,length);
+                    }
+                    data=out.toByteArray();
+                }
+                if(data.length==0 || (expected>=0 && expected!=data.length))throw new IOException("订阅下载不完整，保留原规则");
+                checkDownloadDeadline(deadline);
+                writeBytes(target,data);return;
+            } catch(IOException error) {
+                checkDownloadDeadline(deadline);throw error;
+            } finally {cancellation.cancel(false);connection.disconnect();}
+        }
+        throw new IOException("订阅跳转次数过多");
+    }
+    private static void deleteTree(File file) {
+        File[] children=file.listFiles();if(children!=null)for(File child:children)deleteTree(child);file.delete();
+    }
+    private static void checkInterrupted() throws InterruptedIOException {
+        if(Thread.currentThread().isInterrupted()) throw new InterruptedIOException("规则更新已取消；已经完成的提交保留");
+    }
+    static void checkDownloadDeadline(long deadline) throws IOException {
+        checkInterrupted();
+        if(System.nanoTime()>=deadline)throw new IOException("规则镜像下载超时；已尝试备用地址，保留该来源旧快照");
+    }
+    private static int timeout(long deadline,int cap) throws IOException {
+        checkDownloadDeadline(deadline);
+        return (int)Math.max(1,Math.min(cap,TimeUnit.NANOSECONDS.toMillis(deadline-System.nanoTime())));
+    }
+    private static String errorMessage(Throwable error) {
+        String message=error.getMessage();return message==null||message.trim().isEmpty()?error.getClass().getSimpleName():message;
+    }
+}
+,2);
+                    if(endMarker<0)endMarker=adblock.length();
+                    String raw=adblock.substring(2,endMarker).trim().toLowerCase(Locale.ROOT);
+                    if(raw.startsWith("*."))raw=raw.substring(2);
+                    if(raw.indexOf('*')>=0||raw.indexOf('/')>=0||raw.indexOf(':')>=0)continue;
+                    String d=normalize(raw);
+                    if(d!=null)rules.add(exception?"@@"+d:d);
+                    if(rules.size()>MAX_DOMAINS)throw new IOException("规则条数超过限制");
+                    continue;
+                }
+                if(exception)continue;
 
                 int comment=line.indexOf('#'); if(comment>=0)line=line.substring(0,comment).trim();
                 if(line.isEmpty())continue;
@@ -739,6 +820,276 @@ public final class RuleStore {
             }
         }
         if(rules.isEmpty()&&!emptyAllowed)throw new IOException("订阅未包含可用 DNS 规则，保留原规则");
+        return rules;
+    }
+    private static void download(String address,File target,long batchDeadline) throws Exception {
+        URL url=new URL(address);
+        final long deadline=Math.min(batchDeadline,System.nanoTime()+TimeUnit.SECONDS.toNanos(45));
+        final Thread owner=Thread.currentThread();
+        for(int hop=0;hop<6;hop++) {
+            checkDownloadDeadline(deadline);
+            if(!url.getProtocol().equals("https"))throw new IOException("订阅及跳转必须使用 HTTPS");
+            final HttpsURLConnection connection=(HttpsURLConnection)url.openConnection();
+            connection.setInstanceFollowRedirects(false);connection.setConnectTimeout(timeout(deadline,8000));connection.setReadTimeout(timeout(deadline,15000));
+            connection.setRequestProperty("User-Agent","Hetu/1.0 (Android; dns-filter)");connection.setRequestProperty("Accept-Encoding","identity");
+            // Interrupting a Future does not interrupt a blocking HTTPS read. Close
+            // the socket as well, so stopped background jobs release their worker.
+            ScheduledFuture<?> cancellation=DOWNLOAD_WATCHDOG.scheduleWithFixedDelay(() -> {
+                if(owner.isInterrupted()||System.nanoTime()>=deadline)connection.disconnect();
+            },250,250,TimeUnit.MILLISECONDS);
+            try {
+                int status=connection.getResponseCode();
+                checkDownloadDeadline(deadline);
+                if(status==301||status==302||status==303||status==307||status==308) {
+                    String location=connection.getHeaderField("Location");if(location==null)throw new IOException("订阅跳转地址缺失");url=new URL(url,location);continue;
+                }
+                if(status!=200)throw new IOException("规则下载失败：HTTP "+status);
+                long expected=connection.getContentLengthLong();if(expected>MAX_SOURCE_BYTES)throw new IOException("订阅超过 8 MiB");
+                String encoding=connection.getContentEncoding();if(encoding!=null&&!encoding.equalsIgnoreCase("identity"))throw new IOException("订阅返回不支持的压缩传输");
+                byte[] data;
+                try(InputStream input=connection.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()) {
+                    byte[] buffer=new byte[16384];int length,total=0;
+                    while(true) {
+                        checkInterrupted();
+                        long left=(deadline-System.nanoTime())/1000000;
+                        if(left<=0)throw new IOException("规则镜像下载超时；已尝试备用地址，保留该来源旧快照");
+                        connection.setReadTimeout((int)Math.min(25000,Math.max(1,left)));
+                        length=input.read(buffer);if(length<0)break;
+                        checkInterrupted();
+                        total+=length;if(total>MAX_SOURCE_BYTES)throw new IOException("订阅超过 8 MiB");
+                        out.write(buffer,0,length);
+                    }
+                    data=out.toByteArray();
+                }
+                if(data.length==0 || (expected>=0 && expected!=data.length))throw new IOException("订阅下载不完整，保留原规则");
+                checkDownloadDeadline(deadline);
+                writeBytes(target,data);return;
+            } catch(IOException error) {
+                checkDownloadDeadline(deadline);throw error;
+            } finally {cancellation.cancel(false);connection.disconnect();}
+        }
+        throw new IOException("订阅跳转次数过多");
+    }
+    private static void deleteTree(File file) {
+        File[] children=file.listFiles();if(children!=null)for(File child:children)deleteTree(child);file.delete();
+    }
+    private static void checkInterrupted() throws InterruptedIOException {
+        if(Thread.currentThread().isInterrupted()) throw new InterruptedIOException("规则更新已取消；已经完成的提交保留");
+    }
+    static void checkDownloadDeadline(long deadline) throws IOException {
+        checkInterrupted();
+        if(System.nanoTime()>=deadline)throw new IOException("规则镜像下载超时；已尝试备用地址，保留该来源旧快照");
+    }
+    private static int timeout(long deadline,int cap) throws IOException {
+        checkDownloadDeadline(deadline);
+        return (int)Math.max(1,Math.min(cap,TimeUnit.NANOSECONDS.toMillis(deadline-System.nanoTime())));
+    }
+    private static String errorMessage(Throwable error) {
+        String message=error.getMessage();return message==null||message.trim().isEmpty()?error.getClass().getSimpleName():message;
+    }
+}
+,2);
+                    if(endMarker<0) endMarker=adblock.length();
+                    String raw=adblock.substring(2,endMarker).trim().toLowerCase(Locale.ROOT);
+                    if(raw.startsWith("*.")) raw=raw.substring(2);
+                    if(raw.indexOf('*')>=0 || raw.indexOf('/')>=0 || raw.indexOf(':')>=0) continue;
+                    String d=normalize(raw);
+                    if(d!=null) rules.add(exception?"@@"+d:d);
+                    if(rules.size()>MAX_DOMAINS) throw new IOException("规则条数超过限制");
+                    continue;
+                }
+                if(exception) continue;
+
+                int comment=line.indexOf('#');
+                if(comment>=0) line=line.substring(0,comment).trim();
+                if(line.isEmpty()) continue;
+                String[] fields=line.split("\\s+"); int first=0;
+                if(fields[0].equals("0.0.0.0") || fields[0].equals("127.0.0.1")
+                        || fields[0].equals("::") || fields[0].equals("::1")) first=1;
+                else if(fields.length!=1) continue;
+                if(first>=fields.length) continue;
+                for(int i=first;i<fields.length;i++) {
+                    String raw=fields[i].toLowerCase(Locale.ROOT);
+                    if(raw.startsWith("*.")) raw=raw.substring(2);
+                    if(raw.endsWith(".")) raw=raw.substring(0,raw.length()-1);
+                    if(raw.equals("localhost") || raw.equals("localhost.localdomain") || raw.equals("local")
+                            || raw.equals("broadcasthost")
+                            || raw.matches("ip6-(localhost|loopback|localnet|mcastprefix|allnodes|allrouters|allhosts)")) continue;
+                    if(raw.indexOf('*')>=0 || raw.indexOf('/')>=0 || raw.indexOf(':')>=0 || raw.indexOf('(String address,File target,long batchDeadline) throws Exception {
+        URL url=new URL(address);
+        final long deadline=Math.min(batchDeadline,System.nanoTime()+TimeUnit.SECONDS.toNanos(90));
+        final Thread owner=Thread.currentThread();
+        for(int hop=0;hop<6;hop++) {
+            checkDownloadDeadline(deadline);
+            if(!url.getProtocol().equals("https"))throw new IOException("订阅及跳转必须使用 HTTPS");
+            final HttpsURLConnection connection=(HttpsURLConnection)url.openConnection();
+            connection.setInstanceFollowRedirects(false);connection.setConnectTimeout(timeout(deadline,8000));connection.setReadTimeout(timeout(deadline,15000));
+            connection.setRequestProperty("User-Agent","Hetu/1.0 (Android; dns-filter)");connection.setRequestProperty("Accept-Encoding","identity");
+            // Interrupting a Future does not interrupt a blocking HTTPS read. Close
+            // the socket as well, so stopped background jobs release their worker.
+            ScheduledFuture<?> cancellation=DOWNLOAD_WATCHDOG.scheduleWithFixedDelay(() -> {
+                if(owner.isInterrupted()||System.nanoTime()>=deadline)connection.disconnect();
+            },250,250,TimeUnit.MILLISECONDS);
+            try {
+                int status=connection.getResponseCode();
+                checkDownloadDeadline(deadline);
+                if(status==301||status==302||status==303||status==307||status==308) {
+                    String location=connection.getHeaderField("Location");if(location==null)throw new IOException("订阅跳转地址缺失");url=new URL(url,location);continue;
+                }
+                if(status!=200)throw new IOException("规则下载失败：HTTP "+status);
+                long expected=connection.getContentLengthLong();if(expected>MAX_SOURCE_BYTES)throw new IOException("订阅超过 8 MiB");
+                String encoding=connection.getContentEncoding();if(encoding!=null&&!encoding.equalsIgnoreCase("identity"))throw new IOException("订阅返回不支持的压缩传输");
+                byte[] data;
+                try(InputStream input=connection.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()) {
+                    byte[] buffer=new byte[16384];int length,total=0;
+                    while(true) {
+                        checkInterrupted();
+                        long left=(deadline-System.nanoTime())/1000000;
+                        if(left<=0)throw new IOException("规则镜像下载超时；已尝试备用地址，保留该来源旧快照");
+                        connection.setReadTimeout((int)Math.min(25000,Math.max(1,left)));
+                        length=input.read(buffer);if(length<0)break;
+                        checkInterrupted();
+                        total+=length;if(total>MAX_SOURCE_BYTES)throw new IOException("订阅超过 8 MiB");
+                        out.write(buffer,0,length);
+                    }
+                    data=out.toByteArray();
+                }
+                if(data.length==0 || (expected>=0 && expected!=data.length))throw new IOException("订阅下载不完整，保留原规则");
+                checkDownloadDeadline(deadline);
+                writeBytes(target,data);return;
+            } catch(IOException error) {
+                checkDownloadDeadline(deadline);throw error;
+            } finally {cancellation.cancel(false);connection.disconnect();}
+        }
+        throw new IOException("订阅跳转次数过多");
+    }
+    private static void deleteTree(File file) {
+        File[] children=file.listFiles();if(children!=null)for(File child:children)deleteTree(child);file.delete();
+    }
+    private static void checkInterrupted() throws InterruptedIOException {
+        if(Thread.currentThread().isInterrupted()) throw new InterruptedIOException("规则更新已取消；已经完成的提交保留");
+    }
+    static void checkDownloadDeadline(long deadline) throws IOException {
+        checkInterrupted();
+        if(System.nanoTime()>=deadline)throw new IOException("规则镜像下载超时；已尝试备用地址，保留该来源旧快照");
+    }
+    private static int timeout(long deadline,int cap) throws IOException {
+        checkDownloadDeadline(deadline);
+        return (int)Math.max(1,Math.min(cap,TimeUnit.NANOSECONDS.toMillis(deadline-System.nanoTime())));
+    }
+    private static String errorMessage(Throwable error) {
+        String message=error.getMessage();return message==null||message.trim().isEmpty()?error.getClass().getSimpleName():message;
+    }
+}
+,2);
+                    if(endMarker<0)endMarker=adblock.length();
+                    String raw=adblock.substring(2,endMarker).trim().toLowerCase(Locale.ROOT);
+                    if(raw.startsWith("*."))raw=raw.substring(2);
+                    if(raw.indexOf('*')>=0||raw.indexOf('/')>=0||raw.indexOf(':')>=0)continue;
+                    String d=normalize(raw);
+                    if(d!=null)rules.add(exception?"@@"+d:d);
+                    if(rules.size()>MAX_DOMAINS)throw new IOException("规则条数超过限制");
+                    continue;
+                }
+                if(exception)continue;
+
+                int comment=line.indexOf('#'); if(comment>=0)line=line.substring(0,comment).trim();
+                if(line.isEmpty())continue;
+                String[] fields=line.split("\\s+"); int first=0;
+                if(fields[0].equals("0.0.0.0")||fields[0].equals("127.0.0.1")||fields[0].equals("::")||fields[0].equals("::1")) first=1;
+                else if(fields.length!=1) continue;
+                if(first>=fields.length)continue;
+                for(int i=first;i<fields.length;i++) {
+                    String raw=fields[i].toLowerCase(Locale.ROOT);
+                    if(raw.startsWith("*."))raw=raw.substring(2);
+                    if(raw.endsWith("."))raw=raw.substring(0,raw.length()-1);
+                    if(raw.equals("localhost")||raw.equals("localhost.localdomain")||raw.equals("local")||raw.equals("broadcasthost")||raw.matches("ip6-(localhost|loopback|localnet|mcastprefix|allnodes|allrouters|allhosts)")) continue;
+                    if(raw.indexOf('*')>=0||raw.indexOf('/')>=0||raw.indexOf(':')>=0||raw.indexOf('$')>=0)continue;
+                    String d=normalize(raw);
+                    if(d==null)continue;
+                    rules.add(d);
+                    if(rules.size()>MAX_DOMAINS)throw new IOException("规则条数超过限制");
+                }
+            }
+        }
+        if(rules.isEmpty()&&!emptyAllowed)throw new IOException("订阅未包含可用 DNS 规则，保留原规则");
+        return rules;
+    }
+    private static void download(String address,File target,long batchDeadline) throws Exception {
+        URL url=new URL(address);
+        final long deadline=Math.min(batchDeadline,System.nanoTime()+TimeUnit.SECONDS.toNanos(45));
+        final Thread owner=Thread.currentThread();
+        for(int hop=0;hop<6;hop++) {
+            checkDownloadDeadline(deadline);
+            if(!url.getProtocol().equals("https"))throw new IOException("订阅及跳转必须使用 HTTPS");
+            final HttpsURLConnection connection=(HttpsURLConnection)url.openConnection();
+            connection.setInstanceFollowRedirects(false);connection.setConnectTimeout(timeout(deadline,8000));connection.setReadTimeout(timeout(deadline,15000));
+            connection.setRequestProperty("User-Agent","Hetu/1.0 (Android; dns-filter)");connection.setRequestProperty("Accept-Encoding","identity");
+            // Interrupting a Future does not interrupt a blocking HTTPS read. Close
+            // the socket as well, so stopped background jobs release their worker.
+            ScheduledFuture<?> cancellation=DOWNLOAD_WATCHDOG.scheduleWithFixedDelay(() -> {
+                if(owner.isInterrupted()||System.nanoTime()>=deadline)connection.disconnect();
+            },250,250,TimeUnit.MILLISECONDS);
+            try {
+                int status=connection.getResponseCode();
+                checkDownloadDeadline(deadline);
+                if(status==301||status==302||status==303||status==307||status==308) {
+                    String location=connection.getHeaderField("Location");if(location==null)throw new IOException("订阅跳转地址缺失");url=new URL(url,location);continue;
+                }
+                if(status!=200)throw new IOException("规则下载失败：HTTP "+status);
+                long expected=connection.getContentLengthLong();if(expected>MAX_SOURCE_BYTES)throw new IOException("订阅超过 8 MiB");
+                String encoding=connection.getContentEncoding();if(encoding!=null&&!encoding.equalsIgnoreCase("identity"))throw new IOException("订阅返回不支持的压缩传输");
+                byte[] data;
+                try(InputStream input=connection.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()) {
+                    byte[] buffer=new byte[16384];int length,total=0;
+                    while(true) {
+                        checkInterrupted();
+                        long left=(deadline-System.nanoTime())/1000000;
+                        if(left<=0)throw new IOException("规则镜像下载超时；已尝试备用地址，保留该来源旧快照");
+                        connection.setReadTimeout((int)Math.min(25000,Math.max(1,left)));
+                        length=input.read(buffer);if(length<0)break;
+                        checkInterrupted();
+                        total+=length;if(total>MAX_SOURCE_BYTES)throw new IOException("订阅超过 8 MiB");
+                        out.write(buffer,0,length);
+                    }
+                    data=out.toByteArray();
+                }
+                if(data.length==0 || (expected>=0 && expected!=data.length))throw new IOException("订阅下载不完整，保留原规则");
+                checkDownloadDeadline(deadline);
+                writeBytes(target,data);return;
+            } catch(IOException error) {
+                checkDownloadDeadline(deadline);throw error;
+            } finally {cancellation.cancel(false);connection.disconnect();}
+        }
+        throw new IOException("订阅跳转次数过多");
+    }
+    private static void deleteTree(File file) {
+        File[] children=file.listFiles();if(children!=null)for(File child:children)deleteTree(child);file.delete();
+    }
+    private static void checkInterrupted() throws InterruptedIOException {
+        if(Thread.currentThread().isInterrupted()) throw new InterruptedIOException("规则更新已取消；已经完成的提交保留");
+    }
+    static void checkDownloadDeadline(long deadline) throws IOException {
+        checkInterrupted();
+        if(System.nanoTime()>=deadline)throw new IOException("规则镜像下载超时；已尝试备用地址，保留该来源旧快照");
+    }
+    private static int timeout(long deadline,int cap) throws IOException {
+        checkDownloadDeadline(deadline);
+        return (int)Math.max(1,Math.min(cap,TimeUnit.NANOSECONDS.toMillis(deadline-System.nanoTime())));
+    }
+    private static String errorMessage(Throwable error) {
+        String message=error.getMessage();return message==null||message.trim().isEmpty()?error.getClass().getSimpleName():message;
+    }
+}
+)>=0) continue;
+                    String d=normalize(raw);
+                    if(d==null) continue;
+                    rules.add(d);
+                    if(rules.size()>MAX_DOMAINS) throw new IOException("规则条数超过限制");
+                }
+            }
+        }
+        if(rules.isEmpty()&&!emptyAllowed) throw new IOException("订阅未包含可用 DNS 规则，保留原规则");
         return rules;
     }
     private static void download(String address,File target,long batchDeadline) throws Exception {
