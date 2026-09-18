@@ -91,8 +91,11 @@ fun HetuGlassDock(
         onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
     val shape = if (floating) RoundedCornerShape(31.dp) else RoundedCornerShape(topStart = 31.dp, topEnd = 31.dp)
-    val runtimeLiquid = activeGlass && enableBlur && backdrop != null && isRuntimeShaderSupported()
-    val activeHaze = activeGlass && enableBlur && !runtimeLiquid
+    // Never render a translucent glass shell without a real blur/backdrop behind it.
+    // That fallback was the source of the opaque white slab when either appearance switch was disabled.
+    val renderGlass = activeGlass && enableBlur
+    val runtimeLiquid = renderGlass && backdrop != null && isRuntimeShaderSupported()
+    val activeHaze = renderGlass && !runtimeLiquid
     val dockSurfaceBackdrop = rememberLayerBackdrop()
     val hazeModifier = if (activeHaze) {
         Modifier.hazeEffect(state = hazeState, style = HazeMaterials.ultraThin()) {
@@ -101,8 +104,8 @@ fun HetuGlassDock(
         }
     } else Modifier
     val glassBrush = when {
-        activeGlass && dark -> Brush.verticalGradient(listOf(Color.White.copy(alpha = .10f), Color.White.copy(alpha = .035f)))
-        activeGlass -> Brush.verticalGradient(listOf(Color.White.copy(alpha = .22f), Color.White.copy(alpha = .09f)))
+        renderGlass && dark -> Brush.verticalGradient(listOf(Color.White.copy(alpha = .10f), Color.White.copy(alpha = .035f)))
+        renderGlass -> Brush.verticalGradient(listOf(Color.White.copy(alpha = .22f), Color.White.copy(alpha = .09f)))
         else -> Brush.verticalGradient(
             listOf(tokens.elevatedCardBackground.copy(alpha = .98f), tokens.elevatedCardBackground.copy(alpha = .98f)),
         )
@@ -150,7 +153,7 @@ fun HetuGlassDock(
             .then(hazeModifier)
             .background(glassBrush)
             .drawBehind {
-                if (activeGlass) {
+                if (renderGlass) {
                     drawRoundRect(
                         brush = Brush.radialGradient(
                             colors = listOf(
@@ -181,7 +184,7 @@ fun HetuGlassDock(
                 .then(liquidShellModifier)
                 .border(
                     if (runtimeLiquid) .45.dp else .7.dp,
-                    if (activeGlass) {
+                    if (renderGlass) {
                         if (dark) Color.White.copy(alpha = .11f) else Color.White.copy(alpha = .32f)
                     } else if (dark) Color.White.copy(alpha = .10f) else Color.White.copy(alpha = .50f),
                     shape,
@@ -201,7 +204,7 @@ fun HetuGlassDock(
             indicatorShadow = 3.dp,
             selectedColor = scheme.primary,
             unselectedColor = scheme.onSurfaceVariant.copy(alpha = .90f),
-            liquidGlass = activeGlass,
+            liquidGlass = renderGlass,
             indicatorBackdrop = dockSurfaceBackdrop.takeIf { runtimeLiquid },
             dark = dark,
         )
