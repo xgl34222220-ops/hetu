@@ -106,6 +106,22 @@ final class RootProxyManager {
         return iface;
     }
 
+    private boolean coreAliveFast(){
+        try{
+            RootBridge.requireWorkerThread();
+            String command="P=$(cat "+RootBridge.quote(ROOT+"/run/core.pid")+" 2>/dev/null || echo 0); "
+                    +"case \"$P\" in ''|*[!0-9]*) P=0;; esac; "
+                    +"if [ \"$P\" -gt 0 ] && kill -0 \"$P\" >/dev/null 2>&1; then "
+                    +"EXE=$(readlink \"/proc/$P/exe\" 2>/dev/null || true); "
+                    +"case \"$EXE\" in "+BIN+") printf 1;; *) printf 0;; esac; "
+                    +"else printf 0; fi";
+            RootBridge.Result result=RootBridge.rootShell(context,command,4000L);
+            return result.ok()&&"1".equals(result.output.trim());
+        }catch(Exception ignored){
+            return prefs.getBoolean("proxyRootRuntimeRunning",false)&&prefs.getBoolean("proxyRootWanted",false);
+        }
+    }
+
     String ensureRuntimeBase(ProxyRuntimeProfile.Core requestedCore)throws Exception{
         RootBridge.requireWorkerThread();
         ProxyRuntimeProfile.Core core=requestedCore;
@@ -235,12 +251,12 @@ final class RootProxyManager {
     private JSONObject startInternal(ProxyRuntimeProfile profile,Progress progress,boolean replaceRunning)throws Exception{
         CONTROL_LOCK.lock();
         try{
-            JSONObject existing=status();
-            if(existing.optBoolean("running",false)&&!replaceRunning){
-                prefs.edit().putBoolean("proxyRootWanted",true).apply();
+            boolean existingRunning=coreAliveFast();
+            if(existingRunning&&!replaceRunning){
+                prefs.edit().putBoolean("proxyRootWanted",true).putBoolean("proxyRootRuntimeRunning",true).apply();
                 ensureContinuityService(true);
-                existing.put("ok",true).put("alreadyRunning",true).put("message","Root 代理已在运行，已忽略重复启动请求");
-                return existing;
+                return new JSONObject().put("ok",true).put("running",true).put("alreadyRunning",true)
+                        .put("message","Root 代理已在运行，已忽略重复启动请求");
             }
             if(replaceRunning) {
                 // Preserve the user's intent before any new preparation. The shell start transaction
@@ -316,9 +332,8 @@ final class RootProxyManager {
             if(!result.optBoolean("ok"))throw new IOException(result.optString("message","Root 代理启动失败"));
         }catch(Exception startFailure){if(adblockCoordinatorEntered)ProxyAdblockCoordinator.exit(context);throw startFailure;}
 
-        stage(progress,"确认策略控制接口、守护与回滚状态…");
-        JSONObject state=status();
-        if(!state.optBoolean("running",false)){
+        stage(progress,"确认核心进程、策略控制接口与守护状态…");
+        if(!coreAliveFast()){
             if(adblockCoordinatorEntered)ProxyAdblockCoordinator.exit(context);
             throw new IOException("启动命令已返回，但未检测到河图私有核心进程"+(diagnostics().isEmpty()?"":"："+diagnostics()));
         }
