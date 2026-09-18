@@ -3310,7 +3310,7 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
         item { RefSectionLabel("订阅与数据") }
         item {
             RefGroup {
-                RefToolRow(Icons.Rounded.CloudDownload, Color(0xFF2563EB), "订阅管理", "链接 · User-Agent · 更新", trailingText = "管理", trailingColor = Color(0xFF2563EB)) {
+                RefToolRow(Icons.Rounded.CloudDownload, Color(0xFF2563EB), "订阅管理", "链接 · 多配置 · YAML", trailingText = "管理", trailingColor = Color(0xFF2563EB)) {
                     context.startActivity(Intent(context, ProxySubscriptionActivity::class.java))
                 }
                 RefDivider()
