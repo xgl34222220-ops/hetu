@@ -113,7 +113,7 @@ final class RootProxyManager {
         File stage=new File(context.getCacheDir(),"hetu-runtime-init");
         if(!stage.isDirectory()&&!stage.mkdirs())throw new IOException("无法创建河图运行初始化目录");
         File script=new File(stage,"hetu-root.sh");
-        copyAsset("proxy-root-v3.sh",script,true);
+        copyAsset("hetu-root.sh",script,true);
         File binary=coreFile(core,stage);
         String deploySuffix=".new."+Long.toHexString(System.nanoTime());
         String scriptTmp=SCRIPT+deploySuffix;
@@ -539,12 +539,13 @@ final class RootProxyManager {
     private void installRuntimeFiles(Prepared p,boolean includeConfig)throws Exception{
         RootBridge.requireWorkerThread();
         File stage=new File(context.getCacheDir(),"hetu-root-stage");
-        if(!stage.isDirectory()&&!stage.mkdirs())throw new IOException("无法创建 Root 代理临时目录");
+        if(!stage.isDirectory()&&!stage.mkdirs())throw new IOException("无法创建河图运行临时目录");
         File script=new File(stage,"hetu-root.sh");
-        copyAsset("proxy-root-v3.sh",script,true);
+        copyAsset("hetu-root.sh",script,true);
         File binary=coreFile(p.profile.core,stage);
         File cfg=new File(stage,"startup-config");
         File adblock=p.adblock==null?null:p.adblock.file;
+        File adblockAllow=p.adblock==null?null:p.adblock.allowFile;
         File cn4=null,cn6=null;
         if(p.profile.cnIpDirect){
             cn4=new File(stage,"hetu-cn-v4.txt");copyAsset("cnip/hetu-cn-v4.txt",cn4,false);
@@ -568,6 +569,12 @@ final class RootProxyManager {
             cmd.append("; cp ").append(RootBridge.quote(adblock.getAbsolutePath())).append(' ').append(RootBridge.quote(tmp))
                     .append("; chmod 600 ").append(RootBridge.quote(tmp)).append("; chown 0:0 ").append(RootBridge.quote(tmp))
                     .append("; mv -f ").append(RootBridge.quote(tmp)).append(' ').append(RootBridge.quote(dst));
+            if(adblockAllow!=null){
+                String allowDst=ROOT+"/run/ruleset/hetu-adblock-allow.txt",allowTmp=allowDst+".new";
+                cmd.append("; cp ").append(RootBridge.quote(adblockAllow.getAbsolutePath())).append(' ').append(RootBridge.quote(allowTmp))
+                        .append("; chmod 600 ").append(RootBridge.quote(allowTmp)).append("; chown 0:0 ").append(RootBridge.quote(allowTmp))
+                        .append("; mv -f ").append(RootBridge.quote(allowTmp)).append(' ').append(RootBridge.quote(allowDst));
+            }
         }
         if(p.profile.cnIpDirect){
             String dst4=ROOT+"/run/ruleset/hetu-cn-v4.txt",dst6=ROOT+"/run/ruleset/hetu-cn-v6.txt";
