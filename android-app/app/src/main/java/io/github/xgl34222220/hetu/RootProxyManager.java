@@ -17,6 +17,7 @@ final class RootProxyManager {
     private static final String ROOT="/data/adb/hetu";
     private static final String BIN=ROOT+"/bin/core";
     private static final String CONFIG=ROOT+"/run/state/startup-config";
+    private static final String CORE_TOKEN=ROOT+"/run/state/core.token";
     private static final String SCRIPT=ROOT+"/hetu-root.sh";
     private static final String OLD_HETU_SCRIPT=ROOT+"/proxy-root.sh";
     private static final String LEGACY_ROOT="/data/adb/bichen/proxy";
@@ -106,6 +107,25 @@ final class RootProxyManager {
         return iface;
     }
 
+    private String expectedCoreToken(ProxyRuntimeProfile.Core core){
+        if(cores.installed(core)){
+            File file=cores.file(core);
+            return "file:"+core.id+":"+file.length()+":"+file.lastModified();
+        }
+        return "asset:"+BuildConfig.VERSION_CODE+":"+core.id;
+    }
+
+    private boolean runtimeCoreCurrent(String token){
+        try{
+            RootBridge.Result result=RootBridge.rootShell(context,
+                    "if [ -x "+RootBridge.quote(BIN)+" ] && [ -r "+RootBridge.quote(CORE_TOKEN)+" ] && [ \"$(cat "+RootBridge.quote(CORE_TOKEN)+" 2>/dev/null)\" = "+RootBridge.quote(token)+" ]; then printf 1; else printf 0; fi",
+                    4000L);
+            return result.ok()&&"1".equals(result.output.trim());
+        }catch(Exception ignored){
+            return false;
+        }
+    }
+
     private boolean coreAliveFast(){
         try{
             RootBridge.requireWorkerThread();
@@ -130,7 +150,9 @@ final class RootProxyManager {
         if(!stage.isDirectory()&&!stage.mkdirs())throw new IOException("无法创建河图运行初始化目录");
         File script=new File(stage,"hetu-root.sh");
         copyAsset("hetu-root.sh",script,true);
-        File binary=coreFile(core,stage);
+        String coreToken=expectedCoreToken(core);
+        boolean deployCore=!runtimeCoreCurrent(coreToken);
+        File binary=deployCore?coreFile(core,stage):null;
         String deploySuffix=".new."+Long.toHexString(System.nanoTime());
         String scriptTmp=SCRIPT+deploySuffix;
         String binTmp=BIN+deploySuffix;
@@ -142,12 +164,15 @@ final class RootProxyManager {
                 .append(RootBridge.quote(ROOT+"/run/ruleset"))
                 .append("; cp ").append(RootBridge.quote(script.getAbsolutePath())).append(' ').append(RootBridge.quote(scriptTmp))
                 .append("; chmod 700 ").append(RootBridge.quote(scriptTmp)).append("; chown 0:0 ").append(RootBridge.quote(scriptTmp))
-                .append("; mv -f ").append(RootBridge.quote(scriptTmp)).append(' ').append(RootBridge.quote(SCRIPT))
-                .append("; if [ ! -x ").append(RootBridge.quote(BIN)).append(" ]; then cp ")
-                .append(RootBridge.quote(binary.getAbsolutePath())).append(' ').append(RootBridge.quote(binTmp))
-                .append("; chmod 700 ").append(RootBridge.quote(binTmp)).append("; chown 0:0 ").append(RootBridge.quote(binTmp))
-                .append("; mv -f ").append(RootBridge.quote(binTmp)).append(' ').append(RootBridge.quote(BIN)).append("; fi")
-                .append("; rm -f ").append(RootBridge.quote(OLD_HETU_SCRIPT))
+                .append("; mv -f ").append(RootBridge.quote(scriptTmp)).append(' ').append(RootBridge.quote(SCRIPT));
+        if(deployCore){
+            cmd.append("; cp ").append(RootBridge.quote(binary.getAbsolutePath())).append(' ').append(RootBridge.quote(binTmp))
+                    .append("; chmod 700 ").append(RootBridge.quote(binTmp)).append("; chown 0:0 ").append(RootBridge.quote(binTmp))
+                    .append("; mv -f ").append(RootBridge.quote(binTmp)).append(' ').append(RootBridge.quote(BIN))
+                    .append("; printf %s ").append(RootBridge.quote(coreToken)).append(" > ").append(RootBridge.quote(CORE_TOKEN))
+                    .append("; chmod 600 ").append(RootBridge.quote(CORE_TOKEN)).append("; chown 0:0 ").append(RootBridge.quote(CORE_TOKEN));
+        }
+        cmd.append("; rm -f ").append(RootBridge.quote(OLD_HETU_SCRIPT))
                 .append("; printf %s ").append(RootBridge.quote(infoText)).append(" > ").append(RootBridge.quote(info))
                 .append("; chmod 600 ").append(RootBridge.quote(info)).append("; chown 0:0 ").append(RootBridge.quote(info));
         RootBridge.Result r=RootBridge.rootShell(context,cmd.toString(),45000L);
@@ -618,7 +643,9 @@ final class RootProxyManager {
         if(!stage.isDirectory()&&!stage.mkdirs())throw new IOException("无法创建河图运行临时目录");
         File script=new File(stage,"hetu-root.sh");
         copyAsset("hetu-root.sh",script,true);
-        File binary=coreFile(p.profile.core,stage);
+        String coreToken=expectedCoreToken(p.profile.core);
+        boolean deployCore=!runtimeCoreCurrent(coreToken);
+        File binary=deployCore?coreFile(p.profile.core,stage):null;
         File cfg=new File(stage,"startup-config");
         File adblock=p.adblock==null?null:p.adblock.file;
         File adblockAllow=p.adblock==null?null:p.adblock.allowFile;
@@ -636,10 +663,14 @@ final class RootProxyManager {
                 .append("; cp ").append(RootBridge.quote(script.getAbsolutePath())).append(' ').append(RootBridge.quote(scriptTmp))
                 .append("; chmod 700 ").append(RootBridge.quote(scriptTmp)).append("; chown 0:0 ").append(RootBridge.quote(scriptTmp))
                 .append("; mv -f ").append(RootBridge.quote(scriptTmp)).append(' ').append(RootBridge.quote(SCRIPT))
-                .append("; rm -f ").append(RootBridge.quote(OLD_HETU_SCRIPT))
-                .append("; cp ").append(RootBridge.quote(binary.getAbsolutePath())).append(' ').append(RootBridge.quote(binTmp))
-                .append("; chmod 700 ").append(RootBridge.quote(binTmp)).append("; chown 0:0 ").append(RootBridge.quote(binTmp))
-                .append("; mv -f ").append(RootBridge.quote(binTmp)).append(' ').append(RootBridge.quote(BIN));
+                .append("; rm -f ").append(RootBridge.quote(OLD_HETU_SCRIPT));
+        if(deployCore){
+            cmd.append("; cp ").append(RootBridge.quote(binary.getAbsolutePath())).append(' ').append(RootBridge.quote(binTmp))
+                    .append("; chmod 700 ").append(RootBridge.quote(binTmp)).append("; chown 0:0 ").append(RootBridge.quote(binTmp))
+                    .append("; mv -f ").append(RootBridge.quote(binTmp)).append(' ').append(RootBridge.quote(BIN))
+                    .append("; printf %s ").append(RootBridge.quote(coreToken)).append(" > ").append(RootBridge.quote(CORE_TOKEN))
+                    .append("; chmod 600 ").append(RootBridge.quote(CORE_TOKEN)).append("; chown 0:0 ").append(RootBridge.quote(CORE_TOKEN));
+        }
         if(adblock!=null){
             String dst=ROOT+"/run/ruleset/hetu-adblock.txt",tmp=dst+".new";
             cmd.append("; cp ").append(RootBridge.quote(adblock.getAbsolutePath())).append(' ').append(RootBridge.quote(tmp))
