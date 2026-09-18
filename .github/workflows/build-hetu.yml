@@ -40,6 +40,9 @@ jobs:
           ! grep -R 'io.github.xgl34222220.bichen' android-app/app/src/main native README.md
           ! grep -R 'ModuleInstaller\|ModuleArchive' android-app/app/src/main
           test -f android-app/app/src/main/assets/sources.tsv
+          test -f android-app/app/src/main/assets/hetu-root.sh
+          sh -n android-app/app/src/main/assets/hetu-root.sh
+          grep -q 'copyAsset("hetu-root.sh",script,true)' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
           test -f android-app/app/src/main/assets/rules/adaway.txt
           test -f android-app/app/src/main/assets/rules/china.txt
           test -f android-app/app/src/main/assets/rules/tracking.txt
@@ -126,6 +129,7 @@ jobs:
           printf '%s\n' "$BADGING" | grep -q "application-label:'河图'"
           unzip -l "$APK" | grep -q 'lib/arm64-v8a/libhetu_core.so'
           unzip -l "$APK" | grep -q 'assets/mihomo-root/arm64-v8a/mihomo'
+          unzip -l "$APK" | grep -q 'assets/hetu-root.sh'
           unzip -l "$APK" | grep -q 'assets/rules/adaway.txt'
           ! unzip -l "$APK" | grep -q 'libbichen_core.so'
 
