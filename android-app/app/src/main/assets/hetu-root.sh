@@ -605,7 +605,9 @@ status(){
   case "$STATUS_MODE" in
     tproxy|enhance) [ "$M4O" = true ] && MODE4=true; [ "$M6O" = true ] && MODE6=true;;
     redirect) [ "$N4O" = true ] && MODE4=true; [ "$N6O" = true ] && MODE6=true;;
-    tun|ebpf) MODE4=true; MODE6=true;;
+    tun|ebpf)
+      if ip link show hetu0 >/dev/null 2>&1; then MODE4=true; MODE6=true; fi
+      ;;
   esac
   if [ "$SHAREV" = 1 ]; then
     case "$STATUS_MODE" in
@@ -616,10 +618,19 @@ status(){
 
   DNS4=true; DNS6=true; DNSREADY=true
   if [ "$DNSV" != off ]; then
-    DNS4=$D4O
-    [ "$SHAREV" != 1 ] || [ "$D4P" = true ] || DNS4=false
-    DNS6=$D6O
-    [ "$SHAREV" != 1 ] || [ "$D6P" = true ] || DNS6=false
+    # TUN/eBPF owns DNS interception inside Mihomo's TUN device; Root DNS chains are
+    # only required by transparent TPROXY/REDIRECT/ENHANCE modes.
+    case "$STATUS_MODE" in
+      tun|ebpf) ;;
+      *)
+        DNS4=$D4O
+        [ "$SHAREV" != 1 ] || [ "$D4P" = true ] || DNS4=false
+        if v6active && [ "$IPV6V" = enable ]; then
+          DNS6=$D6O
+          [ "$SHAREV" != 1 ] || [ "$D6P" = true ] || DNS6=false
+        fi
+        ;;
+    esac
     DNSREADY=false
     if has ss; then
       ss -lnut 2>/dev/null | grep -Eq "(:|])${DPV}[[:space:]]" && DNSREADY=true
