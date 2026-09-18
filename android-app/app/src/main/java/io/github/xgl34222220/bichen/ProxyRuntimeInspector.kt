@@ -102,14 +102,12 @@ internal class ProxyRuntimeInspector(context: Context) {
 
     suspend fun adblockRuntimeStats(): AdblockRuntimeStats = withContext(Dispatchers.IO) {
         val command = """
-            LOG=/data/adb/bichen/proxy/run/core.log
-            if [ ! -r "$LOG" ]; then
+            if [ ! -r /data/adb/bichen/proxy/run/core.log ]; then
               echo '__COUNT__=0'
               exit 0
             fi
-            C=$(grep -Eic 'bichen-adblock|RuleSet/bichen-adblock' "$LOG" 2>/dev/null || true)
-            echo "__COUNT__=$C"
-            grep -Ei 'bichen-adblock|RuleSet/bichen-adblock' "$LOG" 2>/dev/null | tail -n 24 || true
+            echo "__COUNT__=$(grep -Eic 'bichen-adblock|RuleSet/bichen-adblock' /data/adb/bichen/proxy/run/core.log 2>/dev/null || true)"
+            grep -Ei 'bichen-adblock|RuleSet/bichen-adblock' /data/adb/bichen/proxy/run/core.log 2>/dev/null | tail -n 24 || true
         """.trimIndent()
         val result = RootBridge.rootShell(app, command, 6_000L)
         if (!result.ok()) return@withContext AdblockRuntimeStats()
@@ -118,7 +116,7 @@ internal class ProxyRuntimeInspector(context: Context) {
             ?.substringAfter('=')
             ?.toLongOrNull()
             ?: 0L
-        val target = Regex("""-->\s+([^\s"]+)""")
+        val target = Regex("""-->\\s+([^\\s"]+)""")
         val recent = LinkedHashSet<String>()
         for (line in lines.asReversed()) {
             if (!line.contains("bichen-adblock", ignoreCase = true)) continue
