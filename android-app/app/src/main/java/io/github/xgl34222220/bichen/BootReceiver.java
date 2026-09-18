@@ -18,19 +18,24 @@ public final class BootReceiver extends BroadcastReceiver {
             new Thread(() -> {
                 RootProxyManager root = new RootProxyManager(context.getApplicationContext());
                 try {
-                    try { root.stop(); } catch (Exception ignored) { }
-                    Thread.sleep(180L);
-                    root.start(ProxyRuntimeProfile.load(prefs));
+                    prefs.edit().putBoolean("proxyRootWanted", true).apply();
+                    root.replaceRunningAfterUpgrade(ProxyRuntimeProfile.load(prefs));
                     prefs.edit()
                             .putLong("proxyRootLastUpgradeRestartAt", System.currentTimeMillis())
                             .remove("proxyRootUpgradeError")
                             .apply();
                 } catch (Exception e) {
-                    prefs.edit().putString(
-                            "proxyRootUpgradeError",
-                            "升级后自动刷新 Root 运行环境失败：" +
-                                    (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage())
-                    ).apply();
+                    // Never reinterpret an upgrade failure as "the user asked to stop".
+                    // If the old core is still healthy, it stays alive because replacement is
+                    // validated before the shell transaction switches runtime state.
+                    prefs.edit()
+                            .putBoolean("proxyRootWanted", true)
+                            .putString(
+                                    "proxyRootUpgradeError",
+                                    "升级后运行环境刷新失败，已保留运行意图：" +
+                                            (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage())
+                            )
+                            .apply();
                 } finally {
                     pending.finish();
                 }
