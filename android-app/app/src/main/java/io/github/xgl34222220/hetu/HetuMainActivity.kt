@@ -241,7 +241,7 @@ private fun HomePage(
                     title = "代理控制台",
                     subtitle = if (snapshot.proxyRunning) "透明代理运行中" else "核心 · 节点 · 连接 · 测速",
                     status = if (snapshot.proxyRunning) "运行中" else "未运行",
-                ) { context.startActivity(android.content.Intent(context, ComposeProxyActivity::class.java)) }
+                ) { context.startActivity(android.content.Intent(context, ReferenceProxyActivity::class.java)) }
                 QuickCard(
                     icon = Icons.Rounded.Security,
                     title = "设备与保护状态",
