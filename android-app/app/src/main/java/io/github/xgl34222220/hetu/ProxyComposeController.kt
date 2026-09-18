@@ -510,16 +510,13 @@ internal class ProxyComposeController(context: Context) {
     }
 
     private fun readSocketUidMap(): Map<String, Int> {
-        val command = """
-            for F in tcp tcp6; do
-              [ -r /proc/net/$F ] || continue
-              awk 'NR>1 { split($2,a,":"); if (a[2] != "" && $8 ~ /^[0-9]+$/) print "tcp " a[2] " " $8 }' /proc/net/$F
-            done
-            for F in udp udp6; do
-              [ -r /proc/net/$F ] || continue
-              awk 'NR>1 { split($2,a,":"); if (a[2] != "" && $8 ~ /^[0-9]+$/) print "udp " a[2] " " $8 }' /proc/net/$F
-            done
-        """.trimIndent()
+        val command = "for F in tcp tcp6; do " +
+            "[ -r /proc/net/\$F ] || continue; " +
+            "awk 'NR>1 { split(\$2,a,\":\"); if (a[2] != \"\" && \$8 ~ /^[0-9]+\$/) print \"tcp \" a[2] \" \" \$8 }' /proc/net/\$F; " +
+            "done; for F in udp udp6; do " +
+            "[ -r /proc/net/\$F ] || continue; " +
+            "awk 'NR>1 { split(\$2,a,\":\"); if (a[2] != \"\" && \$8 ~ /^[0-9]+\$/) print \"udp \" a[2] \" \" \$8 }' /proc/net/\$F; " +
+            "done"
         return try {
             val result = RootBridge.rootShell(app, command, 3_500L)
             if (!result.ok()) return emptyMap()
