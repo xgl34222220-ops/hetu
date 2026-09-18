@@ -2918,7 +2918,11 @@ private fun RefConnectionDiagnosticsCard(
     val stats = remember(items, context.packageName) {
         refConnectionDiagnostics(items, context.packageName)
     }
-    val stale = state.runtimeRefreshPending || !state.selfUidBypassed
+    val stale = state.runtimeRefreshPending || state.runtimeSchema < 63 || !state.selfUidBypassed
+    val tunLike = state.mode.contains("TUN", true) || state.mode.contains("eBPF", true)
+    val dnsHealthy = state.dnsMode == "off" ||
+        (state.dnsListenerReady && (tunLike || state.dnsIpv4Rule))
+    val dataPlaneHealthy = state.ipv4Rules && state.watchdog && dnsHealthy
     Surface(
         shape = RoundedCornerShape(20.dp),
         color = t.cardBackground,
@@ -3010,6 +3014,45 @@ private fun RefConnectionDiagnosticsCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.widthIn(max = 150.dp),
+                    )
+                }
+            }
+
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = when {
+                    stale -> Color(0xFFF59E0B).copy(alpha = if (dark) .12f else .08f)
+                    dataPlaneHealthy -> Color(0xFF10B981).copy(alpha = if (dark) .10f else .07f)
+                    else -> Color(0xFFF43F5E).copy(alpha = if (dark) .10f else .07f)
+                },
+            ) {
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        "数据面 · schema ${state.runtimeSchema.takeIf { it > 0 } ?: "旧版"}",
+                        color = t.textPrimary,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        buildString {
+                            append("IPv4 ").append(if (state.ipv4Rules) "✓" else "×")
+                            append(" · IPv6 ").append(if (state.ipv6Rules) "✓" else "—")
+                            append(" · DNS ").append(
+                                when {
+                                    state.dnsMode == "off" -> "关闭"
+                                    dnsHealthy -> "✓ ${state.dnsMode}"
+                                    else -> "× ${state.dnsMode.ifBlank { "未知" }}"
+                                },
+                            )
+                            append(" · 守护 ").append(if (state.watchdog) "✓" else "×")
+                            append(" · ").append(if (state.quicBlocked) "QUIC 阻断" else "QUIC 放行")
+                        },
+                        color = if (dataPlaneHealthy && !stale) Color(0xFF059669) else if (stale) Color(0xFFB45309) else Color(0xFFE11D48),
+                        fontSize = 9.sp,
+                        lineHeight = 13.sp,
                     )
                 }
             }
