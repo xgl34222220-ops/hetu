@@ -1,38 +1,33 @@
-name: Hetu full rebrand and build
+name: Hetu Android build
 
 on:
   push:
     branches: ['feature/hetu-rebrand-root-app']
     paths:
-      - 'tools/migrate_to_hetu.py'
-      - '.github/workflows/hetu-migration-build.yml'
+      - 'android-app/**'
+      - 'native/**'
+      - 'README.md'
+      - '.gitignore'
+      - '.github/workflows/build-hetu.yml'
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   actions: read
 
 jobs:
-  migrate-build:
-    if: ${{ !contains(github.event.head_commit.message || '', '[hetu-migration]') }}
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Apply Hetu migration
-        run: python3 tools/migrate_to_hetu.py
-
-      - name: Verify source migration invariants
+      - name: Verify Hetu source invariants
         shell: bash
         run: |
           set -euo pipefail
-          test -f .hetu-migration-complete
           test ! -d module
-          test ! -d downloads
           test -d android-app/app/src/main/java/io/github/xgl34222220/hetu
           test ! -d android-app/app/src/main/java/io/github/xgl34222220/bichen
           grep -q 'namespace = "io.github.xgl34222220.hetu"' android-app/app/build.gradle.kts
@@ -43,7 +38,6 @@ jobs:
           grep -q 'private static final String ROOT="/data/adb/hetu";' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
           ! grep -R '/data/adb/hetu/proxy' android-app/app/src/main native README.md
           ! grep -R 'io.github.xgl34222220.bichen' android-app/app/src/main native README.md
-          ! grep -R -E '辟尘|Bichen' android-app/app/src/main native README.md
           ! grep -R 'ModuleInstaller\|ModuleArchive' android-app/app/src/main
           test -f android-app/app/src/main/assets/sources.tsv
           test -f android-app/app/src/main/assets/rules/adaway.txt
@@ -137,22 +131,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Hetu-Rebrand-Debug
+          name: Hetu-Debug
           path: android-app/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
-
-      - name: Commit verified Hetu migration
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -rf .upstream
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          if git diff --cached --quiet; then
-            echo "No migration changes to commit"
-            exit 0
-          fi
-          git commit -m "Refactor Bichen into Hetu root app [hetu-migration]"
-          git push origin HEAD:feature/hetu-rebrand-root-app

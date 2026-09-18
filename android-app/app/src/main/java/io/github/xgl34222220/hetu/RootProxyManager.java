@@ -18,6 +18,9 @@ final class RootProxyManager {
     private static final String BIN=ROOT+"/bin/core";
     private static final String CONFIG=ROOT+"/run/state/startup-config";
     private static final String SCRIPT=ROOT+"/proxy-root.sh";
+    private static final String LEGACY_ROOT="/data/adb/bichen/proxy";
+    private static final String LEGACY_MODULE="/data/adb/modules/bichen";
+    private static final String LEGACY_MODULE_UPDATE="/data/adb/modules_update/bichen";
     private static final ReentrantLock CONTROL_LOCK=new ReentrantLock(true);
     private final Context context;
     private final SharedPreferences prefs;
@@ -194,6 +197,7 @@ final class RootProxyManager {
             policy=p.policy;
             stage(progress,"代理配置可用；本次仅关闭串联广告过滤继续启动…");
         }
+        quiesceLegacyRuntime(progress);
         stage(progress,"检查 TUN / TPROXY / eBPF / UID / IPv6 能力…");
         JSONObject pre=runJson("preflight",
                 profile.mode.id,String.valueOf(p.tproxyPort),String.valueOf(p.redirectPort),profile.ipv6.id,
@@ -224,6 +228,7 @@ final class RootProxyManager {
             if(adblockCoordinatorEntered)ProxyAdblockCoordinator.exit(context);
             throw new IOException("启动命令已返回，但未检测到河图私有核心进程"+(diagnostics().isEmpty()?"":"："+diagnostics()));
         }
+        retireLegacyInstallation(progress);
         // Publish only the port of a successfully running core.
         prefs.edit().putInt("proxyControllerPort",p.controllerPort).commit();
         MihomoControllerClient controller=new MihomoControllerClient(context);
@@ -250,6 +255,10 @@ final class RootProxyManager {
         String adblockFallbackReason=prefs.getString("proxyAdblockLastError","");
         if(!profile.adblockChain&&adblockFallbackReason!=null&&!adblockFallbackReason.isEmpty()){
             warning=(warning.isEmpty()?"":warning+"；")+"代理已启动，但广告串联本次降级："+adblockFallbackReason;
+        }
+        String legacyCleanupWarning=prefs.getString("hetuLegacyCleanupWarning","");
+        if(legacyCleanupWarning!=null&&!legacyCleanupWarning.isEmpty()){
+            warning=(warning.isEmpty()?"":warning+"；")+legacyCleanupWarning;
         }
         result.put("sourceConfig",p.source.name)
                 .put("core",profile.core.id)
@@ -421,6 +430,43 @@ final class RootProxyManager {
         catch(Exception e){throw new IOException(r.output.isEmpty()?"Root 控制器没有返回状态":r.output);}
         if(r.code!=0)throw new IOException(j.optString("message","Root 代理命令失败，退出码 "+r.code));
         return j;
+    }
+
+    private void quiesceLegacyRuntime(Progress progress)throws IOException{
+        RootBridge.requireWorkerThread();
+        String legacyScript=LEGACY_ROOT+"/proxy-root.sh";
+        String cmd="set +e; legacy=0; if [ -e "+RootBridge.quote(LEGACY_ROOT)+" ]; then legacy=1; if [ -x "+RootBridge.quote(legacyScript)+" ]; then "+RootBridge.quote(legacyScript)+" stop >/dev/null 2>&1 || true; fi; fi; echo legacy=$legacy; exit 0";
+        RootBridge.Result r=RootBridge.rootShell(context,cmd,20000L);
+        if(!r.ok())throw new IOException("无法停止旧运行环境："+r.output.trim());
+        if(r.output!=null&&r.output.contains("legacy=1"))stage(progress,"已停止旧运行环境，准备由河图接管网络…");
+    }
+
+    private void retireLegacyInstallation(Progress progress){
+        try{
+            RootBridge.requireWorkerThread();
+            String uninstall=LEGACY_MODULE+"/uninstall.sh";
+            String disable=LEGACY_MODULE+"/disable";
+            String remove=LEGACY_MODULE+"/remove";
+            String cmd="set +e; legacy=0; "
+                    +"if [ -d "+RootBridge.quote(LEGACY_MODULE)+" ]; then legacy=1; "
+                    +"if [ -f "+RootBridge.quote(uninstall)+" ]; then sh "+RootBridge.quote(uninstall)+" >/dev/null 2>&1 || true; fi; "
+                    +"touch "+RootBridge.quote(disable)+" "+RootBridge.quote(remove)+" >/dev/null 2>&1 || true; fi; "
+                    +"if [ -d "+RootBridge.quote(LEGACY_MODULE_UPDATE)+" ]; then legacy=1; rm -rf "+RootBridge.quote(LEGACY_MODULE_UPDATE)+"; fi; "
+                    +"if [ -e "+RootBridge.quote(LEGACY_ROOT)+" ]; then legacy=1; rm -rf "+RootBridge.quote(LEGACY_ROOT)+"; fi; "
+                    +"echo legacy=$legacy; exit 0";
+            RootBridge.Result r=RootBridge.rootShell(context,cmd,20000L);
+            if(!r.ok()){
+                String detail=r.output==null?"未知 Root 错误":r.output.trim();
+                prefs.edit().putString("hetuLegacyCleanupWarning","河图已运行，但旧安装清理失败："+detail).apply();
+                return;
+            }
+            prefs.edit().remove("hetuLegacyCleanupWarning").apply();
+            if(r.output!=null&&r.output.contains("legacy=1"))stage(progress,"河图已接管；旧模块已停用并标记卸载，重启后彻底退出旧挂载");
+        }catch(Exception e){
+            String detail=e.getMessage()==null?e.getClass().getSimpleName():e.getMessage();
+            if(detail.length()>400)detail=detail.substring(0,400)+"…";
+            prefs.edit().putString("hetuLegacyCleanupWarning","河图已运行，但旧安装清理失败："+detail).apply();
+        }
     }
 
     private void installRuntimeFiles(Prepared p,boolean includeConfig)throws Exception{
