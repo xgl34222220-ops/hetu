@@ -139,6 +139,50 @@ final class RootProxyManager {
         return ROOT;
     }
 
+    String refreshAdblockRuntime()throws Exception{
+        CONTROL_LOCK.lock();
+        try{
+            RootBridge.requireWorkerThread();
+            if(!prefs.getBoolean("proxyAdblockChain",true))return "广告过滤串联未开启";
+            JSONObject state=status();
+            if(!state.optBoolean("running",false))return "规则已保存；代理下次启动时自动使用新规则";
+            ProxyAdblockRules.Snapshot snapshot=ProxyAdblockRules.export(context);
+            if(snapshot.count<=0)throw new IOException("当前没有可热更新的广告规则");
+            String blockDst=ROOT+"/run/ruleset/hetu-adblock.txt";
+            String allowDst=ROOT+"/run/ruleset/hetu-adblock-allow.txt";
+            String suffix=".new."+Long.toHexString(System.nanoTime());
+            String cmd="set -e; mkdir -p "+RootBridge.quote(ROOT+"/run/ruleset")
+                    +"; cp "+RootBridge.quote(snapshot.file.getAbsolutePath())+" "+RootBridge.quote(blockDst+suffix)
+                    +"; chmod 600 "+RootBridge.quote(blockDst+suffix)+"; chown 0:0 "+RootBridge.quote(blockDst+suffix)
+                    +"; mv -f "+RootBridge.quote(blockDst+suffix)+" "+RootBridge.quote(blockDst)
+                    +"; cp "+RootBridge.quote(snapshot.allowFile.getAbsolutePath())+" "+RootBridge.quote(allowDst+suffix)
+                    +"; chmod 600 "+RootBridge.quote(allowDst+suffix)+"; chown 0:0 "+RootBridge.quote(allowDst+suffix)
+                    +"; mv -f "+RootBridge.quote(allowDst+suffix)+" "+RootBridge.quote(allowDst);
+            RootBridge.Result copied=RootBridge.rootShell(context,cmd,20000L);
+            if(!copied.ok())throw new IOException("规则已更新，但写入运行目录失败："+copied.output.trim());
+
+            int port=liveControllerPort(state);
+            if(port>0)prefs.edit().putInt("proxyControllerPort",port).apply();
+            MihomoControllerClient controller=new MihomoControllerClient(context);
+            String warning="";
+            try{
+                controller.reloadConfig(CONFIG);
+                if(!controller.waitReady(8000))warning="；Controller 重载后仍在初始化";
+            }catch(Exception reloadError){
+                String detail=reloadError.getMessage()==null?reloadError.getClass().getSimpleName():reloadError.getMessage();
+                warning="；运行中的 Controller 暂未热重载："+detail+"，下次重启必定使用新规则";
+            }
+            prefs.edit()
+                    .putInt("proxyAdblockLastRuleCount",snapshot.count)
+                    .putString("proxyAdblockLastRevision",snapshot.revision)
+                    .putLong("proxyAdblockHotReloadAt",System.currentTimeMillis())
+                    .apply();
+            return "已热更新 "+snapshot.count+" 条广告规则"+warning;
+        }finally{
+            CONTROL_LOCK.unlock();
+        }
+    }
+
     Prepared prepare(ProxyRuntimeProfile profile)throws Exception{
         RootBridge.requireWorkerThread();
         if(profile.core!=ProxyRuntimeProfile.Core.MIHOMO&&profile.core!=ProxyRuntimeProfile.Core.MIHOMO_SMART)
