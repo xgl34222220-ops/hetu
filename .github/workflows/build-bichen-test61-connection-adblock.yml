@@ -1,0 +1,116 @@
+name: Build Bichen 0.4.0-test.61 connection adblock polish
+
+on:
+  push:
+    branches: ['release/bichen-0.4.0-test.61']
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    if: github.event.head_commit.message == 'Build Bichen 0.4.0-test.61 connection adblock polish'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify test61 source invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD=android-app/app/build.gradle.kts
+          POLICY=android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyPolicy.java
+          REF=android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt
+          ADBRULES=android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAdblockRules.java
+          STARTUP=android-app/app/src/main/java/io/github/xgl34222220/bichen/MihomoStartupConfig.java
+          MANIFEST=android-app/app/src/main/AndroidManifest.xml
+          SH=android-app/app/src/main/assets/proxy-root-v3.sh
+
+          grep -q 'versionCode = 461' "$BUILD"
+          grep -q 'versionName = "0.4.0-test.61"' "$BUILD"
+
+          grep -q 'directUids.add(self.uid)' "$POLICY"
+          grep -q 'resolvedDirectPackages.add(context.getPackageName())' "$POLICY"
+
+          grep -q 'latencyAutoRefreshSeconds", 0' "$REF"
+          ! grep -q 'latencyAutoRefreshSeconds", 60' "$REF"
+          grep -q 'Auto site probes are opt-in' "$REF"
+
+          grep -Fq 'out.write(childAllow ? domain : "+." + domain)' "$ADBRULES"
+          grep -q 'isSpecificDirectWhitelist' "$STARTUP"
+          grep -q 'priority.add(lines\[i\])' "$STARTUP"
+          grep -q 'RULE-SET,"+ProxyAdblockRules.PROVIDER_NAME+",REJECT' "$STARTUP"
+
+          ! grep -q 'ProxyWebUiActivity' "$MANIFEST"
+          test ! -f android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyWebUiActivity.kt
+          ! grep -q 'external-ui:' "$STARTUP"
+          ! grep -q 'external-ui-url:' "$STARTUP"
+
+          grep -q 'direct_uid_returns' "$SH"
+          grep -q 'START_DIRECT_UIDS' "$SH"
+          sh -n "$SH"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+          cache-read-only: false
+
+      - name: Reuse verified test60 native runtime
+        uses: actions/download-artifact@v4
+        with:
+          name: Bichen-0.4.0-test.60-No-WebUI-Runtime-Refresh
+          path: previous-artifact
+          github-token: ${{ github.token }}
+          repository: xgl34222220-ops/pichen
+          run-id: 35291993762
+
+      - name: Restore native runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          PREV=$(find previous-artifact -name '*.apk' -type f | head -n 1)
+          test -n "$PREV"
+          mkdir -p android-app/app/src/main/jniLibs/arm64-v8a android-app/app/src/main/jniLibs/x86_64
+          mkdir -p android-app/app/src/main/assets/mihomo-root/arm64-v8a android-app/app/src/main/assets/mihomo-root/x86_64
+          unzip -p "$PREV" lib/arm64-v8a/libbichen_core.so > android-app/app/src/main/jniLibs/arm64-v8a/libbichen_core.so
+          unzip -p "$PREV" lib/x86_64/libbichen_core.so > android-app/app/src/main/jniLibs/x86_64/libbichen_core.so
+          unzip -p "$PREV" assets/mihomo-root/arm64-v8a/mihomo > android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo
+          unzip -p "$PREV" assets/mihomo-root/x86_64/mihomo > android-app/app/src/main/assets/mihomo-root/x86_64/mihomo
+          unzip -p "$PREV" assets/MIHOMO-LICENSE > android-app/app/src/main/assets/MIHOMO-LICENSE
+          unzip -p "$PREV" assets/mihomo-revision.txt > android-app/app/src/main/assets/mihomo-revision.txt
+
+      - name: Build debug APK
+        working-directory: android-app
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Verify APK payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=android-app/app/build/outputs/apk/debug/app-debug.apk
+          test -f "$APK"
+          unzip -t "$APK" >/dev/null
+          unzip -l "$APK" | grep -q 'assets/proxy-root-v3.sh'
+          unzip -l "$APK" | grep -q 'assets/mihomo-root/arm64-v8a/mihomo'
+          unzip -p "$APK" assets/proxy-root-v3.sh | grep -q 'START_DIRECT_UIDS'
+          unzip -p "$APK" assets/sources.tsv | grep -q 'HaGeZi Light'
+          ! unzip -p "$APK" AndroidManifest.xml 2>/dev/null | strings | grep -q 'ProxyWebUiActivity' || exit 1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Bichen-0.4.0-test.61-Connection-Adblock-Polish
+          path: android-app/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
