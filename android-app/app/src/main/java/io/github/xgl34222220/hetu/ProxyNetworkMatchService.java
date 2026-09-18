@@ -18,6 +18,7 @@ public final class ProxyNetworkMatchService extends Service {
     private final ScheduledExecutorService metrics=Executors.newScheduledThreadPool(2);
     private Network lastDefaultNetwork;
     private boolean defaultNetworkSeen;
+    private volatile long lastAdblockMetricPoll;
 
     @Override public void onCreate(){
         super.onCreate();
@@ -219,6 +220,10 @@ public final class ProxyNetworkMatchService extends Service {
             if(!prefs.getBoolean("proxyRootRuntimeRunning",false)
                     ||!prefs.getBoolean("proxyAdblockChain",true)
                     ||!prefs.getBoolean("proxyAdblockCounterArmed",false))return;
+            long now=SystemClock.elapsedRealtime();
+            long interval=prefs.getBoolean("proxyAdblockUiVisible",false)?3000L:15000L;
+            if(now-lastAdblockMetricPoll<interval)return;
+            lastAdblockMetricPoll=now;
             long offset=Math.max(0L,prefs.getLong("proxyAdblockLogOffset",0L));
             String path="/data/adb/hetu/run/core.log";
             String command="set +e; S=$(wc -c < "+RootBridge.quote(path)+" 2>/dev/null || echo 0); "
