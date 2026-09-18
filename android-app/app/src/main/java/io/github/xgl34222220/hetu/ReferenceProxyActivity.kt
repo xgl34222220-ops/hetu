@@ -329,9 +329,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
         scope.launch {
             operation = "正在重启…"
             try {
-                controller.stop { operation = it }
-                delay(160)
-                controller.start { operation = it }
+                controller.restart { operation = it }
                 delay(250)
                 refresh()
             } catch (cancel: CancellationException) {
@@ -390,7 +388,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
             runCatching { controller.ensureRuntimeFiles() }
         }
         while (true) {
-            delay(2200)
+            delay(3000)
             if (operation.isBlank()) refresh()
         }
     }
