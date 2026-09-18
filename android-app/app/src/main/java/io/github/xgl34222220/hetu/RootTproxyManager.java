@@ -20,7 +20,7 @@ final class RootTproxyManager {
     private static final String ROOT = "/data/adb/hetu";
     private static final String BIN = ROOT + "/bin/mihomo";
     private static final String CONFIG = ROOT + "/config.yaml";
-    private static final String SCRIPT = ROOT + "/tproxy-root.sh";
+    private static final String SCRIPT = ROOT + "/hetu-route.sh";
     private static final Pattern TOP_TPROXY = Pattern.compile("(?m)^\\s*tproxy-port\\s*:\\s*([0-9]{1,5})\\s*(?:#.*)?$");
     private static final Pattern PORT = Pattern.compile("^\\s*port\\s*:\\s*([0-9]{1,5})\\s*(?:#.*)?$");
     private static final Pattern TYPE = Pattern.compile("^\\s*type\\s*:\\s*[\"']?tproxy[\"']?\\s*(?:#.*)?$", Pattern.CASE_INSENSITIVE);
@@ -99,8 +99,8 @@ final class RootTproxyManager {
         RootBridge.requireWorkerThread();
         File staging = new File(context.getCacheDir(), "tproxy-stage");
         if (!staging.exists() && !staging.mkdirs()) throw new IOException("无法创建 TPROXY 临时目录");
-        File script = new File(staging, "tproxy-root.sh");
-        copyAsset("tproxy-root.sh", script);
+        File script = new File(staging, "hetu-route.sh");
+        copyAsset("hetu-route.sh", script);
         File binary = new File(staging, "mihomo");
         copyAsset(rootBinaryAsset(), binary);
         File config = new File(staging, "config.yaml");
