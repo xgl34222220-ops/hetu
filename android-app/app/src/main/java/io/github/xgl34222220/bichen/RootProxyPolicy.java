@@ -68,6 +68,18 @@ final class RootProxyPolicy {
         if (selected == null) selected = Collections.emptySet();
         PackageManager pm = context.getPackageManager();
 
+        // The Android control app must never proxy its own WAN probes, rule downloads,
+        // subscription traffic or diagnostics back through Mihomo. Mature transparent
+        // proxy clients exclude their controller UID for the same reason: self-generated
+        // traffic otherwise inflates /connections and can create feedback loops.
+        try {
+            ApplicationInfo self = pm.getApplicationInfo(context.getPackageName(), 0);
+            if (self.uid >= FIRST_APP_UID) {
+                directUids.add(self.uid);
+                resolvedDirectPackages.add(context.getPackageName());
+            }
+        } catch (PackageManager.NameNotFoundException impossible) { }
+
         if (profile.appScope != ProxyRuntimeProfile.AppScope.CORE) {
             for (String pkg : new TreeSet<>(selected)) {
                 if (pkg == null || pkg.isEmpty() || pkg.equals(context.getPackageName())) continue;
@@ -136,7 +148,7 @@ final class RootProxyPolicy {
         ArrayList<String> parts = new ArrayList<>();
         if (!missingPackages.isEmpty()) parts.add("已忽略 " + missingPackages.size() + " 个已卸载应用");
         if (!skippedSystemPackages.isEmpty()) parts.add("为避免影响系统服务，已忽略 " + skippedSystemPackages.size() + " 个系统 UID 应用");
-        if (!directPackages.isEmpty()) parts.add("已将配置中的 " + directPackages.size() + " 个 DIRECT 应用下沉为 Root 直连");
+        if (!directPackages.isEmpty()) parts.add("已将 " + directPackages.size() + " 个应用下沉为 Root 直连（包含辟尘自身控制进程）");
         return String.join("；", parts);
     }
 
