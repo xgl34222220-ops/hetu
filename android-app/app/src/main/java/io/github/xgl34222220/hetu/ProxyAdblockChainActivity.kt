@@ -58,6 +58,10 @@ private fun cachedRuleSources(raw: String?): List<RuleSourceItem> {
                         url = item.optString("url"),
                         enabled = item.optBoolean("enabled"),
                         count = item.optInt("count"),
+                        lastSuccess = item.optLong("lastSuccess", 0L),
+                        lastError = item.optString("lastError", ""),
+                        durationMs = item.optLong("durationMs", 0L),
+                        mirror = item.optInt("mirror", -1),
                     ),
                 )
             }
@@ -74,7 +78,11 @@ private fun encodeRuleSources(items: List<RuleSourceItem>): String {
                 .put("name", item.name)
                 .put("url", item.url)
                 .put("enabled", item.enabled)
-                .put("count", item.count),
+                .put("count", item.count)
+                .put("lastSuccess", item.lastSuccess)
+                .put("lastError", item.lastError)
+                .put("durationMs", item.durationMs)
+                .put("mirror", item.mirror),
         )
     }
     return array.toString()
@@ -536,7 +544,24 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             Text(source.name, color = t.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                            Text(if (source.count >= 0) "${source.count} 条 · ${source.id}" else source.id, color = t.textSecondary, fontSize = 10.sp)
+                            Text(
+                                buildString {
+                                    append(if (source.count >= 0) "${source.count} 条 · ${source.id}" else source.id)
+                                    if (source.durationMs > 0) append(" · ${source.durationMs} ms")
+                                    if (source.mirror >= 0) append(" · 镜像 ${source.mirror + 1}")
+                                },
+                                color = t.textSecondary,
+                                fontSize = 10.sp,
+                            )
+                            if (source.lastError.isNotBlank()) {
+                                Text(
+                                    "最近更新：${source.lastError}",
+                                    color = Color(0xFFD97706),
+                                    fontSize = 9.sp,
+                                    maxLines = 2,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                )
+                            }
                         }
                         Switch(checked = source.enabled, onCheckedChange = { toggleSource(source) }, enabled = !busy)
                     }
