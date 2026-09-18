@@ -460,7 +460,6 @@ private fun PanelPage(
     ) {
         item {
             CompactTopBar("代理面板", "${state.groups.size} 个策略组", null) {
-                SmallAction(Icons.Rounded.Language, "WebUI", onOpenWebUi)
                 SmallAction(Icons.Rounded.Search, "搜索") { search = !search }
             }
         }
