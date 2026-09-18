@@ -193,7 +193,6 @@ private fun ProxyApp(onBack: () -> Unit) {
                         backdrop = backdrop.takeIf { liquid },
                         onBack = onBack,
                         onOpenPanel = { page = ProxyPage.Panel },
-                        onOpenWebUi = { context.startActivity(Intent(context, ProxyWebUiActivity::class.java)) },
                         onStartStop = ::startStop,
                         onRestart = ::restart,
                         onGlobalDelay = ::globalDelay,
@@ -205,7 +204,6 @@ private fun ProxyApp(onBack: () -> Unit) {
                         testingAll = testingAll,
                         backdrop = backdrop.takeIf { liquid },
                         onGlobalDelay = ::globalDelay,
-                        onOpenWebUi = { context.startActivity(Intent(context, ProxyWebUiActivity::class.java)) },
                         onStateChanged = { revision++ },
                     )
                     ProxyPage.Tools -> ToolsPage(
@@ -271,7 +269,6 @@ private fun HomePage(
     backdrop: LayerBackdrop?,
     onBack: () -> Unit,
     onOpenPanel: () -> Unit,
-    onOpenWebUi: () -> Unit,
     onStartStop: () -> Unit,
     onRestart: () -> Unit,
     onGlobalDelay: () -> Unit,
@@ -288,7 +285,6 @@ private fun HomePage(
     ) {
         item {
             CompactTopBar("代理", "${state.core} · ${state.mode}", onBack) {
-                SmallAction(Icons.Rounded.Language, "WebUI", onOpenWebUi)
             }
         }
         item {
@@ -374,7 +370,6 @@ private fun HomePage(
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 QuickTile(Icons.Rounded.Public, "策略面板", "节点与策略", Modifier.weight(1f), onOpenPanel, backdrop)
-                QuickTile(Icons.Rounded.Language, "WebUI", "本机 Zashboard", Modifier.weight(1f), onOpenWebUi, backdrop)
                 QuickTile(
                     Icons.Rounded.Speed,
                     if (testingAll) "测速中" else "全部测速",
@@ -407,7 +402,6 @@ private fun PanelPage(
     testingAll: Boolean,
     backdrop: LayerBackdrop?,
     onGlobalDelay: () -> Unit,
-    onOpenWebUi: () -> Unit,
     onStateChanged: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -665,11 +659,6 @@ private fun ToolsPage(
         verticalArrangement = Arrangement.spacedBy(9.dp),
     ) {
         item { CompactTopBar("工具", if (state.running) "代理运行中" else "代理已停止", null) }
-        item {
-            ActionRow(Icons.Rounded.Language, "WebUI", "本机 Zashboard · 与 Mihomo API 同源", if (state.running) "打开" else "未运行", backdrop, enabled = state.running) {
-                context.startActivity(Intent(context, ProxyWebUiActivity::class.java))
-            }
-        }
         item {
             ActionRow(Icons.Rounded.Speed, if (testingAll) "正在测速" else "全部节点测速", "策略组批量测速 + 未覆盖节点补测", if (state.running) "开始" else "未运行", backdrop, enabled = state.running && !testingAll, onClick = onGlobalDelay)
         }
