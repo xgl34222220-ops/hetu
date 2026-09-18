@@ -311,7 +311,11 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
         scope.launch {
             busy = true
             runCatching { adController.setRuleSource(item.id, !item.enabled) }
-                .onSuccess { notice = "${item.name} 已${if (item.enabled) "关闭" else "开启"}；代理运行中时请重启代理应用新快照"; revision++ }
+                .onSuccess { hot ->
+                    notice = "${item.name} 已${if (item.enabled) "关闭" else "开启"}" +
+                        if (hot.isBlank()) "" else "；$hot"
+                    revision++
+                }
                 .onFailure { notice = it.message ?: "规则源修改失败" }
             busy = false
         }
@@ -482,7 +486,10 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                                     if (!busy) scope.launch {
                                         busy = true
                                         runCatching { adController.setRuleProfile(id) }
-                                            .onSuccess { notice = "已切换到${label}保护；Root 代理运行中请重启以载入新快照"; revision++ }
+                                            .onSuccess { hot ->
+                                                notice = "已切换到${label}保护" + if (hot.isBlank()) "" else "；$hot"
+                                                revision++
+                                            }
                                             .onFailure { notice = it.message ?: "保护强度切换失败" }
                                         busy = false
                                     }
@@ -493,7 +500,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                             )
                         }
                     }
-                    Text("轻量：国内纯广告；均衡：HaGeZi Normal + 国内规则；加强：再加入隐私/追踪增强。HaGeZi 作为主 DNS 规则库，不再叠加重复主列表。用户黑白名单始终保留。", color = t.textSecondary, fontSize = 10.sp, lineHeight = 15.sp)
+                    Text("轻量：国内纯广告；均衡：AdGuard DNS + 国内规则；加强：AdGuard DNS + HaGeZi + 隐私/追踪增强。例外规则和用户白名单始终优先。", color = t.textSecondary, fontSize = 10.sp, lineHeight = 15.sp)
                 }
             }
         }
@@ -598,7 +605,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                         updatingRules = false
                         result
                             .onSuccess {
-                                notice = "$it；代理运行中时请重启代理应用新快照"
+                                notice = it
                                 revision++
                                 updateSuccess = true
                                 updateView.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
