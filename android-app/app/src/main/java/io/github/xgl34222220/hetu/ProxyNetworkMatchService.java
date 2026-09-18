@@ -19,6 +19,7 @@ public final class ProxyNetworkMatchService extends Service {
     private Network lastDefaultNetwork;
     private boolean defaultNetworkSeen;
     private volatile long lastAdblockMetricPoll;
+    private volatile long networkChangeGeneration;
 
     @Override public void onCreate(){
         super.onCreate();
@@ -50,7 +51,7 @@ public final class ProxyNetworkMatchService extends Service {
     private void register(){
         cb=new ConnectivityManager.NetworkCallback(){
             @Override public void onAvailable(Network n){handleDefaultNetwork(n);evaluate();}
-            @Override public void onLost(Network n){evaluate();}
+            @Override public void onLost(Network n){networkChangeGeneration++;evaluate();}
             @Override public void onCapabilitiesChanged(Network n,NetworkCapabilities c){evaluate();}
         };
         try{cm.registerDefaultNetworkCallback(cb);}
@@ -58,19 +59,29 @@ public final class ProxyNetworkMatchService extends Service {
     }
 
     private void handleDefaultNetwork(Network n){
-        worker.execute(()->{
-            boolean changed=defaultNetworkSeen&&lastDefaultNetwork!=null&&n!=null&&!lastDefaultNetwork.equals(n);
-            lastDefaultNetwork=n;
-            defaultNetworkSeen=true;
-            if(!changed||!prefs.getBoolean("proxyRootWanted",false))return;
-            SystemClock.sleep(220);
+        boolean changed=defaultNetworkSeen&&lastDefaultNetwork!=null&&n!=null&&!lastDefaultNetwork.equals(n);
+        lastDefaultNetwork=n;
+        defaultNetworkSeen=true;
+        if(!changed||!prefs.getBoolean("proxyRootWanted",false))return;
+        final long generation=++networkChangeGeneration;
+        metrics.schedule(()->worker.execute(()->{
+            if(generation!=networkChangeGeneration||!prefs.getBoolean("proxyRootWanted",false))return;
+            Network active=cm.getActiveNetwork();
+            if(active==null||!active.equals(n))return;
+            NetworkCapabilities caps=cm.getNetworkCapabilities(active);
+            if(caps==null||!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))return;
             try{
                 new MihomoControllerClient(getApplicationContext()).closeAll();
-                prefs.edit().putLong("proxyLastNetworkSessionReset",System.currentTimeMillis()).remove("proxyNetworkSessionResetError").apply();
+                prefs.edit()
+                        .putLong("proxyLastNetworkSessionReset",System.currentTimeMillis())
+                        .putString("proxyLastNetworkSessionResetReason","default-network-stable-2500ms")
+                        .remove("proxyNetworkSessionResetError")
+                        .apply();
             }catch(Exception e){
-                prefs.edit().putString("proxyNetworkSessionResetError",e.getMessage()==null?e.getClass().getSimpleName():e.getMessage()).apply();
+                prefs.edit().putString("proxyNetworkSessionResetError",
+                        e.getMessage()==null?e.getClass().getSimpleName():e.getMessage()).apply();
             }
-        });
+        }),2500L,TimeUnit.MILLISECONDS);
     }
 
     private void evaluate(){
@@ -228,9 +239,10 @@ public final class ProxyNetworkMatchService extends Service {
             String path="/data/adb/hetu/run/core.log";
             String command="set +e; S=$(wc -c < "+RootBridge.quote(path)+" 2>/dev/null || echo 0); "
                     +"case \"$S\" in ''|*[!0-9]*) S=0;; esac; "
-                    +"printf '%s\\n' \"$S\"; "
                     +"if [ \"$S\" -lt "+offset+" ]; then START=1; else START="+(offset+1)+"; fi; "
-                    +"if [ \"$S\" -ge \"$START\" ]; then tail -c +\"$START\" "+RootBridge.quote(path)+" 2>/dev/null | tail -c 1048576; fi";
+                    +"END=$S; LIMIT=$((START+1048576-1)); [ \"$END\" -gt \"$LIMIT\" ] && END=$LIMIT; "
+                    +"printf '%s\\n' \"$END\"; "
+                    +"if [ \"$END\" -ge \"$START\" ]; then tail -c +\"$START\" "+RootBridge.quote(path)+" 2>/dev/null | head -c $((END-START+1)); fi";
             RootBridge.Result result=RootBridge.rootShell(getApplicationContext(),command,5000L);
             if(!result.ok()||result.output==null||result.output.isEmpty())return;
             int newline=result.output.indexOf('\n');
