@@ -88,7 +88,7 @@ internal class HetuComposeController(private val context: Context) {
     private val iconCache = android.util.LruCache<String, Bitmap>(128)
 
     suspend fun homeSnapshot(): HomeSnapshot = withContext(Dispatchers.IO) {
-        val status = RootBridge.status(app)
+        val rootGranted = RootBridge.hasRoot(app)
         val rules = RuleStore(app)
         var ruleCount = 0
         var allowCount = 0
@@ -103,12 +103,12 @@ internal class HetuComposeController(private val context: Context) {
 
         val rootProxyRunning = ProxyStatusBridge.rootProxyRunning(app)
         HomeSnapshot(
-            rootGranted = status.optBoolean("rootGranted"),
-            installed = status.optBoolean("installed"),
-            moduleEnabled = status.optBoolean("enabled") && !status.optBoolean("moduleDisabled") && !status.optBoolean("moduleRemovalPending"),
-            pendingReboot = status.optBoolean("pendingReboot"),
-            version = status.optString("version", "—"),
-            ruleCount = if (status.optInt("ruleCount") > 0) status.optInt("ruleCount") else ruleCount,
+            rootGranted = rootGranted,
+            installed = rootGranted,
+            moduleEnabled = false,
+            pendingReboot = false,
+            version = BuildConfig.VERSION_NAME,
+            ruleCount = ruleCount,
             allowCount = allowCount,
             blockCount = blockCount,
             blockedQueries = DnsVpnService.currentBlocked(app),
@@ -118,8 +118,8 @@ internal class HetuComposeController(private val context: Context) {
             vpnWanted = prefs.getBoolean("vpnWanted", false),
             proxyRunning = rootProxyRunning || MihomoVpnService.engaged || prefs.getBoolean("proxyWanted", false),
             message = prefs.getString("vpnError", "")?.takeIf {
-                preferredVpnMode() && !DnsVpnService.running && it.isNotBlank()
-            } ?: status.optString("error", status.optString("message", "")),
+                !DnsVpnService.running && it.isNotBlank()
+            } ?: "",
         )
     }
 
