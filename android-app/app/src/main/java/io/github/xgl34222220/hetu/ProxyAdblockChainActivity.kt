@@ -137,6 +137,10 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
     var liveRecentDomains by remember {
         mutableStateOf(cachedRecentDomains(prefs.getString("proxyAdblockRecentDomains", "")))
     }
+    DisposableEffect(Unit) {
+        prefs.edit().putBoolean("proxyAdblockUiVisible", true).apply()
+        onDispose { prefs.edit().putBoolean("proxyAdblockUiVisible", false).apply() }
+    }
     DisposableEffect(prefs) {
         val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { shared, key ->
             when (key) {
