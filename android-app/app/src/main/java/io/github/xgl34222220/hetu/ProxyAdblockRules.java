@@ -6,63 +6,62 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 
-/** Exports the exact effective Hetu ad-block snapshot for Mihomo's local domain rule-provider. */
+/** Exports Hetu DNS block/allow snapshots for Mihomo local domain providers. */
 final class ProxyAdblockRules {
     static final String PROVIDER_NAME = "hetu-adblock";
+    static final String ALLOW_PROVIDER_NAME = "hetu-adblock-allow";
     static final String PROVIDER_PATH = "./ruleset/hetu-adblock.txt";
+    static final String ALLOW_PROVIDER_PATH = "./ruleset/hetu-adblock-allow.txt";
 
     static final class Snapshot {
         final File file;
+        final File allowFile;
         final int count;
+        final int allowCount;
         final String revision;
-        Snapshot(File file, int count, String revision) {
-            this.file = file; this.count = count; this.revision = revision == null ? "" : revision;
+        Snapshot(File file, File allowFile, int count, int allowCount, String revision) {
+            this.file=file; this.allowFile=allowFile; this.count=count; this.allowCount=allowCount;
+            this.revision=revision==null?"":revision;
         }
     }
 
     static Snapshot export(Context context) throws Exception {
-        RuleStore rules = new RuleStore(context.getApplicationContext());
+        RuleStore rules=new RuleStore(context.getApplicationContext());
         rules.reload();
-        ArrayList<String> domains = new ArrayList<>(rules.effectiveDomains());
+        ArrayList<String> domains=new ArrayList<>(rules.effectiveDomains());
+        ArrayList<String> allow=new ArrayList<>(rules.userList(true));
         Collections.sort(domains);
-        if (domains.size() > 500000) throw new IOException("广告规则超过安全上限");
-        ArrayList<String> allow = new ArrayList<>(rules.userList(true));
+        Collections.sort(allow);
+        if(domains.size()>750000)throw new IOException("广告规则超过安全上限");
 
-        File dir = new File(context.getCacheDir(), "proxy-adblock");
-        if (!dir.isDirectory() && !dir.mkdirs()) throw new IOException("无法创建代理广告规则目录");
-        File target = new File(dir, "hetu-adblock.txt");
-        File temp = new File(dir, "hetu-adblock.txt.new");
-        try (FileOutputStream raw = new FileOutputStream(temp, false);
-             OutputStreamWriter writer = new OutputStreamWriter(raw, StandardCharsets.UTF_8);
-             BufferedWriter out = new BufferedWriter(writer, 64 * 1024)) {
-            for (String domain : domains) {
-                if (domain == null || domain.isEmpty()) continue;
-                // Mihomo domain-provider wildcard '+.' is suffix-aware: it matches the
-                // base domain and every subdomain. That is much closer to what DNS
-                // blocklists intend than an exact-host-only provider.
-                //
-                // If the user explicitly allowlisted a child hostname, keep this one
-                // rule exact instead of widening it, so the allow exception cannot be
-                // swallowed by a parent suffix rule.
-                boolean childAllow = false;
-                String suffix = "." + domain;
-                for (String allowed : allow) {
-                    if (allowed != null && allowed.endsWith(suffix)) {
-                        childAllow = true;
-                        break;
-                    }
-                }
-                out.write(childAllow ? domain : "+." + domain);
+        File dir=new File(context.getCacheDir(),"hetu-dns-filter");
+        if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("无法创建河图 DNS 过滤规则目录");
+        File target=new File(dir,"hetu-adblock.txt");
+        File allowTarget=new File(dir,"hetu-adblock-allow.txt");
+        writeProvider(domains,target);
+        writeProvider(allow,allowTarget);
+        return new Snapshot(target,allowTarget,domains.size(),allow.size(),rules.currentRevision());
+    }
+
+    private static void writeProvider(List<String> domains,File target)throws IOException{
+        File temp=new File(target.getParentFile(),target.getName()+".new");
+        try(FileOutputStream raw=new FileOutputStream(temp,false);
+            OutputStreamWriter writer=new OutputStreamWriter(raw,StandardCharsets.UTF_8);
+            BufferedWriter out=new BufferedWriter(writer,64*1024)){
+            for(String domain:domains){
+                if(domain==null||domain.isEmpty())continue;
+                // Mihomo behavior=domain accepts +.example.com as suffix match,
+                // matching the DNS semantics used by Hetu and AdGuard-style lists.
+                out.write("+."+domain);
                 out.newLine();
             }
             out.flush();
             raw.getFD().sync();
         }
-        try {
-            Files.move(temp.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-        } catch (Exception atomic) {
-            if (!temp.renameTo(target)) { temp.delete(); throw new IOException("无法保存代理广告规则快照", atomic); }
+        try{
+            Files.move(temp.toPath(),target.toPath(),StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);
+        }catch(Exception atomic){
+            if(!temp.renameTo(target)){temp.delete();throw new IOException("无法保存河图 DNS 过滤快照",atomic);}
         }
-        return new Snapshot(target, domains.size(), rules.currentRevision());
     }
 }
