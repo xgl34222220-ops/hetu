@@ -13,7 +13,17 @@ final class ProxyConfigLibrary {
     private static final int LIMIT=4*1024*1024;
     private final File root;
     private final SharedPreferences prefs;
-    ProxyConfigLibrary(Context c){Context app=c.getApplicationContext();root=new File(app.getFilesDir(),"proxy/configs");prefs=app.getSharedPreferences("hetu",Context.MODE_PRIVATE);}
+    ProxyConfigLibrary(Context c){
+        Context app=c.getApplicationContext();
+        File legacy=new File(app.getFilesDir(),"proxy/configs");
+        root=new File(app.getFilesDir(),"hetu/configs");
+        if(!root.exists()&&legacy.isDirectory()){
+            File parent=root.getParentFile();
+            if(parent!=null&&!parent.isDirectory())parent.mkdirs();
+            legacy.renameTo(root);
+        }
+        prefs=app.getSharedPreferences("hetu",Context.MODE_PRIVATE);
+    }
 
     static final class Entry {final ProxyRuntimeProfile.Core core;final String name;final File file;Entry(ProxyRuntimeProfile.Core c,String n,File f){core=c;name=n;file=f;}}
     static final class Subscription {final String name,url;final boolean placeholder;Subscription(String n,String u){name=n;url=u;placeholder=u.contains(PLACEHOLDER);}}
