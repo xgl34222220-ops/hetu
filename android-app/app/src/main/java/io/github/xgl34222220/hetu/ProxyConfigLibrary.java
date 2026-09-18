@@ -47,12 +47,26 @@ final class ProxyConfigLibrary {
     void select(ProxyRuntimeProfile.Core core,String name)throws IOException{ensureBundled(core);String n=safeName(name);File f=new File(dir(core),n);if(!f.isFile()||!coreAccepts(core,n))throw new IOException("配置不存在或格式不属于当前核心");prefs.edit().putString(key(core),n).apply();}
 
     Entry importConfig(ProxyRuntimeProfile.Core core,String requestedName,InputStream source)throws IOException{
-        if(source==null)throw new IOException("无法读取配置文件");String n=safeName(requestedName);if(!coreAccepts(core,n))throw new IOException(core.label+" 不支持该配置格式");File target=new File(dir(core),n);writeStreamAtomic(target,source);prefs.edit().putString(key(core),n).apply();return new Entry(core,n,target);
+        if(source==null)throw new IOException("无法读取配置文件");
+        File d=dir(core);if(!d.isDirectory()&&!d.mkdirs())throw new IOException("无法创建配置目录");
+        String requested=safeName(requestedName);
+        if(!coreAccepts(core,requested))throw new IOException(core.label+" 不支持该配置格式");
+        String n=uniqueName(d,requested);
+        File target=new File(d,n);
+        writeStreamAtomic(target,source);
+        prefs.edit().putString(key(core),n).apply();
+        return new Entry(core,n,target);
     }
 
     String read(Entry e)throws IOException{if(e==null||!e.file.isFile())throw new IOException("尚未选择配置");byte[] b=Files.readAllBytes(e.file.toPath());if(b.length>LIMIT)throw new IOException("配置超过 4 MiB");try{return StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT).decode(java.nio.ByteBuffer.wrap(b)).toString();}catch(CharacterCodingException x){throw new IOException("配置必须是 UTF-8 文本");}}
     void write(Entry e,String text)throws IOException{if(e==null)throw new IOException("尚未选择配置");if(text==null||text.trim().isEmpty())throw new IOException("配置不能为空");byte[] b=text.getBytes(StandardCharsets.UTF_8);if(b.length>LIMIT)throw new IOException("配置超过 4 MiB");File d=e.file.getParentFile();if(d!=null&&!d.isDirectory()&&!d.mkdirs())throw new IOException("无法创建配置目录");File tmp=new File(d,e.file.getName()+".new");try(FileOutputStream out=new FileOutputStream(tmp,false)){out.write(b);out.getFD().sync();}catch(IOException x){tmp.delete();throw x;}replaceAtomic(tmp,e.file);}
-    void delete(Entry e)throws IOException{if(e==null)return;if(BUNDLED_NAME.equals(e.name))throw new IOException("内置配置不能删除，可以直接编辑或导入其他配置");if(e.file.exists()&&!e.file.delete())throw new IOException("无法删除配置");if(e.name.equals(prefs.getString(key(e.core),"")))prefs.edit().remove(key(e.core)).apply();}
+    void delete(Entry e)throws IOException{
+        if(e==null)return;
+        if(BUNDLED_NAME.equals(e.name))throw new IOException("内置配置不能删除，可以切换到其他配置");
+        if(e.file.exists()&&!e.file.delete())throw new IOException("无法删除配置");
+        if(e.name.equals(prefs.getString(key(e.core),"")))prefs.edit().remove(key(e.core)).apply();
+        ensureBundled(e.core);
+    }
 
     List<Subscription> subscriptions(Entry e)throws IOException{
         String[] lines=normalize(read(e)).split("\n",-1);Section s=providerSection(lines);ArrayList<Subscription> out=new ArrayList<>();if(s==null)return out;
@@ -75,6 +89,18 @@ final class ProxyConfigLibrary {
 
     void deleteSubscription(Entry e,String name)throws IOException{
         String n=providerName(name);String[] lines=normalize(read(e)).split("\n",-1);Section s=providerSection(lines);if(s==null)throw new IOException("当前配置没有 proxy-providers 段");if(subscriptions(e).size()<=1)throw new IOException("至少保留一个订阅槽位；也可以直接使用 YAML 编辑器重构配置");int begin=findProvider(lines,s,n);if(begin<0)throw new IOException("订阅不存在："+n);int end=providerEnd(lines,s,begin);StringBuilder out=new StringBuilder();for(int i=0;i<lines.length;i++){if(i>=begin&&i<end)continue;out.append(removeProviderFromUse(lines[i],n)).append('\n');}write(e,trimTerminal(out.toString()));
+    }
+
+    private static String uniqueName(File dir,String requested)throws IOException{
+        File direct=new File(dir,requested);if(!direct.exists())return requested;
+        int dot=requested.lastIndexOf('.');
+        String base=dot>0?requested.substring(0,dot):requested;
+        String ext=dot>0?requested.substring(dot):"";
+        for(int i=2;i<=999;i++){
+            String candidate=base+" ("+i+")"+ext;
+            if(!new File(dir,candidate).exists())return candidate;
+        }
+        throw new IOException("同名配置过多，请先整理配置库");
     }
 
     private void writeStreamAtomic(File target,InputStream source)throws IOException{File d=target.getParentFile();if(d!=null&&!d.isDirectory()&&!d.mkdirs())throw new IOException("无法创建配置目录");File tmp=new File(d,target.getName()+".new");int total=0;try(InputStream in=source;FileOutputStream out=new FileOutputStream(tmp,false)){byte[] b=new byte[8192];int n;while((n=in.read(b))!=-1){total+=n;if(total>LIMIT)throw new IOException("配置超过 4 MiB");out.write(b,0,n);}out.getFD().sync();}catch(IOException x){tmp.delete();throw x;}if(total==0){tmp.delete();throw new IOException("配置为空");}replaceAtomic(tmp,target);}
