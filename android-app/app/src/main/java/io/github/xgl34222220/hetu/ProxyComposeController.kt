@@ -101,6 +101,7 @@ internal class ProxyComposeController(context: Context) {
     private val configs = ProxyConfigLibrary(app)
     private val api = MihomoControllerClient(app)
     private val icons = ProxyIconStore(app)
+    private val appIconCache = android.util.LruCache<String, Bitmap>(96)
 
     suspend fun state(): ProxyComposeState = withContext(Dispatchers.IO) {
         val profile = ProxyRuntimeProfile.load(prefs)
@@ -109,12 +110,14 @@ internal class ProxyComposeController(context: Context) {
             if (selected == null) emptyMap() else parseGroupIcons(configs.read(selected))
         } catch (_: Exception) { emptyMap() }
 
+        val fastRunning = ProxyStatusBridge.rootProxyRunning(app)
         val status = try {
             root.status()
         } catch (error: Exception) {
-            JSONObject().put("running", false).put("message", error.message ?: "状态读取失败")
+            JSONObject().put("running", fastRunning).put("message", error.message ?: "状态读取失败")
         }
-        val running = status.optBoolean("running", false)
+        val running = status.optBoolean("running", fastRunning) || fastRunning
+        prefs.edit().putBoolean("proxyRootRuntimeRunning", running).apply()
         var groups = emptyList<ProxyGroupUi>()
         var connections = emptyList<ProxyConnectionUi>()
         var panelReady = false
@@ -483,15 +486,32 @@ internal class ProxyComposeController(context: Context) {
 
     private fun resolveApp(meta: JSONObject): AppIdentity {
         val uid = meta.optInt("uid", -1)
-        val process = meta.optString("process").substringBefore(':')
+        val processRaw = meta.optString("process").ifBlank { meta.optString("processPath") }
+        val process = processRaw.substringAfterLast('/').substringBefore(':')
         val pm = app.packageManager
+        val uidPackages = if (uid > 0) pm.getPackagesForUid(uid)?.toList().orEmpty() else emptyList()
         val candidates = LinkedHashSet<String>()
-        if (uid > 0) pm.getPackagesForUid(uid)?.forEach { candidates += it }
         if (process.contains('.')) candidates += process
+        uidPackages.sortedByDescending { pkg ->
+            when {
+                process == pkg -> 3
+                process.startsWith("$pkg:") -> 2
+                process.startsWith(pkg) -> 1
+                else -> 0
+            }
+        }.forEach { candidates += it }
         val packageName = candidates.firstOrNull { pkg ->
             try { pm.getApplicationInfo(pkg, 0); true } catch (_: Exception) { false }
         }.orEmpty()
-        if (packageName.isBlank()) return AppIdentity(uid, "", process, null)
+        if (packageName.isBlank()) {
+            val fallback = when {
+                process.isNotBlank() -> process
+                uid == 0 -> "系统服务"
+                uid > 0 -> "UID $uid"
+                else -> "未知应用"
+            }
+            return AppIdentity(uid, "", fallback, null)
+        }
         return try {
             val info = pm.getApplicationInfo(packageName, 0)
             AppIdentity(uid, packageName, pm.getApplicationLabel(info).toString(), loadIcon(packageName))
@@ -500,16 +520,21 @@ internal class ProxyComposeController(context: Context) {
         }
     }
 
-    private fun loadIcon(packageName: String): Bitmap? = try {
-        val drawable = app.packageManager.getApplicationIcon(packageName)
-        val size = 72
-        if (drawable is BitmapDrawable) Bitmap.createScaledBitmap(drawable.bitmap, size, size, true)
-        else Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888).also { bitmap ->
-            val canvas = Canvas(bitmap)
-            drawable.setBounds(0, 0, size, size)
-            drawable.draw(canvas)
-        }
-    } catch (_: Exception) { null }
+    private fun loadIcon(packageName: String): Bitmap? {
+        appIconCache.get(packageName)?.let { return it }
+        return try {
+            val drawable = app.packageManager.getApplicationIcon(packageName)
+            val size = 72
+            val bitmap = if (drawable is BitmapDrawable) Bitmap.createScaledBitmap(drawable.bitmap, size, size, true)
+            else Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888).also { out ->
+                val canvas = Canvas(out)
+                drawable.setBounds(0, 0, size, size)
+                drawable.draw(canvas)
+            }
+            appIconCache.put(packageName, bitmap)
+            bitmap
+        } catch (_: Exception) { null }
+    }
 
     private fun parseRules(root: JSONObject): List<ProxyRuleUi> {
         val array = root.optJSONArray("rules") ?: JSONArray()
