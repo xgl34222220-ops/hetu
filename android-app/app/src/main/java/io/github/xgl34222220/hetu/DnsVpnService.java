@@ -327,26 +327,9 @@ public final class DnsVpnService extends VpnService {
         synchronized (LOGS_LOCK) { context.getSharedPreferences("hetu", Context.MODE_PRIVATE).edit().putBoolean("requestLogs", enabled).apply(); }
     }
 
-    /** Record restoration intent before changing persistent module state, including failed starts. */
-    private void pauseHosts() throws Exception {
-        JSONObject status = RootBridge.status(this);
-        if (!status.optBoolean("ok", false)) throw new IOException("无法确认模块状态：" + status.optString("message", "请检查 Root 授权"));
-        if (status.optBoolean("pendingReboot", false)) throw new IOException("模块升级待重启，请先重启手机后再开启 DNS 防护");
-        if (!status.optBoolean("installed", true)) return;
-        showForeground("正在同步模块规则与白名单…");
-        rules.syncFromModule();
-        boolean disabled = status.optBoolean("moduleDisabled", false) || status.optBoolean("moduleRemovalPending", false);
-        if (disabled && !status.optBoolean("mounted", false)) return;
-        if (status.optBoolean("enabled", false) || status.optBoolean("mounted", false)) {
-            if (!disabled && status.optBoolean("enabled", false) && !prefs.edit().putBoolean("vpnRestoreHosts", true).commit())
-                throw new IOException("无法保存模式恢复信息");
-            showForeground("正在暂停 hosts 并核对应用放行条件…");
-            RootBridge.Result paused = RootBridge.run(this, "pause");
-            if (paused.code != 0) throw new IOException("暂停 hosts 失败：" + paused.output);
-        }
-        JSONObject checked = RootBridge.status(this);
-        if (!checked.optBoolean("ok", false) || checked.optBoolean("enabled", false) || checked.optBoolean("mounted", false))
-            throw new IOException("未确认 hosts 已停止，暂不能保证按应用放行");
+    /** Hetu DNS filtering is app-owned; no Magisk/hosts module is paused or restored. */
+    private void pauseHosts() {
+        prefs.edit().remove("vpnRestoreHosts").remove("proxyRestoreHostsAfterChain").apply();
     }
 
     private void readPackets(ParcelFileDescriptor descriptor, int token) {
@@ -623,9 +606,8 @@ public final class DnsVpnService extends VpnService {
             closeNetwork();
             if (latestInstance == this) {
                 prefs.edit().putBoolean("vpnWanted", false).commit();
-                String restorationError = restoreHosts();
-                if (error != null) setError(error + (restorationError == null ? "" : "；" + restorationError));
-                else if (restorationError != null) setError(restorationError);
+                restoreHosts();
+                if (error != null) setError(error);
                 else prefs.edit().remove("vpnError").apply();
             }
             // A START delivered during a slow hosts restoration must remain queued and alive.
@@ -636,30 +618,8 @@ public final class DnsVpnService extends VpnService {
     }
 
     private String restoreHosts() {
-        if (!prefs.getBoolean("vpnRestoreHosts", false)) return null;
-        try {
-            JSONObject before = RootBridge.status(this);
-            if (!before.optBoolean("ok", false)) return "原 hosts 防护待恢复：" + before.optString("message", "无法读取模块状态");
-            if (before.optBoolean("ok", false) && !before.optBoolean("installed", true)) {
-                prefs.edit().putBoolean("vpnRestoreHosts", false).commit(); return null;
-            }
-            if (before.optBoolean("moduleDisabled", false) || before.optBoolean("moduleRemovalPending", false)) {
-                if (!prefs.edit().putBoolean("vpnRestoreHosts", false).commit())
-                    return "模块已停用，无法保存取消恢复状态；未重新启用 hosts";
-                return "模块已在 Root 管理器中停用或待卸载，已取消自动恢复；未重新启用 hosts";
-            }
-            if (before.optBoolean("pendingReboot", false))
-                return "模块更新等待重启，原 hosts 恢复已暂停；请重启后检查状态";
-            if (before.optBoolean("enabled", false) && before.optBoolean("mounted", false)) {
-                prefs.edit().putBoolean("vpnRestoreHosts", false).commit(); return null;
-            }
-            RootBridge.Result result = RootBridge.run(this, "enable");
-            JSONObject status = RootBridge.status(this);
-            if (result.code != 0 || !status.optBoolean("ok", false) || !status.optBoolean("enabled", false) || !status.optBoolean("mounted", false))
-                return "原 hosts 防护恢复失败，请在首页检查并重新开启";
-            prefs.edit().putBoolean("vpnRestoreHosts", false).commit();
-            return null;
-        } catch (Exception e) { return "原 hosts 防护待恢复：" + message(e); }
+        prefs.edit().remove("vpnRestoreHosts").remove("proxyRestoreHostsAfterChain").apply();
+        return null;
     }
 
     private void setError(String message) { prefs.edit().putString("vpnError", message).commit(); }
