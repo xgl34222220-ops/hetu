@@ -60,11 +60,6 @@ final class MihomoControllerClient {
         request("PUT","/providers/proxies/"+Uri.encode(name),null,30000);
     }
 
-    /** Use Mihomo's external-ui-url updater through the local authenticated controller. */
-    void upgradeUi()throws Exception{
-        request("POST","/upgrade/ui",null,90000);
-    }
-
     void healthCheckProxyProvider(String name)throws Exception{
         request("GET","/providers/proxies/"+Uri.encode(name)+"/healthcheck",null,15000);
     }
