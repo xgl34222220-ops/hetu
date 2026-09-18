@@ -7,6 +7,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
 import android.net.VpnService
+import io.github.xgl34222220.hetu.BuildConfig
 import io.github.xgl34222220.hetu.DnsVpnService
 import io.github.xgl34222220.hetu.MihomoVpnService
 import io.github.xgl34222220.hetu.ProxyStatusBridge
