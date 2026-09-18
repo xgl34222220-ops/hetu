@@ -247,6 +247,13 @@ final class RootProxyManager {
             ProxyAdblockCoordinator.enter(context);adblockCoordinatorEntered=true;
         }
         stage(progress,"启动核心并等待订阅、规则与监听就绪（首次可能较慢）…");
+        prefs.edit()
+                .putLong("proxyAdblockSessionHits",0L)
+                .putLong("proxyAdblockLogOffset",0L)
+                .putLong("proxyAdblockLastHitAt",0L)
+                .remove("proxyAdblockLastDomain")
+                .remove("proxyAdblockRecentDomains")
+                .apply();
         JSONObject result;
         try{result=runJsonWithTimeout(125000L,"start",
                 BIN,CONFIG,profile.mode.id,String.valueOf(p.tproxyPort),String.valueOf(p.redirectPort),profile.ipv6.id,
@@ -318,6 +325,7 @@ final class RootProxyManager {
         if(!warning.isEmpty())result.put("warning",warning);
         prefs.edit()
                 .putBoolean("proxyRootWanted",true)
+                .putBoolean("proxyRootRuntimeRunning",true)
                 .putInt("proxyAutoDirectPackageCount",policy.directPackages.size())
                 .putBoolean("proxyAdblockLastEffective",profile.adblockChain)
                 .putInt("proxyAdblockLastRuleCount",p.adblock==null?0:p.adblock.count)
@@ -339,7 +347,10 @@ final class RootProxyManager {
             JSONObject r=runJsonAllowMissing("stop",new JSONObject().put("ok",true).put("running",false).put("state","idle").put("message","Root 代理未运行"));
             ProxyAdblockCoordinator.exit(context);
             stage(progress,"网络规则、广告过滤接管与临时 IPv6 状态已恢复");
-            prefs.edit().putBoolean("proxyRootWanted",false).apply();
+            prefs.edit()
+                    .putBoolean("proxyRootWanted",false)
+                    .putBoolean("proxyRootRuntimeRunning",false)
+                    .apply();
             ensureContinuityService(false);
             return r;
         }finally{
