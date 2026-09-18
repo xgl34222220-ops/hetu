@@ -83,6 +83,10 @@ final class MihomoStartupConfig {
         yaml=removeTopLevelScalar(yaml,"external-ui-name");
         yaml=removeTopLevelScalar(yaml,"external-ui-url");
         yaml=removeTopLevelScalar(yaml,"find-process-mode");
+        // Hetu owns ad-block hit accounting. Mihomo only emits matched RULE-SET details
+        // at info/debug levels, so normalize the private runtime to info while the DNS
+        // filtering chain is enabled. The user's source YAML remains untouched.
+        if(profile.adblockChain) yaml=removeTopLevelScalar(yaml,"log-level");
 
         // Both Root DNS modes terminate DNS in Mihomo's private built-in resolver.
         // This preserves fake-ip / respect-rules and prevents plaintext DNS from being sent
@@ -143,6 +147,7 @@ final class MihomoStartupConfig {
         // Android netd owns the socket fwmark/netId. Do not overwrite the full SO_MARK here;
         // the Root controller exempts the root-owned Mihomo process from OUTPUT interception.
         override.append("find-process-mode: strict\n");
+        if(profile.adblockChain) override.append("log-level: info\n");
         override.append("external-controller: 127.0.0.1:").append(controllerPort).append('\n');
         override.append("secret: '").append(controllerSecret.replace("'","''")).append("'\n");
         override.append("# --- end Hetu runtime isolation ---\n");
