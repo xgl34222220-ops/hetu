@@ -21,7 +21,7 @@ public final class RuleStore {
     private static final int MAX_SOURCE_BYTES = 32 * 1024 * 1024;
     private static final int MAX_COMBINED_BYTES = 128 * 1024 * 1024;
     private static final int MAX_DOMAINS = 1500000;
-    private static final long DOWNLOAD_BATCH_MILLIS = 240000L;
+    private static final long DOWNLOAD_BATCH_MILLIS = 300000L;
     private static final ScheduledExecutorService DOWNLOAD_WATCHDOG = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t=new Thread(r,"hetu-rule-download-guard");t.setDaemon(true);return t;
     });
@@ -267,7 +267,7 @@ public final class RuleStore {
                     for(int mirror=0;mirror<source.urls.size();mirror++) {
                         checkInterrupted();
                         File downloaded=new File(staging,source.id+"-"+mirror+".download");
-                        long mirrorDeadline=Math.min(batchDeadline,System.nanoTime()+TimeUnit.SECONDS.toNanos(35));
+                        long mirrorDeadline=Math.min(batchDeadline,System.nanoTime()+TimeUnit.SECONDS.toNanos(75));
                         try {
                             download(source.urls.get(mirror),downloaded,mirrorDeadline);
                             try(InputStream in=new FileInputStream(downloaded)) { parsed=parseRules(in,false); }
@@ -289,8 +289,9 @@ public final class RuleStore {
                 if(successes.isEmpty()) {
                     String detail=failures.isEmpty()?"没有启用规则源":join(failures);
                     prefs.edit().putLong("last_rule_check",System.currentTimeMillis())
-                            .putString("last_rule_update_warning",detail).apply();
-                    throw new IOException("规则更新失败："+detail+"；已继续使用本地旧快照");
+                            .putString("last_rule_update_warning",detail+"；已继续使用本地旧快照").apply();
+                    if(before.effective.isEmpty()) throw new IOException("首次规则下载失败："+detail);
+                    return false;
                 }
 
                 Snapshot candidate=compose("",false,before.allow,before.block,before.enabled,next,null);
@@ -742,7 +743,7 @@ public final class RuleStore {
     }
     private static void download(String address,File target,long batchDeadline) throws Exception {
         URL url=new URL(address);
-        final long deadline=Math.min(batchDeadline,System.nanoTime()+TimeUnit.SECONDS.toNanos(45));
+        final long deadline=Math.min(batchDeadline,System.nanoTime()+TimeUnit.SECONDS.toNanos(90));
         final Thread owner=Thread.currentThread();
         for(int hop=0;hop<6;hop++) {
             checkDownloadDeadline(deadline);
