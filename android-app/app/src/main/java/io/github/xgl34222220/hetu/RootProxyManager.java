@@ -446,12 +446,31 @@ final class RootProxyManager {
     private JSONObject runJsonAllowMissing(String action,JSONObject missing)throws Exception{
         RootBridge.requireWorkerThread();
         String cmd="if [ -x "+RootBridge.quote(SCRIPT)+" ]; then exec "+RootBridge.quote(SCRIPT)+" "+RootBridge.quote(action)+"; else printf '%s\\n' "+RootBridge.quote(missing.toString())+"; fi";
-        RootBridge.Result r=RootBridge.rootShell(context,cmd,20000L);
-        JSONObject j;
-        try{j=RootBridge.parseObject(r.output.trim());}
-        catch(Exception e){throw new IOException(r.output.isEmpty()?"Root 授权或状态查询不可用":r.output);}
-        if(r.code!=0)throw new IOException(j.optString("message","Root 状态查询失败，退出码 "+r.code));
+        long timeout="status".equals(action)?8000L:20000L;
+        RootBridge.Result r=RootBridge.rootShell(context,cmd,timeout);
+        String raw=r.output==null?"":r.output.trim();
+        JSONObject j=null;
+        if(!raw.isEmpty()){
+            int newline=raw.indexOf('\n');
+            String first=newline<0?raw:raw.substring(0,newline).trim();
+            try{j=RootBridge.parseObject(first);}catch(Exception ignored){}
+            if(j==null)try{j=RootBridge.parseObject(raw);}catch(Exception ignored){}
+        }
+        if(j==null)throw new IOException(raw.isEmpty()?"Root 授权或状态查询不可用":compactRootError(raw));
+        if(r.code!=0){
+            if("status".equals(action)&&j.optBoolean("ok",false))return j;
+            throw new IOException(j.optString("message","Root 状态查询失败，退出码 "+r.code));
+        }
         return j;
+    }
+
+    private static String compactRootError(String raw){
+        if(raw==null||raw.trim().isEmpty())return "Root 命令没有返回可读信息";
+        String text=raw.trim();
+        int newline=text.indexOf('\n');
+        if(text.startsWith("{")&&newline>0)text=text.substring(newline+1).trim();
+        text=text.replace('\n',' ');
+        return text.length()>220?text.substring(0,220)+"…":text;
     }
 
     private JSONObject runJson(String...args)throws Exception{return runJsonWithTimeout(55000L,args);}
