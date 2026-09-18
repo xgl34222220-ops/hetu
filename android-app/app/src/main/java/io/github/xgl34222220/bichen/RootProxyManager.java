@@ -139,18 +139,28 @@ final class RootProxyManager {
                 policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges);
     }
 
-    JSONObject start(ProxyRuntimeProfile p)throws Exception{return start(p,null);}
-    JSONObject start(ProxyRuntimeProfile profile,Progress progress)throws Exception{
+    JSONObject start(ProxyRuntimeProfile p)throws Exception{return startInternal(p,null,false);}
+    JSONObject start(ProxyRuntimeProfile profile,Progress progress)throws Exception{return startInternal(profile,progress,false);}
+    JSONObject replaceRunningAfterUpgrade(ProxyRuntimeProfile profile)throws Exception{return startInternal(profile,null,true);}
+
+    private JSONObject startInternal(ProxyRuntimeProfile profile,Progress progress,boolean replaceRunning)throws Exception{
         CONTROL_LOCK.lock();
         try{
             JSONObject existing=status();
-            if(existing.optBoolean("running",false)){
+            if(existing.optBoolean("running",false)&&!replaceRunning){
                 prefs.edit().putBoolean("proxyRootWanted",true).apply();
                 ensureContinuityService(true);
                 existing.put("ok",true).put("alreadyRunning",true).put("message","Root 代理已在运行，已忽略重复启动请求");
                 return existing;
             }
-            stage(progress,"检查配置、应用范围与绕过策略…");
+            if(replaceRunning) {
+                // Preserve the user's intent before any new preparation. The shell start transaction
+                // validates the new config before it cleans up the old core/network rules.
+                prefs.edit().putBoolean("proxyRootWanted",true).apply();
+                stage(progress,"校验新版运行环境，确认可替换后再切换旧核心…");
+            } else {
+                stage(progress,"检查配置、应用范围与绕过策略…");
+            }
         Prepared p;
         try{
             p=prepare(profile);
