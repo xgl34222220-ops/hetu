@@ -2,9 +2,12 @@ package io.github.xgl34222220.hetu
 
 import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
@@ -62,6 +65,23 @@ class ProxySubscriptionActivity : ComponentActivity() {
     }
 }
 
+private fun importedConfigName(context: android.content.Context, uri: Uri): String {
+    var name = ""
+    runCatching {
+        context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (index >= 0) name = cursor.getString(index).orEmpty()
+            }
+        }
+    }
+    if (name.isBlank()) name = uri.lastPathSegment?.substringAfterLast('/') ?: "imported-config"
+    name = name.replace('/', '_').replace('\\', '_').trim().ifBlank { "imported-config" }
+    if (!name.endsWith(".yaml", ignoreCase = true) && !name.endsWith(".yml", ignoreCase = true)) {
+        name += ".yaml"
+    }
+    return name.take(120)
+}
 
 private object YamlSyntaxHighlightOutputTransformation : OutputTransformation {
     private val keyRegex = Regex("(?m)^[\\t -]*([A-Za-z0-9_.-]+)(?=\\s*:)")
@@ -122,6 +142,21 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
     var yamlError by remember { mutableStateOf("") }
     var yamlLoading by remember { mutableStateOf(false) }
     var yamlSaving by remember { mutableStateOf(false) }
+
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val displayName = importedConfigName(context, uri)
+        loading = true
+        scope.launch {
+            runCatching { controller.importConfig(uri, displayName) }
+                .onSuccess {
+                    message = "已导入并选中 $displayName；启动或重启代理后生效"
+                    revision++
+                }
+                .onFailure { message = it.message ?: "导入配置失败" }
+            loading = false
+        }
+    }
 
     LaunchedEffect(revision) {
         loading = true
@@ -218,22 +253,40 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                             }
                         }
                         Text(
-                            "内置模板不包含任何私人订阅。订阅链接只保存在 App 私有配置目录；列表仅显示域名，不展示 Token。",
+                            "支持直接导入完整 YAML/YML 配置，也可以只填写订阅链接。配置文件最大 4 MiB，导入后会自动切换为当前配置。",
                             color = tokens.textSecondary,
                             style = MaterialTheme.typography.bodySmall,
                         )
-                        Button(
-                            onClick = {
-                                addingSubscription = true
-                                editSubscription = null
-                                editorName = ""
-                                editorUrl = ""
-                                editorError = ""
-                            },
-                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                            shape = RoundedCornerShape(18.dp),
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
-                            Icon(Icons.Rounded.Add, null, Modifier.size(20.dp)); Spacer(Modifier.width(7.dp)); Text("添加订阅")
+                            OutlinedButton(
+                                onClick = { importLauncher.launch(arrayOf("*/*")) },
+                                enabled = !loading,
+                                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                                shape = RoundedCornerShape(18.dp),
+                            ) {
+                                Icon(Icons.Rounded.FileOpen, null, Modifier.size(19.dp))
+                                Spacer(Modifier.width(7.dp))
+                                Text("导入配置")
+                            }
+                            Button(
+                                onClick = {
+                                    addingSubscription = true
+                                    editSubscription = null
+                                    editorName = ""
+                                    editorUrl = ""
+                                    editorError = ""
+                                },
+                                enabled = !loading,
+                                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                                shape = RoundedCornerShape(18.dp),
+                            ) {
+                                Icon(Icons.Rounded.Add, null, Modifier.size(20.dp))
+                                Spacer(Modifier.width(7.dp))
+                                Text("添加订阅")
+                            }
                         }
                     }
                 }
