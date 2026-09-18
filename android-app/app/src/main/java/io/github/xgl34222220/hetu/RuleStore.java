@@ -110,7 +110,8 @@ public final class RuleStore {
     private void migrateDnsFilterDefaultsIfNeeded() throws Exception {
         if(prefs.getBoolean("dns_filter_v3_migrated",false)||live==null)return;
         Map<String,Boolean> flags=new LinkedHashMap<>(live.enabled);
-        if(catalog.containsKey("hagezi"))flags.put("hagezi",true);
+        if(catalog.containsKey("adguard"))flags.put("adguard",true);
+        if(catalog.containsKey("hagezi"))flags.put("hagezi",false);
         if(catalog.containsKey("china"))flags.put("china",true);
         if(catalog.containsKey("adaway"))flags.put("adaway",false);
         if(catalog.containsKey("tracking"))flags.put("tracking",false);
@@ -410,7 +411,7 @@ public final class RuleStore {
                     // One module generation includes both lists and all source flags.
                     // An older module rejects this command before applying any list.
                     List<String> arguments=new ArrayList<>(Arrays.asList("import-settings",a.getAbsolutePath(),b.getAbsolutePath()));
-                    for(String id:Arrays.asList("adaway","china","tracking","hagezi")) if(catalog.containsKey(id))
+                    for(String id:catalog.keySet())
                         arguments.add(Boolean.TRUE.equals(flags.get(id))?"1":"0");
                     rootJson(arguments.toArray(new String[0]));
                     persistImportPreferences(bypass,"模块配置已整批提交，等待同步");
