@@ -130,7 +130,8 @@ public final class ProxyNetworkMatchService extends Service {
     private void updateAdblockMetrics(){
         try{
             if(!prefs.getBoolean("proxyRootRuntimeRunning",false)
-                    ||!prefs.getBoolean("proxyAdblockChain",true))return;
+                    ||!prefs.getBoolean("proxyAdblockChain",true)
+                    ||!prefs.getBoolean("proxyAdblockCounterArmed",false))return;
             long offset=Math.max(0L,prefs.getLong("proxyAdblockLogOffset",0L));
             String path="/data/adb/hetu/run/core.log";
             String command="set +e; S=$(wc -c < "+RootBridge.quote(path)+" 2>/dev/null || echo 0); "
