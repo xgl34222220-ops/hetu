@@ -19,10 +19,17 @@
 ├── run/
 │   ├── state/
 │   └── ruleset/
-└── proxy-root.sh
+└── hetu-root.sh
 ```
 
-其中 `proxy-root.sh` 是透明代理控制脚本文件名，不再代表运行目录；运行目录本身不再包含旧的 `/proxy` 层级。
+其中 `hetu-root.sh` 是河图自己的 Root 网络控制脚本；运行目录和运行文件均不再使用旧的 `proxy-root.sh` 命名。
+
+## 配置与 DNS 过滤
+
+- 支持保存多份 YAML/YML 配置并随时切换；同名导入自动保留为副本，不覆盖原配置。
+- DNS 过滤采用后缀匹配，个人白名单优先；Root 代理运行时由 Mihomo 本地 rule-provider 接管。
+- Root 代理关闭时可启用河图本地 DNS VPN 继续过滤，不依赖独立模块。
+- 默认均衡档使用 HaGeZi Normal + 中国本地规则；规则源支持镜像回退和部分成功提交，一个来源超时不会让整批更新作废。
 
 ## 规则资产
 
