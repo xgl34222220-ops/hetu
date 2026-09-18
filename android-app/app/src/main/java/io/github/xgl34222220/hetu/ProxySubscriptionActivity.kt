@@ -127,7 +127,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
     var revision by remember { mutableIntStateOf(0) }
     var subscriptions by remember { mutableStateOf(emptyList<ProxySubscriptionUi>()) }
     var configName by remember { mutableStateOf("加载中…") }
-    var loading by remember { mutableStateOf(true) }
+    var loading by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("") }
 
     var editSubscription by remember { mutableStateOf<ProxySubscriptionUi?>(null) }
@@ -160,17 +160,17 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
 
     LaunchedEffect(revision) {
         loading = true
-        runCatching {
-            val state = controller.state()
-            configName = state.config
-            controller.subscriptions()
-        }.onSuccess {
-            subscriptions = it
-            message = ""
-        }.onFailure {
-            subscriptions = emptyList()
-            message = it.message ?: "读取订阅失败"
-        }
+        runCatching { controller.configOverview() }
+            .onSuccess { overview ->
+                configName = overview.first
+                subscriptions = overview.second
+                if (message.startsWith("读取订阅失败") || message.startsWith("读取配置失败")) message = ""
+            }
+            .onFailure {
+                configName = "配置读取失败"
+                subscriptions = emptyList()
+                message = "读取配置失败：" + (it.message ?: "未知错误")
+            }
         loading = false
     }
 
@@ -263,7 +263,6 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                         ) {
                             OutlinedButton(
                                 onClick = { importLauncher.launch(arrayOf("*/*")) },
-                                enabled = !loading,
                                 modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                                 shape = RoundedCornerShape(18.dp),
                             ) {
@@ -279,7 +278,6 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                                     editorUrl = ""
                                     editorError = ""
                                 },
-                                enabled = !loading,
                                 modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                                 shape = RoundedCornerShape(18.dp),
                             ) {
