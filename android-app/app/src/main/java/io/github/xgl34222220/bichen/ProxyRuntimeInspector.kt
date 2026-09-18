@@ -88,7 +88,16 @@ internal class ProxyRuntimeInspector(context: Context) {
         val command = "echo '--- controller-port ---'; echo $port; (ss -lntp 2>/dev/null || netstat -lntp 2>/dev/null || true) | grep -E ':$port([[:space:]]|$)' || true; echo '--- start-state ---'; cat /data/adb/bichen/proxy/run/start-state 2>/dev/null || true; echo '--- last-start-error ---'; cat /data/adb/bichen/proxy/run/last-start-error 2>/dev/null || true; echo '--- core.log ---'; tail -n 140 /data/adb/bichen/proxy/run/core.log 2>&1 || true; echo '--- watchdog.log ---'; tail -n 30 /data/adb/bichen/proxy/run/watchdog.log 2>/dev/null || true; echo '--- last-crash ---'; cat /data/adb/bichen/proxy/run/last-crash 2>/dev/null || true"
         val result = RootBridge.rootShell(app, command, 10_000L)
         val text = result.output.trim()
-        if (text.isBlank()) "暂无运行日志" else text.takeLast(24_000)
+        val appEvents = buildString {
+            prefs.getString("proxyRootUpgradeError", "")?.takeIf { it.isNotBlank() }?.let {
+                append("\n--- upgrade-error ---\n").append(it)
+            }
+            prefs.getString("proxyLastAutoStopReason", "")?.takeIf { it.isNotBlank() }?.let {
+                append("\n--- last-auto-stop ---\n").append(it)
+            }
+        }
+        val combined = (text + appEvents).trim()
+        if (combined.isBlank()) "暂无运行日志" else combined.takeLast(24_000)
     }
 
     suspend fun adblockRuntimeStats(): AdblockRuntimeStats = withContext(Dispatchers.IO) {
