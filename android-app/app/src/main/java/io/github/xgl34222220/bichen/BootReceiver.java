@@ -9,8 +9,36 @@ import android.net.VpnService;
 /** Only starts previously authorized, explicitly opted-in protection after boot. */
 public final class BootReceiver extends BroadcastReceiver {
     @Override public void onReceive(Context context, Intent intent) {
-        if (!Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) return;
+        String action = intent == null ? "" : intent.getAction();
         SharedPreferences prefs = context.getSharedPreferences("bichen", Context.MODE_PRIVATE);
+
+        if (Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) {
+            if (!prefs.getBoolean("proxyRootWanted", false)) return;
+            final PendingResult pending = goAsync();
+            new Thread(() -> {
+                RootProxyManager root = new RootProxyManager(context.getApplicationContext());
+                try {
+                    root.stop();
+                    Thread.sleep(180L);
+                    root.start(ProxyRuntimeProfile.load(prefs));
+                    prefs.edit()
+                            .putLong("proxyRootLastUpgradeRestartAt", System.currentTimeMillis())
+                            .remove("proxyRootUpgradeError")
+                            .apply();
+                } catch (Exception e) {
+                    prefs.edit().putString(
+                            "proxyRootUpgradeError",
+                            "升级后自动刷新 Root 运行环境失败：" +
+                                    (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage())
+                    ).apply();
+                } finally {
+                    pending.finish();
+                }
+            }, "bichen-root-upgrade").start();
+            return;
+        }
+
+        if (!Intent.ACTION_BOOT_COMPLETED.equals(action)) return;
         if (prefs.getBoolean("proxyRootAutoStart", false) && prefs.getBoolean("proxyRootWanted", false)) {
             final PendingResult pending = goAsync();
             new Thread(() -> {
