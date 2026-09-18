@@ -283,7 +283,7 @@ final class RootProxyManager {
             policy=p.policy;
             stage(progress,"代理配置可用；本次仅关闭串联广告过滤继续启动…");
         }
-        quiesceLegacyRuntime(progress);
+        if(!prefs.getBoolean("hetuLegacyRetired",false))quiesceLegacyRuntime(progress);
         stage(progress,"检查 TUN / TPROXY / eBPF / UID / IPv6 能力…");
         JSONObject pre=runJson("preflight",
                 profile.mode.id,String.valueOf(p.tproxyPort),String.valueOf(p.redirectPort),profile.ipv6.id,
@@ -322,30 +322,25 @@ final class RootProxyManager {
             if(adblockCoordinatorEntered)ProxyAdblockCoordinator.exit(context);
             throw new IOException("启动命令已返回，但未检测到河图私有核心进程"+(diagnostics().isEmpty()?"":"："+diagnostics()));
         }
-        retireLegacyInstallation(progress);
+        if(!prefs.getBoolean("hetuLegacyRetired",false))retireLegacyInstallation(progress);
         // Publish only the port of a successfully running core.
         prefs.edit().putInt("proxyControllerPort",p.controllerPort).commit();
         MihomoControllerClient controller=new MihomoControllerClient(context);
-        if(!controller.waitReady(12000)){
-            prefs.edit().putString("proxyRootEgressWarning","Root 代理核心已运行；本地控制接口仍在初始化，面板数据可能稍后出现").apply();
+        if(!controller.waitReady(5000)){
+            prefs.edit().putString("proxyRootEgressWarning","Root 代理核心已运行；本地控制接口仍在初始化，后台会继续验证").apply();
         }else{
-            try{
-                controller.delay("DIRECT","https://connectivitycheck.platform.hicloud.com/generate_204","200-399");
-                prefs.edit().remove("proxyRootEgressWarning").apply();
-            }catch(Exception firstProbe){
-                try{
-                    controller.delay("DIRECT","https://cp.cloudflare.com/generate_204","200-399");
-                    prefs.edit().remove("proxyRootEgressWarning").apply();
-                }catch(Exception secondProbe){
-                    String detail=secondProbe.getMessage()==null?secondProbe.getClass().getSimpleName():secondProbe.getMessage();
-                    prefs.edit().putString("proxyRootEgressWarning","核心已保持运行，但启动联网探测失败："+detail).apply();
-                }
-            }
+            prefs.edit().remove("proxyRootEgressWarning").apply();
         }
+        // Connectivity probing is intentionally asynchronous. A slow captive portal or
+        // blocked 204 endpoint must never keep the Start button spinning after the core
+        // and transparent routing are already healthy.
+        prefs.edit()
+                .putBoolean("proxyRootEgressPending",true)
+                .putInt("proxyRootEgressProbeAttempts",0)
+                .remove("proxyRootEgressProbeLastError")
+                .apply();
 
         String warning=policy.warning();
-        String egressWarning=prefs.getString("proxyRootEgressWarning","");
-        if(egressWarning!=null&&!egressWarning.isEmpty())warning=(warning.isEmpty()?"":warning+"；")+egressWarning;
         String adblockFallbackReason=prefs.getString("proxyAdblockLastError","");
         if(!profile.adblockChain&&adblockFallbackReason!=null&&!adblockFallbackReason.isEmpty()){
             warning=(warning.isEmpty()?"":warning+"；")+"代理已启动，但广告串联本次降级："+adblockFallbackReason;
@@ -593,7 +588,7 @@ final class RootProxyManager {
                 prefs.edit().putString("hetuLegacyCleanupWarning","河图已运行，但旧安装清理失败："+detail).apply();
                 return;
             }
-            prefs.edit().remove("hetuLegacyCleanupWarning").apply();
+            prefs.edit().remove("hetuLegacyCleanupWarning").putBoolean("hetuLegacyRetired",true).apply();
             if(r.output!=null&&r.output.contains("legacy=1"))stage(progress,"河图已接管；旧模块已停用并标记卸载，重启后彻底退出旧挂载");
         }catch(Exception e){
             String detail=e.getMessage()==null?e.getClass().getSimpleName():e.getMessage();
