@@ -11,6 +11,7 @@ import io.github.xgl34222220.hetu.BuildConfig
 import io.github.xgl34222220.hetu.DnsVpnService
 import io.github.xgl34222220.hetu.MihomoVpnService
 import io.github.xgl34222220.hetu.ProxyStatusBridge
+import io.github.xgl34222220.hetu.ProxyAdblockRuntimeBridge
 import io.github.xgl34222220.hetu.RootBridge
 import io.github.xgl34222220.hetu.RuleStore
 import kotlinx.coroutines.Dispatchers
@@ -53,6 +54,10 @@ internal data class RuleSourceItem(
     val url: String,
     val enabled: Boolean,
     val count: Int,
+    val lastSuccess: Long = 0L,
+    val lastError: String = "",
+    val durationMs: Long = 0L,
+    val mirror: Int = -1,
 )
 
 internal data class RulesSnapshot(
@@ -241,6 +246,10 @@ internal class HetuComposeController(private val context: Context) {
                 url = o.optString("url"),
                 enabled = o.optBoolean("enabled"),
                 count = o.optInt("count"),
+                lastSuccess = o.optLong("lastSuccess", 0L),
+                lastError = o.optString("lastError", ""),
+                durationMs = o.optLong("durationMs", 0L),
+                mirror = o.optInt("mirror", -1),
             )
         }
         RulesSnapshot(
@@ -252,22 +261,33 @@ internal class HetuComposeController(private val context: Context) {
         )
     }
 
-    suspend fun setRuleSource(id: String, enabled: Boolean) = withContext(Dispatchers.IO) {
+    private fun hotApplyRulesIfNeeded(): String {
+        if (!prefs.getBoolean("proxyAdblockChain", true)) return ""
+        if (!ProxyStatusBridge.rootProxyRunning(app)) return ""
+        return runCatching { ProxyAdblockRuntimeBridge.hotReload(app) }.getOrElse { error ->
+            "规则已保存；热更新失败：" + (error.message ?: error::class.java.simpleName) + "，下次重启自动生效"
+        }
+    }
+
+    suspend fun setRuleSource(id: String, enabled: Boolean): String = withContext(Dispatchers.IO) {
         val rules = RuleStore(app)
         rules.reload()
         rules.setSource(id, enabled, false)
+        hotApplyRulesIfNeeded()
     }
 
-    suspend fun setRuleProfile(id: String) = withContext(Dispatchers.IO) {
+    suspend fun setRuleProfile(id: String): String = withContext(Dispatchers.IO) {
         val rules = RuleStore(app)
         rules.reload()
         rules.setProfile(id, false)
+        hotApplyRulesIfNeeded()
     }
 
-    suspend fun changeDomain(domain: String, allow: Boolean, add: Boolean) = withContext(Dispatchers.IO) {
+    suspend fun changeDomain(domain: String, allow: Boolean, add: Boolean): String = withContext(Dispatchers.IO) {
         val rules = RuleStore(app)
         rules.reload()
         rules.changeDomain(domain, allow, add, false)
+        hotApplyRulesIfNeeded()
     }
 
     suspend fun updateRules(): String = withContext(Dispatchers.IO) {
@@ -275,12 +295,14 @@ internal class HetuComposeController(private val context: Context) {
         rules.reload()
         val changed = rules.updateRules(false)
         val warning = rules.summary().optString("lastRuleUpdateWarning", "")
-        when {
+        val hot = if (changed) hotApplyRulesIfNeeded() else ""
+        val base = when {
             changed && warning.isNotBlank() -> "规则已更新；$warning"
             changed -> "规则已更新"
             warning.isNotBlank() -> "规则已校验；$warning"
             else -> "规则已校验，没有变化"
         }
+        if (hot.isBlank()) base else "$base；$hot"
     }
 
     private fun requestTime(o: JSONObject): String {
