@@ -92,6 +92,15 @@ internal data class ProxyComposeState(
     val uploadTotal: Long = 0,
     val memoryBytes: Long = 0,
     val corePid: Int = 0,
+    val runtimeSchema: Int = 0,
+    val ipv4Rules: Boolean = false,
+    val ipv6Rules: Boolean = false,
+    val dnsMode: String = "",
+    val dnsIpv4Rule: Boolean = false,
+    val dnsIpv6Rule: Boolean = false,
+    val dnsListenerReady: Boolean = false,
+    val watchdog: Boolean = false,
+    val dataPlaneHealthy: Boolean = false,
 )
 
 internal class ProxyComposeController(context: Context) {
@@ -112,14 +121,52 @@ internal class ProxyComposeController(context: Context) {
         } catch (_: Exception) { emptyMap() }
 
         val fastRunning = ProxyStatusBridge.rootProxyRunning(app)
-        val status = if (fastRunning) {
-            JSONObject().put("running", true).put("message", "")
-        } else {
+        val nowElapsed = android.os.SystemClock.elapsedRealtime()
+        val lastHealth = prefs.getLong("proxyRootHealthProbeElapsed", 0L)
+        val shouldProbeHealth = !fastRunning || nowElapsed - lastHealth >= 10_000L
+        val status = if (shouldProbeHealth) {
             try {
-                root.status()
+                root.status().also { live ->
+                    prefs.edit()
+                        .putLong("proxyRootHealthProbeElapsed", nowElapsed)
+                        .putInt("proxyRootRuntimeSchema", live.optInt("runtimeSchema", 0))
+                        .putBoolean("proxyRootIpv4Rules", live.optBoolean("ipv4Rules", false))
+                        .putBoolean("proxyRootIpv6Rules", live.optBoolean("ipv6Rules", false))
+                        .putString("proxyRootDnsMode", live.optString("dnsMode", ""))
+                        .putBoolean("proxyRootDnsIpv4Rule", live.optBoolean("dnsIpv4Rule", false))
+                        .putBoolean("proxyRootDnsIpv6Rule", live.optBoolean("dnsIpv6Rule", false))
+                        .putBoolean("proxyRootDnsListenerReady", live.optBoolean("dnsListenerReady", false))
+                        .putBoolean("proxyRootWatchdog", live.optBoolean("watchdog", false))
+                        .putBoolean("proxyRootDataPlaneHealthy", live.optBoolean("dataPlaneHealthy", false))
+                        .apply()
+                }
             } catch (error: Exception) {
-                JSONObject().put("running", false).put("message", error.message ?: "状态读取失败")
+                if (fastRunning) JSONObject()
+                    .put("running", true)
+                    .put("message", error.message ?: "数据面健康检查暂时不可用")
+                    .put("runtimeSchema", prefs.getInt("proxyRootRuntimeSchema", 0))
+                    .put("ipv4Rules", prefs.getBoolean("proxyRootIpv4Rules", false))
+                    .put("ipv6Rules", prefs.getBoolean("proxyRootIpv6Rules", false))
+                    .put("dnsMode", prefs.getString("proxyRootDnsMode", "") ?: "")
+                    .put("dnsIpv4Rule", prefs.getBoolean("proxyRootDnsIpv4Rule", false))
+                    .put("dnsIpv6Rule", prefs.getBoolean("proxyRootDnsIpv6Rule", false))
+                    .put("dnsListenerReady", prefs.getBoolean("proxyRootDnsListenerReady", false))
+                    .put("watchdog", prefs.getBoolean("proxyRootWatchdog", false))
+                    .put("dataPlaneHealthy", prefs.getBoolean("proxyRootDataPlaneHealthy", false))
+                else JSONObject().put("running", false).put("message", error.message ?: "状态读取失败")
             }
+        } else {
+            JSONObject()
+                .put("running", true)
+                .put("runtimeSchema", prefs.getInt("proxyRootRuntimeSchema", 0))
+                .put("ipv4Rules", prefs.getBoolean("proxyRootIpv4Rules", false))
+                .put("ipv6Rules", prefs.getBoolean("proxyRootIpv6Rules", false))
+                .put("dnsMode", prefs.getString("proxyRootDnsMode", "") ?: "")
+                .put("dnsIpv4Rule", prefs.getBoolean("proxyRootDnsIpv4Rule", false))
+                .put("dnsIpv6Rule", prefs.getBoolean("proxyRootDnsIpv6Rule", false))
+                .put("dnsListenerReady", prefs.getBoolean("proxyRootDnsListenerReady", false))
+                .put("watchdog", prefs.getBoolean("proxyRootWatchdog", false))
+                .put("dataPlaneHealthy", prefs.getBoolean("proxyRootDataPlaneHealthy", false))
         }
         val running = status.optBoolean("running", fastRunning) || fastRunning
         prefs.edit().putBoolean("proxyRootRuntimeRunning", running).apply()
@@ -152,12 +199,15 @@ internal class ProxyComposeController(context: Context) {
             ipv6 = profile.ipv6.id,
             autoOverwrite = profile.autoOverwrite,
             config = selected?.name ?: "尚未选择配置",
-            message = if (!running) {
-                listOf(
+            message = when {
+                !running -> listOf(
                     status.optString("message", ""),
                     prefs.getString("proxyAutoRecoveryError", "").orEmpty(),
                 ).filter { it.isNotBlank() }.distinct().joinToString("；")
-            } else "",
+                !status.optBoolean("dataPlaneHealthy", false) ->
+                    "核心仍在运行，但透明代理/DNS 数据面健康检查未完整通过"
+                else -> ""
+            },
             panelReady = panelReady,
             groups = groups,
             connections = connections,
@@ -165,10 +215,20 @@ internal class ProxyComposeController(context: Context) {
             uploadTotal = up,
             memoryBytes = memory,
             corePid = 0,
+            runtimeSchema = status.optInt("runtimeSchema", 0),
+            ipv4Rules = status.optBoolean("ipv4Rules", false),
+            ipv6Rules = status.optBoolean("ipv6Rules", false),
+            dnsMode = status.optString("dnsMode", ""),
+            dnsIpv4Rule = status.optBoolean("dnsIpv4Rule", false),
+            dnsIpv6Rule = status.optBoolean("dnsIpv6Rule", false),
+            dnsListenerReady = status.optBoolean("dnsListenerReady", false),
+            watchdog = status.optBoolean("watchdog", false),
+            dataPlaneHealthy = status.optBoolean("dataPlaneHealthy", false),
         )
     }
 
     suspend fun ensureRuntimeFiles(): String = withContext(Dispatchers.IO) {
+        LegacyAppMigrator.migrateIfNeeded(app)
         var core = ProxyRuntimeProfile.load(prefs).core
         if (core == ProxyRuntimeProfile.Core.MIHOMO_SMART && !ProxyCoreStore(app).installed(core)) {
             core = ProxyRuntimeProfile.Core.MIHOMO
@@ -177,6 +237,7 @@ internal class ProxyComposeController(context: Context) {
     }
 
     suspend fun start(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
+        LegacyAppMigrator.migrateIfNeeded(app)
         var profile = ProxyRuntimeProfile.load(prefs)
         if (!profile.capability().available) {
             onProgress("检测到旧版本遗留的不可用核心/模式，回退到 Mihomo · TPROXY…")
@@ -201,6 +262,19 @@ internal class ProxyComposeController(context: Context) {
             else prefs.edit().putString("proxyRootSessionOwner", previousOwner).apply()
             throw error
         }
+    }
+
+    suspend fun restart(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
+        LegacyAppMigrator.migrateIfNeeded(app)
+        val profile = ProxyRuntimeProfile.load(prefs)
+        onProgress("校验新运行环境，确认可用后再替换当前核心…")
+        val result = root.replaceRunningAfterUpgrade(profile)
+        prefs.edit()
+            .putString("proxyRootSessionOwner", "manual")
+            .remove("proxyRootRuntimeRefreshPending")
+            .remove("proxyRootUpgradeError")
+            .apply()
+        result
     }
 
     suspend fun stop(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
