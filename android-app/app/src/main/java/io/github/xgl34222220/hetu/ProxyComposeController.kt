@@ -140,7 +140,8 @@ internal class ProxyComposeController(context: Context) {
                 down = rawConnections.optLong("downloadTotal", 0L)
                 up = rawConnections.optLong("uploadTotal", 0L)
                 memory = rawConnections.optLong("memory", 0L)
-                connections = parseConnections(rawConnections)
+                val socketUids = if (needsSocketUidFallback(rawConnections)) readSocketUidMap() else emptyMap()
+                connections = parseConnections(rawConnections, socketUids)
                 panelReady = true
             } catch (_: Exception) { }
         }
@@ -460,7 +461,7 @@ internal class ProxyComposeController(context: Context) {
         return result.sortedBy { it.name.lowercase(Locale.ROOT) }
     }
 
-    private fun parseConnections(root: JSONObject): List<ProxyConnectionUi> {
+    private fun parseConnections(root: JSONObject, socketUids: Map<String, Int> = emptyMap()): List<ProxyConnectionUi> {
         val array = root.optJSONArray("connections") ?: JSONArray()
         val out = ArrayList<ProxyConnectionUi>()
         for (i in 0 until array.length()) {
@@ -471,7 +472,10 @@ internal class ProxyComposeController(context: Context) {
             val rawHost = meta.optString("host").ifBlank { meta.optString("destinationIP", "未知目标") }
             val port = meta.optString("destinationPort")
             val host = if (port.isNotBlank() && !rawHost.endsWith(":$port")) "$rawHost:$port" else rawHost
-            val appIdentity = resolveApp(meta)
+            val protocol = meta.optString("network").lowercase(Locale.ROOT)
+            val sourcePort = meta.optInt("sourcePort", -1)
+            val fallbackUid = if (sourcePort > 0) socketUids["$protocol:$sourcePort"] ?: -1 else -1
+            val appIdentity = resolveApp(meta, fallbackUid)
             out += ProxyConnectionUi(
                 id = c.optString("id", i.toString()),
                 host = host,
@@ -494,8 +498,48 @@ internal class ProxyComposeController(context: Context) {
 
     private data class AppIdentity(val uid: Int, val packageName: String, val label: String, val icon: Bitmap?)
 
-    private fun resolveApp(meta: JSONObject): AppIdentity {
-        val uid = meta.optInt("uid", -1)
+    private fun needsSocketUidFallback(root: JSONObject): Boolean {
+        val array = root.optJSONArray("connections") ?: return false
+        for (i in 0 until array.length()) {
+            val meta = array.optJSONObject(i)?.optJSONObject("metadata") ?: continue
+            val uid = meta.optInt("uid", -1)
+            val process = meta.optString("process").ifBlank { meta.optString("processPath") }
+            if (uid <= 0 && process.isBlank() && meta.optInt("sourcePort", -1) > 0) return true
+        }
+        return false
+    }
+
+    private fun readSocketUidMap(): Map<String, Int> {
+        val command = """
+            for F in tcp tcp6; do
+              [ -r /proc/net/$F ] || continue
+              awk 'NR>1 { split($2,a,":"); if (a[2] != "" && $8 ~ /^[0-9]+$/) print "tcp " a[2] " " $8 }' /proc/net/$F
+            done
+            for F in udp udp6; do
+              [ -r /proc/net/$F ] || continue
+              awk 'NR>1 { split($2,a,":"); if (a[2] != "" && $8 ~ /^[0-9]+$/) print "udp " a[2] " " $8 }' /proc/net/$F
+            done
+        """.trimIndent()
+        return try {
+            val result = RootBridge.rootShell(app, command, 3_500L)
+            if (!result.ok()) return emptyMap()
+            val out = HashMap<String, Int>()
+            result.output.lineSequence().forEach { line ->
+                val parts = line.trim().split(Regex("\\s+"))
+                if (parts.size < 3) return@forEach
+                val protocol = parts[0].lowercase(Locale.ROOT)
+                val port = parts[1].toIntOrNull(16) ?: return@forEach
+                val uid = parts[2].toIntOrNull() ?: return@forEach
+                if (port > 0 && uid >= 0) out.putIfAbsent("$protocol:$port", uid)
+            }
+            out
+        } catch (_: Exception) {
+            emptyMap()
+        }
+    }
+
+    private fun resolveApp(meta: JSONObject, fallbackUid: Int = -1): AppIdentity {
+        val uid = meta.optInt("uid", -1).takeIf { it > 0 } ?: fallbackUid
         val processRaw = meta.optString("process").ifBlank { meta.optString("processPath") }
         val process = processRaw.substringAfterLast('/').substringBefore(':')
         val cacheKey = "$uid|$process"
