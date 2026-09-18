@@ -32,6 +32,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.Arrays;
+import java.util.ArrayDeque;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
@@ -74,6 +75,8 @@ public final class DnsVpnService extends VpnService {
     private static volatile String liveLastBlockedDomain = "";
     private static volatile long liveLastBlockedAt;
     private final AtomicLong cacheHits = new AtomicLong(), fallbackCount = new AtomicLong(), latencyMs = new AtomicLong();
+    private final ArrayDeque<JSONObject> requestLogRing = new ArrayDeque<>(100);
+    private volatile boolean requestLogDirty;
     private final DnsCache cache = new DnsCache();
     private final Object outputLock = new Object();
     private volatile ParcelFileDescriptor tunnel;
@@ -94,9 +97,11 @@ public final class DnsVpnService extends VpnService {
         sessionStartQueries = queries.get(); sessionStartBlocked = blocked.get();
         cacheHits.set(prefs.getLong("cacheHits", 0)); fallbackCount.set(prefs.getLong("dnsFallbackCount", 0));
         latencyMs.set(prefs.getLong("dnsLatencyMs", 0));
+        loadRequestLogs();
         NotificationManager manager = getSystemService(NotificationManager.class);
         manager.createNotificationChannel(new NotificationChannel(CHANNEL, "DNS 去广告", NotificationManager.IMPORTANCE_LOW));
         statistics.scheduleWithFixedDelay(this::flushStatistics, 10, 10, TimeUnit.SECONDS);
+        statistics.scheduleWithFixedDelay(this::flushRequestLogs, 1, 1, TimeUnit.SECONDS);
     }
 
     public static long currentQueries(Context context) {
@@ -321,7 +326,15 @@ public final class DnsVpnService extends VpnService {
     }
 
     public static void clearRequestLogs(Context context) {
-        synchronized (LOGS_LOCK) { context.getSharedPreferences("hetu", Context.MODE_PRIVATE).edit().putString("dnsLogs", "[]").remove("dnsLogError").remove("dnsLogNotice").apply(); }
+        DnsVpnService instance=latestInstance;
+        synchronized (LOGS_LOCK) {
+            if(instance!=null){
+                instance.requestLogRing.clear();
+                instance.requestLogDirty=false;
+            }
+            context.getSharedPreferences("hetu", Context.MODE_PRIVATE).edit()
+                    .putString("dnsLogs", "[]").remove("dnsLogError").remove("dnsLogNotice").apply();
+        }
     }
     public static void setRequestLogging(Context context, boolean enabled) {
         synchronized (LOGS_LOCK) { context.getSharedPreferences("hetu", Context.MODE_PRIVATE).edit().putBoolean("requestLogs", enabled).apply(); }
@@ -545,29 +558,59 @@ public final class DnsVpnService extends VpnService {
 
     private void record(String domain, String outcome) { record(domain, outcome, ""); }
 
+    private void loadRequestLogs() {
+        synchronized (LOGS_LOCK) {
+            requestLogRing.clear();
+            boolean repaired=false;
+            try {
+                JSONArray previous=new JSONArray(prefs.getString("dnsLogs","[]"));
+                for(int i=Math.max(0,previous.length()-100);i<previous.length();i++){
+                    JSONObject entry=previous.optJSONObject(i);
+                    if(entry!=null&&!entry.optString("domain").isEmpty()&&!entry.optString("result").isEmpty()){
+                        requestLogRing.addLast(entry);
+                    }else repaired=true;
+                }
+            } catch(Exception invalid) {
+                repaired=true;
+            }
+            requestLogDirty=repaired;
+            if(repaired)prefs.edit().putString("dnsLogNotice","旧请求记录损坏，已重建记录；丢失内容不会补造").apply();
+        }
+    }
+
     private void record(String domain, String outcome, String matchedDomain) {
         if (!prefs.getBoolean("requestLogs", false)) return;
         synchronized (LOGS_LOCK) {
             try {
                 if (!prefs.getBoolean("requestLogs", false)) return;
-                JSONArray previous;
-                boolean repaired = false;
-                try { previous = new JSONArray(prefs.getString("dnsLogs", "[]")); }
-                catch (org.json.JSONException invalid) { previous = new JSONArray(); repaired = true; }
-                JSONArray next = new JSONArray();
-                for (int i = Math.max(0, previous.length() - 99); i < previous.length(); i++) {
-                    JSONObject entry = previous.optJSONObject(i);
-                    if (entry != null && !entry.optString("domain").isEmpty() && !entry.optString("result").isEmpty()) next.put(entry);
-                    else repaired = true;
-                }
-                next.put(new JSONObject().put("time", System.currentTimeMillis()).put("domain", domain).put("result", outcome).put("matchedDomain", matchedDomain).put("blocked", outcome.startsWith("blocked")));
-                SharedPreferences.Editor edit = prefs.edit().putString("dnsLogs", next.toString()).remove("dnsLogError");
-                if (repaired) edit.putString("dnsLogNotice", "旧请求记录损坏，已重建记录；丢失内容不会补造");
-                edit.apply();
-            } catch (Exception failure) {
-                // Do not silently stop logging forever. No domain or payload is included.
-                prefs.edit().putString("dnsLogError", "请求记录写入失败：" + failure.getClass().getSimpleName()).apply();
+                JSONObject entry=new JSONObject()
+                        .put("time",System.currentTimeMillis())
+                        .put("domain",domain)
+                        .put("result",outcome)
+                        .put("matchedDomain",matchedDomain)
+                        .put("blocked",outcome.startsWith("blocked"));
+                requestLogRing.addLast(entry);
+                while(requestLogRing.size()>100)requestLogRing.removeFirst();
+                requestLogDirty=true;
+            } catch(Exception failure) {
+                prefs.edit().putString("dnsLogError","请求记录缓存失败："+failure.getClass().getSimpleName()).apply();
             }
+        }
+    }
+
+    private void flushRequestLogs() {
+        if(prefs==null)return;
+        JSONArray snapshot=new JSONArray();
+        synchronized (LOGS_LOCK) {
+            if(!requestLogDirty)return;
+            for(JSONObject entry:requestLogRing)snapshot.put(entry);
+            requestLogDirty=false;
+        }
+        try {
+            prefs.edit().putString("dnsLogs",snapshot.toString()).remove("dnsLogError").apply();
+        } catch(Exception failure) {
+            synchronized (LOGS_LOCK) { requestLogDirty=true; }
+            prefs.edit().putString("dnsLogError","请求记录写入失败："+failure.getClass().getSimpleName()).apply();
         }
     }
 
@@ -595,6 +638,7 @@ public final class DnsVpnService extends VpnService {
         cache.clear();
         ThreadPoolExecutor pool = workers; workers = null;
         if (pool != null) pool.shutdownNow();
+        flushRequestLogs();
         flushStatistics();
     }
 
