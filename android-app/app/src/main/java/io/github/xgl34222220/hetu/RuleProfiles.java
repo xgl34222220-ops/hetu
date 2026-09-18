@@ -19,16 +19,16 @@ public final class RuleProfiles {
                 hagezi = false;
                 tracking = false;
                 break;
-            // Daily default: China + AdAway + HaGeZi Light. This raises practical
-            // coverage substantially without jumping straight to privacy-heavy rules.
+            // Daily default: HaGeZi Normal is the main DNS filter; the China list
+            // complements it for local ad domains. Avoid stacking redundant main lists.
             case "balanced":
-                adaway = true;
+                adaway = false;
                 hagezi = true;
                 tracking = false;
                 break;
-            // Enhanced additionally enables the broader AWAvenue privacy/tracking set.
+            // Enhanced adds the local privacy/tracking source on top of the same main list.
             case "enhanced":
-                adaway = true;
+                adaway = false;
                 hagezi = true;
                 tracking = true;
                 break;
