@@ -279,6 +279,7 @@ final class RootProxyManager {
                 .putBoolean("proxyAdblockLastEffective",profile.adblockChain)
                 .putInt("proxyAdblockLastRuleCount",p.adblock==null?0:p.adblock.count)
                 .putString("proxyAdblockLastRevision",p.adblock==null?"":p.adblock.revision)
+                .remove("proxyRootRuntimeRefreshPending")
                 .apply();
         ensureContinuityService(true);
         return result;
