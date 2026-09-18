@@ -79,7 +79,7 @@ public final class MihomoVpnService extends VpnService {
    try(InputStream in=getAssets().open("rules/hagezi.txt")){suffixCandidates=RuleStore.parseRules(in,false);}
   }
   final DomainRuleProjection projected=DomainRuleProjection.build(effective.domains,suffixCandidates,rules.userList(true));
-  b.setConfigureIntent(PendingIntent.getActivity(this,401,new Intent(this,ProxyActivity.class),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE));
+  b.setConfigureIntent(PendingIntent.getActivity(this,401,new Intent(this,ReferenceProxyActivity.class),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE));
   descriptor=b.establish();if(descriptor==null)throw new IOException("系统没有建立 VPN 接口");
   JSONObject start=new JSONObject().put("action","start").put("home",store.home().getAbsolutePath()).put("yaml",yaml).put("fd",descriptor.getFd()).put("filter",applied.filterEnabled).put("dnsGuard",dnsGuardEnabled);
   if(applied.filterEnabled)start.put("domains",new JSONArray(projected.exact)).put("suffixDomains",new JSONArray(projected.suffix));
@@ -134,7 +134,7 @@ public final class MihomoVpnService extends VpnService {
 
  private void foreground(){if(destroyed||owner!=this)return;
   NotificationManager nm=getSystemService(NotificationManager.class);nm.createNotificationChannel(new NotificationChannel("proxy_core","Mihomo 代理",NotificationManager.IMPORTANCE_LOW));
-  PendingIntent open=PendingIntent.getActivity(this,402,new Intent(this,ProxyActivity.class),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+  PendingIntent open=PendingIntent.getActivity(this,402,new Intent(this,ReferenceProxyActivity.class),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
   PendingIntent stop=PendingIntent.getService(this,403,new Intent(this,MihomoVpnService.class).setAction("STOP"),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
   Notification n=new Notification.Builder(this,"proxy_core").setSmallIcon(getApplicationInfo().icon).setContentTitle("河图 · Mihomo").setContentText(state).setContentIntent(open).setOngoing(true).addAction(new Notification.Action.Builder(null,"停止",stop).build()).build();
   if(Build.VERSION.SDK_INT>=34)startForeground(401,n,ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);else startForeground(401,n);
