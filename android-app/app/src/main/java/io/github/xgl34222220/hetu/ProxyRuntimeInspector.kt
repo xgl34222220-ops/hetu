@@ -180,7 +180,7 @@ internal class ProxyRuntimeInspector(context: Context) {
 
     private fun publicNetwork(): Triple<String, String, String> {
         val now = SystemClock.elapsedRealtime()
-        if (now - wanCacheAt < 60_000L && wanCache.first != "—") return wanCache
+        if (now - wanCacheAt < 900_000L && wanCache.first != "—") return wanCache
         val fresh = runCatching {
             val connection = (URL("https://ipwho.is/?fields=success,ip,country_code,region").openConnection() as HttpURLConnection).apply {
                 connectTimeout = 3_000
