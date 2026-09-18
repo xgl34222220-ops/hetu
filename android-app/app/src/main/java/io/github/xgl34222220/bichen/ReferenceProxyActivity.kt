@@ -2920,7 +2920,8 @@ private fun RefConnectionDiagnosticsCard(
     val tunLike = state.mode.contains("TUN", true) || state.mode.contains("eBPF", true)
     val dnsHealthy = state.dnsMode == "off" ||
         (state.dnsListenerReady && (tunLike || state.dnsIpv4Rule))
-    val dataPlaneHealthy = state.ipv4Rules && state.watchdog && dnsHealthy
+    val routeHealthy = tunLike || state.ipv4Rules
+    val dataPlaneHealthy = routeHealthy && state.watchdog && dnsHealthy
     Surface(
         shape = RoundedCornerShape(20.dp),
         color = t.cardBackground,
@@ -3036,7 +3037,7 @@ private fun RefConnectionDiagnosticsCard(
                     )
                     Text(
                         buildString {
-                            append("IPv4 ").append(if (state.ipv4Rules) "✓" else "×")
+                            append(if (tunLike) "TUN ✓" else "IPv4 " + if (state.ipv4Rules) "✓" else "×")
                             append(" · IPv6 ").append(if (state.ipv6Rules) "✓" else "—")
                             append(" · DNS ").append(
                                 when {
