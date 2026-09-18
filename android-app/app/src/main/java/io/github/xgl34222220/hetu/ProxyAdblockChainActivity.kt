@@ -218,8 +218,8 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                 }
                 Spacer(Modifier.width(4.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("广告过滤", color = t.textPrimary, fontSize = 24.sp, lineHeight = 30.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("代理串联 · 明确白名单优先，广告后缀规则早于普通分流", color = t.textSecondary, fontSize = 11.sp)
+                    Text("DNS 广告过滤", color = t.textPrimary, fontSize = 24.sp, lineHeight = 30.sp, fontWeight = FontWeight.ExtraBold)
+                    Text("AdGuard DNS 语法 · hosts · 纯域名 · 例外规则优先", color = t.textSecondary, fontSize = 11.sp)
                 }
                 IconButton(onClick = { revision++ }, enabled = !busy, modifier = Modifier.size(42.dp)) {
                     Icon(Icons.Rounded.Refresh, "刷新", tint = MaterialTheme.colorScheme.primary)
@@ -236,7 +236,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                         }
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
-                            Text("随代理串联过滤", color = t.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            Text("河图 DNS 过滤引擎", color = t.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                             Text(
                                 when {
                                     snapshot.effective -> "已生效 · Mihomo 当前已加载河图广告规则链"
