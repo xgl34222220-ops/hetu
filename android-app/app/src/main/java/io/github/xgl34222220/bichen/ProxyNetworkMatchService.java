@@ -101,7 +101,16 @@ public final class ProxyNetworkMatchService extends Service {
                             }
                         }else if("stop".equals(action)){
                             if(running&&"automation".equals(owner)){
-                                root.stop();prefs.edit().remove("proxyRootSessionOwner").apply();
+                                if(shouldStopAfterStabilize()){
+                                    prefs.edit()
+                                            .putString("proxyLastAutoStopReason","网络匹配在稳定确认后执行停止："+env)
+                                            .putLong("proxyLastAutoStopAt",System.currentTimeMillis())
+                                            .apply();
+                                    root.stop();
+                                    prefs.edit().remove("proxyRootSessionOwner").apply();
+                                }else{
+                                    prefs.edit().putString("networkMatchLastEnvironment",env+" · 网络切换抖动，已取消自动停止").apply();
+                                }
                             }
                         }
                     }
@@ -113,6 +122,26 @@ public final class ProxyNetworkMatchService extends Service {
                 prefs.edit().putString("networkMatchLastEnvironment","执行失败："+(e.getMessage()==null?e.getClass().getSimpleName():e.getMessage())).apply();
             }
         });
+    }
+
+    private boolean shouldStopAfterStabilize() {
+        SystemClock.sleep(3500L);
+        Network n=cm.getActiveNetwork();
+        NetworkCapabilities caps=n==null?null:cm.getNetworkCapabilities(n);
+        boolean wifi=caps!=null&&caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI);
+        boolean mobile=caps!=null&&caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR);
+        String ssid="",bssid="";
+        if(wifi)try{
+            WifiManager wm=(WifiManager)getApplicationContext().getSystemService(WIFI_SERVICE);
+            WifiInfo info=wm==null?null:wm.getConnectionInfo();
+            if(info!=null){ssid=clean(info.getSSID());bssid=clean(info.getBSSID());}
+        }catch(SecurityException ignored){}
+        boolean matched=(wifi&&matches(ssid,set("networkMatchSsids"),false)&&matches(bssid,set("networkMatchBssids"),true))
+                ||(mobile&&prefs.getBoolean("networkMatchMobile",false));
+        String action=prefs.getString(matched?"networkMatchAction":"networkUnmatchAction",matched?"start":"none");
+        prefs.edit().putString("networkMatchLastStableEnvironment",
+                wifi?("Wi‑Fi"+(ssid.isEmpty()?"":" · "+ssid)):(mobile?"移动数据":"其他/离线")).apply();
+        return "stop".equals(action);
     }
 
     private Set<String> set(String key){Set<String>s=prefs.getStringSet(key,Collections.emptySet());return s==null?Collections.emptySet():new HashSet<>(s);}
