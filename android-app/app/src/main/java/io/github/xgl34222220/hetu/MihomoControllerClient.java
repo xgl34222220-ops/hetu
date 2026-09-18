@@ -56,6 +56,10 @@ final class MihomoControllerClient {
         request("PUT","/providers/rules/"+Uri.encode(name),null,30000);
     }
 
+    void reloadLocalRuleProvider(String name)throws Exception{
+        request("PUT","/providers/rules/"+Uri.encode(name),null,6000);
+    }
+
     void updateProxyProvider(String name)throws Exception{
         request("PUT","/providers/proxies/"+Uri.encode(name),null,30000);
     }
