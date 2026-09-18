@@ -1493,6 +1493,9 @@ private fun RefPanel(
                     )
                 }
                 RefPanelTab.Connections -> {
+                    item("connection-diagnostics") {
+                        RefConnectionDiagnosticsCard(state, state.connections)
+                    }
                     item {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             FilterChip(selected = connectionView == "active", onClick = { connectionView = "active" }, label = { Text("活跃 ${state.connections.size}") })
@@ -2855,6 +2858,194 @@ private fun refExpireDate(expire: Long): String {
     return runCatching { java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date(millis)) }.getOrDefault("—")
 }
 
+private data class RefConnectionDiagnostics(
+    val total: Int,
+    val tcp: Int,
+    val udp: Int,
+    val direct: Int,
+    val system: Int,
+    val unknown: Int,
+    val self: Int,
+    val topApps: List<Pair<String, Int>>,
+)
+
+private fun refConnectionDiagnostics(items: List<ProxyConnectionUi>, selfPackage: String): RefConnectionDiagnostics {
+    var tcp = 0
+    var udp = 0
+    var direct = 0
+    var system = 0
+    var unknown = 0
+    var self = 0
+    val apps = LinkedHashMap<String, Int>()
+    items.forEach { item ->
+        val network = item.network.lowercase()
+        if ("udp" in network) udp++ else tcp++
+        val route = (item.chain + " " + item.rule + " " + item.rulePayload).uppercase()
+        if ("DIRECT" in route) direct++
+        if (item.uid in 1..9999) system++
+        val isSelf = item.packageName == selfPackage ||
+            item.process == selfPackage ||
+            item.process.startsWith("$selfPackage:")
+        if (isSelf) self++
+        if (item.packageName.isBlank() && item.uid <= 0) unknown++
+        val label = item.appName.ifBlank {
+            item.packageName.ifBlank {
+                item.process.ifBlank { if (item.uid > 0) "UID ${item.uid}" else "未识别" }
+            }
+        }
+        apps[label] = (apps[label] ?: 0) + 1
+    }
+    return RefConnectionDiagnostics(
+        total = items.size,
+        tcp = tcp,
+        udp = udp,
+        direct = direct,
+        system = system,
+        unknown = unknown,
+        self = self,
+        topApps = apps.entries.sortedByDescending { it.value }.take(4).map { it.key to it.value },
+    )
+}
+
+@Composable
+private fun RefConnectionDiagnosticsCard(
+    state: ProxyComposeState,
+    items: List<ProxyConnectionUi>,
+) {
+    val context = LocalContext.current
+    val t = LocalBichenTokens.current
+    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
+    val stats = remember(items, context.packageName) {
+        refConnectionDiagnostics(items, context.packageName)
+    }
+    val stale = state.runtimeRefreshPending || !state.selfUidBypassed
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = t.cardBackground,
+        shadowElevation = 1.dp,
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(36.dp)
+                        .background(
+                            if (stale) Color(0xFFF59E0B).copy(alpha = .11f) else Color(0xFF2563EB).copy(alpha = .09f),
+                            RoundedCornerShape(11.dp),
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        if (stale) Icons.Rounded.WarningAmber else Icons.Rounded.AccountTree,
+                        null,
+                        tint = if (stale) Color(0xFFD97706) else Color(0xFF2563EB),
+                        modifier = Modifier.size(19.dp),
+                    )
+                }
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("连接来源诊断", color = t.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        if (stale) "当前 Root 运行环境仍是旧策略，主动重启代理后应用最新 UID 绕过"
+                        else "当前 Root 数据面已包含辟尘自身 UID 绕过",
+                        color = if (stale) Color(0xFFB45309) else Color(0xFF059669),
+                        fontSize = 10.sp,
+                        lineHeight = 14.sp,
+                    )
+                }
+                Text(
+                    "${stats.total}",
+                    color = t.textPrimary,
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Black,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                )
+            }
+
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                listOf(
+                    "TCP" to stats.tcp,
+                    "UDP" to stats.udp,
+                    "DIRECT" to stats.direct,
+                    "未识别" to stats.unknown,
+                ).forEach { (label, value) ->
+                    Surface(
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (dark) Color.White.copy(alpha = .045f) else Color(0xFFF8FAFC),
+                    ) {
+                        Column(
+                            Modifier.padding(horizontal = 7.dp, vertical = 8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Text(
+                                value.toString(),
+                                color = if (label == "未识别" && value > 0) Color(0xFFD97706) else t.textPrimary,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            )
+                            Text(label, color = t.textMuted, fontSize = 9.sp, maxLines = 1)
+                        }
+                    }
+                }
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "系统 UID ${stats.system} · 辟尘自身 ${stats.self}",
+                    color = if (stats.system > 0 || stats.self > 0) Color(0xFFD97706) else t.textSecondary,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
+                )
+                if (state.directUidRanges.isNotBlank()) {
+                    Text(
+                        "DIRECT UID ${state.directUidRanges}",
+                        color = t.textMuted,
+                        fontSize = 9.sp,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = 150.dp),
+                    )
+                }
+            }
+
+            if (stats.topApps.isNotEmpty()) {
+                HorizontalDivider(
+                    thickness = .5.dp,
+                    color = if (dark) t.outline.copy(alpha = .28f) else Color(0xFFF1F5F9),
+                )
+                Text("连接最多", color = t.textMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    stats.topApps.forEach { (name, count) ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                name,
+                                color = t.textSecondary,
+                                fontSize = 10.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text(
+                                "$count",
+                                color = t.textPrimary,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun RefConnectionRow(item: ProxyConnectionUi, onClose: (() -> Unit)?) {
     val t = LocalBichenTokens.current
@@ -2870,7 +3061,22 @@ private fun RefConnectionRow(item: ProxyConnectionUi, onClose: (() -> Unit)?) {
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(item.host, color = t.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(listOf(item.network, item.inbound).filter { it.isNotBlank() }.joinToString(" · "), color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                val identity = item.appName.ifBlank {
+                    item.packageName.ifBlank {
+                        item.process.ifBlank { if (item.uid > 0) "UID ${item.uid}" else "未识别应用" }
+                    }
+                }
+                Text(
+                    buildString {
+                        append(identity)
+                        if (item.uid > 0) append(" · UID ").append(item.uid)
+                    },
+                    color = t.textSecondary,
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(listOf(item.network, item.inbound).filter { it.isNotBlank() }.joinToString(" · "), color = t.textMuted, style = MaterialTheme.typography.labelSmall, maxLines = 1)
                 Text(item.chain.ifBlank { item.rule.ifBlank { "DIRECT" } }, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text("↑ ${refBytes(item.upload)}   ↓ ${refBytes(item.download)}", color = t.textMuted, style = MaterialTheme.typography.labelSmall)
             }
