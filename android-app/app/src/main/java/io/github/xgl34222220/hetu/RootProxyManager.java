@@ -165,13 +165,21 @@ final class RootProxyManager {
             if(port>0)prefs.edit().putInt("proxyControllerPort",port).apply();
             MihomoControllerClient controller=new MihomoControllerClient(context);
             String warning="";
+            boolean providerReloaded=false;
             try{
-                controller.reloadConfig(CONFIG);
-                if(!controller.waitReady(8000))warning="；Controller 重载后仍在初始化";
-            }catch(Exception reloadError){
-                String detail=reloadError.getMessage()==null?reloadError.getClass().getSimpleName():reloadError.getMessage();
-                warning="；运行中的 Controller 暂未热重载："+detail+"，下次重启必定使用新规则";
+                controller.updateRuleProvider(ProxyAdblockRules.ALLOW_PROVIDER_NAME);
+                controller.updateRuleProvider(ProxyAdblockRules.PROVIDER_NAME);
+                providerReloaded=true;
+            }catch(Exception providerError){
+                try{
+                    controller.reloadConfig(CONFIG);
+                    if(!controller.waitReady(8000))warning="；Controller 重载后仍在初始化";
+                }catch(Exception reloadError){
+                    String detail=reloadError.getMessage()==null?reloadError.getClass().getSimpleName():reloadError.getMessage();
+                    warning="；运行中的 Controller 暂未热重载："+detail+"，下次重启必定使用新规则";
+                }
             }
+            if(providerReloaded)prefs.edit().putLong("proxyAdblockProviderReloadAt",System.currentTimeMillis()).apply();
             prefs.edit()
                     .putInt("proxyAdblockLastRuleCount",snapshot.count)
                     .putString("proxyAdblockLastRevision",snapshot.revision)
