@@ -106,7 +106,7 @@ internal class ProxyRuntimeInspector(context: Context) {
               echo '__COUNT__=0'
               exit 0
             fi
-            echo "__COUNT__=$(grep -Eic 'bichen-adblock|RuleSet/bichen-adblock' /data/adb/bichen/proxy/run/core.log 2>/dev/null || true)"
+            grep -Ei 'bichen-adblock|RuleSet/bichen-adblock' /data/adb/bichen/proxy/run/core.log 2>/dev/null | awk 'END { print "__COUNT__=" NR }'
             grep -Ei 'bichen-adblock|RuleSet/bichen-adblock' /data/adb/bichen/proxy/run/core.log 2>/dev/null | tail -n 24 || true
         """.trimIndent()
         val result = RootBridge.rootShell(app, command, 6_000L)
