@@ -3037,7 +3037,7 @@ private fun RefConnectionDiagnosticsCard(
                     )
                     Text(
                         buildString {
-                            append(if (tunLike) "TUN ✓" else "IPv4 " + if (state.ipv4Rules) "✓" else "×")
+                            append(if (tunLike) "TUN ✓" else "IPv4 " + (if (state.ipv4Rules) "✓" else "×"))
                             append(" · IPv6 ").append(if (state.ipv6Rules) "✓" else "—")
                             append(" · DNS ").append(
                                 when {
