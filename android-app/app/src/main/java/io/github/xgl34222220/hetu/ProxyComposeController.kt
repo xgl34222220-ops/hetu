@@ -337,6 +337,15 @@ internal class ProxyComposeController(context: Context) {
         configs.select(ProxyRuntimeProfile.load(prefs).core, name)
     }
 
+    suspend fun configOverview(): Pair<String, List<ProxySubscriptionUi>> = withContext(Dispatchers.IO) {
+        val profile = ProxyRuntimeProfile.load(prefs)
+        val entry = configs.selected(profile.core)
+        val name = entry?.name ?: "尚未选择配置"
+        val items = if (entry == null) emptyList() else
+            configs.subscriptions(entry).map { ProxySubscriptionUi(it.name, it.url, it.placeholder) }
+        name to items
+    }
+
     suspend fun importConfig(uri: Uri, displayName: String) = withContext(Dispatchers.IO) {
         val input = app.contentResolver.openInputStream(uri) ?: error("无法读取配置文件")
         configs.importConfig(ProxyRuntimeProfile.load(prefs).core, displayName, input)
