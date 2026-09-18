@@ -13,33 +13,18 @@ public final class BootReceiver extends BroadcastReceiver {
         SharedPreferences prefs = context.getSharedPreferences("bichen", Context.MODE_PRIVATE);
 
         if (Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) {
-            if (!prefs.getBoolean("proxyRootWanted", false)) return;
-            final PendingResult pending = goAsync();
-            new Thread(() -> {
-                RootProxyManager root = new RootProxyManager(context.getApplicationContext());
-                try {
-                    prefs.edit().putBoolean("proxyRootWanted", true).apply();
-                    root.replaceRunningAfterUpgrade(ProxyRuntimeProfile.load(prefs));
-                    prefs.edit()
-                            .putLong("proxyRootLastUpgradeRestartAt", System.currentTimeMillis())
-                            .remove("proxyRootUpgradeError")
-                            .apply();
-                } catch (Exception e) {
-                    // Never reinterpret an upgrade failure as "the user asked to stop".
-                    // If the old core is still healthy, it stays alive because replacement is
-                    // validated before the shell transaction switches runtime state.
-                    prefs.edit()
-                            .putBoolean("proxyRootWanted", true)
-                            .putString(
-                                    "proxyRootUpgradeError",
-                                    "升级后运行环境刷新失败，已保留运行意图：" +
-                                            (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage())
-                            )
-                            .apply();
-                } finally {
-                    pending.finish();
-                }
-            }, "bichen-root-upgrade").start();
+            // Never touch a live Root proxy during APK replacement. Android may kill/restart
+            // app processes around package replacement, and an automatic core transaction
+            // here can turn an otherwise healthy proxy into an outage if the new runtime
+            // fails after validation. Mark the deployed runtime stale instead; the user's
+            // next explicit restart applies the new assets/policy safely.
+            if (prefs.getBoolean("proxyRootWanted", false)) {
+                prefs.edit()
+                        .putBoolean("proxyRootRuntimeRefreshPending", true)
+                        .putLong("proxyRootRuntimeRefreshPendingAt", System.currentTimeMillis())
+                        .remove("proxyRootUpgradeError")
+                        .apply();
+            }
             return;
         }
 
