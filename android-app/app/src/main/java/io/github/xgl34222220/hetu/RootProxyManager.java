@@ -105,6 +105,39 @@ final class RootProxyManager {
         return iface;
     }
 
+    String ensureRuntimeBase(ProxyRuntimeProfile.Core requestedCore)throws Exception{
+        RootBridge.requireWorkerThread();
+        ProxyRuntimeProfile.Core core=requestedCore;
+        if(core==ProxyRuntimeProfile.Core.MIHOMO_SMART&&!cores.installed(core))core=ProxyRuntimeProfile.Core.MIHOMO;
+        File stage=new File(context.getCacheDir(),"hetu-runtime-init");
+        if(!stage.isDirectory()&&!stage.mkdirs())throw new IOException("无法创建河图运行初始化目录");
+        File script=new File(stage,"hetu-root.sh");
+        copyAsset("proxy-root-v3.sh",script,true);
+        File binary=coreFile(core,stage);
+        String deploySuffix=".new."+Long.toHexString(System.nanoTime());
+        String scriptTmp=SCRIPT+deploySuffix;
+        String binTmp=BIN+deploySuffix;
+        String info=ROOT+"/run/state/runtime.info";
+        String infoText="app="+BuildConfig.VERSION_NAME+"\ncore="+core.id+"\nroot="+ROOT+"\n";
+        StringBuilder cmd=new StringBuilder("set -e; mkdir -p ")
+                .append(RootBridge.quote(ROOT+"/bin")).append(' ')
+                .append(RootBridge.quote(ROOT+"/run/state")).append(' ')
+                .append(RootBridge.quote(ROOT+"/run/ruleset"))
+                .append("; if [ ! -s ").append(RootBridge.quote(SCRIPT)).append(" ]; then cp ")
+                .append(RootBridge.quote(script.getAbsolutePath())).append(' ').append(RootBridge.quote(scriptTmp))
+                .append("; chmod 700 ").append(RootBridge.quote(scriptTmp)).append("; chown 0:0 ").append(RootBridge.quote(scriptTmp))
+                .append("; mv -f ").append(RootBridge.quote(scriptTmp)).append(' ').append(RootBridge.quote(SCRIPT)).append("; fi")
+                .append("; if [ ! -x ").append(RootBridge.quote(BIN)).append(" ]; then cp ")
+                .append(RootBridge.quote(binary.getAbsolutePath())).append(' ').append(RootBridge.quote(binTmp))
+                .append("; chmod 700 ").append(RootBridge.quote(binTmp)).append("; chown 0:0 ").append(RootBridge.quote(binTmp))
+                .append("; mv -f ").append(RootBridge.quote(binTmp)).append(' ').append(RootBridge.quote(BIN)).append("; fi")
+                .append("; printf %s ").append(RootBridge.quote(infoText)).append(" > ").append(RootBridge.quote(info))
+                .append("; chmod 600 ").append(RootBridge.quote(info)).append("; chown 0:0 ").append(RootBridge.quote(info));
+        RootBridge.Result r=RootBridge.rootShell(context,cmd.toString(),45000L);
+        if(!r.ok())throw new IOException("无法初始化河图运行目录："+r.output.trim());
+        return ROOT;
+    }
+
     Prepared prepare(ProxyRuntimeProfile profile)throws Exception{
         RootBridge.requireWorkerThread();
         if(profile.core!=ProxyRuntimeProfile.Core.MIHOMO&&profile.core!=ProxyRuntimeProfile.Core.MIHOMO_SMART)
