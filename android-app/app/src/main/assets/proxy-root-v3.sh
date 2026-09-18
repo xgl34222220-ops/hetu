@@ -561,15 +561,15 @@ status(){
   STATUS_MODE=$(cat "$MODEFILE" 2>/dev/null || echo none); T4=false; T6=false; K4=false; K6=false
   for SPEC in "mangle OUTPUT $MOUT" "nat OUTPUT $NOUT" "nat OUTPUT $DNSOUT" "filter OUTPUT $QUICOUT"; do set -- $SPEC; xt4q -t "$1" -C "$2" -j "$3" >/dev/null 2>&1 && T4=true; done; xt4q -t filter -C OUTPUT -j "$KOUT" >/dev/null 2>&1 && K4=true
   if has ip6tables; then for SPEC in "mangle OUTPUT $MOUT" "nat OUTPUT $NOUT" "nat OUTPUT $DNSOUT" "filter OUTPUT $QUICOUT" "filter OUTPUT $V6OUT"; do set -- $SPEC; xt6q -t "$1" -C "$2" -j "$3" >/dev/null 2>&1 && T6=true; done; xt6q -t filter -C OUTPUT -j "$KOUT" >/dev/null 2>&1 && K6=true; fi
-  V6OFF=false; [ -f "$IPV6_STATE" ] && V6OFF=true; RECOVERED=false
-  if [ "$STATUS_RUNNING" = false ] && [ "$K4" = false ] && [ "$K6" = false ] && { [ "$T4" = true ] || [ "$T6" = true ] || [ "$V6OFF" = true ]; }; then if acquire_lock; then cleanup; restorev6; rm -f "$PIDFILE" "$MODEFILE" "$SESSION"; STATUS_MODE=none; T4=false; T6=false; V6OFF=false; RECOVERED=true; fi; fi
+  V6OFF=false; [ -f "$IPV6_STATE" ] && V6OFF=true; RECOVERED=false; STALE=false
+  if [ "$STATUS_RUNNING" = false ] && { [ "$T4" = true ] || [ "$T6" = true ] || [ "$K4" = true ] || [ "$K6" = true ] || [ "$V6OFF" = true ]; }; then STALE=true; fi
   WD=false; W=$(cat "$WATCHDOG_PID" 2>/dev/null || true); case "$W" in ''|*[!0-9]*) ;; *) kill -0 "$W" >/dev/null 2>&1 && WD=true;; esac
   SM=""; ST=""; if loadnet >/dev/null 2>&1; then SM="$MARK"; ST="$TABLE"; fi
   SCOPEV=$(sed -n 's/^APP_SCOPE=//p' "$SESSION" 2>/dev/null | head -n 1); DIRECTV=$(sed -n 's/^DIRECT_UIDS=//p' "$SESSION" 2>/dev/null | head -n 1); SHAREV=$(sed -n 's/^SHARE=//p' "$SESSION" 2>/dev/null | head -n 1); KILLV=$(sed -n 's/^KILL=//p' "$SESSION" 2>/dev/null | head -n 1)
   CPV=$(sed -n 's/^CONTROLLER_PORT=//p' "$SESSION" 2>/dev/null | head -n 1); case "$CPV" in ''|*[!0-9]*) CPV=0;; esac
   if [ "$CPV" = 0 ]; then CPV=$(sed -n 's/^[[:space:]]*external-controller:[[:space:]]*127\.0\.0\.1:\([0-9][0-9]*\)[[:space:]]*$/\1/p' "$RUN/state/startup-config" 2>/dev/null | tail -n 1); case "$CPV" in ''|*[!0-9]*) CPV=0;; esac; fi
   SP=$(state_value PREF 2>/dev/null || true)
-  printf '{"ok":true,"running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","log":"%s","configCheckLog":"%s"}\n' "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$T4" "$T6" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$RECOVERED" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$SHAREV" "$KILLV" "$LOG" "$CHECKLOG"
+  printf '{"ok":true,"running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":%s,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","log":"%s","configCheckLog":"%s"}\n' "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$T4" "$T6" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$RECOVERED" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$SHAREV" "$KILLV" "$LOG" "$CHECKLOG"
 }
 
 case "${1:-status}" in
