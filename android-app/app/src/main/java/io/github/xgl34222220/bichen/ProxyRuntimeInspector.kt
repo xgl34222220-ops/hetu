@@ -95,6 +95,9 @@ internal class ProxyRuntimeInspector(context: Context) {
             prefs.getString("proxyLastAutoStopReason", "")?.takeIf { it.isNotBlank() }?.let {
                 append("\n--- last-auto-stop ---\n").append(it)
             }
+            if (prefs.getBoolean("proxyRootRuntimeRefreshPending", false)) {
+                append("\n--- runtime-refresh ---\nAPK 已更新；当前 Root 运行环境保持不动，下一次主动重启代理时应用新规则")
+            }
         }
         val combined = (text + appEvents).trim()
         if (combined.isBlank()) "暂无运行日志" else combined.takeLast(24_000)
