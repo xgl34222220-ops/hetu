@@ -152,6 +152,9 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
     var fallbackEnabled by remember(revision) {
         mutableStateOf(prefs.getBoolean("proxyAdblockFallbackEnabled", prefs.getBoolean("vpnWanted", false)))
     }
+    var cnameProtection by remember(revision) {
+        mutableStateOf(prefs.getBoolean("cnameProtection", true))
+    }
     val vpnPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK && prefs.getBoolean("proxyAdblockFallbackEnabled", false)) {
             adController.startVpn()
@@ -536,6 +539,32 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                         Switch(checked = fallbackEnabled, onCheckedChange = { applyFallback(it) }, enabled = !busy)
                     }
                     Text("类似 AdGuard Home 的 DNS 层过滤思路：域名后缀规则 + 白名单优先；Root 代理运行时由 Mihomo 规则链接管，代理停止后由本地 DNS 过滤继续。", color = t.textSecondary, fontSize = 10.sp, lineHeight = 15.sp)
+                }
+            }
+        }
+
+        item("cname-protection") {
+            Surface(shape = RoundedCornerShape(20.dp), color = if (dark) t.elevatedCardBackground else Color.White, shadowElevation = if (dark) 0.dp else 1.dp) {
+                Row(Modifier.fillMaxWidth().padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier.size(40.dp).background(MaterialTheme.colorScheme.primary.copy(alpha = .09f), RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Rounded.AccountTree, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                    }
+                    Spacer(Modifier.width(11.dp))
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text("CNAME 别名链保护", color = t.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                        Text("独立 DNS 模式会继续检查别名最终目标，防止广告/跟踪域名通过 CNAME 绕过。", color = t.textSecondary, fontSize = 10.sp, lineHeight = 14.sp)
+                    }
+                    Switch(
+                        checked = cnameProtection,
+                        onCheckedChange = {
+                            cnameProtection = it
+                            prefs.edit().putBoolean("cnameProtection", it).apply()
+                            notice = if (it) "CNAME 别名链保护已开启" else "CNAME 别名链保护已关闭"
+                        },
+                    )
                 }
             }
         }
