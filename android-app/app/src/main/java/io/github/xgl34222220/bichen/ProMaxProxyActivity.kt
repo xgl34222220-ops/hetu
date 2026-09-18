@@ -238,7 +238,6 @@ private fun ProMaxProxyShell(onBack: () -> Unit) {
                     onReload = ::reloadConfig,
                     onRestart = ::restart,
                     onShowLog = ::showLog,
-                    onWebUi = { context.startActivity(Intent(context, ProxyWebUiActivity::class.java)) },
                 )
                 ProPage.Panel -> ProPanel(
                     state = state,
@@ -283,7 +282,6 @@ private fun ProHome(
     onReload: () -> Unit,
     onRestart: () -> Unit,
     onShowLog: () -> Unit,
-    onWebUi: () -> Unit,
 ) {
     val t = LocalBichenTokens.current
     val values = delays.values.filter { it > 0 }
@@ -332,7 +330,6 @@ private fun ProHome(
                             ProTextAction("重启核心", Icons.Rounded.RestartAlt, onRestart, Modifier.weight(1f))
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            ProTextAction("WebUI", Icons.Rounded.Language, onWebUi, Modifier.weight(1f))
                             ProTextAction("运行日志", Icons.Rounded.Article, onShowLog, Modifier.weight(1f))
                         }
                     }
@@ -865,8 +862,6 @@ private fun ProTools(state: ProxyComposeState) {
                 FlatActionRow(Icons.Rounded.Memory, "内核管理", "${state.core} · 在线更新", { context.startActivity(Intent(context, ProxyCoreActivity::class.java)) }, insideList = true)
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .45f))
                 FlatActionRow(Icons.Rounded.CloudDownload, "订阅与配置", state.config, { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) }, insideList = true)
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .45f))
-                FlatActionRow(Icons.Rounded.Language, "WebUI", "MetaCubeXD · 本机安全控制面板", { context.startActivity(Intent(context, ProxyWebUiActivity::class.java)) }, insideList = true)
             }
         }
     }
