@@ -18,7 +18,7 @@ public final class BootReceiver extends BroadcastReceiver {
             new Thread(() -> {
                 RootProxyManager root = new RootProxyManager(context.getApplicationContext());
                 try {
-                    root.stop();
+                    try { root.stop(); } catch (Exception ignored) { }
                     Thread.sleep(180L);
                     root.start(ProxyRuntimeProfile.load(prefs));
                     prefs.edit()
