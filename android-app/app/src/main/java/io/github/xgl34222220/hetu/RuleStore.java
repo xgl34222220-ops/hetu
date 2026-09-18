@@ -516,9 +516,9 @@ public final class RuleStore {
         if(effective==null) {
             effective=new HashSet<>(block);
             for(String id:catalog.keySet()) if(Boolean.TRUE.equals(enabled.get(id))) effective.addAll(sources.get(id));
-            effective.removeAll(allow);
+            effective.removeIf(domain->suffixMatch(allow,domain));
         }
-        if(effective.size()>MAX_DOMAINS) throw new IOException("合并后规则超过 500000 条");
+        if(effective.size()>MAX_DOMAINS) throw new IOException("合并后规则超过 "+MAX_DOMAINS+" 条");
         return new Snapshot("",revision,fromModule,effective,allow,block,enabled,sources,System.currentTimeMillis());
     }
     private void commit(Snapshot candidate) throws Exception {
@@ -571,9 +571,7 @@ public final class RuleStore {
         Map<String,Set<String>> sources=new LinkedHashMap<>();
         for(String source:catalog.keySet()) {
             File stored=new File(dir,"source-"+source);
-            // v0.2 snapshots have the original three sources. A newly introduced
-            // optional source stays disabled until the user explicitly enables it.
-            try(InputStream in=stored.isFile()||!source.equals("hagezi")?new FileInputStream(stored):context.getAssets().open("rules/"+source+".txt")) {
+            try(InputStream in=stored.isFile()?new FileInputStream(stored):context.getAssets().open("rules/"+source+".txt")) {
                 sources.put(source,parseRules(in,false));
             }
         }
@@ -605,8 +603,9 @@ public final class RuleStore {
             if(!catalog.containsKey(id) || result.containsKey(id) || !(item.get("enabled") instanceof Boolean)) throw new IOException("订阅配置无效");
             result.put(id,item.getBoolean("enabled"));
         }
-        if(complete && catalog.containsKey("hagezi")&&!result.containsKey("hagezi"))result.put("hagezi",false);
-        if(complete && result.size()!=catalog.size()) throw new IOException("订阅配置不完整");
+        if(complete){
+            for(Source source:catalog.values()) if(!result.containsKey(source.id)) result.put(source.id,source.defaultOn);
+        }
         return result;
     }
     private static Set<String> domainArray(JSONArray list) throws Exception {
