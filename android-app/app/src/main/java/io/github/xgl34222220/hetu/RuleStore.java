@@ -108,7 +108,7 @@ public final class RuleStore {
         }
     }
     private void migrateDnsFilterDefaultsIfNeeded() throws Exception {
-        if(prefs.getBoolean("dns_filter_v3_migrated",false)||live==null)return;
+        if(prefs.getBoolean("dns_filter_v4_adguard_migrated",false)||live==null)return;
         Map<String,Boolean> flags=new LinkedHashMap<>(live.enabled);
         if(catalog.containsKey("adguard"))flags.put("adguard",true);
         if(catalog.containsKey("hagezi"))flags.put("hagezi",false);
@@ -119,7 +119,7 @@ public final class RuleStore {
             Snapshot current=live;
             commit(compose("",false,current.allow,current.block,flags,current.sourceRules,null));
         }
-        prefs.edit().putBoolean("dns_filter_v3_migrated",true).apply();
+        prefs.edit().putBoolean("dns_filter_v4_adguard_migrated",true).apply();
     }
     /** Domain list and revision are captured from the same immutable generation. */
     static final class EffectiveRules {
