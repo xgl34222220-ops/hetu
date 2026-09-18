@@ -122,7 +122,7 @@ class ReferenceProxyActivity : ComponentActivity() {
 private enum class RefProxyPage { Home, Panel, Tools, Settings }
 private data class RefSubscriptionCache(val used: Long = 0L, val total: Long = 0L, val count: Int = 0)
 private enum class RefPanelTab(val label: String) {
-    Overview("节点"), Nodes("概览"), Subscriptions("订阅"), Connections("连接"), Rules("规则"), RuleSets("规则集")
+    Groups("节点"), Overview("概览"), Subscriptions("订阅"), Connections("连接"), Rules("规则"), RuleSets("规则集")
 }
 
 @Composable
@@ -143,7 +143,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
     }
 
     var page by rememberSaveable { mutableStateOf(RefProxyPage.Home) }
-    var panelTab by rememberSaveable { mutableStateOf(RefPanelTab.Overview) }
+    var panelTab by rememberSaveable { mutableStateOf(RefPanelTab.Groups) }
     var panelSearchRequest by rememberSaveable { mutableIntStateOf(0) }
     var panelDetailVisible by rememberSaveable { mutableStateOf(false) }
     var state by remember {
@@ -1304,8 +1304,8 @@ private fun RefPanel(
             error = ""
             try {
                 when (tab) {
-                    RefPanelTab.Overview -> delays.putAll(repo.globalDelay())
-                    RefPanelTab.Nodes -> onRefreshState()
+                    RefPanelTab.Groups -> delays.putAll(repo.globalDelay())
+                    RefPanelTab.Overview -> onRefreshState()
                     RefPanelTab.Subscriptions -> providers = repo.refreshSubscriptions()
                     RefPanelTab.RuleSets -> ruleSets = repo.refreshRuleSets()
                     RefPanelTab.Rules -> rules = repo.rules()
@@ -1325,7 +1325,7 @@ private fun RefPanel(
     LaunchedEffect(searchRequest) { if (searchRequest > 0) searchOpen = true }
 
     LaunchedEffect(tab) {
-        if (tab != RefPanelTab.Overview) selectedGroupName = null
+        if (tab != RefPanelTab.Groups) selectedGroupName = null
         onDetailVisibleChanged(false)
     }
 
@@ -1367,7 +1367,7 @@ private fun RefPanel(
             if (!state.running) {
                 item { RefNotice("代理未运行") }
             } else when (tab) {
-                RefPanelTab.Overview -> {
+                RefPanelTab.Groups -> {
                     itemsIndexed(filteredGroups.chunked(2), key = { index, _ -> "${tab.name}-groups-$index" }, contentType = { _, _ -> "group-row" }) { _, pair ->
                         val expandedGroup = pair.firstOrNull { it.name == selectedGroupName }
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1472,7 +1472,7 @@ private fun RefPanel(
                         }
                     }
                 }
-                RefPanelTab.Nodes -> item(key = "${tab.name}-traffic-overview", contentType = "traffic-overview") { RefTrafficOverview(state) }
+                RefPanelTab.Overview -> item(key = "${tab.name}-traffic-overview", contentType = "traffic-overview") { RefTrafficOverview(state) }
                 RefPanelTab.Subscriptions -> items(providers, key = { "${tab.name}-provider-${it.name}" }, contentType = { "subscription-provider" }) { item ->
                     RefProviderRow(
                         item = item,
