@@ -14,7 +14,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import javax.net.ssl.HttpsURLConnection;
 
-/** Exact-domain rules. DNS readers only see a complete, immutable snapshot. */
+/** DNS suffix filter rules. Readers only see a complete, immutable snapshot. */
 public final class RuleStore {
     private static final Object LOCK = new Object();
     private static final RuleUpdateGate UPDATE_GATE = new RuleUpdateGate();
@@ -85,7 +85,11 @@ public final class RuleStore {
     /** Fast local load; this never opens su or the network. */
     public void reload() throws Exception {
         synchronized (LOCK) {
-            if (live!=null && root.getAbsolutePath().equals(liveRoot)) { recoverImportedPreferences();return; }
+            if (live!=null && root.getAbsolutePath().equals(liveRoot)) {
+                recoverImportedPreferences();
+                migrateDnsFilterDefaultsIfNeeded();
+                return;
+            }
             ensureRoot();
             JSONObject pointer=readPointer();
             if (pointer!=null) {
@@ -100,7 +104,21 @@ public final class RuleStore {
                 Map<String,Set<String>> sources=readBuiltins();
                 commit(compose("",false,allow,block,enabled,sources,null));
             }
+            migrateDnsFilterDefaultsIfNeeded();
         }
+    }
+    private void migrateDnsFilterDefaultsIfNeeded() throws Exception {
+        if(prefs.getBoolean("dns_filter_v3_migrated",false)||live==null)return;
+        Map<String,Boolean> flags=new LinkedHashMap<>(live.enabled);
+        if(catalog.containsKey("hagezi"))flags.put("hagezi",true);
+        if(catalog.containsKey("china"))flags.put("china",true);
+        if(catalog.containsKey("adaway"))flags.put("adaway",false);
+        if(catalog.containsKey("tracking"))flags.put("tracking",false);
+        if(!flags.equals(live.enabled)){
+            Snapshot current=live;
+            commit(compose("",false,current.allow,current.block,flags,current.sourceRules,null));
+        }
+        prefs.edit().putBoolean("dns_filter_v3_migrated",true).apply();
     }
     /** Domain list and revision are captured from the same immutable generation. */
     static final class EffectiveRules {
@@ -131,7 +149,19 @@ public final class RuleStore {
     }
     public boolean isBlocked(String domain) {
         String normalized=normalize(domain); Snapshot s=live;
-        return normalized!=null && s!=null && s.effective.contains(normalized);
+        if(normalized==null||s==null)return false;
+        if(suffixMatch(s.allow,normalized))return false;
+        return suffixMatch(s.effective,normalized);
+    }
+    private static boolean suffixMatch(Set<String> rules,String domain){
+        if(rules==null||rules.isEmpty()||domain==null||domain.isEmpty())return false;
+        String current=domain;
+        while(true){
+            if(rules.contains(current))return true;
+            int dot=current.indexOf('.');
+            if(dot<0||dot+1>=current.length())return false;
+            current=current.substring(dot+1);
+        }
     }
     public List<String> userList(boolean allow) {
         Snapshot s=live; List<String> result=new ArrayList<>();
@@ -154,13 +184,13 @@ public final class RuleStore {
     public String describe(String input) {
         String d=normalize(input); if(d==null) return "请输入有效的域名或 HTTP(S) 网址";
         Snapshot s=live; if(s==null) return d+"：规则尚未加载";
-        String suffix="\n精确域名匹配；不会自动包含子域名。此处显示规则命中，不代表所有应用的实际流量。";
+        String suffix="\nDNS 后缀匹配：一条域名规则会覆盖该域名及其子域；白名单优先。此处显示规则命中，不代表所有应用的实际流量。";
         if(prefs.getBoolean("rules_need_module_sync",false)) suffix="\n注意：模块变更尚未同步，以下是应用保留的上一份完整快照。"+suffix;
-        if(s.allow.contains(d)) return d+"：白名单放行（优先于黑名单与订阅）"+suffix;
-        if(s.block.contains(d)) return d+"：命中自定义黑名单"+suffix;
-        if(s.fromModule) return d+(s.effective.contains(d)?"：命中已同步的模块有效规则；此快照未导出订阅归属，无法确定具体来源":"：未命中已同步的模块有效规则")+suffix;
+        if(suffixMatch(s.allow,d)) return d+"：白名单放行（优先于黑名单与订阅）"+suffix;
+        if(suffixMatch(s.block,d)) return d+"：命中自定义黑名单"+suffix;
+        if(s.fromModule) return d+(suffixMatch(s.effective,d)?"：命中已同步的有效规则":"：未命中已同步的有效规则")+suffix;
         List<String> active=new ArrayList<>(), inactive=new ArrayList<>();
-        for(Source source:catalog.values()) if(s.sourceRules.get(source.id).contains(d)) {
+        for(Source source:catalog.values()) if(suffixMatch(s.sourceRules.get(source.id),d)) {
             (Boolean.TRUE.equals(s.enabled.get(source.id))?active:inactive).add(source.name);
         }
         if(!active.isEmpty()) return d+"：命中 "+join(active)+suffix;
