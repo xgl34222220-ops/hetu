@@ -32,7 +32,7 @@ final class ProxyAdblockRules {
         ArrayList<String> allow=new ArrayList<>(rules.effectiveAllowDomains());
         Collections.sort(domains);
         Collections.sort(allow);
-        if(domains.size()>750000)throw new IOException("广告规则超过安全上限");
+        if(domains.size()>1500000)throw new IOException("广告规则超过 150 万条安全上限");
 
         File dir=new File(context.getCacheDir(),"hetu-dns-filter");
         if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("无法创建河图 DNS 过滤规则目录");
