@@ -88,9 +88,6 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
     var fallbackEnabled by remember(revision) {
         mutableStateOf(prefs.getBoolean("proxyAdblockFallbackEnabled", prefs.getBoolean("vpnWanted", false)))
     }
-    var fallbackMode by remember(revision) {
-        mutableStateOf((prefs.getString("proxyAdblockFallbackMode", adController.protectionMode()) ?: "vpn").let { if (it == "module") "module" else "vpn" })
-    }
     val vpnPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK && prefs.getBoolean("proxyAdblockFallbackEnabled", false)) {
             adController.startVpn()
@@ -143,22 +140,21 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
             effective = effective,
             lastError = lastError,
             vpnFallbackRunning = independent?.vpnRunning == true,
-            hostsFallbackRunning = independent?.moduleEnabled == true,
+            hostsFallbackRunning = false,
             message = listOfNotNull(state?.message?.takeIf { it.isNotBlank() }, rulesResult.exceptionOrNull()?.message).joinToString("；"),
         )
     }
 
-    fun applyFallback(enabled: Boolean, mode: String) {
+    fun applyFallback(enabled: Boolean) {
         if (busy) return
         prefs.edit()
             .putBoolean("proxyAdblockFallbackEnabled", enabled)
-            .putString("proxyAdblockFallbackMode", mode)
-            .putBoolean("autoStartVpn", enabled && mode == "vpn")
+            .putString("proxyAdblockFallbackMode", "vpn")
+            .putBoolean("autoStartVpn", enabled)
             .apply()
         fallbackEnabled = enabled
-        fallbackMode = mode
         if (snapshot.running) {
-            notice = if (enabled) "已保存；Root 代理停止后自动恢复${if (mode == "vpn") "独立 DNS 去广告" else "Root hosts 去广告"}" else "已关闭代理停止后的独立去广告"
+            notice = if (enabled) "已保存；Root 代理停止后自动恢复独立 DNS 过滤" else "已关闭代理停止后的独立 DNS 过滤"
             revision++
             return
         }
@@ -167,10 +163,8 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
             try {
                 if (!enabled) {
                     if (snapshot.vpnFallbackRunning || prefs.getBoolean("vpnWanted", false)) adController.stopVpn()
-                    if (snapshot.hostsFallbackRunning) adController.toggleModuleProtection(true)
-                    notice = "独立去广告已关闭"
-                } else if (mode == "vpn") {
-                    if (snapshot.hostsFallbackRunning) adController.toggleModuleProtection(true)
+                    notice = "独立 DNS 过滤已关闭"
+                } else {
                     val prepare = adController.prepareVpn()
                     if (prepare != null) {
                         busy = false
@@ -178,16 +172,12 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                         return@launch
                     }
                     adController.startVpn()
-                    notice = "独立 DNS 去广告已启用；代理启动时会自动暂停"
-                } else {
-                    if (snapshot.vpnFallbackRunning || prefs.getBoolean("vpnWanted", false)) adController.stopVpn()
-                    if (!snapshot.hostsFallbackRunning) adController.toggleModuleProtection(false)
-                    notice = "Root hosts 去广告已启用；代理启动时会自动暂停"
+                    notice = "独立 DNS 过滤已启用；Root 代理启动时自动暂停"
                 }
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                notice = error.message ?: "独立去广告切换失败"
+                notice = error.message ?: "独立 DNS 过滤切换失败"
                 prefs.edit().putBoolean("proxyAdblockFallbackEnabled", false).apply()
                 fallbackEnabled = false
             } finally {
@@ -384,7 +374,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                             )
                         }
                     }
-                    Text("轻量：国内纯广告；均衡：AdAway + 国内规则 + HaGeZi Light；加强：再加入隐私/追踪增强。旧均衡只有约 7k 规则，重新点“均衡”即可升级。用户黑白名单始终保留。", color = t.textSecondary, fontSize = 10.sp, lineHeight = 15.sp)
+                    Text("轻量：国内纯广告；均衡：HaGeZi Normal + 国内规则；加强：再加入隐私/追踪增强。HaGeZi 作为主 DNS 规则库，不再叠加重复主列表。用户黑白名单始终保留。", color = t.textSecondary, fontSize = 10.sp, lineHeight = 15.sp)
                 }
             }
         }
@@ -401,47 +391,25 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
 
         item("fallback") {
             Surface(shape = RoundedCornerShape(22.dp), color = if (dark) t.elevatedCardBackground else Color.White, shadowElevation = if (dark) 0.dp else 1.dp) {
-                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(42.dp).background(MaterialTheme.colorScheme.secondary.copy(alpha = .10f), RoundedCornerShape(13.dp)), contentAlignment = Alignment.Center) {
                             Icon(Icons.Rounded.Dns, null, tint = MaterialTheme.colorScheme.secondary)
                         }
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
-                            Text("代理关闭后的独立去广告", color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                            Text("独立 DNS 过滤", color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                             val fallbackState = when {
-                                snapshot.running && fallbackEnabled -> "代理运行中 · 独立模式已暂停"
+                                snapshot.running && fallbackEnabled -> "Root 代理运行中 · 独立 DNS 自动暂停"
                                 !fallbackEnabled -> "关闭"
-                                fallbackMode == "vpn" && snapshot.vpnFallbackRunning -> "DNS VPN 正在运行"
-                                fallbackMode == "module" && snapshot.hostsFallbackRunning -> "Root hosts 正在运行"
+                                snapshot.vpnFallbackRunning -> "DNS 过滤正在运行"
                                 else -> "已启用 · 等待恢复"
                             }
                             Text(fallbackState, color = t.textSecondary, fontSize = 11.sp)
                         }
-                        Switch(checked = fallbackEnabled, onCheckedChange = { applyFallback(it, fallbackMode) }, enabled = !busy)
+                        Switch(checked = fallbackEnabled, onCheckedChange = { applyFallback(it) }, enabled = !busy)
                     }
-                    if (fallbackEnabled) {
-                        HorizontalDivider(color = if (dark) t.outline else Color(0xFFF1F5F9))
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            FilterChip(
-                                selected = fallbackMode == "vpn",
-                                onClick = { if (fallbackMode != "vpn") applyFallback(true, "vpn") },
-                                label = { Text("DNS VPN") },
-                                leadingIcon = { Icon(Icons.Rounded.Dns, null, Modifier.size(16.dp)) },
-                                modifier = Modifier.weight(1f),
-                                enabled = !busy,
-                            )
-                            FilterChip(
-                                selected = fallbackMode == "module",
-                                onClick = { if (fallbackMode != "module") applyFallback(true, "module") },
-                                label = { Text("Root hosts") },
-                                leadingIcon = { Icon(Icons.Rounded.AdminPanelSettings, null, Modifier.size(16.dp)) },
-                                modifier = Modifier.weight(1f),
-                                enabled = !busy,
-                            )
-                        }
-                        Text("只在代理停止时运行；启动 Root 代理会自动暂停，停止代理后按这里的选择恢复。", color = t.textSecondary, fontSize = 10.sp, lineHeight = 15.sp)
-                    }
+                    Text("类似 AdGuard Home 的 DNS 层过滤思路：域名后缀规则 + 白名单优先；Root 代理运行时由 Mihomo 规则链接管，代理停止后由本地 DNS 过滤继续。", color = t.textSecondary, fontSize = 10.sp, lineHeight = 15.sp)
                 }
             }
         }
