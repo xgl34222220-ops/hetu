@@ -75,6 +75,7 @@ internal data class ProxyRuleProviderUi(
 )
 
 internal data class ProxySubscriptionUi(val name: String, val url: String, val placeholder: Boolean)
+internal data class ProxyConfigUi(val name: String, val selected: Boolean, val bundled: Boolean)
 
 internal data class ProxyComposeState(
     val running: Boolean = false,
@@ -333,8 +334,26 @@ internal class ProxyComposeController(context: Context) {
         return configs.list(profile.core).map { it.name }
     }
 
+    suspend fun configLibrary(): List<ProxyConfigUi> = withContext(Dispatchers.IO) {
+        val profile = ProxyRuntimeProfile.load(prefs)
+        val selected = configs.selected(profile.core)?.name
+        configs.list(profile.core).map {
+            ProxyConfigUi(
+                name = it.name,
+                selected = it.name == selected,
+                bundled = it.name == ProxyConfigLibrary.BUNDLED_NAME,
+            )
+        }
+    }
+
     suspend fun selectConfig(name: String) = withContext(Dispatchers.IO) {
         configs.select(ProxyRuntimeProfile.load(prefs).core, name)
+    }
+
+    suspend fun deleteConfig(name: String) = withContext(Dispatchers.IO) {
+        val profile = ProxyRuntimeProfile.load(prefs)
+        val entry = configs.list(profile.core).firstOrNull { it.name == name } ?: error("配置不存在")
+        configs.delete(entry)
     }
 
     suspend fun configOverview(): Pair<String, List<ProxySubscriptionUi>> = withContext(Dispatchers.IO) {
@@ -346,9 +365,9 @@ internal class ProxyComposeController(context: Context) {
         name to items
     }
 
-    suspend fun importConfig(uri: Uri, displayName: String) = withContext(Dispatchers.IO) {
+    suspend fun importConfig(uri: Uri, displayName: String): String = withContext(Dispatchers.IO) {
         val input = app.contentResolver.openInputStream(uri) ?: error("无法读取配置文件")
-        configs.importConfig(ProxyRuntimeProfile.load(prefs).core, displayName, input)
+        configs.importConfig(ProxyRuntimeProfile.load(prefs).core, displayName, input).name
     }
 
     suspend fun subscriptions(): List<ProxySubscriptionUi> = withContext(Dispatchers.IO) {
