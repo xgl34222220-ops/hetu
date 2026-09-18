@@ -167,8 +167,8 @@ final class RootProxyManager {
             String warning="";
             boolean providerReloaded=false;
             try{
-                controller.updateRuleProvider(ProxyAdblockRules.ALLOW_PROVIDER_NAME);
-                controller.updateRuleProvider(ProxyAdblockRules.PROVIDER_NAME);
+                controller.reloadLocalRuleProvider(ProxyAdblockRules.ALLOW_PROVIDER_NAME);
+                controller.reloadLocalRuleProvider(ProxyAdblockRules.PROVIDER_NAME);
                 providerReloaded=true;
             }catch(Exception providerError){
                 try{
