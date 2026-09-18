@@ -29,7 +29,7 @@ final class ProxyAdblockRules {
         RuleStore rules=new RuleStore(context.getApplicationContext());
         rules.reload();
         ArrayList<String> domains=new ArrayList<>(rules.effectiveDomains());
-        ArrayList<String> allow=new ArrayList<>(rules.userList(true));
+        ArrayList<String> allow=new ArrayList<>(rules.effectiveAllowDomains());
         Collections.sort(domains);
         Collections.sort(allow);
         if(domains.size()>750000)throw new IOException("广告规则超过安全上限");
