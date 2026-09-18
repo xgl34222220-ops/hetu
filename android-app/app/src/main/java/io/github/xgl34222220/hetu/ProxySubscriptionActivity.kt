@@ -203,7 +203,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
     ) {
         LazyColumn(
             Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 36.dp),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 92.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             item("header") {
