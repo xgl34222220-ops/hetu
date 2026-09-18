@@ -555,21 +555,100 @@ start(){
 }
 
 status(){
-  root; STATUS_RUNNING=false; STATUS_PID=0
-  if [ -f "$PIDFILE" ]; then X=$(cat "$PIDFILE" 2>/dev/null || true); case "$X" in ''|*[!0-9]*) ;; *) if pidcore "$X" && kill -0 "$X" >/dev/null 2>&1; then STATUS_RUNNING=true; STATUS_PID="$X"; fi;; esac; fi
-  if [ "$STATUS_RUNNING" = false ]; then RECOVER_PID=$(findcorepid 2>/dev/null || true); case "$RECOVER_PID" in ''|*[!0-9]*) ;; *) STATUS_RUNNING=true; STATUS_PID="$RECOVER_PID"; printf '%s\n' "$RECOVER_PID" > "$PIDFILE" 2>/dev/null || true;; esac; fi
-  STATUS_MODE=$(cat "$MODEFILE" 2>/dev/null || echo none); T4=false; T6=false; K4=false; K6=false
-  for SPEC in "mangle OUTPUT $MOUT" "nat OUTPUT $NOUT" "nat OUTPUT $DNSOUT" "filter OUTPUT $QUICOUT"; do set -- $SPEC; xt4q -t "$1" -C "$2" -j "$3" >/dev/null 2>&1 && T4=true; done; xt4q -t filter -C OUTPUT -j "$KOUT" >/dev/null 2>&1 && K4=true
-  if has ip6tables; then for SPEC in "mangle OUTPUT $MOUT" "nat OUTPUT $NOUT" "nat OUTPUT $DNSOUT" "filter OUTPUT $QUICOUT" "filter OUTPUT $V6OUT"; do set -- $SPEC; xt6q -t "$1" -C "$2" -j "$3" >/dev/null 2>&1 && T6=true; done; xt6q -t filter -C OUTPUT -j "$KOUT" >/dev/null 2>&1 && K6=true; fi
-  V6OFF=false; [ -f "$IPV6_STATE" ] && V6OFF=true; RECOVERED=false; STALE=false
-  if [ "$STATUS_RUNNING" = false ] && { [ "$T4" = true ] || [ "$T6" = true ] || [ "$K4" = true ] || [ "$K6" = true ] || [ "$V6OFF" = true ]; }; then STALE=true; fi
-  WD=false; W=$(cat "$WATCHDOG_PID" 2>/dev/null || true); case "$W" in ''|*[!0-9]*) ;; *) kill -0 "$W" >/dev/null 2>&1 && WD=true;; esac
+  root
+  STATUS_RUNNING=false; STATUS_PID=0
+  if [ -f "$PIDFILE" ]; then
+    X=$(cat "$PIDFILE" 2>/dev/null || true)
+    case "$X" in ''|*[!0-9]*) ;; *) if pidcore "$X" && kill -0 "$X" >/dev/null 2>&1; then STATUS_RUNNING=true; STATUS_PID="$X"; fi;; esac
+  fi
+  if [ "$STATUS_RUNNING" = false ]; then
+    RECOVER_PID=$(findcorepid 2>/dev/null || true)
+    case "$RECOVER_PID" in ''|*[!0-9]*) ;; *) STATUS_RUNNING=true; STATUS_PID="$RECOVER_PID"; printf '%s\n' "$RECOVER_PID" > "$PIDFILE" 2>/dev/null || true;; esac
+  fi
+
+  STATUS_MODE=$(cat "$MODEFILE" 2>/dev/null || echo none)
+  SCOPEV=$(sed -n 's/^APP_SCOPE=//p' "$SESSION" 2>/dev/null | head -n 1)
+  DIRECTV=$(sed -n 's/^DIRECT_UIDS=//p' "$SESSION" 2>/dev/null | head -n 1)
+  SHAREV=$(sed -n 's/^SHARE=//p' "$SESSION" 2>/dev/null | head -n 1)
+  KILLV=$(sed -n 's/^KILL=//p' "$SESSION" 2>/dev/null | head -n 1)
+  DNSV=$(sed -n 's/^DNS=//p' "$SESSION" 2>/dev/null | head -n 1); [ -n "$DNSV" ] || DNSV=off
+  IPV6V=$(sed -n 's/^IPV6=//p' "$SESSION" 2>/dev/null | head -n 1); [ -n "$IPV6V" ] || IPV6V=enable
+  CPV=$(sed -n 's/^CONTROLLER_PORT=//p' "$SESSION" 2>/dev/null | head -n 1)
+  case "$CPV" in ''|*[!0-9]*) CPV=0;; esac
+  if [ "$CPV" = 0 ]; then
+    CPV=$(sed -n 's/^[[:space:]]*external-controller:[[:space:]]*127\.0\.0\.1:\([0-9][0-9]*\)[[:space:]]*$/\1/p' "$RUN/state/startup-config" 2>/dev/null | tail -n 1)
+    case "$CPV" in ''|*[!0-9]*) CPV=0;; esac
+  fi
+
+  M4O=false; M4P=false; N4O=false; N4P=false; D4O=false; D4P=false
+  M6O=false; M6P=false; N6O=false; N6P=false; D6O=false; D6P=false
+  xt4q -t mangle -C OUTPUT -j "$MOUT" >/dev/null 2>&1 && M4O=true
+  xt4q -t mangle -C PREROUTING -j "$MPRE" >/dev/null 2>&1 && M4P=true
+  xt4q -t nat -C OUTPUT -j "$NOUT" >/dev/null 2>&1 && N4O=true
+  xt4q -t nat -C PREROUTING -j "$NPRE" >/dev/null 2>&1 && N4P=true
+  xt4q -t nat -C OUTPUT -j "$DNSOUT" >/dev/null 2>&1 && D4O=true
+  xt4q -t nat -C PREROUTING -j "$DNSPRE" >/dev/null 2>&1 && D4P=true
+  K4=false; xt4q -t filter -C OUTPUT -j "$KOUT" >/dev/null 2>&1 && K4=true
+
+  if has ip6tables; then
+    xt6q -t mangle -C OUTPUT -j "$MOUT" >/dev/null 2>&1 && M6O=true
+    xt6q -t mangle -C PREROUTING -j "$MPRE" >/dev/null 2>&1 && M6P=true
+    xt6q -t nat -C OUTPUT -j "$NOUT" >/dev/null 2>&1 && N6O=true
+    xt6q -t nat -C PREROUTING -j "$NPRE" >/dev/null 2>&1 && N6P=true
+    xt6q -t nat -C OUTPUT -j "$DNSOUT" >/dev/null 2>&1 && D6O=true
+    xt6q -t nat -C PREROUTING -j "$DNSPRE" >/dev/null 2>&1 && D6P=true
+  fi
+  K6=false; has ip6tables && xt6q -t filter -C OUTPUT -j "$KOUT" >/dev/null 2>&1 && K6=true
+
+  MODE4=false; MODE6=false
+  case "$STATUS_MODE" in
+    tproxy|enhance) [ "$M4O" = true ] && MODE4=true; [ "$M6O" = true ] && MODE6=true;;
+    redirect) [ "$N4O" = true ] && MODE4=true; [ "$N6O" = true ] && MODE6=true;;
+    tun|ebpf) MODE4=true; MODE6=true;;
+  esac
+  if [ "$SHAREV" = 1 ]; then
+    case "$STATUS_MODE" in
+      tproxy|enhance) [ "$M4P" = true ] || MODE4=false;;
+      redirect) [ "$N4P" = true ] || MODE4=false;;
+    esac
+  fi
+
+  DNS4=true; DNS6=true; DNSREADY=true
+  if [ "$DNSV" != off ]; then
+    DNS4=$D4O
+    [ "$SHAREV" != 1 ] || [ "$D4P" = true ] || DNS4=false
+    DNS6=$D6O
+    [ "$SHAREV" != 1 ] || [ "$D6P" = true ] || DNS6=false
+    DNSREADY=false
+    if has ss; then
+      ss -lnut 2>/dev/null | grep -Eq '(:|])1053[[:space:]]' && DNSREADY=true
+    elif has netstat; then
+      netstat -lnut 2>/dev/null | grep -Eq '(:|])1053[[:space:]]' && DNSREADY=true
+    else
+      DNSREADY=true
+    fi
+  fi
+
+  IPV4OK=$MODE4
+  IPV6OK=true
+  case "$IPV6V" in
+    enable) if v6active; then IPV6OK=$MODE6; fi;;
+    strict) [ "$K6" = true ] || IPV6OK=false;;
+    bypass|disable) IPV6OK=true;;
+  esac
+
+  WD=false
+  W=$(cat "$WATCHDOG_PID" 2>/dev/null || true)
+  case "$W" in ''|*[!0-9]*) ;; *) kill -0 "$W" >/dev/null 2>&1 && WD=true;; esac
+  V6OFF=false; [ -f "$IPV6_STATE" ] && V6OFF=true
+  STALE=false
+  if [ "$STATUS_RUNNING" = false ] && { [ "$M4O" = true ] || [ "$N4O" = true ] || [ "$D4O" = true ] || [ "$M6O" = true ] || [ "$N6O" = true ] || [ "$D6O" = true ] || [ "$K4" = true ] || [ "$K6" = true ] || [ "$V6OFF" = true ]; }; then STALE=true; fi
+
+  HEALTH=false
+  if [ "$STATUS_RUNNING" = true ] && [ "$IPV4OK" = true ] && [ "$IPV6OK" = true ] && [ "$DNS4" = true ] && [ "$DNS6" = true ] && [ "$DNSREADY" = true ] && [ "$WD" = true ]; then HEALTH=true; fi
   SM=""; ST=""; if loadnet >/dev/null 2>&1; then SM="$MARK"; ST="$TABLE"; fi
-  SCOPEV=$(sed -n 's/^APP_SCOPE=//p' "$SESSION" 2>/dev/null | head -n 1); DIRECTV=$(sed -n 's/^DIRECT_UIDS=//p' "$SESSION" 2>/dev/null | head -n 1); SHAREV=$(sed -n 's/^SHARE=//p' "$SESSION" 2>/dev/null | head -n 1); KILLV=$(sed -n 's/^KILL=//p' "$SESSION" 2>/dev/null | head -n 1)
-  CPV=$(sed -n 's/^CONTROLLER_PORT=//p' "$SESSION" 2>/dev/null | head -n 1); case "$CPV" in ''|*[!0-9]*) CPV=0;; esac
-  if [ "$CPV" = 0 ]; then CPV=$(sed -n 's/^[[:space:]]*external-controller:[[:space:]]*127\.0\.0\.1:\([0-9][0-9]*\)[[:space:]]*$/\1/p' "$RUN/state/startup-config" 2>/dev/null | tail -n 1); case "$CPV" in ''|*[!0-9]*) CPV=0;; esac; fi
   SP=$(state_value PREF 2>/dev/null || true)
-  printf '{"ok":true,"running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":%s,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","log":"%s","configCheckLog":"%s"}\n' "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$T4" "$T6" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$RECOVERED" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$SHAREV" "$KILLV" "$LOG" "$CHECKLOG"
+  printf '{"ok":true,"runtimeSchema":3,"running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"dnsMode":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":false,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","log":"%s","configCheckLog":"%s"}\n' "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$DNSV" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$SHAREV" "$KILLV" "$LOG" "$CHECKLOG"
 }
 
 case "${1:-status}" in
