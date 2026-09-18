@@ -111,7 +111,7 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(pageBg),
-        contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 40.dp),
+        contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 92.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item("header") {
