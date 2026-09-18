@@ -392,7 +392,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         ChainMetric("有效规则", snapshot.rules.count.toString(), Modifier.weight(1f))
                         ChainMetric("规则源", snapshot.rules.sources.count { it.enabled }.toString(), Modifier.weight(1f))
-                        ChainMetric("本次拦截", if (!snapshot.running) "—" else if (displayedHitCount > 0L) displayedHitCount.toString() else "0", Modifier.weight(1f))
+                        ChainMetric("域名命中", if (!snapshot.running) "—" else if (displayedHitCount > 0L) displayedHitCount.toString() else "0", Modifier.weight(1f))
                     }
                 }
             }
@@ -401,8 +401,8 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
 
         item("runtime-verify") {
             val statusText = when {
-                snapshot.effective && displayedHitCount > 0L -> "已生效 · 已记录 ${displayedHitCount} 次实际拦截"
-                snapshot.effective -> "已生效 · 当前运行日志暂未记录到广告拦截"
+                snapshot.effective && displayedHitCount > 0L -> "已生效 · 已记录 ${displayedHitCount} 次域名规则命中"
+                snapshot.effective -> "已生效 · 当前运行日志暂未记录到域名规则命中"
                 !chainEnabled -> "广告串联已关闭"
                 !snapshot.running -> "等待代理启动"
                 snapshot.lastError.isNotBlank() -> "本次运行已降级"
