@@ -125,6 +125,21 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
     var updatingRules by remember { mutableStateOf(false) }
     var updateSuccess by remember { mutableStateOf(false) }
     var notice by remember { mutableStateOf("") }
+    var liveHitCount by remember { mutableLongStateOf(prefs.getLong("proxyAdblockSessionHits", 0L)) }
+    var liveRecentDomains by remember {
+        mutableStateOf(cachedRecentDomains(prefs.getString("proxyAdblockRecentDomains", "")))
+    }
+    DisposableEffect(prefs) {
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { shared, key ->
+            when (key) {
+                "proxyAdblockSessionHits" -> liveHitCount = shared.getLong(key, 0L)
+                "proxyAdblockRecentDomains" -> liveRecentDomains =
+                    cachedRecentDomains(shared.getString(key, ""))
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
     var chainEnabled by remember(revision) { mutableStateOf(prefs.getBoolean("proxyAdblockChain", true)) }
     var fallbackEnabled by remember(revision) {
         mutableStateOf(prefs.getBoolean("proxyAdblockFallbackEnabled", prefs.getBoolean("vpnWanted", false)))
@@ -236,6 +251,10 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
             message = listOfNotNull(state?.message?.takeIf { it.isNotBlank() }, rulesResult.exceptionOrNull()?.message).joinToString("；"),
         )
     }
+
+    val displayedHitCount = maxOf(snapshot.hitCount, liveHitCount)
+    val displayedRecentDomains =
+        if (liveRecentDomains.isNotEmpty()) liveRecentDomains else snapshot.recentBlockedDomains
 
     fun applyFallback(enabled: Boolean) {
         if (busy) return
@@ -354,7 +373,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         ChainMetric("有效规则", snapshot.rules.count.toString(), Modifier.weight(1f))
                         ChainMetric("规则源", snapshot.rules.sources.count { it.enabled }.toString(), Modifier.weight(1f))
-                        ChainMetric("本次拦截", if (!snapshot.running) "—" else if (snapshot.hitCount > 0L) snapshot.hitCount.toString() else "0", Modifier.weight(1f))
+                        ChainMetric("本次拦截", if (!snapshot.running) "—" else if (displayedHitCount > 0L) displayedHitCount.toString() else "0", Modifier.weight(1f))
                     }
                 }
             }
@@ -363,7 +382,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
 
         item("runtime-verify") {
             val statusText = when {
-                snapshot.effective && snapshot.hitCount > 0L -> "已生效 · 已记录 ${snapshot.hitCount} 次实际拦截"
+                snapshot.effective && displayedHitCount > 0L -> "已生效 · 已记录 ${displayedHitCount} 次实际拦截"
                 snapshot.effective -> "已生效 · 当前运行日志暂未记录到广告拦截"
                 !chainEnabled -> "广告串联已关闭"
                 !snapshot.running -> "等待代理启动"
@@ -407,17 +426,17 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                     if (snapshot.running) {
                         ChainVerifyRow(
                             "实际拦截",
-                            snapshot.hitCount > 0L,
-                            if (snapshot.hitCount > 0L) "${snapshot.hitCount} 次 · ${snapshot.hitCountSource.ifBlank { "已记录" }}"
+                            displayedHitCount > 0L,
+                            if (displayedHitCount > 0L) "${displayedHitCount} 次 · ${snapshot.hitCountSource.ifBlank { "已记录" }}"
                             else "0 次 · 已加载规则；首次实际拦截后自动累计",
                             allowNeutral = true,
                         )
                     }
-                    if (snapshot.recentBlockedDomains.isNotEmpty()) {
+                    if (displayedRecentDomains.isNotEmpty()) {
                         Surface(shape = RoundedCornerShape(12.dp), color = if (dark) Color.White.copy(alpha = .04f) else Color(0xFFF8FAFC)) {
                             Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text("最近拦截", color = t.textPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                snapshot.recentBlockedDomains.take(6).forEach { domain ->
+                                displayedRecentDomains.take(6).forEach { domain ->
                                     Text(domain, color = t.textSecondary, fontSize = 10.sp, lineHeight = 14.sp)
                                 }
                             }
