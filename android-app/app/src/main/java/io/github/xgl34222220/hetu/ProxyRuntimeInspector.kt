@@ -104,11 +104,23 @@ internal class ProxyRuntimeInspector(context: Context) {
     }
 
     suspend fun adblockRuntimeStats(): AdblockRuntimeStats = withContext(Dispatchers.IO) {
-        val command = "grep -Ei 'hetu-adblock|RuleSet/hetu-adblock' /data/adb/hetu/run/core.log 2>/dev/null | tail -n 2000 || true"
+        val command = "grep -Ei 'hetu-adblock|RuleSet/hetu-adblock' /data/adb/hetu/run/core.log 2>/dev/null | tail -n 4000 || true"
         val result = RootBridge.rootShell(app, command, 6_000L)
-        if (!result.ok()) return@withContext AdblockRuntimeStats()
+        val persisted = prefs.getLong("proxyAdblockSessionHits", 0L)
+        if (!result.ok()) {
+            return@withContext AdblockRuntimeStats(
+                count = persisted,
+                recentDomains = prefs.getString("proxyAdblockRecentDomains", "").orEmpty()
+                    .lineSequence().map { it.trim() }.filter { it.isNotBlank() }.take(8).toList(),
+                logAvailable = false,
+            )
+        }
         val matched = result.output.lineSequence()
-            .filter { it.contains("hetu-adblock", ignoreCase = true) }
+            .filter {
+                it.contains("hetu-adblock", ignoreCase = true) &&
+                    it.contains("REJECT", ignoreCase = true) &&
+                    it.contains("match", ignoreCase = true)
+            }
             .toList()
         val target = Regex("-->\\s+([^\\s\\\"]+)")
         val recent = LinkedHashSet<String>()
@@ -119,9 +131,18 @@ internal class ProxyRuntimeInspector(context: Context) {
             if (domain.isNotBlank()) recent += domain
             if (recent.size >= 8) break
         }
+        val count = maxOf(persisted, matched.size.toLong())
+        if (count > persisted || recent.isNotEmpty()) {
+            prefs.edit()
+                .putLong("proxyAdblockSessionHits", count)
+                .putString("proxyAdblockRecentDomains", recent.joinToString("\n"))
+                .apply()
+        }
         AdblockRuntimeStats(
-            count = matched.size.toLong(),
-            recentDomains = recent.toList(),
+            count = count,
+            recentDomains = if (recent.isNotEmpty()) recent.toList() else
+                prefs.getString("proxyAdblockRecentDomains", "").orEmpty()
+                    .lineSequence().map { it.trim() }.filter { it.isNotBlank() }.take(8).toList(),
             logAvailable = true,
         )
     }
