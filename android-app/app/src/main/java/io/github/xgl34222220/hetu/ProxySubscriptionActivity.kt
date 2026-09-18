@@ -126,6 +126,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
 
     var revision by remember { mutableIntStateOf(0) }
     var subscriptions by remember { mutableStateOf(emptyList<ProxySubscriptionUi>()) }
+    var configLibrary by remember { mutableStateOf(emptyList<ProxyConfigUi>()) }
     var configName by remember { mutableStateOf("加载中…") }
     var loading by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("") }
@@ -149,8 +150,8 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
         loading = true
         scope.launch {
             runCatching { controller.importConfig(uri, displayName) }
-                .onSuccess {
-                    message = "已导入并选中 $displayName；启动或重启代理后生效"
+                .onSuccess { actualName ->
+                    message = "已导入并选中 $actualName；原配置未覆盖"
                     revision++
                 }
                 .onFailure { message = it.message ?: "导入配置失败" }
@@ -160,15 +161,22 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
 
     LaunchedEffect(revision) {
         loading = true
-        runCatching { controller.configOverview() }
-            .onSuccess { overview ->
+        runCatching {
+            val overview = controller.configOverview()
+            val library = controller.configLibrary()
+            overview to library
+        }
+            .onSuccess { result ->
+                val overview = result.first
                 configName = overview.first
                 subscriptions = overview.second
+                configLibrary = result.second
                 if (message.startsWith("读取订阅失败") || message.startsWith("读取配置失败")) message = ""
             }
             .onFailure {
                 configName = "配置读取失败"
                 subscriptions = emptyList()
+                configLibrary = emptyList()
                 message = "读取配置失败：" + (it.message ?: "未知错误")
             }
         loading = false
@@ -284,6 +292,83 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                                 Icon(Icons.Rounded.Add, null, Modifier.size(20.dp))
                                 Spacer(Modifier.width(7.dp))
                                 Text("添加订阅")
+                            }
+                        }
+                    }
+                }
+            }
+
+            item("config-library-heading") {
+                Column(Modifier.padding(horizontal = 2.dp, vertical = 2.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text("配置库", color = tokens.textPrimary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text("可保存多份 YAML，点一下立即切换；同名导入会自动保留为副本", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+
+            items(configLibrary, key = { "config-" + it.name }) { config ->
+                Surface(
+                    onClick = {
+                        if (!config.selected && !loading) {
+                            loading = true
+                            scope.launch {
+                                runCatching { controller.selectConfig(config.name) }
+                                    .onSuccess { message = "已切换到 ${config.name}"; revision++ }
+                                    .onFailure { message = it.message ?: "切换配置失败" }
+                                loading = false
+                            }
+                        }
+                    },
+                    shape = RoundedCornerShape(22.dp),
+                    color = if (config.selected) scheme.primaryContainer.copy(alpha = .34f) else tokens.cardBackground,
+                    shadowElevation = 1.dp,
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = tokens.elevatedCardBackground,
+                            modifier = Modifier.size(42.dp),
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    if (config.selected) Icons.Rounded.CheckCircle else Icons.Rounded.Description,
+                                    null,
+                                    tint = if (config.selected) scheme.primary else tokens.textSecondary,
+                                    modifier = Modifier.size(21.dp),
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text(config.name, color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                when {
+                                    config.selected -> "当前使用"
+                                    config.bundled -> "河图内置模板"
+                                    else -> "已保存 · 点击切换"
+                                },
+                                color = if (config.selected) scheme.primary else tokens.textSecondary,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                        if (!config.bundled) {
+                            IconButton(
+                                onClick = {
+                                    if (!loading) {
+                                        loading = true
+                                        scope.launch {
+                                            runCatching { controller.deleteConfig(config.name) }
+                                                .onSuccess { message = "已删除 ${config.name}"; revision++ }
+                                                .onFailure { message = it.message ?: "删除配置失败" }
+                                            loading = false
+                                        }
+                                    }
+                                },
+                                enabled = !loading,
+                            ) {
+                                Icon(Icons.Rounded.DeleteOutline, "删除配置", tint = tokens.textSecondary)
                             }
                         }
                     }
