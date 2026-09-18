@@ -447,7 +447,7 @@ public final class DnsVpnService extends VpnService {
     }
 
     private boolean replyAliasBlockedIfNeeded(DnsPacket.Query query, byte[] answer, int token) throws IOException {
-        String target = rules.blockedAlias(query, answer, prefs.getBoolean("cnameProtection", false));
+        String target = rules.blockedAlias(query, answer, prefs.getBoolean("cnameProtection", true));
         if (target == null) return false;
         if (active(token)) {
             blocked.incrementAndGet(); liveLastBlockedDomain = query.domain; liveLastBlockedAt = System.currentTimeMillis(); record(query.domain, "blocked_cname", target);
