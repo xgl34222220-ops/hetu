@@ -103,12 +103,12 @@ internal class ProxyRuntimeInspector(context: Context) {
     suspend fun adblockRuntimeStats(): AdblockRuntimeStats = withContext(Dispatchers.IO) {
         val command = """
             LOG=/data/adb/bichen/proxy/run/core.log
-            if [ ! -r "${' ]; then
+            if [ ! -r "$LOG" ]; then
               echo '__COUNT__=0'
               exit 0
             fi
             C=$(grep -Eic 'bichen-adblock|RuleSet/bichen-adblock' "$LOG" 2>/dev/null || true)
-            echo "__COUNT__=${'
+            echo "__COUNT__=$C"
             grep -Ei 'bichen-adblock|RuleSet/bichen-adblock' "$LOG" 2>/dev/null | tail -n 24 || true
         """.trimIndent()
         val result = RootBridge.rootShell(app, command, 6_000L)
