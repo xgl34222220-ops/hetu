@@ -251,7 +251,6 @@ private fun ProxyV2Shell(onBack: () -> Unit) {
                     onReload = ::reload,
                     onRestart = ::restart,
                     onTestAll = ::testAll,
-                    onWebUi = { context.startActivity(Intent(context, ProxyWebUiActivity::class.java)) },
                     onLog = ::showLog,
                     onPanel = { page = V2Page.Panel },
                 )
@@ -290,7 +289,6 @@ private fun V2Home(
     onReload: () -> Unit,
     onRestart: () -> Unit,
     onTestAll: () -> Unit,
-    onWebUi: () -> Unit,
     onLog: () -> Unit,
     onPanel: () -> Unit,
 ) {
@@ -379,7 +377,6 @@ private fun V2Home(
                         V2Shortcut("重启核心", "重启 Mihomo", Icons.Rounded.RestartAlt, onRestart, Modifier.weight(1f))
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        V2Shortcut("WebUI", "MetaCubeXD", Icons.Rounded.Language, onWebUi, Modifier.weight(1f))
                         V2Shortcut("运行日志", "查看核心输出", Icons.Rounded.Article, onLog, Modifier.weight(1f))
                     }
                 }
@@ -916,7 +913,6 @@ private fun V2Tools(state: ProxyComposeState) {
                     V2Shortcut("订阅配置", state.config, Icons.Rounded.CloudDownload, { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) }, Modifier.weight(1f))
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    V2Shortcut("WebUI", "MetaCubeXD", Icons.Rounded.Language, { context.startActivity(Intent(context, ProxyWebUiActivity::class.java)) }, Modifier.weight(1f))
                     V2Shortcut("基础配置", "核心 · 模式 · IPv6", Icons.Rounded.Tune, { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }, Modifier.weight(1f))
                 }
             }
