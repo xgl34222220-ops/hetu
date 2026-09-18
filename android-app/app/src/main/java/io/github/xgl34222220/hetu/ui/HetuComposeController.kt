@@ -123,13 +123,11 @@ internal class HetuComposeController(private val context: Context) {
         )
     }
 
-    fun protectionMode(): String = prefs.getString("preferredMode", "module") ?: "module"
-    fun preferredVpnMode(): Boolean = protectionMode() == "vpn"
+    fun protectionMode(): String = "vpn"
+    fun preferredVpnMode(): Boolean = true
 
     fun setProtectionMode(value: String) {
-        if (value != "module" && value != "vpn") return
-        prefs.edit().putString("preferredMode", value).apply()
-        if (value == "module" && DnsVpnService.running) stopVpn()
+        prefs.edit().putString("preferredMode", "vpn").apply()
     }
 
     fun dnsCounters(): DnsCounters = DnsCounters(
@@ -253,33 +251,35 @@ internal class HetuComposeController(private val context: Context) {
         )
     }
 
-    private suspend fun moduleInstalled(): Boolean = withContext(Dispatchers.IO) {
-        val s = RootBridge.status(app)
-        s.optBoolean("installed") && !s.optBoolean("pendingReboot")
-    }
-
     suspend fun setRuleSource(id: String, enabled: Boolean) = withContext(Dispatchers.IO) {
         val rules = RuleStore(app)
         rules.reload()
-        rules.setSource(id, enabled, moduleInstalled())
+        rules.setSource(id, enabled, false)
     }
 
     suspend fun setRuleProfile(id: String) = withContext(Dispatchers.IO) {
         val rules = RuleStore(app)
         rules.reload()
-        rules.setProfile(id, moduleInstalled())
+        rules.setProfile(id, false)
     }
 
     suspend fun changeDomain(domain: String, allow: Boolean, add: Boolean) = withContext(Dispatchers.IO) {
         val rules = RuleStore(app)
         rules.reload()
-        rules.changeDomain(domain, allow, add, moduleInstalled())
+        rules.changeDomain(domain, allow, add, false)
     }
 
     suspend fun updateRules(): String = withContext(Dispatchers.IO) {
         val rules = RuleStore(app)
         rules.reload()
-        if (rules.updateRules(moduleInstalled())) "规则已更新" else "规则已校验，没有变化"
+        val changed = rules.updateRules(false)
+        val warning = rules.summary().optString("lastRuleUpdateWarning", "")
+        when {
+            changed && warning.isNotBlank() -> "规则已更新；$warning"
+            changed -> "规则已更新"
+            warning.isNotBlank() -> "规则已校验；$warning"
+            else -> "规则已校验，没有变化"
+        }
     }
 
     private fun requestTime(o: JSONObject): String {
