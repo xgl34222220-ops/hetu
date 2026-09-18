@@ -1,0 +1,149 @@
+name: Hetu full rebrand and build
+
+on:
+  push:
+    branches: ['feature/hetu-rebrand-root-app']
+    paths:
+      - 'tools/migrate_to_hetu.py'
+      - '.github/workflows/hetu-migration-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  migrate-build:
+    if: ${{ !contains(github.event.head_commit.message || '', '[hetu-migration]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply Hetu migration
+        run: python3 tools/migrate_to_hetu.py
+
+      - name: Verify source migration invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f .hetu-migration-complete
+          test ! -d module
+          test ! -d downloads
+          test -d android-app/app/src/main/java/io/github/xgl34222220/hetu
+          test ! -d android-app/app/src/main/java/io/github/xgl34222220/bichen
+          grep -q 'namespace = "io.github.xgl34222220.hetu"' android-app/app/build.gradle.kts
+          grep -q 'applicationId = "io.github.xgl34222220.hetu"' android-app/app/build.gradle.kts
+          grep -q 'android:label="河图"' android-app/app/src/main/AndroidManifest.xml
+          grep -q 'private static final String ROOT="/data/adb/hetu";' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
+          ! grep -R '/data/adb/hetu/proxy' android-app/app/src/main native README.md
+          ! grep -R 'io.github.xgl34222220.bichen' android-app/app/src/main native README.md
+          ! grep -R -E '辟尘|Bichen' android-app/app/src/main native README.md
+          ! grep -R 'ModuleInstaller\|ModuleArchive' android-app/app/src/main
+          test -f android-app/app/src/main/assets/sources.tsv
+          test -f android-app/app/src/main/assets/rules/adaway.txt
+          test -f android-app/app/src/main/assets/rules/china.txt
+          test -f android-app/app/src/main/assets/rules/tracking.txt
+          test -f android-app/app/src/main/assets/rules/hagezi.txt
+          grep -q 'System.loadLibrary("hetu_core")' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoNative.java
+          grep -q 'Java_io_github_xgl34222220_hetu_MihomoNative_invoke' native/bridge/jni_android.c
+          grep -q 'Java_io_github_xgl34222220_hetu_preview_MihomoNative_invoke' native/bridge/jni_android.c
+
+      - uses: actions/checkout@v4
+        with:
+          repository: MetaCubeX/mihomo
+          ref: ac017cdd246ce8bd547653d927e7bf77d7ee73d5
+          path: .upstream
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache-dependency-path: .upstream/go.sum
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK
+        run: sdkmanager 'ndk;28.2.13676358' 'platform-tools' 'platforms;android-37'
+
+      - name: Build Hetu JNI bridge and Root Mihomo
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp -r native/bridge .upstream/hetubridge
+          cd .upstream
+          go test -tags with_gvisor -v ./hetubridge
+          NDK="$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          mkdir -p ../android-app/app/src/main/jniLibs/arm64-v8a ../android-app/app/src/main/jniLibs/x86_64
+          mkdir -p ../android-app/app/src/main/assets/mihomo-root/arm64-v8a ../android-app/app/src/main/assets/mihomo-root/x86_64
+          CGO_ENABLED=1 GOOS=android GOARCH=arm64 CC="$NDK/aarch64-linux-android26-clang" \
+            go build -tags with_gvisor -trimpath -buildmode=c-shared \
+            -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' \
+            -o ../android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so ./hetubridge
+          CGO_ENABLED=1 GOOS=android GOARCH=amd64 CC="$NDK/x86_64-linux-android26-clang" \
+            go build -tags with_gvisor -trimpath -buildmode=c-shared \
+            -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' \
+            -o ../android-app/app/src/main/jniLibs/x86_64/libhetu_core.so ./hetubridge
+          CGO_ENABLED=1 GOOS=android GOARCH=arm64 CC="$NDK/aarch64-linux-android26-clang" \
+            go build -tags with_gvisor -trimpath \
+            -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' \
+            -o ../android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo .
+          CGO_ENABLED=1 GOOS=android GOARCH=amd64 CC="$NDK/x86_64-linux-android26-clang" \
+            go build -tags with_gvisor -trimpath \
+            -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' \
+            -o ../android-app/app/src/main/assets/mihomo-root/x86_64/mihomo .
+          cp LICENSE ../android-app/app/src/main/assets/MIHOMO-LICENSE
+          git rev-parse HEAD > ../android-app/app/src/main/assets/mihomo-revision.txt
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+          cache-read-only: false
+
+      - name: Build Hetu debug APK
+        working-directory: android-app
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Verify APK identity and payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=android-app/app/build/outputs/apk/debug/app-debug.apk
+          test -f "$APK"
+          unzip -t "$APK" >/dev/null
+          BADGING=$(aapt dump badging "$APK")
+          printf '%s\n' "$BADGING" | grep -q "package: name='io.github.xgl34222220.hetu.preview'"
+          printf '%s\n' "$BADGING" | grep -q "application-label:'河图'"
+          unzip -l "$APK" | grep -q 'lib/arm64-v8a/libhetu_core.so'
+          unzip -l "$APK" | grep -q 'assets/mihomo-root/arm64-v8a/mihomo'
+          unzip -l "$APK" | grep -q 'assets/rules/adaway.txt'
+          ! unzip -l "$APK" | grep -q 'libbichen_core.so'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Hetu-Rebrand-Debug
+          path: android-app/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Commit verified Hetu migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .upstream
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No migration changes to commit"
+            exit 0
+          fi
+          git commit -m "Refactor Bichen into Hetu root app [hetu-migration]"
+          git push origin HEAD:feature/hetu-rebrand-root-app
