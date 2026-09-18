@@ -111,10 +111,14 @@ internal class ProxyComposeController(context: Context) {
         } catch (_: Exception) { emptyMap() }
 
         val fastRunning = ProxyStatusBridge.rootProxyRunning(app)
-        val status = try {
-            root.status()
-        } catch (error: Exception) {
-            JSONObject().put("running", fastRunning).put("message", error.message ?: "状态读取失败")
+        val status = if (fastRunning) {
+            JSONObject().put("running", true).put("message", "河图核心运行中")
+        } else {
+            try {
+                root.status()
+            } catch (error: Exception) {
+                JSONObject().put("running", false).put("message", error.message ?: "状态读取失败")
+            }
         }
         val running = status.optBoolean("running", fastRunning) || fastRunning
         prefs.edit().putBoolean("proxyRootRuntimeRunning", running).apply()
