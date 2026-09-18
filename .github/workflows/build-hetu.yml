@@ -78,6 +78,8 @@ jobs:
           ! grep -q 'val activeGlass = true' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
           ! grep -q 'topBarBlurStyle' android-app/app/src/main/java/io/github/xgl34222220/hetu/ThemeSettingsActivity.kt
           ! grep -q 'predictiveBack' android-app/app/src/main/java/io/github/xgl34222220/hetu/ThemeSettingsActivity.kt
+          grep -q 'controllerPort = status.optInt' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
+          grep -Fq '127.0.0.1:${state.controllerPort}' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           grep -q 'head -c \$((END-START+1))' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
           test ! -f android-app/app/src/main/java/io/github/xgl34222220/hetu/LuoShuProxyV3Activity.kt
           test ! -f android-app/app/src/main/java/io/github/xgl34222220/hetu/LuoShuProxyV2Activity.kt
