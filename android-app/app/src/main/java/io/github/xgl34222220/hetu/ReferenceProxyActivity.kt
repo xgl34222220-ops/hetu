@@ -729,7 +729,24 @@ private fun RefHome(
             }
         }
         item {
-            RefSmallTool("运行日志", "查看核心、Root 与网络事务日志", Icons.Rounded.Article, onLog, Modifier.fillMaxWidth())
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                Surface(
+                    onClick = onLog,
+                    shape = CircleShape,
+                    color = t.controlBackground.copy(alpha = .72f),
+                    border = BorderStroke(.7.dp, t.outline.copy(alpha = .55f)),
+                    shadowElevation = 0.dp,
+                ) {
+                    Row(
+                        Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Icon(Icons.Rounded.Article, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(15.dp))
+                        Text("运行日志", color = t.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
         }
         item {
             RefLatencyPanel(
@@ -2203,16 +2220,23 @@ private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolea
     Column(
         modifier
             .height(86.dp)
-            .zIndex(2f)
+            .zIndex(1f)
             .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .95f else 1f }
-            .shadow(if (expanded) 2.dp else 1.dp, shape, clip = false)
+            .shadow(
+                if (expanded) 4.dp else 2.dp,
+                shape,
+                clip = false,
+                ambientColor = Color(0xFF0F172A).copy(alpha = if (dark) .10f else .05f),
+                spotColor = Color(0xFF0F172A).copy(alpha = if (dark) .12f else .045f),
+            )
             .background(premiumBrush, shape)
             .border(
-                if (expanded) 1.25.dp else .8.dp,
-                if (expanded) Color(0xFF002FA7).copy(alpha = .58f) else Color.White.copy(alpha = if (dark) .10f else .92f),
+                if (expanded) 1.25.dp else 1.dp,
+                if (expanded) Color(0xFF002FA7).copy(alpha = .58f)
+                else if (dark) Color.White.copy(alpha = .10f) else Color(0xFFCBD5E1).copy(alpha = .60f),
                 shape,
             )
-            .padding(start = 15.dp, top = 12.dp, end = 14.dp, bottom = 11.dp),
+            .padding(start = 16.dp, top = 14.dp, end = 14.dp, bottom = 12.dp),
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
         Row(
@@ -2289,7 +2313,7 @@ private fun RefInlineGroupExpansion(
         Brush.verticalGradient(listOf(Color(0xFFE7EDF4), wellColor, Color(0xFFF2F5F8)))
     }
     Surface(
-        modifier = Modifier.padding(top = 6.dp, bottom = 18.dp).fillMaxWidth().zIndex(0f),
+        modifier = Modifier.padding(top = 6.dp, bottom = 16.dp).fillMaxWidth().zIndex(0f),
         shape = shape,
         color = Color.Transparent,
         border = BorderStroke(.8.dp, wellBorder),
@@ -3048,8 +3072,16 @@ private fun RefConnectionAppCard(
             }
             androidx.compose.animation.AnimatedVisibility(
                 visible = expanded,
-                enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
-                exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut(),
+                enter = androidx.compose.animation.expandVertically(
+                    expandFrom = Alignment.Top,
+                    animationSpec = spring(dampingRatio = .72f, stiffness = 360f),
+                    clip = false,
+                ) + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(150)),
+                exit = androidx.compose.animation.shrinkVertically(
+                    shrinkTowards = Alignment.Top,
+                    animationSpec = spring(dampingRatio = .84f, stiffness = 460f),
+                    clip = false,
+                ) + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(110)),
             ) {
                 Column(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     HorizontalDivider(color = t.outline.copy(alpha = .35f))
@@ -3060,8 +3092,17 @@ private fun RefConnectionAppCard(
                             }
                         }
                     }
-                    group.connections.take(30).forEach { item ->
-                        RefConnectionRow(item, onCloseConnection?.let { action -> { action(item) } })
+                    group.connections.take(30).forEachIndexed { index, item ->
+                        androidx.compose.animation.AnimatedVisibility(
+                            visible = expanded,
+                            enter = androidx.compose.animation.fadeIn(
+                                androidx.compose.animation.core.tween(150, delayMillis = (index * 12).coerceAtMost(180)),
+                            ) + androidx.compose.animation.slideInVertically(
+                                androidx.compose.animation.core.tween(180, delayMillis = (index * 12).coerceAtMost(180)),
+                            ) { it / 5 },
+                        ) {
+                            RefConnectionRow(item, onCloseConnection?.let { action -> { action(item) } })
+                        }
                     }
                     if (group.connections.size > 30) {
                         Text(
@@ -3149,7 +3190,7 @@ private fun RefRuleGroupCard(items: List<ProxyRuleUi>) {
                                     interactionSource = remember(item.type, item.payload) { MutableInteractionSource() },
                                 ) { expanded = !expanded },
                             shape = RoundedCornerShape(7.dp),
-                            color = if (dark) Color.White.copy(alpha = .045f) else Color(0xFFF1F5F9),
+                            color = Color.Transparent,
                             tonalElevation = 0.dp,
                         ) {
                             androidx.compose.animation.AnimatedContent(
