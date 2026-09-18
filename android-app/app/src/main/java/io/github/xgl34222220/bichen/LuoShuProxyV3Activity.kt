@@ -239,7 +239,6 @@ private fun V3Shell(onBack: () -> Unit) {
                     onRestart = ::restart,
                     onTestAll = ::testAll,
                     onPanel = { page = V3Page.Panel },
-                    onWebUi = { context.startActivity(Intent(context, ProxyWebUiActivity::class.java)) },
                     onLog = { scope.launch { logText = runCatching { inspector.runtimeLog() }.getOrElse { it.message ?: "日志读取失败" } } },
                 )
                 V3Page.Panel -> V3Panel(state, repo, delays, upRate, downRate, rates) { scope.launch { refresh() } }
@@ -286,7 +285,6 @@ private fun V3Home(
     onRestart: () -> Unit,
     onTestAll: () -> Unit,
     onPanel: () -> Unit,
-    onWebUi: () -> Unit,
     onLog: () -> Unit,
 ) {
     val t = LocalBichenTokens.current
@@ -367,7 +365,6 @@ private fun V3Home(
                         V3Shortcut("重启核心", "重启 Mihomo", Icons.Rounded.RestartAlt, onRestart, Modifier.weight(1f))
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        V3Shortcut("WebUI", "MetaCubeXD", Icons.Rounded.Language, onWebUi, Modifier.weight(1f))
                         V3Shortcut("运行日志", "查看核心输出", Icons.Rounded.Article, onLog, Modifier.weight(1f))
                     }
                 }
@@ -886,7 +883,6 @@ private fun V3Tools(state: ProxyComposeState) {
                     V3Shortcut("订阅与配置", state.config, Icons.Rounded.CloudDownload, { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) }, Modifier.weight(1f))
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    V3Shortcut("WebUI", "MetaCubeXD", Icons.Rounded.Language, { context.startActivity(Intent(context, ProxyWebUiActivity::class.java)) }, Modifier.weight(1f))
                     V3Shortcut("基础配置", "核心 · 模式 · IPv6", Icons.Rounded.Tune, { context.startActivity(Intent(context, RootTproxyActivity::class.java)) }, Modifier.weight(1f))
                 }
             }
