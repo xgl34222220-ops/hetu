@@ -216,7 +216,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                 Spacer(Modifier.width(4.dp))
                 Column(Modifier.weight(1f)) {
                     Text("广告过滤", color = t.textPrimary, fontSize = 24.sp, lineHeight = 30.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("代理串联 · 规则先 REJECT，再进入代理分流", color = t.textSecondary, fontSize = 11.sp)
+                    Text("代理串联 · 明确白名单优先，广告后缀规则早于普通分流", color = t.textSecondary, fontSize = 11.sp)
                 }
                 IconButton(onClick = { revision++ }, enabled = !busy, modifier = Modifier.size(42.dp)) {
                     Icon(Icons.Rounded.Refresh, "刷新", tint = MaterialTheme.colorScheme.primary)
@@ -364,8 +364,8 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
             Surface(shape = RoundedCornerShape(18.dp), color = t.selectionBackground) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Text("执行顺序", color = t.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    Text("应用流量 → TUN / TPROXY / eBPF → 用户显式规则 → 广告 RULE-SET → 最终兜底 → 节点或 DIRECT", color = t.textSecondary, fontSize = 11.sp, lineHeight = 17.sp)
-                    Text("代理串联开启时，独立 DNS 去广告会暂停；代理停止后会按原状态恢复。", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    Text("应用流量 → Root DIRECT 应用 / 明确域名白名单 → 广告后缀 RULE-SET → 普通地区/规则集分流 → 最终兜底", color = t.textSecondary, fontSize = 11.sp, lineHeight = 17.sp)
+                    Text("串联模式使用 Mihomo +. 域名后缀匹配，可覆盖多级子域；独立 DNS 去广告在代理运行时暂停。", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
