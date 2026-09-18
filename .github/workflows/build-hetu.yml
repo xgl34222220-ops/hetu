@@ -41,7 +41,8 @@ jobs:
           grep -q 'android:label="河图"' android-app/app/src/main/AndroidManifest.xml
           grep -q 'private static final String ROOT="/data/adb/hetu";' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
           ! grep -R '/data/adb/hetu/proxy' android-app/app/src/main native README.md
-          ! grep -R 'io.github.xgl34222220.bichen' android-app/app/src/main native README.md
+          ! grep -R 'io.github.xgl34222220.bichen' android-app/app/src/main native README.md --exclude=LegacyAppMigrator.java
+          grep -q 'io.github.xgl34222220.bichen' android-app/app/src/main/java/io/github/xgl34222220/hetu/LegacyAppMigrator.java
           ! grep -R 'ModuleInstaller\|ModuleArchive' android-app/app/src/main
           test -f android-app/app/src/main/assets/sources.tsv
           test -f android-app/app/src/main/assets/hetu-root.sh
