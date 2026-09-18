@@ -175,6 +175,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
         count = prefs.getInt("proxyUiLastSubCount", 0),
     )) }
     var cachedConnectionCount by remember { mutableIntStateOf(prefs.getInt("proxyUiLastConnectionCount", 0)) }
+    var lastProviderRefreshAt by remember { mutableLongStateOf(0L) }
     val coldStartAt = remember { SystemClock.elapsedRealtime() }
     var siteDelays by remember { mutableStateOf(mapOf(
         "Baidu" to prefs.getLong("proxyUiLastDelayBaidu", -2L),
@@ -226,7 +227,14 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
             lastProcessTicks = sampled.processTicks
             lastSystemTicks = sampled.systemTicks
             runtime = sampled
-            providers = if (next.running) runCatching { repo.providers() }.getOrDefault(providers) else emptyList()
+            if (!next.running) {
+                providers = emptyList()
+                lastProviderRefreshAt = 0L
+            } else if (providers.isEmpty() || now - lastProviderRefreshAt >= 30_000L) {
+                val freshProviders = runCatching { repo.providers() }.getOrDefault(providers)
+                if (freshProviders.isNotEmpty()) providers = freshProviders
+                lastProviderRefreshAt = now
+            }
             if (providers.isNotEmpty()) {
                 val tracked = providers.filter { it.hasSubscriptionInfo && it.total > 0L }
                 cachedSubscription = RefSubscriptionCache(tracked.sumOf { it.used }, tracked.sumOf { it.total }, providers.size)
