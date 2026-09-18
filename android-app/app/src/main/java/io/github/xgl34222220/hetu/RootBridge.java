@@ -13,7 +13,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 
-/** Bounded, background-thread-only access to the installed module CLI. */
+/** Bounded, background-thread-only Root command bridge for Hetu. */
 public final class RootBridge {
     public static final String MODULE_DIR = "/data/adb/modules/hetu";
     public static final String CLI = MODULE_DIR + "/bin/hetu";
@@ -34,6 +34,12 @@ public final class RootBridge {
         }
 
         public boolean ok() { return code == 0; }
+    }
+
+    public static boolean hasRoot(Context context) {
+        requireWorkerThread();
+        Result result=rootShell(context,"id -u",5000L);
+        return result.ok() && "0".equals(result.output.trim());
     }
 
     public static Result run(Context context, String... args) {
@@ -175,7 +181,7 @@ public final class RootBridge {
                 process.destroy();
                 process.destroyForcibly();
                 return new Result(124, reader.text() + "\n操作超时（" + timeoutMs / 1000
-                        + " 秒），已请求终止进程；不能确认操作完成，请重新检查模块状态。");
+                        + " 秒），已请求终止进程；不能确认操作完成，请重新检查河图运行状态。");
             }
             int code = process.exitValue();
             remaining = deadline - SystemClock.elapsedRealtime();
@@ -185,7 +191,7 @@ public final class RootBridge {
                 String partial = reader.text();
                 if (SystemClock.elapsedRealtime() >= deadline) {
                     return new Result(124, partial
-                            + "\n操作超时，已请求终止进程；请检查模块实际状态。");
+                            + "\n操作超时，已请求终止进程；请检查河图实际运行状态。");
                 }
                 return new Result(125, partial + "\n命令输出流未关闭，无法确认完整结果。");
             }
@@ -200,7 +206,7 @@ public final class RootBridge {
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             if (process != null) { process.destroy(); process.destroyForcibly(); }
-            return new Result(130, (reader == null ? "" : reader.text()) + "\n操作已中断，请检查模块实际状态。");
+            return new Result(130, (reader == null ? "" : reader.text()) + "\n操作已中断，请检查河图实际运行状态。");
         } catch (IOException error) {
             return new Result(126, "无法启动 Root 命令：" + error.getMessage()
                     + "。请检查当前 Root 管理器是否已授予河图权限。");
