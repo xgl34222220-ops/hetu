@@ -14,6 +14,7 @@ public final class ProxyNetworkMatchService extends Service {
     private ConnectivityManager cm;
     private ConnectivityManager.NetworkCallback cb;
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
+    private final ScheduledExecutorService metrics=Executors.newSingleThreadScheduledExecutor();
     private Network lastDefaultNetwork;
     private boolean defaultNetworkSeen;
 
@@ -24,6 +25,7 @@ public final class ProxyNetworkMatchService extends Service {
         ensureChannel();
         startForeground(92,note("代理网络守护已就绪"));
         register();
+        metrics.scheduleWithFixedDelay(this::updateAdblockMetrics,1500L,4000L,TimeUnit.MILLISECONDS);
     }
 
     @Override public int onStartCommand(Intent i,int f,int id){
@@ -37,6 +39,7 @@ public final class ProxyNetworkMatchService extends Service {
     @Override public void onDestroy(){
         if(cb!=null)try{cm.unregisterNetworkCallback(cb);}catch(Exception ignored){}
         worker.shutdownNow();
+        metrics.shutdownNow();
         super.onDestroy();
     }
     @Override public android.os.IBinder onBind(Intent i){return null;}
@@ -122,6 +125,66 @@ public final class ProxyNetworkMatchService extends Service {
                 prefs.edit().putString("networkMatchLastEnvironment","执行失败："+(e.getMessage()==null?e.getClass().getSimpleName():e.getMessage())).apply();
             }
         });
+    }
+
+    private void updateAdblockMetrics(){
+        try{
+            if(!prefs.getBoolean("proxyRootRuntimeRunning",false)
+                    ||!prefs.getBoolean("proxyAdblockChain",true))return;
+            long offset=Math.max(0L,prefs.getLong("proxyAdblockLogOffset",0L));
+            String path="/data/adb/hetu/run/core.log";
+            String command="set +e; S=$(wc -c < "+RootBridge.quote(path)+" 2>/dev/null || echo 0); "
+                    +"case \"$S\" in ''|*[!0-9]*) S=0;; esac; "
+                    +"printf '%s\\n' \"$S\"; "
+                    +"if [ \"$S\" -lt "+offset+" ]; then START=1; else START="+(offset+1)+"; fi; "
+                    +"if [ \"$S\" -ge \"$START\" ]; then tail -c +\"$START\" "+RootBridge.quote(path)+" 2>/dev/null | tail -c 1048576; fi";
+            RootBridge.Result result=RootBridge.rootShell(getApplicationContext(),command,5000L);
+            if(!result.ok()||result.output==null||result.output.isEmpty())return;
+            int newline=result.output.indexOf('\n');
+            String sizeText=(newline<0?result.output:result.output.substring(0,newline)).trim();
+            long size;
+            try{size=Long.parseLong(sizeText);}catch(Exception invalid){return;}
+            String chunk=newline<0?"":result.output.substring(newline+1);
+            long hits=prefs.getLong("proxyAdblockSessionHits",0L);
+            LinkedHashSet<String> recent=new LinkedHashSet<>();
+            String oldRecent=prefs.getString("proxyAdblockRecentDomains","");
+            if(oldRecent!=null&&!oldRecent.isEmpty())for(String item:oldRecent.split("\\n"))if(!item.trim().isEmpty())recent.add(item.trim());
+            java.util.regex.Pattern domainPattern=java.util.regex.Pattern.compile("-->\\s+([^\\s\\\"]+)");
+            for(String line:chunk.split("\\r?\\n")){
+                String lower=line.toLowerCase(Locale.ROOT);
+                if(!lower.contains("hetu-adblock")||!lower.contains("reject")||!lower.contains("match"))continue;
+                hits++;
+                java.util.regex.Matcher matcher=domainPattern.matcher(line);
+                if(matcher.find()){
+                    String raw=matcher.group(1);
+                    String domain=raw;
+                    int colon=raw.lastIndexOf(':');
+                    if(colon>0&&!raw.endsWith("]"))domain=raw.substring(0,colon);
+                    domain=domain.replace("[","").replace("]","").trim();
+                    if(!domain.isEmpty()){
+                        recent.remove(domain);
+                        LinkedHashSet<String> next=new LinkedHashSet<>();
+                        next.add(domain);next.addAll(recent);recent=next;
+                        while(recent.size()>8){
+                            Iterator<String> it=recent.iterator();
+                            String last=null;while(it.hasNext())last=it.next();
+                            if(last!=null)recent.remove(last);else break;
+                        }
+                    }
+                }
+            }
+            StringBuilder recentText=new StringBuilder();
+            for(String item:recent){if(recentText.length()>0)recentText.append('\n');recentText.append(item);}
+            SharedPreferences.Editor edit=prefs.edit()
+                    .putLong("proxyAdblockSessionHits",hits)
+                    .putLong("proxyAdblockLogOffset",size)
+                    .putString("proxyAdblockRecentDomains",recentText.toString());
+            if(!recent.isEmpty()){
+                String first=recent.iterator().next();
+                edit.putString("proxyAdblockLastDomain",first).putLong("proxyAdblockLastHitAt",System.currentTimeMillis());
+            }
+            edit.apply();
+        }catch(Exception ignored){}
     }
 
     private boolean shouldStopAfterStabilize() {
