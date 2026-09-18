@@ -28,6 +28,8 @@ MASK=""
 TABLE=""
 PREF=""
 LOCK_HELD=0
+RUNTIME_SCHEMA=63
+DNS_PORT=11053
 
 LEGACY_MARK=0x2333
 LEGACY_MASK=0xffff
@@ -459,7 +461,23 @@ wait_ready(){
   return 3
 }
 
-write_session(){ M="$1"; V6="$2"; S="$3"; SHARE="$4"; KILL="$5"; CP="$6"; DUIDS="$7"; { printf 'MODE=%s\n' "$M"; printf 'IPV6=%s\n' "$V6"; printf 'APP_SCOPE=%s\n' "$S"; printf 'SHARE=%s\n' "$SHARE"; printf 'KILL=%s\n' "$KILL"; printf 'CONTROLLER_PORT=%s\n' "$CP"; printf 'DIRECT_UIDS=%s\n' "$DUIDS"; } > "$SESSION.new.$" && mv -f "$SESSION.new.$" "$SESSION"; }
+write_session(){
+  M="$1"; V6="$2"; S="$3"; SHARE="$4"; KILL="$5"; CP="$6"; DUIDS="$7"; DNS="$8"; TCP="$9"; UDP="${10}"; QUIC="${11}"
+  {
+    printf 'RUNTIME_SCHEMA=%s\n' "$RUNTIME_SCHEMA"
+    printf 'MODE=%s\n' "$M"
+    printf 'IPV6=%s\n' "$V6"
+    printf 'APP_SCOPE=%s\n' "$S"
+    printf 'SHARE=%s\n' "$SHARE"
+    printf 'KILL=%s\n' "$KILL"
+    printf 'CONTROLLER_PORT=%s\n' "$CP"
+    printf 'DIRECT_UIDS=%s\n' "$DUIDS"
+    printf 'DNS=%s\n' "$DNS"
+    printf 'TCP=%s\n' "$TCP"
+    printf 'UDP=%s\n' "$UDP"
+    printf 'QUIC_BLOCK=%s\n' "$QUIC"
+  } > "$SESSION.new.$$" && mv -f "$SESSION.new.$$" "$SESSION"
+}
 watchdog(){
   COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS="$6"; IFACES="$7"; DUIDS="$8"
   mkdir -p "$RUN" || exit 0; printf '%s\n' "$$" > "$WATCHDOG_PID"; MISS=0; while [ "$MISS" -lt 3 ]; do if pidcore "$COREPID" && kill -0 "$COREPID" >/dev/null 2>&1; then MISS=0; sleep 2; else MISS=$((MISS+1)); sleep 0.20; fi; done; acquire_lock || exit 0
@@ -488,7 +506,7 @@ start(){
 
   mkdir -p "$RUN/rules" "$RUN/proxy_provider" "$RUN/ruleset" "$RUN/ui" || { cleanup; restorev6; rm -f "$SESSION"; fail "无法创建 Mihomo 运行缓存目录"; }
   start_stage "launch-core"
-  : > "$LOG"; "$START_BIN" -d "$RUN" -f "$START_CFG" >>"$LOG" 2>&1 & START_PID=$!; printf '%s\n' "$START_PID" > "$PIDFILE"; printf '%s\n' "$START_MODE" > "$MODEFILE"; write_session "$START_MODE" "$START_V6" "$START_SCOPE" "$START_SHARE" "$START_KILL" "$START_CP" "$START_DIRECT_UIDS"
+  : > "$LOG"; "$START_BIN" -d "$RUN" -f "$START_CFG" >>"$LOG" 2>&1 & START_PID=$!; printf '%s\n' "$START_PID" > "$PIDFILE"; printf '%s\n' "$START_MODE" > "$MODEFILE"; write_session "$START_MODE" "$START_V6" "$START_SCOPE" "$START_SHARE" "$START_KILL" "$START_CP" "$START_DIRECT_UIDS" "$START_DNS" "$START_TCP" "$START_UDP" "$START_QUIC"
   start_stage "wait-listeners"
   wait_ready "$START_PID" "$START_MODE" "$START_TP" "$START_RP" "$START_TCP" "$START_UDP" "$START_DNS" "$START_DP" "$START_CP"; READY_RC=$?
   if [ "$READY_RC" -ne 0 ]; then
@@ -537,11 +555,17 @@ status(){
   if [ "$STATUS_RUNNING" = false ] && [ "$K4" = false ] && [ "$K6" = false ] && { [ "$T4" = true ] || [ "$T6" = true ] || [ "$V6OFF" = true ]; }; then if acquire_lock; then cleanup; restorev6; rm -f "$PIDFILE" "$MODEFILE" "$SESSION"; STATUS_MODE=none; T4=false; T6=false; V6OFF=false; RECOVERED=true; fi; fi
   WD=false; W=$(cat "$WATCHDOG_PID" 2>/dev/null || true); case "$W" in ''|*[!0-9]*) ;; *) kill -0 "$W" >/dev/null 2>&1 && WD=true;; esac
   SM=""; ST=""; if loadnet >/dev/null 2>&1; then SM="$MARK"; ST="$TABLE"; fi
+  SCHEMAV=$(sed -n 's/^RUNTIME_SCHEMA=//p' "$SESSION" 2>/dev/null | head -n 1); case "$SCHEMAV" in ''|*[!0-9]*) SCHEMAV=0;; esac
   SCOPEV=$(sed -n 's/^APP_SCOPE=//p' "$SESSION" 2>/dev/null | head -n 1); DIRECTV=$(sed -n 's/^DIRECT_UIDS=//p' "$SESSION" 2>/dev/null | head -n 1); SHAREV=$(sed -n 's/^SHARE=//p' "$SESSION" 2>/dev/null | head -n 1); KILLV=$(sed -n 's/^KILL=//p' "$SESSION" 2>/dev/null | head -n 1)
+  DNSV=$(sed -n 's/^DNS=//p' "$SESSION" 2>/dev/null | head -n 1); TCPV=$(sed -n 's/^TCP=//p' "$SESSION" 2>/dev/null | head -n 1); UDPV=$(sed -n 's/^UDP=//p' "$SESSION" 2>/dev/null | head -n 1); QUICV=$(sed -n 's/^QUIC_BLOCK=//p' "$SESSION" 2>/dev/null | head -n 1)
   CPV=$(sed -n 's/^CONTROLLER_PORT=//p' "$SESSION" 2>/dev/null | head -n 1); case "$CPV" in ''|*[!0-9]*) CPV=0;; esac
   if [ "$CPV" = 0 ]; then CPV=$(sed -n 's/^[[:space:]]*external-controller:[[:space:]]*127\.0\.0\.1:\([0-9][0-9]*\)[[:space:]]*$/\1/p' "$RUN/state/startup-config" 2>/dev/null | tail -n 1); case "$CPV" in ''|*[!0-9]*) CPV=0;; esac; fi
   SP=$(state_value PREF 2>/dev/null || true)
-  printf '{"ok":true,"running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"killSwitchActive":%s,"ipv6DisabledByBichen":%s,"watchdog":%s,"recoveredStaleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","log":"%s","configCheckLog":"%s"}\n' "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$T4" "$T6" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$RECOVERED" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$SHAREV" "$KILLV" "$LOG" "$CHECKLOG"
+  DNS4=false; DNS6=false; DNSLISTEN=false
+  xt4 -t nat -C OUTPUT -j "$DNSOUT" >/dev/null 2>&1 && DNS4=true
+  if has ip6tables; then xt6 -t nat -C OUTPUT -j "$DNSOUT" >/dev/null 2>&1 && DNS6=true; fi
+  if [ "$DNSV" = off ] || { tcp_listen "$DNS_PORT" && udp_listen "$DNS_PORT"; }; then DNSLISTEN=true; fi
+  printf '{"ok":true,"running":%s,"pid":%s,"mode":"%s","runtimeSchema":%s,"ipv4Rules":%s,"ipv6Rules":%s,"dnsMode":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"tcpEnabled":"%s","udpEnabled":"%s","quicBlocked":"%s","killSwitchActive":%s,"ipv6DisabledByBichen":%s,"watchdog":%s,"recoveredStaleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","log":"%s","configCheckLog":"%s"}\n' "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$SCHEMAV" "$T4" "$T6" "$DNSV" "$DNS4" "$DNS6" "$DNSLISTEN" "$TCPV" "$UDPV" "$QUICV" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$RECOVERED" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$SHAREV" "$KILLV" "$LOG" "$CHECKLOG"
 }
 
 case "${1:-status}" in
