@@ -42,6 +42,17 @@ public final class RuleStore {
         }
         String primaryUrl(){ return urls.isEmpty()?"":urls.get(0); }
     }
+    private static final class SourceFetch {
+        final Source source;
+        final Set<String> rules;
+        final Throwable error;
+        final long durationMs;
+        final int mirror;
+        SourceFetch(Source source,Set<String> rules,Throwable error,long durationMs,int mirror){
+            this.source=source;this.rules=rules;this.error=error;this.durationMs=durationMs;this.mirror=mirror;
+        }
+        boolean ok(){return rules!=null&&!rules.isEmpty();}
+    }
     private static final class Snapshot {
         final String generation, revision;
         final boolean fromModule;
@@ -183,6 +194,10 @@ public final class RuleStore {
                 item.put("enabled",s==null?source.defaultOn:Boolean.TRUE.equals(s.enabled.get(source.id)));
                 // An exported effective set does not identify individual subscription counts.
                 item.put("count",s==null?0:(s.fromModule?-1:s.sourceRules.get(source.id).size()));
+                item.put("lastSuccess",prefs.getLong("rule_source_"+source.id+"_success",0L));
+                item.put("lastError",prefs.getString("rule_source_"+source.id+"_error",""));
+                item.put("durationMs",prefs.getLong("rule_source_"+source.id+"_duration",0L));
+                item.put("mirror",prefs.getInt("rule_source_"+source.id+"_mirror",-1));
                 result.put(item);
             }
         } catch(Exception impossible) { throw new IllegalStateException(impossible); }
@@ -240,52 +255,67 @@ public final class RuleStore {
         clearModulePending();
     }
 
-    /** Update enabled DNS blocklists independently; a slow mirror must not discard other successful sources. */
+    /** Update enabled DNS blocklists in parallel. Slow mirrors cannot block healthy sources or discard old snapshots. */
     public boolean updateRules(boolean moduleInstalled) throws Exception {
         try(RuleUpdateGate.Lease update=UPDATE_GATE.begin()) {
             final Snapshot before;
             synchronized(LOCK) {
                 checkInterrupted();
                 reload();
-                // Hetu no longer requires a separate module for DNS filtering.
                 before=live;
             }
             Map<String,Set<String>> next=new LinkedHashMap<>(before.sourceRules);
             File staging=new File(context.getCacheDir(),"rules-download-"+UUID.randomUUID());
             if(!staging.mkdirs()) throw new IOException("无法建立规则下载目录");
             long batchDeadline=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(DOWNLOAD_BATCH_MILLIS);
+            ArrayList<Source> enabled=new ArrayList<>();
+            for(Source source:catalog.values()) if(Boolean.TRUE.equals(before.enabled.get(source.id))) enabled.add(source);
+            if(enabled.isEmpty()){
+                prefs.edit().putLong("last_rule_check",System.currentTimeMillis())
+                        .putString("last_rule_update_warning","没有启用规则源").apply();
+                return false;
+            }
+
+            ExecutorService pool=Executors.newFixedThreadPool(Math.min(3,enabled.size()),r->{
+                Thread t=new Thread(r,"hetu-rule-fetch");t.setDaemon(true);return t;
+            });
+            LinkedHashMap<Source,Future<SourceFetch>> futures=new LinkedHashMap<>();
             ArrayList<String> failures=new ArrayList<>();
             ArrayList<String> successes=new ArrayList<>();
             try {
-                for(Source source:catalog.values()) {
+                for(Source source:enabled) {
+                    futures.put(source,pool.submit(()->fetchSource(source,staging,batchDeadline)));
+                }
+                for(Map.Entry<Source,Future<SourceFetch>> entry:futures.entrySet()){
                     checkInterrupted();
-                    if(!Boolean.TRUE.equals(before.enabled.get(source.id))) continue;
-                    Set<String> parsed=null;
-                    Throwable lastError=null;
-                    for(int mirror=0;mirror<source.urls.size();mirror++) {
-                        checkInterrupted();
-                        File downloaded=new File(staging,source.id+"-"+mirror+".download");
-                        long mirrorDeadline=Math.min(batchDeadline,System.nanoTime()+TimeUnit.SECONDS.toNanos(75));
-                        try {
-                            download(source.urls.get(mirror),downloaded,mirrorDeadline);
-                            try(InputStream in=new FileInputStream(downloaded)) { parsed=parseRules(in,false); }
-                            if(parsed!=null&&!parsed.isEmpty())break;
-                        } catch(Throwable error) {
-                            if(error instanceof InterruptedException)Thread.currentThread().interrupt();
-                            checkInterrupted();
-                            lastError=error;
-                            parsed=null;
-                        }
+                    Source source=entry.getKey();
+                    SourceFetch fetched;
+                    try{
+                        long left=Math.max(1000L,TimeUnit.NANOSECONDS.toMillis(batchDeadline-System.nanoTime()));
+                        fetched=entry.getValue().get(left,TimeUnit.MILLISECONDS);
+                    }catch(TimeoutException timeout){
+                        entry.getValue().cancel(true);
+                        fetched=new SourceFetch(source,null,new IOException("规则源整体超时"),DOWNLOAD_BATCH_MILLIS,-1);
+                    }catch(ExecutionException execution){
+                        Throwable cause=execution.getCause()==null?execution:execution.getCause();
+                        fetched=new SourceFetch(source,null,cause,0L,-1);
                     }
-                    if(parsed==null||parsed.isEmpty()) {
-                        failures.add(source.name+"："+errorMessage(lastError==null?new IOException("所有镜像均不可用"):lastError));
-                        continue;
+                    SharedPreferences.Editor health=prefs.edit().putLong("rule_source_"+source.id+"_duration",fetched.durationMs);
+                    if(fetched.ok()){
+                        next.put(source.id,fetched.rules);
+                        successes.add(source.name+" "+fetched.rules.size()+" 条");
+                        health.putLong("rule_source_"+source.id+"_success",System.currentTimeMillis())
+                                .putInt("rule_source_"+source.id+"_mirror",fetched.mirror)
+                                .remove("rule_source_"+source.id+"_error");
+                    }else{
+                        String detail=errorMessage(fetched.error==null?new IOException("所有镜像均不可用"):fetched.error);
+                        failures.add(source.name+"："+detail);
+                        health.putString("rule_source_"+source.id+"_error",detail);
                     }
-                    next.put(source.id,parsed);
-                    successes.add(source.name+" "+parsed.size()+" 条");
+                    health.apply();
                 }
                 if(successes.isEmpty()) {
-                    String detail=failures.isEmpty()?"没有启用规则源":join(failures);
+                    String detail=failures.isEmpty()?"所有规则源均未返回有效数据":join(failures);
                     prefs.edit().putLong("last_rule_check",System.currentTimeMillis())
                             .putString("last_rule_update_warning",detail+"；已继续使用本地旧快照").apply();
                     if(before.effective.isEmpty())throw new IOException("首次规则下载失败："+detail);
@@ -301,7 +331,8 @@ public final class RuleStore {
                     String warning=failures.isEmpty()?"":"部分来源沿用旧快照："+join(failures);
                     if(next.equals(before.sourceRules)) {
                         prefs.edit().putLong("last_rule_check",now)
-                                .putString("last_rule_update_warning",warning).apply();
+                                .putString("last_rule_update_warning",warning)
+                                .putString("last_rule_update_success",join(successes)).apply();
                         return false;
                     }
                     commit(candidate);
@@ -310,9 +341,40 @@ public final class RuleStore {
                             .putString("last_rule_update_success",join(successes)).apply();
                     return true;
                 }
-            } finally { deleteTree(staging); }
+            } finally {
+                for(Future<SourceFetch> future:futures.values()) if(!future.isDone())future.cancel(true);
+                pool.shutdownNow();
+                deleteTree(staging);
+            }
         }
     }
+
+    private SourceFetch fetchSource(Source source,File staging,long batchDeadline)throws Exception{
+        long started=System.nanoTime();
+        Set<String> parsed=null;
+        Throwable lastError=null;
+        int usedMirror=-1;
+        for(int mirror=0;mirror<source.urls.size();mirror++){
+            checkInterrupted();
+            if(System.nanoTime()>=batchDeadline){lastError=new IOException("规则更新批次已超时");break;}
+            File downloaded=new File(staging,source.id+"-"+mirror+"-"+Thread.currentThread().getId()+".download");
+            long mirrorDeadline=Math.min(batchDeadline,System.nanoTime()+TimeUnit.SECONDS.toNanos(75));
+            try{
+                download(source.urls.get(mirror),downloaded,mirrorDeadline);
+                try(InputStream in=new FileInputStream(downloaded)){parsed=parseRules(in,false);}
+                if(parsed!=null&&!parsed.isEmpty()){usedMirror=mirror;break;}
+            }catch(Throwable error){
+                if(error instanceof InterruptedException)Thread.currentThread().interrupt();
+                checkInterrupted();
+                lastError=error;parsed=null;
+            }finally{
+                if(downloaded.exists())downloaded.delete();
+            }
+        }
+        long duration=TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-started);
+        return new SourceFetch(source,parsed,lastError,duration,usedMirror);
+    }
+
     public void setSource(String id,boolean enabled,boolean moduleInstalled) throws Exception {
         synchronized(LOCK) {
             reload(); if(!catalog.containsKey(id)) throw new IllegalArgumentException("未知订阅源");
