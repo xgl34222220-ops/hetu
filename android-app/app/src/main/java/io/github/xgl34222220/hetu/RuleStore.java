@@ -670,37 +670,59 @@ public final class RuleStore {
             String line;
             while((line=reader.readLine())!=null) {
                 checkInterrupted();
-                if(++lineNumber>500000 || line.length()>8192) throw new IOException("规则行数或单行长度超过限制");
+                if(++lineNumber>1200000 || line.length()>8192) throw new IOException("规则行数或单行长度超过限制");
                 if(lineNumber==1 && line.startsWith("\uFEFF")) line=line.substring(1);
-                int comment=line.indexOf('#'); if(comment>=0)line=line.substring(0,comment);line=line.trim();
-                if(line.isEmpty() || line.startsWith("!")) continue;
-                String[] fields=line.split("\\s+"); int start=0;
-                if(fields[0].equals("0.0.0.0")||fields[0].equals("127.0.0.1")||fields[0].equals("::")||fields[0].equals("::1")) start=1;
-                else if(fields.length!=1) throw new IOException("规则格式无效（第 "+lineNumber+" 行）");
-                if(start==fields.length) throw new IOException("hosts 行缺少域名");
-                for(int i=start;i<fields.length;i++) {
+                line=line.trim();
+                if(line.isEmpty() || line.startsWith("!") || line.startsWith("#") || line.startsWith("[")) continue;
+
+                // Basic AdGuard/Adblock DNS syntax: ||example.org^ blocks the domain
+                // and every subdomain. External allow rules are intentionally skipped;
+                // Hetu's own allowlist remains authoritative and is injected first.
+                if(line.startsWith("@@")) continue;
+                if(line.startsWith("||")) {
+                    int endMarker=line.indexOf('^',2);
+                    if(endMarker<0)continue;
+                    String raw=line.substring(2,endMarker).trim().toLowerCase(Locale.ROOT);
+                    if(raw.startsWith("*."))raw=raw.substring(2);
+                    if(raw.indexOf('*')>=0||raw.indexOf('/')>=0||raw.indexOf(':')>=0||raw.indexOf('$')>=0)continue;
+                    String d=normalize(raw);
+                    if(d!=null)rules.add(d);
+                    if(rules.size()>MAX_DOMAINS)throw new IOException("规则条数超过限制");
+                    continue;
+                }
+
+                int comment=line.indexOf('#'); if(comment>=0)line=line.substring(0,comment).trim();
+                if(line.isEmpty())continue;
+                String[] fields=line.split("\\s+"); int first=0;
+                if(fields[0].equals("0.0.0.0")||fields[0].equals("127.0.0.1")||fields[0].equals("::")||fields[0].equals("::1")) first=1;
+                else if(fields.length!=1) continue;
+                if(first>=fields.length)continue;
+                for(int i=first;i<fields.length;i++) {
                     String raw=fields[i].toLowerCase(Locale.ROOT);
+                    if(raw.startsWith("*."))raw=raw.substring(2);
                     if(raw.endsWith("."))raw=raw.substring(0,raw.length()-1);
                     if(raw.equals("localhost")||raw.equals("localhost.localdomain")||raw.equals("local")||raw.equals("broadcasthost")||raw.matches("ip6-(localhost|loopback|localnet|mcastprefix|allnodes|allrouters|allhosts)")) continue;
-                    if(raw.indexOf('/')>=0 || raw.indexOf(':')>=0) throw new IOException("仅支持 hosts 与精确域名规则");
-                    String d=normalize(raw); if(d==null)throw new IOException("规则含无效域名（第 "+lineNumber+" 行）");
-                    rules.add(d); if(rules.size()>MAX_DOMAINS)throw new IOException("规则条数超过限制");
+                    if(raw.indexOf('*')>=0||raw.indexOf('/')>=0||raw.indexOf(':')>=0||raw.indexOf('$')>=0)continue;
+                    String d=normalize(raw);
+                    if(d==null)continue;
+                    rules.add(d);
+                    if(rules.size()>MAX_DOMAINS)throw new IOException("规则条数超过限制");
                 }
             }
         }
-        if(rules.isEmpty()&&!emptyAllowed)throw new IOException("订阅未包含可用规则，保留原规则");
+        if(rules.isEmpty()&&!emptyAllowed)throw new IOException("订阅未包含可用 DNS 规则，保留原规则");
         return rules;
     }
     private static void download(String address,File target,long batchDeadline) throws Exception {
         URL url=new URL(address);
-        final long deadline=Math.min(batchDeadline,System.nanoTime()+TimeUnit.SECONDS.toNanos(90));
+        final long deadline=Math.min(batchDeadline,System.nanoTime()+TimeUnit.SECONDS.toNanos(45));
         final Thread owner=Thread.currentThread();
         for(int hop=0;hop<6;hop++) {
             checkDownloadDeadline(deadline);
             if(!url.getProtocol().equals("https"))throw new IOException("订阅及跳转必须使用 HTTPS");
             final HttpsURLConnection connection=(HttpsURLConnection)url.openConnection();
-            connection.setInstanceFollowRedirects(false);connection.setConnectTimeout(timeout(deadline,15000));connection.setReadTimeout(timeout(deadline,25000));
-            connection.setRequestProperty("User-Agent","Hetu/0.3 (Android; rule-update)");connection.setRequestProperty("Accept-Encoding","identity");
+            connection.setInstanceFollowRedirects(false);connection.setConnectTimeout(timeout(deadline,8000));connection.setReadTimeout(timeout(deadline,15000));
+            connection.setRequestProperty("User-Agent","Hetu/1.0 (Android; dns-filter)");connection.setRequestProperty("Accept-Encoding","identity");
             // Interrupting a Future does not interrupt a blocking HTTPS read. Close
             // the socket as well, so stopped background jobs release their worker.
             ScheduledFuture<?> cancellation=DOWNLOAD_WATCHDOG.scheduleWithFixedDelay(() -> {
@@ -721,7 +743,7 @@ public final class RuleStore {
                     while(true) {
                         checkInterrupted();
                         long left=(deadline-System.nanoTime())/1000000;
-                        if(left<=0)throw new IOException("规则下载已超时；单个来源最多 90 秒，整批最多 180 秒，保留原规则");
+                        if(left<=0)throw new IOException("规则镜像下载超时；已尝试备用地址，保留该来源旧快照");
                         connection.setReadTimeout((int)Math.min(25000,Math.max(1,left)));
                         length=input.read(buffer);if(length<0)break;
                         checkInterrupted();
@@ -747,7 +769,7 @@ public final class RuleStore {
     }
     static void checkDownloadDeadline(long deadline) throws IOException {
         checkInterrupted();
-        if(System.nanoTime()>=deadline)throw new IOException("规则下载已超时；单个来源最多 90 秒，整批最多 180 秒，保留原规则");
+        if(System.nanoTime()>=deadline)throw new IOException("规则镜像下载超时；已尝试备用地址，保留该来源旧快照");
     }
     private static int timeout(long deadline,int cap) throws IOException {
         checkDownloadDeadline(deadline);
