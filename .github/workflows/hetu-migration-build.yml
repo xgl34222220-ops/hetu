@@ -37,7 +37,8 @@ jobs:
           test ! -d android-app/app/src/main/java/io/github/xgl34222220/bichen
           grep -q 'namespace = "io.github.xgl34222220.hetu"' android-app/app/build.gradle.kts
           grep -q 'applicationId = "io.github.xgl34222220.hetu"' android-app/app/build.gradle.kts
-          grep -q 'compileSdk = 36' android-app/app/build.gradle.kts
+          grep -q 'version = release(37)' android-app/app/build.gradle.kts
+          grep -q 'minorApiLevel = 0' android-app/app/build.gradle.kts
           grep -q 'android:label="河图"' android-app/app/src/main/AndroidManifest.xml
           grep -q 'private static final String ROOT="/data/adb/hetu";' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
           ! grep -R '/data/adb/hetu/proxy' android-app/app/src/main native README.md
@@ -73,7 +74,7 @@ jobs:
           SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort | tail -n 1)
           test -x "$SDKMANAGER"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
-          "$SDKMANAGER" 'platform-tools' 'platforms;android-36' 'build-tools;35.0.0' 'ndk;28.2.13676358'
+          "$SDKMANAGER" 'platform-tools' 'platforms;android-37.0' 'build-tools;37.0.0' 'ndk;28.2.13676358'
 
       - name: Build Hetu JNI bridge and Root Mihomo
         shell: bash
@@ -125,7 +126,7 @@ jobs:
           APK=android-app/app/build/outputs/apk/debug/app-debug.apk
           test -f "$APK"
           unzip -t "$APK" >/dev/null
-          AAPT="${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools/35.0.0/aapt"
+          AAPT="${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools/37.0.0/aapt"
           BADGING=$("$AAPT" dump badging "$APK")
           printf '%s\n' "$BADGING" | grep -q "package: name='io.github.xgl34222220.hetu.preview'"
           printf '%s\n' "$BADGING" | grep -q "application-label:'河图'"
