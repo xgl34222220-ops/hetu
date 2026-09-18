@@ -113,7 +113,7 @@ internal class ProxyComposeController(context: Context) {
 
         val fastRunning = ProxyStatusBridge.rootProxyRunning(app)
         val status = if (fastRunning) {
-            JSONObject().put("running", true).put("message", "河图核心运行中")
+            JSONObject().put("running", true).put("message", "")
         } else {
             try {
                 root.status()
@@ -151,7 +151,12 @@ internal class ProxyComposeController(context: Context) {
             ipv6 = profile.ipv6.id,
             autoOverwrite = profile.autoOverwrite,
             config = selected?.name ?: "尚未选择配置",
-            message = status.optString("message", ""),
+            message = if (!running) {
+                listOf(
+                    status.optString("message", ""),
+                    prefs.getString("proxyAutoRecoveryError", "").orEmpty(),
+                ).filter { it.isNotBlank() }.distinct().joinToString("；")
+            } else "",
             panelReady = panelReady,
             groups = groups,
             connections = connections,
