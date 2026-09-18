@@ -60,10 +60,8 @@ private fun ThemeSettingsScreen(onBack: () -> Unit, onThemeChanged: () -> Unit) 
     var standard by remember { mutableStateOf(prefs.getString("colorStandard", "Material3_2021") ?: "Material3_2021") }
     var accent by remember { mutableStateOf(prefs.getString("accentHex", "#2563EB") ?: "#2563EB") }
     var blur by remember { mutableStateOf(prefs.getBoolean("enableBlur", true)) }
-    var topBlur by remember { mutableStateOf(prefs.getString("topBarBlurStyle", "gaussian") ?: "gaussian") }
     var floating by remember { mutableStateOf(prefs.getBoolean("floatingBottomBar", true)) }
     var liquid by remember { mutableStateOf(prefs.getBoolean("liquidGlass", true)) }
-    var predictive by remember { mutableStateOf(prefs.getBoolean("predictiveBack", true)) }
     var panelTab by remember { mutableStateOf(prefs.getBoolean("showPanelTab", true)) }
     var scale by remember { mutableFloatStateOf(prefs.getFloat("uiScale", 1f).coerceIn(.8f, 1.2f)) }
 
@@ -173,12 +171,6 @@ private fun ThemeSettingsScreen(onBack: () -> Unit, onThemeChanged: () -> Unit) 
                 blur = it; persistBoolean("enableBlur", it)
             }
             ThemeDivider()
-            ThemeValueRow(Icons.Rounded.BlurCircular, "顶栏模糊样式", if (topBlur == "texture") "纹理折射" else "高斯模糊") {
-                openPicker("顶栏模糊样式", topBlur, listOf(PickerOption("gaussian", "高斯模糊"), PickerOption("texture", "纹理折射"))) {
-                    topBlur = it; persistString("topBarBlurStyle", it)
-                }
-            }
-            ThemeDivider()
             ThemeSwitchRow(Icons.Rounded.SpaceBar, "悬浮底栏", "关闭后吸附到屏幕底部", floating) {
                 floating = it; persistBoolean("floatingBottomBar", it)
             }
@@ -193,10 +185,6 @@ private fun ThemeSettingsScreen(onBack: () -> Unit, onThemeChanged: () -> Unit) 
         } }
 
         item { ThemeSection("交互") {
-            ThemeSwitchRow(Icons.Rounded.Swipe, "预测性返回动画", "Android 14+ 使用系统 Predictive Back", predictive) {
-                predictive = it; persistBoolean("predictiveBack", it, false)
-            }
-            ThemeDivider()
             Column(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Rounded.ZoomIn, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
@@ -218,7 +206,7 @@ private fun ThemeSettingsScreen(onBack: () -> Unit, onThemeChanged: () -> Unit) 
 
         item {
             Text(
-                "主题设置只改变界面层，不修改代理核心、规则或订阅。所有不可用数据仍显示为 —，不会伪造状态。",
+                "主题设置只改变界面层，不修改代理核心、规则或订阅。这里展示的开关都直接对应当前界面行为；不可用数据仍显示为 —。",
                 color = t.textSecondary,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
