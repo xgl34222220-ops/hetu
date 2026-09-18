@@ -164,7 +164,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
         )
     }
     val cachedRunning = remember {
-        prefs.getBoolean("proxyRootRuntimeRunning", false) && prefs.getBoolean("proxyRootWanted", false)
+        prefs.getBoolean("proxyRootRuntimeRunning", false) || prefs.getBoolean("proxyRootWanted", false)
     }
     val cachedSnapshot = remember {
         ChainSnapshot(
