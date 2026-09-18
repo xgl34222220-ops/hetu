@@ -14,7 +14,7 @@ public final class ProxyNetworkMatchService extends Service {
     private ConnectivityManager cm;
     private ConnectivityManager.NetworkCallback cb;
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
-    private final ScheduledExecutorService metrics=Executors.newSingleThreadScheduledExecutor();
+    private final ScheduledExecutorService metrics=Executors.newScheduledThreadPool(2);
     private Network lastDefaultNetwork;
     private boolean defaultNetworkSeen;
 
@@ -26,6 +26,7 @@ public final class ProxyNetworkMatchService extends Service {
         startForeground(92,note("代理网络守护已就绪"));
         register();
         metrics.scheduleWithFixedDelay(this::updateAdblockMetrics,1500L,4000L,TimeUnit.MILLISECONDS);
+        metrics.scheduleWithFixedDelay(this::maintainProxyRuntime,7000L,12000L,TimeUnit.MILLISECONDS);
     }
 
     @Override public int onStartCommand(Intent i,int f,int id){
@@ -95,7 +96,7 @@ public final class ProxyNetworkMatchService extends Service {
                     if(!sig.equals(old)||force){
                         prefs.edit().putString("networkMatchLastSig",sig).putBoolean("networkMatchForceEval",false).apply();
                         RootProxyManager root=new RootProxyManager(getApplicationContext());
-                        boolean running=root.status().optBoolean("running",false);
+                        boolean running=coreAlive();
                         String owner=prefs.getString("proxyRootSessionOwner","");
                         if("start".equals(action)){
                             if(!running&&!"manual".equals(owner)){
@@ -125,6 +126,58 @@ public final class ProxyNetworkMatchService extends Service {
                 prefs.edit().putString("networkMatchLastEnvironment","执行失败："+(e.getMessage()==null?e.getClass().getSimpleName():e.getMessage())).apply();
             }
         });
+    }
+
+    private boolean coreAlive(){
+        try{
+            String command="P=$(cat /data/adb/hetu/run/core.pid 2>/dev/null || echo 0); "
+                    +"case \"$P\" in ''|*[!0-9]*) P=0;; esac; "
+                    +"if [ \"$P\" -gt 0 ] && kill -0 \"$P\" >/dev/null 2>&1; then "
+                    +"EXE=$(readlink \"/proc/$P/exe\" 2>/dev/null || true); "
+                    +"case \"$EXE\" in /data/adb/hetu/bin/core) printf 1;; *) printf 0;; esac; "
+                    +"else printf 0; fi";
+            RootBridge.Result result=RootBridge.rootShell(getApplicationContext(),command,3500L);
+            boolean alive=result.ok()&&"1".equals(result.output.trim());
+            prefs.edit().putBoolean("proxyRootRuntimeRunning",alive).apply();
+            return alive;
+        }catch(Exception ignored){
+            return prefs.getBoolean("proxyRootRuntimeRunning",false);
+        }
+    }
+
+    private void maintainProxyRuntime(){
+        try{
+            if(!prefs.getBoolean("proxyRootWanted",false))return;
+            if(coreAlive()){
+                prefs.edit().remove("proxyAutoRecoveryError").apply();
+                return;
+            }
+            prefs.edit().putBoolean("proxyRootRuntimeRunning",false).apply();
+            Network network=cm==null?null:cm.getActiveNetwork();
+            if(network==null){
+                prefs.edit().putString("proxyAutoRecoveryError","等待网络恢复后重新启动代理").apply();
+                return;
+            }
+            long now=System.currentTimeMillis();
+            long last=prefs.getLong("proxyAutoRecoveryAttempt",0L);
+            if(now-last<30000L)return;
+            prefs.edit().putLong("proxyAutoRecoveryAttempt",now).apply();
+            RootProxyManager root=new RootProxyManager(getApplicationContext());
+            JSONObject result=root.start(ProxyRuntimeProfile.load(prefs));
+            if(result.optBoolean("running",false)||result.optBoolean("ok",false)){
+                prefs.edit()
+                        .putBoolean("proxyRootRuntimeRunning",true)
+                        .putLong("proxyAutoRecoverySuccess",System.currentTimeMillis())
+                        .remove("proxyAutoRecoveryError")
+                        .apply();
+            }else{
+                prefs.edit().putString("proxyAutoRecoveryError",result.optString("message","代理自动恢复未完成")).apply();
+            }
+        }catch(Exception error){
+            String detail=error.getMessage()==null?error.getClass().getSimpleName():error.getMessage();
+            if(detail.length()>300)detail=detail.substring(0,300)+"…";
+            prefs.edit().putString("proxyAutoRecoveryError",detail).apply();
+        }
     }
 
     private void updateAdblockMetrics(){
