@@ -37,8 +37,9 @@ jobs:
 
           grep -q 'replaceRunningAfterUpgrade' "$ROOT"
           grep -q 'existing.optBoolean("running",false)&&!replaceRunning' "$ROOT"
-          grep -q 'root.replaceRunningAfterUpgrade' "$BOOT"
+          grep -q 'proxyRootRuntimeRefreshPending' "$BOOT"
           ! awk '/ACTION_MY_PACKAGE_REPLACED/{f=1} /BOOT_COMPLETED/{if(f){exit}} f' "$BOOT" | grep -q 'root.stop()'
+          ! awk '/ACTION_MY_PACKAGE_REPLACED/{f=1} /BOOT_COMPLETED/{if(f){exit}} f' "$BOOT" | grep -q 'root.start('
 
           grep -q 'shouldStopAfterStabilize' "$MATCH"
           grep -q 'proxyLastAutoStopReason' "$MATCH"
