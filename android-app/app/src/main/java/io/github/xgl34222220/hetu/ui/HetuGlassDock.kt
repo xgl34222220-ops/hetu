@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -73,9 +74,22 @@ fun HetuGlassDock(
     val tokens = LocalHetuTokens.current
     val dark = scheme.background.luminance() < .5f
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val floating = true
-    val enableBlur = true
-    val activeGlass = true
+    val context = LocalContext.current
+    val prefs = remember(context) { context.getSharedPreferences("hetu", 0) }
+    var floating by remember { mutableStateOf(prefs.getBoolean("floatingBottomBar", true)) }
+    var enableBlur by remember { mutableStateOf(prefs.getBoolean("enableBlur", true)) }
+    var activeGlass by remember { mutableStateOf(prefs.getBoolean("liquidGlass", true)) }
+    DisposableEffect(prefs) {
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { shared, key ->
+            when (key) {
+                "floatingBottomBar" -> floating = shared.getBoolean(key, true)
+                "enableBlur" -> enableBlur = shared.getBoolean(key, true)
+                "liquidGlass" -> activeGlass = shared.getBoolean(key, true)
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
     val shape = if (floating) RoundedCornerShape(31.dp) else RoundedCornerShape(topStart = 31.dp, topEnd = 31.dp)
     val runtimeLiquid = activeGlass && enableBlur && backdrop != null && isRuntimeShaderSupported()
     val activeHaze = activeGlass && enableBlur && !runtimeLiquid
@@ -162,7 +176,7 @@ fun HetuGlassDock(
             modifier = Modifier
                 .fillMaxSize()
                 .shadow(if (floating) 18.dp else 5.dp, shape, clip = false)
-                .squircleClip(31.dp)
+                .then(if (floating) Modifier.squircleClip(31.dp) else Modifier.clip(shape))
                 .then(if (runtimeLiquid) Modifier.layerBackdrop(dockSurfaceBackdrop) else Modifier)
                 .then(liquidShellModifier)
                 .border(
