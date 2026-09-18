@@ -61,6 +61,8 @@ jobs:
           grep -q 'controller.restart { operation = it }' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           grep -q 'replaceRunningAfterUpgrade(profile)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
           grep -q 'dataPlaneHealthy' android-app/app/src/main/assets/hetu-root.sh
+          grep -q "printf 'DNS=%s" android-app/app/src/main/assets/hetu-root.sh
+          grep -q "printf 'DNS_PORT=%s" android-app/app/src/main/assets/hetu-root.sh
           grep -q 'dataPlaneHealthy' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
           grep -q 'default-network-stable-2500ms' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
           grep -q 'head -c \$((END-START+1))' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
