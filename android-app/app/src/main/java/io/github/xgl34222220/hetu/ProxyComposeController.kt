@@ -102,6 +102,7 @@ internal class ProxyComposeController(context: Context) {
     private val api = MihomoControllerClient(app)
     private val icons = ProxyIconStore(app)
     private val appIconCache = android.util.LruCache<String, Bitmap>(96)
+    private val appIdentityCache = android.util.LruCache<String, AppIdentity>(192)
 
     suspend fun state(): ProxyComposeState = withContext(Dispatchers.IO) {
         val profile = ProxyRuntimeProfile.load(prefs)
@@ -492,6 +493,8 @@ internal class ProxyComposeController(context: Context) {
         val uid = meta.optInt("uid", -1)
         val processRaw = meta.optString("process").ifBlank { meta.optString("processPath") }
         val process = processRaw.substringAfterLast('/').substringBefore(':')
+        val cacheKey = "$uid|$process"
+        appIdentityCache.get(cacheKey)?.let { return it }
         val pm = app.packageManager
         val uidPackages = if (uid > 0) pm.getPackagesForUid(uid)?.toList().orEmpty() else emptyList()
         val candidates = LinkedHashSet<String>()
@@ -514,13 +517,14 @@ internal class ProxyComposeController(context: Context) {
                 uid > 0 -> "UID $uid"
                 else -> "未知应用"
             }
-            return AppIdentity(uid, "", fallback, null)
+            return AppIdentity(uid, "", fallback, null).also { appIdentityCache.put(cacheKey, it) }
         }
         return try {
             val info = pm.getApplicationInfo(packageName, 0)
             AppIdentity(uid, packageName, pm.getApplicationLabel(info).toString(), loadIcon(packageName))
+                .also { appIdentityCache.put(cacheKey, it) }
         } catch (_: Exception) {
-            AppIdentity(uid, packageName, packageName, null)
+            AppIdentity(uid, packageName, packageName, null).also { appIdentityCache.put(cacheKey, it) }
         }
     }
 
