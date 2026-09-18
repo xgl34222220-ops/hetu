@@ -5,12 +5,10 @@ import android.os.SystemClock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import java.io.File
 import java.net.HttpURLConnection
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.net.URL
-import java.util.zip.ZipInputStream
 
 internal data class ProxyRuntimeSnapshot(
     val running: Boolean = false,
@@ -33,10 +31,6 @@ internal class ProxyRuntimeInspector(context: Context) {
     private val prefs = app.getSharedPreferences("bichen", Context.MODE_PRIVATE)
     @Volatile private var wanCacheAt = 0L
     @Volatile private var wanCache = Triple("—", "", "—")
-
-    companion object {
-        private const val ZASHBOARD_ZIP = "https://github.com/Zephyruso/zashboard/releases/latest/download/dist-no-fonts.zip"
-    }
 
     suspend fun sample(): ProxyRuntimeSnapshot = withContext(Dispatchers.IO) {
         val command = """
@@ -89,167 +83,6 @@ internal class ProxyRuntimeInspector(context: Context) {
         val result = RootBridge.rootShell(app, command, 10_000L)
         val text = result.output.trim()
         if (text.isBlank()) "暂无运行日志" else text.takeLast(24_000)
-    }
-
-    /**
-     * Install Zashboard directly into Mihomo's local external-ui directory.
-     * The UI is then served from the same 127.0.0.1 origin as the Clash API, so Android WebView
-     * no longer depends on hosted-page CORS or Private Network Access behavior.
-     */
-    suspend fun ensureWebUi() = withContext(Dispatchers.IO) {
-        if (waitWebUiReady(1_200L)) return@withContext
-        var officialError = ""
-        try {
-            api.upgradeUi()
-            if (waitWebUiReady(10_000L)) return@withContext
-            officialError = "Mihomo /upgrade/ui 已返回，但 /ui/ 仍不可访问"
-        } catch (error: Exception) {
-            officialError = error.message ?: "Mihomo /upgrade/ui 调用失败"
-        }
-        try {
-            installZashboard()
-            if (waitWebUiReady(5_000L)) return@withContext
-            error("本地文件已安装，但 Mihomo 没有从 /ui/ 提供页面")
-        } catch (fallback: Exception) {
-            val second = fallback.message ?: "本地安装失败"
-            error("WebUI 安装失败：$officialError；备用安装：$second")
-        }
-    }
-
-    suspend fun repairWebUi() = withContext(Dispatchers.IO) {
-        removeWebUiFiles()
-        ensureWebUi()
-    }
-
-    fun controllerSecret(): String = prefs.getString("proxyControllerSecret", "").orEmpty()
-
-    private fun installZashboard() {
-        val stage = File(app.cacheDir, "zashboard-stage")
-        if (stage.exists()) stage.deleteRecursively()
-        if (!stage.mkdirs()) error("无法创建 WebUI 临时目录")
-
-        try {
-            val connection = openDownload(ZASHBOARD_ZIP)
-            connection.inputStream.buffered().use { input ->
-                ZipInputStream(input).use { zip ->
-                    val stageRoot = stage.canonicalFile
-                    while (true) {
-                        val entry = zip.nextEntry ?: break
-                        val out = File(stage, entry.name).canonicalFile
-                        if (out != stageRoot && !out.path.startsWith(stageRoot.path + File.separator)) {
-                            error("WebUI 压缩包包含非法路径")
-                        }
-                        if (entry.isDirectory) {
-                            if (!out.isDirectory && !out.mkdirs()) error("无法创建 WebUI 目录")
-                        } else {
-                            out.parentFile?.let { parent ->
-                                if (!parent.isDirectory && !parent.mkdirs()) error("无法创建 WebUI 目录")
-                            }
-                            out.outputStream().buffered().use { output -> zip.copyTo(output) }
-                        }
-                        zip.closeEntry()
-                    }
-                }
-            }
-            connection.disconnect()
-
-            val index = stage.walkTopDown().firstOrNull {
-                it.isFile && it.name.equals("index.html", ignoreCase = true) &&
-                    runCatching { it.readText().contains("zashboard", ignoreCase = true) }.getOrDefault(false)
-            } ?: error("Zashboard 压缩包里没有有效的 index.html")
-            val root = index.parentFile ?: error("Zashboard 文件结构异常")
-            val hasJs = root.walkTopDown().any { it.isFile && it.extension.equals("js", ignoreCase = true) }
-            if (!hasJs) error("Zashboard 静态资源不完整")
-
-            val uiPath = "/data/adb/bichen/proxy/run/${MihomoStartupConfig.EXTERNAL_UI_DIR}"
-            val command = buildString {
-                append("set -e; rm -rf ").append(RootBridge.quote(uiPath))
-                append("; mkdir -p ").append(RootBridge.quote(uiPath))
-                append("; cp -a ").append(RootBridge.quote(root.absolutePath + "/."))
-                append(' ').append(RootBridge.quote(uiPath + "/"))
-                append("; chmod -R a+rX ").append(RootBridge.quote(uiPath))
-            }
-            val copied = RootBridge.rootShell(app, command, 20_000L)
-            if (!copied.ok()) error("安装 Zashboard 失败：${copied.output.trim().takeLast(300)}")
-            if (!webUiReady()) error("Zashboard 已复制但本机静态资源校验失败")
-        } finally {
-            stage.deleteRecursively()
-        }
-    }
-
-    private fun openDownload(initialUrl: String): HttpURLConnection {
-        var current = initialUrl
-        repeat(6) {
-            val connection = (URL(current).openConnection() as HttpURLConnection).apply {
-                instanceFollowRedirects = false
-                connectTimeout = 15_000
-                readTimeout = 90_000
-                requestMethod = "GET"
-                setRequestProperty("User-Agent", "Bichen-Android")
-                setRequestProperty("Accept", "application/zip,application/octet-stream,*/*")
-            }
-            val code = connection.responseCode
-            if (code in listOf(301, 302, 303, 307, 308)) {
-                val location = connection.getHeaderField("Location") ?: error("WebUI 下载重定向缺少地址")
-                current = URL(URL(current), location).toString()
-                connection.disconnect()
-            } else {
-                if (code !in 200..299) {
-                    connection.disconnect()
-                    error("Zashboard 下载失败：HTTP $code")
-                }
-                return connection
-            }
-        }
-        error("Zashboard 下载重定向次数过多")
-    }
-
-    private fun webUiReady(): Boolean {
-        val uiPath = "/data/adb/bichen/proxy/run/${MihomoStartupConfig.EXTERNAL_UI_DIR}"
-        val command = "UI=${RootBridge.quote(uiPath)}; test -s \"${'$'}UI/index.html\" && find \"${'$'}UI\" -type f -print 2>/dev/null | grep -Eq '\\.(m?js)$' && echo READY || echo MISSING"
-        val result = RootBridge.rootShell(app, command, 4_000L)
-        return result.ok() && result.output.contains("READY")
-    }
-
-    private fun webUiHttpReady(): Boolean {
-        val connection = (URL("http://127.0.0.1:${MihomoStartupConfig.CONTROLLER_PORT}/ui/").openConnection() as HttpURLConnection).apply {
-            instanceFollowRedirects = true
-            connectTimeout = 2_000
-            readTimeout = 3_000
-            requestMethod = "GET"
-            setRequestProperty("Accept", "text/html,*/*")
-            controllerSecret().takeIf { it.isNotBlank() }?.let { setRequestProperty("Authorization", "Bearer $it") }
-        }
-        return try {
-            val code = connection.responseCode
-            if (code !in 200..299) false else {
-                val head = connection.inputStream.bufferedReader().use { reader ->
-                    val chars = CharArray(4096)
-                    val count = reader.read(chars)
-                    if (count <= 0) "" else String(chars, 0, count)
-                }
-                head.contains("<html", ignoreCase = true) || head.contains("<!doctype", ignoreCase = true)
-            }
-        } catch (_: Exception) {
-            false
-        } finally {
-            connection.disconnect()
-        }
-    }
-
-    private fun waitWebUiReady(timeoutMs: Long): Boolean {
-        val end = SystemClock.elapsedRealtime() + timeoutMs
-        do {
-            if (webUiReady() && webUiHttpReady()) return true
-            if (SystemClock.elapsedRealtime() >= end) break
-            Thread.sleep(180L)
-        } while (true)
-        return false
-    }
-
-    private fun removeWebUiFiles() {
-        val uiPath = "/data/adb/bichen/proxy/run/${MihomoStartupConfig.EXTERNAL_UI_DIR}"
-        RootBridge.rootShell(app, "rm -rf ${RootBridge.quote(uiPath)}; mkdir -p ${RootBridge.quote(uiPath)}", 8_000L)
     }
 
     private fun localNetwork(): Pair<String, String> {
