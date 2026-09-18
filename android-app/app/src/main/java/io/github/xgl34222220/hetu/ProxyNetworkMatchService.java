@@ -7,6 +7,7 @@ import android.net.wifi.*;
 import android.os.*;
 import java.util.*;
 import java.util.concurrent.*;
+import org.json.JSONObject;
 
 public final class ProxyNetworkMatchService extends Service {
     private static final String CHANNEL="hetu-network-match";
