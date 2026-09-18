@@ -5,6 +5,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -17,6 +18,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -94,8 +98,12 @@ private fun CoreManagerScreen(onBack: () -> Unit) {
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 32.dp),
+        modifier = Modifier.fillMaxSize().background(tokens.pageBackground),
+        contentPadding = PaddingValues(
+            start = 20.dp,
+            end = 20.dp,
+            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 92.dp,
+        ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item("header") {
