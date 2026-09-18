@@ -18,10 +18,10 @@ import javax.net.ssl.HttpsURLConnection;
 public final class RuleStore {
     private static final Object LOCK = new Object();
     private static final RuleUpdateGate UPDATE_GATE = new RuleUpdateGate();
-    private static final int MAX_SOURCE_BYTES = 16 * 1024 * 1024;
-    private static final int MAX_COMBINED_BYTES = 64 * 1024 * 1024;
-    private static final int MAX_DOMAINS = 750000;
-    private static final long DOWNLOAD_BATCH_MILLIS = 150000L;
+    private static final int MAX_SOURCE_BYTES = 32 * 1024 * 1024;
+    private static final int MAX_COMBINED_BYTES = 128 * 1024 * 1024;
+    private static final int MAX_DOMAINS = 1500000;
+    private static final long DOWNLOAD_BATCH_MILLIS = 240000L;
     private static final ScheduledExecutorService DOWNLOAD_WATCHDOG = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t=new Thread(r,"hetu-rule-download-guard");t.setDaemon(true);return t;
     });
@@ -46,14 +46,14 @@ public final class RuleStore {
         final String generation, revision;
         final boolean fromModule;
         final long updatedAt;
-        final Set<String> effective, allow, block;
+        final Set<String> effective, allow, block, filterExceptions;
         final Map<String,Boolean> enabled;
         final Map<String,Set<String>> sourceRules;
-        Snapshot(String g, String r, boolean m, Set<String> e, Set<String> a, Set<String> b,
+        Snapshot(String g, String r, boolean m, Set<String> e, Set<String> a, Set<String> b, Set<String> exceptions,
                  Map<String,Boolean> on, Map<String,Set<String>> sources, long updated) {
             generation=g; revision=r; fromModule=m;
             updatedAt=updated;
-            effective=immutable(e); allow=immutable(a); block=immutable(b);
+            effective=immutable(e); allow=immutable(a); block=immutable(b); filterExceptions=immutable(exceptions);
             enabled=Collections.unmodifiableMap(new LinkedHashMap<>(on));
             Map<String,Set<String>> copy=new LinkedHashMap<>();
             for (Map.Entry<String,Set<String>> item:sources.entrySet()) copy.put(item.getKey(),immutable(item.getValue()));
@@ -150,8 +150,16 @@ public final class RuleStore {
     public boolean isBlocked(String domain) {
         String normalized=normalize(domain); Snapshot s=live;
         if(normalized==null||s==null)return false;
-        if(suffixMatch(s.allow,normalized))return false;
+        if(suffixMatch(s.allow,normalized) || suffixMatch(s.filterExceptions,normalized))return false;
         return suffixMatch(s.effective,normalized);
+    }
+
+    public java.util.List<String> effectiveAllowDomains() {
+        Snapshot s=live;
+        if(s==null)return java.util.Collections.emptyList();
+        java.util.TreeSet<String> merged=new java.util.TreeSet<>(s.allow);
+        merged.addAll(s.filterExceptions);
+        return new java.util.ArrayList<>(merged);
     }
     private static boolean suffixMatch(Set<String> rules,String domain){
         if(rules==null||rules.isEmpty()||domain==null||domain.isEmpty())return false;
@@ -187,6 +195,7 @@ public final class RuleStore {
         String suffix="\nDNS 后缀匹配：一条域名规则会覆盖该域名及其子域；白名单优先。此处显示规则命中，不代表所有应用的实际流量。";
         if(prefs.getBoolean("rules_need_module_sync",false)) suffix="\n注意：模块变更尚未同步，以下是应用保留的上一份完整快照。"+suffix;
         if(suffixMatch(s.allow,d)) return d+"：白名单放行（优先于黑名单与订阅）"+suffix;
+        if(suffixMatch(s.filterExceptions,d)) return d+"：命中过滤器例外规则，放行"+suffix;
         if(suffixMatch(s.block,d)) return d+"：命中自定义黑名单"+suffix;
         if(s.fromModule) return d+(suffixMatch(s.effective,d)?"：命中已同步的有效规则":"：未命中已同步的有效规则")+suffix;
         List<String> active=new ArrayList<>(), inactive=new ArrayList<>();
@@ -340,7 +349,8 @@ public final class RuleStore {
         if(snapshot==null) return null;
         // One immutable snapshot for both exceptions and blocked targets.
         return DnsResponseFilter.blockedAlias(query,response,enabled,
-                snapshot.allow::contains,snapshot.effective::contains);
+                domain -> suffixMatch(snapshot.allow,domain) || suffixMatch(snapshot.filterExceptions,domain),
+                domain -> suffixMatch(snapshot.effective,domain));
     }
     public void changeDomain(String raw,boolean allow,boolean add,boolean moduleInstalled) throws Exception {
         String domain=normalize(raw); if(domain==null) throw new IllegalArgumentException("请输入有效域名或 HTTP(S) 网址，不支持 IP 或通配符");
@@ -512,14 +522,30 @@ public final class RuleStore {
     }
     private Snapshot compose(String revision,boolean fromModule,Set<String> allow,Set<String> block,
             Map<String,Boolean> enabled,Map<String,Set<String>> sources,Set<String> exact) throws IOException {
+        Set<String> exceptions=sourceExceptions(enabled,sources);
         Set<String> effective=exact;
         if(effective==null) {
             effective=new HashSet<>(block);
-            for(String id:catalog.keySet()) if(Boolean.TRUE.equals(enabled.get(id))) effective.addAll(sources.get(id));
-            effective.removeIf(domain->suffixMatch(allow,domain));
+            for(String id:catalog.keySet()) if(Boolean.TRUE.equals(enabled.get(id))) {
+                Set<String> values=sources.get(id);
+                if(values==null)continue;
+                for(String rule:values) if(!rule.startsWith("@@")) effective.add(rule);
+            }
+            effective.removeIf(domain->suffixMatch(allow,domain) || suffixMatch(exceptions,domain));
         }
         if(effective.size()>MAX_DOMAINS) throw new IOException("合并后规则超过 "+MAX_DOMAINS+" 条");
-        return new Snapshot("",revision,fromModule,effective,allow,block,enabled,sources,System.currentTimeMillis());
+        return new Snapshot("",revision,fromModule,effective,allow,block,exceptions,enabled,sources,System.currentTimeMillis());
+    }
+
+    private static Set<String> sourceExceptions(Map<String,Boolean> enabled,Map<String,Set<String>> sources){
+        Set<String> out=new HashSet<>();
+        for(Map.Entry<String,Boolean> flag:enabled.entrySet()){
+            if(!Boolean.TRUE.equals(flag.getValue()))continue;
+            Set<String> values=sources.get(flag.getKey());
+            if(values==null)continue;
+            for(String rule:values)if(rule.startsWith("@@")&&rule.length()>2)out.add(rule.substring(2));
+        }
+        return out;
     }
     private void commit(Snapshot candidate) throws Exception {
         commit(candidate,null,false);
@@ -544,7 +570,7 @@ public final class RuleStore {
             }
             cfg.put("sources",flags); writeDomains(new File(dir,"effective"),candidate.effective,MAX_COMBINED_BYTES);
             writeBytes(new File(dir,"config.json"),cfg.toString().getBytes(StandardCharsets.UTF_8),MAX_COMBINED_BYTES);
-            Snapshot next=new Snapshot(id,candidate.revision,candidate.fromModule,candidate.effective,candidate.allow,candidate.block,candidate.enabled,candidate.sourceRules,candidate.updatedAt);
+            Snapshot next=new Snapshot(id,candidate.revision,candidate.fromModule,candidate.effective,candidate.allow,candidate.block,candidate.filterExceptions,candidate.enabled,candidate.sourceRules,candidate.updatedAt);
             String previous=live==null || !root.getAbsolutePath().equals(liveRoot)?"":live.generation;
             // Cancellation is checked immediately before the atomic switch. Once the
             // pointer commits, always publish that same generation to DNS readers.
@@ -571,14 +597,19 @@ public final class RuleStore {
         Map<String,Set<String>> sources=new LinkedHashMap<>();
         for(String source:catalog.keySet()) {
             File stored=new File(dir,"source-"+source);
-            try(InputStream in=stored.isFile()?new FileInputStream(stored):context.getAssets().open("rules/"+source+".txt")) {
-                sources.put(source,parseRules(in,false));
+            if(stored.isFile()) {
+                try(InputStream in=new FileInputStream(stored)){ sources.put(source,parseRules(in,true)); }
+            } else {
+                try(InputStream in=context.getAssets().open("rules/"+source+".txt")) { sources.put(source,parseRules(in,true)); }
+                catch(FileNotFoundException missing){ sources.put(source,new HashSet<>()); }
             }
         }
         Set<String> effective;
         try(InputStream in=new FileInputStream(new File(dir,"effective"))) { effective=parseRules(in,true); }
+        Map<String,Boolean> enabled=sourceFlags(cfg.getJSONArray("sources"),true);
+        Set<String> allow=domainArray(cfg.getJSONArray("allow")), block=domainArray(cfg.getJSONArray("block"));
         return new Snapshot(id,cfg.optString("revision",""),cfg.optBoolean("fromModule",false),effective,
-                domainArray(cfg.getJSONArray("allow")),domainArray(cfg.getJSONArray("block")),sourceFlags(cfg.getJSONArray("sources"),true),sources,cfg.optLong("updatedAt",new File(dir,"config.json").lastModified()));
+                allow,block,sourceExceptions(enabled,sources),enabled,sources,cfg.optLong("updatedAt",new File(dir,"config.json").lastModified()));
     }
     private void publish(Snapshot s) { liveRoot=root.getAbsolutePath(); live=s; }
     private void mirrorPrefs(Snapshot s) {
@@ -593,7 +624,10 @@ public final class RuleStore {
     }
     private Map<String,Set<String>> readBuiltins() throws Exception {
         Map<String,Set<String>> result=new LinkedHashMap<>();
-        for(String id:catalog.keySet()) try(InputStream in=context.getAssets().open("rules/"+id+".txt")) { result.put(id,parseRules(in,false)); }
+        for(String id:catalog.keySet()) {
+            try(InputStream in=context.getAssets().open("rules/"+id+".txt")) { result.put(id,parseRules(in,true)); }
+            catch(FileNotFoundException missing){ result.put(id,new HashSet<>()); }
+        }
         return result;
     }
     private Map<String,Boolean> sourceFlags(JSONArray list,boolean complete) throws Exception {
@@ -675,21 +709,113 @@ public final class RuleStore {
                 line=line.trim();
                 if(line.isEmpty() || line.startsWith("!") || line.startsWith("#") || line.startsWith("[")) continue;
 
-                // Basic AdGuard/Adblock DNS syntax: ||example.org^ blocks the domain
-                // and every subdomain. External allow rules are intentionally skipped;
-                // Hetu's own allowlist remains authoritative and is injected first.
-                if(line.startsWith("@@")) continue;
-                if(line.startsWith("||")) {
-                    int endMarker=line.indexOf('^',2);
-                    if(endMarker<0)continue;
-                    String raw=line.substring(2,endMarker).trim().toLowerCase(Locale.ROOT);
+                // AdGuard Home compatible core DNS syntax:
+                // ||example.org^ blocks the domain tree; @@||example.org^ is an exception.
+                boolean exception=line.startsWith("@@");
+                String adblock=exception?line.substring(2):line;
+                if(adblock.startsWith("||")) {
+                    int endMarker=adblock.indexOf('^',2);
+                    if(endMarker<0)endMarker=adblock.indexOf('
+
+                int comment=line.indexOf('#'); if(comment>=0)line=line.substring(0,comment).trim();
+                if(line.isEmpty())continue;
+                String[] fields=line.split("\\s+"); int first=0;
+                if(fields[0].equals("0.0.0.0")||fields[0].equals("127.0.0.1")||fields[0].equals("::")||fields[0].equals("::1")) first=1;
+                else if(fields.length!=1) continue;
+                if(first>=fields.length)continue;
+                for(int i=first;i<fields.length;i++) {
+                    String raw=fields[i].toLowerCase(Locale.ROOT);
                     if(raw.startsWith("*."))raw=raw.substring(2);
+                    if(raw.endsWith("."))raw=raw.substring(0,raw.length()-1);
+                    if(raw.equals("localhost")||raw.equals("localhost.localdomain")||raw.equals("local")||raw.equals("broadcasthost")||raw.matches("ip6-(localhost|loopback|localnet|mcastprefix|allnodes|allrouters|allhosts)")) continue;
                     if(raw.indexOf('*')>=0||raw.indexOf('/')>=0||raw.indexOf(':')>=0||raw.indexOf('$')>=0)continue;
                     String d=normalize(raw);
-                    if(d!=null)rules.add(d);
+                    if(d==null)continue;
+                    rules.add(d);
+                    if(rules.size()>MAX_DOMAINS)throw new IOException("规则条数超过限制");
+                }
+            }
+        }
+        if(rules.isEmpty()&&!emptyAllowed)throw new IOException("订阅未包含可用 DNS 规则，保留原规则");
+        return rules;
+    }
+    private static void download(String address,File target,long batchDeadline) throws Exception {
+        URL url=new URL(address);
+        final long deadline=Math.min(batchDeadline,System.nanoTime()+TimeUnit.SECONDS.toNanos(45));
+        final Thread owner=Thread.currentThread();
+        for(int hop=0;hop<6;hop++) {
+            checkDownloadDeadline(deadline);
+            if(!url.getProtocol().equals("https"))throw new IOException("订阅及跳转必须使用 HTTPS");
+            final HttpsURLConnection connection=(HttpsURLConnection)url.openConnection();
+            connection.setInstanceFollowRedirects(false);connection.setConnectTimeout(timeout(deadline,8000));connection.setReadTimeout(timeout(deadline,15000));
+            connection.setRequestProperty("User-Agent","Hetu/1.0 (Android; dns-filter)");connection.setRequestProperty("Accept-Encoding","identity");
+            // Interrupting a Future does not interrupt a blocking HTTPS read. Close
+            // the socket as well, so stopped background jobs release their worker.
+            ScheduledFuture<?> cancellation=DOWNLOAD_WATCHDOG.scheduleWithFixedDelay(() -> {
+                if(owner.isInterrupted()||System.nanoTime()>=deadline)connection.disconnect();
+            },250,250,TimeUnit.MILLISECONDS);
+            try {
+                int status=connection.getResponseCode();
+                checkDownloadDeadline(deadline);
+                if(status==301||status==302||status==303||status==307||status==308) {
+                    String location=connection.getHeaderField("Location");if(location==null)throw new IOException("订阅跳转地址缺失");url=new URL(url,location);continue;
+                }
+                if(status!=200)throw new IOException("规则下载失败：HTTP "+status);
+                long expected=connection.getContentLengthLong();if(expected>MAX_SOURCE_BYTES)throw new IOException("订阅超过 8 MiB");
+                String encoding=connection.getContentEncoding();if(encoding!=null&&!encoding.equalsIgnoreCase("identity"))throw new IOException("订阅返回不支持的压缩传输");
+                byte[] data;
+                try(InputStream input=connection.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()) {
+                    byte[] buffer=new byte[16384];int length,total=0;
+                    while(true) {
+                        checkInterrupted();
+                        long left=(deadline-System.nanoTime())/1000000;
+                        if(left<=0)throw new IOException("规则镜像下载超时；已尝试备用地址，保留该来源旧快照");
+                        connection.setReadTimeout((int)Math.min(25000,Math.max(1,left)));
+                        length=input.read(buffer);if(length<0)break;
+                        checkInterrupted();
+                        total+=length;if(total>MAX_SOURCE_BYTES)throw new IOException("订阅超过 8 MiB");
+                        out.write(buffer,0,length);
+                    }
+                    data=out.toByteArray();
+                }
+                if(data.length==0 || (expected>=0 && expected!=data.length))throw new IOException("订阅下载不完整，保留原规则");
+                checkDownloadDeadline(deadline);
+                writeBytes(target,data);return;
+            } catch(IOException error) {
+                checkDownloadDeadline(deadline);throw error;
+            } finally {cancellation.cancel(false);connection.disconnect();}
+        }
+        throw new IOException("订阅跳转次数过多");
+    }
+    private static void deleteTree(File file) {
+        File[] children=file.listFiles();if(children!=null)for(File child:children)deleteTree(child);file.delete();
+    }
+    private static void checkInterrupted() throws InterruptedIOException {
+        if(Thread.currentThread().isInterrupted()) throw new InterruptedIOException("规则更新已取消；已经完成的提交保留");
+    }
+    static void checkDownloadDeadline(long deadline) throws IOException {
+        checkInterrupted();
+        if(System.nanoTime()>=deadline)throw new IOException("规则镜像下载超时；已尝试备用地址，保留该来源旧快照");
+    }
+    private static int timeout(long deadline,int cap) throws IOException {
+        checkDownloadDeadline(deadline);
+        return (int)Math.max(1,Math.min(cap,TimeUnit.NANOSECONDS.toMillis(deadline-System.nanoTime())));
+    }
+    private static String errorMessage(Throwable error) {
+        String message=error.getMessage();return message==null||message.trim().isEmpty()?error.getClass().getSimpleName():message;
+    }
+}
+,2);
+                    if(endMarker<0)endMarker=adblock.length();
+                    String raw=adblock.substring(2,endMarker).trim().toLowerCase(Locale.ROOT);
+                    if(raw.startsWith("*."))raw=raw.substring(2);
+                    if(raw.indexOf('*')>=0||raw.indexOf('/')>=0||raw.indexOf(':')>=0)continue;
+                    String d=normalize(raw);
+                    if(d!=null)rules.add(exception?"@@"+d:d);
                     if(rules.size()>MAX_DOMAINS)throw new IOException("规则条数超过限制");
                     continue;
                 }
+                if(exception)continue;
 
                 int comment=line.indexOf('#'); if(comment>=0)line=line.substring(0,comment).trim();
                 if(line.isEmpty())continue;
