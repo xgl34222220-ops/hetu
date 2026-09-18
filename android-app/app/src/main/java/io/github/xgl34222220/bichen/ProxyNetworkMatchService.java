@@ -57,10 +57,19 @@ public final class ProxyNetworkMatchService extends Service {
             lastDefaultNetwork=n;
             defaultNetworkSeen=true;
             if(!changed||!prefs.getBoolean("proxyRootWanted",false))return;
-            SystemClock.sleep(220);
+            // Wait until Android has actually committed the new default network.
+            // Otherwise Wi-Fi/cellular handover can generate two callbacks and close
+            // healthy sessions twice while the route is still oscillating.
+            SystemClock.sleep(650);
+            Network active=cm.getActiveNetwork();
+            if(active==null||!active.equals(n))return;
             try{
                 new MihomoControllerClient(getApplicationContext()).closeAll();
-                prefs.edit().putLong("proxyLastNetworkSessionReset",System.currentTimeMillis()).remove("proxyNetworkSessionResetError").apply();
+                prefs.edit()
+                        .putLong("proxyLastNetworkSessionReset",System.currentTimeMillis())
+                        .putString("proxyLastNetworkSessionResetReason","默认网络已稳定切换，清理旧 Mihomo 会话")
+                        .remove("proxyNetworkSessionResetError")
+                        .apply();
             }catch(Exception e){
                 prefs.edit().putString("proxyNetworkSessionResetError",e.getMessage()==null?e.getClass().getSimpleName():e.getMessage()).apply();
             }
