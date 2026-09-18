@@ -18,10 +18,10 @@ import javax.net.ssl.HttpsURLConnection;
 public final class RuleStore {
     private static final Object LOCK = new Object();
     private static final RuleUpdateGate UPDATE_GATE = new RuleUpdateGate();
-    private static final int MAX_SOURCE_BYTES = 8 * 1024 * 1024;
-    private static final int MAX_COMBINED_BYTES = 32 * 1024 * 1024;
-    private static final int MAX_DOMAINS = 500000;
-    private static final long DOWNLOAD_BATCH_MILLIS = 180000L;
+    private static final int MAX_SOURCE_BYTES = 16 * 1024 * 1024;
+    private static final int MAX_COMBINED_BYTES = 64 * 1024 * 1024;
+    private static final int MAX_DOMAINS = 750000;
+    private static final long DOWNLOAD_BATCH_MILLIS = 150000L;
     private static final ScheduledExecutorService DOWNLOAD_WATCHDOG = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t=new Thread(r,"hetu-rule-download-guard");t.setDaemon(true);return t;
     });
@@ -34,9 +34,13 @@ public final class RuleStore {
     private final LinkedHashMap<String,Source> catalog = new LinkedHashMap<>();
 
     private static final class Source {
-        final String id, name, url;
+        final String id, name;
+        final List<String> urls;
         final boolean defaultOn;
-        Source(String i, String n, String u, boolean d) { id=i; name=n; url=u; defaultOn=d; }
+        Source(String i, String n, List<String> u, boolean d) {
+            id=i; name=n; urls=Collections.unmodifiableList(new ArrayList<>(u)); defaultOn=d;
+        }
+        String primaryUrl(){ return urls.isEmpty()?"":urls.get(0); }
     }
     private static final class Snapshot {
         final String generation, revision;
@@ -64,10 +68,17 @@ public final class RuleStore {
             while ((line=reader.readLine())!=null) {
                 if (line.trim().isEmpty() || line.startsWith("#")) continue;
                 String[] p=line.split("\t",4);
-                if(p.length!=4 || !p[0].matches("adaway|china|tracking|hagezi") || !p[3].startsWith("https://") || catalog.containsKey(p[0])) throw new IOException("内置订阅目录无效");
-                catalog.put(p[0],new Source(p[0],p[2],p[3],p[1].equals("1")));
+                if(p.length!=4 || !p[0].matches("[a-z0-9][a-z0-9_-]{1,31}") || catalog.containsKey(p[0])) throw new IOException("内置订阅目录无效");
+                ArrayList<String> urls=new ArrayList<>();
+                for(String raw:p[3].split(";")){
+                    String u=raw.trim();
+                    if(!u.startsWith("https://"))throw new IOException("规则源必须使用 HTTPS");
+                    if(!urls.contains(u))urls.add(u);
+                }
+                if(urls.isEmpty())throw new IOException("规则源缺少下载地址");
+                catalog.put(p[0],new Source(p[0],p[2],urls,p[1].equals("1")));
             }
-            if (!catalog.keySet().containsAll(Arrays.asList("adaway","china","tracking"))) throw new IOException("内置订阅目录不完整");
+            if (!catalog.keySet().containsAll(Arrays.asList("china","hagezi"))) throw new IOException("内置 DNS 过滤目录不完整");
         } catch (IOException e) { throw new IllegalStateException("无法读取内置订阅",e); }
     }
 
@@ -110,6 +121,7 @@ public final class RuleStore {
                 .put("allowCount",s==null?0:s.allow.size()).put("blockCount",s==null?0:s.block.size())
                 .put("updatedAt",s==null?0:s.updatedAt).put("lastRuleUpdate",prefs.getLong("last_rule_update",0))
                 .put("lastRuleCheck",prefs.getLong("last_rule_check",0))
+                .put("lastRuleUpdateWarning",prefs.getString("last_rule_update_warning",""))
                 .put("fromModule",s!=null&&s.fromModule).put("source",s==null?"unloaded":s.fromModule?"module":"local")
                 .put("revision",s==null?"":s.generation).put("moduleRevision",s==null?"":s.revision)
                 .put("needsModuleSync",prefs.getBoolean("rules_need_module_sync",false))
@@ -130,7 +142,7 @@ public final class RuleStore {
         JSONArray result=new JSONArray(); Snapshot s=live;
         try {
             for(Source source:catalog.values()) {
-                JSONObject item=new JSONObject().put("id",source.id).put("name",source.name).put("url",source.url);
+                JSONObject item=new JSONObject().put("id",source.id).put("name",source.name).put("url",source.primaryUrl());
                 item.put("enabled",s==null?source.defaultOn:Boolean.TRUE.equals(s.enabled.get(source.id)));
                 // An exported effective set does not identify individual subscription counts.
                 item.put("count",s==null?0:(s.fromModule?-1:s.sourceRules.get(source.id).size()));
