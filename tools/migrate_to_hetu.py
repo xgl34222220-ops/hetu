@@ -72,7 +72,14 @@ def transform_text(text: str) -> str:
 def rewrite_gradle() -> None:
     path = ROOT / "android-app/app/build.gradle.kts"
     text = path.read_text(encoding="utf-8")
-    text = text.replace("compileSdk = 37", "compileSdk = 36")
+    text = text.replace(
+        "compileSdk = 37",
+        """compileSdk {
+        version = release(37) {
+            minorApiLevel = 0
+        }
+    }""",
+    )
     text = re.sub(r'^import org\.gradle\.api\.tasks\.Sync\n+', '', text, flags=re.M)
     text = re.sub(
         r'val generatedRuleAssets = .*?\nval syncHetuRuleAssets = tasks\.register<Sync>\("syncHetuRuleAssets"\) \{.*?\n\}\n\n',
