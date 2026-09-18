@@ -487,7 +487,7 @@ wait_ready(){
   return 3
 }
 
-write_session(){ M="$1"; V6="$2"; S="$3"; SHARE="$4"; KILL="$5"; CP="$6"; DUIDS="$7"; { printf 'MODE=%s\n' "$M"; printf 'IPV6=%s\n' "$V6"; printf 'APP_SCOPE=%s\n' "$S"; printf 'SHARE=%s\n' "$SHARE"; printf 'KILL=%s\n' "$KILL"; printf 'CONTROLLER_PORT=%s\n' "$CP"; printf 'DIRECT_UIDS=%s\n' "$DUIDS"; } > "$SESSION.new.$" && mv -f "$SESSION.new.$" "$SESSION"; }
+write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$7"; CP="$8"; DUIDS="$9"; { printf 'MODE=%s\n' "$M"; printf 'IPV6=%s\n' "$V6"; printf 'DNS=%s\n' "$DNS"; printf 'DNS_PORT=%s\n' "$DP"; printf 'APP_SCOPE=%s\n' "$S"; printf 'SHARE=%s\n' "$SHARE"; printf 'KILL=%s\n' "$KILL"; printf 'CONTROLLER_PORT=%s\n' "$CP"; printf 'DIRECT_UIDS=%s\n' "$DUIDS"; } > "$SESSION.new.$" && mv -f "$SESSION.new.$" "$SESSION"; }
 watchdog(){
   COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS="$6"; IFACES="$7"; DUIDS="$8"
   mkdir -p "$RUN" || exit 0; printf '%s\n' "$$" > "$WATCHDOG_PID"; MISS=0; while [ "$MISS" -lt 3 ]; do if pidcore "$COREPID" && kill -0 "$COREPID" >/dev/null 2>&1; then MISS=0; sleep 2; else MISS=$((MISS+1)); sleep 0.20; fi; done; acquire_lock || exit 0
@@ -516,7 +516,7 @@ start(){
 
   mkdir -p "$RUN/rules" "$RUN/proxy_provider" "$RUN/ruleset" "$RUN/ui" || { cleanup; restorev6; rm -f "$SESSION"; fail "无法创建 Mihomo 运行缓存目录"; }
   start_stage "launch-core"
-  : > "$LOG"; "$START_BIN" -d "$RUN" -f "$START_CFG" >>"$LOG" 2>&1 & START_PID=$!; printf '%s\n' "$START_PID" > "$PIDFILE"; printf '%s\n' "$START_MODE" > "$MODEFILE"; write_session "$START_MODE" "$START_V6" "$START_SCOPE" "$START_SHARE" "$START_KILL" "$START_CP" "$START_DIRECT_UIDS"
+  : > "$LOG"; "$START_BIN" -d "$RUN" -f "$START_CFG" >>"$LOG" 2>&1 & START_PID=$!; printf '%s\n' "$START_PID" > "$PIDFILE"; printf '%s\n' "$START_MODE" > "$MODEFILE"; write_session "$START_MODE" "$START_V6" "$START_DNS" "$START_DP" "$START_SCOPE" "$START_SHARE" "$START_KILL" "$START_CP" "$START_DIRECT_UIDS"
   start_stage "wait-listeners"
   wait_ready "$START_PID" "$START_MODE" "$START_TP" "$START_RP" "$START_TCP" "$START_UDP" "$START_DNS" "$START_DP" "$START_CP"; READY_RC=$?
   if [ "$READY_RC" -ne 0 ]; then
@@ -572,6 +572,7 @@ status(){
   SHAREV=$(sed -n 's/^SHARE=//p' "$SESSION" 2>/dev/null | head -n 1)
   KILLV=$(sed -n 's/^KILL=//p' "$SESSION" 2>/dev/null | head -n 1)
   DNSV=$(sed -n 's/^DNS=//p' "$SESSION" 2>/dev/null | head -n 1); [ -n "$DNSV" ] || DNSV=off
+  DPV=$(sed -n 's/^DNS_PORT=//p' "$SESSION" 2>/dev/null | head -n 1); case "$DPV" in ''|*[!0-9]*) DPV=1053;; esac
   IPV6V=$(sed -n 's/^IPV6=//p' "$SESSION" 2>/dev/null | head -n 1); [ -n "$IPV6V" ] || IPV6V=enable
   CPV=$(sed -n 's/^CONTROLLER_PORT=//p' "$SESSION" 2>/dev/null | head -n 1)
   case "$CPV" in ''|*[!0-9]*) CPV=0;; esac
@@ -621,9 +622,9 @@ status(){
     [ "$SHAREV" != 1 ] || [ "$D6P" = true ] || DNS6=false
     DNSREADY=false
     if has ss; then
-      ss -lnut 2>/dev/null | grep -Eq '(:|])1053[[:space:]]' && DNSREADY=true
+      ss -lnut 2>/dev/null | grep -Eq "(:|])${DPV}[[:space:]]" && DNSREADY=true
     elif has netstat; then
-      netstat -lnut 2>/dev/null | grep -Eq '(:|])1053[[:space:]]' && DNSREADY=true
+      netstat -lnut 2>/dev/null | grep -Eq "(:|])${DPV}[[:space:]]" && DNSREADY=true
     else
       DNSREADY=true
     fi
