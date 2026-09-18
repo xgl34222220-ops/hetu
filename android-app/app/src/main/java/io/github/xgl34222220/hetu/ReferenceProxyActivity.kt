@@ -1244,6 +1244,9 @@ private fun RefPanel(
     val expandedConnectionApps = remember { mutableStateMapOf<String, Boolean>() }
     val closedConnections = remember { mutableStateListOf<ProxyConnectionUi>() }
     var previousConnections by remember { mutableStateOf<List<ProxyConnectionUi>>(emptyList()) }
+    val activeConnectionGroups = remember(state.connections) { refConnectionGroups(state.connections) }
+    val closedConnectionSnapshot = closedConnections.toList()
+    val closedConnectionGroups = remember(closedConnectionSnapshot) { refConnectionGroups(closedConnectionSnapshot) }
 
     LaunchedEffect(capsuleText) {
         if (capsuleText.isNotBlank()) {
@@ -1499,16 +1502,14 @@ private fun RefPanel(
                     )
                 }
                 RefPanelTab.Connections -> {
-                    val activeGroups = remember(state.connections) { refConnectionGroups(state.connections) }
-                    val closedGroups = remember(closedConnections.toList()) { refConnectionGroups(closedConnections) }
-                    val shownGroups = if (connectionView == "active") activeGroups else closedGroups
+                    val shownGroups = if (connectionView == "active") activeConnectionGroups else closedConnectionGroups
                     item {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 FilterChip(
                                     selected = connectionView == "active",
                                     onClick = { connectionView = "active" },
-                                    label = { Text("应用 ${activeGroups.size} · 连接 ${state.connections.size}") },
+                                    label = { Text("应用 ${activeConnectionGroups.size} · 连接 ${state.connections.size}") },
                                 )
                                 FilterChip(
                                     selected = connectionView == "closed",
