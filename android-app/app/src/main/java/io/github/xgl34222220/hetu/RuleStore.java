@@ -720,7 +720,14 @@ public final class RuleStore {
                     if(rules.size()>MAX_DOMAINS)throw new IOException("规则条数超过限制");
                     continue;
                 }
-                if(exception)continue;
+                if(exception) {
+                    // Internal persisted snapshots encode parsed exceptions as @@domain.
+                    String raw=adblock.trim().toLowerCase(Locale.ROOT);
+                    String d=normalize(raw);
+                    if(d!=null)rules.add("@@"+d);
+                    if(rules.size()>MAX_DOMAINS)throw new IOException("规则条数超过限制");
+                    continue;
+                }
                 int comment=line.indexOf('#');if(comment>=0)line=line.substring(0,comment).trim();
                 if(line.isEmpty())continue;
                 String[] fields=line.split("\\s+");int first=0;
