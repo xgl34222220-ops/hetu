@@ -43,7 +43,10 @@ jobs:
           test -f android-app/app/src/main/assets/hetu-root.sh
           test ! -f android-app/app/src/main/assets/proxy-root-v3.sh
           test ! -f android-app/app/src/main/assets/proxy-root.sh
+          test ! -f android-app/app/src/main/assets/tproxy-root.sh
+          test -f android-app/app/src/main/assets/hetu-route.sh
           sh -n android-app/app/src/main/assets/hetu-root.sh
+          sh -n android-app/app/src/main/assets/hetu-route.sh
           grep -q 'copyAsset("hetu-root.sh",script,true)' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
           test -f android-app/app/src/main/assets/rules/adaway.txt
           test -f android-app/app/src/main/assets/rules/china.txt
@@ -132,7 +135,9 @@ jobs:
           unzip -l "$APK" | grep -q 'lib/arm64-v8a/libhetu_core.so'
           unzip -l "$APK" | grep -q 'assets/mihomo-root/arm64-v8a/mihomo'
           unzip -l "$APK" | grep -q 'assets/hetu-root.sh'
+          unzip -l "$APK" | grep -q 'assets/hetu-route.sh'
           ! unzip -l "$APK" | grep -q 'assets/proxy-root'
+          ! unzip -l "$APK" | grep -q 'assets/tproxy-root'
           unzip -l "$APK" | grep -q 'assets/rules/adaway.txt'
           ! unzip -l "$APK" | grep -q 'libbichen_core.so'
 
