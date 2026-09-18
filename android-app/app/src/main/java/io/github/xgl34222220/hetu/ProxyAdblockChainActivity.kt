@@ -33,6 +33,8 @@ import io.github.xgl34222220.hetu.ui.RuleSourceItem
 import io.github.xgl34222220.hetu.ui.RulesSnapshot
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import org.json.JSONArray
+import org.json.JSONObject
 
 class ProxyAdblockChainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -41,6 +43,45 @@ class ProxyAdblockChainActivity : ComponentActivity() {
         setContent { HetuTheme { ProxyAdblockChainPage(onBack = { finish() }) } }
     }
 }
+
+private fun cachedRuleSources(raw: String?): List<RuleSourceItem> {
+    if (raw.isNullOrBlank()) return emptyList()
+    return runCatching {
+        val array = JSONArray(raw)
+        buildList {
+            for (i in 0 until array.length()) {
+                val item = array.optJSONObject(i) ?: continue
+                add(
+                    RuleSourceItem(
+                        id = item.optString("id"),
+                        name = item.optString("name"),
+                        url = item.optString("url"),
+                        enabled = item.optBoolean("enabled"),
+                        count = item.optInt("count"),
+                    ),
+                )
+            }
+        }
+    }.getOrDefault(emptyList())
+}
+
+private fun encodeRuleSources(items: List<RuleSourceItem>): String {
+    val array = JSONArray()
+    items.forEach { item ->
+        array.put(
+            JSONObject()
+                .put("id", item.id)
+                .put("name", item.name)
+                .put("url", item.url)
+                .put("enabled", item.enabled)
+                .put("count", item.count),
+        )
+    }
+    return array.toString()
+}
+
+private fun cachedRecentDomains(raw: String?): List<String> =
+    raw.orEmpty().lineSequence().map { it.trim() }.filter { it.isNotBlank() }.take(8).toList()
 
 private data class ChainSnapshot(
     val rules: RulesSnapshot = RulesSnapshot(),
@@ -100,15 +141,52 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
         }
     }
 
-    val cachedRules = remember { RulesSnapshot(count = prefs.getInt("proxyAdblockUiRuleCount", 0), profile = prefs.getString("proxyAdblockUiProfile", "加载中") ?: "加载中") }
-    val snapshot by produceState(initialValue = ChainSnapshot(rules = cachedRules), revision) {
+    val cachedRules = remember {
+        RulesSnapshot(
+            count = prefs.getInt("proxyAdblockUiRuleCount", 0),
+            sources = cachedRuleSources(prefs.getString("proxyAdblockUiSources", "")),
+            profile = prefs.getString("proxyAdblockUiProfile", "加载中") ?: "加载中",
+        )
+    }
+    val cachedRunning = remember {
+        prefs.getBoolean("proxyRootRuntimeRunning", false) && prefs.getBoolean("proxyRootWanted", false)
+    }
+    val cachedSnapshot = remember {
+        ChainSnapshot(
+            rules = cachedRules,
+            running = cachedRunning,
+            hitCount = prefs.getLong("proxyAdblockSessionHits", 0L),
+            hitCountSource = if (prefs.getLong("proxyAdblockSessionHits", 0L) > 0L) "河图会话计数" else "",
+            recentBlockedDomains = cachedRecentDomains(prefs.getString("proxyAdblockRecentDomains", "")),
+            startupInjected = cachedRunning && prefs.getBoolean("proxyAdblockUiStartupInjected", false),
+            controllerLoaded = cachedRunning && prefs.getBoolean("proxyAdblockUiControllerLoaded", false),
+            effective = cachedRunning && prefs.getBoolean("proxyAdblockUiEffective", false),
+            lastError = prefs.getString("proxyAdblockLastError", "").orEmpty(),
+            vpnFallbackRunning = DnsVpnService.running,
+        )
+    }
+    val snapshot by produceState(initialValue = cachedSnapshot, revision) {
         val rulesResult = runCatching { adController.rulesSnapshot() }
         val rules = rulesResult.getOrDefault(cachedRules)
         if (rules.count > 0 || rules.sources.isNotEmpty()) {
-            prefs.edit().putInt("proxyAdblockUiRuleCount", rules.count).putString("proxyAdblockUiProfile", rules.profile).apply()
+            prefs.edit()
+                .putInt("proxyAdblockUiRuleCount", rules.count)
+                .putString("proxyAdblockUiProfile", rules.profile)
+                .putString("proxyAdblockUiSources", encodeRuleSources(rules.sources))
+                .apply()
         }
+
+        val sessionHits = prefs.getLong("proxyAdblockSessionHits", 0L)
+        val sessionRecent = cachedRecentDomains(prefs.getString("proxyAdblockRecentDomains", ""))
+        value = value.copy(
+            rules = rules,
+            hitCount = maxOf(value.hitCount, sessionHits),
+            hitCountSource = if (sessionHits > 0L) "河图会话计数" else value.hitCountSource,
+            recentBlockedDomains = if (sessionRecent.isNotEmpty()) sessionRecent else value.recentBlockedDomains,
+            vpnFallbackRunning = DnsVpnService.running,
+        )
+
         val state = runCatching { proxyController.state() }.getOrNull()
-        val independent = runCatching { adController.homeSnapshot() }.getOrNull()
         val startup = runCatching { rootManager.startupConfig() }.getOrDefault("")
         val startupInjected = startup.contains("${ProxyAdblockRules.PROVIDER_NAME}:") &&
             startup.contains("RULE-SET,${ProxyAdblockRules.PROVIDER_NAME},REJECT")
@@ -120,26 +198,40 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
         val controllerLoaded = adRule != null
         val apiHits = adRule?.hitCount ?: 0L
         val logStats = if (state?.running == true) runCatching { runtimeInspector.adblockRuntimeStats() }.getOrDefault(AdblockRuntimeStats()) else AdblockRuntimeStats()
-        val hits = maxOf(apiHits, logStats.count)
+        val persistedHits = prefs.getLong("proxyAdblockSessionHits", 0L)
+        val hits = maxOf(persistedHits, apiHits, logStats.count)
+        val recent = when {
+            logStats.recentDomains.isNotEmpty() -> logStats.recentDomains
+            else -> cachedRecentDomains(prefs.getString("proxyAdblockRecentDomains", ""))
+        }
         val hitSource = when {
+            persistedHits > 0L -> "河图会话计数"
             logStats.count > 0L -> "Mihomo 运行日志"
             apiHits > 0L -> "Controller 规则计数"
-            logStats.logAvailable -> "运行日志已检查"
+            logStats.logAvailable -> "等待实际命中"
             else -> ""
         }
         val lastError = prefs.getString("proxyAdblockLastError", "").orEmpty()
-        val effective = chainEnabled && state?.running == true && rules.count > 0 && startupInjected && controllerLoaded
+        val running = state?.running == true
+        val effective = chainEnabled && running && rules.count > 0 && startupInjected && controllerLoaded
+        prefs.edit()
+            .putBoolean("proxyRootRuntimeRunning", running)
+            .putBoolean("proxyAdblockUiStartupInjected", startupInjected)
+            .putBoolean("proxyAdblockUiControllerLoaded", controllerLoaded)
+            .putBoolean("proxyAdblockUiEffective", effective)
+            .putLong("proxyAdblockUiVerifiedAt", System.currentTimeMillis())
+            .apply()
         value = ChainSnapshot(
             rules = rules,
-            running = state?.running == true,
+            running = running,
             hitCount = hits,
             hitCountSource = hitSource,
-            recentBlockedDomains = logStats.recentDomains,
+            recentBlockedDomains = recent,
             startupInjected = startupInjected,
             controllerLoaded = controllerLoaded,
             effective = effective,
             lastError = lastError,
-            vpnFallbackRunning = independent?.vpnRunning == true,
+            vpnFallbackRunning = DnsVpnService.running,
             hostsFallbackRunning = false,
             message = listOfNotNull(state?.message?.takeIf { it.isNotBlank() }, rulesResult.exceptionOrNull()?.message).joinToString("；"),
         )
@@ -317,7 +409,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                             "实际拦截",
                             snapshot.hitCount > 0L,
                             if (snapshot.hitCount > 0L) "${snapshot.hitCount} 次 · ${snapshot.hitCountSource.ifBlank { "已记录" }}"
-                            else "0 次 · 已加载规则，但当前日志/API 尚未记录命中",
+                            else "0 次 · 已加载规则；首次实际拦截后自动累计",
                             allowNeutral = true,
                         )
                     }
