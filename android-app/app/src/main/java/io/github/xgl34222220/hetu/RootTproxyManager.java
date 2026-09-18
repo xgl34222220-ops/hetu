@@ -112,7 +112,8 @@ final class RootTproxyManager {
                 .append("cp ").append(RootBridge.quote(script.getAbsolutePath())).append(' ').append(RootBridge.quote(SCRIPT)).append("; ")
                 .append("cp ").append(RootBridge.quote(binary.getAbsolutePath())).append(' ').append(RootBridge.quote(BIN)).append("; ")
                 .append("chmod 700 ").append(RootBridge.quote(SCRIPT)).append(' ').append(RootBridge.quote(BIN)).append("; ")
-                .append("chown 0:0 ").append(RootBridge.quote(SCRIPT)).append(' ').append(RootBridge.quote(BIN));
+                .append("chown 0:0 ").append(RootBridge.quote(SCRIPT)).append(' ').append(RootBridge.quote(BIN))
+                .append("; rm -f ").append(RootBridge.quote(ROOT + "/tproxy-root.sh")).append(' ').append(RootBridge.quote(ROOT + "/proxy-root.sh"));
         if (includeConfig) command.append("; cp ").append(RootBridge.quote(config.getAbsolutePath())).append(' ').append(RootBridge.quote(CONFIG))
                 .append("; chmod 600 ").append(RootBridge.quote(CONFIG)).append("; chown 0:0 ").append(RootBridge.quote(CONFIG));
         RootBridge.Result installed = RootBridge.rootShell(context, command.toString(), 45_000L);
