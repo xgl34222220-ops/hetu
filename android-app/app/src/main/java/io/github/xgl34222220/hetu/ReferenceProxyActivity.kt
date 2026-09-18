@@ -1721,7 +1721,7 @@ private fun RefGroupDetailPage(
                     Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回", tint = t.textPrimary, modifier = Modifier.size(21.dp))
                 }
                 Text(
-                    "127.0.0.1:${MihomoStartupConfig.CONTROLLER_PORT}",
+                    "127.0.0.1:${state.controllerPort}",
                     color = t.textSecondary,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
@@ -3490,13 +3490,13 @@ private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
     }
 
     if (portsInfo) {
-        RefPortsBottomSheet(onDismiss = { portsInfo = false })
+        RefPortsBottomSheet(controllerPort = state.controllerPort, onDismiss = { portsInfo = false })
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun RefPortsBottomSheet(onDismiss: () -> Unit) {
+private fun RefPortsBottomSheet(controllerPort: Int, onDismiss: () -> Unit) {
     val t = LocalHetuTokens.current
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -3519,7 +3519,7 @@ private fun RefPortsBottomSheet(onDismiss: () -> Unit) {
                     HorizontalDivider(color = t.outline.copy(alpha = .32f))
                     RefPortDetailRow("Redirect 端口", MihomoStartupConfig.REDIRECT_PORT.toString())
                     HorizontalDivider(color = t.outline.copy(alpha = .32f))
-                    RefPortDetailRow("外部控制器", "127.0.0.1:${MihomoStartupConfig.CONTROLLER_PORT}", Color(0xFF2563EB))
+                    RefPortDetailRow("外部控制器", "127.0.0.1:$controllerPort", Color(0xFF2563EB))
                 }
             }
             FilledTonalButton(
