@@ -26,6 +26,7 @@ final class ProxyAdblockRules {
         ArrayList<String> domains = new ArrayList<>(rules.effectiveDomains());
         Collections.sort(domains);
         if (domains.size() > 500000) throw new IOException("广告规则超过安全上限");
+        ArrayList<String> allow = new ArrayList<>(rules.userList(true));
 
         File dir = new File(context.getCacheDir(), "proxy-adblock");
         if (!dir.isDirectory() && !dir.mkdirs()) throw new IOException("无法创建代理广告规则目录");
@@ -36,7 +37,22 @@ final class ProxyAdblockRules {
              BufferedWriter out = new BufferedWriter(writer, 64 * 1024)) {
             for (String domain : domains) {
                 if (domain == null || domain.isEmpty()) continue;
-                out.write(domain);
+                // Mihomo domain-provider wildcard '+.' is suffix-aware: it matches the
+                // base domain and every subdomain. That is much closer to what DNS
+                // blocklists intend than an exact-host-only provider.
+                //
+                // If the user explicitly allowlisted a child hostname, keep this one
+                // rule exact instead of widening it, so the allow exception cannot be
+                // swallowed by a parent suffix rule.
+                boolean childAllow = false;
+                String suffix = "." + domain;
+                for (String allowed : allow) {
+                    if (allowed != null && allowed.endsWith(suffix)) {
+                        childAllow = true;
+                        break;
+                    }
+                }
+                out.write(childAllow ? domain : "+." + domain);
                 out.newLine();
             }
             out.flush();
