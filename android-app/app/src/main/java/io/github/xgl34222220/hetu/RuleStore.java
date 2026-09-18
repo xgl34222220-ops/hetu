@@ -202,61 +202,73 @@ public final class RuleStore {
         clearModulePending();
     }
 
-    /** Download every enabled subscription before changing the active generation. */
+    /** Update enabled DNS blocklists independently; a slow mirror must not discard other successful sources. */
     public boolean updateRules(boolean moduleInstalled) throws Exception {
         try(RuleUpdateGate.Lease update=UPDATE_GATE.begin()) {
             final Snapshot before;
             synchronized(LOCK) {
                 checkInterrupted();
-                reload(); verifyLocalTarget(moduleInstalled);if(moduleInstalled) syncModule(null);
+                reload();
+                // Hetu no longer requires a separate module for DNS filtering.
                 before=live;
             }
-            // Network and parsing run outside LOCK. Domain edits, mode switching
-            // and rollback must not wait for a 180-second subscription download.
             Map<String,Set<String>> next=new LinkedHashMap<>(before.sourceRules);
             File staging=new File(context.getCacheDir(),"rules-download-"+UUID.randomUUID());
             if(!staging.mkdirs()) throw new IOException("无法建立规则下载目录");
-            List<String> args=new ArrayList<>(); args.add("import-batch");
-            long downloadDeadline=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(DOWNLOAD_BATCH_MILLIS);
+            long batchDeadline=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(DOWNLOAD_BATCH_MILLIS);
+            ArrayList<String> failures=new ArrayList<>();
+            ArrayList<String> successes=new ArrayList<>();
             try {
                 for(Source source:catalog.values()) {
                     checkInterrupted();
                     if(!Boolean.TRUE.equals(before.enabled.get(source.id))) continue;
-                    File downloaded=new File(staging,source.id+".download");
-                    try { download(source.url,downloaded,downloadDeadline); }
-                    catch(InterruptedIOException e) {
-                        checkInterrupted();throw new IOException(source.name+" 下载超时："+errorMessage(e)+"；原规则未替换",e);
+                    Set<String> parsed=null;
+                    Throwable lastError=null;
+                    for(int mirror=0;mirror<source.urls.size();mirror++) {
+                        checkInterrupted();
+                        File downloaded=new File(staging,source.id+"-"+mirror+".download");
+                        long mirrorDeadline=Math.min(batchDeadline,System.nanoTime()+TimeUnit.SECONDS.toNanos(35));
+                        try {
+                            download(source.urls.get(mirror),downloaded,mirrorDeadline);
+                            try(InputStream in=new FileInputStream(downloaded)) { parsed=parseRules(in,false); }
+                            if(parsed!=null&&!parsed.isEmpty())break;
+                        } catch(Throwable error) {
+                            if(error instanceof InterruptedException)Thread.currentThread().interrupt();
+                            checkInterrupted();
+                            lastError=error;
+                            parsed=null;
+                        }
                     }
-                    catch(Exception e) { throw new IOException(source.name+" 更新失败："+errorMessage(e)+"；原规则未替换",e); }
-                    Set<String> parsed;
-                    try(InputStream in=new FileInputStream(downloaded)) { parsed=parseRules(in,false); }
-                    catch(IOException e) {
-                        checkInterrupted();throw new IOException(source.name+" 校验失败："+errorMessage(e)+"；原规则未替换",e);
+                    if(parsed==null||parsed.isEmpty()) {
+                        failures.add(source.name+"："+errorMessage(lastError==null?new IOException("所有镜像均不可用"):lastError));
+                        continue;
                     }
-                    checkDownloadDeadline(downloadDeadline);
-                    File canonical=new File(staging,source.id+".domains"); writeDomains(canonical,parsed);
-                    next.put(source.id,parsed); args.add(source.id); args.add(canonical.getAbsolutePath());
+                    next.put(source.id,parsed);
+                    successes.add(source.name+" "+parsed.size()+" 条");
                 }
-                if(args.size()==1) throw new IOException("请先启用至少一个订阅源");
+                if(successes.isEmpty()) {
+                    String detail=failures.isEmpty()?"没有启用规则源":join(failures);
+                    prefs.edit().putLong("last_rule_check",System.currentTimeMillis())
+                            .putString("last_rule_update_warning",detail).apply();
+                    throw new IOException("规则更新失败："+detail+"；已继续使用本地旧快照");
+                }
+
                 Snapshot candidate=compose("",false,before.allow,before.block,before.enabled,next,null);
                 synchronized(LOCK) {
                     checkInterrupted();
-                    reload(); verifyLocalTarget(moduleInstalled);
-                    if(moduleInstalled) syncModule(null); // Also detect external module edits.
+                    reload();
                     update.verify(before.generation,live.generation);
-                    if(!moduleInstalled && !before.fromModule && next.equals(before.sourceRules)) {
-                        // No-op checks must not evict a useful rollback snapshot or DNS cache.
-                        prefs.edit().putLong("last_rule_check",System.currentTimeMillis()).apply();
+                    long now=System.currentTimeMillis();
+                    String warning=failures.isEmpty()?"":"部分来源沿用旧快照："+join(failures);
+                    if(next.equals(before.sourceRules)) {
+                        prefs.edit().putLong("last_rule_check",now)
+                                .putString("last_rule_update_warning",warning).apply();
                         return false;
                     }
-                    if(moduleInstalled) {
-                        markModulePending();
-                        rootJson(args.toArray(new String[0]));
-                        try { syncModule(next); }
-                        catch(Exception e) { throw new IOException("模块已更新，但应用同步失败；请重新同步模块："+e.getMessage(),e); }
-                    } else commit(candidate);
-                    long now=System.currentTimeMillis();
-                    prefs.edit().putLong("last_rule_update",now).putLong("last_rule_check",now).apply();
+                    commit(candidate);
+                    prefs.edit().putLong("last_rule_update",now).putLong("last_rule_check",now)
+                            .putString("last_rule_update_warning",warning)
+                            .putString("last_rule_update_success",join(successes)).apply();
                     return true;
                 }
             } finally { deleteTree(staging); }
