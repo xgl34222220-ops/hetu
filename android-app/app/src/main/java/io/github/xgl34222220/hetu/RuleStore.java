@@ -354,7 +354,11 @@ public final class RuleStore {
         Set<String> parsed=null;
         Throwable lastError=null;
         int usedMirror=-1;
-        for(int mirror=0;mirror<source.urls.size();mirror++){
+        ArrayList<Integer> order=new ArrayList<>();
+        int preferred=prefs.getInt("rule_source_"+source.id+"_mirror",-1);
+        if(preferred>=0&&preferred<source.urls.size())order.add(preferred);
+        for(int mirror=0;mirror<source.urls.size();mirror++)if(mirror!=preferred)order.add(mirror);
+        for(int mirror:order){
             checkInterrupted();
             if(System.nanoTime()>=batchDeadline){lastError=new IOException("规则更新批次已超时");break;}
             File downloaded=new File(staging,source.id+"-"+mirror+"-"+Thread.currentThread().getId()+".download");
