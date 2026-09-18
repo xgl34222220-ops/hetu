@@ -134,8 +134,10 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     val haze = rememberHazeState()
     val liquidBackdrop = rememberLayerBackdrop()
-    val liquid = isRuntimeShaderSupported()
     val prefs = remember { context.getSharedPreferences("hetu", 0) }
+    val blurEnabled = prefs.getBoolean("enableBlur", true)
+    val liquidGlassEnabled = prefs.getBoolean("liquidGlass", true)
+    val liquid = blurEnabled && liquidGlassEnabled && isRuntimeShaderSupported()
     val showPanelTab = prefs.getBoolean("showPanelTab", true)
     val startupProfile = remember { ProxyRuntimeProfile.load(prefs) }
     val startupConfig = remember(startupProfile.core) {
@@ -449,7 +451,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
     Box(Modifier.fillMaxSize().background(shellBackground)) {
         Box(
             Modifier.fillMaxSize()
-                .then(if (!liquid) Modifier.hazeSource(haze) else Modifier)
+                .then(if (!liquid && blurEnabled) Modifier.hazeSource(haze) else Modifier)
                 .then(if (liquid) Modifier.layerBackdrop(liquidBackdrop) else Modifier),
         ) {
             // Match LuoShu's backdrop architecture: the full-screen page backdrop must live
