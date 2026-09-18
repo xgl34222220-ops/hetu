@@ -56,6 +56,9 @@ has(){ command -v "$1" >/dev/null 2>&1; }
 # iptables itself owns the lock; -w avoids racy fail/rollback while preserving atomic rules.
 xt4(){ command iptables -w 15 "$@"; }
 xt6(){ command ip6tables -w 15 "$@"; }
+# Status polling must never sit behind Android/netd's xtables lock for 15 seconds.
+xt4q(){ command iptables -w 1 "$@"; }
+xt6q(){ command ip6tables -w 1 "$@"; }
 port(){ case "${1:-}" in ''|*[!0-9]*) return 1;; esac; [ "$1" -ge 1 ] && [ "$1" -le 65535 ]; }
 mode(){ case "${1:-}" in tproxy|redirect|enhance|tun|ebpf) return 0;; *) return 1;; esac; }
 ipv6mode(){ case "${1:-}" in enable|bypass|strict|disable) return 0;; *) return 1;; esac; }
@@ -121,11 +124,36 @@ allocnet(){
   savenet
 }
 
+legacy_unhook(){
+  B="$1"; T="$2"; BASECHAIN="$3"; CHAIN="$4"; N=0
+  while "$B" -w 1 -t "$T" -C "$BASECHAIN" -j "$CHAIN" >/dev/null 2>&1; do
+    "$B" -w 1 -t "$T" -D "$BASECHAIN" -j "$CHAIN" >/dev/null 2>&1 || break
+    N=$((N+1)); [ "$N" -lt 8 ] || break
+  done
+  "$B" -w 1 -t "$T" -F "$CHAIN" >/dev/null 2>&1 || true
+  "$B" -w 1 -t "$T" -X "$CHAIN" >/dev/null 2>&1 || true
+}
 cleanlegacy(){
   ip rule del pref "$LEGACY_PREF" fwmark "$LEGACY_MARK/$LEGACY_MASK" table "$LEGACY_TABLE" >/dev/null 2>&1 || true
   ip -6 rule del pref "$LEGACY_PREF" fwmark "$LEGACY_MARK/$LEGACY_MASK" table "$LEGACY_TABLE" >/dev/null 2>&1 || true
   ip route del local 0.0.0.0/0 dev lo table "$LEGACY_TABLE" >/dev/null 2>&1 || true
   ip -6 route del local ::/0 dev lo table "$LEGACY_TABLE" >/dev/null 2>&1 || true
+  if has iptables; then
+    legacy_unhook iptables mangle OUTPUT BICHEN_MOUT; legacy_unhook iptables mangle PREROUTING BICHEN_MPRE
+    legacy_unhook iptables nat OUTPUT BICHEN_DNSOUT; legacy_unhook iptables nat PREROUTING BICHEN_DNSPRE
+    legacy_unhook iptables nat OUTPUT BICHEN_NOUT; legacy_unhook iptables nat PREROUTING BICHEN_NPRE
+    legacy_unhook iptables filter OUTPUT BICHEN_QUICOUT; legacy_unhook iptables filter FORWARD BICHEN_QUICFWD
+    legacy_unhook iptables filter OUTPUT BICHEN_KOUT; legacy_unhook iptables filter FORWARD BICHEN_KFWD
+  fi
+  if has ip6tables; then
+    legacy_unhook ip6tables mangle OUTPUT BICHEN_MOUT; legacy_unhook ip6tables mangle PREROUTING BICHEN_MPRE
+    legacy_unhook ip6tables nat OUTPUT BICHEN_DNSOUT; legacy_unhook ip6tables nat PREROUTING BICHEN_DNSPRE
+    legacy_unhook ip6tables nat OUTPUT BICHEN_NOUT; legacy_unhook ip6tables nat PREROUTING BICHEN_NPRE
+    legacy_unhook ip6tables filter OUTPUT BICHEN_QUICOUT; legacy_unhook ip6tables filter FORWARD BICHEN_QUICFWD
+    legacy_unhook ip6tables filter OUTPUT BICHEN_V6OUT; legacy_unhook ip6tables filter FORWARD BICHEN_V6FWD
+    legacy_unhook ip6tables filter OUTPUT BICHEN_KOUT; legacy_unhook ip6tables filter FORWARD BICHEN_KFWD
+  fi
+  ip link del bichen0 >/dev/null 2>&1 || true
 }
 unhook(){
   BIN="$1"; T="$2"; BASECHAIN="$3"; CHAIN="$4"
@@ -531,8 +559,8 @@ status(){
   if [ -f "$PIDFILE" ]; then X=$(cat "$PIDFILE" 2>/dev/null || true); case "$X" in ''|*[!0-9]*) ;; *) if pidcore "$X" && kill -0 "$X" >/dev/null 2>&1; then STATUS_RUNNING=true; STATUS_PID="$X"; fi;; esac; fi
   if [ "$STATUS_RUNNING" = false ]; then RECOVER_PID=$(findcorepid 2>/dev/null || true); case "$RECOVER_PID" in ''|*[!0-9]*) ;; *) STATUS_RUNNING=true; STATUS_PID="$RECOVER_PID"; printf '%s\n' "$RECOVER_PID" > "$PIDFILE" 2>/dev/null || true;; esac; fi
   STATUS_MODE=$(cat "$MODEFILE" 2>/dev/null || echo none); T4=false; T6=false; K4=false; K6=false
-  for SPEC in "mangle OUTPUT $MOUT" "nat OUTPUT $NOUT" "nat OUTPUT $DNSOUT" "filter OUTPUT $QUICOUT"; do set -- $SPEC; xt4 -t "$1" -C "$2" -j "$3" >/dev/null 2>&1 && T4=true; done; xt4 -t filter -C OUTPUT -j "$KOUT" >/dev/null 2>&1 && K4=true
-  if has ip6tables; then for SPEC in "mangle OUTPUT $MOUT" "nat OUTPUT $NOUT" "nat OUTPUT $DNSOUT" "filter OUTPUT $QUICOUT" "filter OUTPUT $V6OUT"; do set -- $SPEC; xt6 -t "$1" -C "$2" -j "$3" >/dev/null 2>&1 && T6=true; done; xt6 -t filter -C OUTPUT -j "$KOUT" >/dev/null 2>&1 && K6=true; fi
+  for SPEC in "mangle OUTPUT $MOUT" "nat OUTPUT $NOUT" "nat OUTPUT $DNSOUT" "filter OUTPUT $QUICOUT"; do set -- $SPEC; xt4q -t "$1" -C "$2" -j "$3" >/dev/null 2>&1 && T4=true; done; xt4q -t filter -C OUTPUT -j "$KOUT" >/dev/null 2>&1 && K4=true
+  if has ip6tables; then for SPEC in "mangle OUTPUT $MOUT" "nat OUTPUT $NOUT" "nat OUTPUT $DNSOUT" "filter OUTPUT $QUICOUT" "filter OUTPUT $V6OUT"; do set -- $SPEC; xt6q -t "$1" -C "$2" -j "$3" >/dev/null 2>&1 && T6=true; done; xt6q -t filter -C OUTPUT -j "$KOUT" >/dev/null 2>&1 && K6=true; fi
   V6OFF=false; [ -f "$IPV6_STATE" ] && V6OFF=true; RECOVERED=false
   if [ "$STATUS_RUNNING" = false ] && [ "$K4" = false ] && [ "$K6" = false ] && { [ "$T4" = true ] || [ "$T6" = true ] || [ "$V6OFF" = true ]; }; then if acquire_lock; then cleanup; restorev6; rm -f "$PIDFILE" "$MODEFILE" "$SESSION"; STATUS_MODE=none; T4=false; T6=false; V6OFF=false; RECOVERED=true; fi; fi
   WD=false; W=$(cat "$WATCHDOG_PID" 2>/dev/null || true); case "$W" in ''|*[!0-9]*) ;; *) kill -0 "$W" >/dev/null 2>&1 && WD=true;; esac
