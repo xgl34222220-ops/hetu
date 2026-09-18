@@ -859,7 +859,24 @@ private fun CompactRulesPage(controller: HetuComposeController) {
                 Row(Modifier.fillMaxWidth().padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         Text(source.name, color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall)
-                        Text(if (source.count >= 0) "${source.count} 条规则" else "模块快照", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            buildString {
+                                append(if (source.count >= 0) "${source.count} 条规则" else "规则快照")
+                                if (source.durationMs > 0) append(" · ${source.durationMs} ms")
+                                if (source.mirror >= 0) append(" · 镜像 ${source.mirror + 1}")
+                            },
+                            color = tokens.textSecondary,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        if (source.lastError.isNotBlank()) {
+                            Text(
+                                source.lastError,
+                                color = Color(0xFFD97706),
+                                style = MaterialTheme.typography.labelSmall,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                     Switch(source.enabled, onCheckedChange = { on -> scope.launch { runCatching { controller.setRuleSource(source.id, on) }; reload++ } })
                 }
