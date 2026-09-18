@@ -4,8 +4,8 @@ import re
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / "android-app/app/build.gradle.kts"
 SHELL = ROOT / "android-app/app/src/main/assets/proxy-root-v3.sh"
-UI = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt"
-INSPECTOR = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyRuntimeInspector.kt"
+UI = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt"
+INSPECTOR = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeInspector.kt"
 
 # Version
 text = BUILD.read_text(encoding="utf-8")

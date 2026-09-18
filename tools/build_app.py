@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Build the native Java Bichen app without Gradle or third-party runtime libraries.
+"""Build the native Java Hetu app without Gradle or third-party runtime libraries.
 
 Requirements: Python 3, JDK 17, Android SDK platform 35 + build-tools 35.0.0.
 Set ANDROID_SDK_ROOT (or ANDROID_HOME). The local ../tooling SDK/ECJ bundle
 is also supported for environments that only have a Java runtime.
 
-Signing: set BICHEN_KEYSTORE, BICHEN_KEY_ALIAS, BICHEN_STOREPASS and
-BICHEN_KEYPASS to reuse your own key. Without these, a development key is
+Signing: set HETU_KEYSTORE, HETU_KEY_ALIAS, HETU_STOREPASS and
+HETU_KEYPASS to reuse your own key. Without these, a development key is
 created outside source directories. Keep that key to sign future updates;
 do not publish it in a source archive.
 """
@@ -64,28 +64,28 @@ def java_tool(name: str) -> str | None:
 
 def sign_key() -> tuple[Path, str, dict[str, str]]:
     env = os.environ.copy()
-    explicit = bool(env.get("BICHEN_KEYSTORE"))
+    explicit = bool(env.get("HETU_KEYSTORE"))
     if explicit:
-        keystore = Path(env["BICHEN_KEYSTORE"]).expanduser().resolve()
-    elif (LOCAL_TOOLS / "bichen-dev.keystore").is_file():
-        keystore = LOCAL_TOOLS / "bichen-dev.keystore"
+        keystore = Path(env["HETU_KEYSTORE"]).expanduser().resolve()
+    elif (LOCAL_TOOLS / "hetu-dev.keystore").is_file():
+        keystore = LOCAL_TOOLS / "hetu-dev.keystore"
     else:
-        keystore = BUILD / "signing" / "bichen-dev.keystore"
-    alias = env.get("BICHEN_KEY_ALIAS", "androiddebugkey")
-    env.setdefault("BICHEN_STOREPASS", "android")
-    env.setdefault("BICHEN_KEYPASS", env["BICHEN_STOREPASS"])
+        keystore = BUILD / "signing" / "hetu-dev.keystore"
+    alias = env.get("HETU_KEY_ALIAS", "androiddebugkey")
+    env.setdefault("HETU_STOREPASS", "android")
+    env.setdefault("HETU_KEYPASS", env["HETU_STOREPASS"])
     if not keystore.is_file():
         if explicit:
-            raise RuntimeError(f"BICHEN_KEYSTORE does not exist: {keystore}")
+            raise RuntimeError(f"HETU_KEYSTORE does not exist: {keystore}")
         keytool = java_tool("keytool")
         if not keytool:
             raise RuntimeError("keytool is required to create a development signing key.")
         keystore.parent.mkdir(parents=True, exist_ok=True)
         run([
             keytool, "-genkeypair", "-keystore", keystore,
-            "-storepass:env", "BICHEN_STOREPASS", "-keypass:env", "BICHEN_KEYPASS",
+            "-storepass:env", "HETU_STOREPASS", "-keypass:env", "HETU_KEYPASS",
             "-alias", alias, "-keyalg", "RSA", "-keysize", "2048", "-validity", "10000",
-            "-dname", "CN=Bichen Development,O=Bichen,C=CN",
+            "-dname", "CN=Hetu Development,O=Hetu,C=CN",
         ], env=env)
         keystore.chmod(0o600)
         print("Generated a development signing key; retain it for compatible app updates.", flush=True)
@@ -94,7 +94,7 @@ def sign_key() -> tuple[Path, str, dict[str, str]]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--out", type=Path, default=ROOT / "out" / f"Bichen-{VERSION}.apk")
+    parser.add_argument("--out", type=Path, default=ROOT / "out" / f"Hetu-{VERSION}.apk")
     args = parser.parse_args()
     output = args.out.expanduser().resolve()
     tools, android_jar = sdk_paths()
@@ -159,7 +159,7 @@ def main() -> None:
     keystore, alias, env = sign_key()
     run([
         tools / "apksigner", "sign", "--ks", keystore, "--ks-key-alias", alias,
-        "--ks-pass", "env:BICHEN_STOREPASS", "--key-pass", "env:BICHEN_KEYPASS",
+        "--ks-pass", "env:HETU_STOREPASS", "--key-pass", "env:HETU_KEYPASS",
         "--v1-signing-enabled", "false", "--v2-signing-enabled", "true",
         "--v3-signing-enabled", "true", "--v4-signing-enabled", "false",
         "--out", output, BUILD / "aligned.apk",

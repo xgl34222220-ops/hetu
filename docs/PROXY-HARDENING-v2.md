@@ -1,4 +1,4 @@
-# 辟尘代理 P0 加固说明（2026-09-16）
+# 河图代理 P0 加固说明（2026-09-16）
 
 本轮针对 Root 透明代理数据面做 P0 加固，目标是避免 Android `netd` fwmark 冲突、核心异常后残留劫持规则、PID 误杀以及错误配置接管网络。
 
@@ -7,7 +7,7 @@
 - 不再使用 `0x2333/0xffff` 覆盖 Android fwmark 的低 16 位 `netId`。
 - TPROXY / Enhance 启动时从 Android 当前保留位区间中动态选择未冲突的单 bit mark，并使用同 mask 写入。
 - 动态分配独立 policy-routing table 与 rule priority，避开已有规则。
-- 新 mark/table/pref 写入运行时状态文件，stop/crash-recovery 只删除辟尘自己的路由对象。
+- 新 mark/table/pref 写入运行时状态文件，stop/crash-recovery 只删除河图自己的路由对象。
 - 清理旧版本 `0x2333` 规则时不再 `flush table 100`，避免误删系统/OEM 路由。
 - 启动透明代理前执行 Mihomo `-t` 配置校验；失败时保持原网络不被接管。
 - PID 停止前校验 `/proc/<pid>/cmdline`，降低 PID 复用误杀风险。
@@ -26,7 +26,7 @@
 ## 真机验收
 
 - [ ] Android 14 / 15 / 16 启动 TPROXY 成功
-- [ ] `ip rule` 中辟尘 mark mask 不覆盖低 16 位
+- [ ] `ip rule` 中河图 mark mask 不覆盖低 16 位
 - [ ] Wi-Fi → 5G → Wi-Fi 切换后不掉网
 - [ ] 杀掉 Mihomo 后进入状态页可自动清除残留规则并恢复直连
 - [ ] Stop 连续执行两次均正常

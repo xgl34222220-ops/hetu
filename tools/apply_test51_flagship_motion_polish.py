@@ -1,7 +1,7 @@
 from pathlib import Path
 import re
 
-ROOT = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen')
+ROOT = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu')
 
 
 def require_replace(text: str, old: str, new: str, label: str) -> str:
@@ -55,7 +55,7 @@ ref = require_replace(
 
 network_card = r'''@Composable
 private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: Int, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     var lanMode by rememberSaveable { mutableStateOf(true) }
     val source = remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
@@ -141,7 +141,7 @@ ref = replace_region(
 
 subscription_card = r'''@Composable
 private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, modifier: Modifier, onClick: () -> Unit) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val haptic = LocalHapticFeedback.current
     val tracked = items.filter { it.hasSubscriptionInfo && it.total > 0L }
     val used = tracked.sumOf { it.used }
@@ -200,7 +200,7 @@ ref = replace_region(
 
 resource_card = r'''@Composable
 private fun RefResourceCard(memory: Long, cpuPercent: Float, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val valueColor = if (scheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A)
     val progress = (cpuPercent / 100f).coerceIn(0f, 1f)
@@ -304,7 +304,7 @@ switch_end = ref.find('@Composable\nprivate fun RefDivider', switch_start)
 if switch_start < 0 or switch_end < 0:
     raise RuntimeError('Missing RefSwitchRow region')
 switch_block = ref[switch_start:switch_end]
-switch_block = require_replace(switch_block, '    val t = LocalBichenTokens.current\n', '    val t = LocalBichenTokens.current\n    val view = LocalView.current\n', 'switch local view')
+switch_block = require_replace(switch_block, '    val t = LocalHetuTokens.current\n', '    val t = LocalHetuTokens.current\n    val view = LocalView.current\n', 'switch local view')
 switch_block = require_replace(switch_block, '            onCheckedChange = onCheckedChange,', '            onCheckedChange = { value ->\n                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)\n                onCheckedChange(value)\n            },', 'switch haptic')
 ref = ref[:switch_start] + switch_block + ref[switch_end:]
 
@@ -358,7 +358,7 @@ ad_path = ROOT / 'ProxyAdblockChainActivity.kt'
 ad = ad_path.read_text()
 chain_metric = r'''@Composable
 private fun ChainMetric(label: String, value: String, modifier: Modifier = Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val accent = when (label) {
         "规则源" -> Color(0xFF059669)

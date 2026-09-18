@@ -16,13 +16,13 @@ import time
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-PACKAGE = 'io.github.xgl34222220.bichen'
-JAVA = ROOT / 'android-app/app/src/main/java/io/github/xgl34222220/bichen'
+PACKAGE = 'io.github.xgl34222220.hetu'
+JAVA = ROOT / 'android-app/app/src/main/java/io/github/xgl34222220/hetu'
 
 class RootProcessTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.temp = tempfile.TemporaryDirectory(prefix='bichen-root-process-')
+        cls.temp = tempfile.TemporaryDirectory(prefix='hetu-root-process-')
         cls.work = Path(cls.temp.name)
         cls.bb = shutil.which('busybox')
         if not cls.bb:
@@ -41,7 +41,7 @@ class RootProcessTests(unittest.TestCase):
                 public JSONTokener(String s){} public Object nextValue(){throw new UnsupportedOperationException();}
                 public char nextClean(){throw new UnsupportedOperationException();}
             }''',
-            'RootHarness.java': '''package io.github.xgl34222220.bichen;
+            'RootHarness.java': '''package io.github.xgl34222220.hetu;
                 public class RootHarness { public static void main(String[] args) {
                     RootBridge.Result r=RootBridge.rootShell(null,args[0],Long.parseLong(args[1]));
                     System.out.println(r.code);
@@ -58,8 +58,8 @@ import os,sys
 assert len(sys.argv)==3 and sys.argv[1]=='-c'
 script=sys.argv[2]
 for p in ('/data/adb/ksu/bin/busybox','/data/adb/ap/bin/busybox','/data/adb/magisk/busybox'):
-    script=script.replace(p,os.environ['BICHEN_HOST_BB'])
-shell=os.environ['BICHEN_HOST_SHELL']
+    script=script.replace(p,os.environ['HETU_HOST_BB'])
+shell=os.environ['HETU_HOST_SHELL']
 args=[shell]+(['ash'] if shell.endswith('busybox') else [])
 os.execv(shell,args+['-c',script])
 ''')
@@ -70,7 +70,7 @@ os.execv(shell,args+['-c',script])
     def tearDownClass(cls): cls.temp.cleanup()
 
     def call(self,cmd,timeout=5000,shell='/bin/sh',cat=False):
-        env=dict(os.environ,PATH=str(self.work)+os.pathsep+os.environ['PATH'],BICHEN_HOST_BB=self.bb,BICHEN_HOST_SHELL=shell,BICHEN_TEST_CAT='1' if cat else '0')
+        env=dict(os.environ,PATH=str(self.work)+os.pathsep+os.environ['PATH'],HETU_HOST_BB=self.bb,HETU_HOST_SHELL=shell,HETU_TEST_CAT='1' if cat else '0')
         start=time.monotonic()
         p=subprocess.run(['java','-cp',str(self.work),PACKAGE+'.RootHarness',cmd,str(timeout)],env=env,capture_output=True,text=True,timeout=timeout/1000+4)
         self.assertEqual(p.returncode,0,p.stderr)
@@ -91,8 +91,8 @@ os.execv(shell,args+['-c',script])
             self.assertEqual(code,7,out)
 
     def test_quoted_command_and_old_timeout_text_are_data(self):
-        code,out,_=self.call('printf \'%s\\n\' "a\'b" \'$HOME; $(false)\' \'__BICHEN_TIMEOUT__\'')
-        self.assertEqual(code,0);self.assertEqual(out,"a'b\n$HOME; $(false)\n__BICHEN_TIMEOUT__\n")
+        code,out,_=self.call('printf \'%s\\n\' "a\'b" \'$HOME; $(false)\' \'__HETU_TIMEOUT__\'')
+        self.assertEqual(code,0);self.assertEqual(out,"a'b\n$HOME; $(false)\n__HETU_TIMEOUT__\n")
 
     def test_large_output_is_drained(self):
         code,out,_=self.call("awk 'BEGIN { for(i=0;i<12000;i++)print \"1234567890abcdef\" }'")

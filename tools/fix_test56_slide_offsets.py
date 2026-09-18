@@ -1,6 +1,6 @@
 from pathlib import Path
 
-p = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt')
+p = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt')
 s = p.read_text(encoding='utf-8')
 old_in = 'androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(220)) { 4.dp.roundToPx() }'
 new_in = 'androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(220)) { fullHeight -> (fullHeight * .08f).toInt().coerceAtLeast(4) }'

@@ -5,7 +5,7 @@ checks = {
         'versionCode = 450',
         'versionName = "0.4.0-test.50"',
     ],
-    Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt'): [
+    Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt'): [
         'groupArrow',
         'Color(0xFFE7EDF4)',
         'modifier.height(62.dp)',
@@ -15,18 +15,18 @@ checks = {
         'thickness = .5.dp',
         'rules.chunked(18)',
     ],
-    Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAdblockChainActivity.kt'): [
+    Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockChainActivity.kt'): [
         'Color(0xFFF8FAFC)',
         'private fun ChainMetric',
     ],
-    Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxySubscriptionActivity.kt'): [
+    Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt'): [
         'BasicTextField',
         'lineCount = remember(yamlText)',
         r"yamlText.count { it == '\n' }",
         r'joinToString("\n")',
         'Color(0xFFF8FAFC)',
     ],
-    Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAdvancedSettingsActivity.kt'): [
+    Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt'): [
         'Root 数据面 · 修改后重启代理生效',
         'maxLines = 1',
         'overflow = TextOverflow.Ellipsis',

@@ -1,7 +1,7 @@
 from pathlib import Path
 
-ui_path = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt')
-dock_path = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ui/BichenGlassDock.kt')
+ui_path = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt')
+dock_path = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt')
 s = ui_path.read_text()
 d = dock_path.read_text()
 
@@ -71,7 +71,7 @@ one(
 one(
 '''@Composable
 private fun RefPanelTabs(selected: RefPanelTab, onSelect: (RefPanelTab) -> Unit) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
     val tabs = RefPanelTab.entries
@@ -110,7 +110,7 @@ private fun RefPanelTabs(selected: RefPanelTab, onSelect: (RefPanelTab) -> Unit)
 }''',
 '''@Composable
 private fun RefPanelTabs(selected: RefPanelTab, onSelect: (RefPanelTab) -> Unit) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
     val tabs = RefPanelTab.entries
@@ -352,7 +352,7 @@ one(
 one(
 '''@Composable
 private fun RefMetric(title: String, value: String, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(value, color = t.textPrimary, fontSize = 16.sp, lineHeight = 21.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(title, color = t.textSecondary, fontSize = 12.sp, lineHeight = 16.sp, maxLines = 1)
@@ -360,7 +360,7 @@ private fun RefMetric(title: String, value: String, modifier: Modifier) {
 }''',
 '''@Composable
 private fun RefMetric(title: String, value: String, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(value, color = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A), fontSize = 19.sp, lineHeight = 23.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(title, color = Color(0xFF94A3B8), fontSize = 11.sp, lineHeight = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1)
@@ -385,7 +385,7 @@ one(
     val context = LocalContext.current
     val inspector = remember { ProxyRuntimeInspector(context) }
     val scope = rememberCoroutineScope()
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     var unavailable by remember { mutableStateOf<String?>(null) }
     LazyColumn(
@@ -449,7 +449,7 @@ one(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {''',
-'''    val t = LocalBichenTokens.current
+'''    val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     LazyColumn(
         Modifier.fillMaxSize().background(if (dark) t.pageBackground else Color(0xFFF1F5F9)),
@@ -506,13 +506,13 @@ one(
 one(
 '''@Composable
 private fun RefGroup(content: @Composable ColumnScope.() -> Unit) {
-    Surface(shape = RoundedCornerShape(16.dp), color = LocalBichenTokens.current.cardBackground, shadowElevation = 0.dp) {
+    Surface(shape = RoundedCornerShape(16.dp), color = LocalHetuTokens.current.cardBackground, shadowElevation = 0.dp) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp), content = content)
     }
 }''',
 '''@Composable
 private fun RefGroup(content: @Composable ColumnScope.() -> Unit) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     Surface(
         shape = RoundedCornerShape(24.dp),
@@ -528,7 +528,7 @@ private fun RefGroup(content: @Composable ColumnScope.() -> Unit) {
 one(
 '''@Composable
 private fun RefToolRow(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val source = remember(title) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) .97f else 1f, spring(dampingRatio = .78f, stiffness = 560f), label = "tool$title")
@@ -549,7 +549,7 @@ private fun RefToolRow(icon: ImageVector, title: String, subtitle: String, onCli
 }''',
 '''@Composable
 private fun RefToolRow(icon: ImageVector, accent: Color, title: String, subtitle: String, onClick: () -> Unit) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val source = remember(title) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) .97f else 1f, spring(dampingRatio = .78f, stiffness = 560f), label = "tool$title")
@@ -583,7 +583,7 @@ private fun RefToolRow(icon: ImageVector, accent: Color, title: String, subtitle
 one(
 '''@Composable
 private fun RefValueRow(title: String, value: String, onClick: (() -> Unit)? = null) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val source = remember(title) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed && onClick != null) .98f else 1f, spring(dampingRatio = .80f, stiffness = 560f), label = "value$title")
@@ -600,7 +600,7 @@ private fun RefValueRow(title: String, value: String, onClick: (() -> Unit)? = n
 }''',
 '''@Composable
 private fun RefValueRow(title: String, value: String, icon: ImageVector? = null, accent: Color = Color(0xFF64748B), onClick: (() -> Unit)? = null) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val source = remember(title) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed && onClick != null) .98f else 1f, spring(dampingRatio = .80f, stiffness = 560f), label = "value$title")
@@ -628,13 +628,13 @@ private fun RefValueRow(title: String, value: String, icon: ImageVector? = null,
 )
 one(
 '''@Composable
-private fun RefDivider() { HorizontalDivider(color = LocalBichenTokens.current.outline) }''',
+private fun RefDivider() { HorizontalDivider(color = LocalHetuTokens.current.outline) }''',
 '''@Composable
 private fun RefDivider() {
     HorizontalDivider(
         modifier = Modifier.padding(start = 64.dp, end = 16.dp),
         thickness = 1.dp,
-        color = if (MaterialTheme.colorScheme.background.luminance() < .5f) LocalBichenTokens.current.outline else Color(0xFFF1F5F9),
+        color = if (MaterialTheme.colorScheme.background.luminance() < .5f) LocalHetuTokens.current.outline else Color(0xFFF1F5F9),
     )
 }''',
 'indented grouped divider',
@@ -644,16 +644,16 @@ private fun RefDivider() {
 # to the opaque .98 surface that looked like a white plastic slab.
 dock_one(
 '''    val context = LocalContext.current
-    val prefs = remember { context.getSharedPreferences("bichen", 0) }
+    val prefs = remember { context.getSharedPreferences("hetu", 0) }
     val scheme = MaterialTheme.colorScheme
-    val tokens = LocalBichenTokens.current
+    val tokens = LocalHetuTokens.current
     val dark = scheme.background.luminance() < .5f
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val floating = prefs.getBoolean("floatingBottomBar", true)
     val enableBlur = prefs.getBoolean("enableBlur", true)
     val activeGlass = prefs.getBoolean("liquidGlass", true)''',
 '''    val scheme = MaterialTheme.colorScheme
-    val tokens = LocalBichenTokens.current
+    val tokens = LocalHetuTokens.current
     val dark = scheme.background.luminance() < .5f
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val floating = true

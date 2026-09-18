@@ -1,6 +1,6 @@
 from pathlib import Path
 
-p = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt')
+p = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt')
 s = p.read_text(encoding='utf-8')
 
 if 'label = "test46GhostHeader"' in s:
@@ -64,7 +64,7 @@ replace_once(old, new, 'home clean header')
 # Home latency semantics: green <100, amber 100..300, rose >300; keep values visible while testing.
 old = '''@Composable
 private fun RefLatencyColumn(label: String, value: Long?, testing: Boolean, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(label, color = Color(0xFF64748B), fontSize = 11.sp, lineHeight = 15.sp, maxLines = 1)
@@ -209,7 +209,7 @@ private fun RefPanelHeaderAction(
     active: Boolean = false,
     onClick: () -> Unit,
 ) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
     val view = LocalView.current
@@ -476,7 +476,7 @@ private fun RefInfoBottomSheet(
     actionLabel: String,
     onDismiss: () -> Unit,
 ) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val terminal = title.contains("日志")
     val renderedText = remember(text, terminal) {
         if (!terminal) {

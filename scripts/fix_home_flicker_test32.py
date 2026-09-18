@@ -1,7 +1,7 @@
 from pathlib import Path
 
-proxy_path = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt')
-main_path = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/BichenMainActivity.kt')
+proxy_path = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt')
+main_path = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/HetuMainActivity.kt')
 
 proxy = proxy_path.read_text(encoding='utf-8')
 main = main_path.read_text(encoding='utf-8')
@@ -13,7 +13,7 @@ old = '''class ReferenceProxyActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            key(uiRevision) { BichenTheme { RefProxyShell { finish() } } }
+            key(uiRevision) { HetuTheme { RefProxyShell { finish() } } }
         }
     }
 
@@ -33,7 +33,7 @@ new = '''class ReferenceProxyActivity : ComponentActivity() {
             // The previous forced wrapper recreated RefProxyShell and briefly exposed
             // default/empty runtime state before the async refresh completed.
             val revision = resumeRevision
-            BichenTheme { RefProxyShell(resumeRevision = revision) { finish() } }
+            HetuTheme { RefProxyShell(resumeRevision = revision) { finish() } }
         }
     }
 
@@ -94,22 +94,22 @@ if old not in main:
     raise SystemExit('HomePage call not found')
 main = main.replace(old, new, 1)
 
-old = '''private fun HomePage(controller: BichenComposeController, actionScope: CoroutineScope) {
+old = '''private fun HomePage(controller: HetuComposeController, actionScope: CoroutineScope) {
     val context = LocalContext.current
-    val tokens = LocalBichenTokens.current
+    val tokens = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     var revision by remember { mutableIntStateOf(0) }
     var snapshot by remember { mutableStateOf(HomeSnapshot()) }
     var busy by remember { mutableStateOf(false) }
     var operationMessage by remember { mutableStateOf("") }'''
 new = '''private fun HomePage(
-    controller: BichenComposeController,
+    controller: HetuComposeController,
     actionScope: CoroutineScope,
     cachedSnapshot: HomeSnapshot?,
     onSnapshot: (HomeSnapshot) -> Unit,
 ) {
     val context = LocalContext.current
-    val tokens = LocalBichenTokens.current
+    val tokens = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     var revision by remember { mutableIntStateOf(0) }
     var snapshot by remember { mutableStateOf(cachedSnapshot ?: HomeSnapshot()) }

@@ -13,9 +13,9 @@ key=OUT/'ci-only.keystore'
 run('keytool','-genkeypair','-keystore',key,'-storepass','android','-keypass','android','-alias','test','-keyalg','RSA','-keysize','2048','-validity','2','-dname','CN=Disposable CI Test')
 def sign(src,dst):
  run(TOOLS/'apksigner','sign','--ks',key,'--ks-key-alias','test','--ks-pass','pass:android','--key-pass','pass:android','--v4-signing-enabled','false','--out',dst,src)
-sign(ROOT/('out/preview/Bichen-'+version+'-unsigned.apk'),OUT/'device-app.apk')
+sign(ROOT/('out/preview/Hetu-'+version+'-unsigned.apk'),OUT/'device-app.apk')
 manifest=OUT/'AndroidManifest.xml'
-manifest.write_text('''<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="bichen.devicecheck"><uses-sdk android:minSdkVersion="26" android:targetSdkVersion="35"/><application android:label="Bichen device checks" android:debuggable="true"/><instrumentation android:name="bichen.devicecheck.Smoke" android:targetPackage="io.github.xgl34222220.bichen.preview" android:functionalTest="true"/></manifest>''')
+manifest.write_text('''<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="hetu.devicecheck"><uses-sdk android:minSdkVersion="26" android:targetSdkVersion="35"/><application android:label="Hetu device checks" android:debuggable="true"/><instrumentation android:name="hetu.devicecheck.Smoke" android:targetPackage="io.github.xgl34222220.hetu.preview" android:functionalTest="true"/></manifest>''')
 classes=OUT/'classes';classes.mkdir(exist_ok=True)
 run('javac','-source','8','-target','8','-encoding','UTF-8','-bootclasspath',str(JAR)+os.pathsep+str(TOOLS/'core-lambda-stubs.jar'),'-d',classes,*sorted((ROOT/'tests/device').glob('*.java')))
 with zipfile.ZipFile(OUT/'classes.jar','w') as z:
@@ -30,9 +30,9 @@ sign(OUT/'test-aligned.apk',OUT/'device-test.apk')
 run('adb','install','-r',OUT/'device-app.apk');run('adb','install','-r',OUT/'device-test.apk')
 run('adb','shell','settings','put','system','system_locales','zh-CN')
 run('adb','shell','settings','put','system','font_scale','1.3')
-proc=run('adb','shell','am','instrument','-w','-e','expectedVersion',version,'bichen.devicecheck/.Smoke',capture_output=True,text=True,timeout=150)
+proc=run('adb','shell','am','instrument','-w','-e','expectedVersion',version,'hetu.devicecheck/.Smoke',capture_output=True,text=True,timeout=150)
 (OUT/'device-results.txt').write_text(proc.stdout+'\n'+proc.stderr);print(proc.stdout)
-assert 'BICHEN_DEVICE_PASS' in proc.stdout and 'BICHEN_DEVICE_FAIL' not in proc.stdout
+assert 'HETU_DEVICE_PASS' in proc.stdout and 'HETU_DEVICE_FAIL' not in proc.stdout
 # adb root restarts adbd and can return "closed" before the new daemon connects.
 # This is only the disposable CI emulator, after app tests have finished. Check
 # actual UID instead of treating a closed transport as a test/application failure.
@@ -46,6 +46,6 @@ for attempt in range(20):
   root_ready=True;break
  time.sleep(0.25)
 assert root_ready, 'CI emulator did not allow screenshot collection; UI result saved separately'
-run('adb','pull','/data/user/0/io.github.xgl34222220.bichen.preview/files',OUT/'screenshots',timeout=30)
+run('adb','pull','/data/user/0/io.github.xgl34222220.hetu.preview/files',OUT/'screenshots',timeout=30)
 shots=list((OUT/'screenshots').glob('actual-page-*.png'))
 assert len(shots)==4, 'Expected four actual-page screenshots'

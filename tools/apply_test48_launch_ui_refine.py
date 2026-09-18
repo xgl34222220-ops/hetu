@@ -2,8 +2,8 @@ from pathlib import Path
 import re
 
 ROOT = Path(__file__).resolve().parents[1]
-UI = ROOT / 'android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt'
-SUB = ROOT / 'android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxySubscriptionActivity.kt'
+UI = ROOT / 'android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt'
+SUB = ROOT / 'android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt'
 BUILD = ROOT / 'android-app/app/build.gradle.kts'
 STYLES = ROOT / 'android-app/app/src/main/res/values/styles.xml'
 
@@ -38,8 +38,8 @@ text = UI.read_text(encoding='utf-8')
 # ---------------------------------------------------------------------------
 text = replace_once(
     text,
-    '''    val prefs = remember { context.getSharedPreferences("bichen", 0) }\n    val showPanelTab = prefs.getBoolean("showPanelTab", true)''',
-    '''    val prefs = remember { context.getSharedPreferences("bichen", 0) }\n    val showPanelTab = prefs.getBoolean("showPanelTab", true)\n    val startupProfile = remember { ProxyRuntimeProfile.load(prefs) }\n    val startupConfig = remember(startupProfile.core) {\n        prefs.getString("proxySelectedConfig.${startupProfile.core.id}", "").orEmpty().ifBlank { "尚未选择配置" }\n    }''',
+    '''    val prefs = remember { context.getSharedPreferences("hetu", 0) }\n    val showPanelTab = prefs.getBoolean("showPanelTab", true)''',
+    '''    val prefs = remember { context.getSharedPreferences("hetu", 0) }\n    val showPanelTab = prefs.getBoolean("showPanelTab", true)\n    val startupProfile = remember { ProxyRuntimeProfile.load(prefs) }\n    val startupConfig = remember(startupProfile.core) {\n        prefs.getString("proxySelectedConfig.${startupProfile.core.id}", "").orEmpty().ifBlank { "尚未选择配置" }\n    }''',
     'startup snapshot inputs',
 )
 text = replace_once(
@@ -73,8 +73,8 @@ text = text.replace('calculateBottomPadding() + 132.dp', 'calculateBottomPadding
 # ---------------------------------------------------------------------------
 # 2) Home: aligned industrial identity, denser hero, instrument typography.
 # ---------------------------------------------------------------------------
-old_header = '''                Text(\n                    "辟尘",\n                    color = if (scheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A),\n                    fontSize = 24.sp,\n                    lineHeight = 30.sp,\n                    fontWeight = FontWeight.ExtraBold,\n                    letterSpacing = (-0.45).sp,\n                )\n                Spacer(Modifier.width(8.dp))\n                Surface(\n                    shape = CircleShape,\n                    color = if (scheme.background.luminance() < .5f) Color.White.copy(alpha = .07f) else Color(0xFFE2E8F0).copy(alpha = .62f),\n                    tonalElevation = 0.dp,\n                ) {\n                    Text(\n                        "Mihomo Core",\n                        Modifier.padding(horizontal = 8.dp, vertical = 3.dp),\n                        color = Color(0xFF94A3B8),\n                        fontSize = 9.sp,\n                        lineHeight = 12.sp,\n                        fontWeight = FontWeight.SemiBold,\n                        letterSpacing = .2.sp,\n                    )\n                }'''
-new_header = '''                Text(\n                    "辟尘",\n                    color = if (scheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A),\n                    fontSize = 25.sp,\n                    lineHeight = 30.sp,\n                    fontWeight = FontWeight.Black,\n                    letterSpacing = (-0.70).sp,\n                )\n                Spacer(Modifier.width(10.dp))\n                Surface(\n                    shape = CircleShape,\n                    color = if (scheme.background.luminance() < .5f) Color(0xFF1D4ED8).copy(alpha = .16f) else Color(0xFFEAF2FF).copy(alpha = .90f),\n                    border = BorderStroke(.7.dp, if (scheme.background.luminance() < .5f) Color(0xFF60A5FA).copy(alpha = .18f) else Color(0xFFBFDBFE).copy(alpha = .72f)),\n                    shadowElevation = 1.dp,\n                    tonalElevation = 0.dp,\n                ) {\n                    Text(\n                        "Mihomo Core",\n                        Modifier.padding(horizontal = 8.dp, vertical = 3.dp),\n                        color = if (scheme.background.luminance() < .5f) Color(0xFF93C5FD) else Color(0xFF2563EB),\n                        fontSize = 10.sp,\n                        lineHeight = 13.sp,\n                        fontWeight = FontWeight.Bold,\n                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,\n                        letterSpacing = .15.sp,\n                    )\n                }'''
+old_header = '''                Text(\n                    "河图",\n                    color = if (scheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A),\n                    fontSize = 24.sp,\n                    lineHeight = 30.sp,\n                    fontWeight = FontWeight.ExtraBold,\n                    letterSpacing = (-0.45).sp,\n                )\n                Spacer(Modifier.width(8.dp))\n                Surface(\n                    shape = CircleShape,\n                    color = if (scheme.background.luminance() < .5f) Color.White.copy(alpha = .07f) else Color(0xFFE2E8F0).copy(alpha = .62f),\n                    tonalElevation = 0.dp,\n                ) {\n                    Text(\n                        "Mihomo Core",\n                        Modifier.padding(horizontal = 8.dp, vertical = 3.dp),\n                        color = Color(0xFF94A3B8),\n                        fontSize = 9.sp,\n                        lineHeight = 12.sp,\n                        fontWeight = FontWeight.SemiBold,\n                        letterSpacing = .2.sp,\n                    )\n                }'''
+new_header = '''                Text(\n                    "河图",\n                    color = if (scheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A),\n                    fontSize = 25.sp,\n                    lineHeight = 30.sp,\n                    fontWeight = FontWeight.Black,\n                    letterSpacing = (-0.70).sp,\n                )\n                Spacer(Modifier.width(10.dp))\n                Surface(\n                    shape = CircleShape,\n                    color = if (scheme.background.luminance() < .5f) Color(0xFF1D4ED8).copy(alpha = .16f) else Color(0xFFEAF2FF).copy(alpha = .90f),\n                    border = BorderStroke(.7.dp, if (scheme.background.luminance() < .5f) Color(0xFF60A5FA).copy(alpha = .18f) else Color(0xFFBFDBFE).copy(alpha = .72f)),\n                    shadowElevation = 1.dp,\n                    tonalElevation = 0.dp,\n                ) {\n                    Text(\n                        "Mihomo Core",\n                        Modifier.padding(horizontal = 8.dp, vertical = 3.dp),\n                        color = if (scheme.background.luminance() < .5f) Color(0xFF93C5FD) else Color(0xFF2563EB),\n                        fontSize = 10.sp,\n                        lineHeight = 13.sp,\n                        fontWeight = FontWeight.Bold,\n                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,\n                        letterSpacing = .15.sp,\n                    )\n                }'''
 text = replace_once(text, old_header, new_header, 'home identity capsule')
 
 old_hero_status = '''                            Row(verticalAlignment = Alignment.CenterVertically) {\n                                Box(Modifier.size(9.dp).background(if (state.running) scheme.primary else t.danger, CircleShape))\n                                Spacer(Modifier.width(9.dp))\n                                Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {\n                                    Text(\n                                        if (state.running) "运行中" else "已停止",\n                                        color = t.textPrimary,\n                                        fontSize = 20.sp,\n                                        lineHeight = 24.sp,\n                                        fontWeight = FontWeight.ExtraBold,\n                                        maxLines = 1,\n                                    )\n                                    Text(\n                                        if (state.running) refDuration(runtime.elapsedSeconds) else "等待启动",\n                                        color = t.textMuted,\n                                        fontSize = 11.sp,\n                                        lineHeight = 15.sp,\n                                        fontWeight = FontWeight.Medium,\n                                        maxLines = 1,\n                                    )\n                                }\n                            }'''
@@ -143,7 +143,7 @@ text = replace_once(
 
 new_resource = r'''@Composable
 private fun RefResourceCard(memory: Long, cpuPercent: Float, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val valueColor = if (scheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A)
     val progress = (cpuPercent / 100f).coerceIn(0f, 1f)
@@ -184,7 +184,7 @@ text = replace_regex(text, r'@Composable\nprivate fun RefResourceCard\(.*?\n\}\n
 # ---------------------------------------------------------------------------
 new_group_card = r'''@Composable
 private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolean, delay: Long?, testing: Boolean, modifier: Modifier, onClick: () -> Unit, onDelay: () -> Unit) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
     val source = remember(group.name) { MutableInteractionSource() }
@@ -273,7 +273,7 @@ private fun RefInlineNodeCard(
     onSelect: () -> Unit,
     onDelay: () -> Unit,
 ) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val shape = RoundedCornerShape(16.dp)
     val source = remember(node.name) { MutableInteractionSource() }
@@ -458,7 +458,7 @@ text = replace_once(
 
 new_rule_group = r'''@Composable
 private fun RefRuleGroupCard(items: List<ProxyRuleUi>) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val shape = RoundedCornerShape(22.dp)
     Surface(

@@ -30,9 +30,9 @@ import (
 )
 
 const coreRevision = "ac017cdd246ce8bd547653d927e7bf77d7ee73d5"
-const filterName = "__bichen_exact_filter"
-const dnsGuardName = "__bichen_dns_guard"
-const filterSubRule = "__bichen_filter_branch"
+const filterName = "__hetu_exact_filter"
+const dnsGuardName = "__hetu_dns_guard"
+const filterSubRule = "__hetu_filter_branch"
 
 var mu sync.Mutex
 var tunCloser io.Closer
@@ -430,7 +430,7 @@ func prepare(r request) ([]byte, error) {
 			providers = map[string]any{}
 		}
 		branch := make([]any, 0, len(allow)+len(doh)+4)
-		// PASS inside SUB-RULE exits Bichen's branch and resumes the user's main rules.
+		// PASS inside SUB-RULE exits Hetu's branch and resumes the user's main rules.
 		for _, domain := range allow {
 			branch = append(branch, "DOMAIN,"+domain+",PASS")
 		}
@@ -441,7 +441,7 @@ func prepare(r request) ([]byte, error) {
 			}
 			if len(doh) > 0 {
 				if _, exists := providers[dnsGuardName]; exists {
-					return nil, errors.New("配置占用了辟尘 DNS 防绕过内部规则名称")
+					return nil, errors.New("配置占用了河图 DNS 防绕过内部规则名称")
 				}
 				payload := make([]string, 0, len(doh))
 				for _, domain := range doh {
@@ -458,7 +458,7 @@ func prepare(r request) ([]byte, error) {
 		}
 		if r.Filter && len(exact)+len(suffix) > 0 {
 			if _, exists := providers[filterName]; exists {
-				return nil, errors.New("配置占用了辟尘内部规则名称")
+				return nil, errors.New("配置占用了河图内部规则名称")
 			}
 			payload := make([]string, 0, len(exact)+len(suffix))
 			for _, domain := range exact {
@@ -477,7 +477,7 @@ func prepare(r request) ([]byte, error) {
 				subRules = map[string]any{}
 			}
 			if _, exists := subRules[filterSubRule]; exists {
-				return nil, errors.New("配置占用了辟尘内部子规则名称")
+				return nil, errors.New("配置占用了河图内部子规则名称")
 			}
 			subRules[filterSubRule] = branch
 			m["sub-rules"] = subRules
@@ -523,7 +523,7 @@ func execute(r request) (any, error) {
 				executor.Shutdown()
 				return nil, err
 			}
-			options := LC.Tun{Enable: true, Device: "bichen", Stack: C.TunGvisor, MTU: 1500, FileDescriptor: fd, DNSHijack: []string{"any:53", "tcp://any:53"}, Inet4Address: []netip.Prefix{netip.MustParsePrefix("172.29.0.1/30")}, Inet6Address: []netip.Prefix{netip.MustParsePrefix("fdfe:dcba:9876::1/126")}}
+			options := LC.Tun{Enable: true, Device: "hetu", Stack: C.TunGvisor, MTU: 1500, FileDescriptor: fd, DNSHijack: []string{"any:53", "tcp://any:53"}, Inet4Address: []netip.Prefix{netip.MustParsePrefix("172.29.0.1/30")}, Inet6Address: []netip.Prefix{netip.MustParsePrefix("fdfe:dcba:9876::1/126")}}
 			t, err := sing_tun.New(options, tunnel.Tunnel)
 			if err != nil {
 				executor.Shutdown()

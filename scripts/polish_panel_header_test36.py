@@ -1,6 +1,6 @@
 from pathlib import Path
 
-ui = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt')
+ui = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt')
 s = ui.read_text()
 
 
@@ -136,7 +136,7 @@ private fun RefPanelHeaderAction(
     active: Boolean = false,
     onClick: () -> Unit,
 ) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
     val source = remember(contentDescription) { MutableInteractionSource() }
@@ -173,7 +173,7 @@ s = s.replace(anchor, helper + anchor, 1)
 one(
 '''@Composable
 private fun RefPanelTabs(selected: RefPanelTab, onSelect: (RefPanelTab) -> Unit) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
     val tabs = RefPanelTab.entries
@@ -222,7 +222,7 @@ private fun RefPanelTabs(selected: RefPanelTab, onSelect: (RefPanelTab) -> Unit)
 }''',
 '''@Composable
 private fun RefPanelTabs(selected: RefPanelTab, onSelect: (RefPanelTab) -> Unit) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
     val tabs = RefPanelTab.entries

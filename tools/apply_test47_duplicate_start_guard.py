@@ -2,7 +2,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / "android-app/app/build.gradle.kts"
-MGR = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java"
+MGR = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java"
 
 # Version
 text = BUILD.read_text(encoding="utf-8")
@@ -25,11 +25,11 @@ if anchor not in text:
 if 'CONTROL_LOCK' not in text:
     text = text.replace(anchor, anchor + '    private static final ReentrantLock CONTROL_LOCK=new ReentrantLock(true);\n', 1)
 
-# Controller port selection should not always race on 29090 if a second installed Bichen build
+# Controller port selection should not always race on 29090 if a second installed Hetu build
 # or another Clash frontend wakes at the same time. Scan the whole private range from a rotating
 # start point, and only then fall back to the previously remembered port ordering.
-old_chooser = '''    private int chooseControllerPort()throws IOException{\n        int preferred=prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT);\n        LinkedHashSet<Integer> candidates=new LinkedHashSet<>();\n        if(preferred>=29090&&preferred<=29149)candidates.add(preferred);\n        for(int port=29090;port<=29149;port++)candidates.add(port);\n        for(int port:candidates){\n            try(ServerSocket socket=new ServerSocket()){\n                socket.setReuseAddress(false);\n                socket.bind(new InetSocketAddress(InetAddress.getByName("127.0.0.1"),port));\n                prefs.edit().putInt("proxyControllerPort",port).commit();\n                return port;\n            }catch(IOException occupied){ }\n        }\n        throw new IOException("辟尘控制接口动态端口 29090-29149 均被占用，请关闭冲突代理后重试");\n    }\n'''
-new_chooser = '''    private int chooseControllerPort()throws IOException{\n        int preferred=prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT);\n        LinkedHashSet<Integer> candidates=new LinkedHashSet<>();\n        int span=60;\n        int start=(int)(Math.abs(System.nanoTime())%span);\n        for(int offset=0;offset<span;offset++)candidates.add(29090+((start+offset)%span));\n        if(preferred>=29090&&preferred<=29149)candidates.add(preferred);\n        for(int port:candidates){\n            try(ServerSocket socket=new ServerSocket()){\n                socket.setReuseAddress(false);\n                socket.bind(new InetSocketAddress(InetAddress.getByName("127.0.0.1"),port));\n                prefs.edit().putInt("proxyControllerPort",port).commit();\n                return port;\n            }catch(IOException occupied){ }\n        }\n        throw new IOException("辟尘控制接口动态端口 29090-29149 均被占用，请关闭冲突代理后重试");\n    }\n'''
+old_chooser = '''    private int chooseControllerPort()throws IOException{\n        int preferred=prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT);\n        LinkedHashSet<Integer> candidates=new LinkedHashSet<>();\n        if(preferred>=29090&&preferred<=29149)candidates.add(preferred);\n        for(int port=29090;port<=29149;port++)candidates.add(port);\n        for(int port:candidates){\n            try(ServerSocket socket=new ServerSocket()){\n                socket.setReuseAddress(false);\n                socket.bind(new InetSocketAddress(InetAddress.getByName("127.0.0.1"),port));\n                prefs.edit().putInt("proxyControllerPort",port).commit();\n                return port;\n            }catch(IOException occupied){ }\n        }\n        throw new IOException("河图控制接口动态端口 29090-29149 均被占用，请关闭冲突代理后重试");\n    }\n'''
+new_chooser = '''    private int chooseControllerPort()throws IOException{\n        int preferred=prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT);\n        LinkedHashSet<Integer> candidates=new LinkedHashSet<>();\n        int span=60;\n        int start=(int)(Math.abs(System.nanoTime())%span);\n        for(int offset=0;offset<span;offset++)candidates.add(29090+((start+offset)%span));\n        if(preferred>=29090&&preferred<=29149)candidates.add(preferred);\n        for(int port:candidates){\n            try(ServerSocket socket=new ServerSocket()){\n                socket.setReuseAddress(false);\n                socket.bind(new InetSocketAddress(InetAddress.getByName("127.0.0.1"),port));\n                prefs.edit().putInt("proxyControllerPort",port).commit();\n                return port;\n            }catch(IOException occupied){ }\n        }\n        throw new IOException("河图控制接口动态端口 29090-29149 均被占用，请关闭冲突代理后重试");\n    }\n'''
 if old_chooser not in text:
     raise SystemExit('test47: controller-port chooser block not found')
 text = text.replace(old_chooser, new_chooser, 1)

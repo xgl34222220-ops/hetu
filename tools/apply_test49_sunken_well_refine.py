@@ -2,8 +2,8 @@ from pathlib import Path
 import re
 
 ROOT = Path(__file__).resolve().parents[1]
-UI = ROOT / 'android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt'
-AD = ROOT / 'android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAdblockChainActivity.kt'
+UI = ROOT / 'android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt'
+AD = ROOT / 'android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockChainActivity.kt'
 BUILD = ROOT / 'android-app/app/build.gradle.kts'
 
 
@@ -43,7 +43,7 @@ private fun RefInlineGroupExpansion(
     onDelay: (String) -> Unit,
     onTestAll: () -> Unit,
 ) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val shape = RoundedCornerShape(22.dp)
     val wellColor = if (dark) Color(0xFF18212E) else Color(0xFFEEF2F6)
@@ -131,7 +131,7 @@ private fun RefInlineNodeCard(
     onSelect: () -> Unit,
     onDelay: () -> Unit,
 ) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val shape = RoundedCornerShape(14.dp)
     val source = remember(node.name) { MutableInteractionSource() }
@@ -254,7 +254,7 @@ text = text.replace('                Icon(Icons.Rounded.Bolt, "单独测速", ti
 text = replace_once(text, 'rules.chunked(12)', 'rules.chunked(18)', 'rule chunk size')
 new_rules = r'''@Composable
 private fun RefRuleGroupCard(items: List<ProxyRuleUi>) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val shape = RoundedCornerShape(22.dp)
     Surface(
@@ -325,7 +325,7 @@ text = replace_regex(text, r'@Composable\nprivate fun RefRuleGroupCard\(.*?\n\}\
 # ---------------------------------------------------------------------------
 new_traffic = r'''@Composable
 private fun RefTrafficOverview(state: ProxyComposeState) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val history = remember { mutableStateListOf<Triple<Long, Long, Long>>() }
     var lastUpload by remember { mutableLongStateOf(state.uploadTotal) }

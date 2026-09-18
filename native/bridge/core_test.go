@@ -29,7 +29,7 @@ func TestRuntimeCopy(t *testing.T){
  if strings.Index(text,"DOMAIN,safe.tracker.example.test,PASS")>strings.Index(text,"RULE-SET,"+filterName+",REJECT"){t.Fatal("allow PASS must precede reject inside branch")}
  sniffer:=object(t,m["sniffer"],"sniffer");if !boolValue(t,sniffer,"enable")||!boolValue(t,sniffer,"parse-pure-ip")||!boolValue(t,sniffer,"force-dns-mapping"){t.Fatal("DNS guard sniffer not fully enabled")}
  sniff:=object(t,sniffer["sniff"],"sniffer.sniff")
- for _,proto:=range []string{"TLS","QUIC"}{raw,ok:=fold(sniff,proto);if !ok{t.Fatalf("%s sniffer missing",proto)};cfg:=object(t,raw,"sniffer."+proto);if !hasPort(cfg["ports"],"443")||!hasPort(cfg["ports"],"853"){t.Fatalf("%s guard ports missing: %v",proto,cfg["ports"])};if override,ok:=cfg["override-destination"].(bool);!ok||override{t.Fatalf("%s Bichen sniffer must not rewrite destination",proto)}}
+ for _,proto:=range []string{"TLS","QUIC"}{raw,ok:=fold(sniff,proto);if !ok{t.Fatalf("%s sniffer missing",proto)};cfg:=object(t,raw,"sniffer."+proto);if !hasPort(cfg["ports"],"443")||!hasPort(cfg["ports"],"853"){t.Fatalf("%s guard ports missing: %v",proto,cfg["ports"])};if override,ok:=cfg["override-destination"].(bool);!ok||override{t.Fatalf("%s Hetu sniffer must not rewrite destination",proto)}}
  C.SetHomeDir(t.TempDir());if _,e=config.Parse(b);e!=nil{t.Fatal(e)}
  if r.YAML!=s{t.Fatal("input changed")}
 }

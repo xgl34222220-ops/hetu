@@ -1,6 +1,6 @@
 from pathlib import Path
 
-p = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt')
+p = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt')
 s = p.read_text()
 
 if 'import androidx.compose.foundation.rememberScrollState' not in s:
@@ -32,7 +32,7 @@ private fun RefHome(
     onWebUi: () -> Unit,
     onLog: () -> Unit,
 ) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val selectedDelays = state.groups.mapNotNull { group ->
         val name = group.now
@@ -55,7 +55,7 @@ private fun RefHome(
                 Modifier.fillMaxWidth().statusBarsPadding().padding(top = 12.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("辟尘", color = t.textPrimary, fontSize = 32.sp, lineHeight = 38.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Text("河图", color = t.textPrimary, fontSize = 32.sp, lineHeight = 38.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                 IconButton(onClick = onRefresh, modifier = Modifier.size(42.dp)) {
                     Icon(Icons.Rounded.Refresh, "刷新", tint = t.textSecondary, modifier = Modifier.size(20.dp))
                 }
@@ -128,7 +128,7 @@ private fun RefHome(
 
 @Composable
 private fun RefLatencyPanel(current: Long?, average: Long?, fastest: Long?, testing: Boolean, onClick: () -> Unit) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     Surface(onClick = onClick, enabled = !testing, shape = RoundedCornerShape(15.dp), color = t.cardBackground, shadowElevation = 0.dp) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -150,7 +150,7 @@ private fun RefLatencyPanel(current: Long?, average: Long?, fastest: Long?, test
 
 @Composable
 private fun RefLatencyColumn(label: String, value: String, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(label, color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
         Text(value, color = MaterialTheme.colorScheme.primary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
@@ -159,7 +159,7 @@ private fun RefLatencyColumn(label: String, value: String, modifier: Modifier) {
 
 @Composable
 private fun RefNetworkIdentityCard(lan: String, connections: Int, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     Surface(modifier = modifier, shape = RoundedCornerShape(15.dp), color = t.cardBackground, shadowElevation = 0.dp) {
         Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("网络", color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
@@ -172,7 +172,7 @@ private fun RefNetworkIdentityCard(lan: String, connections: Int, modifier: Modi
 
 @Composable
 private fun RefSpeedCard(up: Long, down: Long, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     Surface(modifier = modifier, shape = RoundedCornerShape(15.dp), color = t.cardBackground, shadowElevation = 0.dp) {
         Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("网速", color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
@@ -184,7 +184,7 @@ private fun RefSpeedCard(up: Long, down: Long, modifier: Modifier) {
 
 @Composable
 private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val tracked = items.filter { it.hasSubscriptionInfo && it.total > 0L }
     val used = tracked.sumOf { it.used }
     val total = tracked.sumOf { it.total }
@@ -204,7 +204,7 @@ private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, modifier: M
 
 @Composable
 private fun RefResourceCard(memory: Long, pid: Int, connections: Int, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     Surface(modifier = modifier, shape = RoundedCornerShape(15.dp), color = t.cardBackground, shadowElevation = 0.dp) {
         Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("资源占用", color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
@@ -222,7 +222,7 @@ tabs_start = s.index('@Composable\nprivate fun RefPanelTabs(')
 tabs_end = s.index('@Composable\nprivate fun RefPanelOverview', tabs_start)
 tabs = r'''@Composable
 private fun RefPanelTabs(selected: RefPanelTab, onSelect: (RefPanelTab) -> Unit) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     Row(
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(6.dp),

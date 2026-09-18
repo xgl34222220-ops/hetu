@@ -1,6 +1,6 @@
 from pathlib import Path
 
-p = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxySubscriptionActivity.kt')
+p = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt')
 s = p.read_text()
 
 # The first generated source accidentally contained a literal backslash followed by

@@ -13,7 +13,7 @@ def apps(s):
     if 'import androidx.compose.animation.core.*' not in s:
         s=must(s,'import androidx.activity.enableEdgeToEdge\n','import androidx.activity.enableEdgeToEdge\nimport androidx.compose.animation.core.*\n','animation import')
     return s
-patch('android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAppSelectionActivity.kt', apps)
+patch('android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAppSelectionActivity.kt', apps)
 
 # Avoid fragile Java string regex escaping while detecting the eBPF default interface.
 def mgr(s):
@@ -22,13 +22,13 @@ def mgr(s):
     out,n=re.subn(pattern,repl,s,count=1,flags=re.S)
     if n!=1: raise SystemExit('default interface command not found')
     return out
-patch('android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java', mgr)
+patch('android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java', mgr)
 
 # Local ruleset success should visibly morph to a green check for the 1.2 s success window.
 def ref(s):
     old='''Icon(Icons.Rounded.Download, "远端更新", tint = if (success) Color(0xFF10B981) else scheme.primary, modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = if (refreshing) spin else 0f })'''
     new='''Icon(if (success) Icons.Rounded.CheckCircle else Icons.Rounded.Download, if (success) "更新完成" else "远端更新", tint = if (success) Color(0xFF10B981) else scheme.primary, modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = if (refreshing) spin else 0f })'''
     return must(s,old,new,'ruleset success icon')
-patch('android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt', ref)
+patch('android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt', ref)
 
 print('test56 compile fixes applied')

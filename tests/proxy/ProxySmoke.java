@@ -1,4 +1,4 @@
-package bichen.proxytest;
+package hetu.proxytest;
 import android.app.*;
 import android.content.*;
 import android.os.*;
@@ -23,15 +23,15 @@ public final class ProxySmoke extends Instrumentation {
   save.invoke(store,yaml,"");check(true,"complete YAML imported through production store");
   Class<?> ruleClass=Class.forName(pkg+".RuleStore",true,loader);Object rules=ruleClass.getConstructor(Context.class).newInstance(context);ruleClass.getMethod("reload").invoke(rules);
   ruleClass.getMethod("changeDomain",String.class,boolean.class,boolean.class,boolean.class).invoke(rules,"ads.integration.test",false,true,false);
-  context.getSharedPreferences("bichen",0).edit().putBoolean("proxyManageHosts",false).putBoolean("proxyFilter",true).putBoolean("vpnWanted",false).putBoolean("vpnRestoreHosts",false).commit();
+  context.getSharedPreferences("hetu",0).edit().putBoolean("proxyManageHosts",false).putBoolean("proxyFilter",true).putBoolean("vpnWanted",false).putBoolean("vpnRestoreHosts",false).commit();
   CountDownLatch done=new CountDownLatch(1);final Intent[] probe={null};BroadcastReceiver receiver=new BroadcastReceiver(){public void onReceive(Context c,Intent i){probe[0]=i;done.countDown();}};
-  context.registerReceiver(receiver,new IntentFilter("bichen.integration.RESULT"),Context.RECEIVER_EXPORTED);
+  context.registerReceiver(receiver,new IntentFilter("hetu.integration.RESULT"),Context.RECEIVER_EXPORTED);
   context.startForegroundService(new Intent(context,service).setAction("START"));
   for(int i=0;i<300&&!service.getField("running").getBoolean(null);i++){if(!service.getField("failure").get(null).toString().isEmpty())break;SystemClock.sleep(100);}
   check(service.getField("running").getBoolean(null),"full Android TUN established: "+service.getField("failure").get(null));
   JSONObject groups=call(new JSONObject().put("action","proxies")).getJSONObject("data");check(groups.has("SELECT"),"core returns actual proxy group");
   call(new JSONObject().put("action","select").put("group","SELECT").put("name","LOOP"));check(true,"actual selector change accepted");
-  context.startActivity(new Intent().setComponent(new ComponentName("bichen.probe","bichen.probe.Probe")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+  context.startActivity(new Intent().setComponent(new ComponentName("hetu.probe","hetu.probe.Probe")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
   check(done.await(25,TimeUnit.SECONDS),"independent UID network probe returned");context.unregisterReceiver(receiver);
   check(probe[0].getBooleanExtra("allowed",false),"HTTP crossed TUN and configured proxy: "+probe[0].getStringExtra("detail"));
   check(probe[0].getBooleanExtra("blocked",false),"ad-domain request rejected through same TUN");
@@ -41,6 +41,6 @@ public final class ProxySmoke extends Instrumentation {
   Bitmap shot=getUiAutomation().takeScreenshot();if(shot!=null)try(OutputStream out=new FileOutputStream(new File(context.getFilesDir(),"mihomo-screen.png"))){shot.compress(Bitmap.CompressFormat.PNG,100,out);}
   context.startService(new Intent(context,service).setAction("STOP"));for(int i=0;i<100&&service.getField("engaged").getBoolean(null);i++)SystemClock.sleep(100);
   check(!service.getField("engaged").getBoolean(null),"service and core stop without restarting legacy DNS");
-  log.append("BICHEN_PROXY_PASS checks=").append(checks).append("\nControlled emulator proxy only; no OEM Root, real subscription or leak certification.\n");result.putString("stream",log.toString());finish(Activity.RESULT_OK,result);
- }catch(Throwable e){try{if(context!=null&&service!=null)context.startService(new Intent(context,service).setAction("STOP"));}catch(Throwable ignored){}result.putString("stream",log+"\nBICHEN_PROXY_FAIL "+android.util.Log.getStackTraceString(e));finish(Activity.RESULT_CANCELED,result);}}
+  log.append("HETU_PROXY_PASS checks=").append(checks).append("\nControlled emulator proxy only; no OEM Root, real subscription or leak certification.\n");result.putString("stream",log.toString());finish(Activity.RESULT_OK,result);
+ }catch(Throwable e){try{if(context!=null&&service!=null)context.startService(new Intent(context,service).setAction("STOP"));}catch(Throwable ignored){}result.putString("stream",log+"\nHETU_PROXY_FAIL "+android.util.Log.getStackTraceString(e));finish(Activity.RESULT_CANCELED,result);}}
 }

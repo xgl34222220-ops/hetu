@@ -1,6 +1,6 @@
 from pathlib import Path
 
-p = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java')
+p = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java')
 s = p.read_text()
 s = s.replace('import java.util.regex.*;\n', '')
 old = '''            Matcher matcher=Pattern.compile("(?m)^\\s*external-controller:\\s*127\\.0\\.0\\.1:(\\d+)\\s*$").matcher(result.output==null?"":result.output);\n            int found=0;\n            while(matcher.find()){\n                int candidate=Integer.parseInt(matcher.group(1));\n                if(candidate>=29090&&candidate<=29149)found=candidate;\n            }\n            return found;'''

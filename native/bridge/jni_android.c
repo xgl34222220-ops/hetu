@@ -11,5 +11,5 @@ static jbyteArray call(JNIEnv *env,jbyteArray bytes){
  jsize size=(jsize)strlen(result);jbyteArray out=(*env)->NewByteArray(env,size);
  if(out)(*env)->SetByteArrayRegion(env,out,0,size,(jbyte*)result);free(result);return out;
 }
-JNIEXPORT jbyteArray JNICALL Java_io_github_xgl34222220_bichen_MihomoNative_invoke(JNIEnv *e,jclass c,jbyteArray b){return call(e,b);}
-JNIEXPORT jbyteArray JNICALL Java_io_github_xgl34222220_bichen_preview_MihomoNative_invoke(JNIEnv *e,jclass c,jbyteArray b){return call(e,b);}
+JNIEXPORT jbyteArray JNICALL Java_io_github_xgl34222220_hetu_MihomoNative_invoke(JNIEnv *e,jclass c,jbyteArray b){return call(e,b);}
+JNIEXPORT jbyteArray JNICALL Java_io_github_xgl34222220_hetu_preview_MihomoNative_invoke(JNIEnv *e,jclass c,jbyteArray b){return call(e,b);}

@@ -1,7 +1,7 @@
 from pathlib import Path
 
-ACTIVITY = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt')
-DOCK = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ui/BichenGlassDock.kt')
+ACTIVITY = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt')
+DOCK = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt')
 
 
 def swap(text: str, old: str, new: str, label: str) -> str:
@@ -63,19 +63,19 @@ s = swap(s, old_shell_open, new_shell_open, 'LuoShu single-page transition')
 
 old_shell_close = '''            }
         }
-        BichenGlassDock(
+        HetuGlassDock(
 '''
 new_shell_close = '''            }
                 }
             }
         }
-        BichenGlassDock(
+        HetuGlassDock(
 '''
 s = swap(s, old_shell_close, new_shell_close, 'LuoShu page transition close')
 
-old_bg = '    Box(Modifier.fillMaxSize().background(LocalBichenTokens.current.pageBackground)) {\n'
+old_bg = '    Box(Modifier.fillMaxSize().background(LocalHetuTokens.current.pageBackground)) {\n'
 new_bg = '''    val shellBackground = if (MaterialTheme.colorScheme.background.luminance() < .5f) {
-        LocalBichenTokens.current.pageBackground
+        LocalHetuTokens.current.pageBackground
     } else {
         Color(0xFFF4F6F9)
     }
@@ -101,7 +101,7 @@ s = swap(
 # 3) WebUI / Logs: 56dp horizontal compact cards.
 old_small_tool = '''@Composable
 private fun RefSmallTool(title: String, subtitle: String, icon: ImageVector, onClick: () -> Unit, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val source = remember(title) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) .97f else 1f, spring(dampingRatio = .78f, stiffness = 520f), label = "smallTool$title")
@@ -128,7 +128,7 @@ private fun RefSmallTool(title: String, subtitle: String, icon: ImageVector, onC
 '''
 new_small_tool = '''@Composable
 private fun RefSmallTool(title: String, subtitle: String, icon: ImageVector, onClick: () -> Unit, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val source = remember(title) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) .98f else 1f, spring(dampingRatio = .78f, stiffness = 520f), label = "smallTool$title")
@@ -167,7 +167,7 @@ s = swap(s, old_small_tool, new_small_tool, '56dp WebUI/log cards')
 # 4) Home latency values: no pill/background; color alone expresses health.
 old_latency_column = '''@Composable
 private fun RefLatencyColumn(label: String, value: Long?, testing: Boolean, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) {
         Text(label, color = t.textSecondary, fontSize = 11.sp, lineHeight = 15.sp, maxLines = 1)
         RefDelayBadge(value = value, testing = testing, onClick = null)
@@ -176,7 +176,7 @@ private fun RefLatencyColumn(label: String, value: Long?, testing: Boolean, modi
 '''
 new_latency_column = '''@Composable
 private fun RefLatencyColumn(label: String, value: Long?, testing: Boolean, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val valueColor = when {
         testing -> MaterialTheme.colorScheme.primary
         value == null -> Color(0xFF94A3B8)
@@ -209,7 +209,7 @@ s = s.replace('fontSize = 19.sp, lineHeight = 23.sp, fontWeight = FontWeight.Bol
 
 old_speed = '''@Composable
 private fun RefSpeedCard(up: Long, down: Long, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     Surface(modifier = modifier, shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
         Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("网速", color = Color(0xFF94A3B8), fontSize = 12.sp, fontWeight = FontWeight.Medium)
@@ -229,7 +229,7 @@ private fun RefSpeedCard(up: Long, down: Long, modifier: Modifier) {
 '''
 new_speed = '''@Composable
 private fun RefSpeedCard(up: Long, down: Long, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     Surface(modifier = modifier.height(96.dp), shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
         Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text("网速", color = Color(0xFF94A3B8), fontSize = 12.sp, fontWeight = FontWeight.Medium)
@@ -251,7 +251,7 @@ s = swap(s, old_speed, new_speed, '96dp speed card')
 
 old_sub_compact = '''@Composable
 private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val tracked = items.filter { it.hasSubscriptionInfo && it.total > 0L }
     val used = tracked.sumOf { it.used }
     val total = tracked.sumOf { it.total }
@@ -274,7 +274,7 @@ private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, modifier: M
 '''
 new_sub_compact = '''@Composable
 private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val tracked = items.filter { it.hasSubscriptionInfo && it.total > 0L }
     val used = tracked.sumOf { it.used }
     val total = tracked.sumOf { it.total }
@@ -304,7 +304,7 @@ s = swap(s, old_sub_compact, new_sub_compact, '96dp subscription card')
 
 old_resource = '''@Composable
 private fun RefResourceCard(memory: Long, cpuPercent: Float, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     Surface(modifier = modifier, shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
         Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("资源占用", color = Color(0xFF94A3B8), fontSize = 12.sp, fontWeight = FontWeight.Medium)
@@ -324,7 +324,7 @@ private fun RefResourceCard(memory: Long, cpuPercent: Float, modifier: Modifier)
 '''
 new_resource = '''@Composable
 private fun RefResourceCard(memory: Long, cpuPercent: Float, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     Surface(modifier = modifier.height(96.dp), shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
         Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("资源占用", color = Color(0xFF94A3B8), fontSize = 12.sp, fontWeight = FontWeight.Medium)
@@ -347,7 +347,7 @@ s = swap(s, old_resource, new_resource, '96dp resource card')
 # 6) Strategy cards: fixed 92dp and compact top/middle/bottom hierarchy.
 old_group = '''@Composable
 private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolean, delay: Long?, modifier: Modifier, onClick: () -> Unit) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val source = remember(group.name) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
@@ -379,7 +379,7 @@ private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolea
 '''
 new_group = '''@Composable
 private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolean, delay: Long?, modifier: Modifier, onClick: () -> Unit) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val source = remember(group.name) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) .97f else 1f, spring(dampingRatio = .76f, stiffness = 560f), label = "group${group.name}")
@@ -545,7 +545,7 @@ s = swap(s, old_settings_items, new_settings_items, 'grouped settings page')
 # 9) Floating list card shape and section labels.
 old_ref_group = '''@Composable
 private fun RefGroup(content: @Composable ColumnScope.() -> Unit) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     Surface(
         shape = RoundedCornerShape(24.dp),
@@ -559,7 +559,7 @@ private fun RefGroup(content: @Composable ColumnScope.() -> Unit) {
 '''
 new_ref_group = '''@Composable
 private fun RefGroup(content: @Composable ColumnScope.() -> Unit) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     Surface(
         shape = RoundedCornerShape(16.dp),

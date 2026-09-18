@@ -1,4 +1,4 @@
-package io.github.xgl34222220.bichen;
+package io.github.xgl34222220.hetu;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;

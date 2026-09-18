@@ -1,6 +1,6 @@
 from pathlib import Path
 
-p = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt')
+p = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt')
 s = p.read_text()
 
 
@@ -16,7 +16,7 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
     val context = LocalContext.current
     val inspector = remember { ProxyRuntimeInspector(context) }
     val scope = rememberCoroutineScope()
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
 
     fun unavailable(message: String) {
@@ -102,14 +102,14 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
 settings = r'''@Composable
 private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
     val context = LocalContext.current
-    val prefs = remember { context.getSharedPreferences("bichen", 0) }
+    val prefs = remember { context.getSharedPreferences("hetu", 0) }
     var modePicker by remember { mutableStateOf(false) }
     var ipv6Picker by remember { mutableStateOf(false) }
     var portsInfo by remember { mutableStateOf(false) }
     var autoStart by remember { mutableStateOf(prefs.getBoolean("autoStartVpn", false)) }
     var blurEnabled by remember { mutableStateOf(prefs.getBoolean("enableBlur", true)) }
 
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     LazyColumn(
         Modifier.fillMaxSize().background(if (dark) t.pageBackground else Color(0xFFF1F5F9)),
@@ -252,7 +252,7 @@ private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RefPortsBottomSheet(onDismiss: () -> Unit) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
@@ -290,8 +290,8 @@ private fun RefPortsBottomSheet(onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun RefPortDetailRow(label: String, value: String, valueColor: Color = LocalBichenTokens.current.textPrimary) {
-    val t = LocalBichenTokens.current
+private fun RefPortDetailRow(label: String, value: String, valueColor: Color = LocalHetuTokens.current.textPrimary) {
+    val t = LocalHetuTokens.current
     Row(Modifier.fillMaxWidth().padding(vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(label, color = t.textSecondary, fontSize = 12.sp, modifier = Modifier.weight(1f))
         Text(value, color = valueColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
@@ -328,7 +328,7 @@ private fun RefToolRow(
     trailingColor: Color = Color(0xFF2563EB),
     onClick: () -> Unit,
 ) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val source = remember(title) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) .985f else 1f, spring(dampingRatio = .78f, stiffness = 560f), label = "tool$title")
@@ -379,7 +379,7 @@ private fun RefValueRow(
     highlightValue: Boolean = false,
     onClick: (() -> Unit)? = null,
 ) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val source = remember(title) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed && onClick != null) .985f else 1f, spring(dampingRatio = .80f, stiffness = 560f), label = "value$title")
@@ -420,7 +420,7 @@ private fun RefSwitchRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
 ) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -448,7 +448,7 @@ private fun RefSwitchRow(
 
 group = r'''@Composable
 private fun RefGroup(content: @Composable ColumnScope.() -> Unit) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val shape = RoundedCornerShape(22.dp)
     val brush = if (dark) {

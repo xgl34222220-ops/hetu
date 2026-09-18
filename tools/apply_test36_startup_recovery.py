@@ -17,7 +17,7 @@ text = text.replace('versionName = "0.4.0-test.35"', 'versionName = "0.4.0-test.
 build.write_text(text, encoding='utf-8')
 
 # 1) Make startup failures visible and diagnostic instead of looking like a dead button.
-ref = ROOT / 'android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt'
+ref = ROOT / 'android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt'
 replace_once(ref,
 '''    var testing by remember { mutableStateOf(false) }\n    var logText by remember { mutableStateOf<String?>(null) }''',
 '''    var testing by remember { mutableStateOf(false) }\n    var logText by remember { mutableStateOf<String?>(null) }\n    var startupError by remember { mutableStateOf<String?>(null) }''',
@@ -32,18 +32,18 @@ replace_once(ref,
 'ref startup error sheet')
 
 # 2) Handle stale hidden core/mode preferences before starting.
-controller = ROOT / 'android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyComposeController.kt'
+controller = ROOT / 'android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt'
 replace_once(controller,
 '''    suspend fun start(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {\n        val profile = ProxyRuntimeProfile.load(prefs)\n        val selected = configs.selected(profile.core) ?: error("尚未选择配置")\n        if (!configs.hasConfiguredSubscription(selected)) {\n            error("默认配置不内置私人订阅，请先到「订阅」添加或编辑自己的订阅")\n        }\n        root.start(profile) { onProgress(it) }\n    }''',
-'''    suspend fun start(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {\n        var profile = ProxyRuntimeProfile.load(prefs)\n        if (!profile.capability().available) {\n            onProgress("检测到旧版本遗留的不可用核心/模式，回退到 Mihomo · TPROXY…")\n            prefs.edit().putString("proxyBaseCore", "mihomo").putString("proxyBaseMode", "tproxy").apply()\n            profile = ProxyRuntimeProfile.load(prefs)\n        }\n        if (profile.core == ProxyRuntimeProfile.Core.MIHOMO_SMART && !ProxyCoreStore(app).installed(profile.core)) {\n            onProgress("Mihomo Smart 尚未安装，先使用内置 Mihomo 启动…")\n            prefs.edit().putString("proxyBaseCore", "mihomo").apply()\n            profile = ProxyRuntimeProfile.load(prefs)\n        }\n        val selected = configs.selected(profile.core) ?: error("尚未选择配置")\n        if (!configs.hasConfiguredSubscription(selected)) {\n            error("当前是辟尘内置占位配置，尚未填写真实订阅。请打开「面板 → 订阅」添加订阅，或导入一份完整可运行的 YAML 配置。")\n        }\n        root.start(profile) { onProgress(it) }\n    }''',
+'''    suspend fun start(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {\n        var profile = ProxyRuntimeProfile.load(prefs)\n        if (!profile.capability().available) {\n            onProgress("检测到旧版本遗留的不可用核心/模式，回退到 Mihomo · TPROXY…")\n            prefs.edit().putString("proxyBaseCore", "mihomo").putString("proxyBaseMode", "tproxy").apply()\n            profile = ProxyRuntimeProfile.load(prefs)\n        }\n        if (profile.core == ProxyRuntimeProfile.Core.MIHOMO_SMART && !ProxyCoreStore(app).installed(profile.core)) {\n            onProgress("Mihomo Smart 尚未安装，先使用内置 Mihomo 启动…")\n            prefs.edit().putString("proxyBaseCore", "mihomo").apply()\n            profile = ProxyRuntimeProfile.load(prefs)\n        }\n        val selected = configs.selected(profile.core) ?: error("尚未选择配置")\n        if (!configs.hasConfiguredSubscription(selected)) {\n            error("当前是河图内置占位配置，尚未填写真实订阅。请打开「面板 → 订阅」添加订阅，或导入一份完整可运行的 YAML 配置。")\n        }\n        root.start(profile) { onProgress(it) }\n    }''',
 'controller start migration')
 
 # 3) If chained-adblock injection is the only reason a valid user config cannot start,
 #    retry with the source config unchanged (adblock off) instead of killing the whole proxy.
-manager = ROOT / 'android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java'
+manager = ROOT / 'android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java'
 replace_once(manager,
 '''    private static void stage(Progress p,String text){if(p!=null)p.onStage(text);}\n    private static String bit(boolean value){return value?"1":"0";}''',
-'''    private static void stage(Progress p,String text){if(p!=null)p.onStage(text);}\n    private static String bit(boolean value){return value?"1":"0";}\n    private static ProxyRuntimeProfile withoutAdblock(ProxyRuntimeProfile p){\n        return new ProxyRuntimeProfile(p.core,p.mode,p.ipv6,p.appScope,p.dnsHijack,p.autoOverwrite,p.tcp,p.udp,p.quicBlocked,p.cnIpDirect,false);\n    }\n    private static boolean adblockPreparationFailure(Exception error){\n        String m=error==null||error.getMessage()==null?"":error.getMessage();\n        return m.contains("代理串联去广告")||m.contains("广告 provider")||m.contains("广告规则")||m.contains("bichen-adblock");\n    }\n    private void rememberAdblockFallback(Exception error){\n        String m=error==null||error.getMessage()==null?"广告串联与当前配置不兼容":error.getMessage();\n        if(m.length()>600)m=m.substring(0,600)+"…";\n        prefs.edit().putString("proxyAdblockLastError",m).apply();\n    }''',
+'''    private static void stage(Progress p,String text){if(p!=null)p.onStage(text);}\n    private static String bit(boolean value){return value?"1":"0";}\n    private static ProxyRuntimeProfile withoutAdblock(ProxyRuntimeProfile p){\n        return new ProxyRuntimeProfile(p.core,p.mode,p.ipv6,p.appScope,p.dnsHijack,p.autoOverwrite,p.tcp,p.udp,p.quicBlocked,p.cnIpDirect,false);\n    }\n    private static boolean adblockPreparationFailure(Exception error){\n        String m=error==null||error.getMessage()==null?"":error.getMessage();\n        return m.contains("代理串联去广告")||m.contains("广告 provider")||m.contains("广告规则")||m.contains("hetu-adblock");\n    }\n    private void rememberAdblockFallback(Exception error){\n        String m=error==null||error.getMessage()==null?"广告串联与当前配置不兼容":error.getMessage();\n        if(m.length()>600)m=m.substring(0,600)+"…";\n        prefs.edit().putString("proxyAdblockLastError",m).apply();\n    }''',
 'manager helpers')
 replace_once(manager,
 '''        stage(progress,"检查配置、应用范围与绕过策略…");\n        Prepared p=prepare(profile);\n        RootProxyPolicy policy=p.policy;\n        stage(progress,"部署 Root 核心与事务控制器…");\n        installRuntimeFiles(p,true);\n        stage(progress,"用 Mihomo 校验最终启动配置…");\n        validateRuntimeConfig();\n        stage(progress,"检查 TPROXY / Redirect / UID / IPv6 能力…");''',
@@ -59,7 +59,7 @@ replace_once(manager,
 'manager fallback warning')
 
 # 4) Common YAML style: allow a top-level key followed only by an inline comment.
-mihomo = ROOT / 'android-app/app/src/main/java/io/github/xgl34222220/bichen/MihomoStartupConfig.java'
+mihomo = ROOT / 'android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java'
 text = mihomo.read_text(encoding='utf-8')
 text = text.replace('String rest=found.group(1).trim();\n        if(!rest.isEmpty()&&!rest.equals("{}"))throw new IOException("代理串联去广告需要普通 rule-providers: 配置块；当前源配置使用行内写法");',
 '''String rest=found.group(1).trim();\n        if(rest.startsWith("#"))rest="";\n        if(!rest.isEmpty()&&!rest.equals("{}"))throw new IOException("代理串联去广告需要普通 rule-providers: 配置块；当前源配置使用行内写法");''',1)
@@ -70,9 +70,9 @@ mihomo.write_text(text, encoding='utf-8')
 # Hard audit.
 checks = {
     'android-app/app/build.gradle.kts': ['versionCode = 436', 'versionName = "0.4.0-test.36"'],
-    'android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt': ['startupError', 'title = "启动失败"', 'controller.diagnostics()'],
-    'android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyComposeController.kt': ['旧版本遗留的不可用核心/模式', '当前是辟尘内置占位配置'],
-    'android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java': ['withoutAdblock', 'proxyAdblockLastError', '串联广告配置校验失败'],
+    'android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt': ['startupError', 'title = "启动失败"', 'controller.diagnostics()'],
+    'android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt': ['旧版本遗留的不可用核心/模式', '当前是河图内置占位配置'],
+    'android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java': ['withoutAdblock', 'proxyAdblockLastError', '串联广告配置校验失败'],
 }
 for rel, needles in checks.items():
     data=(ROOT/rel).read_text(encoding='utf-8')

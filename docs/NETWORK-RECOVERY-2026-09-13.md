@@ -1,4 +1,4 @@
-# 辟尘第二轮：网络恢复与规则更新并发
+# 河图第二轮：网络恢复与规则更新并发
 
 基线：PR #1 的 `95880c3f0a698ba3217c3f1d45e42246989edcaa`，在第一轮 CNAME 与规则档位代码上继续修改。未修改模块代码、版本号或原签名下载包。
 
@@ -6,7 +6,7 @@
 
 ### 网络切换不沿用旧会话
 
-- 使用 Android 为辟尘自身选择的默认网络；App 本身已排除在自己的 DNS VPN 外。只接收 INTERNET、NOT_VPN 且非 VPN transport 的网络，不猜测 Wi-Fi 必然优于移动网络，不主动唤醒备用网络。
+- 使用 Android 为河图自身选择的默认网络；App 本身已排除在自己的 DNS VPN 外。只接收 INTERNET、NOT_VPN 且非 VPN transport 的网络，不猜测 Wi-Fi 必然优于移动网络，不主动唤醒备用网络。
 - 等待有序的网络能力和链路属性回调，再使用 Network.bindSocket 绑定 UDP / TCP 上游；DoH 使用该 Network.openConnection，保留系统 TLS 与主机名校验。
 - Wi-Fi/流量切换、链路属性变化、系统阻断联网及网络恢复都会更新网络代次。旧 DNS 缓存不跨代次复用，旧请求不能写回新网络；旧 DoH 连接与退避状态释放。通过 setUnderlyingNetworks 向系统报告实际上游。
 - 断网/等候回调期间，VPN 接口和本地规则仍保留；本地命中的域名照常拦截，其他请求直接返回 SERVFAIL，不占上游工作队列，也不偷偷改用明文 DNS。

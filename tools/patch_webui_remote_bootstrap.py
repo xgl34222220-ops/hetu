@@ -1,11 +1,11 @@
 from pathlib import Path
 
-p = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyWebUiActivity.kt')
+p = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyWebUiActivity.kt')
 s = p.read_text()
-old = """                              window.location.replace('/ui/?bichen_fresh=1');
+old = """                              window.location.replace('/ui/?hetu_fresh=1');
                               return 'reloading';
 """
-new = """                              ${if (selected.local) "window.location.replace('/ui/?bichen_fresh=1');" else "window.location.reload();"}
+new = """                              ${if (selected.local) "window.location.replace('/ui/?hetu_fresh=1');" else "window.location.reload();"}
                               return 'reloading';
 """
 if old not in s:

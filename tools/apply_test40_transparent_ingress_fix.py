@@ -2,7 +2,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / "android-app/app/build.gradle.kts"
-STARTUP = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/bichen/MihomoStartupConfig.java"
+STARTUP = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java"
 SCRIPT = ROOT / "android-app/app/src/main/assets/proxy-root-v3.sh"
 
 # ---------------------------------------------------------------------------
@@ -20,7 +20,7 @@ BUILD.write_text(build, encoding="utf-8")
 # The user's real YAML intentionally has allow-lan:false + bind-address:127.0.0.1.
 # That is fine for a local mixed port, but it also makes Mihomo's TPROXY listener bind
 # to loopback. Linux TPROXY preserves the original destination, therefore the transparent
-# socket must accept non-loopback local destinations. Force only Bichen's private runtime
+# socket must accept non-loopback local destinations. Force only Hetu's private runtime
 # copy to wildcard ingress; the user's source YAML stays untouched.
 # ---------------------------------------------------------------------------
 startup = STARTUP.read_text(encoding="utf-8")
@@ -32,7 +32,7 @@ replacement = '''        yaml=removeTopLevelScalar(yaml,"mixed-port");
         yaml=removeTopLevelScalar(yaml,"port");
         // Root TPROXY must listen on a wildcard transparent socket. The source config may
         // deliberately bind ordinary HTTP/SOCKS listeners to loopback; do not inherit that
-        // restriction into Bichen's private transparent runtime.
+        // restriction into Hetu's private transparent runtime.
         yaml=removeTopLevelScalar(yaml,"allow-lan");
         yaml=removeTopLevelScalar(yaml,"bind-address");'''
 if anchor not in startup:

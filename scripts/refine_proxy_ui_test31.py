@@ -1,6 +1,6 @@
 from pathlib import Path
 
-PATH = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt')
+PATH = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt')
 s = PATH.read_text()
 
 
@@ -118,7 +118,7 @@ s = s.replace('fontWeight = FontWeight.ExtraBold,\n            maxLines = 1,\n  
 # 5) Rebalance the four dashboard cards.
 new_network = '''@Composable
 private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: Int, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     var lanMode by rememberSaveable { mutableStateOf(true) }
     val source = remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
@@ -165,7 +165,7 @@ replace_section('@Composable\nprivate fun RefNetworkIdentityCard', '@Composable\
 
 new_speed = '''@Composable
 private fun RefSpeedCard(up: Long, down: Long, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val valueColor = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A)
     Surface(modifier = modifier.height(96.dp), shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
         Column(Modifier.fillMaxSize().padding(13.dp), verticalArrangement = Arrangement.SpaceBetween) {
@@ -193,7 +193,7 @@ replace_section('@Composable\nprivate fun RefSpeedCard', '@Composable\nprivate f
 
 new_sub = '''@Composable
 private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val tracked = items.filter { it.hasSubscriptionInfo && it.total > 0L }
     val used = tracked.sumOf { it.used }
     val total = tracked.sumOf { it.total }
@@ -224,7 +224,7 @@ replace_section('@Composable\nprivate fun RefSubscriptionCompact', '@Composable\
 
 new_resource = '''@Composable
 private fun RefResourceCard(memory: Long, cpuPercent: Float, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val valueColor = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A)
     Surface(modifier = modifier.height(96.dp), shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
         Column(Modifier.fillMaxSize().padding(13.dp), verticalArrangement = Arrangement.SpaceBetween) {
@@ -291,13 +291,13 @@ swap(old_unavailable, new_unavailable, 'tool notice bottom sheet')
 new_settings = '''@Composable
 private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
     val context = LocalContext.current
-    val prefs = remember { context.getSharedPreferences("bichen", 0) }
+    val prefs = remember { context.getSharedPreferences("hetu", 0) }
     var modePicker by remember { mutableStateOf(false) }
     var ipv6Picker by remember { mutableStateOf(false) }
     var portsInfo by remember { mutableStateOf(false) }
     var notice by remember { mutableStateOf<String?>(null) }
 
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     LazyColumn(
         Modifier.fillMaxSize().background(if (dark) t.pageBackground else Color(0xFFF4F6F9)),
@@ -390,7 +390,7 @@ private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
             text = "TProxy：${MihomoStartupConfig.TPROXY_PORT}\n" +
                 "Redirect：${MihomoStartupConfig.REDIRECT_PORT}\n" +
                 "控制器：127.0.0.1:${MihomoStartupConfig.CONTROLLER_PORT}\n\n" +
-                "这些是辟尘运行副本使用的安全端口。源订阅文件不会被直接修改。",
+                "这些是河图运行副本使用的安全端口。源订阅文件不会被直接修改。",
             actionLabel = "关闭",
             onDismiss = { portsInfo = false },
         )
@@ -414,7 +414,7 @@ private fun RefChoiceBottomSheet(
     onDismiss: () -> Unit,
     onSelect: (Int) -> Unit,
 ) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
@@ -456,7 +456,7 @@ private fun RefInfoBottomSheet(
     actionLabel: String,
     onDismiss: () -> Unit,
 ) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
@@ -503,4 +503,4 @@ if 'AlertDialog(' in s:
     raise SystemExit('centered AlertDialog still present in ReferenceProxyActivity')
 
 PATH.write_text(s)
-print('test31 proxy UI refinement complete; BichenGlassDock.kt untouched')
+print('test31 proxy UI refinement complete; HetuGlassDock.kt untouched')

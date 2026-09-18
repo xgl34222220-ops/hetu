@@ -1,6 +1,6 @@
 from pathlib import Path
 
-path = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt')
+path = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt')
 text = path.read_text(encoding='utf-8')
 needle = 'import androidx.compose.animation.core.animateFloatAsState\n'
 addition = 'import androidx.compose.animation.core.animateFloat\n'

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-path = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt')
+path = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt')
 text = path.read_text()
 start = text.index('@OptIn(ExperimentalHazeMaterialsApi::class)\n@Composable\nprivate fun RefPanelGlassHeader(')
 end = text.index('@Composable\nprivate fun RefPanelOverview(', start)
@@ -18,7 +18,7 @@ private fun RefPanelGlassHeader(
     hazeState: HazeState,
     backdrop: LayerBackdrop?,
 ) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
     val runtimeLiquid = backdrop != null && isRuntimeShaderSupported()
@@ -153,7 +153,7 @@ private fun RefPanelHeaderAction(
     active: Boolean = false,
     onClick: () -> Unit,
 ) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
     val source = remember(contentDescription) { MutableInteractionSource() }
@@ -197,7 +197,7 @@ private fun RefPanelTabs(
     liquidGlass: Boolean = false,
     onSelect: (RefPanelTab) -> Unit,
 ) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
     val tabs = RefPanelTab.entries

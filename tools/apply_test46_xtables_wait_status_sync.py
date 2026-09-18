@@ -3,7 +3,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / "android-app/app/build.gradle.kts"
 SCRIPT = ROOT / "android-app/app/src/main/assets/proxy-root-v3.sh"
-UI = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt"
+UI = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt"
 
 # ---------------------------------------------------------------------------
 # 1) Version
@@ -17,8 +17,8 @@ BUILD.write_text(text, encoding="utf-8")
 
 # ---------------------------------------------------------------------------
 # 2) Android shares one global xtables lock between every iptables client.
-#    Network managers / firewall apps / OEM services can briefly own it while Bichen
-#    installs its TPROXY transaction. All Bichen iptables/ip6tables calls must wait
+#    Network managers / firewall apps / OEM services can briefly own it while Hetu
+#    installs its TPROXY transaction. All Hetu iptables/ip6tables calls must wait
 #    instead of treating a transient lock as a fatal rule-install failure.
 # ---------------------------------------------------------------------------
 text = SCRIPT.read_text(encoding="utf-8")

@@ -13,14 +13,14 @@ build.write_text(text, encoding="utf-8")
 
 # Root controller: cold configs can contain many remote proxy/rule providers. 8 s was
 # far too aggressive and killed a healthy Mihomo process while it was still building
-# provider caches in Bichen's private HomeDir.
+# provider caches in Hetu's private HomeDir.
 script = ROOT / "android-app/app/src/main/assets/proxy-root-v3.sh"
 text = script.read_text(encoding="utf-8")
 old = '''wait_ready(){ PID="$1"; M="$2"; TP="$3"; RP="$4"; TCP="$5"; UDP="$6"; DNS="$7"; DP="$8"; CP="$9"; N=0; while [ "$N" -lt 80 ]; do ready "$PID" "$M" "$TP" "$RP" "$TCP" "$UDP" "$DNS" "$DP" "$CP" && return 0; pidcore "$PID" && kill -0 "$PID" >/dev/null 2>&1 || return 1; sleep 0.1; N=$((N+1)); done; return 1; }'''
 new = '''wait_ready(){
   PID="$1"; M="$2"; TP="$3"; RP="$4"; TCP="$5"; UDP="$6"; DNS="$7"; DP="$8"; CP="$9"
   # A real user config may have dozens of remote proxy/rule providers. On the first
-  # run inside Bichen's private HomeDir their caches are cold; Mihomo keeps the process
+  # run inside Hetu's private HomeDir their caches are cold; Mihomo keeps the process
   # alive while initial configuration is still loading. Do not mistake that for a dead
   # listener after only 8 seconds. Keep network rules detached until every required
   # listener is actually ready, so a slow cold start cannot black-hole traffic.
@@ -51,7 +51,7 @@ text = text.replace(old_launch, new_launch)
 script.write_text(text, encoding="utf-8")
 
 # App -> Root command timeout must exceed the Root controller's cold-start window.
-manager = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java"
+manager = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java"
 text = manager.read_text(encoding="utf-8")
 text = text.replace('stage(progress,"启动核心并等待监听端口就绪…");', 'stage(progress,"启动核心并等待订阅、规则与监听就绪（首次可能较慢）…");')
 text = text.replace('try{result=runJson("start",', 'try{result=runJsonWithTimeout(125000L,"start",')

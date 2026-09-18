@@ -2,7 +2,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / "android-app/app/build.gradle.kts"
-STARTUP = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/bichen/MihomoStartupConfig.java"
+STARTUP = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java"
 SCRIPT = ROOT / "android-app/app/src/main/assets/proxy-root-v3.sh"
 
 # Version.
@@ -15,9 +15,9 @@ BUILD.write_text(build, encoding="utf-8")
 
 # Runtime owns its own private listeners. A Root TPROXY session must not also inherit
 # source mixed-port/port/socks-port listeners such as 7890: that caused the real-device
-# bind collision shown in runtime.log. Move Bichen's private listeners away from the
+# bind collision shown in runtime.log. Move Hetu's private listeners away from the
 # common Clash defaults as well, so an unrelated proxy app can coexist without making
-# Bichen fail before its Root routing transaction is installed.
+# Hetu fail before its Root routing transaction is installed.
 startup = STARTUP.read_text(encoding="utf-8")
 startup = startup.replace('static final int TPROXY_PORT=9898;', 'static final int TPROXY_PORT=19898;', 1)
 startup = startup.replace('static final int REDIRECT_PORT=9797;', 'static final int REDIRECT_PORT=19797;', 1)
@@ -48,8 +48,8 @@ if startup.count('rp=REDIRECT_PORT;') < 2:
 STARTUP.write_text(startup, encoding="utf-8")
 
 # Strengthen stale-core recognition: after atomic replacement, /proc/PID/exe can show
-# '/data/adb/bichen/proxy/bin/core (deleted)' even if argv[0] is shortened by the runtime.
-# Match both cmdline and executable target, still scoped strictly to Bichen's private path.
+# '/data/adb/hetu/bin/core (deleted)' even if argv[0] is shortened by the runtime.
+# Match both cmdline and executable target, still scoped strictly to Hetu's private path.
 script = SCRIPT.read_text(encoding="utf-8")
 old_pidcore = '''pidcore(){
   P="$1"; [ -r "/proc/$P/cmdline" ] || return 1
@@ -76,7 +76,7 @@ if old_orphan not in script:
     raise SystemExit("test39: orphan recovery block missing")
 script = script.replace(old_orphan, new_orphan, 1)
 
-# Give a deterministic, readable failure before launching if a non-Bichen process somehow
+# Give a deterministic, readable failure before launching if a non-Hetu process somehow
 # owns one of the dedicated ports. This avoids a misleading pile of Mihomo bind errors.
 ready_anchor = '''wait_ready(){
   PID="$1"; M="$2"; TP="$3"; RP="$4"; TCP="$5"; UDP="$6"; DNS="$7"; DP="$8"; CP="$9"'''

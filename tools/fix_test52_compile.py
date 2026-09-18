@@ -1,6 +1,6 @@
 from pathlib import Path
 
-path = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAdvancedSettingsActivity.kt')
+path = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt')
 text = path.read_text()
 needle = 'import androidx.compose.material3.*\n'
 addition = 'import androidx.compose.material3.*\nimport androidx.compose.animation.core.animateFloat\n'

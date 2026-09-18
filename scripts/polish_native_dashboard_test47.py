@@ -1,8 +1,8 @@
 from pathlib import Path
 import re
 
-UI = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt')
-SUB = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxySubscriptionActivity.kt')
+UI = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt')
+SUB = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt')
 text = UI.read_text(encoding='utf-8')
 sub = SUB.read_text(encoding='utf-8')
 
@@ -35,7 +35,7 @@ text = replace_once(
     'remove redundant home action params',
 )
 old_home_header = '''        item {\n            Box(\n                Modifier.fillMaxWidth().statusBarsPadding().padding(top = 16.dp, bottom = 10.dp).height(44.dp),\n                contentAlignment = Alignment.CenterStart,\n            ) {\n                Text(\n                    "BoxProxy",\n                    color = if (scheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A),\n                    fontSize = 26.sp,\n                    lineHeight = 32.sp,\n                    fontWeight = FontWeight.ExtraBold,\n                    letterSpacing = (-0.6).sp,\n                )\n            }\n        }'''
-new_home_header = '''        item {\n            Row(\n                Modifier.fillMaxWidth().statusBarsPadding().padding(top = 16.dp, bottom = 10.dp).height(44.dp),\n                verticalAlignment = Alignment.CenterVertically,\n            ) {\n                Text(\n                    "辟尘",\n                    color = if (scheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A),\n                    fontSize = 24.sp,\n                    lineHeight = 30.sp,\n                    fontWeight = FontWeight.ExtraBold,\n                    letterSpacing = (-0.45).sp,\n                )\n                Spacer(Modifier.width(8.dp))\n                Surface(\n                    shape = CircleShape,\n                    color = if (scheme.background.luminance() < .5f) Color.White.copy(alpha = .07f) else Color(0xFFE2E8F0).copy(alpha = .62f),\n                    tonalElevation = 0.dp,\n                ) {\n                    Text(\n                        "Mihomo Core",\n                        Modifier.padding(horizontal = 8.dp, vertical = 3.dp),\n                        color = Color(0xFF94A3B8),\n                        fontSize = 9.sp,\n                        lineHeight = 12.sp,\n                        fontWeight = FontWeight.SemiBold,\n                        letterSpacing = .2.sp,\n                    )\n                }\n            }\n        }'''
+new_home_header = '''        item {\n            Row(\n                Modifier.fillMaxWidth().statusBarsPadding().padding(top = 16.dp, bottom = 10.dp).height(44.dp),\n                verticalAlignment = Alignment.CenterVertically,\n            ) {\n                Text(\n                    "河图",\n                    color = if (scheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A),\n                    fontSize = 24.sp,\n                    lineHeight = 30.sp,\n                    fontWeight = FontWeight.ExtraBold,\n                    letterSpacing = (-0.45).sp,\n                )\n                Spacer(Modifier.width(8.dp))\n                Surface(\n                    shape = CircleShape,\n                    color = if (scheme.background.luminance() < .5f) Color.White.copy(alpha = .07f) else Color(0xFFE2E8F0).copy(alpha = .62f),\n                    tonalElevation = 0.dp,\n                ) {\n                    Text(\n                        "Mihomo Core",\n                        Modifier.padding(horizontal = 8.dp, vertical = 3.dp),\n                        color = Color(0xFF94A3B8),\n                        fontSize = 9.sp,\n                        lineHeight = 12.sp,\n                        fontWeight = FontWeight.SemiBold,\n                        letterSpacing = .2.sp,\n                    )\n                }\n            }\n        }'''
 text = replace_once(text, old_home_header, new_home_header, 'rename home title')
 
 # Dashboard keeps only the clean search ghost icon.
@@ -75,11 +75,11 @@ private fun RefActionText(
     enabled: Boolean,
     onClick: () -> Unit,
     modifier: Modifier,
-    color: Color = LocalBichenTokens.current.textPrimary,
+    color: Color = LocalHetuTokens.current.textPrimary,
     icon: ImageVector? = null,
     danger: Boolean = false,
 ) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val view = LocalView.current
     val source = remember(text) { MutableInteractionSource() }
@@ -160,7 +160,7 @@ private fun RefInlineNodeCard(
     onSelect: () -> Unit,
     onDelay: () -> Unit,
 ) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val shape = RoundedCornerShape(16.dp)
     val source = remember(node.name) { MutableInteractionSource() }
@@ -311,7 +311,7 @@ text = text.replace(
 
 # Sanity checks for ReferenceProxyActivity.
 required = [
-    '"辟尘"',
+    '"河图"',
     '"Mihomo Core"',
     'measureSitesInternal(reportError = false)',
     'latencyAutoRefreshSeconds',

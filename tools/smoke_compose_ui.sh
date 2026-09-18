@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 APK="${APK:-android-app/app/build/outputs/apk/debug/app-debug.apk}"
-PKG="io.github.xgl34222220.bichen.preview"
+PKG="io.github.xgl34222220.hetu.preview"
 OUT="out/compose-smoke"
 mkdir -p "$OUT"
 
@@ -144,4 +144,4 @@ if grep -A18 -B4 'FATAL EXCEPTION' "$OUT/logcat.txt" | grep -q "$PKG"; then
   echo "Compose UI crashed" >&2
   exit 1
 fi
-printf 'BICHEN_BOXPROXY_SMOKE_PASS\n' | tee "$OUT/result.txt"
+printf 'HETU_BOXPROXY_SMOKE_PASS\n' | tee "$OUT/result.txt"

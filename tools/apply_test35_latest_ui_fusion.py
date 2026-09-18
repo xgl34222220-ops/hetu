@@ -10,7 +10,7 @@ text = text.replace('versionName = "0.4.0-test.34"', 'versionName = "0.4.0-test.
 build.write_text(text, encoding="utf-8")
 
 # Keep the newest visual shell, but wire it to the real test.34 backends.
-ref = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt"
+ref = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt"
 text = ref.read_text(encoding="utf-8")
 
 text = text.replace('''\n    fun unavailable(message: String) {\n        android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()\n    }\n''', '\n')

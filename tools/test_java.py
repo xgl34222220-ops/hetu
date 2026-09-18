@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run Bichen host regression tests without depending on a prior APK build."""
+"""Run Hetu host regression tests without depending on a prior APK build."""
 import argparse
 import os
 import subprocess
@@ -30,7 +30,7 @@ def main():
 
     dest = BUILD / ('protocol-tests' if args.protocol_only else 'host-tests')
     dest.mkdir(parents=True, exist_ok=True)
-    package = ROOT / 'android-app/app/src/main/java/io/github/xgl34222220/bichen'
+    package = ROOT / 'android-app/app/src/main/java/io/github/xgl34222220/hetu'
 
     names = list(PROTOCOL_TESTS)
     sources = [ROOT / 'tests' / (name + '.java') for name in names]
@@ -64,11 +64,11 @@ def main():
 
     runtime = str(dest) + os.pathsep + cp
     for name in names:
-        subprocess.run([java, '-cp', runtime, 'io.github.xgl34222220.bichen.' + name], check=True)
+        subprocess.run([java, '-cp', runtime, 'io.github.xgl34222220.hetu.' + name], check=True)
 
     if not args.protocol_only:
         subprocess.run(
-            [java, '-cp', runtime, 'io.github.xgl34222220.bichen.RuleStoreParserTest']
+            [java, '-cp', runtime, 'io.github.xgl34222220.hetu.RuleStoreParserTest']
             + [str(ROOT / ('module/rules/' + source + '.txt')) for source in ['adaway', 'china', 'tracking', 'hagezi']],
             check=True,
         )

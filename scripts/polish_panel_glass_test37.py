@@ -1,10 +1,10 @@
 from pathlib import Path
 import re
 
-path = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt')
+path = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt')
 text = path.read_text(encoding='utf-8')
 
-# Imports for the same runtime glass stack used by BichenGlassDock/LuoShu.
+# Imports for the same runtime glass stack used by HetuGlassDock/LuoShu.
 if 'import dev.chrisbanes.haze.HazeState' not in text:
     text = text.replace(
         'import dev.chrisbanes.haze.hazeSource\nimport dev.chrisbanes.haze.rememberHazeState\n',
@@ -15,11 +15,11 @@ if 'import dev.chrisbanes.haze.HazeState' not in text:
         'import dev.chrisbanes.haze.materials.HazeMaterials\n'
         'import dev.chrisbanes.haze.rememberHazeState\n'
     )
-if 'import io.github.xgl34222220.bichen.ui.glass.liquidGlassLens' not in text:
+if 'import io.github.xgl34222220.hetu.ui.glass.liquidGlassLens' not in text:
     text = text.replace(
-        'import io.github.xgl34222220.bichen.ui.LocalBichenTokens\n',
-        'import io.github.xgl34222220.bichen.ui.LocalBichenTokens\n'
-        'import io.github.xgl34222220.bichen.ui.glass.liquidGlassLens\n'
+        'import io.github.xgl34222220.hetu.ui.LocalHetuTokens\n',
+        'import io.github.xgl34222220.hetu.ui.LocalHetuTokens\n'
+        'import io.github.xgl34222220.hetu.ui.glass.liquidGlassLens\n'
     )
 if 'import top.yukonga.miuix.kmp.blur.LayerBackdrop' not in text:
     text = text.replace(
@@ -83,7 +83,7 @@ private fun RefPanelGlassHeader(
     hazeState: HazeState,
     backdrop: LayerBackdrop?,
 ) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
     val runtimeLiquid = backdrop != null && isRuntimeShaderSupported()
@@ -222,7 +222,7 @@ private fun RefPanelHeaderAction(
     backdrop: LayerBackdrop? = null,
     onClick: () -> Unit,
 ) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
     val source = remember(contentDescription) { MutableInteractionSource() }
@@ -285,7 +285,7 @@ private fun RefPanelTabs(
     liquidGlass: Boolean = false,
     onSelect: (RefPanelTab) -> Unit,
 ) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
     val tabs = RefPanelTab.entries

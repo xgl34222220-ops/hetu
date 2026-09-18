@@ -1,6 +1,6 @@
 from pathlib import Path
 
-path = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt')
+path = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt')
 s = path.read_text()
 
 
@@ -39,7 +39,7 @@ one(
 'panel invocation',
 )
 one(
-'''        BichenGlassDock(
+'''        HetuGlassDock(
             items = dock,
             selected = dockPages.indexOf(page).coerceAtLeast(0),
             onSelect = { page = dockPages[it] },
@@ -48,7 +48,7 @@ one(
             modifier = Modifier.align(Alignment.BottomCenter),
         )''',
 '''        if (!panelDetailVisible) {
-            BichenGlassDock(
+            HetuGlassDock(
                 items = dock,
                 selected = dockPages.indexOf(page).coerceAtLeast(0),
                 onSelect = { page = dockPages[it] },
@@ -192,7 +192,7 @@ private fun RefGroupDetailPage(
     onTestAll: () -> Unit,
 ) {
     BackHandler(onBack = onBack)
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
     val haptic = LocalHapticFeedback.current
@@ -414,7 +414,7 @@ private fun RefDetailNodeCard(
     onSelect: () -> Unit,
     onDelay: () -> Unit,
 ) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
     val source = remember(node.name) { MutableInteractionSource() }

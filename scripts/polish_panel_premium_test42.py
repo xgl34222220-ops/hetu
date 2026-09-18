@@ -1,6 +1,6 @@
 from pathlib import Path
 
-p = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt')
+p = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt')
 s = p.read_text()
 
 
@@ -27,7 +27,7 @@ private fun RefPanelGlassHeader(
     hazeState: HazeState,
     backdrop: LayerBackdrop?,
 ) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
 
@@ -161,7 +161,7 @@ replace_fun(
     '@Composable\nprivate fun RefGroupCornerVisual',
 '''@Composable
 private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolean, delay: Long?, modifier: Modifier, onClick: () -> Unit) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
     val source = remember(group.name) { MutableInteractionSource() }
@@ -238,7 +238,7 @@ private fun RefDetailNodeCard(
     onSelect: () -> Unit,
     onDelay: () -> Unit,
 ) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
     val source = remember(node.name) { MutableInteractionSource() }

@@ -1,4 +1,4 @@
-package bichen.devicecheck;
+package hetu.devicecheck;
 
 import android.app.Activity;
 import android.app.Instrumentation;
@@ -21,7 +21,7 @@ public final class RequestLogs {
     }
     private static JSONArray entries(SharedPreferences p)throws Exception{return new JSONArray(p.getString("dnsLogs","[]"));}
     public static void run(Instrumentation in,Activity activity,StringBuilder log)throws Exception{
-        SharedPreferences p=activity.getSharedPreferences("bichen",0);
+        SharedPreferences p=activity.getSharedPreferences("hetu",0);
         Class<?> cls=Class.forName(activity.getPackageName()+".DnsVpnService",true,activity.getClassLoader());
         Object service=cls.getDeclaredConstructor().newInstance();
         field(cls,"prefs").set(service,p);

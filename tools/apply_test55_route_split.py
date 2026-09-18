@@ -2,9 +2,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / "android-app/app/build.gradle.kts"
-REF = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt"
+REF = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt"
 MANIFEST = ROOT / "android-app/app/src/main/AndroidManifest.xml"
-FOCUSED = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyFocusedSettingsActivities.kt"
+FOCUSED = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyFocusedSettingsActivities.kt"
 
 
 def replace_once(text: str, old: str, new: str, name: str) -> str:
@@ -34,7 +34,7 @@ insert = '''        <activity android:name=".ProxyRuntimeCoreSettingsActivity" a
 manifest = replace_once(manifest, needle, insert + needle, 'manifest focused activities')
 MANIFEST.write_text(manifest)
 
-FOCUSED.write_text(r'''package io.github.xgl34222220.bichen
+FOCUSED.write_text(r'''package io.github.xgl34222220.hetu
 
 import android.content.Intent
 import android.os.Bundle
@@ -62,42 +62,42 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.github.xgl34222220.bichen.ui.BichenTheme
-import io.github.xgl34222220.bichen.ui.LocalBichenTokens
+import io.github.xgl34222220.hetu.ui.HetuTheme
+import io.github.xgl34222220.hetu.ui.LocalHetuTokens
 import java.util.TreeSet
 
 class ProxyRuntimeCoreSettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState); enableEdgeToEdge()
-        setContent { BichenTheme { RuntimeCoreSettingsPage { finish() } } }
+        setContent { HetuTheme { RuntimeCoreSettingsPage { finish() } } }
     }
 }
 
 class ProxySharedNetworkSettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState); enableEdgeToEdge()
-        setContent { BichenTheme { SharedNetworkSettingsPage { finish() } } }
+        setContent { HetuTheme { SharedNetworkSettingsPage { finish() } } }
     }
 }
 
 class ProxyCnIpSettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState); enableEdgeToEdge()
-        setContent { BichenTheme { CnIpSettingsPage { finish() } } }
+        setContent { HetuTheme { CnIpSettingsPage { finish() } } }
     }
 }
 
 class ProxyBypassRulesActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState); enableEdgeToEdge()
-        setContent { BichenTheme { BypassRulesPage { finish() } } }
+        setContent { HetuTheme { BypassRulesPage { finish() } } }
     }
 }
 
 @Composable
 private fun RuntimeCoreSettingsPage(onBack: () -> Unit) {
     val context = LocalContext.current
-    val prefs = remember { context.getSharedPreferences("bichen", 0) }
+    val prefs = remember { context.getSharedPreferences("hetu", 0) }
     var revision by remember { mutableIntStateOf(0) }
     val profile = remember(revision) { ProxyRuntimeProfile.load(prefs) }
     FocusedSettingsScaffold("运行核心", "选择真正负责 Root 代理运行的核心", onBack) {
@@ -126,10 +126,10 @@ private fun RuntimeCoreSettingsPage(onBack: () -> Unit) {
 @Composable
 private fun SharedNetworkSettingsPage(onBack: () -> Unit) {
     val context = LocalContext.current
-    val prefs = remember { context.getSharedPreferences("bichen", 0) }
+    val prefs = remember { context.getSharedPreferences("hetu", 0) }
     var enabled by remember { mutableStateOf(prefs.getBoolean("proxySharedNetwork", false)) }
     FocusedSettingsScaffold("共享网络", "热点、USB 与局域网转发流量", onBack) {
-        item { FocusedNotice("仅在确实需要让热点/USB 下游设备经过辟尘时开启。修改后重启代理生效。") }
+        item { FocusedNotice("仅在确实需要让热点/USB 下游设备经过河图时开启。修改后重启代理生效。") }
         item {
             FocusedGroup {
                 FocusedSwitchRow(Icons.Rounded.WifiTethering, Color(0xFF10B981), "接管共享网络", "将进入 PREROUTING 的共享流量纳入 Root 透明代理", enabled) {
@@ -145,7 +145,7 @@ private fun SharedNetworkSettingsPage(onBack: () -> Unit) {
 @Composable
 private fun CnIpSettingsPage(onBack: () -> Unit) {
     val context = LocalContext.current
-    val prefs = remember { context.getSharedPreferences("bichen", 0) }
+    val prefs = remember { context.getSharedPreferences("hetu", 0) }
     var enabled by remember { mutableStateOf(prefs.getBoolean("proxyCnIpDirect", false)) }
     FocusedSettingsScaffold("CNIP 设置", "中国大陆 IPv4 / IPv6 自动直连", onBack) {
         item { FocusedNotice("CNIP 只补充 IP 级直连，不替代 YAML 中已有的域名规则。修改后重启代理生效。") }
@@ -167,7 +167,7 @@ private data class BypassEditor(val key: String, val title: String, val hint: St
 @Composable
 private fun BypassRulesPage(onBack: () -> Unit) {
     val context = LocalContext.current
-    val prefs = remember { context.getSharedPreferences("bichen", 0) }
+    val prefs = remember { context.getSharedPreferences("hetu", 0) }
     var revision by remember { mutableIntStateOf(0) }
     var editor by remember { mutableStateOf<BypassEditor?>(null) }
     fun summary(key: String): String { revision; val values = prefs.getStringSet(key, emptySet()).orEmpty(); return if (values.isEmpty()) "未设置" else "${values.size} 条" }
@@ -210,7 +210,7 @@ private fun BypassRulesPage(onBack: () -> Unit) {
 
 @Composable
 private fun FocusedSettingsScaffold(title: String, subtitle: String, onBack: () -> Unit, content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val bg = if (dark) t.pageBackground else Color(0xFFF1F5F9)
     androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.fillMaxSize().background(bg), contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 28.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -261,4 +261,4 @@ private fun FocusedValueRow(icon: ImageVector, accent: Color, title: String, sub
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) { FocusedIcon(icon, accent); Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text(title, fontSize = 14.sp, fontWeight = FontWeight.Bold); Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, lineHeight = 15.sp) }; Text(value, color = Color(0xFF64748B), fontSize = 12.sp, fontWeight = FontWeight.SemiBold); Spacer(Modifier.width(4.dp)); Icon(Icons.Rounded.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .52f)) }
 }
 ''')
-print("Applied Bichen 0.4.0-test.55 dedicated settings routes")
+print("Applied Hetu 0.4.0-test.55 dedicated settings routes")

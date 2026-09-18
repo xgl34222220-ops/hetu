@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:colorAccent">#317C70</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:statusBarColor">#F1F5F9</item>
+        <item name="android:navigationBarColor">#F1F5F9</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowBackground">#F1F5F9</item>
+        <item name="android:windowAnimationStyle">@style/HetuSharedAxisWindowAnimation</item>
+    </style>
+    <style name="AppThemeDark" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:colorAccent">#8DD3C3</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">#121714</item>
+        <item name="android:navigationBarColor">#121714</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowBackground">#121714</item>
+        <item name="android:windowAnimationStyle">@style/HetuSharedAxisWindowAnimation</item>
+    </style>
+    <style name="HetuSharedAxisWindowAnimation">
+        <item name="android:activityOpenEnterAnimation">@anim/hetu_route_open_enter</item>
+        <item name="android:activityOpenExitAnimation">@anim/hetu_route_open_exit</item>
+        <item name="android:activityCloseEnterAnimation">@anim/hetu_route_close_enter</item>
+        <item name="android:activityCloseExitAnimation">@anim/hetu_route_close_exit</item>
+    </style>
+</resources>

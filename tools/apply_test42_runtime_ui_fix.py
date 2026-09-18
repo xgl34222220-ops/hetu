@@ -2,14 +2,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / "android-app/app/build.gradle.kts"
-STARTUP = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/bichen/MihomoStartupConfig.java"
+STARTUP = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java"
 SCRIPT = ROOT / "android-app/app/src/main/assets/proxy-root-v3.sh"
-ROOT_MANAGER = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java"
-CONTROLLER = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyComposeController.kt"
-NETWORK_MATCH = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyNetworkMatchService.java"
-INSPECTOR = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyRuntimeInspector.kt"
-DASHBOARD = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyDashboardRepository.kt"
-UI = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt"
+ROOT_MANAGER = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java"
+CONTROLLER = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt"
+NETWORK_MATCH = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java"
+INSPECTOR = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeInspector.kt"
+DASHBOARD = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt"
+UI = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt"
 
 
 def replace_once(text: str, old: str, new: str, label: str) -> str:
@@ -154,8 +154,8 @@ NETWORK_MATCH.write_text(network, encoding="utf-8")
 inspector = INSPECTOR.read_text(encoding="utf-8")
 inspector = replace_once(
     inspector,
-    '        val command = "tail -n 160 /data/adb/bichen/proxy/run/core.log 2>&1 || true"\n',
-    '        val command = "echo \'--- core.log ---\'; tail -n 140 /data/adb/bichen/proxy/run/core.log 2>&1 || true; echo \'--- watchdog.log ---\'; tail -n 30 /data/adb/bichen/proxy/run/watchdog.log 2>/dev/null || true; echo \'--- last-crash ---\'; cat /data/adb/bichen/proxy/run/last-crash 2>/dev/null || true"\n',
+    '        val command = "tail -n 160 /data/adb/hetu/run/core.log 2>&1 || true"\n',
+    '        val command = "echo \'--- core.log ---\'; tail -n 140 /data/adb/hetu/run/core.log 2>&1 || true; echo \'--- watchdog.log ---\'; tail -n 30 /data/adb/hetu/run/watchdog.log 2>/dev/null || true; echo \'--- last-crash ---\'; cat /data/adb/hetu/run/last-crash 2>/dev/null || true"\n',
     'runtime log diagnostics',
 )
 INSPECTOR.write_text(inspector, encoding="utf-8")
@@ -431,9 +431,9 @@ ui = replace_once(ui, '            .shadow(5.dp, shape, clip = false, ambientCol
 
 # Provider row: spinner and Glacier-blue remaining block.
 ui = replace_once(ui,
-    'private fun RefProviderRow(item: DashboardProviderUi, onRefresh: () -> Unit, onClick: () -> Unit) {\n    val t = LocalBichenTokens.current\n    val scheme = MaterialTheme.colorScheme\n',
+    'private fun RefProviderRow(item: DashboardProviderUi, onRefresh: () -> Unit, onClick: () -> Unit) {\n    val t = LocalHetuTokens.current\n    val scheme = MaterialTheme.colorScheme\n',
     'private fun RefProviderRow(item: DashboardProviderUi, refreshing: Boolean, onRefresh: () -> Unit, onClick: () -> Unit) {\n'
-    '    val t = LocalBichenTokens.current\n'
+    '    val t = LocalHetuTokens.current\n'
     '    val scheme = MaterialTheme.colorScheme\n'
     '    val spinTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "providerRefreshSpin${item.name}")\n'
     '    val spin by spinTransition.animateFloat(\n'
@@ -463,9 +463,9 @@ ui = replace_once(ui, '                            Text(refBytes(item.remaining)
 
 # Rule-set row: local per-item spin.
 ui = replace_once(ui,
-    'private fun RefRuleSetRow(item: DashboardRuleSetUi, onRefresh: () -> Unit) {\n    val t = LocalBichenTokens.current\n    val scheme = MaterialTheme.colorScheme\n',
+    'private fun RefRuleSetRow(item: DashboardRuleSetUi, onRefresh: () -> Unit) {\n    val t = LocalHetuTokens.current\n    val scheme = MaterialTheme.colorScheme\n',
     'private fun RefRuleSetRow(item: DashboardRuleSetUi, refreshing: Boolean, onRefresh: () -> Unit) {\n'
-    '    val t = LocalBichenTokens.current\n'
+    '    val t = LocalHetuTokens.current\n'
     '    val scheme = MaterialTheme.colorScheme\n'
     '    val spinTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "ruleSetRefreshSpin${item.name}")\n'
     '    val spin by spinTransition.animateFloat(\n'

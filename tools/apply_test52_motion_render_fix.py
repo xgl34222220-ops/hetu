@@ -1,6 +1,6 @@
 from pathlib import Path
 
-ROOT = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen')
+ROOT = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu')
 
 
 def require_replace(text: str, old: str, new: str, label: str) -> str:
@@ -64,7 +64,7 @@ ref = require_replace(
 
 network_card = r'''@Composable
 private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: Int, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val view = LocalView.current
     val scope = rememberCoroutineScope()
     var showLan by rememberSaveable { mutableStateOf(true) }
@@ -492,7 +492,7 @@ adv = require_replace(
 preflight_sheet = r'''@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AdvancedPreflightSheet(passed: Boolean, text: String, onDismiss: () -> Unit) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val pulseTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "preflightShieldPulse")
     val pulse by pulseTransition.animateFloat(
         initialValue = .94f,
@@ -560,4 +560,4 @@ adv = adv.replace(
 )
 adv_path.write_text(adv)
 
-print('Applied Bichen 0.4.0-test.52 motion/render fixes')
+print('Applied Hetu 0.4.0-test.52 motion/render fixes')

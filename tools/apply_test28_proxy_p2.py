@@ -24,7 +24,7 @@ replace_once(
 )
 
 # Runtime profile: add automatic CN IP direct switch, default off for safe upgrades.
-profile = "android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyRuntimeProfile.java"
+profile = "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeProfile.java"
 replace_once(
     profile,
     "final Core core;final Mode mode;final Ipv6 ipv6;final AppScope appScope;final DnsHijack dnsHijack;final boolean autoOverwrite,tcp,udp,quicBlocked;\n    ProxyRuntimeProfile(Core core,Mode mode,Ipv6 ipv6,AppScope appScope,DnsHijack dnsHijack,boolean autoOverwrite,boolean tcp,boolean udp,boolean quicBlocked){this.core=core;this.mode=mode;this.ipv6=ipv6;this.appScope=appScope;this.dnsHijack=dnsHijack;this.autoOverwrite=autoOverwrite;this.tcp=tcp;this.udp=udp;this.quicBlocked=quicBlocked;}",
@@ -37,19 +37,19 @@ replace_once(
 )
 
 # Mihomo startup copy: merge two reserved http ipcidr rule-providers into ordinary block YAML.
-startup = "android-app/app/src/main/java/io/github/xgl34222220/bichen/MihomoStartupConfig.java"
+startup = "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java"
 replace_once(startup, "import java.util.regex.*;", "import java.util.*;\nimport java.util.regex.*;")
 replace_once(
     startup,
     'static final String EXTERNAL_UI_URL="https://github.com/Zephyruso/zashboard/releases/latest/download/dist-no-fonts.zip";',
-    'static final String EXTERNAL_UI_URL="https://github.com/Zephyruso/zashboard/releases/latest/download/dist-no-fonts.zip";\n    static final String CNIP_V4_URL="https://raw.githubusercontent.com/gaoyifan/china-operator-ip/ip-lists/china.txt";\n    static final String CNIP_V6_URL="https://raw.githubusercontent.com/gaoyifan/china-operator-ip/ip-lists/china6.txt";\n    static final String CNIP_V4_PATH="./ruleset/bichen-cn-v4.txt";\n    static final String CNIP_V6_PATH="./ruleset/bichen-cn-v6.txt";',
+    'static final String EXTERNAL_UI_URL="https://github.com/Zephyruso/zashboard/releases/latest/download/dist-no-fonts.zip";\n    static final String CNIP_V4_URL="https://raw.githubusercontent.com/gaoyifan/china-operator-ip/ip-lists/china.txt";\n    static final String CNIP_V6_URL="https://raw.githubusercontent.com/gaoyifan/china-operator-ip/ip-lists/china6.txt";\n    static final String CNIP_V4_PATH="./ruleset/hetu-cn-v4.txt";\n    static final String CNIP_V6_PATH="./ruleset/hetu-cn-v6.txt";',
 )
 replace_once(
     startup,
     'if(profile.dnsHijack==ProxyRuntimeProfile.DnsHijack.REDIRECT)\n            yaml=ensureDnsListener(yaml,DNS_PORT);',
     'if(profile.dnsHijack==ProxyRuntimeProfile.DnsHijack.REDIRECT)\n            yaml=ensureDnsListener(yaml,DNS_PORT);\n        if(profile.cnIpDirect)\n            yaml=ensureCnIpDirect(yaml);',
 )
-cn_methods = r'''    /** Merge Bichen CN IP providers into the private startup copy without editing the subscription. */
+cn_methods = r'''    /** Merge Hetu CN IP providers into the private startup copy without editing the subscription. */
     private static String ensureCnIpDirect(String source)throws IOException{
         String yaml=normalize(source);
         yaml=injectCnProviders(yaml);
@@ -68,14 +68,14 @@ cn_methods = r'''    /** Merge Bichen CN IP providers into the private startup c
             if(m.find()){index=i;found=m;break;}
         }
         String providerBlock=
-                "  bichen-cn-v4:\n"+
+                "  hetu-cn-v4:\n"+
                 "    type: http\n"+
                 "    behavior: ipcidr\n"+
                 "    format: text\n"+
                 "    path: "+CNIP_V4_PATH+"\n"+
                 "    url: '"+CNIP_V4_URL+"'\n"+
                 "    interval: 86400\n"+
-                "  bichen-cn-v6:\n"+
+                "  hetu-cn-v6:\n"+
                 "    type: http\n"+
                 "    behavior: ipcidr\n"+
                 "    format: text\n"+
@@ -97,8 +97,8 @@ cn_methods = r'''    /** Merge Bichen CN IP providers into the private startup c
         }
         for(int i=index+1;i<end;i++){
             String t=lines[i].trim();
-            if(t.startsWith("bichen-cn-v4:")||t.startsWith("bichen-cn-v6:"))
-                throw new IOException("源配置占用了辟尘保留的 CNIP provider 名称");
+            if(t.startsWith("hetu-cn-v4:")||t.startsWith("hetu-cn-v6:"))
+                throw new IOException("源配置占用了河图保留的 CNIP provider 名称");
         }
         StringBuilder out=new StringBuilder();
         for(int i=0;i<lines.length;i++){
@@ -118,7 +118,7 @@ cn_methods = r'''    /** Merge Bichen CN IP providers into the private startup c
             Matcher m=top.matcher(lines[i]);
             if(m.find()){index=i;found=m;break;}
         }
-        String cnRules="  - RULE-SET,bichen-cn-v4,DIRECT,no-resolve\n  - RULE-SET,bichen-cn-v6,DIRECT,no-resolve\n";
+        String cnRules="  - RULE-SET,hetu-cn-v4,DIRECT,no-resolve\n  - RULE-SET,hetu-cn-v6,DIRECT,no-resolve\n";
         if(index<0){
             String base=trimOne(source);
             return base+(base.isEmpty()?"":"\n")+"rules:\n"+cnRules;
@@ -138,7 +138,7 @@ cn_methods = r'''    /** Merge Bichen CN IP providers into the private startup c
 insert_before(startup, "    /** Ensure Mihomo's built-in DNS server owns a dedicated TCP+UDP loop used by DNS REDIRECT. */", cn_methods)
 
 # Root runtime: install bundled CNIP snapshot once, then let Mihomo's provider update the same cache path.
-manager = "android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java"
+manager = "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java"
 replace_once(
     manager,
     '.put("killSwitch",policy.killSwitch)\n                .put("bypassCidrs",policy.cidrs)',
@@ -152,7 +152,7 @@ replace_once(
 replace_once(
     manager,
     'File cfg=new File(stage,"startup-config");\n        if(includeConfig)Files.write(cfg.toPath(),p.startup.getBytes(StandardCharsets.UTF_8));',
-    'File cfg=new File(stage,"startup-config");\n        File cn4=null,cn6=null;\n        if(p.profile.cnIpDirect){\n            cn4=new File(stage,"bichen-cn-v4.txt");copyAsset("cnip/bichen-cn-v4.txt",cn4,false);\n            cn6=new File(stage,"bichen-cn-v6.txt");copyAsset("cnip/bichen-cn-v6.txt",cn6,false);\n        }\n        if(includeConfig)Files.write(cfg.toPath(),p.startup.getBytes(StandardCharsets.UTF_8));',
+    'File cfg=new File(stage,"startup-config");\n        File cn4=null,cn6=null;\n        if(p.profile.cnIpDirect){\n            cn4=new File(stage,"hetu-cn-v4.txt");copyAsset("cnip/hetu-cn-v4.txt",cn4,false);\n            cn6=new File(stage,"hetu-cn-v6.txt");copyAsset("cnip/hetu-cn-v6.txt",cn6,false);\n        }\n        if(includeConfig)Files.write(cfg.toPath(),p.startup.getBytes(StandardCharsets.UTF_8));',
 )
 replace_once(
     manager,
@@ -162,11 +162,11 @@ replace_once(
 replace_once(
     manager,
     'if(includeConfig)cmd.append("; cp ").append(RootBridge.quote(cfg.getAbsolutePath())).append(\' \').append(RootBridge.quote(CONFIG))\n                .append("; chmod 600 ").append(RootBridge.quote(CONFIG)).append("; chown 0:0 ").append(RootBridge.quote(CONFIG));',
-    'if(p.profile.cnIpDirect){\n            String dst4=ROOT+"/run/ruleset/bichen-cn-v4.txt",dst6=ROOT+"/run/ruleset/bichen-cn-v6.txt";\n            cmd.append("; if [ ! -s ").append(RootBridge.quote(dst4)).append(" ]; then cp ").append(RootBridge.quote(cn4.getAbsolutePath())).append(\' \').append(RootBridge.quote(dst4)).append("; chmod 600 ").append(RootBridge.quote(dst4)).append("; chown 0:0 ").append(RootBridge.quote(dst4)).append("; fi")\n                    .append("; if [ ! -s ").append(RootBridge.quote(dst6)).append(" ]; then cp ").append(RootBridge.quote(cn6.getAbsolutePath())).append(\' \').append(RootBridge.quote(dst6)).append("; chmod 600 ").append(RootBridge.quote(dst6)).append("; chown 0:0 ").append(RootBridge.quote(dst6)).append("; fi");\n        }\n        if(includeConfig)cmd.append("; cp ").append(RootBridge.quote(cfg.getAbsolutePath())).append(\' \').append(RootBridge.quote(CONFIG))\n                .append("; chmod 600 ").append(RootBridge.quote(CONFIG)).append("; chown 0:0 ").append(RootBridge.quote(CONFIG));',
+    'if(p.profile.cnIpDirect){\n            String dst4=ROOT+"/run/ruleset/hetu-cn-v4.txt",dst6=ROOT+"/run/ruleset/hetu-cn-v6.txt";\n            cmd.append("; if [ ! -s ").append(RootBridge.quote(dst4)).append(" ]; then cp ").append(RootBridge.quote(cn4.getAbsolutePath())).append(\' \').append(RootBridge.quote(dst4)).append("; chmod 600 ").append(RootBridge.quote(dst4)).append("; chown 0:0 ").append(RootBridge.quote(dst4)).append("; fi")\n                    .append("; if [ ! -s ").append(RootBridge.quote(dst6)).append(" ]; then cp ").append(RootBridge.quote(cn6.getAbsolutePath())).append(\' \').append(RootBridge.quote(dst6)).append("; chmod 600 ").append(RootBridge.quote(dst6)).append("; chown 0:0 ").append(RootBridge.quote(dst6)).append("; fi");\n        }\n        if(includeConfig)cmd.append("; cp ").append(RootBridge.quote(cfg.getAbsolutePath())).append(\' \').append(RootBridge.quote(CONFIG))\n                .append("; chmod 600 ").append(RootBridge.quote(CONFIG)).append("; chown 0:0 ").append(RootBridge.quote(CONFIG));',
 )
 
 # Settings/UI: explicit CNIP toggle + diagnostics + deliberate recovery action.
-activity = "android-app/app/src/main/java/io/github/xgl34222220/bichen/RootTproxyActivity.java"
+activity = "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java"
 replace_once(
     activity,
     'private TextView coreValue,modeValue,ipv6Value,overwriteValue,appScopeValue,tcpValue,udpValue,dnsValue,quicValue,shareValue,killValue,cidrValue,ifaceValue;',
@@ -192,11 +192,11 @@ diag_methods = r'''    private void showDiagnostics(){
     }
 
     private void confirmRepairNetwork(){
-        new AlertDialog.Builder(this).setTitle("清理残留并恢复网络").setMessage("这会停止当前 Root 代理，并清理辟尘创建的透明代理、Kill Switch、IPv6 临时状态和残留规则。不会删除订阅或节点配置。")
+        new AlertDialog.Builder(this).setTitle("清理残留并恢复网络").setMessage("这会停止当前 Root 代理，并清理河图创建的透明代理、Kill Switch、IPv6 临时状态和残留规则。不会删除订阅或节点配置。")
                 .setPositiveButton("清理并停止",(d,w)->repairNetwork()).setNegativeButton("取消",null).show();
     }
 
-    private void repairNetwork(){task(()->{root.stop();return "已停止 Root 代理并恢复辟尘网络规则";});}
+    private void repairNetwork(){task(()->{root.stop();return "已停止 Root 代理并恢复河图网络规则";});}
 
 '''
 insert_before(activity, "    private void refresh(){", diag_methods)
@@ -211,7 +211,7 @@ replace_once(
 replace_once(
     test,
     'boolean denied=false;try{MihomoStartupConfig.generate(source,p(ProxyRuntimeProfile.Mode.EBPF,true));}catch(Exception expected){denied=true;}check(denied,"unsupported eBPF is not faked");',
-    'String cnSource="mode: rule\\nproxies: []\\nproxy-groups: []\\nrules:\\n  - MATCH,DIRECT\\n";\n  ProxyRuntimeProfile cnProfile=new ProxyRuntimeProfile(ProxyRuntimeProfile.Core.MIHOMO,ProxyRuntimeProfile.Mode.TPROXY,ProxyRuntimeProfile.Ipv6.BYPASS,ProxyRuntimeProfile.AppScope.BLACKLIST,ProxyRuntimeProfile.DnsHijack.TPROXY,true,true,true,false,true);\n  MihomoStartupConfig.Result cn=MihomoStartupConfig.generate(cnSource,cnProfile);\n  check(cn.yaml.contains("bichen-cn-v4:")&&cn.yaml.contains("bichen-cn-v6:"),"CNIP providers injected");\n  check(cn.yaml.contains("RULE-SET,bichen-cn-v4,DIRECT,no-resolve")&&cn.yaml.indexOf("RULE-SET,bichen-cn-v4")<cn.yaml.indexOf("MATCH,DIRECT"),"CNIP direct rules precede source fallback");\n  check(cn.yaml.contains("./ruleset/bichen-cn-v4.txt")&&cn.yaml.contains("interval: 86400"),"CNIP cache path and refresh interval configured");\n  boolean denied=false;try{MihomoStartupConfig.generate(source,p(ProxyRuntimeProfile.Mode.EBPF,true));}catch(Exception expected){denied=true;}check(denied,"unsupported eBPF is not faked");',
+    'String cnSource="mode: rule\\nproxies: []\\nproxy-groups: []\\nrules:\\n  - MATCH,DIRECT\\n";\n  ProxyRuntimeProfile cnProfile=new ProxyRuntimeProfile(ProxyRuntimeProfile.Core.MIHOMO,ProxyRuntimeProfile.Mode.TPROXY,ProxyRuntimeProfile.Ipv6.BYPASS,ProxyRuntimeProfile.AppScope.BLACKLIST,ProxyRuntimeProfile.DnsHijack.TPROXY,true,true,true,false,true);\n  MihomoStartupConfig.Result cn=MihomoStartupConfig.generate(cnSource,cnProfile);\n  check(cn.yaml.contains("hetu-cn-v4:")&&cn.yaml.contains("hetu-cn-v6:"),"CNIP providers injected");\n  check(cn.yaml.contains("RULE-SET,hetu-cn-v4,DIRECT,no-resolve")&&cn.yaml.indexOf("RULE-SET,hetu-cn-v4")<cn.yaml.indexOf("MATCH,DIRECT"),"CNIP direct rules precede source fallback");\n  check(cn.yaml.contains("./ruleset/hetu-cn-v4.txt")&&cn.yaml.contains("interval: 86400"),"CNIP cache path and refresh interval configured");\n  boolean denied=false;try{MihomoStartupConfig.generate(source,p(ProxyRuntimeProfile.Mode.EBPF,true));}catch(Exception expected){denied=true;}check(denied,"unsupported eBPF is not faked");',
 )
 
 # Any other host tests constructing the profile directly need the new final boolean.
@@ -225,16 +225,16 @@ for rel in ["tests/ProxyRuntimeProfileTest.java"]:
 # Main feature CI metadata for future pushes.
 workflow = ".github/workflows/compose-ui.yml"
 replace_once(workflow, "versionName='0.4.0-test.27-preview'", "versionName='0.4.0-test.28-preview'")
-replace_once(workflow, "name: Bichen-0.4.0-test.27-proxy-P1", "name: Bichen-0.4.0-test.28-proxy-P2")
+replace_once(workflow, "name: Hetu-0.4.0-test.27-proxy-P1", "name: Hetu-0.4.0-test.28-proxy-P2")
 replace_once(
     workflow,
-    "grep -q 'proxySharedNetwork' android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyPolicy.java",
-    "grep -q 'proxySharedNetwork' android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyPolicy.java\n          grep -q 'proxyCnIpDirect' android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyRuntimeProfile.java\n          grep -q 'bichen-cn-v4' android-app/app/src/main/java/io/github/xgl34222220/bichen/MihomoStartupConfig.java",
+    "grep -q 'proxySharedNetwork' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyPolicy.java",
+    "grep -q 'proxySharedNetwork' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyPolicy.java\n          grep -q 'proxyCnIpDirect' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeProfile.java\n          grep -q 'hetu-cn-v4' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java",
 )
 replace_once(
     workflow,
     "grep -q 'assets/proxy-root-v3.sh' compose-apk-files.txt",
-    "grep -q 'assets/proxy-root-v3.sh' compose-apk-files.txt\n          grep -q 'assets/cnip/bichen-cn-v4.txt' compose-apk-files.txt\n          grep -q 'assets/cnip/bichen-cn-v6.txt' compose-apk-files.txt",
+    "grep -q 'assets/proxy-root-v3.sh' compose-apk-files.txt\n          grep -q 'assets/cnip/hetu-cn-v4.txt' compose-apk-files.txt\n          grep -q 'assets/cnip/hetu-cn-v6.txt' compose-apk-files.txt",
 )
 
 print("test.28 Proxy P2 source patch applied")

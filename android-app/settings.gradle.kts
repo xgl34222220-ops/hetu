@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "BichenCompose"
+rootProject.name = "HetuCompose"
 include(":app")

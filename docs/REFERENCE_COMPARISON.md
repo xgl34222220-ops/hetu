@@ -1,10 +1,10 @@
-# 辟尘：去广告方案对照与实现取舍
+# 河图：去广告方案对照与实现取舍
 
 读取日期：2026-09-12（UTC）。本次实际打开了下列项目的官方仓库或官方文档，覆盖 9 个有代表性的去广告应用、模块及规则项目，并补充 Android 与 root 管理器文档。它们覆盖主要技术路线，不代表穷尽市面所有产品。本文记录研究结论和建议，**不是本版已实现功能清单，也不代表任何手机已经实测通过**。
 
 ## 1. 对照结果
 
-| 方案 | 官方资料确认的能力 | 辟尘可借鉴的设计 | 实现边界 | 许可证记录 |
+| 方案 | 官方资料确认的能力 | 河图可借鉴的设计 | 实现边界 | 许可证记录 |
 | --- | --- | --- | --- | --- |
 | [bindhosts](https://github.com/bindhosts/bindhosts) | 面向 Magisk、KernelSU、APatch；支持管理器挂载、bind mount、OverlayFS 等方式；有 WebUI、动作按钮与自更新 | 挂载能力探测；简单暂停/恢复；模块独立运行；按实际挂载结果报告状态 | 多种挂载方式需要分别验证，不能仅检查模块目录存在；不要同时抢写别的 hosts 模块 | 官方仓库标注 WTFPL；本次只借鉴架构，不复制代码 |
 | [AdAway](https://github.com/AdAway/AdAway) | 同时提供 root hosts 与本地 VPN 路线；可添加 hosts 来源；官方权限说明把应用排除用于 VPN | 来源管理、用户例外、配置导入导出；把 root 与 VPN 模式明确分开 | root hosts 不因此获得按应用隔离能力；VPN 模式需要系统 VPN 授权 | App：GPLv3+；规则源另按各自许可处理，不能用 App 许可概括全部规则 |
@@ -75,17 +75,17 @@ Android 官方要求每条 VPN 连接选择 allowed list 或 disallowed list 之
 | KernelSU | `ksud module install ZIP` | 官方常量本体为 `/data/adb/ksud`，另有 `/data/adb/ksu/bin/ksud` 链接。先 `test -x`，再探测帮助/版本。[官方 defs.rs](https://raw.githubusercontent.com/tiann/KernelSU/main/userspace/ksud/src/defs.rs)、[官方 cli.rs](https://github.com/tiann/KernelSU/blob/main/userspace/ksud/src/cli.rs) |
 | APatch | `apd module install ZIP` | 官方常量本体为 `/data/adb/apd`；`/data/adb/ap/bin/` 是工具目录，不能认定 apd 一定在那里。[官方 defs.rs](https://raw.githubusercontent.com/bmax121/APatch/main/apd/src/defs.rs)、[官方 cli.rs](https://raw.githubusercontent.com/bmax121/APatch/main/apd/src/cli.rs) |
 
-KernelSU 的 module 命令会进入 PID 1 的挂载命名空间，因此不能假定 App 私有 cache 路径在安装器执行时仍可见。建议把 APK 内置 ZIP 经获授权 root 进程写入 `/data/adb/` 下辟尘专属随机临时目录，目录权限 0700、文件权限 0600，验证摘要后调用已探测的 CLI，保留退出码和日志并最终清理。本方案是辟尘的工程取舍，不是上述框架规定的统一暂存目录。只使用正常 root 授权；不读取 APatch SuperKey，不修改授权数据库。
+KernelSU 的 module 命令会进入 PID 1 的挂载命名空间，因此不能假定 App 私有 cache 路径在安装器执行时仍可见。建议把 APK 内置 ZIP 经获授权 root 进程写入 `/data/adb/` 下河图专属随机临时目录，目录权限 0700、文件权限 0600，验证摘要后调用已探测的 CLI，保留退出码和日志并最终清理。本方案是河图的工程取舍，不是上述框架规定的统一暂存目录。只使用正常 root 授权；不读取 APatch SuperKey，不修改授权数据库。
 
 ### 挂载
 
 安装成功、配置生成、真实挂载、应用解析是四个不同状态。当前 KernelSU 官方文档指出，普通依赖挂载的模块在未安装 metamodule 时不会自动挂载；具备自己挂载逻辑的模块应独立验证，不要仅依赖 `system/etc/hosts` 路径存在。[KernelSU Metamodule](https://kernelsu.org/guide/metamodule.html)
 
-建议辟尘：探测实际活动路径与内容摘要；显示挂载方式及错误；检测其它 hosts 管理器冲突；暂停、更新、回滚后再次读回验证。保留一份已验证原始 hosts 和一份最近有效规则，不把损坏下载覆盖到正在使用的文件。开机阻塞阶段不做网络下载和巨量规则合并，避免拖慢系统启动。[Magisk 启动阶段说明](https://topjohnwu.github.io/Magisk/guides.html)
+建议河图：探测实际活动路径与内容摘要；显示挂载方式及错误；检测其它 hosts 管理器冲突；暂停、更新、回滚后再次读回验证。保留一份已验证原始 hosts 和一份最近有效规则，不把损坏下载覆盖到正在使用的文件。开机阻塞阶段不做网络下载和巨量规则合并，避免拖慢系统启动。[Magisk 启动阶段说明](https://topjohnwu.github.io/Magisk/guides.html)
 
 ### ReSukiSU / 用户所说的 ResuKSU
 
-本次确认存在官方 [ReSukiSU 仓库](https://github.com/ReSukiSU/ReSukiSU)，其文档说明使用 metamodule 模块体系并支持多个管理器。用户设备显示的“ResuKSU”是否就是此分支，应由版本/日志确认，不凭相近名称认定。兼容判断必须基于可用安装环境、`ksud` 能力和实际挂载结果，不能只做管理器包名白名单。该仓库将内核标为 GPL-2.0-only，其余多数部分为 GPL-3.0-or-later，图标另有约定；辟尘无需复制它的图标或内核。
+本次确认存在官方 [ReSukiSU 仓库](https://github.com/ReSukiSU/ReSukiSU)，其文档说明使用 metamodule 模块体系并支持多个管理器。用户设备显示的“ResuKSU”是否就是此分支，应由版本/日志确认，不凭相近名称认定。兼容判断必须基于可用安装环境、`ksud` 能力和实际挂载结果，不能只做管理器包名白名单。该仓库将内核标为 GPL-2.0-only，其余多数部分为 GPL-3.0-or-later，图标另有约定；河图无需复制它的图标或内核。
 
 ## 4. 首个可交付版建议范围
 
@@ -106,7 +106,7 @@ KernelSU 的 module 命令会进入 PID 1 的挂载命名空间，因此不能�
 | 配置导入导出 | 导出来源、白黑名单、档位和版本；导入前验证结构；不导出 root 凭据等无关内容 |
 | UI | 首页只突出开关、当前状态、规则更新时间和问题入口；来源/规则/应用模式各自有明确状态；应用放行显示它实际采用哪种语义 |
 
-这些建议吸收了上面对照项目的来源管理、透明状态、误杀修复和模式分离思想。回滚、原子替换、状态读回、包摘要等是针对辟尘交付失败风险提出的工程要求，不应反向宣传为所有参考项目都已具备的特性。
+这些建议吸收了上面对照项目的来源管理、透明状态、误杀修复和模式分离思想。回滚、原子替换、状态读回、包摘要等是针对河图交付失败风险提出的工程要求，不应反向宣传为所有参考项目都已具备的特性。
 
 ## 5. DNS 引擎的进一步完善
 
@@ -144,4 +144,4 @@ KernelSU 的 module 命令会进入 PID 1 的挂载命名空间，因此不能�
 
 直接落实的是 Re-Malwack 式档位选择的交互思想、personalDNSfilter/AdGuard 的响应别名检查方向，
 以及查询活动到误拦恢复的操作链路。所有新代码为本轮独立实现；没有直接复制参考项目源码。
-档位复用辟尘已有四个来源，并非这些项目规则的并集；新增来源仍须逐份核对许可证、格式和误拦。
+档位复用河图已有四个来源，并非这些项目规则的并集；新增来源仍须逐份核对许可证、格式和误拦。

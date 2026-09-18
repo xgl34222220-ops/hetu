@@ -3,8 +3,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / "android-app/app/build.gradle.kts"
 SCRIPT = ROOT / "android-app/app/src/main/assets/proxy-root-v3.sh"
-MGR = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java"
-INSPECTOR = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyRuntimeInspector.kt"
+MGR = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java"
+INSPECTOR = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeInspector.kt"
 
 # Version
 build = BUILD.read_text(encoding="utf-8")
@@ -107,7 +107,7 @@ new_verify = '''        stage(progress,"确认策略控制接口、守护与回�
         JSONObject state=status();
         if(!state.optBoolean("running",false)){
             if(adblockCoordinatorEntered)ProxyAdblockCoordinator.exit(context);
-            throw new IOException("启动命令已返回，但未检测到辟尘私有核心进程"+(diagnostics().isEmpty()?"":"："+diagnostics()));
+            throw new IOException("启动命令已返回，但未检测到河图私有核心进程"+(diagnostics().isEmpty()?"":"："+diagnostics()));
         }
         MihomoControllerClient controller=new MihomoControllerClient(context);
         if(!controller.waitReady(12000)){
@@ -134,8 +134,8 @@ MGR.write_text(mgr, encoding='utf-8')
 
 # Runtime log must show controller transaction failures even when watchdog never started.
 inspector = INSPECTOR.read_text(encoding='utf-8')
-old_log = '''        val command = "echo '--- core.log ---'; tail -n 140 /data/adb/bichen/proxy/run/core.log 2>&1 || true; echo '--- watchdog.log ---'; tail -n 30 /data/adb/bichen/proxy/run/watchdog.log 2>/dev/null || true; echo '--- last-crash ---'; cat /data/adb/bichen/proxy/run/last-crash 2>/dev/null || true"'''
-new_log = '''        val command = "echo '--- start-state ---'; cat /data/adb/bichen/proxy/run/start-state 2>/dev/null || true; echo '--- last-start-error ---'; cat /data/adb/bichen/proxy/run/last-start-error 2>/dev/null || true; echo '--- core.log ---'; tail -n 140 /data/adb/bichen/proxy/run/core.log 2>&1 || true; echo '--- watchdog.log ---'; tail -n 30 /data/adb/bichen/proxy/run/watchdog.log 2>/dev/null || true; echo '--- last-crash ---'; cat /data/adb/bichen/proxy/run/last-crash 2>/dev/null || true"'''
+old_log = '''        val command = "echo '--- core.log ---'; tail -n 140 /data/adb/hetu/run/core.log 2>&1 || true; echo '--- watchdog.log ---'; tail -n 30 /data/adb/hetu/run/watchdog.log 2>/dev/null || true; echo '--- last-crash ---'; cat /data/adb/hetu/run/last-crash 2>/dev/null || true"'''
+new_log = '''        val command = "echo '--- start-state ---'; cat /data/adb/hetu/run/start-state 2>/dev/null || true; echo '--- last-start-error ---'; cat /data/adb/hetu/run/last-start-error 2>/dev/null || true; echo '--- core.log ---'; tail -n 140 /data/adb/hetu/run/core.log 2>&1 || true; echo '--- watchdog.log ---'; tail -n 30 /data/adb/hetu/run/watchdog.log 2>/dev/null || true; echo '--- last-crash ---'; cat /data/adb/hetu/run/last-crash 2>/dev/null || true"'''
 if old_log not in inspector:
     raise SystemExit('test44: runtime log command missing')
 inspector = inspector.replace(old_log, new_log, 1)

@@ -3,9 +3,9 @@ import re
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / "android-app/app/build.gradle.kts"
-STARTUP = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/bichen/MihomoStartupConfig.java"
-ROOTM = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java"
-SERVICE = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyNetworkMatchService.java"
+STARTUP = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java"
+ROOTM = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java"
+SERVICE = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java"
 SCRIPT = ROOT / "android-app/app/src/main/assets/proxy-root-v3.sh"
 MANIFEST = ROOT / "android-app/app/src/main/AndroidManifest.xml"
 
@@ -20,11 +20,11 @@ text = replace_once(text, 'versionCode = 453', 'versionCode = 454', 'versionCode
 text = replace_once(text, 'versionName = "0.4.0-test.53"', 'versionName = "0.4.0-test.54"', 'versionName')
 BUILD.write_text(text)
 
-# Respect the user's routing policy: Bichen adblock becomes a supplemental rule right
+# Respect the user's routing policy: Hetu adblock becomes a supplemental rule right
 # before a terminal MATCH/FINAL instead of overriding every explicit DIRECT rule.
 text = STARTUP.read_text()
 text = replace_once(text, 'yaml=prependAdblockRule(yaml);', 'yaml=insertAdblockRuleRespectingUserPolicy(yaml);', 'adblock call')
-pattern = re.compile(r'''    private static String prependAdblockRule\(String source\)throws IOException\{.*?\n    \}\n\n    /\*\* Merge Bichen CN IP''', re.S)
+pattern = re.compile(r'''    private static String prependAdblockRule\(String source\)throws IOException\{.*?\n    \}\n\n    /\*\* Merge Hetu CN IP''', re.S)
 replacement = r'''    private static String insertAdblockRuleRespectingUserPolicy(String source)throws IOException{
         String[] lines=normalize(source).split("\\n",-1);
         int index=-1;Matcher found=null;Pattern top=Pattern.compile("^rules\\s*:(.*)$");
@@ -56,7 +56,7 @@ replacement = r'''    private static String insertAdblockRuleRespectingUserPolic
         return trimOne(out.toString());
     }
 
-    /** Merge Bichen CN IP'''
+    /** Merge Hetu CN IP'''
 text, count = pattern.subn(replacement, text, count=1)
 if count != 1:
     raise SystemExit('failed replacing adblock policy method')
@@ -82,7 +82,7 @@ SCRIPT.write_text(text)
 # A lightweight always-on continuity guard while Root proxy is requested. On an actual
 # default-network switch, close old Mihomo sessions once so long-lived IM sockets reconnect
 # immediately on the new path. Optional network matching automation remains opt-in.
-SERVICE.write_text(r'''package io.github.xgl34222220.bichen;
+SERVICE.write_text(r'''package io.github.xgl34222220.hetu;
 
 import android.app.*;
 import android.content.*;
@@ -93,7 +93,7 @@ import java.util.*;
 import java.util.concurrent.*;
 
 public final class ProxyNetworkMatchService extends Service {
-    private static final String CHANNEL="bichen-network-match";
+    private static final String CHANNEL="hetu-network-match";
     private SharedPreferences prefs;
     private ConnectivityManager cm;
     private ConnectivityManager.NetworkCallback cb;
@@ -103,7 +103,7 @@ public final class ProxyNetworkMatchService extends Service {
 
     @Override public void onCreate(){
         super.onCreate();
-        prefs=getSharedPreferences("bichen",MODE_PRIVATE);
+        prefs=getSharedPreferences("hetu",MODE_PRIVATE);
         cm=(ConnectivityManager)getSystemService(CONNECTIVITY_SERVICE);
         ensureChannel();
         startForeground(92,note("代理网络守护已就绪"));
@@ -202,8 +202,8 @@ public final class ProxyNetworkMatchService extends Service {
     private Set<String> set(String key){Set<String>s=prefs.getStringSet(key,Collections.emptySet());return s==null?Collections.emptySet():new HashSet<>(s);}
     private boolean matches(String value,Set<String>s,boolean ignore){if(s.isEmpty())return true;for(String x:s)if(ignore?x.equalsIgnoreCase(value):x.equals(value))return true;return false;}
     private String clean(String s){if(s==null||"<unknown ssid>".equalsIgnoreCase(s))return"";if(s.length()>1&&s.startsWith("\"")&&s.endsWith("\""))return s.substring(1,s.length()-1);return s;}
-    private void ensureChannel(){if(Build.VERSION.SDK_INT>=26)((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).createNotificationChannel(new NotificationChannel(CHANNEL,"辟尘代理网络守护",NotificationManager.IMPORTANCE_LOW));}
-    private Notification note(String text){Notification.Builder b=Build.VERSION.SDK_INT>=26?new Notification.Builder(this,CHANNEL):new Notification.Builder(this);PendingIntent p=PendingIntent.getActivity(this,0,new Intent(this,ReferenceProxyActivity.class),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);return b.setSmallIcon(R.drawable.ic_bichen).setContentTitle("辟尘 · 代理守护").setContentText(text).setContentIntent(p).setOngoing(true).build();}
+    private void ensureChannel(){if(Build.VERSION.SDK_INT>=26)((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).createNotificationChannel(new NotificationChannel(CHANNEL,"河图代理网络守护",NotificationManager.IMPORTANCE_LOW));}
+    private Notification note(String text){Notification.Builder b=Build.VERSION.SDK_INT>=26?new Notification.Builder(this,CHANNEL):new Notification.Builder(this);PendingIntent p=PendingIntent.getActivity(this,0,new Intent(this,ReferenceProxyActivity.class),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);return b.setSmallIcon(R.drawable.ic_hetu).setContentTitle("河图 · 代理守护").setContentText(text).setContentIntent(p).setOngoing(true).build();}
 }
 ''')
 
@@ -247,4 +247,4 @@ text = replace_once(text,
     'FGS subtype')
 MANIFEST.write_text(text)
 
-print('Applied Bichen 0.4.0-test.54 WeChat/connection lifecycle fix')
+print('Applied Hetu 0.4.0-test.54 WeChat/connection lifecycle fix')

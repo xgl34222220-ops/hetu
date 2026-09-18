@@ -1,6 +1,6 @@
 from pathlib import Path
 
-path = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt')
+path = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt')
 s = path.read_text()
 
 
@@ -48,7 +48,7 @@ replace_block(
     '\n@Composable\nprivate fun RefNetworkIdentityCard',
     '''@Composable
 private fun RefLatencyPanel(baidu: Long?, cloudflare: Long?, google: Long?, testing: Boolean, onClick: () -> Unit) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     Surface(shape = RoundedCornerShape(20.dp), color = t.cardBackground, shadowElevation = 1.dp) {
         Column(
@@ -74,7 +74,7 @@ private fun RefLatencyPanel(baidu: Long?, cloudflare: Long?, google: Long?, test
 
 @Composable
 private fun RefLatencyColumn(label: String, value: Long?, testing: Boolean, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(label, color = Color(0xFF64748B), fontSize = 11.sp, lineHeight = 15.sp, maxLines = 1)
@@ -97,7 +97,7 @@ replace_block(
     '\n@Composable\nprivate fun RefSpeedCard',
     '''@Composable
 private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: Int, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     var lanMode by rememberSaveable { mutableStateOf(true) }
     val source = remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
@@ -152,7 +152,7 @@ replace_block(
     '\n@Composable\nprivate fun RefSubscriptionCompact',
     '''@Composable
 private fun RefSpeedCard(up: Long, down: Long, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val valueColor = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A)
     Surface(modifier = modifier.heightIn(min = 98.dp), shape = RoundedCornerShape(20.dp), color = t.cardBackground, shadowElevation = 1.dp) {
         Column(
@@ -179,7 +179,7 @@ replace_block(
     '\n@Composable\nprivate fun RefResourceCard',
     '''@Composable
 private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val tracked = items.filter { it.hasSubscriptionInfo && it.total > 0L }
     val used = tracked.sumOf { it.used }
     val total = tracked.sumOf { it.total }
@@ -215,7 +215,7 @@ replace_block(
     '\nprivate fun countryEmoji',
     '''@Composable
 private fun RefResourceCard(memory: Long, cpuPercent: Float, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val valueColor = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A)
     Surface(modifier = modifier.heightIn(min = 98.dp), shape = RoundedCornerShape(20.dp), color = t.cardBackground, shadowElevation = 1.dp) {
         Column(
@@ -243,7 +243,7 @@ replace_block(
     '\n@Composable\nprivate fun RefSubscriptionCard',
     '''@Composable
 private fun RefSmallTool(title: String, subtitle: String, icon: ImageVector, onClick: () -> Unit, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val source = remember(title) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) .98f else 1f, spring(dampingRatio = .78f, stiffness = 520f), label = "smallTool$title")
@@ -300,7 +300,7 @@ replace_block(
     '\n@Composable\nprivate fun RefGroupVisualIcon',
     '''@Composable
 private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolean, delay: Long?, modifier: Modifier, onClick: () -> Unit) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val source = remember(group.name) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
@@ -354,7 +354,7 @@ private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolea
 
 @Composable
 private fun RefGroupCornerVisual(group: ProxyGroupUi, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val knownFlags = listOf("🇭🇰", "🇹🇼", "🇯🇵", "🇸🇬", "🇰🇷", "🇺🇸", "🇬🇧", "🇩🇪", "🇫🇷")
     val flag = knownFlags.firstOrNull { group.name.contains(it) } ?: refNodeFlag(group.name)
     if (flag.isNotBlank()) {
@@ -374,7 +374,7 @@ replace_block(
     '\n@Composable\nprivate fun RefRateCard',
     '''@Composable
 private fun RefTrafficOverview(state: ProxyComposeState) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val history = remember { mutableStateListOf<Triple<Long, Long, Long>>() }
     var lastUpload by remember { mutableLongStateOf(state.uploadTotal) }
@@ -471,7 +471,7 @@ replace_block(
     '\n@Composable\nprivate fun RefProviderRow',
     '''@Composable
 private fun RefRateCard(title: String, value: Long, icon: ImageVector, color: Color, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     Surface(modifier = modifier, shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 1.dp) {
         Row(
             Modifier.fillMaxWidth().padding(14.dp),
@@ -497,7 +497,7 @@ replace_block(
     '\nprivate fun refExpireDays',
     '''@Composable
 private fun RefProviderRow(item: DashboardProviderUi, onRefresh: () -> Unit, onClick: () -> Unit) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val source = remember(item.name) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
@@ -563,7 +563,7 @@ replace_block(
     '\n@Composable\nprivate fun RefRuleSetRow',
     '''@Composable
 private fun RefRuleRow(item: ProxyRuleUi) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     Surface(shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 1.dp) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -590,7 +590,7 @@ replace_block(
     '\n@Composable\nprivate fun RefTools',
     '''@Composable
 private fun RefRuleSetRow(item: DashboardRuleSetUi, onRefresh: () -> Unit) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     Surface(shape = RoundedCornerShape(20.dp), color = t.cardBackground, shadowElevation = 1.dp) {
         Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {

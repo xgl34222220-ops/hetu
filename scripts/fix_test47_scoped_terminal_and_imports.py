@@ -1,8 +1,8 @@
 from pathlib import Path
 import re
 
-UI = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt')
-SUB = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxySubscriptionActivity.kt')
+UI = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt')
+SUB = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt')
 text = UI.read_text(encoding='utf-8')
 sub = SUB.read_text(encoding='utf-8')
 

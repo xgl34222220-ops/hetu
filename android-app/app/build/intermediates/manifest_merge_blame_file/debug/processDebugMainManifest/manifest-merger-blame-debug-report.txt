@@ -1,0 +1,490 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="io.github.xgl34222220.hetu.preview"
+4    android:versionCode="462"
+5    android:versionName="0.4.0-test.62-preview" >
+6
+7    <uses-sdk
+7-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:4:5-68
+8        android:minSdkVersion="26"
+8-->INJECTED
+9        android:targetSdkVersion="35" />
+9-->INJECTED
+10
+11    <uses-permission android:name="android.permission.INTERNET" />
+11-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:5:5-67
+11-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:5:22-64
+12    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+12-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:6:5-79
+12-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:6:22-76
+13    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+13-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:7:5-76
+13-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:7:22-73
+14    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+14-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:8:5-79
+14-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:8:22-76
+15    <uses-permission
+15-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:9:5-125
+16        android:name="android.permission.NEARBY_WIFI_DEVICES"
+16-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:9:22-75
+17        android:usesPermissionFlags="neverForLocation" />
+17-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:9:76-122
+18    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+18-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:10:5-77
+18-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:10:22-74
+19    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+19-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:11:5-77
+19-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:11:22-74
+20    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+20-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:12:5-89
+20-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:12:22-86
+21    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+21-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:13:5-77
+21-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:13:22-74
+22    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+22-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:14:5-81
+22-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:14:22-78
+23
+24    <permission
+24-->[androidx.core:core:1.18.0] /home/runner/.gradle/caches/9.5.0/transforms/7d507d82ed2272ec9ed0810e4aae2753/transformed/core-1.18.0/AndroidManifest.xml:22:5-24:47
+25        android:name="io.github.xgl34222220.hetu.preview.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+25-->[androidx.core:core:1.18.0] /home/runner/.gradle/caches/9.5.0/transforms/7d507d82ed2272ec9ed0810e4aae2753/transformed/core-1.18.0/AndroidManifest.xml:23:9-81
+26        android:protectionLevel="signature" />
+26-->[androidx.core:core:1.18.0] /home/runner/.gradle/caches/9.5.0/transforms/7d507d82ed2272ec9ed0810e4aae2753/transformed/core-1.18.0/AndroidManifest.xml:24:9-44
+27
+28    <uses-permission android:name="io.github.xgl34222220.hetu.preview.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+28-->[androidx.core:core:1.18.0] /home/runner/.gradle/caches/9.5.0/transforms/7d507d82ed2272ec9ed0810e4aae2753/transformed/core-1.18.0/AndroidManifest.xml:26:5-97
+28-->[androidx.core:core:1.18.0] /home/runner/.gradle/caches/9.5.0/transforms/7d507d82ed2272ec9ed0810e4aae2753/transformed/core-1.18.0/AndroidManifest.xml:26:22-94
+29
+30    <application
+30-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:15:5-60:19
+31        android:allowBackup="false"
+31-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:15:102-129
+32        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+32-->[androidx.core:core:1.18.0] /home/runner/.gradle/caches/9.5.0/transforms/7d507d82ed2272ec9ed0810e4aae2753/transformed/core-1.18.0/AndroidManifest.xml:28:18-86
+33        android:debuggable="true"
+34        android:enableOnBackInvokedCallback="true"
+34-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:15:290-332
+35        android:extractNativeLibs="true"
+35-->INJECTED
+36        android:hardwareAccelerated="true"
+36-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:15:255-289
+37        android:icon="@drawable/ic_hetu"
+37-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:15:69-101
+38        android:label="河图"
+38-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:15:18-36
+39        android:networkSecurityConfig="@xml/network_security_config"
+39-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:15:194-254
+40        android:supportsRtl="true"
+40-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:15:130-156
+41        android:theme="@style/AppTheme"
+41-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:15:37-68
+42        android:usesCleartextTraffic="false" >
+42-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:15:157-193
+43        <service
+43-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:16:9-134
+44            android:name="io.github.xgl34222220.hetu.UpdateJobService"
+44-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:16:18-50
+45            android:exported="true"
+45-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:16:108-131
+46            android:permission="android.permission.BIND_JOB_SERVICE" />
+46-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:16:51-107
+47
+48        <activity
+48-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:17:9-125
+49            android:name="io.github.xgl34222220.hetu.CompactMainActivity"
+49-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:17:19-54
+50            android:exported="false"
+50-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:17:55-79
+51            android:windowSoftInputMode="adjustResize" />
+51-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:17:80-122
+52        <activity
+52-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:18:9-106
+53            android:name="io.github.xgl34222220.hetu.ThemeSettingsActivity"
+53-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:18:19-56
+54            android:exported="false"
+54-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:18:79-103
+55            android:label="主题与界面" />
+55-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:18:57-78
+56        <activity
+56-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:19:9-122
+57            android:name="io.github.xgl34222220.hetu.HetuMainActivity"
+57-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:19:19-51
+58            android:exported="false"
+58-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:19:52-76
+59            android:windowSoftInputMode="adjustResize" />
+59-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:19:77-119
+60        <activity
+60-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:20:9-22:20
+61            android:name="io.github.xgl34222220.hetu.ReferenceProxyActivity"
+61-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:20:19-57
+62            android:exported="true"
+62-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:20:77-100
+63            android:label="河图" >
+63-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:20:58-76
+64            <intent-filter>
+64-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:21:13-156
+65                <action android:name="android.intent.action.MAIN" />
+65-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:21:28-80
+65-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:21:36-77
+66
+67                <category android:name="android.intent.category.LAUNCHER" />
+67-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:21:80-140
+67-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:21:90-137
+68            </intent-filter>
+69        </activity>
+70        <activity
+70-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:23:9-112
+71            android:name="io.github.xgl34222220.hetu.ReferenceFileManagerActivity"
+71-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:23:19-63
+72            android:exported="false"
+72-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:23:85-109
+73            android:label="文件管理" />
+73-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:23:64-84
+74        <activity
+74-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:24:9-109
+75            android:name="io.github.xgl34222220.hetu.LuoShuProxyV3Activity"
+75-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:24:19-56
+76            android:exported="false"
+76-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:24:82-106
+77            android:label="代理（旧 V3）" />
+77-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:24:57-81
+78        <activity
+78-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:25:9-109
+79            android:name="io.github.xgl34222220.hetu.LuoShuProxyV2Activity"
+79-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:25:19-56
+80            android:exported="false"
+80-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:25:82-106
+81            android:label="代理（旧 V2）" />
+81-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:25:57-81
+82        <activity
+82-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:26:9-112
+83            android:name="io.github.xgl34222220.hetu.ProMaxProxyActivity"
+83-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:26:19-54
+84            android:exported="false"
+84-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:26:85-109
+85            android:label="代理（旧 Pro Max）" />
+85-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:26:55-84
+86        <activity
+86-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:27:9-108
+87            android:name="io.github.xgl34222220.hetu.LuoShuProxyActivity"
+87-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:27:19-54
+88            android:exported="false"
+88-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:27:81-105
+89            android:label="代理（旧洛书面板）" />
+89-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:27:55-80
+90        <activity
+90-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:28:9-109
+91            android:name="io.github.xgl34222220.hetu.ProxyDashboardActivity"
+91-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:28:19-57
+92            android:exported="false"
+92-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:28:82-106
+93            android:label="代理（旧面板）" />
+93-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:28:58-81
+94        <activity
+94-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:29:9-110
+95            android:name="io.github.xgl34222220.hetu.ProxyWorkspaceActivity"
+95-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:29:19-57
+96            android:exported="false"
+96-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:29:83-107
+97            android:label="代理（旧工作台）" />
+97-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:29:58-82
+98        <activity
+98-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:30:9-113
+99            android:name="io.github.xgl34222220.hetu.ComposeProxyActivity"
+99-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:30:19-55
+100            android:exported="false"
+100-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:30:86-110
+101            android:label="代理（旧 Compose）" />
+101-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:30:56-85
+102        <activity
+102-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:31:9-101
+103            android:name="io.github.xgl34222220.hetu.ProxyCoreActivity"
+103-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:31:19-52
+104            android:exported="false"
+104-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:31:74-98
+105            android:label="内核管理" />
+105-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:31:53-73
+106        <activity
+106-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:32:9-153
+107            android:name="io.github.xgl34222220.hetu.ProxySubscriptionActivity"
+107-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:32:19-60
+108            android:exported="false"
+108-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:32:83-107
+109            android:label="订阅与配置"
+109-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:32:61-82
+110            android:windowSoftInputMode="adjustResize" />
+110-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:32:108-150
+111        <activity
+111-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:33:9-100
+112            android:name="io.github.xgl34222220.hetu.ProxyActivity"
+112-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:33:19-48
+113            android:exported="false"
+113-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:33:73-97
+114            android:label="代理（旧界面）" />
+114-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:33:49-72
+115        <activity
+115-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:34:9-116
+116            android:name="io.github.xgl34222220.hetu.ProxyRuntimeCoreSettingsActivity"
+116-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:34:19-67
+117            android:exported="false"
+117-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:34:89-113
+118            android:label="运行核心" />
+118-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:34:68-88
+119        <activity
+119-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:35:9-118
+120            android:name="io.github.xgl34222220.hetu.ProxySharedNetworkSettingsActivity"
+120-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:35:19-69
+121            android:exported="false"
+121-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:35:91-115
+122            android:label="共享网络" />
+122-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:35:70-90
+123        <activity
+123-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:36:9-112
+124            android:name="io.github.xgl34222220.hetu.ProxyCnIpSettingsActivity"
+124-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:36:19-60
+125            android:exported="false"
+125-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:36:85-109
+126            android:label="CNIP 设置" />
+126-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:36:61-84
+127        <activity
+127-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:37:9-108
+128            android:name="io.github.xgl34222220.hetu.ProxyBypassRulesActivity"
+128-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:37:19-59
+129            android:exported="false"
+129-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:37:81-105
+130            android:label="绕过规则" />
+130-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:37:60-80
+131        <activity
+131-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:38:9-115
+132            android:name="io.github.xgl34222220.hetu.ProxyAdvancedSettingsActivity"
+132-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:38:19-64
+133            android:exported="false"
+133-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:38:88-112
+134            android:label="高级代理配置" />
+134-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:38:65-87
+135        <activity
+135-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:39:9-114
+136            android:name="io.github.xgl34222220.hetu.ProxyNetworkAutomationActivity"
+136-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:39:19-65
+137            android:exported="false"
+137-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:39:87-111
+138            android:label="网络匹配" />
+138-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:39:66-86
+139        <activity
+139-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:40:9-111
+140            android:name="io.github.xgl34222220.hetu.ProxyAppSelectionActivity"
+140-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:40:19-60
+141            android:exported="false"
+141-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:40:84-108
+142            android:label="代理应用名单" />
+142-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:40:61-83
+143        <activity
+143-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:41:9-111
+144            android:name="io.github.xgl34222220.hetu.ProxyAdblockChainActivity"
+144-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:41:19-60
+145            android:exported="false"
+145-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:41:84-108
+146            android:label="代理广告过滤" />
+146-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:41:61-83
+147        <activity
+147-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:42:9-107
+148            android:name="io.github.xgl34222220.hetu.RootTproxyActivity"
+148-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:42:19-53
+149            android:exported="false"
+149-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:42:80-104
+150            android:label="基础代理配置（旧）" />
+150-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:42:54-79
+151        <activity
+151-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:43:9-109
+152            android:name="io.github.xgl34222220.hetu.ProxyNetworkMatchActivity"
+152-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:43:19-60
+153            android:exported="false"
+153-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:43:82-106
+154            android:label="网络匹配" />
+154-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:43:61-81
+155
+156        <service
+156-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:44:9-46:19
+157            android:name="io.github.xgl34222220.hetu.ProxyNetworkMatchService"
+157-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:44:18-58
+158            android:exported="false"
+158-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:44:59-83
+159            android:foregroundServiceType="specialUse" >
+159-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:44:84-126
+160            <property
+160-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:45:13-173
+161                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+161-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:45:23-82
+162                android:value="Root proxy default-network continuity and optional environment matching" />
+162-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:45:83-170
+163        </service>
+164        <service
+164-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:47:9-51:19
+165            android:name="io.github.xgl34222220.hetu.DnsVpnService"
+165-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:47:18-47
+166            android:exported="true"
+166-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:47:105-128
+167            android:foregroundServiceType="specialUse"
+167-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:47:129-171
+168            android:permission="android.permission.BIND_VPN_SERVICE" >
+168-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:47:48-104
+169            <intent-filter>
+169-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:48:13-92
+170                <action android:name="android.net.VpnService" />
+170-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:48:28-76
+170-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:48:36-73
+171            </intent-filter>
+172
+173            <meta-data
+173-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:49:13-105
+174                android:name="android.net.VpnService.SUPPORTS_ALWAYS_ON"
+174-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:49:24-80
+175                android:value="false" />
+175-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:49:81-102
+176
+177            <property
+177-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:45:13-173
+178                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+178-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:45:23-82
+179                android:value="User activated local DNS filtering VPN with application exclusions" />
+179-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:45:83-170
+180        </service>
+181
+182        <receiver
+182-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:52:9-54:20
+183            android:name="io.github.xgl34222220.hetu.BootReceiver"
+183-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:52:19-47
+184            android:exported="true" >
+184-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:52:48-71
+185            <intent-filter>
+185-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:53:13-173
+186                <action android:name="android.intent.action.BOOT_COMPLETED" />
+186-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:53:28-90
+186-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:53:36-87
+187                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+187-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:53:90-157
+187-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:53:98-154
+188            </intent-filter>
+189        </receiver>
+190
+191        <service
+191-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:55:9-59:19
+192            android:name="io.github.xgl34222220.hetu.MihomoVpnService"
+192-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:55:18-50
+193            android:exported="true"
+193-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:55:108-131
+194            android:foregroundServiceType="specialUse"
+194-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:55:132-174
+195            android:permission="android.permission.BIND_VPN_SERVICE" >
+195-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:55:51-107
+196            <intent-filter>
+196-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:48:13-92
+197                <action android:name="android.net.VpnService" />
+197-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:48:28-76
+197-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:48:36-73
+198            </intent-filter>
+199
+200            <meta-data
+200-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:49:13-105
+201                android:name="android.net.VpnService.SUPPORTS_ALWAYS_ON"
+201-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:49:24-80
+202                android:value="false" />
+202-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:49:81-102
+203
+204            <property
+204-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:45:13-173
+205                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+205-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:45:23-82
+206                android:value="User initiated local Mihomo proxy and domain filtering VPN" />
+206-->/home/runner/work/pichen/pichen/android-app/app/src/main/AndroidManifest.xml:45:83-170
+207        </service>
+208
+209        <activity
+209-->[androidx.compose.ui:ui-tooling-android:1.11.2] /home/runner/.gradle/caches/9.5.0/transforms/d2b4afeabb609d3d7df6f0e51f8962c2/transformed/ui-tooling/AndroidManifest.xml:23:9-25:39
+210            android:name="androidx.compose.ui.tooling.PreviewActivity"
+210-->[androidx.compose.ui:ui-tooling-android:1.11.2] /home/runner/.gradle/caches/9.5.0/transforms/d2b4afeabb609d3d7df6f0e51f8962c2/transformed/ui-tooling/AndroidManifest.xml:24:13-71
+211            android:exported="true" />
+211-->[androidx.compose.ui:ui-tooling-android:1.11.2] /home/runner/.gradle/caches/9.5.0/transforms/d2b4afeabb609d3d7df6f0e51f8962c2/transformed/ui-tooling/AndroidManifest.xml:25:13-36
+212
+213        <provider
+213-->[androidx.emoji2:emoji2:1.4.0] /home/runner/.gradle/caches/9.5.0/transforms/7e55e88a45bb0c4a269b2c74dcffd4ce/transformed/emoji2-1.4.0/AndroidManifest.xml:24:9-32:20
+214            android:name="androidx.startup.InitializationProvider"
+214-->[androidx.emoji2:emoji2:1.4.0] /home/runner/.gradle/caches/9.5.0/transforms/7e55e88a45bb0c4a269b2c74dcffd4ce/transformed/emoji2-1.4.0/AndroidManifest.xml:25:13-67
+215            android:authorities="io.github.xgl34222220.hetu.preview.androidx-startup"
+215-->[androidx.emoji2:emoji2:1.4.0] /home/runner/.gradle/caches/9.5.0/transforms/7e55e88a45bb0c4a269b2c74dcffd4ce/transformed/emoji2-1.4.0/AndroidManifest.xml:26:13-68
+216            android:exported="false" >
+216-->[androidx.emoji2:emoji2:1.4.0] /home/runner/.gradle/caches/9.5.0/transforms/7e55e88a45bb0c4a269b2c74dcffd4ce/transformed/emoji2-1.4.0/AndroidManifest.xml:27:13-37
+217            <meta-data
+217-->[androidx.emoji2:emoji2:1.4.0] /home/runner/.gradle/caches/9.5.0/transforms/7e55e88a45bb0c4a269b2c74dcffd4ce/transformed/emoji2-1.4.0/AndroidManifest.xml:29:13-31:52
+218                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+218-->[androidx.emoji2:emoji2:1.4.0] /home/runner/.gradle/caches/9.5.0/transforms/7e55e88a45bb0c4a269b2c74dcffd4ce/transformed/emoji2-1.4.0/AndroidManifest.xml:30:17-75
+219                android:value="androidx.startup" />
+219-->[androidx.emoji2:emoji2:1.4.0] /home/runner/.gradle/caches/9.5.0/transforms/7e55e88a45bb0c4a269b2c74dcffd4ce/transformed/emoji2-1.4.0/AndroidManifest.xml:31:17-49
+220            <meta-data
+220-->[androidx.lifecycle:lifecycle-process:2.10.0] /home/runner/.gradle/caches/9.5.0/transforms/955e888e6754cefb5bc9b76f0df76145/transformed/lifecycle-process-2.10.0/AndroidManifest.xml:29:13-31:52
+221                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+221-->[androidx.lifecycle:lifecycle-process:2.10.0] /home/runner/.gradle/caches/9.5.0/transforms/955e888e6754cefb5bc9b76f0df76145/transformed/lifecycle-process-2.10.0/AndroidManifest.xml:30:17-78
+222                android:value="androidx.startup" />
+222-->[androidx.lifecycle:lifecycle-process:2.10.0] /home/runner/.gradle/caches/9.5.0/transforms/955e888e6754cefb5bc9b76f0df76145/transformed/lifecycle-process-2.10.0/AndroidManifest.xml:31:17-49
+223            <meta-data
+223-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/runner/.gradle/caches/9.5.0/transforms/27540cc7da8f5ed1d1822def07d1a557/transformed/profileinstaller-1.4.0/AndroidManifest.xml:29:13-31:52
+224                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
+224-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/runner/.gradle/caches/9.5.0/transforms/27540cc7da8f5ed1d1822def07d1a557/transformed/profileinstaller-1.4.0/AndroidManifest.xml:30:17-85
+225                android:value="androidx.startup" />
+225-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/runner/.gradle/caches/9.5.0/transforms/27540cc7da8f5ed1d1822def07d1a557/transformed/profileinstaller-1.4.0/AndroidManifest.xml:31:17-49
+226        </provider>
+227
+228        <uses-library
+228-->[androidx.window:window:1.5.0] /home/runner/.gradle/caches/9.5.0/transforms/a331068784eeed87e5a6d4997dfce877/transformed/window-1.5.0/AndroidManifest.xml:23:9-25:40
+229            android:name="androidx.window.extensions"
+229-->[androidx.window:window:1.5.0] /home/runner/.gradle/caches/9.5.0/transforms/a331068784eeed87e5a6d4997dfce877/transformed/window-1.5.0/AndroidManifest.xml:24:13-54
+230            android:required="false" />
+230-->[androidx.window:window:1.5.0] /home/runner/.gradle/caches/9.5.0/transforms/a331068784eeed87e5a6d4997dfce877/transformed/window-1.5.0/AndroidManifest.xml:25:13-37
+231        <uses-library
+231-->[androidx.window:window:1.5.0] /home/runner/.gradle/caches/9.5.0/transforms/a331068784eeed87e5a6d4997dfce877/transformed/window-1.5.0/AndroidManifest.xml:26:9-28:40
+232            android:name="androidx.window.sidecar"
+232-->[androidx.window:window:1.5.0] /home/runner/.gradle/caches/9.5.0/transforms/a331068784eeed87e5a6d4997dfce877/transformed/window-1.5.0/AndroidManifest.xml:27:13-51
+233            android:required="false" />
+233-->[androidx.window:window:1.5.0] /home/runner/.gradle/caches/9.5.0/transforms/a331068784eeed87e5a6d4997dfce877/transformed/window-1.5.0/AndroidManifest.xml:28:13-37
+234
+235        <receiver
+235-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/runner/.gradle/caches/9.5.0/transforms/27540cc7da8f5ed1d1822def07d1a557/transformed/profileinstaller-1.4.0/AndroidManifest.xml:34:9-52:20
+236            android:name="androidx.profileinstaller.ProfileInstallReceiver"
+236-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/runner/.gradle/caches/9.5.0/transforms/27540cc7da8f5ed1d1822def07d1a557/transformed/profileinstaller-1.4.0/AndroidManifest.xml:35:13-76
+237            android:directBootAware="false"
+237-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/runner/.gradle/caches/9.5.0/transforms/27540cc7da8f5ed1d1822def07d1a557/transformed/profileinstaller-1.4.0/AndroidManifest.xml:36:13-44
+238            android:enabled="true"
+238-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/runner/.gradle/caches/9.5.0/transforms/27540cc7da8f5ed1d1822def07d1a557/transformed/profileinstaller-1.4.0/AndroidManifest.xml:37:13-35
+239            android:exported="true"
+239-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/runner/.gradle/caches/9.5.0/transforms/27540cc7da8f5ed1d1822def07d1a557/transformed/profileinstaller-1.4.0/AndroidManifest.xml:38:13-36
+240            android:permission="android.permission.DUMP" >
+240-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/runner/.gradle/caches/9.5.0/transforms/27540cc7da8f5ed1d1822def07d1a557/transformed/profileinstaller-1.4.0/AndroidManifest.xml:39:13-57
+241            <intent-filter>
+241-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/runner/.gradle/caches/9.5.0/transforms/27540cc7da8f5ed1d1822def07d1a557/transformed/profileinstaller-1.4.0/AndroidManifest.xml:40:13-42:29
+242                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
+242-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/runner/.gradle/caches/9.5.0/transforms/27540cc7da8f5ed1d1822def07d1a557/transformed/profileinstaller-1.4.0/AndroidManifest.xml:41:17-91
+242-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/runner/.gradle/caches/9.5.0/transforms/27540cc7da8f5ed1d1822def07d1a557/transformed/profileinstaller-1.4.0/AndroidManifest.xml:41:25-88
+243            </intent-filter>
+244            <intent-filter>
+244-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/runner/.gradle/caches/9.5.0/transforms/27540cc7da8f5ed1d1822def07d1a557/transformed/profileinstaller-1.4.0/AndroidManifest.xml:43:13-45:29
+245                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
+245-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/runner/.gradle/caches/9.5.0/transforms/27540cc7da8f5ed1d1822def07d1a557/transformed/profileinstaller-1.4.0/AndroidManifest.xml:44:17-85
+245-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/runner/.gradle/caches/9.5.0/transforms/27540cc7da8f5ed1d1822def07d1a557/transformed/profileinstaller-1.4.0/AndroidManifest.xml:44:25-82
+246            </intent-filter>
+247            <intent-filter>
+247-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/runner/.gradle/caches/9.5.0/transforms/27540cc7da8f5ed1d1822def07d1a557/transformed/profileinstaller-1.4.0/AndroidManifest.xml:46:13-48:29
+248                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
+248-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/runner/.gradle/caches/9.5.0/transforms/27540cc7da8f5ed1d1822def07d1a557/transformed/profileinstaller-1.4.0/AndroidManifest.xml:47:17-88
+248-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/runner/.gradle/caches/9.5.0/transforms/27540cc7da8f5ed1d1822def07d1a557/transformed/profileinstaller-1.4.0/AndroidManifest.xml:47:25-85
+249            </intent-filter>
+250            <intent-filter>
+250-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/runner/.gradle/caches/9.5.0/transforms/27540cc7da8f5ed1d1822def07d1a557/transformed/profileinstaller-1.4.0/AndroidManifest.xml:49:13-51:29
+251                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
+251-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/runner/.gradle/caches/9.5.0/transforms/27540cc7da8f5ed1d1822def07d1a557/transformed/profileinstaller-1.4.0/AndroidManifest.xml:50:17-95
+251-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/runner/.gradle/caches/9.5.0/transforms/27540cc7da8f5ed1d1822def07d1a557/transformed/profileinstaller-1.4.0/AndroidManifest.xml:50:25-92
+252            </intent-filter>
+253        </receiver>
+254    </application>
+255
+256</manifest>

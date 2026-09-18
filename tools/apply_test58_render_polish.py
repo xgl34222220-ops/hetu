@@ -22,7 +22,7 @@ build = replace_once(build, 'versionCode = 457', 'versionCode = 458', 'versionCo
 build = replace_once(build, 'versionName = "0.4.0-test.57"', 'versionName = "0.4.0-test.58"', 'versionName')
 write(build_path, build)
 
-ref_path = "android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt"
+ref_path = "android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt"
 ref = read(ref_path)
 if 'import androidx.compose.ui.zIndex' not in ref:
     ref = ref.replace('import androidx.compose.ui.unit.sp\n', 'import androidx.compose.ui.unit.sp\nimport androidx.compose.ui.zIndex\n', 1)
@@ -129,7 +129,7 @@ ref = ref.replace('modifier = Modifier.height(20.dp),', 'modifier = Modifier.fil
 
 old_rule = '''@Composable
 private fun RefRuleGroupCard(items: List<ProxyRuleUi>) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val shape = RoundedCornerShape(22.dp)
     Surface(
@@ -196,7 +196,7 @@ private fun RefRuleGroupCard(items: List<ProxyRuleUi>) {
 '''
 new_rule = '''@Composable
 private fun RefRuleGroupCard(items: List<ProxyRuleUi>) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val shape = RoundedCornerShape(22.dp)
     Surface(
@@ -291,7 +291,7 @@ private fun RefRuleGroupCard(items: List<ProxyRuleUi>) {
 ref = replace_once(ref, old_rule, new_rule, 'rule code pill')
 write(ref_path, ref)
 
-net_path = "android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyNetworkAutomationActivity.kt"
+net_path = "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt"
 net = read(net_path)
 old_net_editor = '''@Composable
 private fun NetworkSetEditor(state: NetworkEditor, onDismiss: () -> Unit, onSave: (String) -> Unit) {
@@ -301,7 +301,7 @@ private fun NetworkSetEditor(state: NetworkEditor, onDismiss: () -> Unit, onSave
         title = { Text(state.title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(state.hint, color = LocalBichenTokens.current.textSecondary, fontSize = 12.sp)
+                Text(state.hint, color = LocalHetuTokens.current.textSecondary, fontSize = 12.sp)
                 OutlinedTextField(value = text, onValueChange = { text = it }, modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp, max = 320.dp), minLines = 6)
             }
         },
@@ -314,7 +314,7 @@ new_net_editor = '''@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NetworkSetEditor(state: NetworkEditor, onDismiss: () -> Unit, onSave: (String) -> Unit) {
     var text by remember(state) { mutableStateOf(state.value) }
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = t.elevatedCardBackground,
@@ -364,7 +364,7 @@ net = net.replace(
 )
 write(net_path, net)
 
-adv_path = "android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAdvancedSettingsActivity.kt"
+adv_path = "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt"
 adv = read(adv_path)
 if 'import androidx.compose.foundation.BorderStroke' not in adv:
     adv = adv.replace('import androidx.compose.foundation.background\n', 'import androidx.compose.foundation.BorderStroke\nimport androidx.compose.foundation.background\n')
@@ -378,7 +378,7 @@ private fun SetEditorDialog(state: SetEditorState, onDismiss: () -> Unit, onSave
         title = { Text(state.title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(state.hint, color = LocalBichenTokens.current.textSecondary, fontSize = 12.sp)
+                Text(state.hint, color = LocalHetuTokens.current.textSecondary, fontSize = 12.sp)
                 OutlinedTextField(value = text, onValueChange = { text = it }, modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp, max = 320.dp), minLines = 6)
             }
         },
@@ -391,7 +391,7 @@ new_adv_editor = '''@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SetEditorDialog(state: SetEditorState, onDismiss: () -> Unit, onSave: (String) -> Unit) {
     var text by remember(state) { mutableStateOf(state.value) }
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = t.elevatedCardBackground,
@@ -434,7 +434,7 @@ adv = replace_once(adv, old_adv_editor, new_adv_editor, 'advanced set editor bot
 old_info = '''@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AdvancedInfoSheet(title: String, text: String, onDismiss: () -> Unit) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = t.elevatedCardBackground, tonalElevation = 0.dp, shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)) {
         Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(title, color = t.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
@@ -508,7 +508,7 @@ new_info = '''private fun advancedYamlPreview(text: String): androidx.compose.ui
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AdvancedInfoSheet(title: String, text: String, onDismiss: () -> Unit) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val codePreview = title == "启动配置"
     val highlighted = remember(text, codePreview) { if (codePreview) advancedYamlPreview(text) else null }
     ModalBottomSheet(
@@ -594,7 +594,7 @@ adv = adv.replace(
 )
 write(adv_path, adv)
 
-adb_path = "android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAdblockChainActivity.kt"
+adb_path = "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockChainActivity.kt"
 adb = read(adb_path)
 if 'import androidx.compose.animation.core.animateFloat' not in adb:
     adb = adb.replace('import androidx.compose.foundation.background\n', 'import androidx.compose.animation.core.animateFloat\nimport androidx.compose.foundation.background\n')
@@ -676,7 +676,7 @@ write(adb_path, adb)
 
 # WebUI: only intercept back when the embedded dashboard has history. Otherwise the
 # activity back event stays with Android so predictive cross-activity back can render.
-web_path = "android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyWebUiActivity.kt"
+web_path = "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyWebUiActivity.kt"
 web = read(web_path)
 web = web.replace('import androidx.activity.OnBackPressedCallback\n', '')
 if 'import androidx.activity.compose.BackHandler' not in web:

@@ -1,7 +1,7 @@
 from pathlib import Path
 import re
 
-PATH = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt')
+PATH = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt')
 text = PATH.read_text(encoding='utf-8')
 
 
@@ -54,7 +54,7 @@ replace_once(
 # Four dashboard cards: exact 100dp height and a consistent three-tier layout.
 network_fn = r'''@Composable
 private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: Int, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     var lanMode by rememberSaveable { mutableStateOf(true) }
     val source = remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
@@ -108,7 +108,7 @@ replace_regex(
 
 speed_fn = r'''@Composable
 private fun RefSpeedCard(up: Long, down: Long, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val valueColor = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A)
     Surface(modifier = modifier.height(100.dp), shape = RoundedCornerShape(20.dp), color = t.cardBackground, shadowElevation = 1.dp) {
         Column(
@@ -135,7 +135,7 @@ replace_regex(
 
 subscription_compact_fn = r'''@Composable
 private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, modifier: Modifier, onClick: () -> Unit) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val haptic = LocalHapticFeedback.current
     val tracked = items.filter { it.hasSubscriptionInfo && it.total > 0L }
     val used = tracked.sumOf { it.used }
@@ -184,7 +184,7 @@ replace_regex(
 
 resource_fn = r'''@Composable
 private fun RefResourceCard(memory: Long, cpuPercent: Float, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val valueColor = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A)
     Surface(modifier = modifier.height(100.dp), shape = RoundedCornerShape(20.dp), color = t.cardBackground, shadowElevation = 1.dp) {
         Column(
@@ -235,8 +235,8 @@ replace_regex(
 
 # Add a local haptic handle for the accordion interactions.
 replace_once(
-    '    val context = LocalContext.current\n    val t = LocalBichenTokens.current\n    var refreshing by remember { mutableStateOf(false) }',
-    '    val context = LocalContext.current\n    val t = LocalBichenTokens.current\n    val haptic = LocalHapticFeedback.current\n    var refreshing by remember { mutableStateOf(false) }',
+    '    val context = LocalContext.current\n    val t = LocalHetuTokens.current\n    var refreshing by remember { mutableStateOf(false) }',
+    '    val context = LocalContext.current\n    val t = LocalHetuTokens.current\n    val haptic = LocalHapticFeedback.current\n    var refreshing by remember { mutableStateOf(false) }',
     'add panel haptics',
 )
 
@@ -330,7 +330,7 @@ private fun RefPanelTabs(
     liquidGlass: Boolean = false,
     onSelect: (RefPanelTab) -> Unit,
 ) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
     val tabs = RefPanelTab.entries
@@ -403,7 +403,7 @@ replace_regex(
 # Group card now advertises inline expand/collapse instead of looking like a navigation tile.
 group_card_fn = r'''@Composable
 private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolean, delay: Long?, modifier: Modifier, onClick: () -> Unit) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
     val source = remember(group.name) { MutableInteractionSource() }
@@ -485,7 +485,7 @@ private fun RefInlineGroupExpansion(
     onDelay: (String) -> Unit,
     onTestAll: () -> Unit,
 ) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val shape = RoundedCornerShape(20.dp)
     Surface(
@@ -534,7 +534,7 @@ private fun RefInlineNodeCard(
     onSelect: () -> Unit,
     onDelay: () -> Unit,
 ) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val shape = RoundedCornerShape(14.dp)
     val source = remember(node.name) { MutableInteractionSource() }
@@ -585,7 +585,7 @@ replace_once(
 # Subscription cards get a slim animated used-traffic progress rail.
 provider_fn = r'''@Composable
 private fun RefProviderRow(item: DashboardProviderUi, onRefresh: () -> Unit, onClick: () -> Unit) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val source = remember(item.name) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()

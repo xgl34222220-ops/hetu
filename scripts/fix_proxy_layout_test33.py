@@ -1,6 +1,6 @@
 from pathlib import Path
 
-path = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt')
+path = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt')
 s = path.read_text()
 
 
@@ -15,12 +15,12 @@ def one(old: str, new: str, label: str) -> None:
 # surface contrast instead of wireframe-style gray outlines.
 one(
 '''    val shellBackground = if (MaterialTheme.colorScheme.background.luminance() < .5f) {
-        LocalBichenTokens.current.pageBackground
+        LocalHetuTokens.current.pageBackground
     } else {
         Color(0xFFF4F6F9)
     }''',
 '''    val shellBackground = if (MaterialTheme.colorScheme.background.luminance() < .5f) {
-        LocalBichenTokens.current.pageBackground
+        LocalHetuTokens.current.pageBackground
     } else {
         Color(0xFFF1F5F9)
     }''',
@@ -172,4 +172,4 @@ if '.height(96.dp)' in s:
     raise SystemExit('fixed 96dp home metric card remains')
 
 path.write_text(s)
-print('Applied test33 proxy layout polish without touching BichenGlassDock.kt')
+print('Applied test33 proxy layout polish without touching HetuGlassDock.kt')

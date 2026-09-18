@@ -1,6 +1,6 @@
 from pathlib import Path
 
-p = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt')
+p = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt')
 s = p.read_text(encoding='utf-8')
 
 old_source = ".then(if (!liquid) Modifier.hazeSource(haze) else Modifier)\n                .then(if (liquid) Modifier.layerBackdrop(liquidBackdrop) else Modifier)"

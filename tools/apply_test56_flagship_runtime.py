@@ -23,7 +23,7 @@ s=rep(s,'versionName = "0.4.0-test.55"','versionName = "0.4.0-test.56"','version
 write(p,s)
 
 # 2) Make TUN real and eBPF an explicitly validated experimental mode.
-p='android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyRuntimeProfile.java'; s=read(p)
+p='android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeProfile.java'; s=read(p)
 s=rep(s,
 '''            case TUN:return new Capability(false,true,true,true,false,false,false,true,true,"Root TUN 正在并入统一运行时；旧 VpnService 仍保留，但这里不再假报为 Root 模式可用");
             case EBPF:return new Capability(false,false,false,false,false,false,false,false,false,"eBPF 必须完成 verifier/attach/map 能力探测并使用兼容核心；后端接通前不开放");''',
@@ -32,7 +32,7 @@ s=rep(s,
 write(p,s)
 
 # 3) Generate actual TUN / eBPF runtime config.
-p='android-app/app/src/main/java/io/github/xgl34222220/bichen/MihomoStartupConfig.java'; s=read(p)
+p='android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java'; s=read(p)
 s=rep(s,
 '''    static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret,int controllerPort)throws IOException{
         if(source==null||source.trim().isEmpty())throw new IOException("源配置为空");''',
@@ -69,7 +69,7 @@ helper='''    private static void appendTun(StringBuilder out,ProxyRuntimeProfil
             Set<String> packages,boolean autoRoute,boolean packageFilter){
         out.append("tun:\\n");
         out.append("  enable: true\\n");
-        out.append("  device: bichen0\\n");
+        out.append("  device: hetu0\\n");
         out.append("  stack: mixed\\n");
         out.append("  auto-route: ").append(autoRoute?"true":"false").append('\\n');
         out.append("  auto-redirect: false\\n");
@@ -96,7 +96,7 @@ s=rep(s,anchor,helper,'tun helper')
 write(p,s)
 
 # 4) Root manager: allow modes, pass package filtering to TUN, detect eBPF interface.
-p='android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java'; s=read(p)
+p='android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java'; s=read(p)
 s=rep(s,
 '''        if(profile.mode!=ProxyRuntimeProfile.Mode.TPROXY&&profile.mode!=ProxyRuntimeProfile.Mode.REDIRECT&&profile.mode!=ProxyRuntimeProfile.Mode.ENHANCE)
             throw new IOException(profile.mode.label+" 的统一 Root 后端还未接入");''',
@@ -137,7 +137,7 @@ p='android-app/app/src/main/assets/proxy-root-v3.sh'; s=read(p)
 s=rep(s,'mode(){ case "${1:-}" in tproxy|redirect|enhance) return 0;; *) return 1;; esac; }',
           'mode(){ case "${1:-}" in tproxy|redirect|enhance|tun|ebpf) return 0;; *) return 1;; esac; }','root modes')
 s=rep(s,'cleanup(){ MARK=""; MASK=""; TABLE=""; PREF=""; loadnet >/dev/null 2>&1 || true; cleanup4; cleanup6; cleanlegacy; rm -f "$NET_STATE"; MARK=""; MASK=""; TABLE=""; PREF=""; }',
-          'cleanup(){ MARK=""; MASK=""; TABLE=""; PREF=""; loadnet >/dev/null 2>&1 || true; cleanup4; cleanup6; cleanlegacy; ip link del bichen0 >/dev/null 2>&1 || true; rm -f "$NET_STATE"; MARK=""; MASK=""; TABLE=""; PREF=""; }','tun cleanup')
+          'cleanup(){ MARK=""; MASK=""; TABLE=""; PREF=""; loadnet >/dev/null 2>&1 || true; cleanup4; cleanup6; cleanlegacy; ip link del hetu0 >/dev/null 2>&1 || true; rm -f "$NET_STATE"; MARK=""; MASK=""; TABLE=""; PREF=""; }','tun cleanup')
 s=rep(s,
 '''  probecidrs "$CIDRS" || fail "CIDR 绕过列表包含当前系统不支持的地址"
 
@@ -157,7 +157,7 @@ s=rep(s,
 '''  if [ "$M" != tun ] && [ "$M" != ebpf ] && [ "$NEED_TP" = 0 ] && [ "$NEED_RP" = 0 ] && [ "$DNS" = off ]; then fail "TCP、UDP 与 DNS 接管均已关闭，代理没有可接管流量"; fi''','tun no-traffic exemption')
 s=rep(s,
 '''  case "$M" in tproxy) [ "$TCP" = 0 ] || tcp_listen "$TP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; redirect) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1;; enhance) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; esac''',
-'''  case "$M" in tproxy) [ "$TCP" = 0 ] || tcp_listen "$TP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; redirect) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1;; enhance) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; tun|ebpf) ip link show bichen0 >/dev/null 2>&1 || return 1;; esac''','tun ready')
+'''  case "$M" in tproxy) [ "$TCP" = 0 ] || tcp_listen "$TP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; redirect) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1;; enhance) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; tun|ebpf) ip link show hetu0 >/dev/null 2>&1 || return 1;; esac''','tun ready')
 s=rep(s,'[ "$START_DNS" = tproxy ] && NEED_TP=1',
           'if [ "$START_DNS" = tproxy ] && [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ]; then NEED_TP=1; fi','tun allocnet')
 s=rep(s,
@@ -184,7 +184,7 @@ s=rep(s,
 write(p,s)
 
 # 6) Adblock page: initial local rules must render independently of Root status; add protection profiles.
-p='android-app/app/src/main/java/io/github/xgl34222220/bichen/ui/BichenComposeController.kt'; s=read(p)
+p='android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuComposeController.kt'; s=read(p)
 s=rep(s,
 '''    suspend fun setRuleSource(id: String, enabled: Boolean) = withContext(Dispatchers.IO) {
         val rules = RuleStore(app)
@@ -206,7 +206,7 @@ s=rep(s,
 ''','adblock profile controller')
 write(p,s)
 
-p='android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAdblockChainActivity.kt'; s=read(p)
+p='android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockChainActivity.kt'; s=read(p)
 s=rep(s,
 '''    val snapshot by produceState(initialValue = ChainSnapshot(), revision) {
         value = try {
@@ -252,8 +252,8 @@ s=rep(s,
         )
     }
 ''','adblock independent initial load')
-s=rep(s,'Text(if (chainEnabled) "广告规则会插在代理分流规则之前" else "代理仅负责转发，不执行辟尘广告规则", color = t.textSecondary, fontSize = 11.sp)',
-          'Text(if (chainEnabled) "尊重用户显式规则；广告规则只在最终兜底前拦截" else "代理仅负责转发，不执行辟尘广告规则", color = t.textSecondary, fontSize = 11.sp)','adblock wording master')
+s=rep(s,'Text(if (chainEnabled) "广告规则会插在代理分流规则之前" else "代理仅负责转发，不执行河图广告规则", color = t.textSecondary, fontSize = 11.sp)',
+          'Text(if (chainEnabled) "尊重用户显式规则；广告规则只在最终兜底前拦截" else "代理仅负责转发，不执行河图广告规则", color = t.textSecondary, fontSize = 11.sp)','adblock wording master')
 s=rep(s,'Text("应用流量 → Root TPROXY / Redirect → 广告 RULE-SET → REJECT → CNIP / 用户规则 / 策略组 → 节点或 DIRECT", color = t.textSecondary, fontSize = 11.sp, lineHeight = 17.sp)',
           'Text("应用流量 → TUN / TPROXY / eBPF → 用户显式规则 → 广告 RULE-SET → 最终兜底 → 节点或 DIRECT", color = t.textSecondary, fontSize = 11.sp, lineHeight = 17.sp)','adblock flow wording')
 profile_item='''
@@ -295,7 +295,7 @@ s=rep(s,'        item("flow") {',profile_item+'        item("flow") {','adblock 
 write(p,s)
 
 # 7) Cold-start snapshot, panel no-remount, duplicate cleanup, UI micro polish.
-p='android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt'; s=read(p)
+p='android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt'; s=read(p)
 s=rep(s,'private enum class RefProxyPage { Home, Panel, Tools, Settings }',
 '''private enum class RefProxyPage { Home, Panel, Tools, Settings }
 private data class RefSubscriptionCache(val used: Long = 0L, val total: Long = 0L, val count: Int = 0)''','subscription cache class')
@@ -392,7 +392,7 @@ s=rep(s,'                RefSubscriptionCompact(providers, Modifier.weight(1f), 
 pattern=r'@Composable\nprivate fun RefNetworkIdentityCard\(runtime: ProxyRuntimeSnapshot, connections: Int, modifier: Modifier\) \{.*?\n\}\n\n@Composable\nprivate fun RefSpeedCard'
 new_func='''@Composable
 private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: Int, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val view = LocalView.current
     var showLan by rememberSaveable { mutableStateOf(true) }
     val source = remember { MutableInteractionSource() }
@@ -536,7 +536,7 @@ s=rep(s,
 write(p,s)
 
 # 8) Shimmer app skeleton + spring checkbox feedback.
-p='android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAppSelectionActivity.kt'; s=read(p)
+p='android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAppSelectionActivity.kt'; s=read(p)
 s=rep(s,'import androidx.compose.ui.graphics.Color\n', 'import androidx.compose.ui.graphics.Color\nimport androidx.compose.ui.graphics.Brush\nimport androidx.compose.ui.graphics.graphicsLayer\n','app shimmer imports')
 s=rep(s,'    val pageBg = if (dark) t.pageBackground else Color(0xFFF1F5F9)\n',
 '''    val pageBg = if (dark) t.pageBackground else Color(0xFFF1F5F9)
@@ -562,7 +562,7 @@ s=rep(s,
 write(p,s)
 
 # 9) YAML gutter divider.
-p='android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxySubscriptionActivity.kt'; s=read(p)
+p='android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt'; s=read(p)
 s=rep(s,
 '''                            }
                             BasicTextField(
@@ -574,7 +574,7 @@ s=rep(s,
 write(p,s)
 
 # 10) Remove heavyweight close button from generic diagnostic sheet as well.
-p='android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAdvancedSettingsActivity.kt'; s=read(p)
+p='android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt'; s=read(p)
 s=rep(s,
 '''            FilledTonalButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(15.dp)) { Text("关闭") }''',
 '''            Text("下滑即可关闭", color = Color(0xFF94A3B8), fontSize = 10.sp, fontWeight = FontWeight.Medium, modifier = Modifier.align(Alignment.CenterHorizontally))''','generic sheet close button')

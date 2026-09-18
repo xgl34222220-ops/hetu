@@ -2,10 +2,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / "android-app/app/build.gradle.kts"
-MGR = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java"
-STARTUP = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/bichen/MihomoStartupConfig.java"
-CLIENT = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/bichen/MihomoControllerClient.java"
-INSPECTOR = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyRuntimeInspector.kt"
+MGR = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java"
+STARTUP = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java"
+CLIENT = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java"
+INSPECTOR = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeInspector.kt"
 
 # version
 text = BUILD.read_text(encoding="utf-8")
@@ -17,8 +17,8 @@ BUILD.write_text(text, encoding="utf-8")
 
 # Startup config: allow a runtime-selected API port while keeping old overloads for tests/callers.
 text = STARTUP.read_text(encoding="utf-8")
-old = '''    static Result generate(String source,ProxyRuntimeProfile profile)throws IOException{\n        return generate(source,profile,"bichen-test-controller");\n    }\n\n    static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret)throws IOException{\n'''
-new = '''    static Result generate(String source,ProxyRuntimeProfile profile)throws IOException{\n        return generate(source,profile,"bichen-test-controller",CONTROLLER_PORT);\n    }\n\n    static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret)throws IOException{\n        return generate(source,profile,controllerSecret,CONTROLLER_PORT);\n    }\n\n    static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret,int controllerPort)throws IOException{\n'''
+old = '''    static Result generate(String source,ProxyRuntimeProfile profile)throws IOException{\n        return generate(source,profile,"hetu-test-controller");\n    }\n\n    static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret)throws IOException{\n'''
+new = '''    static Result generate(String source,ProxyRuntimeProfile profile)throws IOException{\n        return generate(source,profile,"hetu-test-controller",CONTROLLER_PORT);\n    }\n\n    static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret)throws IOException{\n        return generate(source,profile,controllerSecret,CONTROLLER_PORT);\n    }\n\n    static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret,int controllerPort)throws IOException{\n'''
 if old not in text:
     raise SystemExit('test45: startup generate overload block not found')
 text = text.replace(old, new, 1)
@@ -45,7 +45,7 @@ text = text.replace(old, new, 1)
 anchor = '''    String controllerSecret(){\n        String s=prefs.getString("proxyControllerSecret","");\n        if(s==null||s.isEmpty()){\n            s=UUID.randomUUID().toString().replace("-","")+Long.toHexString(System.nanoTime());\n            prefs.edit().putString("proxyControllerSecret",s).commit();\n        }\n        return s;\n    }\n\n'''
 if anchor not in text:
     raise SystemExit('test45: controllerSecret block not found')
-chooser = anchor + '''    private int chooseControllerPort()throws IOException{\n        int preferred=prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT);\n        LinkedHashSet<Integer> candidates=new LinkedHashSet<>();\n        if(preferred>=29090&&preferred<=29149)candidates.add(preferred);\n        for(int port=29090;port<=29149;port++)candidates.add(port);\n        for(int port:candidates){\n            try(ServerSocket socket=new ServerSocket()){\n                socket.setReuseAddress(false);\n                socket.bind(new InetSocketAddress(InetAddress.getByName("127.0.0.1"),port));\n                prefs.edit().putInt("proxyControllerPort",port).commit();\n                return port;\n            }catch(IOException occupied){ }\n        }\n        throw new IOException("辟尘控制接口动态端口 29090-29149 均被占用，请关闭冲突代理后重试");\n    }\n\n'''
+chooser = anchor + '''    private int chooseControllerPort()throws IOException{\n        int preferred=prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT);\n        LinkedHashSet<Integer> candidates=new LinkedHashSet<>();\n        if(preferred>=29090&&preferred<=29149)candidates.add(preferred);\n        for(int port=29090;port<=29149;port++)candidates.add(port);\n        for(int port:candidates){\n            try(ServerSocket socket=new ServerSocket()){\n                socket.setReuseAddress(false);\n                socket.bind(new InetSocketAddress(InetAddress.getByName("127.0.0.1"),port));\n                prefs.edit().putInt("proxyControllerPort",port).commit();\n                return port;\n            }catch(IOException occupied){ }\n        }\n        throw new IOException("河图控制接口动态端口 29090-29149 均被占用，请关闭冲突代理后重试");\n    }\n\n'''
 text = text.replace(anchor, chooser, 1)
 old_gen = '        MihomoStartupConfig.Result generated=MihomoStartupConfig.generate(source,profile,controllerSecret());\n        writeStartupCopy(generated.yaml);\n        return new Prepared(profile,selected,policy,adblock,generated.yaml,generated.tproxyPort,generated.redirectPort);\n'
 new_gen = '        int controllerPort=chooseControllerPort();\n        MihomoStartupConfig.Result generated=MihomoStartupConfig.generate(source,profile,controllerSecret(),controllerPort);\n        writeStartupCopy(generated.yaml);\n        return new Prepared(profile,selected,policy,adblock,generated.yaml,generated.tproxyPort,generated.redirectPort,controllerPort);\n'
@@ -68,10 +68,10 @@ MGR.write_text(text, encoding="utf-8")
 # Clash API client: every request reads the port chosen for the current runtime.
 text = CLIENT.read_text(encoding="utf-8")
 text = text.replace('    private static final int PORT=MihomoStartupConfig.CONTROLLER_PORT;\n', '', 1)
-secret = '''    private String secret()throws IOException{\n        String value=context.getSharedPreferences("bichen",0).getString("proxyControllerSecret","");\n        if(value==null||value.isEmpty())throw new IOException("策略控制接口尚未初始化");\n        return value;\n    }\n\n'''
+secret = '''    private String secret()throws IOException{\n        String value=context.getSharedPreferences("hetu",0).getString("proxyControllerSecret","");\n        if(value==null||value.isEmpty())throw new IOException("策略控制接口尚未初始化");\n        return value;\n    }\n\n'''
 if secret not in text:
     raise SystemExit('test45: client secret block not found')
-port_method = secret + '''    private int port(){\n        int value=context.getSharedPreferences("bichen",0).getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT);\n        return value>=1024&&value<=65535?value:MihomoStartupConfig.CONTROLLER_PORT;\n    }\n\n'''
+port_method = secret + '''    private int port(){\n        int value=context.getSharedPreferences("hetu",0).getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT);\n        return value>=1024&&value<=65535?value:MihomoStartupConfig.CONTROLLER_PORT;\n    }\n\n'''
 text = text.replace(secret, port_method, 1)
 old_req = '''        byte[] payload=body==null?new byte[0]:body.toString().getBytes(StandardCharsets.UTF_8);\n        Socket socket=new Socket();\n        try{\n            socket.connect(new InetSocketAddress(InetAddress.getByName("127.0.0.1"),PORT),2200);\n'''
 new_req = '''        byte[] payload=body==null?new byte[0]:body.toString().getBytes(StandardCharsets.UTF_8);\n        int port=port();\n        Socket socket=new Socket();\n        try{\n            socket.connect(new InetSocketAddress(InetAddress.getByName("127.0.0.1"),port),2200);\n'''
@@ -85,11 +85,11 @@ CLIENT.write_text(text, encoding="utf-8")
 
 # Runtime log: make future port/stage collisions visible immediately.
 text = INSPECTOR.read_text(encoding="utf-8")
-old = '''        val command = "echo '--- start-state ---'; cat /data/adb/bichen/proxy/run/start-state 2>/dev/null || true; echo '--- last-start-error ---'; cat /data/adb/bichen/proxy/run/last-start-error 2>/dev/null || true; echo '--- core.log ---'; tail -n 140 /data/adb/bichen/proxy/run/core.log 2>&1 || true; echo '--- watchdog.log ---'; tail -n 30 /data/adb/bichen/proxy/run/watchdog.log 2>/dev/null || true; echo '--- last-crash ---'; cat /data/adb/bichen/proxy/run/last-crash 2>/dev/null || true"\n'''
+old = '''        val command = "echo '--- start-state ---'; cat /data/adb/hetu/run/start-state 2>/dev/null || true; echo '--- last-start-error ---'; cat /data/adb/hetu/run/last-start-error 2>/dev/null || true; echo '--- core.log ---'; tail -n 140 /data/adb/hetu/run/core.log 2>&1 || true; echo '--- watchdog.log ---'; tail -n 30 /data/adb/hetu/run/watchdog.log 2>/dev/null || true; echo '--- last-crash ---'; cat /data/adb/hetu/run/last-crash 2>/dev/null || true"\n'''
 if old not in text:
     # test44 may have only old log string if workflow patch changed a different exact form
-    old = '''        val command = "echo '--- core.log ---'; tail -n 140 /data/adb/bichen/proxy/run/core.log 2>&1 || true; echo '--- watchdog.log ---'; tail -n 30 /data/adb/bichen/proxy/run/watchdog.log 2>/dev/null || true; echo '--- last-crash ---'; cat /data/adb/bichen/proxy/run/last-crash 2>/dev/null || true"\n'''
-new = '''        val port = prefs.getInt("proxyControllerPort", MihomoStartupConfig.CONTROLLER_PORT)\n        val command = "echo '--- controller-port ---'; echo ${'$'}port; (ss -lntp 2>/dev/null || netstat -lntp 2>/dev/null || true) | grep -E ':${'$'}port([[:space:]]|${'$'})' || true; echo '--- start-state ---'; cat /data/adb/bichen/proxy/run/start-state 2>/dev/null || true; echo '--- last-start-error ---'; cat /data/adb/bichen/proxy/run/last-start-error 2>/dev/null || true; echo '--- core.log ---'; tail -n 140 /data/adb/bichen/proxy/run/core.log 2>&1 || true; echo '--- watchdog.log ---'; tail -n 30 /data/adb/bichen/proxy/run/watchdog.log 2>/dev/null || true; echo '--- last-crash ---'; cat /data/adb/bichen/proxy/run/last-crash 2>/dev/null || true"\n'''
+    old = '''        val command = "echo '--- core.log ---'; tail -n 140 /data/adb/hetu/run/core.log 2>&1 || true; echo '--- watchdog.log ---'; tail -n 30 /data/adb/hetu/run/watchdog.log 2>/dev/null || true; echo '--- last-crash ---'; cat /data/adb/hetu/run/last-crash 2>/dev/null || true"\n'''
+new = '''        val port = prefs.getInt("proxyControllerPort", MihomoStartupConfig.CONTROLLER_PORT)\n        val command = "echo '--- controller-port ---'; echo ${'$'}port; (ss -lntp 2>/dev/null || netstat -lntp 2>/dev/null || true) | grep -E ':${'$'}port([[:space:]]|${'$'})' || true; echo '--- start-state ---'; cat /data/adb/hetu/run/start-state 2>/dev/null || true; echo '--- last-start-error ---'; cat /data/adb/hetu/run/last-start-error 2>/dev/null || true; echo '--- core.log ---'; tail -n 140 /data/adb/hetu/run/core.log 2>&1 || true; echo '--- watchdog.log ---'; tail -n 30 /data/adb/hetu/run/watchdog.log 2>/dev/null || true; echo '--- last-crash ---'; cat /data/adb/hetu/run/last-crash 2>/dev/null || true"\n'''
 if old not in text:
     raise SystemExit('test45: runtime log command not found')
 text = text.replace(old, new, 1)

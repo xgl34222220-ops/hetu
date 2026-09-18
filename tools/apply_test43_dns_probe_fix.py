@@ -2,8 +2,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / "android-app/app/build.gradle.kts"
-STARTUP = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/bichen/MihomoStartupConfig.java"
-MANAGER = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java"
+STARTUP = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java"
+MANAGER = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java"
 
 # Version
 build = BUILD.read_text(encoding="utf-8")
@@ -15,7 +15,7 @@ BUILD.write_text(build, encoding='utf-8')
 
 # DNSPod stopped publicly advertising raw-IP DoH endpoints such as 1.12.12.12.
 # Older user configs can therefore fail with connection refused even though the rest
-# of the YAML is valid. Keep the source file untouched and normalize only Bichen's
+# of the YAML is valid. Keep the source file untouched and normalize only Hetu's
 # private runtime copy to Alibaba's secondary encrypted IP endpoint, which avoids a
 # domain-bootstrap recursion in default-nameserver/proxy-server-nameserver.
 startup = STARTUP.read_text(encoding='utf-8')
@@ -25,7 +25,7 @@ if needle not in startup:
     raise SystemExit('test43: startup normalize hook not found')
 startup = startup.replace(needle, replacement, 1)
 
-insert_before = '''    /** Merge the local effective Bichen ad-block snapshot into the private startup copy. */\n'''
+insert_before = '''    /** Merge the local effective Hetu ad-block snapshot into the private startup copy. */\n'''
 helper = '''    /**\n     * Runtime-only compatibility for public DNS providers that retired raw-IP DoH access.\n     * The user's selected YAML remains byte-for-byte unchanged. Using 223.6.6.6 here keeps\n     * bootstrap encrypted without creating a resolver-domain bootstrap loop.\n     */\n    private static String normalizeDeprecatedEncryptedDns(String source){\n        return source\n                .replace("https://1.12.12.12/dns-query","https://223.6.6.6/dns-query")\n                .replace("https://120.53.53.53/dns-query","https://223.6.6.6/dns-query");\n    }\n\n'''
 if insert_before not in startup:
     raise SystemExit('test43: helper insertion point not found')

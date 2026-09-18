@@ -3,10 +3,10 @@ import re
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / "android-app/app/build.gradle.kts"
-UI = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt"
-AD = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAdblockChainActivity.kt"
-SUB = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxySubscriptionActivity.kt"
-ADV = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAdvancedSettingsActivity.kt"
+UI = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt"
+AD = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockChainActivity.kt"
+SUB = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt"
+ADV = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt"
 
 
 def require_replace(text: str, old: str, new: str, count: int = 1, label: str = "replacement") -> str:
@@ -235,7 +235,7 @@ ui = ui[:s] + traffic_block + ui[e:]
 # 5) Connections: gray micro-button by default, red only while pressed.
 new_connection = '''@Composable
 private fun RefConnectionRow(item: ProxyConnectionUi, onClose: (() -> Unit)?) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val closeSource = remember(item.id) { MutableInteractionSource() }
     val closePressed by closeSource.collectIsPressedAsState()
@@ -288,7 +288,7 @@ UI.write_text(ui)
 ad = AD.read_text()
 new_metric = '''@Composable
 private fun ChainMetric(label: String, value: String, modifier: Modifier = Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val accent = when (label) {
         "规则源" -> Color(0xFF059669)
@@ -406,4 +406,4 @@ new_first_group = '''        item { AdvancedSectionLabel("流量接管") }
 adv = require_replace(adv, old_first_group, new_first_group, label="advanced first-card note")
 ADV.write_text(adv)
 
-print("Applied Bichen 0.4.0-test.50 commercial polish")
+print("Applied Hetu 0.4.0-test.50 commercial polish")

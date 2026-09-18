@@ -1,4 +1,4 @@
-Bichen 0.3.0-beta.1 / versionCode 301
+Hetu 0.3.0-beta.1 / versionCode 301
 Build date: 2026-09-13 UTC
 
 PASS: Android API 35 native Java compilation; minSdk 26, targetSdk 35.

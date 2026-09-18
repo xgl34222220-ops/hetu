@@ -29,29 +29,29 @@ write(build_path, build)
 
 styles_path = "android-app/app/src/main/res/values/styles.xml"
 styles = read(styles_path)
-if "BichenSharedAxisWindowAnimation" not in styles:
+if "HetuSharedAxisWindowAnimation" not in styles:
     styles = replace_once(
         styles,
         '        <item name="android:windowBackground">#F1F5F9</item>',
         '        <item name="android:windowBackground">#F1F5F9</item>\n'
-        '        <item name="android:windowAnimationStyle">@style/BichenSharedAxisWindowAnimation</item>',
+        '        <item name="android:windowAnimationStyle">@style/HetuSharedAxisWindowAnimation</item>',
         'light route animation style',
     )
     styles = replace_once(
         styles,
         '        <item name="android:windowBackground">#121714</item>',
         '        <item name="android:windowBackground">#121714</item>\n'
-        '        <item name="android:windowAnimationStyle">@style/BichenSharedAxisWindowAnimation</item>',
+        '        <item name="android:windowAnimationStyle">@style/HetuSharedAxisWindowAnimation</item>',
         'dark route animation style',
     )
     styles = replace_once(
         styles,
         '</resources>',
-        '''    <style name="BichenSharedAxisWindowAnimation">
-        <item name="android:activityOpenEnterAnimation">@anim/bichen_route_open_enter</item>
-        <item name="android:activityOpenExitAnimation">@anim/bichen_route_open_exit</item>
-        <item name="android:activityCloseEnterAnimation">@anim/bichen_route_close_enter</item>
-        <item name="android:activityCloseExitAnimation">@anim/bichen_route_close_exit</item>
+        '''    <style name="HetuSharedAxisWindowAnimation">
+        <item name="android:activityOpenEnterAnimation">@anim/hetu_route_open_enter</item>
+        <item name="android:activityOpenExitAnimation">@anim/hetu_route_open_exit</item>
+        <item name="android:activityCloseEnterAnimation">@anim/hetu_route_close_enter</item>
+        <item name="android:activityCloseExitAnimation">@anim/hetu_route_close_exit</item>
     </style>
 </resources>''',
         'route animation style block',
@@ -59,7 +59,7 @@ if "BichenSharedAxisWindowAnimation" not in styles:
 write(styles_path, styles)
 
 anim_dir = "android-app/app/src/main/res/anim"
-write(f"{anim_dir}/bichen_route_open_enter.xml", '''<?xml version="1.0" encoding="utf-8"?>
+write(f"{anim_dir}/hetu_route_open_enter.xml", '''<?xml version="1.0" encoding="utf-8"?>
 <set xmlns:android="http://schemas.android.com/apk/res/android"
     android:duration="280"
     android:interpolator="@android:interpolator/fast_out_slow_in">
@@ -70,7 +70,7 @@ write(f"{anim_dir}/bichen_route_open_enter.xml", '''<?xml version="1.0" encoding
     <alpha android:fromAlpha="0.88" android:toAlpha="1.0" />
 </set>
 ''')
-write(f"{anim_dir}/bichen_route_open_exit.xml", '''<?xml version="1.0" encoding="utf-8"?>
+write(f"{anim_dir}/hetu_route_open_exit.xml", '''<?xml version="1.0" encoding="utf-8"?>
 <set xmlns:android="http://schemas.android.com/apk/res/android"
     android:duration="280"
     android:interpolator="@android:interpolator/fast_out_slow_in">
@@ -81,7 +81,7 @@ write(f"{anim_dir}/bichen_route_open_exit.xml", '''<?xml version="1.0" encoding=
     <alpha android:fromAlpha="1.0" android:toAlpha="0.85" />
 </set>
 ''')
-write(f"{anim_dir}/bichen_route_close_enter.xml", '''<?xml version="1.0" encoding="utf-8"?>
+write(f"{anim_dir}/hetu_route_close_enter.xml", '''<?xml version="1.0" encoding="utf-8"?>
 <set xmlns:android="http://schemas.android.com/apk/res/android"
     android:duration="270"
     android:interpolator="@android:interpolator/fast_out_slow_in">
@@ -92,7 +92,7 @@ write(f"{anim_dir}/bichen_route_close_enter.xml", '''<?xml version="1.0" encodin
     <alpha android:fromAlpha="0.85" android:toAlpha="1.0" />
 </set>
 ''')
-write(f"{anim_dir}/bichen_route_close_exit.xml", '''<?xml version="1.0" encoding="utf-8"?>
+write(f"{anim_dir}/hetu_route_close_exit.xml", '''<?xml version="1.0" encoding="utf-8"?>
 <set xmlns:android="http://schemas.android.com/apk/res/android"
     android:duration="250"
     android:interpolator="@android:interpolator/fast_out_slow_in">
@@ -104,7 +104,7 @@ write(f"{anim_dir}/bichen_route_close_exit.xml", '''<?xml version="1.0" encoding
 </set>
 ''')
 
-ref_path = "android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt"
+ref_path = "android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt"
 ref = read(ref_path)
 ref = ref.replace(
     'bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 148.dp',
@@ -118,7 +118,7 @@ start, end, _ = section(
 )
 new_network = r'''@Composable
 private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: Int, modifier: Modifier) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val view = LocalView.current
     val scope = rememberCoroutineScope()
     val density = androidx.compose.ui.platform.LocalDensity.current.density
@@ -338,7 +338,7 @@ log_sheet = log_sheet.replace(
 ref = ref[:log_start] + log_sheet + ref[log_end:]
 write(ref_path, ref)
 
-apps_path = "android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAppSelectionActivity.kt"
+apps_path = "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAppSelectionActivity.kt"
 apps = read(apps_path)
 if 'import androidx.compose.foundation.lazy.itemsIndexed' not in apps:
     apps = apps.replace('import androidx.compose.foundation.lazy.items\n', 'import androidx.compose.foundation.lazy.items\nimport androidx.compose.foundation.lazy.itemsIndexed\n')
@@ -403,7 +403,7 @@ apps = apps.replace(
 )
 write(apps_path, apps)
 
-web_path = "android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyWebUiActivity.kt"
+web_path = "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyWebUiActivity.kt"
 web = read(web_path)
 if 'import androidx.compose.animation.core.*' not in web:
     web = web.replace('import androidx.compose.foundation.shape.RoundedCornerShape\n', 'import androidx.compose.foundation.shape.RoundedCornerShape\nimport androidx.compose.animation.core.*\n')
@@ -471,7 +471,7 @@ sk = sk.replace('background(tokens.controlBackground.copy(alpha = .64f), Rounded
 web = web[:skeleton_start] + sk + web[skeleton_end:]
 write(web_path, web)
 
-yaml_path = "android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxySubscriptionActivity.kt"
+yaml_path = "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt"
 yaml = read(yaml_path)
 if 'import androidx.compose.ui.platform.LocalDensity' not in yaml:
     yaml = yaml.replace('import androidx.compose.ui.platform.LocalContext\n', 'import androidx.compose.ui.platform.LocalContext\nimport androidx.compose.ui.platform.LocalDensity\n')
@@ -525,7 +525,7 @@ private fun subscriptionSummary'''
 yaml = replace_once(yaml, needle, replacement, 'yaml dock animated visibility close')
 write(yaml_path, yaml)
 
-adb_path = "android-app/app/src/main/java/io/github/xgl34222220/bichen/ProxyAdblockChainActivity.kt"
+adb_path = "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockChainActivity.kt"
 adb = read(adb_path)
 if 'import androidx.compose.foundation.shape.CircleShape' not in adb:
     adb = adb.replace('import androidx.compose.foundation.shape.RoundedCornerShape\\n', 'import androidx.compose.foundation.shape.CircleShape\\nimport androidx.compose.foundation.shape.RoundedCornerShape\\n')

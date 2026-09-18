@@ -3,7 +3,7 @@ import re
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / "android-app/app/build.gradle.kts"
-MANAGER = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/bichen/RootProxyManager.java"
+MANAGER = ROOT / "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java"
 SCRIPT = ROOT / "android-app/app/src/main/assets/proxy-root-v3.sh"
 
 # ---------------------------------------------------------------------------
@@ -127,9 +127,9 @@ status = re.sub(r"\$M\b", "$STATUS_MODE", status)
 text = text[:start_at] + start + status + text[case_at:]
 
 # ---------------------------------------------------------------------------
-# 4) A previous crashed/reinstalled build can leave a Bichen core alive while PIDFILE
+# 4) A previous crashed/reinstalled build can leave a Hetu core alive while PIDFILE
 #    is missing, which is exactly consistent with UI='stopped' + executable='busy'.
-#    stopcore() must also kill only stale processes whose cmdline points at Bichen's
+#    stopcore() must also kill only stale processes whose cmdline points at Hetu's
 #    private core path. Never kill generic mihomo/clash processes from other apps.
 # ---------------------------------------------------------------------------
 old_stopcore = '''stopcore(){
@@ -140,7 +140,7 @@ old_stopcore = '''stopcore(){
 new_stopcore = '''stopcore(){
   if [ -f "$PIDFILE" ]; then P=$(cat "$PIDFILE" 2>/dev/null || true); case "$P" in ''|*[!0-9]*) ;; *)
     if pidcore "$P" && kill -0 "$P" >/dev/null 2>&1; then kill "$P" >/dev/null 2>&1 || true; N=0; while kill -0 "$P" >/dev/null 2>&1 && [ "$N" -lt 20 ]; do sleep 0.1; N=$((N+1)); done; if pidcore "$P" && kill -0 "$P" >/dev/null 2>&1; then kill -9 "$P" >/dev/null 2>&1 || true; fi; fi;; esac; fi
-  # Recover orphaned Bichen cores left by a killed/reinstalled app. Match the private
+  # Recover orphaned Hetu cores left by a killed/reinstalled app. Match the private
   # absolute path only; do not touch Mihomo/Clash processes owned by other apps.
   for PROC in /proc/[0-9]*; do
     OPID=${PROC#/proc/}; [ "$OPID" != "$$" ] || continue; [ -r "$PROC/cmdline" ] || continue

@@ -1,7 +1,7 @@
 from pathlib import Path
 import re
 
-PATH = Path('android-app/app/src/main/java/io/github/xgl34222220/bichen/ReferenceProxyActivity.kt')
+PATH = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt')
 text = PATH.read_text(encoding='utf-8')
 
 
@@ -98,8 +98,8 @@ once(
 )
 
 once(
-    '    val t = LocalBichenTokens.current\n    val haptic = LocalHapticFeedback.current\n    val tab = selectedTab',
-    '    val t = LocalBichenTokens.current\n    val haptic = LocalHapticFeedback.current\n    val view = LocalView.current\n    val tab = selectedTab',
+    '    val t = LocalHetuTokens.current\n    val haptic = LocalHapticFeedback.current\n    val tab = selectedTab',
+    '    val t = LocalHetuTokens.current\n    val haptic = LocalHapticFeedback.current\n    val view = LocalView.current\n    val tab = selectedTab',
     'panel native haptics',
 )
 
@@ -155,7 +155,7 @@ private fun RefInlineGroupExpansion(
     onDelay: (String) -> Unit,
     onTestAll: () -> Unit,
 ) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val shape = RoundedCornerShape(20.dp)
     Surface(
@@ -207,7 +207,7 @@ private fun RefInlineNodeCard(
     onSelect: () -> Unit,
     onDelay: () -> Unit,
 ) {
-    val t = LocalBichenTokens.current
+    val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val shape = RoundedCornerShape(14.dp)
     val source = remember(node.name) { MutableInteractionSource() }
@@ -334,8 +334,8 @@ sub(
 
 # Header actions receive a native tick in addition to their spring press animation.
 once(
-    '    val t = LocalBichenTokens.current\n    val scheme = MaterialTheme.colorScheme\n    val dark = scheme.background.luminance() < .5f\n    val source = remember(contentDescription) { MutableInteractionSource() }',
-    '    val t = LocalBichenTokens.current\n    val scheme = MaterialTheme.colorScheme\n    val dark = scheme.background.luminance() < .5f\n    val view = LocalView.current\n    val source = remember(contentDescription) { MutableInteractionSource() }',
+    '    val t = LocalHetuTokens.current\n    val scheme = MaterialTheme.colorScheme\n    val dark = scheme.background.luminance() < .5f\n    val source = remember(contentDescription) { MutableInteractionSource() }',
+    '    val t = LocalHetuTokens.current\n    val scheme = MaterialTheme.colorScheme\n    val dark = scheme.background.luminance() < .5f\n    val view = LocalView.current\n    val source = remember(contentDescription) { MutableInteractionSource() }',
     'header native haptic view',
 )
 once(
@@ -346,8 +346,8 @@ once(
 
 # Primary home action pills get a light native haptic while preserving existing spring behavior.
 once(
-    '    val t = LocalBichenTokens.current\n    val dark = MaterialTheme.colorScheme.background.luminance() < .5f\n    val source = remember(text) { MutableInteractionSource() }',
-    '    val t = LocalBichenTokens.current\n    val dark = MaterialTheme.colorScheme.background.luminance() < .5f\n    val view = LocalView.current\n    val source = remember(text) { MutableInteractionSource() }',
+    '    val t = LocalHetuTokens.current\n    val dark = MaterialTheme.colorScheme.background.luminance() < .5f\n    val source = remember(text) { MutableInteractionSource() }',
+    '    val t = LocalHetuTokens.current\n    val dark = MaterialTheme.colorScheme.background.luminance() < .5f\n    val view = LocalView.current\n    val source = remember(text) { MutableInteractionSource() }',
     'action haptic view',
 )
 once(
