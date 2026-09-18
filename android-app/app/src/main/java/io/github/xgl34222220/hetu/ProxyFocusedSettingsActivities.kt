@@ -177,7 +177,7 @@ private fun FocusedSettingsScaffold(title: String, subtitle: String, onBack: () 
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val bg = if (dark) t.pageBackground else Color(0xFFF1F5F9)
-    androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.fillMaxSize().background(bg), contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 28.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.fillMaxSize().background(bg), contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 92.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             Row(Modifier.fillMaxWidth().statusBarsPadding().padding(top = 8.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack, modifier = Modifier.size(42.dp)) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回", tint = t.textPrimary) }
