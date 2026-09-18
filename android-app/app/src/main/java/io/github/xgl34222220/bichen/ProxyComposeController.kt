@@ -215,6 +215,16 @@ internal class ProxyComposeController(context: Context) {
         prefs.edit().remove("proxyRootSessionOwner").apply()
         result
     }
+    suspend fun restart(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
+        val profile = ProxyRuntimeProfile.load(prefs)
+        onProgress("校验新运行环境，确认可用后再替换当前核心…")
+        val result = root.replaceRunningAfterUpgrade(profile)
+        prefs.edit()
+            .putString("proxyRootSessionOwner", "manual")
+            .remove("proxyRootRuntimeRefreshPending")
+            .apply()
+        result
+    }
     suspend fun select(group: String, node: String) = withContext(Dispatchers.IO) { api.select(group, node) }
     suspend fun delay(node: String): Long = withContext(Dispatchers.IO) { api.delay(node) }
     suspend fun closeAll() = withContext(Dispatchers.IO) { api.closeAll() }
