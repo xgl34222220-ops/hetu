@@ -12,8 +12,6 @@ final class MihomoStartupConfig {
     static final int CONTROLLER_PORT=29090;
     /** AOSP-reserved high fwmark bit used only by Mihomo outbound sockets. */
     static final int OUTBOUND_ROUTING_MARK=0x08000000;
-    static final String EXTERNAL_UI_DIR="ui";
-    static final String EXTERNAL_UI_URL="https://github.com/Zephyruso/zashboard/releases/latest/download/dist-no-fonts.zip";
     static final String CNIP_V4_URL="https://raw.githubusercontent.com/gaoyifan/china-operator-ip/ip-lists/china.txt";
     static final String CNIP_V6_URL="https://raw.githubusercontent.com/gaoyifan/china-operator-ip/ip-lists/china6.txt";
     static final String CNIP_V4_PATH="./ruleset/bichen-cn-v4.txt";
@@ -147,8 +145,6 @@ final class MihomoStartupConfig {
         override.append("find-process-mode: strict\n");
         override.append("external-controller: 127.0.0.1:").append(controllerPort).append('\n');
         override.append("secret: '").append(controllerSecret.replace("'","''")).append("'\n");
-        override.append("external-ui: /data/adb/bichen/proxy/run/").append(EXTERNAL_UI_DIR).append('\n');
-        override.append("external-ui-url: '").append(EXTERNAL_UI_URL).append("'\n");
         override.append("# --- end Bichen runtime isolation ---\n");
         return new Result(yaml+override,tp,rp);
     }
