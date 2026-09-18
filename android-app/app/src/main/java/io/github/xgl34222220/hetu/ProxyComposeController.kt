@@ -153,6 +153,14 @@ internal class ProxyComposeController(context: Context) {
         )
     }
 
+    suspend fun ensureRuntimeFiles(): String = withContext(Dispatchers.IO) {
+        var core = ProxyRuntimeProfile.load(prefs).core
+        if (core == ProxyRuntimeProfile.Core.MIHOMO_SMART && !ProxyCoreStore(app).installed(core)) {
+            core = ProxyRuntimeProfile.Core.MIHOMO
+        }
+        root.ensureRuntimeBase(core)
+    }
+
     suspend fun start(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
         var profile = ProxyRuntimeProfile.load(prefs)
         if (!profile.capability().available) {
