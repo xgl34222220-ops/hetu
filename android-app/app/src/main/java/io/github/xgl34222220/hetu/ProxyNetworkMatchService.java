@@ -151,6 +151,7 @@ public final class ProxyNetworkMatchService extends Service {
             if(!prefs.getBoolean("proxyRootWanted",false))return;
             if(coreAlive()){
                 prefs.edit().remove("proxyAutoRecoveryError").apply();
+                probeEgressIfPending();
                 return;
             }
             prefs.edit().putBoolean("proxyRootRuntimeRunning",false).apply();
@@ -178,6 +179,38 @@ public final class ProxyNetworkMatchService extends Service {
             String detail=error.getMessage()==null?error.getClass().getSimpleName():error.getMessage();
             if(detail.length()>300)detail=detail.substring(0,300)+"…";
             prefs.edit().putString("proxyAutoRecoveryError",detail).apply();
+        }
+    }
+
+    private void probeEgressIfPending(){
+        if(!prefs.getBoolean("proxyRootEgressPending",false))return;
+        long now=System.currentTimeMillis();
+        long last=prefs.getLong("proxyRootEgressProbeAttemptAt",0L);
+        if(now-last<30000L)return;
+        prefs.edit().putLong("proxyRootEgressProbeAttemptAt",now).apply();
+        int attempts=prefs.getInt("proxyRootEgressProbeAttempts",0)+1;
+        MihomoControllerClient controller=new MihomoControllerClient(getApplicationContext());
+        try{
+            try{
+                controller.delay("DIRECT","https://connectivitycheck.platform.hicloud.com/generate_204","200-399");
+            }catch(Exception first){
+                controller.delay("DIRECT","https://cp.cloudflare.com/generate_204","200-399");
+            }
+            prefs.edit()
+                    .putBoolean("proxyRootEgressPending",false)
+                    .putInt("proxyRootEgressProbeAttempts",attempts)
+                    .putLong("proxyRootEgressVerifiedAt",System.currentTimeMillis())
+                    .remove("proxyRootEgressWarning")
+                    .remove("proxyRootEgressProbeLastError")
+                    .apply();
+        }catch(Exception error){
+            String detail=error.getMessage()==null?error.getClass().getSimpleName():error.getMessage();
+            if(detail.length()>260)detail=detail.substring(0,260)+"…";
+            prefs.edit()
+                    .putInt("proxyRootEgressProbeAttempts",attempts)
+                    .putString("proxyRootEgressProbeLastError",detail)
+                    .putString("proxyRootEgressWarning","核心正在运行；后台联网验证暂未通过："+detail)
+                    .apply();
         }
     }
 
