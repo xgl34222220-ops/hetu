@@ -91,7 +91,7 @@ jobs:
           grep -q 'android:launchMode="singleTop"' android-app/app/src/main/AndroidManifest.xml
           grep -Fq 'val indicatorPosition = remember { Animatable(targetIndex.toFloat()) }' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
           grep -Fq 'blur(24.dp.toPx(), 24.dp.toPx())' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
-          grep -Fq 'Color(0xFFF8FBFF).copy(alpha = .46f)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
+          grep -Fq 'Color(0xFFF8FBFF).copy(alpha = .34f)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
           grep -q 'ModalBottomSheet(' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
           ! grep -q 'AlertDialog(' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
           grep -Fq '${it.updatedAt}-${it.upload}-${it.download}-${it.total}-${it.expire}' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
