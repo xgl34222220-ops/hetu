@@ -9,6 +9,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -40,6 +41,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -825,47 +827,75 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                         border = BorderStroke(.8.dp, if (dark) tokens.outline.copy(alpha = .44f) else Color(0xFFE2E8F0)),
                         tonalElevation = 0.dp,
                     ) {
-                        AndroidView(
-                            factory = { viewContext ->
-                                CodeEditor(viewContext).apply {
-                                    setText(yamlText)
-                                    typefaceText = Typeface.MONOSPACE
-                                    setTextSize(13f)
-                                    setLineNumberEnabled(true)
-                                    setWordwrap(false)
-                                    setTabWidth(2)
-                                    setBlockLineEnabled(true)
-                                    setBlockLineWidth(.5f)
-                                    setHighlightCurrentLine(true)
-                                    nonPrintablePaintingFlags =
-                                        CodeEditor.FLAG_DRAW_WHITESPACE_LEADING or
-                                            CodeEditor.FLAG_DRAW_LINE_SEPARATOR or
-                                            CodeEditor.FLAG_DRAW_WHITESPACE_IN_SELECTION
-                                    colorScheme = if (dark) SchemeDarcula() else SchemeGitHub()
-                                    subscribeAlways<ContentChangeEvent> {
+                        Box(Modifier.fillMaxSize()) {
+                            AndroidView(
+                                factory = { viewContext ->
+                                    CodeEditor(viewContext).apply {
+                                        setText(yamlText)
+                                        typefaceText = Typeface.MONOSPACE
+                                        setTextSize(13f)
+                                        setLineNumberEnabled(true)
+                                        setWordwrap(false)
+                                        setTabWidth(2)
+                                        setBlockLineEnabled(true)
+                                        setBlockLineWidth(.5f)
+                                        setHighlightCurrentLine(true)
+                                        nonPrintablePaintingFlags =
+                                            CodeEditor.FLAG_DRAW_WHITESPACE_LEADING or
+                                                CodeEditor.FLAG_DRAW_LINE_SEPARATOR or
+                                                CodeEditor.FLAG_DRAW_WHITESPACE_IN_SELECTION
+                                        colorScheme = if (dark) SchemeDarcula() else SchemeGitHub()
+                                        subscribeAlways<ContentChangeEvent> {
+                                            yamlLineCount = text.lineCount
+                                            yamlCanUndo = canUndo()
+                                            yamlCanRedo = canRedo()
+                                            if (yamlError.isNotBlank()) yamlError = ""
+                                        }
                                         yamlLineCount = text.lineCount
                                         yamlCanUndo = canUndo()
                                         yamlCanRedo = canRedo()
-                                        if (yamlError.isNotBlank()) yamlError = ""
+                                        yamlEditor = this
                                     }
-                                    yamlLineCount = text.lineCount
-                                    yamlCanUndo = canUndo()
-                                    yamlCanRedo = canRedo()
-                                    yamlEditor = this
+                                },
+                                modifier = Modifier.fillMaxSize(),
+                                update = { editor ->
+                                    yamlEditor = editor
+                                },
+                                onRelease = { editor ->
+                                    if (yamlEditor === editor) yamlEditor = null
+                                    editor.release()
+                                },
+                            )
+                            Canvas(Modifier.matchParentSize()) {
+                                val firstGuide = 58.dp.toPx()
+                                val indentStep = 16.dp.toPx()
+                                val stroke = .5.dp.toPx()
+                                val dash = PathEffect.dashPathEffect(floatArrayOf(2.dp.toPx(), 3.dp.toPx()))
+                                val guideColor = if (dark) Color.White.copy(alpha = .075f) else Color(0xFF64748B).copy(alpha = .12f)
+                                var x = firstGuide
+                                while (x < size.width) {
+                                    drawLine(
+                                        color = guideColor,
+                                        start = Offset(x, 0f),
+                                        end = Offset(x, size.height),
+                                        strokeWidth = stroke,
+                                        pathEffect = dash,
+                                    )
+                                    x += indentStep
                                 }
-                            },
-                            modifier = Modifier.fillMaxSize(),
-                            update = { editor ->
-                                yamlEditor = editor
-                            },
-                            onRelease = { editor ->
-                                if (yamlEditor === editor) yamlEditor = null
-                                editor.release()
-                            },
-                        )
+                            }
+                        }
                     }
 
-                    if (yamlError.isNotBlank()) {
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = yamlError.isNotBlank(),
+                        enter = androidx.compose.animation.slideInVertically(
+                            animationSpec = androidx.compose.animation.core.tween(180),
+                        ) { it / 2 } + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(140)),
+                        exit = androidx.compose.animation.slideOutVertically(
+                            animationSpec = androidx.compose.animation.core.tween(140),
+                        ) { it / 2 } + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(110)),
+                    ) {
                         Surface(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
                             shape = RoundedCornerShape(14.dp),
