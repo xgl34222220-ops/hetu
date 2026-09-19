@@ -284,23 +284,17 @@ scoped_reject_all(){
   if [ "$S" = whitelist ]; then OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for U in "$@"; do "$BIN" -t filter -A "$C" -m owner --uid-owner "$U" -j REJECT || return 1; done
   else "$BIN" -t filter -A "$C" -j REJECT || return 1; fi
 }
-scoped_drop_webrtc(){
+scoped_reject_unmarked_udp(){
   BIN="$1"; C="$2"; S="$3"; LIST="$4"
   if [ "$S" = whitelist ]; then
     OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS
-    for U in "$@"; do
-      "$BIN" -t filter -A "$C" -m owner --uid-owner "$U" -p udp --dport 3478 -j REJECT || return 1
-      "$BIN" -t filter -A "$C" -m owner --uid-owner "$U" -p udp --dport 5349 -j REJECT || return 1
-      "$BIN" -t filter -A "$C" -m owner --uid-owner "$U" -p udp --dport 19302:19309 -j REJECT || return 1
-    done
+    for U in "$@"; do "$BIN" -t filter -A "$C" -m owner --uid-owner "$U" -p udp -j REJECT || return 1; done
   else
-    "$BIN" -t filter -A "$C" -p udp --dport 3478 -j REJECT || return 1
-    "$BIN" -t filter -A "$C" -p udp --dport 5349 -j REJECT || return 1
-    "$BIN" -t filter -A "$C" -p udp --dport 19302:19309 -j REJECT || return 1
+    "$BIN" -t filter -A "$C" -p udp -j REJECT || return 1
   fi
 }
 
-bypass4(){
+bypass4(){bypass4(){
   C="$1"; T="$2"; CIDRS="$3"
   for NET in 0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8 169.254.0.0/16 172.16.0.0/12 192.168.0.0/16 224.0.0.0/4 240.0.0.0/4; do xt4 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1; done
   [ -z "$CIDRS" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $CIDRS; IFS=$OLDIFS; for NET in "$@"; do case "$NET" in *:*) ;; *) xt4 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1;; esac; done
@@ -435,8 +429,8 @@ install_dns_redirect6(){
   if [ "$SHARE" = 1 ]; then xt6 -t nat -N "$DNSPRE" || return 1; iface_in xt6 nat "$DNSPRE" "$IFACES" || return 1; for X in tcp udp; do xt6 -t nat -A "$DNSPRE" -p "$X" --dport 53 -j REDIRECT --to-ports "$P" || return 1; done; xt6 -t nat -I PREROUTING 1 -j "$DNSPRE" || return 1; fi
 }
 
-install_webrtc4(){
-  S="$1"; UIDS="$2"; SHARE="$3"; IFACES="$4"; DUIDS="$5"
+install_udp_leak_guard4(){
+  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"
   xt4 -t filter -N "$WROUT" || return 1
   xt4 -t filter -A "$WROUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1
   if [ -n "$MARK" ]; then xt4 -t filter -A "$WROUT" -m mark --mark "$MARK/$MASK" -j RETURN || return 1; fi
@@ -444,20 +438,20 @@ install_webrtc4(){
   direct_uid_returns xt4 filter "$WROUT" "$DUIDS" || return 1
   iface_out xt4 filter "$WROUT" "$IFACES" || return 1
   blacklist_returns xt4 filter "$WROUT" "$S" "$UIDS" || return 1
-  scoped_drop_webrtc xt4 "$WROUT" "$S" "$UIDS" || return 1
+  bypass4 "$WROUT" filter "$CIDRS" || return 1
+  scoped_reject_unmarked_udp xt4 "$WROUT" "$S" "$UIDS" || return 1
   xt4 -t filter -I OUTPUT 1 -j "$WROUT" || return 1
   if [ "$SHARE" = 1 ]; then
     xt4 -t filter -N "$WRFWD" || return 1
     if [ -n "$MARK" ]; then xt4 -t filter -A "$WRFWD" -m mark --mark "$MARK/$MASK" -j RETURN || return 1; fi
     iface_in xt4 filter "$WRFWD" "$IFACES" || return 1
-    xt4 -t filter -A "$WRFWD" -p udp --dport 3478 -j REJECT || return 1
-    xt4 -t filter -A "$WRFWD" -p udp --dport 5349 -j REJECT || return 1
-    xt4 -t filter -A "$WRFWD" -p udp --dport 19302:19309 -j REJECT || return 1
+    bypass4 "$WRFWD" filter "$CIDRS" || return 1
+    xt4 -t filter -A "$WRFWD" -p udp -j REJECT || return 1
     xt4 -t filter -I FORWARD 1 -j "$WRFWD" || return 1
   fi
 }
-install_webrtc6(){
-  S="$1"; UIDS="$2"; SHARE="$3"; IFACES="$4"; DUIDS="$5"; v6active || return 0
+install_udp_leak_guard6(){
+  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; v6active || return 0
   xt6 -t filter -N "$WROUT" || return 1
   xt6 -t filter -A "$WROUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1
   if [ -n "$MARK" ]; then xt6 -t filter -A "$WROUT" -m mark --mark "$MARK/$MASK" -j RETURN || return 1; fi
@@ -465,20 +459,20 @@ install_webrtc6(){
   direct_uid_returns xt6 filter "$WROUT" "$DUIDS" || return 1
   iface_out xt6 filter "$WROUT" "$IFACES" || return 1
   blacklist_returns xt6 filter "$WROUT" "$S" "$UIDS" || return 1
-  scoped_drop_webrtc xt6 "$WROUT" "$S" "$UIDS" || return 1
+  bypass6 "$WROUT" filter "$CIDRS" || return 1
+  scoped_reject_unmarked_udp xt6 "$WROUT" "$S" "$UIDS" || return 1
   xt6 -t filter -I OUTPUT 1 -j "$WROUT" || return 1
   if [ "$SHARE" = 1 ]; then
     xt6 -t filter -N "$WRFWD" || return 1
     if [ -n "$MARK" ]; then xt6 -t filter -A "$WRFWD" -m mark --mark "$MARK/$MASK" -j RETURN || return 1; fi
     iface_in xt6 filter "$WRFWD" "$IFACES" || return 1
-    xt6 -t filter -A "$WRFWD" -p udp --dport 3478 -j REJECT || return 1
-    xt6 -t filter -A "$WRFWD" -p udp --dport 5349 -j REJECT || return 1
-    xt6 -t filter -A "$WRFWD" -p udp --dport 19302:19309 -j REJECT || return 1
+    bypass6 "$WRFWD" filter "$CIDRS" || return 1
+    xt6 -t filter -A "$WRFWD" -p udp -j REJECT || return 1
     xt6 -t filter -I FORWARD 1 -j "$WRFWD" || return 1
   fi
 }
 
-install_quic4(){
+install_quic4(){install_quic4(){
   S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; xt4 -t filter -N "$QUICOUT" || return 1; xt4 -t filter -A "$QUICOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; system_uid_return xt4 filter "$QUICOUT" "$S" || return 1; direct_uid_returns xt4 filter "$QUICOUT" "$DUIDS" || return 1; iface_out xt4 filter "$QUICOUT" "$IFACES" || return 1; blacklist_returns xt4 filter "$QUICOUT" "$S" "$UIDS" || return 1; bypass4 "$QUICOUT" filter "$CIDRS" || return 1; scoped_drop_quic xt4 "$QUICOUT" "$S" "$UIDS" || return 1; xt4 -t filter -A OUTPUT -j "$QUICOUT" || return 1
   if [ "$SHARE" = 1 ]; then xt4 -t filter -N "$QUICFWD" || return 1; iface_in xt4 filter "$QUICFWD" "$IFACES" || return 1; bypass4 "$QUICFWD" filter "$CIDRS" || return 1; xt4 -t filter -A "$QUICFWD" -p udp --dport 443 -j DROP || return 1; xt4 -t filter -A FORWARD -j "$QUICFWD" || return 1; fi
 }
@@ -599,10 +593,14 @@ start(){
   install_redirect4 "$START_RP" "$START_MODE" "$START_TCP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 Redirect 规则安装失败，已回滚"; }
   start_stage "install-ipv4-dns"
   if [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ] && [ "$START_DNS" != off ]; then install_dns_redirect4 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 DNS 劫持安装失败，已回滚"; }; fi
-  start_stage "install-webrtc-guard"
-  if [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ]; then
-    install_webrtc4 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" "$START_DIRECT_UIDS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 WebRTC 防泄漏规则安装失败，已回滚"; }
-    if [ "$START_V6" = enable ]; then install_webrtc6 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" "$START_DIRECT_UIDS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 WebRTC 防泄漏规则安装失败，已回滚"; }; fi
+  start_stage "install-udp-leak-guard"
+  if [ "$START_UDP" = 1 ]; then
+    case "$START_MODE" in
+      tproxy|enhance)
+        install_udp_leak_guard4 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 UDP 防裸连规则安装失败，已回滚"; }
+        if [ "$START_V6" = enable ]; then install_udp_leak_guard6 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 UDP 防裸连规则安装失败，已回滚"; }; fi
+        ;;
+    esac
   fi
   start_stage "install-ipv4-quic"
   [ "$START_QUIC" = 0 ] || install_quic4 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 QUIC 策略安装失败，已回滚"; }

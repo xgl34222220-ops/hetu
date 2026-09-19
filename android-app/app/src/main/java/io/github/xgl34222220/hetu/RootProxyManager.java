@@ -247,8 +247,9 @@ final class RootProxyManager {
         String source=configs.read(selected);
         if(source==null||source.trim().isEmpty())throw new IOException("源配置为空");
         if(source.getBytes(StandardCharsets.UTF_8).length>4*1024*1024)throw new IOException("配置超过 4 MiB");
-        Set<String> directPatterns=MihomoStartupConfig.extractDirectProcessPackages(source);
-        RootProxyPolicy policy=RootProxyPolicy.load(context,prefs,profile,directPatterns);
+        // Source YAML rule order is authoritative. PROCESS-NAME ... DIRECT remains inside
+        // Mihomo and must not be promoted into a pre-Mihomo Root UID bypass.
+        RootProxyPolicy policy=RootProxyPolicy.load(context,prefs,profile);
         ProxyAdblockRules.Snapshot adblock=profile.adblockChain?ProxyAdblockRules.export(context):null;
         if(profile.adblockChain&&adblock.count<=0)throw new IOException("代理串联去广告已开启，但当前没有有效广告规则；请先启用或更新规则源");
         int controllerPort=chooseControllerPort();

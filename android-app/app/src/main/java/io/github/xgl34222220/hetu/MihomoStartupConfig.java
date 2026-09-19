@@ -93,14 +93,12 @@ final class MihomoStartupConfig {
         // as an ordinary transparent UDP flow. The source's 1053 listener is never reused.
         if(profile.dnsHijack!=ProxyRuntimeProfile.DnsHijack.OFF)
             yaml=ensureDnsListener(yaml,DNS_PORT);
-        if(profile.cnIpDirect)
-            yaml=ensureCnIpDirect(yaml);
-        // Build serial ad blocking after runtime providers are prepared; the rule injector keeps explicit DIRECT whitelists first, then adblock, then broad routing.
+        // Preserve every source rule in its original relative position. Hetu additions live
+        // immediately before the final MATCH so WebRTC/DNS/privacy guards in the source stay authoritative.
         if(profile.adblockChain)
             yaml=ensureAdblock(yaml);
-        // WebRTC leak protection is a runtime security invariant. Keep STUN UDP above
-        // user DIRECT/CN/MATCH rules so a source YAML cannot expose the physical WAN IP.
-        yaml=ensureWebRtcLeakGuard(yaml);
+        if(profile.cnIpDirect)
+            yaml=ensureCnIpDirect(yaml);
 
         int tp=0,rp=0;
         StringBuilder override=new StringBuilder();
@@ -225,36 +223,6 @@ final class MihomoStartupConfig {
      * user DIRECT rule. Blocking only the known UDP discovery ports preserves TCP/TURN
      * fallback while preventing public-IP ICE candidates from bypassing the proxy.
      */
-    private static String ensureWebRtcLeakGuard(String source)throws IOException{
-        String[] lines=normalize(source).split("\n",-1);
-        int index=-1;Matcher found=null;Pattern top=Pattern.compile("^rules\\s*:(.*)$");
-        for(int i=0;i<lines.length;i++){
-            if(indent(lines[i])!=0)continue;
-            Matcher m=top.matcher(lines[i]);
-            if(m.find()){index=i;found=m;break;}
-        }
-        String guard=
-                "  - AND,((NETWORK,UDP),(DST-PORT,3478)),REJECT\n"+
-                "  - AND,((NETWORK,UDP),(DST-PORT,5349)),REJECT\n"+
-                "  - AND,((NETWORK,UDP),(DST-PORT,19302-19309)),REJECT\n";
-        if(index<0){
-            String base=trimOne(source);
-            return base+(base.isEmpty()?"":"\n")+"rules:\n"+guard;
-        }
-        String rest=found.group(1).trim();
-        if(rest.startsWith("#"))rest="";
-        // Do not rewrite uncommon inline rule arrays here. The Root STUN guard still
-        // protects transparent modes, while ordinary multi-line rules get full dual-layer protection.
-        if(!rest.isEmpty()&&!rest.equals("[]"))return source;
-
-        StringBuilder out=new StringBuilder();
-        for(int i=0;i<lines.length;i++){
-            out.append(lines[i]).append('\n');
-            if(i==index)out.append(guard);
-        }
-        return trimOne(out.toString());
-    }
-
     /** Merge the local effective Hetu ad-block snapshot into the private startup copy. */
     private static String ensureAdblock(String source)throws IOException{
         String yaml=normalize(source);
@@ -319,6 +287,19 @@ final class MihomoStartupConfig {
     }
 
     private static String insertAdblockRuleRespectingUserPolicy(String source)throws IOException{
+        String rule="  - RULE-SET,"+ProxyAdblockRules.PROVIDER_NAME+",REJECT\n";
+        return insertRulesBeforeFinalMatch(
+                source,
+                rule,
+                "代理串联去广告需要普通 rules: 列表；当前源配置使用行内 rules 写法");
+    }
+
+    /**
+     * Insert a Hetu-owned runtime rule without changing the relative order of any source rule.
+     * Security/privacy rules deliberately placed at the top of the user's YAML therefore keep
+     * precedence; the injected rule only sits immediately before the final MATCH fallback.
+     */
+    private static String insertRulesBeforeFinalMatch(String source,String injected,String inlineError)throws IOException{
         String[] lines=normalize(source).split("\n",-1);
         int index=-1;Matcher found=null;Pattern top=Pattern.compile("^rules\\s*:(.*)$");
         for(int i=0;i<lines.length;i++){
@@ -326,16 +307,13 @@ final class MihomoStartupConfig {
             Matcher m=top.matcher(lines[i]);
             if(m.find()){index=i;found=m;break;}
         }
-        String allowRule="  - RULE-SET,"+ProxyAdblockRules.ALLOW_PROVIDER_NAME+",DIRECT\n";
-        String rule="  - RULE-SET,"+ProxyAdblockRules.PROVIDER_NAME+",REJECT\n";
         if(index<0){
             String base=trimOne(source);
-            return base+(base.isEmpty()?"":"\n")+"rules:\n"+allowRule+rule;
+            return base+(base.isEmpty()?"":"\n")+"rules:\n"+injected;
         }
         String rest=found.group(1).trim();
         if(rest.startsWith("#"))rest="";
-        if(!rest.isEmpty()&&!rest.equals("[]"))
-            throw new IOException("代理串联去广告需要普通 rules: 列表；当前源配置使用行内 rules 写法");
+        if(!rest.isEmpty()&&!rest.equals("[]"))throw new IOException(inlineError);
 
         int end=lines.length;
         for(int i=index+1;i<lines.length;i++){
@@ -343,28 +321,22 @@ final class MihomoStartupConfig {
             if(t.isEmpty()||t.startsWith("#"))continue;
             if(indent(lines[i])==0){end=i;break;}
         }
-
-        // Duplicate only explicit, narrow DIRECT whitelists ahead of the adblock rule.
-        // Broad regional/rule-set routing (GEOSITE CN, RULE-SET CN, MATCH...) stays
-        // behind adblock so ads cannot escape merely because a general route matched first.
-        LinkedHashSet<String> priority=new LinkedHashSet<>();
+        int insertion=end;
         for(int i=index+1;i<end;i++){
-            if(isSpecificDirectWhitelist(lines[i]))priority.add(lines[i]);
+            String t=lines[i].trim().toUpperCase(Locale.ROOT);
+            if(t.startsWith("- MATCH,")){insertion=i;break;}
         }
 
         StringBuilder out=new StringBuilder();
         for(int i=0;i<lines.length;i++){
+            if(i==insertion)out.append(injected);
             out.append(lines[i]).append('\n');
-            if(i==index){
-                for(String p:priority)out.append(p).append('\n');
-                out.append(allowRule);
-                out.append(rule);
-            }
         }
+        if(insertion==lines.length)out.append(injected);
         return trimOne(out.toString());
     }
 
-    /** Merge Hetu CN IP providers into the private startup copy without editing the subscription. */
+    /** Merge Hetu CN IP providers into the private startup copy without editing the subscription. */    /** Merge Hetu CN IP providers into the private startup copy without editing the subscription. */
     private static String ensureCnIpDirect(String source)throws IOException{
         String yaml=normalize(source);
         yaml=injectCnProviders(yaml);
@@ -424,32 +396,15 @@ final class MihomoStartupConfig {
     }
 
     private static String prependCnRules(String source)throws IOException{
-        String[] lines=normalize(source).split("\\n",-1);
-        int index=-1;
-        Matcher found=null;
-        Pattern top=Pattern.compile("^rules\\s*:(.*)$");
-        for(int i=0;i<lines.length;i++){
-            if(indent(lines[i])!=0)continue;
-            Matcher m=top.matcher(lines[i]);
-            if(m.find()){index=i;found=m;break;}
-        }
-        String cnRules="  - RULE-SET,hetu-cn-v4,DIRECT,no-resolve\n  - RULE-SET,hetu-cn-v6,DIRECT,no-resolve\n";
-        if(index<0){
-            String base=trimOne(source);
-            return base+(base.isEmpty()?"":"\n")+"rules:\n"+cnRules;
-        }
-        String rest=found.group(1).trim();
-        if(!rest.isEmpty()&&!rest.equals("[]"))
-            throw new IOException("中国 IP 自动直连需要普通 rules: 列表；当前源配置使用行内 rules 写法");
-        StringBuilder out=new StringBuilder();
-        for(int i=0;i<lines.length;i++){
-            if(i==index){out.append("rules:\n").append(cnRules);continue;}
-            out.append(lines[i]).append('\n');
-        }
-        return trimOne(out.toString());
+        String cnRules="  - RULE-SET,hetu-cn-v4,DIRECT,no-resolve\n"+
+                "  - RULE-SET,hetu-cn-v6,DIRECT,no-resolve\n";
+        return insertRulesBeforeFinalMatch(
+                source,
+                cnRules,
+                "中国 IP 自动直连需要普通 rules: 列表；当前源配置使用行内 rules 写法");
     }
 
-    /** Ensure Mihomo's built-in DNS server owns a dedicated TCP+UDP loop used by DNS REDIRECT. */
+    /** Ensure Mihomo's built-in DNS server owns a dedicated TCP+UDP loop used by DNS REDIRECT. */    /** Ensure Mihomo's built-in DNS server owns a dedicated TCP+UDP loop used by DNS REDIRECT. */
     private static String ensureDnsListener(String source,int port)throws IOException{
         String[] lines=normalize(source).split("\n",-1);
         int start=-1,end=lines.length,childIndent=Integer.MAX_VALUE;
