@@ -115,7 +115,7 @@ fun HetuGlassDock(
             else listOf(Color(0xFFF1F5F9), Color(0xFFE8EEF6)),
         )
     }
-    val shellTint = if (dark) scheme.surface.copy(alpha = .30f) else Color(0xFFF8FBFF).copy(alpha = .46f)
+    val shellTint = if (dark) scheme.surface.copy(alpha = .26f) else Color(0xFFF8FBFF).copy(alpha = .34f)
     val liquidShellModifier = if (runtimeLiquid) {
         Modifier.drawBackdrop(
             backdrop = requireNotNull(backdrop),
@@ -176,6 +176,7 @@ fun HetuGlassDock(
 
     Box(
         modifier = modifier
+            .background(Color.Transparent)
             .then(if (floating) Modifier.padding(horizontal = 20.dp).padding(bottom = bottomInset + 12.dp) else Modifier)
             .fillMaxWidth()
             .height(72.dp + if (floating) 0.dp else bottomInset),
@@ -210,9 +211,9 @@ fun HetuGlassDock(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(start = 6.dp, top = 6.dp, end = 6.dp, bottom = if (floating) 6.dp else bottomInset + 6.dp),
-            indicatorColor = if (dark) Color(0xFF2563EB).copy(alpha = .24f) else Color(0xFFEFF6FF).copy(alpha = .90f),
-            indicatorBorderColor = if (dark) Color(0xFF60A5FA).copy(alpha = .24f) else Color(0xFF2563EB).copy(alpha = .15f),
-            indicatorShadow = 3.dp,
+            indicatorColor = if (dark) Color(0xFF2563EB).copy(alpha = .18f) else Color(0xFF2563EB).copy(alpha = .08f),
+            indicatorBorderColor = if (dark) Color(0xFF60A5FA).copy(alpha = .22f) else Color(0xFF2563EB).copy(alpha = .18f),
+            indicatorShadow = 0.dp,
             selectedColor = scheme.primary,
             unselectedColor = scheme.onSurfaceVariant.copy(alpha = .90f),
             liquidGlass = renderGlass,
@@ -289,7 +290,7 @@ private fun DockItems(
                 },
                 highlight = {
                     (if (dark) Highlight.GlassStrokeSmallDark else Highlight.GlassStrokeSmallLight)
-                        .copy(alpha = .88f)
+                        .copy(alpha = .38f)
                 },
                 layerBlock = {
                     scaleY = 1f - .045f * liquidStretch.value
@@ -299,7 +300,7 @@ private fun DockItems(
                     drawRect(
                         brush = Brush.linearGradient(
                             colors = listOf(
-                                Color.White.copy(alpha = if (dark) .045f else .10f),
+                                Color.White.copy(alpha = if (dark) .035f else .055f),
                                 Color.Transparent,
                             ),
                         ),
@@ -326,7 +327,7 @@ private fun DockItems(
                     drawRoundRect(
                         brush = Brush.radialGradient(
                             colors = listOf(
-                                Color.White.copy(alpha = if (dark) .10f else .24f),
+                                Color.White.copy(alpha = if (dark) .075f else .085f),
                                 Color.Transparent,
                             ),
                             center = Offset(size.width * .27f, 0f),
