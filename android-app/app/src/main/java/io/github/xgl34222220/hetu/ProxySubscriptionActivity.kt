@@ -121,6 +121,7 @@ private object YamlSyntaxHighlightOutputTransformation : OutputTransformation {
 private fun ProxySubscriptionScreen(onBack: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val controller = remember { ProxyComposeController(context) }
+    val dashboardRepo = remember { ProxyDashboardRepository(context) }
     val scope = rememberCoroutineScope()
     val tokens = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
@@ -130,6 +131,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
     var subscriptions by remember { mutableStateOf(emptyList<ProxySubscriptionUi>()) }
     var configLibrary by remember { mutableStateOf(emptyList<ProxyConfigUi>()) }
     var configName by remember { mutableStateOf("加载中…") }
+    var liveProviders by remember { mutableStateOf<Map<String, DashboardProviderUi>>(emptyMap()) }
     var loading by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("") }
 
@@ -166,13 +168,17 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
         runCatching {
             val overview = controller.configOverview()
             val library = controller.configLibrary()
-            overview to library
+            val providerMap = runCatching { dashboardRepo.providers() }
+                .getOrDefault(emptyList())
+                .associateBy { it.name }
+            Triple(overview, library, providerMap)
         }
             .onSuccess { result ->
                 val overview = result.first
                 configName = overview.first
                 subscriptions = overview.second
                 configLibrary = result.second
+                liveProviders = result.third
                 if (message.startsWith("读取订阅失败") || message.startsWith("读取配置失败")) message = ""
             }
             .onFailure {
