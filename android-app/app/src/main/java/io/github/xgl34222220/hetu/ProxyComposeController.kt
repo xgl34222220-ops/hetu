@@ -493,9 +493,14 @@ internal class ProxyComposeController(context: Context) {
         configs.read(entry)
     }
 
+    suspend fun validateConfigText(text: String) = withContext(Dispatchers.IO) {
+        root.validateConfigText(text)
+    }
+
     suspend fun saveConfigText(text: String) = withContext(Dispatchers.IO) {
         val profile = ProxyRuntimeProfile.load(prefs)
         val entry = configs.selected(profile.core) ?: error("尚未选择配置")
+        root.validateConfigText(text)
         configs.write(entry, text)
     }
 
