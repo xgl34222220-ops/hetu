@@ -271,72 +271,26 @@ private fun DockItems(
         val liquidExtra = if (liquidGlass) 16.dp * liquidStretch.value else 0.dp
         val indicatorStart = indicatorX + indicatorInset - if (travelDirection < 0f) liquidExtra else 0.dp
         val indicatorShape = RoundedCornerShape(23.dp)
-        val activeLens = liquidGlass && indicatorBackdrop != null
-        val movingLensModifier = if (activeLens) {
-            Modifier.drawBackdrop(
-                backdrop = requireNotNull(indicatorBackdrop),
-                shape = { indicatorShape },
-                effects = {
-                    val stretch = liquidStretch.value
-                    padding = maxOf(padding, 22.dp.toPx())
-                    colorControls(brightness = .015f, contrast = 1.06f, saturation = 1.34f)
-                    blur(3.dp.toPx(), 3.dp.toPx())
-                    liquidGlassLens(
-                        refractionHeight = (13.dp + 4.dp * stretch).toPx(),
-                        refractionAmount = (14.dp + 5.dp * stretch).toPx(),
-                        depthEffect = true,
-                        chromaticAberration = .08f + .10f * stretch,
-                    )
-                },
-                highlight = {
-                    (if (dark) Highlight.GlassStrokeSmallDark else Highlight.GlassStrokeSmallLight)
-                        .copy(alpha = .38f)
-                },
-                layerBlock = {
-                    scaleY = 1f - .045f * liquidStretch.value
-                },
-                onDrawSurface = {
-                    drawRect(indicatorColor)
-                    drawRect(
-                        brush = Brush.linearGradient(
-                            colors = listOf(
-                                Color.White.copy(alpha = if (dark) .035f else .055f),
-                                Color.Transparent,
-                            ),
-                        ),
-                    )
-                },
+        // The outer dock keeps the real blur/refraction. The active tab must NOT create
+        // another refractive white lens on top of it; that was the remaining white-patch artifact.
+        val activeLens = false
+        val movingLensModifier = Modifier.drawBehind {
+            val radius = CornerRadius(size.height / 2f)
+            drawRoundRect(
+                color = indicatorColor,
+                cornerRadius = radius,
             )
-        } else {
-            Modifier.drawBehind {
-                val radius = CornerRadius(size.height / 2f)
-                drawRoundRect(
-                    brush = Brush.verticalGradient(
-                        if (liquidGlass) {
-                            listOf(
-                                indicatorColor.copy(alpha = (indicatorColor.alpha * 1.18f).coerceAtMost(1f)),
-                                indicatorColor.copy(alpha = indicatorColor.alpha * .72f),
-                            )
-                        } else {
-                            listOf(indicatorColor, indicatorColor)
-                        },
+            drawRoundRect(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Color(0xFF60A5FA).copy(alpha = if (dark) .055f else .045f),
+                        Color.Transparent,
                     ),
-                    cornerRadius = radius,
-                )
-                if (liquidGlass) {
-                    drawRoundRect(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                Color.White.copy(alpha = if (dark) .075f else .085f),
-                                Color.Transparent,
-                            ),
-                            center = Offset(size.width * .27f, 0f),
-                            radius = size.width * .74f,
-                        ),
-                        cornerRadius = radius,
-                    )
-                }
-            }
+                    center = Offset(size.width * .24f, size.height * .08f),
+                    radius = size.width * .72f,
+                ),
+                cornerRadius = radius,
+            )
         }
 
         Box(
@@ -344,7 +298,7 @@ private fun DockItems(
                 .offset(x = indicatorStart)
                 .width(itemWidth - (indicatorInset * 2) + liquidExtra)
                 .height(itemHeight)
-                .shadow(if (activeLens) 4.dp else indicatorShadow, indicatorShape, clip = false)
+                .shadow(indicatorShadow, indicatorShape, clip = false)
                 .squircleClip(23.dp)
                 .then(movingLensModifier)
                 .border(1.dp, indicatorBorderColor, indicatorShape),
