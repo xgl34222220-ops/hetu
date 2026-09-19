@@ -1118,7 +1118,7 @@ private fun SubscriptionMetric(
 private data class YamlLintIssue(val line: Int, val message: String)
 
 private fun yamlLocalLint(text: String): YamlLintIssue? {
-    val compactMapping = Regex("""^(?:-\\s+)?(?:["'][^"']+["']|[A-Za-z0-9_.-]+):\\S""")
+    val compactMapping = Regex("""^(?:-\s+)?(?:["'][^"']+["']|[A-Za-z0-9_.-]+):\S""")
     text.lines().forEachIndexed { index, raw ->
         if (raw.isBlank()) return@forEachIndexed
         val leading = raw.takeWhile { it == ' ' || it == '\t' }

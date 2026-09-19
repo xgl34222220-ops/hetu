@@ -2244,6 +2244,7 @@ private fun RefPanelOverview(state: ProxyComposeState, delays: Map<String, Long>
     }
 }
 
+@OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
 private fun RefGroupCard(
     group: ProxyGroupUi,
@@ -2443,7 +2444,6 @@ private fun RefGroupCard(
     }
 }
 
-@Composable
 @Composable
 private fun RefInlineGroupExpansion(
     group: ProxyGroupUi,

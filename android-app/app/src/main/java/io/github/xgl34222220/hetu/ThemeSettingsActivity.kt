@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -274,7 +275,6 @@ private fun ThemeSettingsScreen(onBack: () -> Unit, onThemeChanged: () -> Unit) 
     }
 
 @Composable
-private fun ThemeSection@Composable
 private fun ThemeSection(title: String, content: @Composable ColumnScope.() -> Unit) {
     val t = LocalHetuTokens.current
     Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
