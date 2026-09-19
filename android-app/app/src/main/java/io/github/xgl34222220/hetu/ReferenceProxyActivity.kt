@@ -1509,7 +1509,7 @@ private fun RefPanel(
                     }
                 }
                 RefPanelTab.Overview -> item(key = "${tab.name}-traffic-overview", contentType = "traffic-overview") { RefTrafficOverview(state) }
-                RefPanelTab.Subscriptions -> items(providers, key = { "${tab.name}-provider-${it.name}" }, contentType = { "subscription-provider" }) { item ->
+                RefPanelTab.Subscriptions -> items(providers, key = { "${tab.name}-provider-${it.name}-${it.updatedAt}-${it.upload}-${it.download}-${it.total}-${it.expire}" }, contentType = { "subscription-provider" }) { item ->
                     RefProviderRow(
                         item = item,
                         refreshing = providerRefreshing[item.name] == true,
@@ -2207,19 +2207,34 @@ private fun RefPanelOverview(state: ProxyComposeState, delays: Map<String, Long>
 @Composable
 private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolean, delay: Long?, testing: Boolean, modifier: Modifier, onClick: () -> Unit, onDelay: () -> Unit) {
     val t = LocalHetuTokens.current
-    val scheme = MaterialTheme.colorScheme
-    val dark = scheme.background.luminance() < .5f
+    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val source = remember(group.name) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .97f else 1f, spring(dampingRatio = .74f, stiffness = 580f), label = "group${group.name}")
+    val scale by animateFloatAsState(
+        if (pressed) .97f else 1f,
+        spring(dampingRatio = .74f, stiffness = 580f),
+        label = "group${group.name}",
+    )
     val shape = RoundedCornerShape(20.dp)
     val nodeName = selected.ifBlank { "未选择" }
     val nodeFlag = refNodeFlag(nodeName)
-    val premiumBrush = if (dark) Brush.verticalGradient(listOf(t.elevatedCardBackground, t.cardBackground))
-    else Brush.verticalGradient(listOf(Color.White, Color(0xFFFAFBFD)))
+    val premiumBrush = if (dark) {
+        Brush.verticalGradient(listOf(t.elevatedCardBackground, t.cardBackground))
+    } else {
+        Brush.verticalGradient(listOf(Color.White, Color(0xFFFAFBFD)))
+    }
+    val arrowRotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        animationSpec = androidx.compose.animation.core.tween(
+            durationMillis = 280,
+            easing = androidx.compose.animation.core.FastOutSlowInEasing,
+        ),
+        label = "groupArrow${group.name}",
+    )
+
     Column(
         modifier
-            .height(86.dp)
+            .height(90.dp)
             .zIndex(1f)
             .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .95f else 1f }
             .shadow(
@@ -2233,31 +2248,30 @@ private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolea
             .border(
                 if (expanded) 1.25.dp else 1.dp,
                 if (expanded) Color(0xFF002FA7).copy(alpha = .58f)
-                else if (dark) Color.White.copy(alpha = .10f) else Color(0xFFCBD5E1).copy(alpha = .60f),
+                else if (dark) Color.White.copy(alpha = .10f) else Color(0xFFE2E8F0).copy(alpha = .80f),
                 shape,
             )
-            .padding(start = 16.dp, top = 14.dp, end = 14.dp, bottom = 12.dp),
+            .clip(shape)
+            .clickable(interactionSource = source, indication = null, onClick = onClick)
+            .padding(start = 16.dp, top = 10.dp, end = 14.dp, bottom = 9.dp),
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
         Row(
-            Modifier.fillMaxWidth().height(36.dp).clip(RoundedCornerShape(10.dp))
-                .clickable(interactionSource = source, indication = null, onClick = onClick),
-            verticalAlignment = Alignment.Top,
+            Modifier.fillMaxWidth().height(23.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(Modifier.weight(1f).padding(end = 5.dp), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                Text(group.name, color = t.textPrimary, fontSize = 14.sp, lineHeight = 17.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("${refGroupTypeCompact(group.type).uppercase()} 0/${group.nodes.size}", color = Color(0xFF94A3B8), fontSize = 10.sp, lineHeight = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1)
-            }
-            RefGroupCornerVisual(group, Modifier.size(27.dp))
-            Spacer(Modifier.width(3.dp))
-            val arrowRotation by animateFloatAsState(
-                targetValue = if (expanded) 180f else 0f,
-                animationSpec = androidx.compose.animation.core.tween(
-                    durationMillis = 280,
-                    easing = androidx.compose.animation.core.FastOutSlowInEasing,
-                ),
-                label = "groupArrow${group.name}",
+            Text(
+                group.name,
+                color = t.textPrimary,
+                fontSize = 14.sp,
+                lineHeight = 17.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
             )
+            RefGroupCornerVisual(group, Modifier.size(22.dp))
+            Spacer(Modifier.width(4.dp))
             Icon(
                 Icons.Rounded.KeyboardArrowDown,
                 if (expanded) "收起" else "展开",
@@ -2268,26 +2282,56 @@ private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolea
                 },
             )
         }
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.weight(1f).height(22.dp).clip(RoundedCornerShape(8.dp))
-                    .clickable(interactionSource = source, indication = null, onClick = onClick)
-                    .padding(end = 5.dp),
-                contentAlignment = Alignment.CenterStart,
+
+        Row(
+            Modifier.fillMaxWidth().height(18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (nodeFlag.isNotBlank()) {
+                Text(nodeFlag, fontSize = 13.sp, modifier = Modifier.padding(end = 4.dp))
+            }
+            Text(
+                nodeName,
+                color = if (dark) t.textSecondary else Color(0xFF334155),
+                fontSize = 12.sp,
+                lineHeight = 15.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+        }
+
+        Row(
+            Modifier.fillMaxWidth().height(22.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Surface(
+                shape = RoundedCornerShape(7.dp),
+                color = if (dark) Color.White.copy(alpha = .055f) else Color(0xFFF1F5F9),
+                tonalElevation = 0.dp,
             ) {
                 Text(
-                    if (nodeFlag.isBlank()) nodeName else "$nodeFlag $nodeName",
-                    color = if (dark) t.textSecondary else Color(0xFF475569),
-                    fontSize = 11.sp,
-                    lineHeight = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    "${refGroupTypeCompact(group.type).lowercase()} · ${group.nodes.size}",
+                    Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    color = Color(0xFF94A3B8),
+                    fontSize = 9.sp,
+                    lineHeight = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
                 )
             }
-            // This button is a sibling, not a child of the accordion click target.
-            // Ping can therefore never toggle expansion.
-            RefDelayBadge(delay, testing, onDelay)
+            Spacer(Modifier.weight(1f))
+            Box(
+                Modifier.clickable(
+                    enabled = !testing,
+                    interactionSource = remember(group.name, "delay") { MutableInteractionSource() },
+                    indication = null,
+                ) { onDelay() },
+            ) {
+                RefDelayBadge(delay, testing, null)
+            }
         }
     }
 }
