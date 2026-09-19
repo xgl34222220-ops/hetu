@@ -85,7 +85,7 @@ jobs:
           ! grep -q '<scale' android-app/app/src/main/res/anim/hetu_route_open_enter.xml
           ! grep -q '<alpha' android-app/app/src/main/res/anim/hetu_route_open_exit.xml
           ! grep -q '<scale' android-app/app/src/main/res/anim/hetu_route_open_exit.xml
-          grep -Fq 'Color(0xFFCBD5E1).copy(alpha = .60f)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
+          grep -Fq 'Color(0xFFE2E8F0).copy(alpha = .80f)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           ! grep -Fq 'RefSmallTool("运行日志"' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           grep -Fq 'color = Color.Transparent,' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           grep -q 'android:launchMode="singleTop"' android-app/app/src/main/AndroidManifest.xml
