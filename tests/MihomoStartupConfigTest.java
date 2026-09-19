@@ -34,6 +34,23 @@ public final class MihomoStartupConfigTest {
   check(ad.yaml.contains("hetu-adblock:")&&ad.yaml.contains("type: file")&&ad.yaml.contains("behavior: domain")&&ad.yaml.contains("format: text"),"adblock local domain provider injected");
   check(ad.yaml.contains("path: ./ruleset/hetu-adblock.txt"),"adblock provider stays inside Mihomo HomeDir");
   check(ad.yaml.contains("RULE-SET,hetu-adblock,REJECT")&&ad.yaml.indexOf("RULE-SET,hetu-adblock")<ad.yaml.indexOf("MATCH,DIRECT"),"adblock REJECT precedes source routing");
+  String privacyAdSource="mode: rule\nproxies: []\nproxy-groups: []\nrules:\n"
+      +"  - DOMAIN-SUFFIX,stun.example,REJECT\n"
+      +"  - IP-CIDR6,::/0,REJECT,no-resolve\n"
+      +"  - RULE-SET,Bank_CN,DIRECT\n"
+      +"  - RULE-SET,去广告,广告拦截\n"
+      +"  - DOMAIN-SUFFIX,wechat.com,DIRECT\n"
+      +"  - MATCH,DIRECT\n";
+  MihomoStartupConfig.Result privacyAd=MihomoStartupConfig.generate(privacyAdSource,adProfile);
+  int pStun=privacyAd.yaml.indexOf("DOMAIN-SUFFIX,stun.example,REJECT");
+  int pV6=privacyAd.yaml.indexOf("IP-CIDR6,::/0,REJECT");
+  int pBank=privacyAd.yaml.indexOf("RULE-SET,Bank_CN,DIRECT");
+  int pHetuAd=privacyAd.yaml.indexOf("RULE-SET,hetu-adblock,REJECT");
+  int pSourceAd=privacyAd.yaml.indexOf("RULE-SET,去广告,广告拦截");
+  int pWechat=privacyAd.yaml.indexOf("DOMAIN-SUFFIX,wechat.com,DIRECT");
+  int pMatch=privacyAd.yaml.indexOf("MATCH,DIRECT");
+  check(pStun>=0&&pStun<pV6&&pV6<pBank&&pBank<pHetuAd&&pHetuAd<pSourceAd&&pSourceAd<pWechat&&pWechat<pMatch,
+      "source privacy guards and whitelists stay ahead of Hetu adblock; app DIRECT stays behind it");
   ProxyRuntimeProfile bothProfile=new ProxyRuntimeProfile(ProxyRuntimeProfile.Core.MIHOMO,ProxyRuntimeProfile.Mode.TPROXY,ProxyRuntimeProfile.Ipv6.BYPASS,ProxyRuntimeProfile.AppScope.BLACKLIST,ProxyRuntimeProfile.DnsHijack.TPROXY,true,true,true,false,true,true);
   MihomoStartupConfig.Result both=MihomoStartupConfig.generate(cnSource,bothProfile);
   check(both.yaml.indexOf("RULE-SET,hetu-adblock")<both.yaml.indexOf("RULE-SET,hetu-cn-v4")&&both.yaml.indexOf("RULE-SET,hetu-cn-v4")<both.yaml.indexOf("MATCH,DIRECT"),"adblock executes before CNIP and source fallback");

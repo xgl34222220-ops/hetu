@@ -56,6 +56,10 @@ jobs:
           grep -q 'install-udp-leak-guard' android-app/app/src/main/assets/hetu-root.sh
           grep -q 'scoped_reject_unmarked_udp' android-app/app/src/main/assets/hetu-root.sh
           grep -q 'insertRulesBeforeFinalMatch' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
+          grep -q 'insertRuleBeforeSourceAdblockAnchor' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
+          grep -q 'isSourceAdblockRule' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
+          grep -Fq 'RULE-SET,去广告,广告拦截' tests/MihomoStartupConfigTest.java
+          grep -Fq 'source privacy guards and whitelists stay ahead of Hetu adblock' tests/MihomoStartupConfigTest.java
           ! grep -q 'ensureWebRtcLeakGuard' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
           ! grep -Fq 'ALLOW_PROVIDER_NAME+",DIRECT"' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
           ! grep -q 'extractDirectProcessPackages(source)' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
@@ -81,8 +85,8 @@ jobs:
           grep -q 'System.loadLibrary("hetu_core")' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoNative.java
           grep -q 'Java_io_github_xgl34222220_hetu_MihomoNative_invoke' native/bridge/jni_android.c
           grep -q 'Java_io_github_xgl34222220_hetu_preview_MihomoNative_invoke' native/bridge/jni_android.c
-          grep -q 'versionName = "0.4.0-test.75"' android-app/app/build.gradle.kts
-          grep -q 'versionCode = 475' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.4.0-test.76"' android-app/app/build.gradle.kts
+          grep -q 'versionCode = 476' android-app/app/build.gradle.kts
           test -f android-app/app/src/main/java/io/github/xgl34222220/hetu/LegacyAppMigrator.java
           grep -q 'LegacyAppMigrator.migrateIfNeeded(app)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
           grep -q 'controller.restart { operation = it }' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt

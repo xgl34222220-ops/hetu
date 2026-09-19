@@ -283,6 +283,8 @@ final class MihomoStartupConfig {
 
     private static String insertAdblockRuleRespectingUserPolicy(String source)throws IOException{
         String rule="  - RULE-SET,"+ProxyAdblockRules.PROVIDER_NAME+",REJECT\n";
+        String anchored=insertRuleBeforeSourceAdblockAnchor(source,rule);
+        if(anchored!=null)return anchored;
         return insertRulesBeforeFinalMatch(
                 source,
                 rule,
@@ -290,9 +292,59 @@ final class MihomoStartupConfig {
     }
 
     /**
+     * Reuse the source YAML's own ad-block placement when it has one. This preserves
+     * WebRTC/DNS/IPv6 security rules and explicit whitelists above the source adblock,
+     * while keeping Hetu's REJECT ahead of later app/CN/DIRECT routing.
+     */
+    private static String insertRuleBeforeSourceAdblockAnchor(String source,String injected)throws IOException{
+        String[] lines=normalize(source).split("\n",-1);
+        int index=-1;Matcher found=null;Pattern top=Pattern.compile("^rules\\s*:(.*)$");
+        for(int i=0;i<lines.length;i++){
+            if(indent(lines[i])!=0)continue;
+            Matcher m=top.matcher(lines[i]);
+            if(m.find()){index=i;found=m;break;}
+        }
+        if(index<0)return null;
+        String rest=found.group(1).trim();
+        if(rest.startsWith("#"))rest="";
+        if(!rest.isEmpty()&&!rest.equals("[]"))
+            throw new IOException("代理串联去广告需要普通 rules: 列表；当前源配置使用行内 rules 写法");
+
+        int end=lines.length;
+        for(int i=index+1;i<lines.length;i++){
+            String t=lines[i].trim();
+            if(t.isEmpty()||t.startsWith("#"))continue;
+            if(indent(lines[i])==0){end=i;break;}
+        }
+        int anchor=-1;
+        for(int i=index+1;i<end;i++){
+            if(isSourceAdblockRule(lines[i])){anchor=i;break;}
+        }
+        if(anchor<0)return null;
+
+        StringBuilder out=new StringBuilder();
+        for(int i=0;i<lines.length;i++){
+            if(i==anchor)out.append(injected);
+            out.append(lines[i]).append('\n');
+        }
+        return trimOne(out.toString());
+    }
+
+    private static boolean isSourceAdblockRule(String raw){
+        String t=raw==null?"":raw.trim();
+        if(!t.startsWith("-"))return false;
+        String upper=t.toUpperCase(Locale.ROOT);
+        if(!upper.startsWith("- RULE-SET,"))return false;
+        return t.contains("广告")
+                || upper.contains("ADBLOCK")
+                || upper.contains("ADGUARD")
+                || upper.contains("ANTI-AD")
+                || upper.contains("ANTIAD");
+    }
+
+    /**
      * Insert a Hetu-owned runtime rule without changing the relative order of any source rule.
-     * Security/privacy rules deliberately placed at the top of the user's YAML therefore keep
-     * precedence; the injected rule only sits immediately before the final MATCH fallback.
+     * This remains the fallback for configs that have no explicit source ad-block anchor.
      */
     private static String insertRulesBeforeFinalMatch(String source,String injected,String inlineError)throws IOException{
         String[] lines=normalize(source).split("\n",-1);
