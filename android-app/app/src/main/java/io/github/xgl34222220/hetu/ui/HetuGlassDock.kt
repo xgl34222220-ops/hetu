@@ -104,13 +104,18 @@ fun HetuGlassDock(
         }
     } else Modifier
     val glassBrush = when {
-        renderGlass && dark -> Brush.verticalGradient(listOf(Color.White.copy(alpha = .10f), Color.White.copy(alpha = .035f)))
-        renderGlass -> Brush.verticalGradient(listOf(Color.White.copy(alpha = .22f), Color.White.copy(alpha = .09f)))
+        renderGlass && dark -> Brush.verticalGradient(
+            listOf(Color.White.copy(alpha = .085f), Color(0xFF60A5FA).copy(alpha = .035f)),
+        )
+        renderGlass -> Brush.verticalGradient(
+            listOf(Color(0xFFF8FBFF).copy(alpha = .58f), Color(0xFFEAF2FF).copy(alpha = .34f)),
+        )
         else -> Brush.verticalGradient(
-            listOf(tokens.elevatedCardBackground.copy(alpha = .98f), tokens.elevatedCardBackground.copy(alpha = .98f)),
+            if (dark) listOf(Color(0xFF1A2230), Color(0xFF151C27))
+            else listOf(Color(0xFFF1F5F9), Color(0xFFE8EEF6)),
         )
     }
-    val shellTint = if (dark) scheme.surface.copy(alpha = .39f) else Color.White.copy(alpha = .40f)
+    val shellTint = if (dark) scheme.surface.copy(alpha = .30f) else Color(0xFFF8FBFF).copy(alpha = .46f)
     val liquidShellModifier = if (runtimeLiquid) {
         Modifier.drawBackdrop(
             backdrop = requireNotNull(backdrop),
@@ -120,9 +125,9 @@ fun HetuGlassDock(
                 colorControls(
                     brightness = if (dark) -.015f else .025f,
                     contrast = 1.05f,
-                    saturation = 1.40f,
+                    saturation = 1.80f,
                 )
-                blur(9.dp.toPx(), 9.dp.toPx())
+                blur(24.dp.toPx(), 24.dp.toPx())
                 liquidGlassLens(
                     refractionHeight = 17.dp.toPx(),
                     refractionAmount = 13.dp.toPx(),
@@ -178,15 +183,21 @@ fun HetuGlassDock(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .shadow(if (floating) 18.dp else 5.dp, shape, clip = false)
+                .shadow(
+                    if (floating) 14.dp else 4.dp,
+                    shape,
+                    clip = false,
+                    ambientColor = Color(0xFF0F172A).copy(alpha = if (dark) .12f else .035f),
+                    spotColor = Color(0xFF0F172A).copy(alpha = if (dark) .16f else .075f),
+                )
                 .then(if (floating) Modifier.squircleClip(31.dp) else Modifier.clip(shape))
                 .then(if (runtimeLiquid) Modifier.layerBackdrop(dockSurfaceBackdrop) else Modifier)
                 .then(liquidShellModifier)
                 .border(
-                    if (runtimeLiquid) .45.dp else .7.dp,
+                    if (renderGlass) .9.dp else .7.dp,
                     if (renderGlass) {
-                        if (dark) Color.White.copy(alpha = .11f) else Color.White.copy(alpha = .32f)
-                    } else if (dark) Color.White.copy(alpha = .10f) else Color.White.copy(alpha = .50f),
+                        if (dark) Color.White.copy(alpha = .13f) else Color.White.copy(alpha = .78f)
+                    } else if (dark) Color.White.copy(alpha = .08f) else Color(0xFFCBD5E1).copy(alpha = .72f),
                     shape,
                 ),
         )
@@ -199,8 +210,8 @@ fun HetuGlassDock(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(start = 6.dp, top = 6.dp, end = 6.dp, bottom = if (floating) 6.dp else bottomInset + 6.dp),
-            indicatorColor = scheme.primary.copy(alpha = if (dark) .28f else .16f),
-            indicatorBorderColor = Color.White.copy(alpha = if (dark) .18f else .46f),
+            indicatorColor = if (dark) Color(0xFF2563EB).copy(alpha = .24f) else Color(0xFFEFF6FF).copy(alpha = .90f),
+            indicatorBorderColor = if (dark) Color(0xFF60A5FA).copy(alpha = .24f) else Color(0xFF2563EB).copy(alpha = .15f),
             indicatorShadow = 3.dp,
             selectedColor = scheme.primary,
             unselectedColor = scheme.onSurfaceVariant.copy(alpha = .90f),
@@ -232,31 +243,31 @@ private fun DockItems(
         val targetIndex = selected.coerceIn(0, items.lastIndex)
         val indicatorInset = 4.dp
         val liquidStretch = remember { Animatable(0f) }
+        val indicatorPosition = remember { Animatable(targetIndex.toFloat()) }
         var travelDirection by remember { mutableFloatStateOf(0f) }
         var previousIndex by remember { mutableIntStateOf(targetIndex) }
         LaunchedEffect(targetIndex) {
             if (targetIndex != previousIndex) {
                 travelDirection = if (targetIndex > previousIndex) 1f else -1f
                 previousIndex = targetIndex
-                liquidStretch.snapTo(1f)
-                liquidStretch.animateTo(
-                    targetValue = 0f,
+                liquidStretch.snapTo(if (liquidGlass) 1f else 0f)
+                indicatorPosition.animateTo(
+                    targetValue = targetIndex.toFloat(),
                     animationSpec = spring(
-                        dampingRatio = .55f,
-                        stiffness = Spring.StiffnessMediumLow,
+                        dampingRatio = if (liquidGlass) .66f else .82f,
+                        stiffness = if (liquidGlass) 245f else 420f,
                     ),
                 )
+                liquidStretch.animateTo(
+                    targetValue = 0f,
+                    animationSpec = spring(dampingRatio = .72f, stiffness = 360f),
+                )
+            } else if (indicatorPosition.value != targetIndex.toFloat()) {
+                indicatorPosition.snapTo(targetIndex.toFloat())
             }
         }
-        val indicatorX by animateDpAsState(
-            targetValue = itemWidth * targetIndex.toFloat(),
-            animationSpec = spring(
-                dampingRatio = if (liquidGlass) .68f else .84f,
-                stiffness = if (liquidGlass) 310f else Spring.StiffnessMediumLow,
-            ),
-            label = "hetuLuoShuDockIndicator",
-        )
-        val liquidExtra = if (liquidGlass) 13.dp * liquidStretch.value else 0.dp
+        val indicatorX = itemWidth * indicatorPosition.value
+        val liquidExtra = if (liquidGlass) 16.dp * liquidStretch.value else 0.dp
         val indicatorStart = indicatorX + indicatorInset - if (travelDirection < 0f) liquidExtra else 0.dp
         val indicatorShape = RoundedCornerShape(23.dp)
         val activeLens = liquidGlass && indicatorBackdrop != null
@@ -288,7 +299,7 @@ private fun DockItems(
                     drawRect(
                         brush = Brush.linearGradient(
                             colors = listOf(
-                                Color.White.copy(alpha = if (dark) .055f else .16f),
+                                Color.White.copy(alpha = if (dark) .045f else .10f),
                                 Color.Transparent,
                             ),
                         ),
