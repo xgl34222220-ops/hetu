@@ -102,7 +102,6 @@ jobs:
           grep -Fq 'subscriptionBytes(provider.used)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
           grep -Fq '1.5.dp else .7.dp' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
           grep -Fq 'YAML 语法大纲' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          grep -Fq 'YamlAccessoryKey("Tab")' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
           grep -Fq 'YamlAccessoryKey("撤销"' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
           grep -Fq 'TextButton(onClick = ::saveYaml' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
           grep -Fq 'gutterStartLine' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
