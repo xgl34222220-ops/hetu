@@ -215,35 +215,66 @@ private fun ThemeSettingsScreen(onBack: () -> Unit, onThemeChanged: () -> Unit) 
     }
 
     pickerTitle?.let { title ->
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { pickerTitle = null },
-            title = { Text(title) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    pickerOptions.forEach { option ->
-                        Surface(
-                            onClick = {
-                                pickerSelected = option.value
-                                pickerApply(option.value)
-                                pickerTitle = null
-                            },
-                            shape = RoundedCornerShape(14.dp),
-                            color = if (option.value == pickerSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+            containerColor = t.elevatedCardBackground,
+            contentColor = t.textPrimary,
+            tonalElevation = 0.dp,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            dragHandle = {
+                Box(
+                    Modifier.padding(top = 10.dp, bottom = 7.dp)
+                        .size(width = 36.dp, height = 4.dp)
+                        .background(t.textMuted.copy(alpha = .40f), CircleShape),
+                )
+            },
+        ) {
+            Column(
+                Modifier.fillMaxWidth().navigationBarsPadding()
+                    .padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(title, color = t.textPrimary, fontSize = 21.sp, lineHeight = 27.sp, fontWeight = FontWeight.ExtraBold)
+                Text("选择后立即生效", color = t.textSecondary, style = MaterialTheme.typography.bodySmall)
+                pickerOptions.forEach { option ->
+                    Surface(
+                        onClick = {
+                            pickerSelected = option.value
+                            pickerApply(option.value)
+                            pickerTitle = null
+                        },
+                        shape = RoundedCornerShape(18.dp),
+                        color = if (option.value == pickerSelected) MaterialTheme.colorScheme.primary.copy(alpha = .10f) else t.cardBackground,
+                        border = BorderStroke(
+                            .7.dp,
+                            if (option.value == pickerSelected) MaterialTheme.colorScheme.primary.copy(alpha = .24f)
+                            else t.outline.copy(alpha = .34f),
+                        ),
+                        tonalElevation = 0.dp,
+                    ) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 13.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text(option.label, Modifier.weight(1f), color = t.textPrimary)
-                                if (option.value == pickerSelected) Icon(Icons.Rounded.Check, null, tint = MaterialTheme.colorScheme.primary)
+                            Text(option.label, Modifier.weight(1f), color = t.textPrimary, fontWeight = FontWeight.SemiBold)
+                            if (option.value == pickerSelected) {
+                                Box(
+                                    Modifier.size(28.dp).background(MaterialTheme.colorScheme.primary.copy(alpha = .11f), CircleShape),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(Icons.Rounded.Check, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                }
                             }
                         }
                     }
                 }
-            },
-            confirmButton = { TextButton(onClick = { pickerTitle = null }) { Text("关闭") } },
-        )
+                Spacer(Modifier.height(2.dp))
+            }
+        }
     }
-}
 
 @Composable
+private fun ThemeSection@Composable
 private fun ThemeSection(title: String, content: @Composable ColumnScope.() -> Unit) {
     val t = LocalHetuTokens.current
     Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {

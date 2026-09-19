@@ -40,7 +40,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextRange
@@ -138,6 +140,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
     val tokens = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
+    val haptic = LocalHapticFeedback.current
 
     var revision by remember { mutableIntStateOf(0) }
     var subscriptions by remember { mutableStateOf(emptyList<ProxySubscriptionUi>()) }
@@ -267,6 +270,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                 val liveUsed = live.sumOf { it.used }
                 val liveTotal = live.sumOf { it.total }
                 val liveRatio = if (liveTotal > 0L) (liveUsed.toDouble() / liveTotal.toDouble()).toFloat().coerceIn(0f, 1f) else 0f
+                val liveNodeCount = live.sumOf { it.nodes.size }
                 Surface(
                     shape = RoundedCornerShape(24.dp),
                     color = tokens.cardBackground,
@@ -284,16 +288,18 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                             Spacer(Modifier.width(11.dp))
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Text("订阅与配置", color = tokens.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
-                                Text("$configured 个已配置 · ${subscriptions.size - configured} 个待填写 · ${configLibrary.size} 份配置", color = tokens.textSecondary, fontSize = 11.sp)
+                                Text("${subscriptions.size - configured} 个待填写 · ${configLibrary.size} 份本地配置", color = tokens.textSecondary, fontSize = 11.sp)
                             }
-                            if (liveTotal > 0L) {
-                                Text(
-                                    "剩余 ${((1f - liveRatio) * 100f).toInt()}%",
-                                    color = scheme.primary,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                )
-                            }
+                        }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            SubscriptionMetric("已配置", configured.toString(), Modifier.weight(1f))
+                            SubscriptionMetric("节点", liveNodeCount.toString(), Modifier.weight(1f))
+                            SubscriptionMetric(
+                                "剩余",
+                                if (liveTotal > 0L) "${((1f - liveRatio) * 100f).toInt()}%" else "—",
+                                Modifier.weight(1f),
+                                accent = liveTotal > 0L,
+                            )
                         }
                         if (liveTotal > 0L) {
                             Box(Modifier.fillMaxWidth().height(6.dp).background(Color(0xFFF1F5F9), CircleShape)) {
@@ -305,7 +311,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                 Text("${subscriptionBytes(liveUsed)} / ${subscriptionBytes(liveTotal)}", color = tokens.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                                 Spacer(Modifier.weight(1f))
-                                Text("${live.sumOf { it.nodes.size }} 个节点", color = tokens.textSecondary, fontSize = 11.sp)
+                                Text("$liveNodeCount 个节点", color = tokens.textSecondary, fontSize = 11.sp)
                             }
                         } else {
                             Text("运行中的 Mihomo 暂未上报订阅流量；配置管理功能仍可正常使用。", color = tokens.textSecondary, fontSize = 11.sp, lineHeight = 16.sp)
@@ -763,6 +769,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                 if (yamlSaving) return
                 val currentText = currentYamlText()
                 yamlLocalLint(currentText)?.let { issue ->
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     yamlError = "第 ${issue.line} 行：${issue.message}"
                     jumpToYamlLine(issue.line - 1)
                     return
@@ -794,7 +801,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                         }
                         Column(Modifier.weight(1f)) {
                             Text(configName, color = tokens.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
-                            Text("$yamlLineCount 行 · 高性能 YAML 编辑", color = tokens.textSecondary, fontSize = 10.sp)
+                            Text("$yamlLineCount 行 · YAML 编辑 · 缩进参考线", color = tokens.textSecondary, fontSize = 10.sp)
                         }
                         IconButton(
                             onClick = {
@@ -827,6 +834,8 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                                     setLineNumberEnabled(true)
                                     setWordwrap(false)
                                     setTabWidth(2)
+                                    setBlockLineEnabled(true)
+                                    setBlockLineWidth(.5f)
                                     setHighlightCurrentLine(true)
                                     nonPrintablePaintingFlags =
                                         CodeEditor.FLAG_DRAW_WHITESPACE_LEADING or
@@ -1066,9 +1075,50 @@ private fun YamlAccessoryKey(label: String, enabled: Boolean = true, onClick: ()
     }
 }
 
+@Composable
+private fun SubscriptionMetric(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    accent: Boolean = false,
+) {
+    val tokens = LocalHetuTokens.current
+    val scheme = MaterialTheme.colorScheme
+    val dark = scheme.background.luminance() < .5f
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(15.dp),
+        color = if (accent) scheme.primary.copy(alpha = if (dark) .13f else .08f)
+        else if (dark) Color.White.copy(alpha = .055f) else Color(0xFFF8FAFC).copy(alpha = .86f),
+        border = BorderStroke(
+            .7.dp,
+            if (accent) scheme.primary.copy(alpha = .20f)
+            else if (dark) Color.White.copy(alpha = .07f) else Color.White.copy(alpha = .92f),
+        ),
+        tonalElevation = 0.dp,
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(1.dp),
+        ) {
+            Text(label, color = tokens.textMuted, fontSize = 9.5.sp, lineHeight = 12.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                value,
+                color = if (accent) scheme.primary else tokens.textPrimary,
+                fontSize = 13.sp,
+                lineHeight = 17.sp,
+                fontWeight = FontWeight.ExtraBold,
+                fontFamily = FontFamily.Monospace,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
 private data class YamlLintIssue(val line: Int, val message: String)
 
 private fun yamlLocalLint(text: String): YamlLintIssue? {
+    val compactMapping = Regex("""^(?:-\\s+)?(?:["'][^"']+["']|[A-Za-z0-9_.-]+):\\S""")
     text.lines().forEachIndexed { index, raw ->
         if (raw.isBlank()) return@forEachIndexed
         val leading = raw.takeWhile { it == ' ' || it == '\t' }
@@ -1079,6 +1129,11 @@ private fun yamlLocalLint(text: String): YamlLintIssue? {
         val trimmed = raw.trimStart()
         if (!trimmed.startsWith("#") && spaces % 2 != 0) {
             return YamlLintIssue(index + 1, "缩进为 ${spaces} 个空格，河图要求按 2 空格层级缩进")
+        }
+        val urlOnly = trimmed.startsWith("http://") || trimmed.startsWith("https://") ||
+            trimmed.startsWith("- http://") || trimmed.startsWith("- https://")
+        if (!urlOnly && !trimmed.startsWith("#") && compactMapping.containsMatchIn(trimmed)) {
+            return YamlLintIssue(index + 1, "冒号后缺少空格，建议写成 key: value")
         }
     }
     return null

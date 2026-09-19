@@ -517,7 +517,8 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                     onSelectedTabChange = { panelTab = it },
                     searchRequest = panelSearchRequest,
                     hazeState = haze,
-                    backdrop = null,
+                    backdrop = liquidBackdrop.takeIf { liquid },
+                    glassEnabled = blurEnabled && liquidGlassEnabled,
                     onRefreshState = { scope.launch { refresh() } },
                     onOpenSettings = { page = RefProxyPage.Settings },
                     onDetailVisibleChanged = { panelDetailVisible = it },
@@ -591,7 +592,7 @@ private fun RefHome(
             start = 16.dp,
             top = 8.dp,
             end = 16.dp,
-            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 164.dp,
+            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 94.dp,
         ),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -686,6 +687,20 @@ private fun RefHome(
                             Text("${state.core} · ${state.mode}", color = t.textSecondary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                             Text(state.config, color = t.textMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
+                        Surface(
+                            onClick = onLog,
+                            modifier = Modifier.size(36.dp),
+                            shape = CircleShape,
+                            color = if (scheme.background.luminance() < .5f) Color.White.copy(alpha = .075f) else Color.White.copy(alpha = .86f),
+                            border = BorderStroke(.7.dp, if (scheme.background.luminance() < .5f) Color.White.copy(alpha = .10f) else Color.White.copy(alpha = .82f)),
+                            shadowElevation = 0.dp,
+                            tonalElevation = 0.dp,
+                        ) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Icon(Icons.Rounded.Article, "运行日志", tint = scheme.primary, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                        Spacer(Modifier.width(8.dp))
                         val checkPulse = androidx.compose.animation.core.rememberInfiniteTransition(label = "heroCheckGlow")
                         val checkGlow by checkPulse.animateFloat(initialValue = 0f, targetValue = 1f, animationSpec = androidx.compose.animation.core.infiniteRepeatable(animation = androidx.compose.animation.core.tween(1500, easing = androidx.compose.animation.core.FastOutSlowInEasing), repeatMode = androidx.compose.animation.core.RepeatMode.Reverse), label = "heroCheckGlowValue")
                         Box(
@@ -724,26 +739,6 @@ private fun RefHome(
                             danger = state.running,
                         )
                         RefActionText("重启", state.running && operation.isBlank(), onRestart, Modifier.weight(1f), neutralAction, Icons.Rounded.RestartAlt)
-                    }
-                }
-            }
-        }
-        item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                Surface(
-                    onClick = onLog,
-                    shape = CircleShape,
-                    color = t.controlBackground.copy(alpha = .72f),
-                    border = BorderStroke(.7.dp, t.outline.copy(alpha = .55f)),
-                    shadowElevation = 0.dp,
-                ) {
-                    Row(
-                        Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Icon(Icons.Rounded.Article, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(15.dp))
-                        Text("运行日志", color = t.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -1268,6 +1263,7 @@ private fun RefPanel(
     searchRequest: Int,
     hazeState: HazeState,
     backdrop: LayerBackdrop?,
+    glassEnabled: Boolean,
     onRefreshState: () -> Unit,
     onOpenSettings: () -> Unit,
     onDetailVisibleChanged: (Boolean) -> Unit,
@@ -1396,7 +1392,7 @@ private fun RefPanel(
                 start = 16.dp,
                 top = 8.dp,
                 end = 16.dp,
-                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 164.dp,
+                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 94.dp,
             ),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -1435,6 +1431,9 @@ private fun RefPanel(
                                         expanded = selectedGroupName == group.name,
                                         delay = delays[selected] ?: group.nodes.firstOrNull { it.name == selected }?.lastDelay,
                                         testing = selected.isNotBlank() && testing[selected] == true,
+                                        hazeState = hazeState,
+                                        backdrop = backdrop,
+                                        glassEnabled = glassEnabled,
                                         modifier = Modifier.weight(1f),
                                         onClick = {
                                             view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
@@ -1461,14 +1460,26 @@ private fun RefPanel(
                                 visible = expandedGroup != null,
                                 enter = androidx.compose.animation.expandVertically(
                                     expandFrom = Alignment.Top,
-                                    animationSpec = spring(dampingRatio = .66f, stiffness = 300f),
+                                    animationSpec = androidx.compose.animation.core.tween(
+                                        durationMillis = 300,
+                                        easing = androidx.compose.animation.core.CubicBezierEasing(.16f, 1f, .30f, 1f),
+                                    ),
                                     clip = false,
-                                ) + androidx.compose.animation.fadeIn(),
+                                ) + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(180)) +
+                                    androidx.compose.animation.slideInVertically(
+                                        animationSpec = androidx.compose.animation.core.tween(
+                                            durationMillis = 300,
+                                            easing = androidx.compose.animation.core.CubicBezierEasing(.16f, 1f, .30f, 1f),
+                                        ),
+                                    ) { -it / 10 },
                                 exit = androidx.compose.animation.shrinkVertically(
                                     shrinkTowards = Alignment.Top,
-                                    animationSpec = spring(dampingRatio = .80f, stiffness = 420f),
+                                    animationSpec = androidx.compose.animation.core.tween(
+                                        durationMillis = 220,
+                                        easing = androidx.compose.animation.core.CubicBezierEasing(.16f, 1f, .30f, 1f),
+                                    ),
                                     clip = false,
-                                ) + androidx.compose.animation.fadeOut(),
+                                ) + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(140)),
                             ) {
                                 expandedGroup?.let { group ->
                                     val selected = selectedLocal[group.name] ?: group.now
@@ -2234,7 +2245,19 @@ private fun RefPanelOverview(state: ProxyComposeState, delays: Map<String, Long>
 }
 
 @Composable
-private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolean, delay: Long?, testing: Boolean, modifier: Modifier, onClick: () -> Unit, onDelay: () -> Unit) {
+private fun RefGroupCard(
+    group: ProxyGroupUi,
+    selected: String,
+    expanded: Boolean,
+    delay: Long?,
+    testing: Boolean,
+    hazeState: HazeState,
+    backdrop: LayerBackdrop?,
+    glassEnabled: Boolean,
+    modifier: Modifier,
+    onClick: () -> Unit,
+    onDelay: () -> Unit,
+) {
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val source = remember(group.name) { MutableInteractionSource() }
@@ -2244,19 +2267,72 @@ private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolea
         spring(dampingRatio = .74f, stiffness = 580f),
         label = "group${group.name}",
     )
-    val shape = RoundedCornerShape(20.dp)
+    val shape = RoundedCornerShape(22.dp)
     val nodeName = selected.ifBlank { "未选择" }
     val nodeFlag = refNodeFlag(nodeName)
-    val premiumBrush = if (dark) {
-        Brush.verticalGradient(listOf(t.elevatedCardBackground, t.cardBackground))
-    } else {
-        Brush.verticalGradient(listOf(Color.White, Color(0xFFFAFBFD)))
+    val runtimeLiquid = glassEnabled && backdrop != null && isRuntimeShaderSupported()
+    val activeHaze = glassEnabled && !runtimeLiquid
+    val premiumBrush = when {
+        glassEnabled && dark -> Brush.verticalGradient(
+            listOf(Color.White.copy(alpha = .085f), Color(0xFF60A5FA).copy(alpha = .030f)),
+        )
+        glassEnabled -> Brush.verticalGradient(
+            listOf(Color.White.copy(alpha = .94f), Color(0xFFF8FAFE).copy(alpha = .85f)),
+        )
+        dark -> Brush.verticalGradient(listOf(t.elevatedCardBackground, t.cardBackground))
+        else -> Brush.verticalGradient(listOf(Color.White, Color(0xFFFAFBFD)))
+    }
+    val shellTint = if (dark) Color(0xFF111827).copy(alpha = .30f) else Color(0xFFF8FBFF).copy(alpha = .44f)
+    val glassModifier = when {
+        runtimeLiquid -> Modifier.drawBackdrop(
+            backdrop = requireNotNull(backdrop),
+            shape = { shape },
+            effects = {
+                padding = maxOf(padding, 24.dp.toPx())
+                colorControls(
+                    brightness = if (dark) -.012f else .022f,
+                    contrast = 1.045f,
+                    saturation = 1.72f,
+                )
+                blur(20.dp.toPx(), 20.dp.toPx())
+                liquidGlassLens(
+                    refractionHeight = 13.dp.toPx(),
+                    refractionAmount = 9.dp.toPx(),
+                    depthEffect = true,
+                    chromaticAberration = .032f,
+                )
+            },
+            highlight = {
+                (if (dark) Highlight.GlassStrokeSmallDark else Highlight.GlassStrokeSmallLight)
+                    .copy(alpha = if (dark) .68f else .84f)
+            },
+            onDrawSurface = {
+                drawRect(shellTint)
+                drawRect(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = if (dark) .055f else .22f),
+                            Color.Transparent,
+                        ),
+                        center = Offset(size.width * .16f, 0f),
+                        radius = size.width * .74f,
+                    ),
+                )
+            },
+        )
+        activeHaze -> Modifier
+            .hazeEffect(state = hazeState, style = HazeMaterials.ultraThin()) {
+                blurRadius = 20.dp
+                noiseFactor = .014f
+            }
+            .background(premiumBrush)
+        else -> Modifier.background(premiumBrush)
     }
     val arrowRotation by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
         animationSpec = androidx.compose.animation.core.tween(
             durationMillis = 280,
-            easing = androidx.compose.animation.core.FastOutSlowInEasing,
+            easing = androidx.compose.animation.core.CubicBezierEasing(.16f, 1f, .30f, 1f),
         ),
         label = "groupArrow${group.name}",
     )
@@ -2267,20 +2343,22 @@ private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolea
             .zIndex(1f)
             .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .95f else 1f }
             .shadow(
-                if (expanded) 4.dp else 2.dp,
+                if (expanded) 7.dp else 4.dp,
                 shape,
                 clip = false,
-                ambientColor = Color(0xFF0F172A).copy(alpha = if (dark) .10f else .03f),
-                spotColor = Color(0xFF0F172A).copy(alpha = if (dark) .12f else .05f),
-            )
-            .background(premiumBrush, shape)
-            .border(
-                if (expanded) 1.25.dp else 1.dp,
-                if (expanded) Color(0xFF002FA7).copy(alpha = .58f)
-                else if (dark) Color.White.copy(alpha = .10f) else Color(0xFFE2E8F0).copy(alpha = .80f),
-                shape,
+                ambientColor = Color(0xFF0F172A).copy(alpha = if (dark) .12f else .032f),
+                spotColor = Color(0xFF0F172A).copy(alpha = if (dark) .15f else .065f),
             )
             .clip(shape)
+            .then(glassModifier)
+            .border(
+                if (expanded) 1.25.dp else .9.dp,
+                if (expanded) Color(0xFF2563EB).copy(alpha = .52f)
+                else if (glassEnabled) {
+                    if (dark) Color.White.copy(alpha = .13f) else Color.White.copy(alpha = .76f)
+                } else if (dark) Color.White.copy(alpha = .10f) else Color(0xFFE2E8F0).copy(alpha = .80f),
+                shape,
+            )
             .clickable(interactionSource = source, indication = null, onClick = onClick)
             .padding(start = 16.dp, top = 10.dp, end = 14.dp, bottom = 9.dp),
         verticalArrangement = Arrangement.SpaceBetween,
@@ -2304,7 +2382,7 @@ private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolea
             Icon(
                 Icons.Rounded.KeyboardArrowDown,
                 if (expanded) "收起" else "展开",
-                tint = if (expanded) Color(0xFF002FA7) else Color(0xFF94A3B8),
+                tint = if (expanded) Color(0xFF2563EB) else Color(0xFF94A3B8),
                 modifier = Modifier.size(15.dp).graphicsLayer {
                     transformOrigin = TransformOrigin.Center
                     rotationZ = arrowRotation
@@ -2337,7 +2415,7 @@ private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolea
         ) {
             Surface(
                 shape = RoundedCornerShape(7.dp),
-                color = if (dark) Color.White.copy(alpha = .055f) else Color(0xFFF1F5F9),
+                color = if (dark) Color.White.copy(alpha = .055f) else Color(0xFFF1F5F9).copy(alpha = .86f),
                 tonalElevation = 0.dp,
             ) {
                 Text(
@@ -2365,6 +2443,7 @@ private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolea
     }
 }
 
+@Composable
 @Composable
 private fun RefInlineGroupExpansion(
     group: ProxyGroupUi,
@@ -3416,7 +3495,7 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
             start = 16.dp,
             top = 8.dp,
             end = 16.dp,
-            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 164.dp,
+            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 94.dp,
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -3506,7 +3585,7 @@ private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
             start = 16.dp,
             top = 8.dp,
             end = 16.dp,
-            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 164.dp,
+            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 94.dp,
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
