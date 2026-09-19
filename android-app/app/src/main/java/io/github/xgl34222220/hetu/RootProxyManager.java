@@ -543,6 +543,40 @@ final class RootProxyManager {
         throw new IOException("Mihomo 最终启动配置校验失败"+(d.isEmpty()?"":"："+d));
     }
 
+    void validateConfigText(String text)throws Exception{
+        RootBridge.requireWorkerThread();
+        if(text==null||text.trim().isEmpty())throw new IOException("YAML 配置不能为空");
+        byte[] bytes=text.getBytes(StandardCharsets.UTF_8);
+        if(bytes.length>4*1024*1024)throw new IOException("YAML 配置超过 4 MiB");
+        ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
+        ensureRuntimeBase(profile.core);
+        File stage=new File(context.getCacheDir(),"hetu-config-validator");
+        if(!stage.isDirectory()&&!stage.mkdirs())throw new IOException("无法创建 YAML 校验缓存目录");
+        File source=File.createTempFile("editor-", ".yaml", stage);
+        try(FileOutputStream out=new FileOutputStream(source,false)){
+            out.write(bytes);out.getFD().sync();
+        }
+        String token=Long.toHexString(System.nanoTime());
+        String rootFile=ROOT+"/run/state/editor-validation-"+token+".yaml";
+        String workDir=ROOT+"/run/validate-"+token;
+        String cmd="set +e; mkdir -p "+RootBridge.quote(ROOT+"/run/state")+" "+RootBridge.quote(workDir)
+                +"; cp "+RootBridge.quote(source.getAbsolutePath())+" "+RootBridge.quote(rootFile)
+                +"; copy_rc=$?; if [ \"$copy_rc\" -ne 0 ]; then rm -f "+RootBridge.quote(rootFile)
+                +"; rm -rf "+RootBridge.quote(workDir)+"; exit \"$copy_rc\"; fi"
+                +"; chmod 600 "+RootBridge.quote(rootFile)
+                +"; "+RootBridge.quote(BIN)+" -t -d "+RootBridge.quote(workDir)+" -f "+RootBridge.quote(rootFile)
+                +"; rc=$?; rm -f "+RootBridge.quote(rootFile)+"; rm -rf "+RootBridge.quote(workDir)+"; exit \"$rc\"";
+        try{
+            RootBridge.Result result=RootBridge.rootShell(context,cmd,30000L);
+            if(result.ok())return;
+            String detail=result.output==null?"":result.output.trim();
+            if(detail.length()>1200)detail=detail.substring(detail.length()-1200);
+            throw new IOException("YAML 校验失败"+(detail.isEmpty()?"":"："+detail));
+        }finally{
+            source.delete();
+        }
+    }
+
     private JSONObject runJsonAllowMissing(String action,JSONObject missing)throws Exception{
         RootBridge.requireWorkerThread();
         String cmd="if [ -x "+RootBridge.quote(SCRIPT)+" ]; then exec "+RootBridge.quote(SCRIPT)+" "+RootBridge.quote(action)+"; else printf '%s\\n' "+RootBridge.quote(missing.toString())+"; fi";
