@@ -251,40 +251,62 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
 
             item("summary") {
                 val configured = subscriptions.count { !it.placeholder }
-                Surface(shape = RoundedCornerShape(28.dp), color = tokens.cardBackground, shadowElevation = 2.dp) {
-                    Column(
-                        Modifier.fillMaxWidth().background(
-                            Brush.linearGradient(listOf(scheme.primaryContainer.copy(alpha = .42f), tokens.cardBackground))
-                        ).padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp),
-                    ) {
+                val live = liveProviders.values.filter { it.hasSubscriptionInfo && it.total > 0L }
+                val liveUsed = live.sumOf { it.used }
+                val liveTotal = live.sumOf { it.total }
+                val liveRatio = if (liveTotal > 0L) (liveUsed.toDouble() / liveTotal.toDouble()).toFloat().coerceIn(0f, 1f) else 0f
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = tokens.cardBackground,
+                    border = BorderStroke(.7.dp, if (dark) tokens.outline.copy(alpha = .34f) else Color(0xFFE2E8F0).copy(alpha = .72f)),
+                    shadowElevation = 1.dp,
+                ) {
+                    Column(Modifier.fillMaxWidth().padding(17.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Surface(shape = RoundedCornerShape(15.dp), color = tokens.elevatedCardBackground, modifier = Modifier.size(46.dp)) {
-                                Box(contentAlignment = Alignment.Center) { Icon(Icons.Rounded.CloudSync, null, tint = scheme.primary, modifier = Modifier.size(23.dp)) }
+                            Box(
+                                Modifier.size(42.dp).background(scheme.primary.copy(alpha = .09f), RoundedCornerShape(14.dp)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(Icons.Rounded.CloudSync, null, tint = scheme.primary, modifier = Modifier.size(21.dp))
                             }
-                            Spacer(Modifier.width(12.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text("代理订阅", color = tokens.textPrimary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                                Text("$configured 个已配置 · ${subscriptions.size - configured} 个待填写", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
+                            Spacer(Modifier.width(11.dp))
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text("订阅与配置", color = tokens.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
+                                Text("$configured 个已配置 · ${subscriptions.size - configured} 个待填写 · ${configLibrary.size} 份配置", color = tokens.textSecondary, fontSize = 11.sp)
+                            }
+                            if (liveTotal > 0L) {
+                                Text(
+                                    "剩余 ${((1f - liveRatio) * 100f).toInt()}%",
+                                    color = scheme.primary,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                )
                             }
                         }
-                        Text(
-                            "支持直接导入完整 YAML/YML 配置，也可以只填写订阅链接。配置文件最大 4 MiB，导入后会自动切换为当前配置。",
-                            color = tokens.textSecondary,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            OutlinedButton(
+                        if (liveTotal > 0L) {
+                            Box(Modifier.fillMaxWidth().height(6.dp).background(Color(0xFFF1F5F9), CircleShape)) {
+                                Box(
+                                    Modifier.fillMaxWidth(liveRatio.coerceIn(.001f, 1f)).fillMaxHeight()
+                                        .background(Brush.horizontalGradient(listOf(Color(0xFF2563EB), Color(0xFF22D3EE))), CircleShape),
+                                )
+                            }
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Text("${subscriptionBytes(liveUsed)} / ${subscriptionBytes(liveTotal)}", color = tokens.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                                Spacer(Modifier.weight(1f))
+                                Text("${live.sumOf { it.nodes.size }} 个节点", color = tokens.textSecondary, fontSize = 11.sp)
+                            }
+                        } else {
+                            Text("运行中的 Mihomo 暂未上报订阅流量；配置管理功能仍可正常使用。", color = tokens.textSecondary, fontSize = 11.sp, lineHeight = 16.sp)
+                        }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            FilledTonalButton(
                                 onClick = { importLauncher.launch(arrayOf("*/*")) },
-                                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                                shape = RoundedCornerShape(18.dp),
+                                modifier = Modifier.weight(1f).height(46.dp),
+                                shape = CircleShape,
                             ) {
-                                Icon(Icons.Rounded.FileOpen, null, Modifier.size(19.dp))
-                                Spacer(Modifier.width(7.dp))
-                                Text("导入配置")
+                                Icon(Icons.Rounded.FileOpen, null, Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("导入配置", fontWeight = FontWeight.Bold)
                             }
                             Button(
                                 onClick = {
@@ -294,12 +316,12 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                                     editorUrl = ""
                                     editorError = ""
                                 },
-                                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                                shape = RoundedCornerShape(18.dp),
+                                modifier = Modifier.weight(1f).height(46.dp),
+                                shape = CircleShape,
                             ) {
-                                Icon(Icons.Rounded.Add, null, Modifier.size(20.dp))
-                                Spacer(Modifier.width(7.dp))
-                                Text("添加订阅")
+                                Icon(Icons.Rounded.Add, null, Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("添加订阅", fontWeight = FontWeight.Bold)
                             }
                         }
                     }
