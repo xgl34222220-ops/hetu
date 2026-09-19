@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TransformedText
@@ -721,13 +722,92 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
             properties = DialogProperties(usePlatformDefaultWidth = false),
         ) {
             val editorShape = RoundedCornerShape(18.dp)
+            val editorScroll = rememberScrollState()
+            val editorHorizontalScroll = rememberScrollState()
+            val editorState = androidx.compose.foundation.text.input.rememberTextFieldState(yamlText)
+            val editorText = editorState.text.toString()
+            val lineCount = remember(editorText) { maxOf(1, editorText.count { it == '\n' } + 1) }
+            val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+            val outlineItems = remember(editorText) { yamlOutlineItems(editorText) }
+            var outlineOpen by remember { mutableStateOf(false) }
+            val undoStack = remember(editorState) { mutableStateListOf<String>() }
+            val redoStack = remember(editorState) { mutableStateListOf<String>() }
+            var historyText by remember(editorState) { mutableStateOf(editorState.text.toString()) }
+            var applyingHistory by remember(editorState) { mutableStateOf(false) }
+            val lineHeightPx = with(LocalDensity.current) { 21.sp.toPx() }
+
+            fun replaceEditorText(next: String) {
+                editorState.edit {
+                    replace(0, length, next)
+                    selection = TextRange(next.length)
+                }
+            }
+
+            fun insertYamlText(snippet: String) {
+                editorState.edit {
+                    val start = selection.min
+                    val end = selection.max
+                    replace(start, end, snippet)
+                    selection = TextRange(start + snippet.length)
+                }
+            }
+
+            fun undoYaml() {
+                if (undoStack.isEmpty()) return
+                val current = editorState.text.toString()
+                val target = undoStack.removeAt(undoStack.lastIndex)
+                redoStack.add(current)
+                applyingHistory = true
+                replaceEditorText(target)
+            }
+
+            fun redoYaml() {
+                if (redoStack.isEmpty()) return
+                val current = editorState.text.toString()
+                val target = redoStack.removeAt(redoStack.lastIndex)
+                undoStack.add(current)
+                applyingHistory = true
+                replaceEditorText(target)
+            }
+
+            fun saveYaml() {
+                if (yamlSaving) return
+                yamlSaving = true
+                scope.launch {
+                    runCatching { controller.saveConfigText(editorState.text.toString()) }
+                        .onSuccess {
+                            yamlOpen = false
+                            revision++
+                            message = "YAML 已保存；重启代理后生效"
+                        }
+                        .onFailure { yamlError = it.message ?: "保存失败" }
+                    yamlSaving = false
+                }
+            }
+
+            LaunchedEffect(editorState) {
+                snapshotFlow { editorState.text.toString() }.collect { next ->
+                    if (yamlError.isNotBlank()) yamlError = ""
+                    if (next != historyText) {
+                        if (applyingHistory) {
+                            applyingHistory = false
+                        } else {
+                            undoStack.add(historyText)
+                            if (undoStack.size > 80) undoStack.removeAt(0)
+                            redoStack.clear()
+                        }
+                        historyText = next
+                    }
+                }
+            }
+
             Surface(
                 modifier = Modifier.fillMaxSize(),
                 color = tokens.pageBackground,
             ) {
                 Column(Modifier.fillMaxSize()) {
                     Row(
-                        Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp).height(48.dp),
+                        Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 10.dp, vertical = 7.dp).height(48.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         IconButton(onClick = { if (!yamlSaving) yamlOpen = false }, enabled = !yamlSaving) {
@@ -735,22 +815,19 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                         }
                         Column(Modifier.weight(1f)) {
                             Text("编辑当前 YAML", color = tokens.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
-                            Text("保存后重启代理生效", color = tokens.textSecondary, fontSize = 10.sp)
+                            Text("$lineCount 行 · 保存后重启代理生效", color = tokens.textSecondary, fontSize = 10.sp)
+                        }
+                        IconButton(onClick = { outlineOpen = true }, enabled = outlineItems.isNotEmpty() && !yamlSaving) {
+                            Icon(Icons.Rounded.FormatListBulleted, "语法大纲", tint = scheme.primary)
+                        }
+                        TextButton(onClick = ::saveYaml, enabled = !yamlSaving) {
+                            if (yamlSaving) CircularProgressIndicator(Modifier.size(17.dp), strokeWidth = 2.dp)
+                            else Text("保存", color = scheme.primary, fontWeight = FontWeight.Bold)
                         }
                     }
-                    val editorScroll = rememberScrollState()
-                    val editorHorizontalScroll = rememberScrollState()
-                    val editorState = androidx.compose.foundation.text.input.rememberTextFieldState(yamlText)
-                    val editorText = editorState.text.toString()
-                    val lineCount = remember(editorText) { maxOf(1, editorText.count { it == '\n' } + 1) }
-                    val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
-                    LaunchedEffect(editorState) {
-                        snapshotFlow { editorState.text.toString() }.collect {
-                            if (yamlError.isNotBlank()) yamlError = ""
-                        }
-                    }
+
                     Surface(
-                        modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 16.dp, vertical = 8.dp),
+                        modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 14.dp, vertical = 7.dp),
                         shape = editorShape,
                         color = if (dark) tokens.cardBackground else Color(0xFFF8FAFC),
                         border = BorderStroke(.7.dp, if (dark) tokens.outline.copy(alpha = .42f) else Color(0xFFE2E8F0)),
@@ -805,9 +882,39 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                             yamlError,
                             color = scheme.error,
                             fontSize = 11.sp,
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp),
+                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 2.dp),
                         )
                     }
+
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = imeVisible,
+                        enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(130)) +
+                            androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(170)) { it / 2 },
+                        exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(100)),
+                    ) {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 5.dp),
+                            shape = RoundedCornerShape(18.dp),
+                            color = if (dark) tokens.elevatedCardBackground else Color(0xFFF1F5F9),
+                            border = BorderStroke(.7.dp, if (dark) tokens.outline.copy(alpha = .42f) else Color(0xFFE2E8F0)),
+                            tonalElevation = 0.dp,
+                        ) {
+                            Row(
+                                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 7.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                YamlAccessoryKey("Tab") { insertYamlText("  ") }
+                                YamlAccessoryKey(":") { insertYamlText(": ") }
+                                YamlAccessoryKey("-") { insertYamlText("- ") }
+                                YamlAccessoryKey("#") { insertYamlText("# ") }
+                                YamlAccessoryKey("\"") { insertYamlText("\"") }
+                                YamlAccessoryKey("撤销", enabled = undoStack.isNotEmpty(), onClick = ::undoYaml)
+                                YamlAccessoryKey("重做", enabled = redoStack.isNotEmpty(), onClick = ::redoYaml)
+                            }
+                        }
+                    }
+
                     androidx.compose.animation.AnimatedVisibility(
                         visible = !imeVisible,
                         enter = androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(180)) { it / 2 } +
@@ -816,56 +923,168 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                             androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(120)),
                     ) {
                         Surface(
-                        modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp)
-                            .shadow(18.dp, RoundedCornerShape(28.dp), clip = false, ambientColor = Color(0xFF0F172A).copy(alpha = .10f), spotColor = Color(0xFF0F172A).copy(alpha = .14f)),
-                        shape = RoundedCornerShape(28.dp),
-                        color = if (dark) tokens.elevatedCardBackground.copy(alpha = .88f) else Color.White.copy(alpha = .84f),
-                        border = BorderStroke(.8.dp, if (dark) Color.White.copy(alpha = .10f) else Color.White.copy(alpha = .96f)),
-                        tonalElevation = 0.dp,
-                    ) {
-                        Row(
-                            Modifier.fillMaxWidth().padding(6.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp)
+                                .shadow(14.dp, RoundedCornerShape(28.dp), clip = false, ambientColor = Color(0xFF0F172A).copy(alpha = .08f), spotColor = Color(0xFF0F172A).copy(alpha = .12f)),
+                            shape = RoundedCornerShape(28.dp),
+                            color = if (dark) tokens.elevatedCardBackground.copy(alpha = .88f) else Color.White.copy(alpha = .82f),
+                            border = BorderStroke(.8.dp, if (dark) Color.White.copy(alpha = .10f) else Color.White.copy(alpha = .94f)),
+                            tonalElevation = 0.dp,
                         ) {
-                            FilledTonalButton(
-                                onClick = { yamlOpen = false },
-                                enabled = !yamlSaving,
-                                modifier = Modifier.weight(1f).height(44.dp),
-                                shape = CircleShape,
-                                colors = ButtonDefaults.filledTonalButtonColors(
-                                    containerColor = if (dark) Color.White.copy(alpha = .08f) else Color(0xFFF1F5F9),
-                                    contentColor = if (dark) Color(0xFFE2E8F0) else Color(0xFF64748B),
-                                ),
-                            ) { Text("取消", fontWeight = FontWeight.Bold) }
-                            Button(
-                                onClick = {
-                                    yamlSaving = true
-                                    scope.launch {
-                                        runCatching { controller.saveConfigText(editorState.text.toString()) }
-                                            .onSuccess { yamlOpen = false; revision++; message = "YAML 已保存；重启代理后生效" }
-                                            .onFailure { yamlError = it.message ?: "保存失败" }
-                                        yamlSaving = false
-                                    }
-                                },
-                                enabled = !yamlSaving,
-                                modifier = Modifier.weight(1f).height(44.dp)
-                                    .shadow(9.dp, CircleShape, clip = false, ambientColor = Color(0xFF002FA7).copy(alpha = .22f), spotColor = Color(0xFF002FA7).copy(alpha = .30f)),
-                                shape = CircleShape,
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF002FA7),
-                                    contentColor = Color.White,
-                                    disabledContainerColor = Color(0xFF002FA7).copy(alpha = .46f),
-                                ),
-                            ) {
-                                if (yamlSaving) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
-                                else Text("保存", fontWeight = FontWeight.Bold)
+                            Row(Modifier.fillMaxWidth().padding(6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                FilledTonalButton(
+                                    onClick = { yamlOpen = false },
+                                    enabled = !yamlSaving,
+                                    modifier = Modifier.weight(1f).height(44.dp),
+                                    shape = CircleShape,
+                                ) { Text("取消", fontWeight = FontWeight.Bold) }
+                                Button(
+                                    onClick = ::saveYaml,
+                                    enabled = !yamlSaving,
+                                    modifier = Modifier.weight(1f).height(44.dp),
+                                    shape = CircleShape,
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF002FA7), contentColor = Color.White),
+                                ) {
+                                    if (yamlSaving) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
+                                    else Text("保存", fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
                     }
+                }
+            }
+
+            if (outlineOpen) {
+                ModalBottomSheet(
+                    onDismissRequest = { outlineOpen = false },
+                    containerColor = tokens.elevatedCardBackground,
+                    contentColor = tokens.textPrimary,
+                    tonalElevation = 0.dp,
+                    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                    dragHandle = {
+                        Box(
+                            Modifier.padding(top = 10.dp, bottom = 6.dp)
+                                .size(width = 36.dp, height = 4.dp)
+                                .background(tokens.textMuted.copy(alpha = .40f), CircleShape),
+                        )
+                    },
+                ) {
+                    Column(
+                        Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text("YAML 语法大纲", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+                        Text("点击直接跳转到对应区段", color = tokens.textSecondary, fontSize = 11.sp)
+                        Column(
+                            Modifier.fillMaxWidth().heightIn(max = 430.dp).verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            outlineItems.forEach { item ->
+                                Surface(
+                                    onClick = {
+                                        scope.launch {
+                                            editorScroll.scrollTo((item.line * lineHeightPx).toInt().coerceAtLeast(0))
+                                            editorHorizontalScroll.scrollTo(0)
+                                        }
+                                        outlineOpen = false
+                                    },
+                                    shape = RoundedCornerShape(15.dp),
+                                    color = tokens.controlBackground.copy(alpha = .58f),
+                                ) {
+                                    Row(
+                                        Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 11.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Icon(Icons.Rounded.SubdirectoryArrowRight, null, tint = scheme.primary, modifier = Modifier.size(17.dp))
+                                        Spacer(Modifier.width(9.dp))
+                                        Text(item.title, color = tokens.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                                        Text("L${item.line + 1}", color = tokens.textMuted, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
+    }
+
+}
+
+private data class YamlOutlineItem(val title: String, val line: Int)
+
+private fun yamlOutlineItems(text: String): List<YamlOutlineItem> {
+    val lines = text.lines()
+    if (lines.isEmpty()) return emptyList()
+    val out = ArrayList<YamlOutlineItem>()
+    out += YamlOutlineItem("文件顶部", 0)
+
+    val portLine = lines.indexOfFirst {
+        val t = it.trim()
+        t.startsWith("mixed-port:") || t.startsWith("port:") || t.startsWith("socks-port:") || t.startsWith("tproxy-port:")
+    }
+    if (portLine >= 0) out += YamlOutlineItem("基础端口", portLine)
+
+    fun sectionEnd(start: Int): Int {
+        for (index in start + 1 until lines.size) {
+            val raw = lines[index]
+            val trimmed = raw.trim()
+            if (trimmed.isNotEmpty() && !trimmed.startsWith("#") && raw.takeWhile { it == ' ' || it == '\t' }.isEmpty()) return index
+        }
+        return lines.size
+    }
+
+    val labels = linkedMapOf(
+        "dns" to "DNS 模块",
+        "tun" to "TUN 设置",
+        "sniffer" to "嗅探设置",
+        "proxy-providers" to "代理订阅",
+        "proxies" to "节点定义",
+        "proxy-groups" to "策略组",
+        "rule-providers" to "规则集",
+        "rules" to "规则分流",
+    )
+    lines.forEachIndexed { index, raw ->
+        if (raw.isBlank() || raw.firstOrNull()?.isWhitespace() == true) return@forEachIndexed
+        val trimmed = raw.trim()
+        if (!trimmed.endsWith(":")) return@forEachIndexed
+        val key = trimmed.removeSuffix(":").trim()
+        val base = labels[key] ?: return@forEachIndexed
+        val end = sectionEnd(index)
+        val count = when (key) {
+            "proxy-groups", "proxies" -> lines.subList(index + 1, end).count { it.trim().startsWith("- name:") }
+            "rules" -> lines.subList(index + 1, end).count { it.trim().startsWith("-") }
+            "proxy-providers", "rule-providers" -> lines.subList(index + 1, end).count {
+                val indent = it.length - it.trimStart().length
+                indent == 2 && it.trim().endsWith(":")
+            }
+            else -> 0
+        }
+        out += YamlOutlineItem(if (count > 0) "$base ($count)" else base, index)
+    }
+    return out.distinctBy { it.line }
+}
+
+@Composable
+private fun YamlAccessoryKey(label: String, enabled: Boolean = true, onClick: () -> Unit) {
+    val tokens = LocalHetuTokens.current
+    val shape = RoundedCornerShape(11.dp)
+    Box(
+        Modifier.height(34.dp).widthIn(min = 42.dp)
+            .clip(shape)
+            .background(if (enabled) tokens.cardBackground else tokens.cardBackground.copy(alpha = .42f), shape)
+            .border(.6.dp, tokens.outline.copy(alpha = if (enabled) .55f else .24f), shape)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 10.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            color = if (enabled) tokens.textPrimary else tokens.textMuted,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace,
+            maxLines = 1,
+        )
     }
 }
 
