@@ -504,21 +504,32 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                 } else {
                     Brush.verticalGradient(listOf(Color.White.copy(alpha = .95f), Color(0xFFF8FAFC).copy(alpha = .85f)))
                 }
-                Surface(
-                    modifier = Modifier.background(ticketBrush, ticketShape),
-                    onClick = {
-                        addingSubscription = false
-                        editSubscription = item
-                        editorName = item.name
-                        editorUrl = if (item.placeholder) "" else item.url
-                        editorError = ""
-                    },
-                    shape = ticketShape,
-                    color = Color.Transparent,
-                    border = BorderStroke(.7.dp, if (dark) tokens.outline.copy(alpha = .30f) else Color(0xFFE2E8F0).copy(alpha = .70f)),
-                    shadowElevation = 1.dp,
+                Box(
+                    Modifier.fillMaxWidth()
+                        .shadow(
+                            8.dp,
+                            ticketShape,
+                            clip = false,
+                            ambientColor = Color(0xFF0F172A).copy(alpha = if (dark) .09f else .028f),
+                            spotColor = Color(0xFF0F172A).copy(alpha = if (dark) .12f else .050f),
+                        )
+                        .background(ticketBrush, ticketShape)
+                        .border(
+                            .8.dp,
+                            if (dark) Color.White.copy(alpha = .10f) else Color.White.copy(alpha = .78f),
+                            ticketShape,
+                        )
+                        .clip(ticketShape)
+                        .clickable {
+                            addingSubscription = false
+                            editSubscription = item
+                            editorName = item.name
+                            editorUrl = if (item.placeholder) "" else item.url
+                            editorError = ""
+                        }
+                        .padding(15.dp),
                 ) {
-                    Column(Modifier.fillMaxWidth().padding(15.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
                                 Modifier.size(36.dp).background(scheme.primary.copy(alpha = .08f), CircleShape),
@@ -547,7 +558,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
 
                         Box(
                             Modifier.fillMaxWidth().height(6.dp)
-                                .background(if (dark) Color.White.copy(alpha = .06f) else Color(0xFFF1F5F9), CircleShape),
+                                .background(if (dark) Color.White.copy(alpha = .06f) else Color(0xFFE2E8F0).copy(alpha = .56f), CircleShape),
                         ) {
                             if (ratio != null && ratio > 0f) {
                                 Box(
@@ -571,7 +582,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                             )
                             if (remainingPercent != null) {
                                 Spacer(Modifier.width(7.dp))
-                                Surface(shape = CircleShape, color = if (dark) Color(0xFF064E3B).copy(alpha = .34f) else Color(0xFFECFDF5)) {
+                                Surface(shape = CircleShape, color = if (dark) Color(0xFF064E3B).copy(alpha = .34f) else Color(0xFFD1FAE5).copy(alpha = .42f)) {
                                     Text(
                                         "剩余 $remainingPercent%",
                                         Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
@@ -603,13 +614,30 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                 }
             }
             item("yaml") {
-                Surface(shape = RoundedCornerShape(24.dp), color = tokens.cardBackground, shadowElevation = 1.dp) {
+                val yamlCardShape = RoundedCornerShape(24.dp)
+                val yamlCardBrush = if (dark) {
+                    Brush.verticalGradient(listOf(Color(0xFF1B2431).copy(alpha = .88f), Color(0xFF151D29).copy(alpha = .82f)))
+                } else {
+                    Brush.verticalGradient(listOf(Color.White.copy(alpha = .94f), Color(0xFFF8FAFE).copy(alpha = .85f)))
+                }
+                Box(
+                    Modifier.fillMaxWidth()
+                        .shadow(7.dp, yamlCardShape, clip = false, ambientColor = Color(0xFF0F172A).copy(alpha = .025f), spotColor = Color(0xFF0F172A).copy(alpha = .045f))
+                        .background(yamlCardBrush, yamlCardShape)
+                        .border(.8.dp, if (dark) Color.White.copy(alpha = .10f) else Color.White.copy(alpha = .78f), yamlCardShape)
+                        .clip(yamlCardShape),
+                ) {
                     Row(
                         Modifier.fillMaxWidth().padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Surface(shape = RoundedCornerShape(15.dp), color = tokens.elevatedCardBackground, modifier = Modifier.size(44.dp)) {
-                            Box(contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Code, null, tint = scheme.primary, modifier = Modifier.size(22.dp)) }
+                        Box(
+                            Modifier.size(44.dp)
+                                .background(scheme.primary.copy(alpha = .08f), RoundedCornerShape(15.dp))
+                                .border(.6.dp, scheme.primary.copy(alpha = .10f), RoundedCornerShape(15.dp)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(Icons.Rounded.Code, null, tint = scheme.primary, modifier = Modifier.size(22.dp))
                         }
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
