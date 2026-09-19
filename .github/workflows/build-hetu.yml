@@ -60,7 +60,7 @@ jobs:
           grep -q 'System.loadLibrary("hetu_core")' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoNative.java
           grep -q 'Java_io_github_xgl34222220_hetu_MihomoNative_invoke' native/bridge/jni_android.c
           grep -q 'Java_io_github_xgl34222220_hetu_preview_MihomoNative_invoke' native/bridge/jni_android.c
-          grep -q 'versionName = "0.4.0-test.68"' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.4.0-test.69"' android-app/app/build.gradle.kts
           test -f android-app/app/src/main/java/io/github/xgl34222220/hetu/LegacyAppMigrator.java
           grep -q 'LegacyAppMigrator.migrateIfNeeded(app)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
           grep -q 'controller.restart { operation = it }' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
@@ -105,6 +105,14 @@ jobs:
           grep -Fq 'YamlAccessoryKey("Tab")' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
           grep -Fq 'YamlAccessoryKey("撤销"' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
           grep -Fq 'TextButton(onClick = ::saveYaml' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
+          grep -Fq 'gutterStartLine' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
+          grep -Fq 'gutterEndLine = minOf(lineCount, gutterStartLine + 40)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
+          grep -Fq 'outputTransformation = if (highlightEnabled)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
+          grep -Fq 'YamlAccessoryKey("2空格")' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
+          grep -Fq 'yamlLocalLint(currentText)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
+          grep -Fq 'subscriptionUpdatedLabel(provider.updatedAt)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
+          grep -Fq 'root.validateConfigText(text)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
+          grep -Fq 'void validateConfigText(String text)' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
           grep -Fq '.background(t.pageBackground)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceFileManagerActivity.kt
           grep -Fq '.background(tokens.pageBackground)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreActivity.kt
           grep -q 'head -c \$((END-START+1))' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
