@@ -100,8 +100,11 @@ jobs:
           grep -Fq 'api.healthCheckProxyProvider(provider.name)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
           grep -Fq 'provider != null -> api.delay(node, provider.testUrl, provider.expectedStatus)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
           grep -Fq 'DELAY_SLOTS=new Semaphore(12,true)' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java
-          grep -Fq 'nodes.forEach { testing[it.name] = true }' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'repo.globalDelay()' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
+          grep -Fq 'val targets = state.groups.mapNotNull' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
+          grep -Fq 'repo.delay(node)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
+          ! grep -Fq 'repo.globalDelay()' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
+          grep -Fq 'failed 失败' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt || true
+          grep -Fq 'failed 未更新' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           grep -Fq 'targets.forEach { providerRefreshing[it.name] = true }' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           grep -Fq 'targets.chunked(16)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           ! grep -Fq 'delays[node.name] = value' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt || true
@@ -136,8 +139,8 @@ jobs:
           grep -q 'System.loadLibrary("hetu_core")' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoNative.java
           grep -q 'Java_io_github_xgl34222220_hetu_MihomoNative_invoke' native/bridge/jni_android.c
           grep -q 'Java_io_github_xgl34222220_hetu_preview_MihomoNative_invoke' native/bridge/jni_android.c
-          grep -q 'versionName = "0.4.0-test.84"' android-app/app/build.gradle.kts
-          grep -q 'versionCode = 484' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.4.0-test.85"' android-app/app/build.gradle.kts
+          grep -q 'versionCode = 485' android-app/app/build.gradle.kts
           test -f android-app/app/src/main/java/io/github/xgl34222220/hetu/LegacyAppMigrator.java
           grep -q 'LegacyAppMigrator.migrateIfNeeded(app)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
           grep -q 'controller.restart { operation = it }' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt

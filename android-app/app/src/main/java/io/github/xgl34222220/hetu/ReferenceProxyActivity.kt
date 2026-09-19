@@ -1495,40 +1495,62 @@ private fun RefPanel(
     }
 
     suspend fun refreshGroupDelaysAnimated() {
-        val nodes = state.groups.flatMap { it.nodes }.distinctBy { it.name }
-        if (nodes.isEmpty()) {
-            capsuleText = "没有可测速节点"
+        // Pull-to-refresh on the strategy page means the same thing as tapping the
+        // delay chip on every visible strategy card: test each group's CURRENT node.
+        // It must not silently expand into a probe of every leaf node in every provider.
+        val targets = state.groups.mapNotNull { group ->
+            (selectedLocal[group.name] ?: group.now)
+                .trim()
+                .takeIf { it.isNotBlank() && it != "未选择" }
+        }.distinct()
+        if (targets.isEmpty()) {
+            capsuleText = "没有可测速的当前节点"
             capsuleError = false
             return
         }
-        nodes.forEach { testing[it.name] = true }
-        capsuleText = "节点批量测速中 · ${nodes.size} 个"
-        capsuleError = false
-        val measured = try {
-            repo.globalDelay()
-        } catch (cancel: CancellationException) {
-            throw cancel
-        } catch (_: Exception) {
-            emptyMap()
+
+        // Remove legacy false-timeout values left by older test builds. A failed refresh
+        // means "no new value", not "this node is definitely timed out".
+        targets.forEach { node ->
+            if ((delays[node] ?: 1L) <= 0L) delays.remove(node)
+            testing[node] = true
         }
+
+        var completed = 0
         var failed = 0
+        capsuleText = "当前节点测速 0/${targets.size}"
+        capsuleError = false
         try {
-            nodes.forEachIndexed { index, node ->
-                val value = measured[node.name]
-                if (value != null && value > 0L) {
-                    delays[node.name] = value
-                } else {
-                    failed++
-                }
-                testing.remove(node.name)
-                capsuleText = "节点测速 ${index + 1}/${nodes.size}"
-                if (index < nodes.lastIndex) delay(12L)
+            coroutineScope {
+                targets.map { node ->
+                    async {
+                        val value = try {
+                            repo.delay(node)
+                        } catch (cancel: CancellationException) {
+                            throw cancel
+                        } catch (_: Exception) {
+                            -1L
+                        }
+                        if (value > 0L) {
+                            delays[node] = value
+                        } else {
+                            failed++
+                        }
+                        testing.remove(node)
+                        completed++
+                        capsuleText = "当前节点测速 $completed/${targets.size}"
+                    }
+                }.awaitAll()
             }
         } finally {
-            nodes.forEach { testing.remove(it.name) }
+            targets.forEach { testing.remove(it) }
         }
         capsuleError = failed > 0
-        capsuleText = if (failed == 0) "节点测速完成 · ${nodes.size}/${nodes.size}" else "节点测速完成 · ${nodes.size - failed} 成功 / $failed 失败"
+        capsuleText = if (failed == 0) {
+            "当前节点测速完成 · ${targets.size}/${targets.size}"
+        } else {
+            "当前节点测速完成 · ${targets.size - failed} 成功 / $failed 未更新"
+        }
         view.performHapticFeedback(if (failed == 0) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.CLOCK_TICK)
     }
 
@@ -1730,10 +1752,11 @@ private fun RefPanel(
                                             if (selected.isNotBlank() && testing[selected] != true) scope.launch {
                                                 testing[selected] = true
                                                 try {
-                                                    delays[selected] = repo.delay(selected)
+                                                    val measured = repo.delay(selected)
+                                                    if (measured > 0L) delays[selected] = measured
                                                     view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                                                 } catch (_: Exception) {
-                                                    delays[selected] = -1L
+                                                    if ((delays[selected] ?: 1L) <= 0L) delays.remove(selected)
                                                 } finally {
                                                     testing.remove(selected)
                                                 }
@@ -1785,9 +1808,12 @@ private fun RefPanel(
                                         onDelay = { node ->
                                             if (testing[node] != true) scope.launch {
                                                 testing[node] = true
-                                                try { delays[node] = repo.delay(node) }
-                                                catch (_: Exception) { delays[node] = -1L }
-                                                finally { testing.remove(node) }
+                                                try {
+                                                    val measured = repo.delay(node)
+                                                    if (measured > 0L) delays[node] = measured
+                                                } catch (_: Exception) {
+                                                    if ((delays[node] ?: 1L) <= 0L) delays.remove(node)
+                                                } finally { testing.remove(node) }
                                             }
                                         },
                                         onTestAll = {
@@ -1803,7 +1829,9 @@ private fun RefPanel(
                                                         }
                                                     }
                                                     pending.forEachIndexed { index, node ->
-                                                        delays[node.name] = wave[index].await()
+                                                        val measured = wave[index].await()
+                                                        if (measured > 0L) delays[node.name] = measured
+                                                        else if ((delays[node.name] ?: 1L) <= 0L) delays.remove(node.name)
                                                         delay(32L)
                                                         testing.remove(node.name)
                                                     }
