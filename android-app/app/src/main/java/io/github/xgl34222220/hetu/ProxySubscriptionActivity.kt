@@ -56,6 +56,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import io.github.xgl34222220.hetu.ui.HetuTheme
 import io.github.xgl34222220.hetu.ui.LocalHetuTokens
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class ProxySubscriptionActivity : ComponentActivity() {
@@ -556,7 +557,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                             )
                         }
                         if (provider?.updatedAt?.isNotBlank() == true) {
-                            Text("更新 ${provider.updatedAt}", color = tokens.textMuted, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(subscriptionUpdatedLabel(provider.updatedAt), color = tokens.textMuted, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                 }
@@ -731,13 +732,28 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
             val editorText = editorState.text.toString()
             val lineCount = remember(editorText) { maxOf(1, editorText.count { it == '\n' } + 1) }
             val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
-            val outlineItems = remember(editorText) { yamlOutlineItems(editorText) }
+            var outlineSource by remember { mutableStateOf(editorText) }
+            LaunchedEffect(editorText) {
+                delay(250)
+                outlineSource = editorText
+            }
+            val outlineItems = remember(outlineSource) { yamlOutlineItems(outlineSource) }
             var outlineOpen by remember { mutableStateOf(false) }
             val undoStack = remember(editorState) { mutableStateListOf<String>() }
             val redoStack = remember(editorState) { mutableStateListOf<String>() }
             var historyText by remember(editorState) { mutableStateOf(editorState.text.toString()) }
             var applyingHistory by remember(editorState) { mutableStateOf(false) }
-            val lineHeightPx = with(LocalDensity.current) { 21.sp.toPx() }
+            val density = LocalDensity.current
+            val lineHeightPx = with(density) { 21.sp.toPx() }
+            val lineHeightDp = with(density) { 21.sp.toDp() }
+            val editorTopPaddingPx = with(density) { 12.dp.toPx() }
+            val gutterContentOffsetPx = (editorScroll.value.toFloat() - editorTopPaddingPx).coerceAtLeast(0f)
+            val gutterStartLine = (gutterContentOffsetPx / lineHeightPx).toInt().coerceIn(0, (lineCount - 1).coerceAtLeast(0))
+            val gutterEndLine = minOf(lineCount, gutterStartLine + 40)
+            val gutterRemainderDp = with(density) {
+                (gutterContentOffsetPx - gutterStartLine * lineHeightPx).coerceAtLeast(0f).toDp()
+            }
+            val highlightEnabled = !imeVisible && editorText.length <= 24_000
 
             fun replaceEditorText(next: String) {
                 editorState.edit {
@@ -777,13 +793,19 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                 if (yamlSaving) return
                 yamlSaving = true
                 scope.launch {
-                    runCatching { controller.saveConfigText(editorState.text.toString()) }
-                        .onSuccess {
-                            yamlOpen = false
-                            revision++
-                            message = "YAML 已保存；重启代理后生效"
+                    val result = runCatching { controller.saveConfigText(editorState.text.toString()) }
+                    result.onSuccess {
+                        yamlOpen = false
+                        revision++
+                        message = "YAML 已保存；重启代理后生效"
+                    }
+                    result.exceptionOrNull()?.let { error ->
+                        yamlError = error.message ?: "保存失败"
+                        yamlErrorLine(yamlError)?.let { line ->
+                            val target = (((line - 1).coerceAtLeast(0)) * lineHeightPx).toInt()
+                            editorScroll.animateScrollTo(target.coerceAtMost(editorScroll.maxValue))
                         }
-                        .onFailure { yamlError = it.message ?: "保存失败" }
+                    }
                     yamlSaving = false
                 }
             }
@@ -841,17 +863,24 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                                 Modifier.width(46.dp).fillMaxHeight().clipToBounds()
                                     .background(if (dark) Color.White.copy(alpha = .035f) else Color(0xFFF1F5F9)),
                             ) {
-                                Text(
-                                    (1..lineCount).joinToString("\n"),
-                                    modifier = Modifier.fillMaxWidth()
-                                        .graphicsLayer { translationY = -editorScroll.value.toFloat() }
-                                        .padding(top = 12.dp, end = 9.dp, bottom = 12.dp),
-                                    color = if (dark) tokens.textMuted else Color(0xFFB0BAC8),
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 11.sp,
-                                    lineHeight = 21.sp,
-                                    textAlign = TextAlign.End,
-                                )
+                                Column(
+                                    Modifier.fillMaxWidth()
+                                        .offset(y = -gutterRemainderDp)
+                                        .padding(top = 12.dp, end = 9.dp),
+                                ) {
+                                    for (lineIndex in gutterStartLine until gutterEndLine) {
+                                        Text(
+                                            (lineIndex + 1).toString(),
+                                            modifier = Modifier.fillMaxWidth().height(lineHeightDp),
+                                            color = if (dark) tokens.textMuted else Color(0xFF94A3B8),
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 11.sp,
+                                            lineHeight = 21.sp,
+                                            textAlign = TextAlign.End,
+                                            maxLines = 1,
+                                        )
+                                    }
+                                }
                             }
                             Box(Modifier.width(1.dp).fillMaxHeight().background(if (dark) Color.White.copy(alpha = .06f) else Color(0xFFE2E8F0)))
                             BasicTextField(
@@ -874,7 +903,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                                     lineHeight = 21.sp,
                                 ),
                                 cursorBrush = SolidColor(scheme.primary),
-                                outputTransformation = YamlSyntaxHighlightOutputTransformation,
+                                outputTransformation = if (highlightEnabled) YamlSyntaxHighlightOutputTransformation else null,
                                 scrollState = editorScroll,
                             )
                         }
@@ -1088,6 +1117,37 @@ private fun YamlAccessoryKey(label: String, enabled: Boolean = true, onClick: ()
             fontFamily = FontFamily.Monospace,
             maxLines = 1,
         )
+    }
+}
+
+private fun yamlErrorLine(message: String): Int? {
+    val patterns = listOf(
+        Regex("(?i)line\\s+(\\d+)"),
+        Regex("(?i)line[:=]\\s*(\\d+)"),
+        Regex("(?i)第\\s*(\\d+)\\s*行"),
+    )
+    return patterns.firstNotNullOfOrNull { regex ->
+        regex.find(message)?.groupValues?.getOrNull(1)?.toIntOrNull()
+    }
+}
+
+private fun subscriptionUpdatedLabel(raw: String): String {
+    if (raw.isBlank()) return "更新 —"
+    val millis = runCatching {
+        java.time.OffsetDateTime.parse(raw).toInstant().toEpochMilli()
+    }.recoverCatching {
+        java.time.Instant.parse(raw).toEpochMilli()
+    }.getOrNull() ?: return "更新 —"
+    val now = System.currentTimeMillis()
+    val age = (now - millis).coerceAtLeast(0L)
+    if (age < 60L * 60L * 1000L) return "刚刚更新"
+    val zone = java.time.ZoneId.systemDefault()
+    val time = java.time.Instant.ofEpochMilli(millis).atZone(zone)
+    val today = java.time.Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
+    return if (time.toLocalDate() == today) {
+        "今天 " + time.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")) + " 更新"
+    } else {
+        time.format(java.time.format.DateTimeFormatter.ofPattern("MM-dd HH:mm")) + " 更新"
     }
 }
 
