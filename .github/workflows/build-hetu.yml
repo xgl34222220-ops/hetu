@@ -64,6 +64,11 @@ jobs:
           grep -Fq 'blurRadius = 16.dp' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           grep -Fq 'Box(modifier.height(72.dp))' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           grep -Fq 'subscriptionExpireLabel' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
+          grep -Fq 'blurRadius = 20.dp' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
+          grep -Fq '.then(if (blurEnabled) Modifier.hazeSource(haze) else Modifier)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
+          grep -Fq 'Modifier.size(24.dp).background(Color.Transparent)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
+          grep -Fq 'Color(0xFFE2E8F0).copy(alpha = .62f)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
+          grep -Fq '+ 94.dp' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           grep -q 'copyAsset("hetu-root.sh",script,true)' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
           test -f android-app/app/src/main/assets/rules/adaway.txt
           test -f android-app/app/src/main/assets/rules/china.txt
@@ -72,8 +77,8 @@ jobs:
           grep -q 'System.loadLibrary("hetu_core")' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoNative.java
           grep -q 'Java_io_github_xgl34222220_hetu_MihomoNative_invoke' native/bridge/jni_android.c
           grep -q 'Java_io_github_xgl34222220_hetu_preview_MihomoNative_invoke' native/bridge/jni_android.c
-          grep -q 'versionName = "0.4.0-test.73"' android-app/app/build.gradle.kts
-          grep -q 'versionCode = 473' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.4.0-test.74"' android-app/app/build.gradle.kts
+          grep -q 'versionCode = 474' android-app/app/build.gradle.kts
           test -f android-app/app/src/main/java/io/github/xgl34222220/hetu/LegacyAppMigrator.java
           grep -q 'LegacyAppMigrator.migrateIfNeeded(app)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
           grep -q 'controller.restart { operation = it }' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt

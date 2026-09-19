@@ -227,7 +227,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
     ) {
         LazyColumn(
             Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 92.dp),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 94.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             item("header") {
@@ -323,6 +323,10 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                                 onClick = { importLauncher.launch(arrayOf("*/*")) },
                                 modifier = Modifier.weight(1f).height(46.dp),
                                 shape = CircleShape,
+                                colors = ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = if (dark) Color.White.copy(alpha = .07f) else Color(0xFFE2E8F0).copy(alpha = .62f),
+                                    contentColor = if (dark) tokens.textPrimary else Color(0xFF334155),
+                                ),
                             ) {
                                 Icon(Icons.Rounded.FileOpen, null, Modifier.size(18.dp))
                                 Spacer(Modifier.width(6.dp))
@@ -358,9 +362,9 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
             items(configLibrary, key = { "config-" + it.name }) { config ->
                 val cardShape = RoundedCornerShape(20.dp)
                 val selectedBrush = if (dark) {
-                    Brush.horizontalGradient(listOf(Color(0xFF172554).copy(alpha = .52f), tokens.cardBackground))
+                    Brush.horizontalGradient(listOf(Color(0xFF172554).copy(alpha = .50f), Color(0xFF1B2431).copy(alpha = .82f)))
                 } else {
-                    Brush.horizontalGradient(listOf(Color(0xFFEFF6FF).copy(alpha = .72f), Color.White.copy(alpha = .86f)))
+                    Brush.horizontalGradient(listOf(Color(0xFFEFF6FF).copy(alpha = .76f), Color(0xFFF8FAFE).copy(alpha = .86f)))
                 }
                 Box(
                     Modifier.fillMaxWidth()
@@ -373,7 +377,8 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                         )
                         .background(
                             if (config.selected) selectedBrush
-                            else Brush.verticalGradient(listOf(tokens.cardBackground.copy(alpha = .82f), tokens.cardBackground.copy(alpha = .68f))),
+                            else if (dark) Brush.verticalGradient(listOf(Color(0xFF1B2431).copy(alpha = .88f), Color(0xFF151D29).copy(alpha = .82f)))
+                            else Brush.verticalGradient(listOf(Color.White.copy(alpha = .94f), Color(0xFFF8FAFE).copy(alpha = .85f))),
                             cardShape,
                         )
                         .border(
@@ -398,17 +403,23 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                 ) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Box(
-                            Modifier.size(23.dp)
-                                .border(
-                                    if (config.selected) 0.dp else 1.3.dp,
-                                    if (config.selected) Color.Transparent else tokens.textMuted.copy(alpha = .60f),
-                                    CircleShape,
-                                )
-                                .background(if (config.selected) scheme.primary else Color.Transparent, CircleShape),
+                            Modifier.size(24.dp).background(Color.Transparent),
                             contentAlignment = Alignment.Center,
                         ) {
                             if (config.selected) {
-                                Icon(Icons.Rounded.Check, "当前使用", tint = Color.White, modifier = Modifier.size(14.dp))
+                                Box(
+                                    Modifier.size(20.dp)
+                                        .shadow(5.dp, CircleShape, clip = false, ambientColor = scheme.primary.copy(alpha = .14f), spotColor = scheme.primary.copy(alpha = .18f))
+                                        .background(scheme.primary, CircleShape),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(Icons.Rounded.Check, "当前使用", tint = Color.White, modifier = Modifier.size(13.dp))
+                                }
+                            } else {
+                                Box(
+                                    Modifier.size(18.dp)
+                                        .border(1.2.dp, tokens.textMuted.copy(alpha = .52f), CircleShape),
+                                )
                             }
                         }
                         Spacer(Modifier.width(11.dp))

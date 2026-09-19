@@ -460,7 +460,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
     Box(Modifier.fillMaxSize().background(shellBackground)) {
         Box(
             Modifier.fillMaxSize()
-                .then(if (!liquid && blurEnabled) Modifier.hazeSource(haze) else Modifier)
+                .then(if (blurEnabled) Modifier.hazeSource(haze) else Modifier)
                 .then(if (liquid) Modifier.layerBackdrop(liquidBackdrop) else Modifier),
         ) {
             // Match LuoShu's backdrop architecture: the full-screen page backdrop must live
@@ -497,6 +497,8 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                     operation = operation,
                     message = message,
                     testing = testing,
+                    hazeState = haze,
+                    glassEnabled = blurEnabled && liquidGlassEnabled,
                     onBack = onBack,
                     onRefresh = { scope.launch { refresh() } },
                     onToggle = ::toggle,
@@ -559,6 +561,53 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalHazeMaterialsApi::class)
+@Composable
+private fun refHomeLiquidModifier(
+    base: Modifier,
+    hazeState: HazeState,
+    glassEnabled: Boolean,
+    shape: RoundedCornerShape,
+): Modifier {
+    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
+    val brush = if (dark) {
+        Brush.verticalGradient(
+            listOf(
+                Color(0xFF1B2431).copy(alpha = .91f),
+                Color(0xFF151D29).copy(alpha = .84f),
+            ),
+        )
+    } else {
+        Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = .94f),
+                Color(0xFFF8FAFE).copy(alpha = .85f),
+            ),
+        )
+    }
+    return base
+        .shadow(
+            8.dp,
+            shape,
+            clip = false,
+            ambientColor = Color(0xFF0F172A).copy(alpha = if (dark) .10f else .028f),
+            spotColor = Color(0xFF0F172A).copy(alpha = if (dark) .13f else .050f),
+        )
+        .clip(shape)
+        .then(
+            if (glassEnabled) Modifier.hazeEffect(state = hazeState, style = HazeMaterials.ultraThin()) {
+                blurRadius = 20.dp
+                noiseFactor = .012f
+            } else Modifier,
+        )
+        .background(brush, shape)
+        .border(
+            .8.dp,
+            if (dark) Color.White.copy(alpha = .10f) else Color.White.copy(alpha = .78f),
+            shape,
+        )
+}
+
 @Composable
 private fun RefHome(
     state: ProxyComposeState,
@@ -573,6 +622,8 @@ private fun RefHome(
     operation: String,
     message: String,
     testing: Boolean,
+    hazeState: HazeState,
+    glassEnabled: Boolean,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
     onToggle: () -> Unit,
@@ -592,7 +643,7 @@ private fun RefHome(
             start = 16.dp,
             top = 8.dp,
             end = 16.dp,
-            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 92.dp,
+            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 94.dp,
         ),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -631,10 +682,12 @@ private fun RefHome(
             }
         }
         item {
+            val heroShape = RoundedCornerShape(26.dp)
             Surface(
-                shape = RoundedCornerShape(26.dp),
-                color = t.heroBackground,
-                shadowElevation = 1.dp,
+                modifier = refHomeLiquidModifier(Modifier.fillMaxWidth(), hazeState, glassEnabled, heroShape),
+                shape = heroShape,
+                color = Color.Transparent,
+                shadowElevation = 0.dp,
             ) {
                 Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Row(verticalAlignment = Alignment.Top) {
@@ -691,8 +744,8 @@ private fun RefHome(
                             onClick = onLog,
                             modifier = Modifier.size(36.dp),
                             shape = CircleShape,
-                            color = if (scheme.background.luminance() < .5f) Color.White.copy(alpha = .075f) else Color.White.copy(alpha = .86f),
-                            border = BorderStroke(.7.dp, if (scheme.background.luminance() < .5f) Color.White.copy(alpha = .10f) else Color.White.copy(alpha = .82f)),
+                            color = scheme.primary.copy(alpha = if (scheme.background.luminance() < .5f) .12f else .075f),
+                            border = BorderStroke(.6.dp, scheme.primary.copy(alpha = .14f)),
                             shadowElevation = 0.dp,
                             tonalElevation = 0.dp,
                         ) {
@@ -749,19 +802,21 @@ private fun RefHome(
                 cloudflare = siteDelays["Cloudflare"],
                 google = siteDelays["Google"],
                 testing = testing,
+                hazeState = hazeState,
+                glassEnabled = glassEnabled,
                 onClick = onDelay,
             )
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                RefNetworkIdentityCard(runtime, if (state.panelReady) state.connections.size else cachedConnections, Modifier.weight(1f))
-                RefSpeedCard(upRate, downRate, Modifier.weight(1f))
+                RefNetworkIdentityCard(runtime, if (state.panelReady) state.connections.size else cachedConnections, Modifier.weight(1f), hazeState, glassEnabled)
+                RefSpeedCard(upRate, downRate, Modifier.weight(1f), hazeState, glassEnabled)
             }
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                RefSubscriptionCompact(providers, cachedSubscription, Modifier.weight(1f), onSubscription)
-                RefResourceCard(memory, cpuPercent, Modifier.weight(1f))
+                RefSubscriptionCompact(providers, cachedSubscription, Modifier.weight(1f), hazeState, glassEnabled, onSubscription)
+                RefResourceCard(memory, cpuPercent, Modifier.weight(1f), hazeState, glassEnabled)
             }
         }
         if (operation.isNotBlank() || message.isNotBlank()) {
@@ -771,10 +826,24 @@ private fun RefHome(
 }
 
 @Composable
-private fun RefLatencyPanel(baidu: Long?, cloudflare: Long?, google: Long?, testing: Boolean, onClick: () -> Unit) {
+private fun RefLatencyPanel(
+    baidu: Long?,
+    cloudflare: Long?,
+    google: Long?,
+    testing: Boolean,
+    hazeState: HazeState,
+    glassEnabled: Boolean,
+    onClick: () -> Unit,
+) {
     val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
-    Surface(shape = RoundedCornerShape(20.dp), color = t.cardBackground, shadowElevation = 1.dp) {
+    val shape = RoundedCornerShape(20.dp)
+    Surface(
+        modifier = refHomeLiquidModifier(Modifier.fillMaxWidth(), hazeState, glassEnabled, shape),
+        shape = shape,
+        color = Color.Transparent,
+        shadowElevation = 0.dp,
+    ) {
         Column(
             Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 13.dp),
             verticalArrangement = Arrangement.spacedBy(9.dp),
@@ -876,7 +945,13 @@ private fun RefLatencyColumn(label: String, value: Long?, testing: Boolean, modi
 }
 
 @Composable
-private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: Int, modifier: Modifier) {
+private fun RefNetworkIdentityCard(
+    runtime: ProxyRuntimeSnapshot,
+    connections: Int,
+    modifier: Modifier,
+    hazeState: HazeState,
+    glassEnabled: Boolean,
+) {
     val t = LocalHetuTokens.current
     val view = LocalView.current
     val scope = rememberCoroutineScope()
@@ -891,10 +966,13 @@ private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: I
     val valueColor = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A)
 
     Surface(
-        modifier = modifier.height(112.dp)
-            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .94f else 1f }
-            .clip(shape)
-            .clickable(interactionSource = source, indication = null) {
+        modifier = refHomeLiquidModifier(
+            modifier.height(112.dp)
+                .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .94f else 1f },
+            hazeState,
+            glassEnabled,
+            shape,
+        ).clickable(interactionSource = source, indication = null) {
                 if (!flipping) {
                     view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                     scope.launch {
@@ -908,37 +986,26 @@ private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: I
                 }
             },
         shape = shape,
-        color = t.cardBackground,
-        shadowElevation = 1.dp,
+        color = Color.Transparent,
+        shadowElevation = 0.dp,
     ) {
         Column(
             Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Row(Modifier.fillMaxWidth().height(24.dp), verticalAlignment = Alignment.CenterVertically) {
-                androidx.compose.animation.AnimatedContent(
-                    targetState = renderedLan,
-                    modifier = Modifier.weight(1f),
-                    transitionSpec = {
-                        (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(150)) +
-                            androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(170)) { it / 3 })
-                            .togetherWith(
-                                androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(100)) +
-                                    androidx.compose.animation.slideOutVertically(androidx.compose.animation.core.tween(120)) { -it / 3 },
-                            )
-                    },
-                    label = "lanWanLabel",
-                ) { lan ->
+                Box(Modifier.weight(1f).widthIn(min = 40.dp), contentAlignment = Alignment.CenterStart) {
                     Text(
-                        if (lan) "LAN" else "WAN",
+                        if (renderedLan) "LAN" else "WAN",
                         color = Color(0xFF64748B),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                     )
                 }
                 Box(
-                    Modifier.size(24.dp).background(Color(0xFFF1F5F9), CircleShape)
-                        .border(.6.dp, Color.White.copy(alpha = .90f), CircleShape),
+                    Modifier.size(24.dp).background(Color(0xFF2563EB).copy(alpha = .08f), CircleShape)
+                        .border(.6.dp, Color(0xFF2563EB).copy(alpha = .12f), CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(Icons.Rounded.SwapHoriz, "切换 LAN/WAN", tint = Color(0xFF2563EB), modifier = Modifier.size(14.dp))
@@ -984,10 +1051,16 @@ private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: I
 }
 
 @Composable
-private fun RefSpeedCard(up: Long, down: Long, modifier: Modifier) {
+private fun RefSpeedCard(up: Long, down: Long, modifier: Modifier, hazeState: HazeState, glassEnabled: Boolean) {
     val t = LocalHetuTokens.current
     val valueColor = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A)
-    Surface(modifier = modifier.height(106.dp), shape = RoundedCornerShape(20.dp), color = t.cardBackground, shadowElevation = 1.dp) {
+    val shape = RoundedCornerShape(20.dp)
+    Surface(
+        modifier = refHomeLiquidModifier(modifier.height(112.dp), hazeState, glassEnabled, shape),
+        shape = shape,
+        color = Color.Transparent,
+        shadowElevation = 0.dp,
+    ) {
         Column(
             Modifier.fillMaxSize().padding(14.dp),
             verticalArrangement = Arrangement.SpaceBetween,
@@ -1006,7 +1079,14 @@ private fun RefSpeedCard(up: Long, down: Long, modifier: Modifier) {
 }
 
 @Composable
-private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, cached: RefSubscriptionCache, modifier: Modifier, onClick: () -> Unit) {
+private fun RefSubscriptionCompact(
+    items: List<DashboardProviderUi>,
+    cached: RefSubscriptionCache,
+    modifier: Modifier,
+    hazeState: HazeState,
+    glassEnabled: Boolean,
+    onClick: () -> Unit,
+) {
     val t = LocalHetuTokens.current
     val haptic = LocalHapticFeedback.current
     val tracked = items.filter { it.hasSubscriptionInfo && it.total > 0L }
@@ -1022,16 +1102,19 @@ private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, cached: Ref
     val scale by animateFloatAsState(if (pressed) .96f else 1f, spring(dampingRatio = .74f, stiffness = 560f), label = "subscriptionCompactPress")
     val shape = RoundedCornerShape(20.dp)
     Surface(
-        modifier = modifier.height(112.dp)
-            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .92f else 1f }
-            .clip(shape)
-            .clickable(interactionSource = source, indication = null) {
+        modifier = refHomeLiquidModifier(
+            modifier.height(112.dp)
+                .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .92f else 1f },
+            hazeState,
+            glassEnabled,
+            shape,
+        ).clickable(interactionSource = source, indication = null) {
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 onClick()
             },
         shape = shape,
-        color = t.cardBackground,
-        shadowElevation = 1.dp,
+        color = Color.Transparent,
+        shadowElevation = 0.dp,
     ) {
         Column(
             Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 14.dp),
@@ -1039,12 +1122,12 @@ private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, cached: Ref
         ) {
             Row(Modifier.fillMaxWidth().height(20.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("订阅", color = Color(0xFF64748B), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                if (total > 0L) Surface(shape = RoundedCornerShape(999.dp), color = Color(0xFFEBF3FF)) {
+                if (total > 0L) Surface(shape = RoundedCornerShape(999.dp), color = Color(0xFF2563EB).copy(alpha = .08f)) {
                     Text("剩余 ${((1f - ratio) * 100f).toInt()}%", Modifier.padding(horizontal = 7.dp, vertical = 2.dp), color = MaterialTheme.colorScheme.primary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
             }
             Text(if (total > 0L) refBytes(used) else "—", color = valueColor, fontSize = 16.sp, lineHeight = 19.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, modifier = Modifier.height(20.dp))
-            Box(Modifier.fillMaxWidth().height(4.dp).background(Color(0xFFEFF3F8), CircleShape)) {
+            Box(Modifier.fillMaxWidth().height(4.dp).background(Color(0xFF94A3B8).copy(alpha = .12f), CircleShape)) {
                 if (total > 0L && ratio > 0f) {
                     Box(
                         Modifier.fillMaxWidth(ratio.coerceIn(.001f, 1f)).fillMaxHeight()
@@ -1061,7 +1144,7 @@ private fun RefSubscriptionCompact(items: List<DashboardProviderUi>, cached: Ref
 }
 
 @Composable
-private fun RefResourceCard(memory: Long, cpuPercent: Float, modifier: Modifier) {
+private fun RefResourceCard(memory: Long, cpuPercent: Float, modifier: Modifier, hazeState: HazeState, glassEnabled: Boolean) {
     val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val valueColor = if (scheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A)
@@ -1076,7 +1159,13 @@ private fun RefResourceCard(memory: Long, cpuPercent: Float, modifier: Modifier)
         ),
         label = "resourceCpuPulseAlpha",
     )
-    Surface(modifier = modifier.height(112.dp), shape = RoundedCornerShape(20.dp), color = t.cardBackground, shadowElevation = 1.dp) {
+    val shape = RoundedCornerShape(20.dp)
+    Surface(
+        modifier = refHomeLiquidModifier(modifier.height(112.dp), hazeState, glassEnabled, shape),
+        shape = shape,
+        color = Color.Transparent,
+        shadowElevation = 0.dp,
+    ) {
         Column(
             Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.SpaceBetween,
@@ -1392,7 +1481,7 @@ private fun RefPanel(
                 start = 16.dp,
                 top = 8.dp,
                 end = 16.dp,
-                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 92.dp,
+                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 94.dp,
             ),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -3452,7 +3541,7 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
             start = 16.dp,
             top = 8.dp,
             end = 16.dp,
-            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 92.dp,
+            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 94.dp,
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -3542,7 +3631,7 @@ private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
             start = 16.dp,
             top = 8.dp,
             end = 16.dp,
-            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 92.dp,
+            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 94.dp,
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
