@@ -307,8 +307,8 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
                     runRoot("启动配置") { root.prepare(ProxyRuntimeProfile.load(prefs)).startup }
                 }
                 AdvancedDivider()
-                AdvancedActionRow(Icons.Rounded.Terminal, Color(0xFF8B5CF6), "Root 诊断", "规则、端口、会话、CNIP 与核心日志") {
-                    runRoot("Root 诊断") { root.diagnostics() }
+                AdvancedActionRow(Icons.Rounded.Terminal, Color(0xFF8B5CF6), "消息与网络诊断", "微信连接、保活、分流与最近运行事件") {
+                    runRoot("消息与网络诊断") { root.diagnostics() }
                 }
                 AdvancedDivider()
                 AdvancedActionRow(Icons.Rounded.Restore, Color(0xFFEF4444), "恢复网络", "停止代理并清理河图自己的透明代理规则") {
@@ -627,6 +627,7 @@ private fun advancedYamlPreview(text: String): androidx.compose.ui.text.Annotate
 @Composable
 private fun AdvancedInfoSheet(title: String, text: String, onDismiss: () -> Unit) {
     val t = LocalHetuTokens.current
+    val context = LocalContext.current
     val codePreview = title == "启动配置"
     val highlighted = remember(text, codePreview) { if (codePreview) advancedYamlPreview(text) else null }
     ModalBottomSheet(
@@ -647,7 +648,14 @@ private fun AdvancedInfoSheet(title: String, text: String, onDismiss: () -> Unit
                 .navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(title, color = if (codePreview) Color(0xFFF8FAFC) else t.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(title, Modifier.weight(1f), color = if (codePreview) Color(0xFFF8FAFC) else t.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                TextButton(onClick = {
+                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText(title, text))
+                    android.widget.Toast.makeText(context, "已复制", android.widget.Toast.LENGTH_SHORT).show()
+                }) { Text("复制") }
+            }
             if (codePreview) {
                 val lines = remember(text) { maxOf(1, text.count { it == '\n' } + 1) }
                 val vScroll = androidx.compose.foundation.rememberScrollState()
@@ -682,7 +690,7 @@ private fun AdvancedInfoSheet(title: String, text: String, onDismiss: () -> Unit
                     }
                 }
             } else {
-                Surface(shape = RoundedCornerShape(16.dp), color = t.controlBackground.copy(alpha = .55f)) {
+                Surface(Modifier.weight(1f), shape = RoundedCornerShape(16.dp), color = t.controlBackground.copy(alpha = .55f)) {
                     Text(
                         text,
                         Modifier.fillMaxWidth().padding(14.dp)

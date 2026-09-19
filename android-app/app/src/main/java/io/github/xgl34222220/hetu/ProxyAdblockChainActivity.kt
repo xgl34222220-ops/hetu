@@ -218,8 +218,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
 
         val state = runCatching { proxyController.state() }.getOrNull()
         val startup = runCatching { rootManager.startupConfig() }.getOrDefault("")
-        val startupInjected = startup.contains("${ProxyAdblockRules.PROVIDER_NAME}:") &&
-            startup.contains("RULE-SET,${ProxyAdblockRules.PROVIDER_NAME},REJECT")
+        val startupInjected = AdblockRuleInspection.isInjected(startup)
         val liveRules = if (state?.running == true) runCatching { proxyController.rules() }.getOrDefault(emptyList()) else emptyList()
         val adRule = liveRules.firstOrNull {
             it.payload.contains(ProxyAdblockRules.PROVIDER_NAME, true) ||
@@ -243,7 +242,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
         }
         val lastError = prefs.getString("proxyAdblockLastError", "").orEmpty()
         val running = state?.running == true
-        val effective = chainEnabled && running && rules.count > 0 && startupInjected && controllerLoaded
+        val effective = chainEnabled && running && startupInjected && controllerLoaded
         prefs.edit()
             .putBoolean("proxyRootRuntimeRunning", running)
             .putBoolean("proxyAdblockUiStartupInjected", startupInjected)
@@ -369,6 +368,8 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                             Text("河图 DNS 过滤引擎", color = t.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                             Text(
                                 when {
+                                    snapshot.effective && snapshot.lastError.isNotBlank() -> "过滤链已加载 · 最近规则更新未确认"
+                                    snapshot.effective && snapshot.rules.count == 0 -> "过滤链已加载 · 当前没有启用的拦截规则"
                                     snapshot.effective -> "已生效 · Mihomo 当前已加载河图广告规则链"
                                     chainEnabled && snapshot.running -> "已开启 · 正在验证当前运行链"
                                     chainEnabled -> "已开启 · 启动 Root 代理后自动验证"
@@ -401,16 +402,17 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
 
         item("runtime-verify") {
             val statusText = when {
+                snapshot.running && snapshot.lastError.isNotBlank() -> if (snapshot.effective) "过滤链正在运行 · 最近规则更新未确认" else "本次过滤未完整加载"
+                snapshot.effective && snapshot.rules.count == 0 -> "过滤链已加载 · 当前规则为空"
                 snapshot.effective && displayedHitCount > 0L -> "已生效 · 已记录 ${displayedHitCount} 次域名规则命中"
                 snapshot.effective -> "已生效 · 当前运行日志暂未记录到域名规则命中"
                 !chainEnabled -> "广告串联已关闭"
                 !snapshot.running -> "等待代理启动"
-                snapshot.lastError.isNotBlank() -> "本次运行已降级"
                 else -> "运行链未完整加载"
             }
             val statusColor = when {
-                snapshot.effective -> Color(0xFF059669)
                 snapshot.lastError.isNotBlank() -> Color(0xFFF59E0B)
+                snapshot.effective -> Color(0xFF059669)
                 else -> Color(0xFF64748B)
             }
             Surface(
@@ -439,7 +441,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                         TextButton(onClick = { if (!busy) revision++ }) { Text("重新检测", fontSize = 11.sp) }
                     }
                     HorizontalDivider(color = if (dark) t.outline.copy(alpha = .35f) else Color(0xFFF1F5F9))
-                    ChainVerifyRow("本地规则库", snapshot.rules.count > 0, if (snapshot.rules.count > 0) "${snapshot.rules.count} 条有效规则" else "没有可用规则")
+                    ChainVerifyRow("本地规则库", snapshot.rules.count > 0, if (snapshot.rules.count > 0) "${snapshot.rules.count} 条有效规则" else "当前没有启用的拦截规则", allowNeutral = true)
                     ChainVerifyRow("启动配置注入", snapshot.startupInjected, if (snapshot.startupInjected) "hetu-adblock 已写入运行副本" else "当前启动副本没有广告 provider")
                     ChainVerifyRow("Mihomo 规则链", snapshot.controllerLoaded, if (snapshot.controllerLoaded) "Controller 已看到 REJECT 规则" else "当前 Controller 未看到广告规则")
                     if (snapshot.running) {
@@ -464,7 +466,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                     if (snapshot.lastError.isNotBlank()) {
                         Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFFF59E0B).copy(alpha = .10f)) {
                             Text(
-                                "最近一次降级原因：${snapshot.lastError}",
+                                "最近一次规则应用问题：${snapshot.lastError}",
                                 Modifier.fillMaxWidth().padding(10.dp),
                                 color = Color(0xFFB45309),
                                 fontSize = 10.sp,

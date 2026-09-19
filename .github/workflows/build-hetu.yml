@@ -6,6 +6,9 @@ on:
     paths:
       - 'android-app/**'
       - 'native/**'
+      - 'tools/**'
+      - 'tests/**'
+      - 'docs/**'
       - 'README.md'
       - '.gitignore'
       - '.github/workflows/build-hetu.yml'
@@ -71,7 +74,7 @@ jobs:
           grep -Fq 'Mijia Cloud' tests/MihomoStartupConfigTest.java
           grep -Fq 'yamlMihomoStrictDomainIssue(text)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
           grep -Fq 'Mihomo 1.19.30 不接受此域名表达式' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          grep -Fq 'persistedGeneration(Context context)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockRules.java
+          grep -Fq 'RuleStore.currentExportRules()' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockRules.java
           grep -Fq 'proxyRootValidatedFingerprint' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
           grep -Fq 'proxyRootCapabilityFingerprint' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
           grep -Fq 'START_FAST_CAPS' android-app/app/src/main/assets/hetu-root.sh
@@ -139,8 +142,8 @@ jobs:
           grep -q 'System.loadLibrary("hetu_core")' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoNative.java
           grep -q 'Java_io_github_xgl34222220_hetu_MihomoNative_invoke' native/bridge/jni_android.c
           grep -q 'Java_io_github_xgl34222220_hetu_preview_MihomoNative_invoke' native/bridge/jni_android.c
-          grep -q 'versionName = "0.4.0-test.86"' android-app/app/build.gradle.kts
-          grep -q 'versionCode = 486' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.4.0-test.87"' android-app/app/build.gradle.kts
+          grep -q 'versionCode = 487' android-app/app/build.gradle.kts
           test -f android-app/app/src/main/java/io/github/xgl34222220/hetu/LegacyAppMigrator.java
           grep -q 'LegacyAppMigrator.migrateIfNeeded(app)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
           grep -q 'controller.restart { operation = it }' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
@@ -242,15 +245,20 @@ jobs:
           java-version: '17'
 
       - name: Verify message filtering and connection continuity
-        run: python3 tools/test_proxy_continuity.py --android-jar "$ANDROID_HOME/platforms/android-37.0/android.jar" --fixture "$RUNNER_TEMP/hetu-continuity.yaml"
+        run: |
+          python3 tools/test_proxy_continuity.py --android-jar "$ANDROID_HOME/platforms/android-37.0/android.jar" --fixture "$RUNNER_TEMP/hetu-continuity.yaml"
+          python3 tools/test_adblock_inspection.py --android-jar "$ANDROID_HOME/platforms/android-37.0/android.jar"
+          python3 tools/test_root_ipv6.py
 
       - name: Build Hetu JNI bridge and Root Mihomo
         shell: bash
         run: |
           set -euo pipefail
+          python3 tools/prepare_root_mihomo.py .upstream
           cp -r native/bridge .upstream/hetubridge
           cd .upstream
-          HETU_RUNTIME_FIXTURE="$RUNNER_TEMP/hetu-continuity.yaml" go test -tags with_gvisor -v ./hetubridge
+          go test -v ./component/keepalive
+          HETU_RUNTIME_FIXTURE="$RUNNER_TEMP/hetu-continuity.yaml" go test -tags with_gvisor,hetu_root -v ./hetubridge ./component/keepalive
           NDK="$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin"
           mkdir -p ../android-app/app/src/main/jniLibs/arm64-v8a ../android-app/app/src/main/jniLibs/x86_64
           mkdir -p ../android-app/app/src/main/assets/mihomo-root/arm64-v8a ../android-app/app/src/main/assets/mihomo-root/x86_64
@@ -263,11 +271,11 @@ jobs:
             -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' \
             -o ../android-app/app/src/main/jniLibs/x86_64/libhetu_core.so ./hetubridge
           CGO_ENABLED=1 GOOS=android GOARCH=arm64 CC="$NDK/aarch64-linux-android26-clang" \
-            go build -tags with_gvisor -trimpath \
+            go build -tags with_gvisor,hetu_root -trimpath \
             -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' \
             -o ../android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo .
           CGO_ENABLED=1 GOOS=android GOARCH=amd64 CC="$NDK/x86_64-linux-android26-clang" \
-            go build -tags with_gvisor -trimpath \
+            go build -tags with_gvisor,hetu_root -trimpath \
             -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' \
             -o ../android-app/app/src/main/assets/mihomo-root/x86_64/mihomo .
           cp LICENSE ../android-app/app/src/main/assets/MIHOMO-LICENSE

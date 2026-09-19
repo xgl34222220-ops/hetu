@@ -65,6 +65,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.HazeTint
@@ -129,6 +132,7 @@ private enum class RefPanelTab(val label: String) {
 @Composable
 private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val controller = remember { ProxyComposeController(context) }
     val repo = remember { ProxyDashboardRepository(context) }
     val inspector = remember { ProxyRuntimeInspector(context) }
@@ -139,7 +143,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
     var uiPrefsRevision by remember { mutableIntStateOf(0) }
     DisposableEffect(prefs) {
         val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key == "enableBlur" || key == "liquidGlass" || key == "showPanelTab") uiPrefsRevision++
+            if (key == "enableBlur" || key == "liquidGlass" || key == "showPanelTab" || key == "latencyAutoRefreshSeconds") uiPrefsRevision++
         }
         prefs.registerOnSharedPreferenceChangeListener(listener)
         onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
@@ -147,6 +151,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
     uiPrefsRevision
     val blurEnabled = prefs.getBoolean("enableBlur", true)
     val liquidGlassEnabled = prefs.getBoolean("liquidGlass", true)
+    val siteProbeInterval = prefs.getInt("latencyAutoRefreshSeconds", 0).takeIf { it == 30 || it == 60 } ?: 0
     val liquid = blurEnabled && liquidGlassEnabled && isRuntimeShaderSupported()
     val showPanelTab = prefs.getBoolean("showPanelTab", true)
     val startupProfile = remember { ProxyRuntimeProfile.load(prefs) }
@@ -435,44 +440,38 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
         }
     }
 
-    LaunchedEffect(Unit) {
-        // First frame must never wait for Root shell + controller API + provider/CPU probes.
-        // Paint the persisted snapshot first, then reconcile the live state asynchronously.
-        launch {
+    LaunchedEffect(lifecycleOwner, resumeRevision) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            // Resume polling only while this screen is visible. The foreground service
+            // independently maintains the running proxy while Hetu is in the background.
+            launch {
+                delay(420)
+                try { repo.ensureIcons() }
+                catch (cancel: CancellationException) { throw cancel }
+                catch (_: Exception) { }
+            }
+            // Paint the persisted snapshot before issuing Root/controller queries.
             delay(320)
-            refresh()
+            while (true) {
+                if (operation.isBlank()) refresh()
+                delay(3000)
+            }
         }
-        launch {
-            delay(420)
-            runCatching { repo.ensureIcons() }
-        }
-        while (true) {
-            delay(3000)
-            if (operation.isBlank()) refresh()
-        }
-    }
-
-    // Returning from a secondary activity refreshes local/runtime state only.
-    // Do not manufacture three WAN probe connections just because the user came back.
-    LaunchedEffect(resumeRevision) {
-        if (resumeRevision > 1) refresh()
     }
 
     // Auto site probes are opt-in. The default is off; manual refresh remains available.
     // This prevents Hetu itself from constantly adding probe traffic to Mihomo.
-    LaunchedEffect(state.running) {
+    LaunchedEffect(state.running, lifecycleOwner, siteProbeInterval) {
         if (!state.running) {
             siteDelays = emptyMap()
             return@LaunchedEffect
         }
-        while (true) {
-            val seconds = prefs.getInt("latencyAutoRefreshSeconds", 0).takeIf { it == 0 || it == 30 || it == 60 } ?: 0
-            if (seconds <= 0) {
-                delay(1_000)
-                continue
+        if (siteProbeInterval <= 0) return@LaunchedEffect
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                delay(siteProbeInterval * 1_000L)
+                measureSitesInternal(reportError = false)
             }
-            delay(seconds * 1_000L)
-            measureSitesInternal(reportError = false)
         }
     }
 

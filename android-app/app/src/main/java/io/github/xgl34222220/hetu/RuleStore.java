@@ -138,6 +138,23 @@ public final class RuleStore {
         EffectiveRules(String revision, java.util.List<String> domains) { this.revision=revision; this.domains=java.util.Collections.unmodifiableList(domains); }
     }
     EffectiveRules effectiveRules() { Snapshot s=live; return new EffectiveRules(s==null?"":s.generation,s==null?new java.util.ArrayList<>():new java.util.ArrayList<>(s.effective)); }
+    /** One generation for both providers; never mix a new allow list with old blocks. */
+    static final class ExportRules {
+        final String revision;
+        final Set<String> domains, allowDomains;
+        private ExportRules(Snapshot snapshot) {
+            revision=snapshot==null?"":snapshot.generation;
+            domains=snapshot==null?Collections.emptySet():snapshot.effective;
+            if(snapshot==null) {
+                allowDomains=Collections.emptySet();
+            } else {
+                Set<String> merged=new HashSet<>(snapshot.allow);
+                merged.addAll(snapshot.filterExceptions);
+                allowDomains=Collections.unmodifiableSet(merged);
+            }
+        }
+    }
+    static ExportRules currentExportRules() { return new ExportRules(live); }
     static String publishedRevision() { Snapshot s=live; return s==null?"":s.generation; }
     public java.util.List<String> effectiveDomains() { Snapshot s=live; return s==null?java.util.Collections.emptyList():new java.util.ArrayList<>(s.effective); }
     public int count() { Snapshot s=live; return s==null?0:s.effective.size(); }

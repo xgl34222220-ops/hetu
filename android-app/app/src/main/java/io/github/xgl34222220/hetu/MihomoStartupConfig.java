@@ -578,7 +578,7 @@ final class MihomoStartupConfig {
             if(out.length()>0&&!out.toString().endsWith("\n"))out.append('\n');
             out.append("dns:\n");
             out.append("  enable: true\n");
-            out.append("  listen: 0.0.0.0:").append(port).append('\n');
+            out.append("  listen: ':").append(port).append("'\n");
             out.append("  nameserver:\n");
             out.append("    - system\n");
             return out.toString();
@@ -596,7 +596,9 @@ final class MihomoStartupConfig {
             out.append(lines[i]).append('\n');
             if(i==start){
                 out.append(spaces(childIndent)).append("enable: true\n");
-                out.append(spaces(childIndent)).append("listen: 0.0.0.0:").append(port).append('\n');
+                // An unspecified Go listen address accepts both families where
+                // supported, and still works on kernels with IPv6 disabled.
+                out.append(spaces(childIndent)).append("listen: ':").append(port).append("'\n");
             }else if(i>start&&i<end){
                 int ind=indent(lines[i]);
                 String t=lines[i].trim();

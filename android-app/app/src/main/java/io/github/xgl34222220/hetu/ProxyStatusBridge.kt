@@ -8,15 +8,11 @@ internal object ProxyStatusBridge {
         val app = context.applicationContext
         val prefs = app.getSharedPreferences("hetu", Context.MODE_PRIVATE)
         return try {
-            val command = "P=\$(cat /data/adb/hetu/run/core.pid 2>/dev/null || echo 0); " +
-                "case \"\$P\" in ''|*[!0-9]*) P=0;; esac; " +
-                "if [ \"\$P\" -gt 0 ] && kill -0 \"\$P\" >/dev/null 2>&1; then " +
-                "EXE=\$(readlink \"/proc/\$P/exe\" 2>/dev/null || true); " +
-                "case \"\$EXE\" in /data/adb/hetu/bin/core) printf 1;; *) printf 0;; esac; " +
-                "else printf 0; fi"
+            val command = ProxyContinuity.coreProbeCommand("/data/adb/hetu/run/core.pid", "/data/adb/hetu/bin/core")
             val result = RootBridge.rootShell(app, command, 3_500L)
-            if (result.ok()) {
-                val running = result.output.trim() == "1"
+            val process = ProxyContinuity.processState(result.ok(), result.output)
+            if (process != ProxyContinuity.ProcessState.UNKNOWN) {
+                val running = process == ProxyContinuity.ProcessState.ALIVE
                 prefs.edit().putBoolean("proxyRootRuntimeRunning", running).apply()
                 running
             } else {

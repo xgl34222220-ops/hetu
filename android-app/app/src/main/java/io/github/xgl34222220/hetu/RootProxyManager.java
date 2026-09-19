@@ -122,7 +122,7 @@ final class RootProxyManager {
             File file=cores.file(core);
             return "file:"+core.id+":"+file.length()+":"+file.lastModified();
         }
-        return "asset:"+core.id+":"+embeddedMihomoRevision()+":fmt1";
+        return "asset:"+core.id+":"+embeddedMihomoRevision()+":fmt2-root-keepalive";
     }
 
     private boolean runtimeCoreCurrent(String token){
@@ -139,12 +139,7 @@ final class RootProxyManager {
     private boolean coreAliveFast(){
         try{
             RootBridge.requireWorkerThread();
-            String command="P=$(cat "+RootBridge.quote(ROOT+"/run/core.pid")+" 2>/dev/null || echo 0); "
-                    +"case \"$P\" in ''|*[!0-9]*) P=0;; esac; "
-                    +"if [ \"$P\" -gt 0 ] && kill -0 \"$P\" >/dev/null 2>&1; then "
-                    +"EXE=$(readlink \"/proc/$P/exe\" 2>/dev/null || true); "
-                    +"case \"$EXE\" in "+BIN+") printf 1;; *) printf 0;; esac; "
-                    +"else printf 0; fi";
+            String command=ProxyContinuity.coreProbeCommand(ROOT+"/run/core.pid",BIN);
             RootBridge.Result result=RootBridge.rootShell(context,command,4000L);
             ProxyContinuity.ProcessState state=ProxyContinuity.processState(result.ok(),result.output);
             return ProxyContinuity.preserveRunning(state,
@@ -200,45 +195,42 @@ final class RootProxyManager {
             JSONObject state=status();
             if(!state.optBoolean("running",false))return "规则已保存；代理下次启动时自动使用新规则";
             ProxyAdblockRules.Snapshot snapshot=ProxyAdblockRules.export(context);
-            if(snapshot.count<=0)throw new IOException("当前没有可热更新的广告规则");
             String blockDst=ROOT+"/run/ruleset/hetu-adblock.txt";
             String allowDst=ROOT+"/run/ruleset/hetu-adblock-allow.txt";
             String suffix=".new."+Long.toHexString(System.nanoTime());
             String cmd="set -e; mkdir -p "+RootBridge.quote(ROOT+"/run/ruleset")
                     +"; cp "+RootBridge.quote(snapshot.file.getAbsolutePath())+" "+RootBridge.quote(blockDst+suffix)
                     +"; chmod 600 "+RootBridge.quote(blockDst+suffix)+"; chown 0:0 "+RootBridge.quote(blockDst+suffix)
-                    +"; mv -f "+RootBridge.quote(blockDst+suffix)+" "+RootBridge.quote(blockDst)
                     +"; cp "+RootBridge.quote(snapshot.allowFile.getAbsolutePath())+" "+RootBridge.quote(allowDst+suffix)
                     +"; chmod 600 "+RootBridge.quote(allowDst+suffix)+"; chown 0:0 "+RootBridge.quote(allowDst+suffix)
-                    +"; mv -f "+RootBridge.quote(allowDst+suffix)+" "+RootBridge.quote(allowDst);
+                    +"; mv -f "+RootBridge.quote(allowDst+suffix)+" "+RootBridge.quote(allowDst)
+                    +"; mv -f "+RootBridge.quote(blockDst+suffix)+" "+RootBridge.quote(blockDst);
             RootBridge.Result copied=RootBridge.rootShell(context,cmd,20000L);
             if(!copied.ok())throw new IOException("规则已更新，但写入运行目录失败："+copied.output.trim());
 
             int port=liveControllerPort(state);
             if(port>0)prefs.edit().putInt("proxyControllerPort",port).apply();
             MihomoControllerClient controller=new MihomoControllerClient(context);
-            String warning="";
-            boolean providerReloaded=false;
             try{
                 controller.reloadLocalRuleProvider(ProxyAdblockRules.ALLOW_PROVIDER_NAME);
                 controller.reloadLocalRuleProvider(ProxyAdblockRules.PROVIDER_NAME);
-                providerReloaded=true;
             }catch(Exception providerError){
-                try{
-                    controller.reloadConfig(CONFIG);
-                    if(!controller.waitReady(8000))warning="；Controller 重载后仍在初始化";
-                }catch(Exception reloadError){
-                    String detail=reloadError.getMessage()==null?reloadError.getClass().getSimpleName():reloadError.getMessage();
-                    warning="；运行中的 Controller 暂未热重载："+detail+"，下次重启必定使用新规则";
-                }
+                // Do not reload the entire proxy after a provider error: this can
+                // disturb live transports, and an old config without the providers
+                // can reload successfully while the new filtering still isn't active.
+                String detail=providerError.getMessage()==null?providerError.getClass().getSimpleName():providerError.getMessage();
+                String message="规则已保存，但运行中的过滤规则未确认更新："+detail+"；请重试或主动重启代理";
+                prefs.edit().putString("proxyAdblockLastError",message).apply();
+                throw new IOException(message,providerError);
             }
-            if(providerReloaded)prefs.edit().putLong("proxyAdblockProviderReloadAt",System.currentTimeMillis()).apply();
             prefs.edit()
+                    .putLong("proxyAdblockProviderReloadAt",System.currentTimeMillis())
                     .putInt("proxyAdblockLastRuleCount",snapshot.count)
                     .putString("proxyAdblockLastRevision",snapshot.revision)
                     .putLong("proxyAdblockHotReloadAt",System.currentTimeMillis())
+                    .remove("proxyAdblockLastError")
                     .apply();
-            return "已热更新 "+snapshot.count+" 条广告规则"+warning;
+            return "已热更新 "+snapshot.count+" 条广告规则";
         }finally{
             CONTROL_LOCK.unlock();
         }
@@ -267,7 +259,6 @@ final class RootProxyManager {
         // Mihomo and must not be promoted into a pre-Mihomo Root UID bypass.
         RootProxyPolicy policy=RootProxyPolicy.load(context,prefs,profile);
         ProxyAdblockRules.Snapshot adblock=profile.adblockChain?ProxyAdblockRules.export(context):null;
-        if(profile.adblockChain&&adblock.count<=0)throw new IOException("代理串联去广告已开启，但当前没有有效广告规则；请先启用或更新规则源");
         int controllerPort=(fixedControllerPort>=29090&&fixedControllerPort<=29149)?fixedControllerPort:chooseControllerPort();
         String ebpfInterface=profile.mode==ProxyRuntimeProfile.Mode.EBPF?detectDefaultInterface():"";
         Set<String> tunPackages=profile.mode==ProxyRuntimeProfile.Mode.TUN?selectedTunPackages():Collections.emptySet();
@@ -383,6 +374,14 @@ final class RootProxyManager {
 
     JSONObject start(ProxyRuntimeProfile p)throws Exception{return startInternal(p,null,false);}
     JSONObject start(ProxyRuntimeProfile profile,Progress progress)throws Exception{return startInternal(profile,progress,false);}
+    JSONObject startIfWanted(ProxyRuntimeProfile profile)throws Exception{
+        CONTROL_LOCK.lock();
+        try{
+            if(!prefs.getBoolean("proxyRootWanted",false))
+                return new JSONObject().put("ok",true).put("running",false).put("cancelled",true);
+            return startInternal(profile,null,false);
+        }finally{CONTROL_LOCK.unlock();}
+    }
     JSONObject replaceRunningAfterUpgrade(ProxyRuntimeProfile profile)throws Exception{return startInternal(profile,null,true);}
     JSONObject replaceRunningAfterUpgrade(ProxyRuntimeProfile profile,Progress progress)throws Exception{return startInternal(profile,progress,true);}
 
@@ -486,7 +485,9 @@ final class RootProxyManager {
         stage(progress,"确认核心进程、策略控制接口与守护状态…");
         if(!coreAliveFast()){
             if(adblockCoordinatorEntered)ProxyAdblockCoordinator.exit(context);
-            throw new IOException("启动命令已返回，但未检测到河图私有核心进程"+(diagnostics().isEmpty()?"":"："+diagnostics()));
+            RootBridge.Result failure=RootBridge.rootShell(context,"tail -c 1800 "+RootBridge.quote(ROOT+"/run/core.log")+" 2>/dev/null || true",3000L);
+            String detail=DiagnosticReport.redact(failure.output,prefs.getString("proxyControllerSecret",""));
+            throw new IOException("启动命令已返回，但未检测到河图私有核心进程"+(detail.isEmpty()?"":"："+detail));
         }
         if(!prefs.getBoolean("hetuLegacyRetired",false))retireLegacyInstallation(progress);
         // Publish only the port of a successfully running core.
@@ -560,6 +561,8 @@ final class RootProxyManager {
     JSONObject stop(Progress progress)throws Exception{
         CONTROL_LOCK.lock();
         try{
+            // Revoke recovery intent before shutdown; queued automatic starts recheck under this lock.
+            prefs.edit().putBoolean("proxyRootWanted",false).apply();
             stage(progress,"停止守护、Kill Switch、核心并回滚透明代理规则…");
             JSONObject r=runJsonAllowMissing("stop",new JSONObject().put("ok",true).put("running",false).put("state","idle").put("message","Root 代理未运行"));
             ProxyAdblockCoordinator.exit(context);
@@ -627,20 +630,70 @@ final class RootProxyManager {
     }
 
     String diagnostics(){
+        RootBridge.requireWorkerThread();
+        DiagnosticReport report=new DiagnosticReport(prefs.getString("proxyControllerSecret",""));
+        StringBuilder events=new StringBuilder("time=").append(new Date())
+                .append("\napp=").append(BuildConfig.VERSION_NAME)
+                .append("\nexpectedCore=").append(expectedCoreToken(ProxyRuntimeProfile.load(prefs).core));
+        Map<String,?> values=prefs.getAll();
+        for(String key:new String[]{"proxyBaseCore","proxyBaseMode","proxyBaseIpv6","proxyRootWanted",
+                "proxyRootRuntimeRunning","proxyRootRuntimeRefreshPending","proxyRootBootError",
+                "proxyRootBootRestoreSuccessAt","proxyLastUnknownProcessProbeAt","proxyAutoRecoveryAttempt",
+                "proxyAutoRecoverySuccess","proxyAutoRecoveryError","proxyLastNetworkSessionReset",
+                "proxyLastNetworkSessionResetCount","proxyLastNetworkSessionResetReason","proxyNetworkSessionResetError",
+                "proxyLastAutoStopAt","proxyLastAutoStopReason","proxyAdblockLastRevision","proxyAdblockLastError",
+                "proxyAdblockHotReloadAt","proxyAdblockLastHitAt","proxyRootEgressProbeLastError"}){
+            if(values.containsKey(key))events.append('\n').append(key).append('=').append(values.get(key));
+        }
+        report.section("版本与最近运行事件",events.toString(),6000);
         try{
-            RootBridge.requireWorkerThread();
-            String cmd="echo '--- root ---'; id; echo '--- runtime ---'; ls -l "+RootBridge.quote(ROOT)+" "+RootBridge.quote(ROOT+"/bin")+" "+RootBridge.quote(ROOT+"/run")+" 2>&1; "+
-                    "echo '--- session ---'; cat "+RootBridge.quote(ROOT+"/run/session.state")+" 2>/dev/null || true; "+
-                    "echo '--- cnip cache ---'; ls -lh "+RootBridge.quote(ROOT+"/run/ruleset")+" 2>&1 || true; "+
-                    "echo '--- sockets ---'; (ss -lntup 2>/dev/null || netstat -lntup 2>/dev/null || true) | tail -n 35; "+
-                    "echo '--- policy ---'; ip rule show 2>/dev/null | tail -n 30; ip -6 rule show 2>/dev/null | tail -n 20; "+
-                    "echo '--- hetu chains ---'; iptables-save 2>/dev/null | grep -E 'HETU|BICHEN' | tail -n 70; ip6tables-save 2>/dev/null | grep -E 'HETU|BICHEN' | tail -n 55; "+
-                    "echo '--- crash ---'; cat "+RootBridge.quote(ROOT+"/run/last-crash")+" 2>/dev/null || true; "+
-                    "echo '--- log ---'; tail -n 55 "+RootBridge.quote(ROOT+"/run/core.log")+" 2>&1 || true";
+            String cmd=String.join("\n",
+                    "id",
+                    "echo '--- actual core token ---'; cat "+RootBridge.quote(CORE_TOKEN)+" 2>/dev/null; echo",
+                    "echo '--- session ---'; cat "+RootBridge.quote(ROOT+"/run/session.state")+" 2>/dev/null || true",
+                    "echo '--- transport config ---'; grep -E '^(disable-keep-alive|keep-alive-idle|keep-alive-interval|find-process-mode|mode|ipv6):' "+RootBridge.quote(CONFIG)+" 2>/dev/null || true",
+                    "echo '--- WeChat processes ---'; ps -A -o UID,PID,NAME 2>/dev/null | grep -F 'com.tencent.mm' || true",
+                    "echo '--- listeners ---'; (ss -lntup 2>/dev/null || netstat -lntup 2>/dev/null || true) | tail -n 24",
+                    "echo '--- core TCP timers ---'; (ss -ntoep 2>/dev/null || true) | grep -E 'core|mihomo' | head -n 24",
+                    "echo '--- IPv6 interfaces ---'; cat /proc/net/if_inet6 2>/dev/null || true",
+                    "echo '--- IPv6 routes ---'; ip -6 route show table all 2>/dev/null | head -n 24",
+                    "echo '--- policy ---'; ip rule show 2>/dev/null | tail -n 24; ip -6 rule show 2>/dev/null | tail -n 24",
+                    "echo '--- Hetu chains ---'; iptables-save 2>/dev/null | grep -E 'HETU|BICHEN' | tail -n 70; ip6tables-save 2>/dev/null | grep -E 'HETU|BICHEN' | tail -n 70",
+                    "true");
             RootBridge.Result r=RootBridge.rootShell(context,cmd,12000L);
-            String t=r.output.trim().replace('\n',' ');
-            return t.length()>1800?t.substring(t.length()-1800):t;
-        }catch(Exception ignored){return"";}
+            report.section("Root 网络状态","exit="+r.code+"\n"+r.output,18000);
+        }catch(Exception e){report.section("Root 网络状态",String.valueOf(e),1000);}
+        try{
+            int wechatUid=-1;
+            try{wechatUid=context.getPackageManager().getApplicationInfo("com.tencent.mm",0).uid;}catch(Exception ignored){}
+            org.json.JSONArray connections=new MihomoControllerClient(context).connections().optJSONArray("connections");
+            StringBuilder matched=new StringBuilder("WeChat UID=").append(wechatUid).append('\n');
+            int count=0;
+            for(int i=0;connections!=null&&i<connections.length()&&count<25;i++){
+                JSONObject connection=connections.optJSONObject(i);
+                JSONObject metadata=connection==null?null:connection.optJSONObject("metadata");
+                if(metadata==null||!DiagnosticReport.isWechat(metadata.optString("process"),metadata.optString("host"),metadata.optInt("uid",-1),wechatUid))continue;
+                count++;
+                matched.append("#").append(count).append(" process=").append(metadata.optString("process"))
+                        .append(" uid=").append(metadata.optInt("uid",-1))
+                        .append(" host=").append(metadata.optString("host"))
+                        .append(" destination=").append(metadata.optString("destinationIP")).append(':').append(metadata.optString("destinationPort"))
+                        .append(" network=").append(metadata.optString("network"))
+                        .append(" start=").append(connection.optString("start"))
+                        .append(" up=").append(connection.optLong("upload")).append(" down=").append(connection.optLong("download"))
+                        .append(" rule=").append(connection.optString("rule")).append('/').append(connection.optString("rulePayload"))
+                        .append(" chains=").append(connection.optJSONArray("chains")).append('\n');
+            }
+            if(count==0)matched.append("当前未识别到微信连接；这不代表微信未联网，可能走应用绕过、OEM推送或已断连。\n");
+            report.section("微信当前连接（仅连接元数据，无聊天内容）",matched.toString(),6000);
+        }catch(Exception e){report.section("微信当前连接","Controller 读取失败："+e.getMessage(),1000);}
+        try{
+            String cmd="echo '--- recent core log ---'; tail -c 9000 "+RootBridge.quote(ROOT+"/run/core.log")
+                    +" 2>/dev/null; echo; echo '--- last crash ---'; tail -c 1500 "+RootBridge.quote(ROOT+"/run/last-crash")+" 2>/dev/null; true";
+            RootBridge.Result logs=RootBridge.rootShell(context,cmd,5000L);
+            report.section("最近核心日志",logs.output,10000);
+        }catch(Exception e){report.section("最近核心日志",String.valueOf(e),1000);}
+        return report.toString();
     }
 
     String startupConfig()throws IOException{

@@ -42,7 +42,7 @@ public final class ProxyContinuityTest {
         check(!MessagingFilterPolicy.subscriptionExceptions(Collections.singleton("szlong.weixin.qq.com")).contains("szlong.weixin.qq.com"),"explicit user block wins over automatic exception");
         check(MessagingFilterPolicy.subscriptionExceptions(Collections.singleton("weixin.qq.com")).isEmpty(),"explicit parent block is respected");
 
-        String source="mode: rule\nproxies: []\nproxy-groups:\n  - name: SELECT\n    type: select\n    proxies: [DIRECT]\n"
+        String source="mode: rule\ndisable-keep-alive: false\nkeep-alive-idle: 120\nkeep-alive-interval: 60\nproxies: []\nproxy-groups:\n  - name: SELECT\n    type: select\n    proxies: [DIRECT]\n"
                 +"rule-providers:\n  source-adblock:\n    type: inline\n    behavior: domain\n    payload: ['+.source-ad.example.test']\n"
                 +"rules:\n  - DOMAIN,stun.example.test,REJECT\n  - DST-PORT,853,REJECT\n"
                 +"  - RULE-SET,source-adblock,REJECT\n  - DOMAIN-SUFFIX,weixin.qq.com,DIRECT\n  - MATCH,SELECT\n";
@@ -58,6 +58,8 @@ public final class ProxyContinuityTest {
         check(!yaml.contains("RULE-SET,hetu-adblock-allow,DIRECT"),"filter exceptions never force direct routing");
         check(yaml.indexOf("DOMAIN-SUFFIX,weixin.qq.com,DIRECT")>originalFilter,"user routing order is preserved");
         check(source.contains("MATCH,SELECT")&&!source.contains("hetu-adblock"),"source configuration remains untouched");
+        check(yaml.contains("listen: ':11053'"),"DNS accepts IPv4 and IPv6 redirects");
+        check(yaml.contains("disable-keep-alive: false")&&yaml.contains("keep-alive-idle: 120")&&yaml.contains("keep-alive-interval: 60"),"Root configuration preserves user keepalive settings");
         if(args.length>0) Files.write(Paths.get(args[0]),yaml.getBytes(StandardCharsets.UTF_8));
         System.out.println("ProxyContinuityTest passed: "+checks);
     }

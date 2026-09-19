@@ -23,12 +23,15 @@ public final class ProxyNetworkMatchService extends Service {
     private volatile long lastAdblockMetricPoll;
     private volatile long networkChangeGeneration;
     private volatile int bootRestoreAttempts;
-    private volatile boolean bootRestoreInFlight;
+    private ProxyRestoreScheduler bootRestores;
 
     @Override public void onCreate(){
         super.onCreate();
         prefs=getSharedPreferences("hetu",MODE_PRIVATE);
         cm=(ConnectivityManager)getSystemService(CONNECTIVITY_SERVICE);
+        bootRestores=new ProxyRestoreScheduler((task,delayMs)->metrics.schedule(()->{
+            try{worker.execute(task);}catch(RejectedExecutionException stopped){}
+        },delayMs,TimeUnit.MILLISECONDS),this::restoreWantedProxyAfterBoot);
         ensureChannel();
         startForeground(92,note("代理网络守护已就绪"));
         register();
@@ -50,57 +53,50 @@ public final class ProxyNetworkMatchService extends Service {
     }
 
     private void scheduleBootRestore(long delayMs){
-        if(bootRestoreInFlight)return;
-        bootRestoreInFlight=true;
-        metrics.schedule(()->worker.execute(()->{
-            try{restoreWantedProxyAfterBoot();}
-            finally{bootRestoreInFlight=false;}
-        }),Math.max(0L,delayMs),TimeUnit.MILLISECONDS);
+        bootRestores.request(delayMs);
     }
 
-    private void restoreWantedProxyAfterBoot(){
-        if(!prefs.getBoolean("proxyRootAutoStart",false)||!prefs.getBoolean("proxyRootWanted",false))return;
+    private long restoreWantedProxyAfterBoot(){
+        if(!prefs.getBoolean("proxyRootAutoStart",false)||!prefs.getBoolean("proxyRootWanted",false))return 0L;
         if(coreAlive()){
             prefs.edit()
-                    .putBoolean("proxyRootRuntimeRunning",true)
                     .putLong("proxyRootBootRestoreSuccessAt",System.currentTimeMillis())
                     .remove("proxyRootBootError")
                     .apply();
-            return;
+            return 0L;
         }
         Network network=cm==null?null:cm.getActiveNetwork();
         NetworkCapabilities caps=network==null||cm==null?null:cm.getNetworkCapabilities(network);
         boolean internet=caps!=null&&caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
         if(!internet){
             prefs.edit().putString("proxyRootBootError","等待开机网络就绪…").apply();
-            if(++bootRestoreAttempts<=12)scheduleBootRestore(Math.min(5000L,750L+bootRestoreAttempts*350L));
-            return;
+            return ++bootRestoreAttempts<=12?Math.min(5000L,750L+bootRestoreAttempts*350L):0L;
         }
         try{
-            JSONObject result=new RootProxyManager(getApplicationContext()).start(ProxyRuntimeProfile.load(prefs));
+            JSONObject result=new RootProxyManager(getApplicationContext()).startIfWanted(ProxyRuntimeProfile.load(prefs));
+            if(result.optBoolean("cancelled",false))return 0L;
             if(result.optBoolean("ok",false)||result.optBoolean("running",false)){
                 bootRestoreAttempts=0;
                 prefs.edit()
-                        .putBoolean("proxyRootRuntimeRunning",true)
                         .putLong("proxyRootBootRestoreSuccessAt",System.currentTimeMillis())
                         .remove("proxyRootBootError")
                         .apply();
-                return;
+                return 0L;
             }
             throw new IllegalStateException(result.optString("message","开机恢复未完成"));
         }catch(Exception error){
             String detail=error.getMessage()==null?error.getClass().getSimpleName():error.getMessage();
             if(detail.length()>260)detail=detail.substring(0,260)+"…";
             prefs.edit()
-                    .putBoolean("proxyRootRuntimeRunning",false)
                     .putString("proxyRootBootError","Root 代理开机恢复失败："+detail)
                     .putLong("proxyRootBootRestoreAttemptAt",System.currentTimeMillis())
                     .apply();
-            if(++bootRestoreAttempts<=8)scheduleBootRestore(Math.min(8000L,1200L+bootRestoreAttempts*800L));
+            return ++bootRestoreAttempts<=8?Math.min(8000L,1200L+bootRestoreAttempts*800L):0L;
         }
     }
 
     @Override public void onDestroy(){
+        bootRestores.close();
         if(cb!=null)try{cm.unregisterNetworkCallback(cb);}catch(Exception ignored){}
         worker.shutdownNow();
         metrics.shutdownNow();
@@ -225,12 +221,7 @@ public final class ProxyNetworkMatchService extends Service {
 
     private ProxyContinuity.ProcessState probeCoreState(){
         try{
-            String command="P=$(cat /data/adb/hetu/run/core.pid 2>/dev/null || echo 0); "
-                    +"case \"$P\" in ''|*[!0-9]*) P=0;; esac; "
-                    +"if [ \"$P\" -gt 0 ] && kill -0 \"$P\" >/dev/null 2>&1; then "
-                    +"EXE=$(readlink \"/proc/$P/exe\" 2>/dev/null || true); "
-                    +"case \"$EXE\" in /data/adb/hetu/bin/core) printf 1;; *) printf 0;; esac; "
-                    +"else printf 0; fi";
+            String command=ProxyContinuity.coreProbeCommand("/data/adb/hetu/run/core.pid","/data/adb/hetu/bin/core");
             RootBridge.Result result=RootBridge.rootShell(getApplicationContext(),command,3500L);
             ProxyContinuity.ProcessState state=ProxyContinuity.processState(result.ok(),result.output);
             if(state!=ProxyContinuity.ProcessState.UNKNOWN){
@@ -255,7 +246,6 @@ public final class ProxyNetworkMatchService extends Service {
                 probeEgressIfPending();
                 return;
             }
-            prefs.edit().putBoolean("proxyRootRuntimeRunning",false).apply();
             Network network=cm==null?null:cm.getActiveNetwork();
             if(network==null){
                 prefs.edit().putString("proxyAutoRecoveryError","等待网络恢复后重新启动代理").apply();
@@ -266,10 +256,10 @@ public final class ProxyNetworkMatchService extends Service {
             if(now-last<30000L)return;
             prefs.edit().putLong("proxyAutoRecoveryAttempt",now).apply();
             RootProxyManager root=new RootProxyManager(getApplicationContext());
-            JSONObject result=root.start(ProxyRuntimeProfile.load(prefs));
+            JSONObject result=root.startIfWanted(ProxyRuntimeProfile.load(prefs));
+            if(result.optBoolean("cancelled",false))return;
             if(result.optBoolean("running",false)||result.optBoolean("ok",false)){
                 prefs.edit()
-                        .putBoolean("proxyRootRuntimeRunning",true)
                         .putLong("proxyAutoRecoverySuccess",System.currentTimeMillis())
                         .remove("proxyAutoRecoveryError")
                         .apply();
@@ -340,6 +330,7 @@ public final class ProxyNetworkMatchService extends Service {
             try{size=Long.parseLong(sizeText);}catch(Exception invalid){return;}
             String chunk=newline<0?"":result.output.substring(newline+1);
             long hits=prefs.getLong("proxyAdblockSessionHits",0L);
+            long previousHits=hits;
             LinkedHashSet<String> recent=new LinkedHashSet<>();
             String oldRecent=prefs.getString("proxyAdblockRecentDomains","");
             if(oldRecent!=null&&!oldRecent.isEmpty())for(String item:oldRecent.split("\\n"))if(!item.trim().isEmpty())recent.add(item.trim());
@@ -373,7 +364,7 @@ public final class ProxyNetworkMatchService extends Service {
                     .putLong("proxyAdblockSessionHits",hits)
                     .putLong("proxyAdblockLogOffset",size)
                     .putString("proxyAdblockRecentDomains",recentText.toString());
-            if(!recent.isEmpty()){
+            if(hits>previousHits&&!recent.isEmpty()){
                 String first=recent.iterator().next();
                 edit.putString("proxyAdblockLastDomain",first).putLong("proxyAdblockLastHitAt",System.currentTimeMillis());
             }

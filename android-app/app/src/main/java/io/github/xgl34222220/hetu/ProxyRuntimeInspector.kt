@@ -110,7 +110,9 @@ internal class ProxyRuntimeInspector(context: Context) {
     }
 
     suspend fun adblockRuntimeStats(): AdblockRuntimeStats = withContext(Dispatchers.IO) {
-        val command = "grep -Ei 'hetu-adblock|RuleSet/hetu-adblock' /data/adb/hetu/run/core.log 2>/dev/null | tail -n 4000 || true"
+        // The service owns cumulative counters. Read only a bounded tail here so a
+        // dashboard refresh never scans an ever-growing log or races its counter.
+        val command = "if [ -r /data/adb/hetu/run/core.log ]; then tail -c 1048576 /data/adb/hetu/run/core.log 2>/dev/null | grep -Ei 'hetu-adblock|RuleSet/hetu-adblock' | tail -n 4000; else exit 2; fi"
         val result = RootBridge.rootShell(app, command, 6_000L)
         val persisted = prefs.getLong("proxyAdblockSessionHits", 0L)
         if (!result.ok()) {
@@ -138,12 +140,6 @@ internal class ProxyRuntimeInspector(context: Context) {
             if (recent.size >= 8) break
         }
         val count = maxOf(persisted, matched.size.toLong())
-        if (count > persisted || recent.isNotEmpty()) {
-            prefs.edit()
-                .putLong("proxyAdblockSessionHits", count)
-                .putString("proxyAdblockRecentDomains", recent.joinToString("\n"))
-                .apply()
-        }
         AdblockRuntimeStats(
             count = count,
             recentDomains = if (recent.isNotEmpty()) recent.toList() else

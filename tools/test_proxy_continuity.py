@@ -28,9 +28,10 @@ def main():
             raise RuntimeError('Unable to obtain production provider constants')
         stub = dest / 'ProxyAdblockRules.java'
         stub.write_text('package io.github.xgl34222220.hetu;\nfinal class ProxyAdblockRules {\n' + '\n'.join(constants) + '\n}\n')
-        names = ('ProxyContinuity', 'MessagingFilterPolicy', 'MihomoStartupConfig', 'ProxyRuntimeProfile')
+        names = ('ProxyContinuity', 'MessagingFilterPolicy', 'MihomoStartupConfig', 'ProxyRuntimeProfile', 'ProxyRestoreScheduler', 'DiagnosticReport')
         sources = [str(PACKAGE / (name + '.java')) for name in names]
-        sources += [str(stub), str(ROOT / 'tests/ProxyContinuityTest.java')]
+        tests = ('ProxyContinuityTest', 'ProxyRestoreSchedulerTest', 'DiagnosticReportTest', 'ProxyCoreProbeTest')
+        sources += [str(stub)] + [str(ROOT / 'tests' / (name + '.java')) for name in tests]
         # Android's java.* stubs conflict with JVM modules in ECJ. Only the Android
         # API types are needed here; use the host JDK implementation of java.*.
         android_api = dest / 'android-api.jar'
@@ -46,6 +47,8 @@ def main():
             fixture.parent.mkdir(parents=True, exist_ok=True)
             command.append(str(fixture))
         subprocess.run(command, check=True)
+        for name in tests[1:]:
+            subprocess.run(['java', '-cp', temp + os.pathsep + str(android_api), 'io.github.xgl34222220.hetu.' + name], check=True)
 
 
 if __name__ == '__main__':

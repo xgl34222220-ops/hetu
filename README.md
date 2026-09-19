@@ -43,3 +43,9 @@ gradle :app:assembleDebug --stacktrace
 ```
 
 JNI 桥接与 Android 源码命名空间均使用 `io.github.xgl34222220.hetu`。原生库名为 `libhetu_core.so`。
+
+内置 Root Mihomo 通过 `tools/prepare_root_mihomo.py` 和 `hetu_root` 构建标签保留配置中的 TCP 保活设置；JNI VPN 核心保持上游 Android 策略。用户自行导入的核心不会被替换，也不自动获得该适配。上游版本改变时，适配脚本要求重新核对函数结构。
+
+交付预览 APK 前必须按 [固定预览签名说明](docs/preview-signing.md) 重签并验签，不能直接把 CI 临时 debug 签名包当作可覆盖升级的测试包。
+
+遇到消息延迟，可在高级设置中打开“消息与网络诊断”并复制结果。报告包含实际核心标识、微信连接分流、TCP 保活定时器和最近恢复事件，不采集聊天内容；已对控制器密钥及日志中的完整 URL 做脱敏。

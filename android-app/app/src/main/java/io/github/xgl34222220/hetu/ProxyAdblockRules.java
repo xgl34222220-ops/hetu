@@ -5,11 +5,10 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
-import org.json.JSONObject;
 
 /** Exports Hetu DNS block/allow snapshots for Mihomo local domain providers. */
 final class ProxyAdblockRules {
-    private static final String EXPORT_VERSION = "filter-v2:";
+    private static final String EXPORT_VERSION = "filter-v3:";
     static final String PROVIDER_NAME = "hetu-adblock";
     static final String ALLOW_PROVIDER_NAME = "hetu-adblock-allow";
     static final String PROVIDER_PATH = "./ruleset/hetu-adblock.txt";
@@ -27,20 +26,6 @@ final class ProxyAdblockRules {
         }
     }
 
-    private static String persistedGeneration(Context context){
-        File pointer=new File(context.getFilesDir(),"rules-v2/current.json");
-        if(!pointer.isFile())return "";
-        try(FileInputStream in=new FileInputStream(pointer)){
-            ByteArrayOutputStream out=new ByteArrayOutputStream();
-            byte[] buffer=new byte[4096];int n,total=0;
-            while((n=in.read(buffer))!=-1){
-                total+=n;if(total>256*1024)return "";
-                out.write(buffer,0,n);
-            }
-            return new JSONObject(new String(out.toByteArray(),StandardCharsets.UTF_8)).optString("current","");
-        }catch(Exception ignored){return "";}
-    }
-
     static synchronized Snapshot export(Context context) throws Exception {
         File dir=new File(context.getCacheDir(),"hetu-dns-filter");
         if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("无法创建河图 DNS 过滤规则目录");
@@ -48,7 +33,10 @@ final class ProxyAdblockRules {
         File allowTarget=new File(dir,"hetu-adblock-allow.txt");
         File meta=new File(dir,"hetu-adblock.meta");
 
-        String generation=persistedGeneration(context);
+        RuleStore rules=new RuleStore(context.getApplicationContext());
+        rules.reload();
+        RuleStore.ExportRules effective=RuleStore.currentExportRules();
+        String generation=effective.revision;
         String persisted=generation.isEmpty()?"":EXPORT_VERSION+generation;
         if(!persisted.isEmpty()&&target.isFile()&&allowTarget.isFile()&&meta.isFile()){
             Properties cached=new Properties();
@@ -63,14 +51,15 @@ final class ProxyAdblockRules {
             }
         }
 
-        RuleStore rules=new RuleStore(context.getApplicationContext());
-        rules.reload();
-        String revision=EXPORT_VERSION+rules.currentRevision();
-        ArrayList<String> domains=new ArrayList<>(rules.effectiveDomains());
-        ArrayList<String> allow=new ArrayList<>(rules.effectiveAllowDomains());
+        String revision=EXPORT_VERSION+generation;
+        ArrayList<String> domains=new ArrayList<>(effective.domains);
+        ArrayList<String> allow=new ArrayList<>(effective.allowDomains);
         Collections.sort(domains);
         Collections.sort(allow);
         if(domains.size()>1500000)throw new IOException("广告规则超过 150 万条安全上限");
+        // A failed second write must not leave an old cache index pointing at a
+        // partially replaced pair (including when the user rolls back a revision).
+        Files.deleteIfExists(meta.toPath());
         writeProvider(domains,target);
         writeProvider(allow,allowTarget);
 
