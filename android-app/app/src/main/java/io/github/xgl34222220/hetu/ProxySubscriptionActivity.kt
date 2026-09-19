@@ -471,75 +471,121 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
 
     if (addingSubscription || editSubscription != null) {
         val existing = editSubscription
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { if (!savingSubscription) { addingSubscription = false; editSubscription = null } },
-            title = { Text(if (existing == null) "添加订阅" else "编辑订阅") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(
-                        value = editorName,
-                        onValueChange = { if (existing == null) editorName = it },
-                        enabled = existing == null,
-                        label = { Text("订阅名称") },
-                        placeholder = { Text("例如：机场一") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                    )
-                    OutlinedTextField(
-                        value = editorUrl,
-                        onValueChange = { editorUrl = it; editorError = "" },
-                        label = { Text("订阅链接") },
-                        placeholder = { Text("https://…") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                    )
-                    Text("链接仅保存在本机私有配置中；订阅列表不会显示 Token。", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                    if (editorError.isNotBlank()) Text(editorError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                    if (existing != null && subscriptions.size > 1) {
-                        TextButton(
-                            onClick = {
-                                savingSubscription = true
-                                scope.launch {
-                                    runCatching { controller.deleteSubscription(existing.name) }
-                                        .onSuccess {
-                                            addingSubscription = false; editSubscription = null; revision++; message = "已删除 ${existing.name}；重启代理后生效"
-                                        }
-                                        .onFailure { editorError = it.message ?: "删除失败" }
-                                    savingSubscription = false
-                                }
-                            },
-                            enabled = !savingSubscription,
-                        ) {
-                            Icon(Icons.Rounded.DeleteOutline, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("删除这个订阅")
+            containerColor = tokens.elevatedCardBackground,
+            contentColor = tokens.textPrimary,
+            tonalElevation = 0.dp,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            dragHandle = {
+                Box(
+                    Modifier.padding(top = 10.dp, bottom = 7.dp)
+                        .size(width = 36.dp, height = 4.dp)
+                        .background(tokens.textMuted.copy(alpha = .40f), CircleShape),
+                )
+            },
+        ) {
+            Column(
+                Modifier.fillMaxWidth().navigationBarsPadding().imePadding()
+                    .padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    if (existing == null) "添加订阅" else "编辑订阅",
+                    color = tokens.textPrimary,
+                    fontSize = 21.sp,
+                    lineHeight = 27.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                )
+                Text(
+                    "订阅链接仅保存在河图本机私有配置中",
+                    color = tokens.textSecondary,
+                    fontSize = 11.sp,
+                )
+                OutlinedTextField(
+                    value = editorName,
+                    onValueChange = { if (existing == null) editorName = it },
+                    enabled = existing == null && !savingSubscription,
+                    label = { Text("订阅名称") },
+                    placeholder = { Text("例如：机场一") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                    shape = RoundedCornerShape(16.dp),
+                )
+                OutlinedTextField(
+                    value = editorUrl,
+                    onValueChange = { editorUrl = it; editorError = "" },
+                    enabled = !savingSubscription,
+                    label = { Text("订阅链接") },
+                    placeholder = { Text("https://…") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                    shape = RoundedCornerShape(16.dp),
+                )
+                if (editorError.isNotBlank()) {
+                    Text(editorError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+                if (existing != null && subscriptions.size > 1) {
+                    TextButton(
+                        onClick = {
+                            savingSubscription = true
+                            scope.launch {
+                                runCatching { controller.deleteSubscription(existing.name) }
+                                    .onSuccess {
+                                        addingSubscription = false
+                                        editSubscription = null
+                                        revision++
+                                        message = "已删除 ${existing.name}；重启代理后生效"
+                                    }
+                                    .onFailure { editorError = it.message ?: "删除失败" }
+                                savingSubscription = false
+                            }
+                        },
+                        enabled = !savingSubscription,
+                    ) {
+                        Icon(Icons.Rounded.DeleteOutline, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("删除这个订阅")
+                    }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    FilledTonalButton(
+                        onClick = { addingSubscription = false; editSubscription = null },
+                        enabled = !savingSubscription,
+                        modifier = Modifier.weight(1f).height(46.dp),
+                        shape = CircleShape,
+                    ) {
+                        Text("取消", fontWeight = FontWeight.Bold)
+                    }
+                    Button(
+                        onClick = {
+                            savingSubscription = true
+                            scope.launch {
+                                val result = if (existing == null) runCatching { controller.addSubscription(editorName, editorUrl) }
+                                else runCatching { controller.updateSubscription(existing.name, editorUrl) }
+                                result.onSuccess {
+                                    addingSubscription = false
+                                    editSubscription = null
+                                    revision++
+                                    message = "订阅已保存；重启代理后生效"
+                                }.onFailure { editorError = it.message ?: "保存失败" }
+                                savingSubscription = false
+                            }
+                        },
+                        enabled = !savingSubscription,
+                        modifier = Modifier.weight(1.35f).height(46.dp),
+                        shape = CircleShape,
+                    ) {
+                        if (savingSubscription) {
+                            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
+                        } else {
+                            Text("保存", fontWeight = FontWeight.Bold)
                         }
                     }
                 }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        savingSubscription = true
-                        scope.launch {
-                            val result = if (existing == null) runCatching { controller.addSubscription(editorName, editorUrl) }
-                            else runCatching { controller.updateSubscription(existing.name, editorUrl) }
-                            result.onSuccess {
-                                addingSubscription = false
-                                editSubscription = null
-                                revision++
-                                message = "订阅已保存；重启代理后生效"
-                            }.onFailure { editorError = it.message ?: "保存失败" }
-                            savingSubscription = false
-                        }
-                    },
-                    enabled = !savingSubscription,
-                ) {
-                    if (savingSubscription) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Text("保存")
-                }
-            },
-            dismissButton = { TextButton(onClick = { addingSubscription = false; editSubscription = null }, enabled = !savingSubscription) { Text("取消") } },
-        )
+                Spacer(Modifier.height(2.dp))
+            }
+        }
     }
 
     if (yamlOpen) {
