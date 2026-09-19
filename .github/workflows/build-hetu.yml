@@ -102,8 +102,8 @@ jobs:
           grep -Fq 'ruleSetRefreshing[item.name] = true' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           grep -Fq 'testing[node.name] = true' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           grep -Fq 'success = providerSucceeded[item.name] == true' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'repo.refreshSubscriptions()' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'repo.refreshRuleSets()' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
+          grep -Fq 'repo.refreshProvider(item.name)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
+          grep -Fq 'repo.refreshRuleSet(item.name)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           grep -Fq 'fun pullRefreshAll()' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
           grep -Fq 'onRefresh = ::pullRefreshAll' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
           grep -Fq '.then(if (blurEnabled) Modifier.hazeSource(haze) else Modifier)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
