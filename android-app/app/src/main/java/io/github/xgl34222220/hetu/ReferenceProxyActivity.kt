@@ -1930,9 +1930,19 @@ private fun RefDetailNodeCard(
     val scale by animateFloatAsState(if (pressed) .96f else 1f, spring(dampingRatio = .72f, stiffness = 580f), label = "detailNode${node.name}")
     val shape = RoundedCornerShape(16.dp)
     val premiumBrush = if (dark) {
-        Brush.verticalGradient(listOf(t.elevatedCardBackground, t.cardBackground))
+        Brush.verticalGradient(
+            listOf(
+                t.elevatedCardBackground.copy(alpha = .94f),
+                t.cardBackground.copy(alpha = .86f),
+            ),
+        )
     } else {
-        Brush.verticalGradient(listOf(Color.White, Color(0xFFFAFBFD)))
+        Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = .95f),
+                Color(0xFFF8FAFC).copy(alpha = .82f),
+            ),
+        )
     }
     Column(
         modifier.height(64.dp)
@@ -2253,15 +2263,15 @@ private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolea
 
     Column(
         modifier
-            .height(90.dp)
+            .height(96.dp)
             .zIndex(1f)
             .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .95f else 1f }
             .shadow(
                 if (expanded) 4.dp else 2.dp,
                 shape,
                 clip = false,
-                ambientColor = Color(0xFF0F172A).copy(alpha = if (dark) .10f else .05f),
-                spotColor = Color(0xFF0F172A).copy(alpha = if (dark) .12f else .045f),
+                ambientColor = Color(0xFF0F172A).copy(alpha = if (dark) .10f else .03f),
+                spotColor = Color(0xFF0F172A).copy(alpha = if (dark) .12f else .05f),
             )
             .background(premiumBrush, shape)
             .border(
@@ -2289,7 +2299,7 @@ private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolea
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            RefGroupCornerVisual(group, Modifier.size(22.dp))
+            RefGroupCornerVisual(group, Modifier.size(32.dp))
             Spacer(Modifier.width(4.dp))
             Icon(
                 Icons.Rounded.KeyboardArrowDown,
@@ -2552,34 +2562,72 @@ private fun RefInlineNodeCard(
 
 @Composable
 private fun RefGroupCornerVisual(group: ProxyGroupUi, modifier: Modifier) {
-    val t = LocalHetuTokens.current
+    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val knownFlags = listOf("🇭🇰", "🇹🇼", "🇯🇵", "🇸🇬", "🇰🇷", "🇺🇸", "🇬🇧", "🇩🇪", "🇫🇷")
     val flag = knownFlags.firstOrNull { group.name.contains(it) } ?: refNodeFlag(group.name)
-    if (flag.isNotBlank()) {
-        Box(modifier.clip(CircleShape).background(t.controlBackground), contentAlignment = Alignment.Center) {
-            Text(flag, fontSize = 18.sp, lineHeight = 21.sp)
+    val palette = refGroupBadgePalette(group.name, dark)
+    val shape = RoundedCornerShape(11.dp)
+    Box(
+        modifier
+            .shadow(
+                2.dp,
+                shape,
+                clip = false,
+                ambientColor = palette.third.copy(alpha = .06f),
+                spotColor = palette.third.copy(alpha = .08f),
+            )
+            .background(palette.first, shape)
+            .border(.7.dp, palette.second, shape)
+            .clip(shape),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (flag.isNotBlank()) {
+            Text(flag, fontSize = 20.sp, lineHeight = 23.sp)
+        } else {
+            RefGroupVisualIcon(group, palette.third, Modifier.fillMaxSize())
         }
-    } else {
-        RefGroupVisualIcon(group, modifier)
     }
 }
 
 @Composable
-private fun RefGroupVisualIcon(group: ProxyGroupUi, modifier: Modifier) {
-    val t = LocalHetuTokens.current
-    val scheme = MaterialTheme.colorScheme
+private fun RefGroupVisualIcon(group: ProxyGroupUi, tint: Color, modifier: Modifier) {
     val bitmap = remember(group.iconPath) {
         runCatching {
-  group.iconPath.takeIf { it.isNotBlank() }?.let { BitmapFactory.decodeFile(it)?.asImageBitmap() }
+            group.iconPath.takeIf { it.isNotBlank() }?.let { BitmapFactory.decodeFile(it)?.asImageBitmap() }
         }.getOrNull()
     }
-    Box(modifier.background(t.controlBackground, RoundedCornerShape(11.dp)).clip(RoundedCornerShape(11.dp)), contentAlignment = Alignment.Center) {
+    Box(modifier, contentAlignment = Alignment.Center) {
         if (bitmap != null) {
-  Image(bitmap = bitmap, contentDescription = group.name, modifier = Modifier.fillMaxSize().padding(5.dp), contentScale = ContentScale.Fit)
+            Image(
+                bitmap = bitmap,
+                contentDescription = group.name,
+                modifier = Modifier.fillMaxSize().padding(5.dp),
+                contentScale = ContentScale.Fit,
+            )
         } else {
-  Icon(refScenarioIcon(group.name, group.type), null, tint = scheme.primary, modifier = Modifier.size(19.dp))
+            Icon(refScenarioIcon(group.name, group.type), null, tint = tint, modifier = Modifier.size(21.dp))
         }
     }
+}
+
+private fun refGroupBadgePalette(name: String, dark: Boolean): Triple<Color, Color, Color> {
+    val value = name.lowercase(java.util.Locale.ROOT)
+    val (base, border, tint) = when {
+        value.contains("openai") || value.contains("chatgpt") || value.contains("ai") ->
+            Triple(Color(0xFFECFDF5), Color(0xFFA7F3D0), Color(0xFF059669))
+        value.contains("telegram") || value.contains("twitter") || value.contains("x ") ->
+            Triple(Color(0xFFF0F9FF), Color(0xFFBAE6FD), Color(0xFF0EA5E9))
+        value.contains("youtube") || value.contains("netflix") ->
+            Triple(Color(0xFFFFF1F2), Color(0xFFFFCDD3), Color(0xFFF43F5E))
+        value.contains("google") || value.contains("chrome") ->
+            Triple(Color(0xFFF8FAFC), Color(0xFFE2E8F0), Color(0xFF475569))
+        value.contains("github") ->
+            Triple(Color(0xFFF8FAFC), Color(0xFFE2E8F0), Color(0xFF334155))
+        else ->
+            Triple(Color(0xFFEFF6FF), Color(0xFFDBEAFE), Color(0xFF2563EB))
+    }
+    return if (!dark) Triple(base, border.copy(alpha = .70f), tint)
+    else Triple(tint.copy(alpha = .14f), tint.copy(alpha = .22f), tint.copy(alpha = .92f))
 }
 
 @Composable
