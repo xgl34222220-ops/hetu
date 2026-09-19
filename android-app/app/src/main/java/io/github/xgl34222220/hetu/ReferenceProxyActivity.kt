@@ -90,6 +90,7 @@ import io.github.xgl34222220.hetu.ui.glass.liquidGlassLens
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -203,6 +204,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
     var lastDown by remember { mutableLongStateOf(0L) }
     var lastAt by remember { mutableLongStateOf(0L) }
     var operation by remember { mutableStateOf("") }
+    var homeRefreshing by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("") }
     var testing by remember { mutableStateOf(false) }
     var logText by remember { mutableStateOf<String?>(null) }
@@ -389,6 +391,50 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
         scope.launch { measureSitesInternal(reportError = true) }
     }
 
+    suspend fun refreshHomeAll() {
+        refresh()
+        if (!state.running) return
+        coroutineScope {
+            val quickTask = async {
+                try { repo.quickDelay() }
+                catch (cancel: CancellationException) { throw cancel }
+                catch (_: Exception) { emptyMap() }
+            }
+            val siteTask = async {
+                try { repo.siteLatencies() }
+                catch (cancel: CancellationException) { throw cancel }
+                catch (_: Exception) { emptyMap() }
+            }
+            val providerTask = async {
+                try { repo.providers() }
+                catch (cancel: CancellationException) { throw cancel }
+                catch (_: Exception) { emptyList() }
+            }
+            val quick = quickTask.await()
+            if (quick.isNotEmpty()) delays.putAll(quick)
+            val sites = siteTask.await()
+            if (sites.isNotEmpty()) {
+                siteDelays = sites
+                prefs.edit()
+                    .putLong("proxyUiLastDelayBaidu", sites["Baidu"] ?: -2L)
+                    .putLong("proxyUiLastDelayCloudflare", sites["Cloudflare"] ?: -2L)
+                    .putLong("proxyUiLastDelayGoogle", sites["Google"] ?: -2L)
+                    .apply()
+            }
+            val freshProviders = providerTask.await()
+            if (freshProviders.isNotEmpty()) {
+                providers = freshProviders
+                lastProviderRefreshAt = SystemClock.elapsedRealtime()
+                val tracked = freshProviders.filter { it.hasSubscriptionInfo && it.total > 0L }
+                cachedSubscription = RefSubscriptionCache(
+                    tracked.sumOf { it.used },
+                    tracked.sumOf { it.total },
+                    freshProviders.size,
+                )
+            }
+        }
+    }
+
     LaunchedEffect(Unit) {
         // First frame must never wait for Root shell + controller API + provider/CPU probes.
         // Paint the persisted snapshot first, then reconcile the live state asynchronously.
@@ -478,7 +524,22 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                         },
                 ) {
             when (page) {
-                RefProxyPage.Home -> RefHome(
+                RefProxyPage.Home -> PullToRefreshBox(
+                    isRefreshing = homeRefreshing,
+                    onRefresh = {
+                        if (!homeRefreshing) scope.launch {
+                            homeRefreshing = true
+                            try {
+                                refreshHomeAll()
+                                if (message.isBlank()) message = "全部刷新完成"
+                            } finally {
+                                homeRefreshing = false
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    RefHome(
                     state = state,
                     runtime = runtime,
                     providers = providers,
@@ -504,7 +565,8 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                         panelTab = RefPanelTab.Subscriptions
                         page = RefProxyPage.Panel
                     },
-                )
+                    )
+                }
                 RefProxyPage.Panel -> RefPanel(
                     state = state,
                     repo = repo,
@@ -515,7 +577,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                     hazeState = haze,
                     backdrop = liquidBackdrop.takeIf { liquid },
                     glassEnabled = blurEnabled && liquidGlassEnabled,
-                    onRefreshState = { scope.launch { refresh() } },
+                    onRefreshState = { refresh() },
                     onOpenSettings = { page = RefProxyPage.Settings },
                     onDetailVisibleChanged = { panelDetailVisible = it },
                 )
@@ -1347,7 +1409,7 @@ private fun RefPanel(
     hazeState: HazeState,
     backdrop: LayerBackdrop?,
     glassEnabled: Boolean,
-    onRefreshState: () -> Unit,
+    onRefreshState: suspend () -> Unit,
     onOpenSettings: () -> Unit,
     onDetailVisibleChanged: (Boolean) -> Unit,
 ) {
@@ -1436,19 +1498,62 @@ private fun RefPanel(
         scope.launch {
             refreshing = true
             error = ""
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
             try {
-                when (tab) {
-                    RefPanelTab.Groups -> delays.putAll(repo.globalDelay())
-                    RefPanelTab.Overview -> onRefreshState()
-                    RefPanelTab.Subscriptions -> providers = repo.refreshSubscriptions()
-                    RefPanelTab.RuleSets -> ruleSets = repo.refreshRuleSets()
-                    RefPanelTab.Rules -> rules = repo.rules()
-                    RefPanelTab.Connections -> onRefreshState()
+                if (!state.running) {
+                    onRefreshState()
+                    return@launch
+                }
+                coroutineScope {
+                    val stateTask = async {
+                        try { onRefreshState(); "" }
+                        catch (cancel: CancellationException) { throw cancel }
+                        catch (e: Exception) { e.message ?: "运行状态刷新失败" }
+                    }
+                    val delayTask = async {
+                        try { repo.globalDelay() to "" }
+                        catch (cancel: CancellationException) { throw cancel }
+                        catch (e: Exception) { emptyMap<String, Long>() to (e.message ?: "节点测速失败") }
+                    }
+                    val subscriptionTask = async {
+                        try { repo.refreshSubscriptions() to "" }
+                        catch (cancel: CancellationException) { throw cancel }
+                        catch (e: Exception) { emptyList<DashboardProviderUi>() to (e.message ?: "订阅刷新失败") }
+                    }
+                    val rulesTask = async {
+                        try { repo.rules() to "" }
+                        catch (cancel: CancellationException) { throw cancel }
+                        catch (e: Exception) { emptyList<ProxyRuleUi>() to (e.message ?: "规则刷新失败") }
+                    }
+                    val ruleSetTask = async {
+                        try { repo.refreshRuleSets() to "" }
+                        catch (cancel: CancellationException) { throw cancel }
+                        catch (e: Exception) { emptyList<DashboardRuleSetUi>() to (e.message ?: "规则集刷新失败") }
+                    }
+
+                    val stateError = stateTask.await()
+                    val (freshDelays, delayError) = delayTask.await()
+                    val (freshProviders, subscriptionError) = subscriptionTask.await()
+                    val (freshRules, rulesError) = rulesTask.await()
+                    val (freshRuleSets, ruleSetError) = ruleSetTask.await()
+
+                    if (freshDelays.isNotEmpty()) delays.putAll(freshDelays)
+                    if (freshProviders.isNotEmpty()) providers = freshProviders
+                    if (freshRules.isNotEmpty()) rules = freshRules
+                    if (freshRuleSets.isNotEmpty()) ruleSets = freshRuleSets
+
+                    val errors = listOf(stateError, delayError, subscriptionError, rulesError, ruleSetError).filter { it.isNotBlank() }
+                    if (errors.isEmpty()) {
+                        capsuleText = "全部刷新完成"
+                        capsuleError = false
+                    } else {
+                        error = errors.joinToString("；")
+                    }
                 }
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (e: Exception) {
-                error = e.message ?: "刷新失败"
+                error = e.message ?: "全部刷新失败"
             } finally {
                 refreshing = false
             }

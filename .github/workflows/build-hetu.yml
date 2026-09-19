@@ -92,6 +92,13 @@ jobs:
           grep -Fq 'Box(modifier.height(72.dp))' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           grep -Fq 'subscriptionExpireLabel' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
           grep -Fq 'blurRadius = 20.dp' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
+          grep -Fq 'suspend fun refreshHomeAll()' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
+          grep -Fq 'isRefreshing = homeRefreshing' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
+          grep -Fq 'capsuleText = "全部刷新完成"' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
+          grep -Fq 'repo.refreshSubscriptions()' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
+          grep -Fq 'repo.refreshRuleSets()' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
+          grep -Fq 'fun pullRefreshAll()' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
+          grep -Fq 'onRefresh = ::pullRefreshAll' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
           grep -Fq '.then(if (blurEnabled) Modifier.hazeSource(haze) else Modifier)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           grep -Fq 'Modifier.size(24.dp).background(Color.Transparent)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
           grep -Fq '.background(ticketBrush, ticketShape)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
@@ -113,8 +120,8 @@ jobs:
           grep -q 'System.loadLibrary("hetu_core")' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoNative.java
           grep -q 'Java_io_github_xgl34222220_hetu_MihomoNative_invoke' native/bridge/jni_android.c
           grep -q 'Java_io_github_xgl34222220_hetu_preview_MihomoNative_invoke' native/bridge/jni_android.c
-          grep -q 'versionName = "0.4.0-test.80"' android-app/app/build.gradle.kts
-          grep -q 'versionCode = 480' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.4.0-test.81"' android-app/app/build.gradle.kts
+          grep -q 'versionCode = 481' android-app/app/build.gradle.kts
           test -f android-app/app/src/main/java/io/github/xgl34222220/hetu/LegacyAppMigrator.java
           grep -q 'LegacyAppMigrator.migrateIfNeeded(app)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
           grep -q 'controller.restart { operation = it }' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt

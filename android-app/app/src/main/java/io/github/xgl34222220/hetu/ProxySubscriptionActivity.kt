@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -150,6 +151,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
     var configName by remember { mutableStateOf("加载中…") }
     var liveProviders by remember { mutableStateOf<Map<String, DashboardProviderUi>>(emptyMap()) }
     var loading by remember { mutableStateOf(false) }
+    var pullRefreshing by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("") }
 
     var editSubscription by remember { mutableStateOf<ProxySubscriptionUi?>(null) }
@@ -177,6 +179,29 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                 }
                 .onFailure { message = it.message ?: "导入配置失败" }
             loading = false
+        }
+    }
+
+    fun pullRefreshAll() {
+        if (pullRefreshing) return
+        scope.launch {
+            pullRefreshing = true
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            try {
+                val freshProviders = runCatching { dashboardRepo.refreshSubscriptions() }.getOrDefault(emptyList())
+                val overview = controller.configOverview()
+                val library = controller.configLibrary()
+                configName = overview.first
+                subscriptions = overview.second
+                configLibrary = library
+                liveProviders = if (freshProviders.isNotEmpty()) freshProviders.associateBy { it.name }
+                    else runCatching { dashboardRepo.providers() }.getOrDefault(emptyList()).associateBy { it.name }
+                message = "订阅、用量与配置状态已刷新"
+            } catch (error: Exception) {
+                message = "刷新失败：" + (error.message ?: "未知错误")
+            } finally {
+                pullRefreshing = false
+            }
         }
     }
 
@@ -225,6 +250,11 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
             )
         },
     ) {
+        PullToRefreshBox(
+            isRefreshing = pullRefreshing,
+            onRefresh = ::pullRefreshAll,
+            modifier = Modifier.fillMaxSize(),
+        ) {
         LazyColumn(
             Modifier.fillMaxSize().statusBarsPadding(),
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 94.dp),
@@ -258,7 +288,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                         contentColor = scheme.primary,
                         shadowElevation = 1.dp,
                     ) {
-                        IconButton(onClick = { revision++ }, enabled = !loading, modifier = Modifier.fillMaxSize()) {
+                        IconButton(onClick = ::pullRefreshAll, enabled = !loading && !pullRefreshing, modifier = Modifier.fillMaxSize()) {
                             if (loading) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                             else Icon(Icons.Rounded.Refresh, "刷新", Modifier.size(21.dp))
                         }
@@ -659,6 +689,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                     }
                 }
             }
+        }
         }
     }
 
