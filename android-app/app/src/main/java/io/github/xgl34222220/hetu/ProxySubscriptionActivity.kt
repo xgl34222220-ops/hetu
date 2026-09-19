@@ -116,6 +116,7 @@ private object YamlSyntaxHighlightOutputTransformation : OutputTransformation {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ProxySubscriptionScreen(onBack: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
