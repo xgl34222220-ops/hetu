@@ -9,6 +9,7 @@ import org.json.JSONObject;
 
 /** Exports Hetu DNS block/allow snapshots for Mihomo local domain providers. */
 final class ProxyAdblockRules {
+    private static final String EXPORT_VERSION = "filter-v2:";
     static final String PROVIDER_NAME = "hetu-adblock";
     static final String ALLOW_PROVIDER_NAME = "hetu-adblock-allow";
     static final String PROVIDER_PATH = "./ruleset/hetu-adblock.txt";
@@ -47,7 +48,8 @@ final class ProxyAdblockRules {
         File allowTarget=new File(dir,"hetu-adblock-allow.txt");
         File meta=new File(dir,"hetu-adblock.meta");
 
-        String persisted=persistedGeneration(context);
+        String generation=persistedGeneration(context);
+        String persisted=generation.isEmpty()?"":EXPORT_VERSION+generation;
         if(!persisted.isEmpty()&&target.isFile()&&allowTarget.isFile()&&meta.isFile()){
             Properties cached=new Properties();
             try(FileInputStream in=new FileInputStream(meta)){cached.load(in);}
@@ -63,7 +65,7 @@ final class ProxyAdblockRules {
 
         RuleStore rules=new RuleStore(context.getApplicationContext());
         rules.reload();
-        String revision=rules.currentRevision();
+        String revision=EXPORT_VERSION+rules.currentRevision();
         ArrayList<String> domains=new ArrayList<>(rules.effectiveDomains());
         ArrayList<String> allow=new ArrayList<>(rules.effectiveAllowDomains());
         Collections.sort(domains);

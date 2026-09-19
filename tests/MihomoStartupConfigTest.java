@@ -33,7 +33,7 @@ public final class MihomoStartupConfigTest {
   MihomoStartupConfig.Result ad=MihomoStartupConfig.generate(cnSource,adProfile);
   check(ad.yaml.contains("hetu-adblock:")&&ad.yaml.contains("type: file")&&ad.yaml.contains("behavior: domain")&&ad.yaml.contains("format: text"),"adblock local domain provider injected");
   check(ad.yaml.contains("path: ./ruleset/hetu-adblock.txt"),"adblock provider stays inside Mihomo HomeDir");
-  check(ad.yaml.contains("RULE-SET,hetu-adblock,REJECT")&&ad.yaml.indexOf("RULE-SET,hetu-adblock")<ad.yaml.indexOf("MATCH,DIRECT"),"adblock REJECT precedes source routing");
+  check(ad.yaml.contains("AND,((RULE-SET,hetu-adblock),(NOT,((RULE-SET,hetu-adblock-allow)))),REJECT")&&ad.yaml.indexOf("RULE-SET,hetu-adblock")<ad.yaml.indexOf("MATCH,DIRECT"),"adblock respects exceptions before source routing");
   String privacyAdSource="mode: rule\nproxies: []\nproxy-groups: []\nrules:\n"
       +"  - DOMAIN-SUFFIX,stun.example,REJECT\n"
       +"  - IP-CIDR6,::/0,REJECT,no-resolve\n"
@@ -45,7 +45,7 @@ public final class MihomoStartupConfigTest {
   int pStun=privacyAd.yaml.indexOf("DOMAIN-SUFFIX,stun.example,REJECT");
   int pV6=privacyAd.yaml.indexOf("IP-CIDR6,::/0,REJECT");
   int pBank=privacyAd.yaml.indexOf("RULE-SET,Bank_CN,DIRECT");
-  int pHetuAd=privacyAd.yaml.indexOf("RULE-SET,hetu-adblock,REJECT");
+  int pHetuAd=privacyAd.yaml.indexOf("AND,((RULE-SET,hetu-adblock)");
   int pSourceAd=privacyAd.yaml.indexOf("RULE-SET,去广告,广告拦截");
   int pWechat=privacyAd.yaml.indexOf("DOMAIN-SUFFIX,wechat.com,DIRECT");
   int pMatch=privacyAd.yaml.indexOf("MATCH,DIRECT");

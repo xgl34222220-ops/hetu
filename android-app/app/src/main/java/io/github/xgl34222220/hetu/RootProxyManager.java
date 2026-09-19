@@ -146,7 +146,9 @@ final class RootProxyManager {
                     +"case \"$EXE\" in "+BIN+") printf 1;; *) printf 0;; esac; "
                     +"else printf 0; fi";
             RootBridge.Result result=RootBridge.rootShell(context,command,4000L);
-            return result.ok()&&"1".equals(result.output.trim());
+            ProxyContinuity.ProcessState state=ProxyContinuity.processState(result.ok(),result.output);
+            return ProxyContinuity.preserveRunning(state,
+                    prefs.getBoolean("proxyRootRuntimeRunning",false)&&prefs.getBoolean("proxyRootWanted",false));
         }catch(Exception ignored){
             return prefs.getBoolean("proxyRootRuntimeRunning",false)&&prefs.getBoolean("proxyRootWanted",false);
         }

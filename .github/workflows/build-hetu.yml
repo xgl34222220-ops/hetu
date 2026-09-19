@@ -139,8 +139,8 @@ jobs:
           grep -q 'System.loadLibrary("hetu_core")' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoNative.java
           grep -q 'Java_io_github_xgl34222220_hetu_MihomoNative_invoke' native/bridge/jni_android.c
           grep -q 'Java_io_github_xgl34222220_hetu_preview_MihomoNative_invoke' native/bridge/jni_android.c
-          grep -q 'versionName = "0.4.0-test.85"' android-app/app/build.gradle.kts
-          grep -q 'versionCode = 485' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.4.0-test.86"' android-app/app/build.gradle.kts
+          grep -q 'versionCode = 486' android-app/app/build.gradle.kts
           test -f android-app/app/src/main/java/io/github/xgl34222220/hetu/LegacyAppMigrator.java
           grep -q 'LegacyAppMigrator.migrateIfNeeded(app)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
           grep -q 'controller.restart { operation = it }' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
@@ -149,7 +149,8 @@ jobs:
           grep -q "printf 'DNS=%s" android-app/app/src/main/assets/hetu-root.sh
           grep -q "printf 'DNS_PORT=%s" android-app/app/src/main/assets/hetu-root.sh
           grep -q 'dataPlaneHealthy' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
-          grep -q 'default-network-stable-2500ms' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
+          grep -q 'old-connections-only-after-network-change' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
+          ! grep -Fq '.closeAll()' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
           grep -q 'getBoolean("floatingBottomBar", true)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
           grep -q 'getBoolean("enableBlur", true)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
           grep -q 'getBoolean("liquidGlass", true)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
@@ -235,13 +236,21 @@ jobs:
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" 'platform-tools' 'platforms;android-37.0' 'build-tools;37.0.0' 'ndk;28.2.13676358'
 
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Verify message filtering and connection continuity
+        run: python3 tools/test_proxy_continuity.py --android-jar "$ANDROID_HOME/platforms/android-37.0/android.jar" --fixture "$RUNNER_TEMP/hetu-continuity.yaml"
+
       - name: Build Hetu JNI bridge and Root Mihomo
         shell: bash
         run: |
           set -euo pipefail
           cp -r native/bridge .upstream/hetubridge
           cd .upstream
-          go test -tags with_gvisor -v ./hetubridge
+          HETU_RUNTIME_FIXTURE="$RUNNER_TEMP/hetu-continuity.yaml" go test -tags with_gvisor -v ./hetubridge
           NDK="$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin"
           mkdir -p ../android-app/app/src/main/jniLibs/arm64-v8a ../android-app/app/src/main/jniLibs/x86_64
           mkdir -p ../android-app/app/src/main/assets/mihomo-root/arm64-v8a ../android-app/app/src/main/assets/mihomo-root/x86_64
@@ -263,11 +272,6 @@ jobs:
             -o ../android-app/app/src/main/assets/mihomo-root/x86_64/mihomo .
           cp LICENSE ../android-app/app/src/main/assets/MIHOMO-LICENSE
           git rev-parse HEAD > ../android-app/app/src/main/assets/mihomo-revision.txt
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
 
       - uses: gradle/actions/setup-gradle@v4
         with:

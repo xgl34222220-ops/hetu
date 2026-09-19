@@ -588,7 +588,7 @@ public final class RuleStore {
     }
     private Snapshot compose(String revision,boolean fromModule,Set<String> allow,Set<String> block,
             Map<String,Boolean> enabled,Map<String,Set<String>> sources,Set<String> exact) throws IOException {
-        Set<String> exceptions=sourceExceptions(enabled,sources);
+        Set<String> exceptions=sourceExceptions(enabled,sources,block);
         Set<String> effective=exact;
         if(effective==null) {
             effective=new HashSet<>(block);
@@ -601,8 +601,8 @@ public final class RuleStore {
         if(effective.size()>MAX_DOMAINS) throw new IOException("合并后规则超过 "+MAX_DOMAINS+" 条");
         return new Snapshot("",revision,fromModule,effective,allow,block,exceptions,enabled,sources,System.currentTimeMillis());
     }
-    private static Set<String> sourceExceptions(Map<String,Boolean> enabled,Map<String,Set<String>> sources){
-        Set<String> out=new HashSet<>();
+    private static Set<String> sourceExceptions(Map<String,Boolean> enabled,Map<String,Set<String>> sources,Set<String> userBlocks){
+        Set<String> out=MessagingFilterPolicy.subscriptionExceptions(userBlocks);
         for(Map.Entry<String,Boolean> flag:enabled.entrySet()){
             if(!Boolean.TRUE.equals(flag.getValue()))continue;
             Set<String> values=sources.get(flag.getKey());if(values==null)continue;
@@ -672,7 +672,7 @@ public final class RuleStore {
         Map<String,Boolean> enabled=sourceFlags(cfg.getJSONArray("sources"),true);
         Set<String> allow=domainArray(cfg.getJSONArray("allow")),block=domainArray(cfg.getJSONArray("block"));
         return new Snapshot(id,cfg.optString("revision",""),cfg.optBoolean("fromModule",false),effective,
-                allow,block,sourceExceptions(enabled,sources),enabled,sources,cfg.optLong("updatedAt",new File(dir,"config.json").lastModified()));
+                allow,block,sourceExceptions(enabled,sources,block),enabled,sources,cfg.optLong("updatedAt",new File(dir,"config.json").lastModified()));
     }
     private void publish(Snapshot s) { liveRoot=root.getAbsolutePath(); live=s; }
     private void mirrorPrefs(Snapshot s) {

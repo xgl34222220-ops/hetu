@@ -8,6 +8,7 @@ import android.os.*;
 import java.util.*;
 import java.util.concurrent.*;
 import org.json.JSONObject;
+import org.json.JSONArray;
 
 public final class ProxyNetworkMatchService extends Service {
     static final String ACTION_BOOT_RESTORE="io.github.xgl34222220.hetu.BOOT_RESTORE";
@@ -128,6 +129,7 @@ public final class ProxyNetworkMatchService extends Service {
         defaultNetworkSeen=true;
         if(!changed||!prefs.getBoolean("proxyRootWanted",false))return;
         final long generation=++networkChangeGeneration;
+        final long changedAt=System.currentTimeMillis();
         metrics.schedule(()->worker.execute(()->{
             if(generation!=networkChangeGeneration||!prefs.getBoolean("proxyRootWanted",false))return;
             Network active=cm.getActiveNetwork();
@@ -135,10 +137,22 @@ public final class ProxyNetworkMatchService extends Service {
             NetworkCapabilities caps=cm.getNetworkCapabilities(active);
             if(caps==null||!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))return;
             try{
-                new MihomoControllerClient(getApplicationContext()).closeAll();
+                MihomoControllerClient controller=new MihomoControllerClient(getApplicationContext());
+                JSONArray connections=controller.connections().optJSONArray("connections");
+                int closed=0;
+                for(int i=0;connections!=null&&i<connections.length();i++){
+                    if(generation!=networkChangeGeneration||!prefs.getBoolean("proxyRootWanted",false))return;
+                    JSONObject connection=connections.optJSONObject(i);
+                    if(connection==null||!ProxyContinuity.startedBeforeNetworkChange(connection.optString("start",""),changedAt))continue;
+                    String id=connection.optString("id","");
+                    if(id.isEmpty())continue;
+                    controller.closeConnection(id);
+                    closed++;
+                }
                 prefs.edit()
                         .putLong("proxyLastNetworkSessionReset",System.currentTimeMillis())
-                        .putString("proxyLastNetworkSessionResetReason","default-network-stable-2500ms")
+                        .putInt("proxyLastNetworkSessionResetCount",closed)
+                        .putString("proxyLastNetworkSessionResetReason","old-connections-only-after-network-change")
                         .remove("proxyNetworkSessionResetError")
                         .apply();
             }catch(Exception e){
@@ -206,6 +220,10 @@ public final class ProxyNetworkMatchService extends Service {
     }
 
     private boolean coreAlive(){
+        return ProxyContinuity.preserveRunning(probeCoreState(),prefs.getBoolean("proxyRootRuntimeRunning",false));
+    }
+
+    private ProxyContinuity.ProcessState probeCoreState(){
         try{
             String command="P=$(cat /data/adb/hetu/run/core.pid 2>/dev/null || echo 0); "
                     +"case \"$P\" in ''|*[!0-9]*) P=0;; esac; "
@@ -214,18 +232,25 @@ public final class ProxyNetworkMatchService extends Service {
                     +"case \"$EXE\" in /data/adb/hetu/bin/core) printf 1;; *) printf 0;; esac; "
                     +"else printf 0; fi";
             RootBridge.Result result=RootBridge.rootShell(getApplicationContext(),command,3500L);
-            boolean alive=result.ok()&&"1".equals(result.output.trim());
-            prefs.edit().putBoolean("proxyRootRuntimeRunning",alive).apply();
-            return alive;
+            ProxyContinuity.ProcessState state=ProxyContinuity.processState(result.ok(),result.output);
+            if(state!=ProxyContinuity.ProcessState.UNKNOWN){
+                prefs.edit().putBoolean("proxyRootRuntimeRunning",state==ProxyContinuity.ProcessState.ALIVE).apply();
+            }
+            return state;
         }catch(Exception ignored){
-            return prefs.getBoolean("proxyRootRuntimeRunning",false);
+            return ProxyContinuity.ProcessState.UNKNOWN;
         }
     }
 
     private void maintainProxyRuntime(){
         try{
             if(!prefs.getBoolean("proxyRootWanted",false))return;
-            if(coreAlive()){
+            ProxyContinuity.ProcessState state=probeCoreState();
+            if(state==ProxyContinuity.ProcessState.UNKNOWN){
+                prefs.edit().putLong("proxyLastUnknownProcessProbeAt",System.currentTimeMillis()).apply();
+                return;
+            }
+            if(state==ProxyContinuity.ProcessState.ALIVE){
                 prefs.edit().remove("proxyAutoRecoveryError").apply();
                 probeEgressIfPending();
                 return;

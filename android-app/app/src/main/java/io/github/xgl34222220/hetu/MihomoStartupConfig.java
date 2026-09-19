@@ -386,7 +386,11 @@ final class MihomoStartupConfig {
     }
 
     private static String insertAdblockRuleRespectingUserPolicy(String source)throws IOException{
-        String rule="  - RULE-SET,"+ProxyAdblockRules.PROVIDER_NAME+",REJECT\n";
+        // Subtract exceptions at match time: removing an allowlisted child from the
+        // exported list cannot exempt it from a blocked parent suffix. A non-match
+        // continues through the user's rules; it must not force DIRECT or skip guards.
+        String rule="  - AND,((RULE-SET,"+ProxyAdblockRules.PROVIDER_NAME+
+                "),(NOT,((RULE-SET,"+ProxyAdblockRules.ALLOW_PROVIDER_NAME+")))),REJECT\n";
         String anchored=insertRuleBeforeSourceAdblockAnchor(source,rule);
         if(anchored!=null)return anchored;
         return insertRulesBeforeFinalMatch(
