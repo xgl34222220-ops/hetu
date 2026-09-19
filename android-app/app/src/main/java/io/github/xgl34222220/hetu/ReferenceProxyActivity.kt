@@ -17,6 +17,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
@@ -40,6 +41,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -60,6 +62,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -163,6 +169,8 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
     var panelTab by rememberSaveable { mutableStateOf(RefPanelTab.Groups) }
     var panelSearchRequest by rememberSaveable { mutableIntStateOf(0) }
     var panelDetailVisible by rememberSaveable { mutableStateOf(false) }
+    val pageStateHolder = rememberSaveableStateHolder()
+    BackHandler(enabled = page != RefProxyPage.Home && !panelDetailVisible) { page = RefProxyPage.Home }
     var state by remember {
         mutableStateOf(
             ProxyComposeState(
@@ -213,6 +221,8 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
     var message by remember { mutableStateOf("") }
     var testing by remember { mutableStateOf(false) }
     var logText by remember { mutableStateOf<String?>(null) }
+    var logTitle by remember { mutableStateOf("运行日志") }
+    var diagnosticLoading by remember { mutableStateOf(false) }
     var startupError by remember { mutableStateOf<String?>(null) }
 
     suspend fun refresh() {
@@ -507,6 +517,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
             // pixels near the Home tail, which the RuntimeShader can stretch into a white strip.
             Box(Modifier.matchParentSize().background(shellBackground))
             key(page) {
+                pageStateHolder.SaveableStateProvider(page.name) {
                 val pageEnter = remember { Animatable(0f) }
                 LaunchedEffect(Unit) {
                     pageEnter.animateTo(
@@ -553,13 +564,41 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                     testing = testing,
                     hazeState = haze,
                     glassEnabled = blurEnabled && liquidGlassEnabled,
-                    onBack = onBack,
-                    onRefresh = { scope.launch { refresh() } },
+                    onRefresh = {
+                        if (!homeRefreshing) scope.launch {
+                            homeRefreshing = true
+                            try { refresh() } finally { homeRefreshing = false }
+                        }
+                    },
                     onToggle = ::toggle,
                     onReload = ::reload,
                     onRestart = ::restart,
                     onDelay = ::measureSites,
-                    onLog = { scope.launch { logText = runCatching { inspector.runtimeLog() }.getOrElse { it.message ?: "日志读取失败" } } },
+                    diagnosticLoading = diagnosticLoading,
+                    onLog = { scope.launch {
+                        logTitle = "运行日志"
+                        logText = runCatching { inspector.runtimeLog() }.getOrElse { it.message ?: "日志读取失败" }
+                    } },
+                    onConnections = {
+                        panelTab = RefPanelTab.Connections
+                        page = RefProxyPage.Panel
+                    },
+                    onSettings = { page = RefProxyPage.Settings },
+                    onDiagnostics = {
+                        if (!diagnosticLoading) scope.launch {
+                            diagnosticLoading = true
+                            try {
+                                logTitle = "消息与网络诊断"
+                                logText = controller.diagnostics()
+                            } catch (cancel: CancellationException) {
+                                throw cancel
+                            } catch (error: Exception) {
+                                message = error.message ?: "诊断读取失败"
+                            } finally {
+                                diagnosticLoading = false
+                            }
+                        }
+                    },
                     onSubscription = {
                         panelTab = RefPanelTab.Subscriptions
                         page = RefProxyPage.Panel
@@ -580,9 +619,10 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                     onOpenSettings = { page = RefProxyPage.Settings },
                     onDetailVisibleChanged = { panelDetailVisible = it },
                 )
-                RefProxyPage.Tools -> RefTools(state) { logText = it }
-                RefProxyPage.Settings -> RefSettings(state) { scope.launch { refresh() } }
+                RefProxyPage.Tools -> RefTools(state) { logTitle = "运行日志"; logText = it }
+                RefProxyPage.Settings -> RefSettings(state, operation, ::restart) { scope.launch { refresh() } }
             }
+                }
                 }
             }
         }
@@ -600,7 +640,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
 
     logText?.let { text ->
         RefInfoBottomSheet(
-            title = "运行日志",
+            title = logTitle,
             text = text,
             actionLabel = "关闭",
             onDismiss = { logText = null },
@@ -679,7 +719,6 @@ private fun RefHome(
     testing: Boolean,
     hazeState: HazeState,
     glassEnabled: Boolean,
-    onBack: () -> Unit,
     onRefresh: () -> Unit,
     onToggle: () -> Unit,
     onReload: () -> Unit,
@@ -687,195 +726,187 @@ private fun RefHome(
     onDelay: () -> Unit,
     onLog: () -> Unit,
     onSubscription: () -> Unit,
+    diagnosticLoading: Boolean,
+    onConnections: () -> Unit,
+    onSettings: () -> Unit,
+    onDiagnostics: () -> Unit,
 ) {
+    val context = LocalContext.current
     val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val memory = runtime.rssBytes.takeIf { it > 0L } ?: state.memoryBytes
+    val busy = operation.isNotBlank()
+    val connections = if (state.panelReady) state.connections.size else cachedConnections
 
     LazyColumn(
         Modifier.fillMaxSize().statusBarsPadding(),
         contentPadding = PaddingValues(
-            start = 16.dp,
-            top = 8.dp,
-            end = 16.dp,
+            start = 16.dp, top = 8.dp, end = 16.dp,
             bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 94.dp,
         ),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item {
+        item(key = "home-title") {
             Row(
-                Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 10.dp).height(44.dp),
+                Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    "河图",
-                    color = if (scheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A),
-                    fontSize = 25.sp,
-                    lineHeight = 30.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = (-0.70).sp,
-                )
-                Spacer(Modifier.width(10.dp))
-                Surface(
-                    shape = CircleShape,
-                    color = if (scheme.background.luminance() < .5f) Color(0xFF1D4ED8).copy(alpha = .16f) else Color(0xFFEAF2FF).copy(alpha = .90f),
-                    border = BorderStroke(.7.dp, if (scheme.background.luminance() < .5f) Color(0xFF60A5FA).copy(alpha = .18f) else Color(0xFFBFDBFE).copy(alpha = .72f)),
-                    shadowElevation = 1.dp,
-                    tonalElevation = 0.dp,
-                ) {
-                    Text(
-                        "Mihomo Core",
-                        Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                        color = if (scheme.background.luminance() < .5f) Color(0xFF93C5FD) else Color(0xFF2563EB),
-                        fontSize = 10.sp,
-                        lineHeight = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                        letterSpacing = .15.sp,
-                    )
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text("河图", color = t.textPrimary, fontSize = 27.sp, lineHeight = 34.sp,
+                        fontWeight = FontWeight.Bold, letterSpacing = (-.7).sp)
+                    Text("网络与广告过滤", color = t.textSecondary, style = MaterialTheme.typography.bodySmall)
                 }
+                RefPanelHeaderAction(Icons.Rounded.Article, "运行日志", onClick = onLog)
+                RefPanelHeaderAction(Icons.Rounded.Refresh, "刷新状态", onClick = onRefresh)
             }
         }
-        item {
-            val heroShape = RoundedCornerShape(26.dp)
+        item(key = "home-status") {
+            val shape = RoundedCornerShape(26.dp)
             Surface(
-                modifier = refHomeLiquidModifier(Modifier.fillMaxWidth(), hazeState, glassEnabled, heroShape),
-                shape = heroShape,
-                color = Color.Transparent,
-                shadowElevation = 0.dp,
+                modifier = refHomeLiquidModifier(Modifier.fillMaxWidth(), hazeState, glassEnabled, shape),
+                shape = shape, color = Color.Transparent,
             ) {
-                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Row(verticalAlignment = Alignment.Top) {
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                val statusPulse = androidx.compose.animation.core.rememberInfiniteTransition(label = "heroStatusPulse")
-                                val statusAlpha by statusPulse.animateFloat(
-                                    initialValue = .52f,
-                                    targetValue = 1f,
-                                    animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-                                        animation = androidx.compose.animation.core.tween(820),
-                                        repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
-                                    ),
-                                    label = "heroStatusAlpha",
-                                )
-                                Box(
-                                    Modifier.size(9.dp)
-                                        .graphicsLayer { alpha = if (state.running) statusAlpha else 1f }
-                                        .background(if (state.running) Color(0xFF002FA7) else t.danger, CircleShape),
-                                )
-                                Spacer(Modifier.width(9.dp))
-                                Text(
-                                    if (state.running) "运行中" else "已停止",
-                                    color = t.textPrimary,
-                                    fontSize = 20.sp,
-                                    lineHeight = 24.sp,
-                                    fontWeight = FontWeight.Black,
-                                    maxLines = 1,
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Surface(
-                                    shape = CircleShape,
-                                    color = if (scheme.background.luminance() < .5f) Color.White.copy(alpha = .10f) else Color.White.copy(alpha = .92f),
-                                    border = BorderStroke(.6.dp, if (scheme.background.luminance() < .5f) Color.White.copy(alpha = .10f) else Color(0xFFE2E8F0).copy(alpha = .72f)),
-                                    shadowElevation = 1.dp,
-                                    tonalElevation = 0.dp,
-                                ) {
-                                    Text(
-                                        if (state.running) refDuration(runtime.elapsedSeconds) else "等待启动",
-                                        Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                        color = if (scheme.background.luminance() < .5f) Color(0xFFE2E8F0) else Color(0xFF475569),
-                                        fontSize = 12.sp,
-                                        lineHeight = 15.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                                        maxLines = 1,
-                                    )
-                                }
-                            }
-                            Text("${state.core} · ${state.mode}", color = t.textSecondary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                            Text(state.config, color = t.textMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                        Surface(
-                            onClick = onLog,
-                            modifier = Modifier.size(36.dp),
-                            shape = CircleShape,
-                            color = scheme.primary.copy(alpha = if (scheme.background.luminance() < .5f) .12f else .075f),
-                            border = BorderStroke(.6.dp, scheme.primary.copy(alpha = .14f)),
-                            shadowElevation = 0.dp,
-                            tonalElevation = 0.dp,
-                        ) {
-                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Icon(Icons.Rounded.Article, "运行日志", tint = scheme.primary, modifier = Modifier.size(18.dp))
-                            }
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        val checkPulse = androidx.compose.animation.core.rememberInfiniteTransition(label = "heroCheckGlow")
-                        val checkGlow by checkPulse.animateFloat(initialValue = 0f, targetValue = 1f, animationSpec = androidx.compose.animation.core.infiniteRepeatable(animation = androidx.compose.animation.core.tween(1500, easing = androidx.compose.animation.core.FastOutSlowInEasing), repeatMode = androidx.compose.animation.core.RepeatMode.Reverse), label = "heroCheckGlowValue")
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                         Box(
-                            Modifier
-                                .size(56.dp)
-                                .graphicsLayer { if (state.running) { scaleX = .99f + checkGlow * .018f; scaleY = .99f + checkGlow * .018f } }
-                                .shadow(
-                                    if (state.running) (13f + checkGlow * 10f).dp else 0.dp,
-                                    CircleShape,
-                                    clip = false,
-                                    ambientColor = Color(0xFF002FA7).copy(alpha = .28f),
-                                    spotColor = Color(0xFF002FA7).copy(alpha = .42f),
-                                )
-                                .background(if (state.running) scheme.primary else t.controlBackground, CircleShape),
-                            contentAlignment = Alignment.Center,
+                            Modifier.size(52.dp).background(
+                                (if (state.running) t.success else scheme.primary).copy(alpha = .11f),
+                                RoundedCornerShape(18.dp),
+                            ), contentAlignment = Alignment.Center,
                         ) {
-                            Icon(
-                                if (state.running) Icons.Rounded.Check else Icons.Rounded.PowerSettingsNew,
-                                null,
-                                tint = if (state.running) Color.White else t.textMuted,
-                                modifier = Modifier.size(30.dp),
+                            if (busy) CircularProgressIndicator(Modifier.size(25.dp), strokeWidth = 2.5.dp)
+                            else Icon(
+                                if (state.running) Icons.Rounded.Shield else Icons.Rounded.PowerSettingsNew,
+                                null, Modifier.size(27.dp), tint = if (state.running) t.success else scheme.primary,
+                            )
+                        }
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                if (busy) "正在处理" else if (state.running) "代理运行中" else "代理已停止",
+                                color = t.textPrimary, fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold,
+                            )
+                            Text(
+                                if (state.running) "已运行 ${refDuration(runtime.elapsedSeconds)} · ${state.mode}" else "准备好后，轻点启动",
+                                color = t.textSecondary, style = MaterialTheme.typography.bodySmall,
                             )
                         }
                     }
-                    HorizontalDivider(color = scheme.primary.copy(alpha = .10f))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        val neutralAction = if (scheme.background.luminance() < .5f) Color(0xFFE2E8F0) else Color(0xFF334155)
-                        RefActionText("重载", state.running && operation.isBlank(), onReload, Modifier.weight(1f), neutralAction, Icons.Rounded.Refresh)
-                        RefActionText(
-                            if (state.running) "停止" else "启动",
-                            operation.isBlank(),
-                            onToggle,
-                            Modifier.weight(1f),
-                            if (state.running) Color(0xFFE11D48) else Color(0xFF2563EB),
-                            if (state.running) null else Icons.Rounded.PlayArrow,
-                            danger = state.running,
-                        )
-                        RefActionText("重启", state.running && operation.isBlank(), onRestart, Modifier.weight(1f), neutralAction, Icons.Rounded.RestartAlt)
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                            .background(t.controlBackground.copy(alpha = .64f)).padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Icon(Icons.Rounded.Description, null, Modifier.size(18.dp), tint = t.textSecondary)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text("当前配置", color = t.textSecondary, style = MaterialTheme.typography.labelMedium)
+                            Text(state.config, color = t.textPrimary, style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        }
                     }
+                    if (busy || message.isNotBlank()) {
+                        Text(
+                            operation.ifBlank { message },
+                            modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite },
+                            color = if (busy) scheme.primary else t.textSecondary,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    if (state.running && state.runtimeSettingsPending) {
+                        Surface(onClick = onSettings, color = t.warning.copy(alpha = .10f), shape = RoundedCornerShape(12.dp)) {
+                            Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Icon(Icons.Rounded.Info, null, Modifier.size(18.dp), tint = t.warning)
+                                Text("设置有更新，重启后生效", Modifier.weight(1f), color = t.textPrimary, style = MaterialTheme.typography.bodySmall)
+                                Icon(Icons.Rounded.ChevronRight, null, Modifier.size(18.dp), tint = t.textSecondary)
+                            }
+                        }
+                    }
+                    RefHomeActions(state.running, busy, onToggle, onReload, onRestart)
                 }
             }
         }
-        item {
-            RefLatencyPanel(
-                baidu = siteDelays["Baidu"],
-                cloudflare = siteDelays["Cloudflare"],
-                google = siteDelays["Google"],
-                testing = testing,
-                hazeState = hazeState,
-                glassEnabled = glassEnabled,
-                onClick = onDelay,
-            )
+        item(key = "home-shortcuts") {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                RefHomeShortcut("应用连接", if (state.running) "$connections 条连接" else "查看连接", Icons.Rounded.Apps, Modifier.weight(1f), onConnections)
+                RefHomeShortcut("广告过滤", "规则与拦截", Icons.Rounded.Shield, Modifier.weight(1f), {
+                    context.startActivity(Intent(context, ProxyAdblockChainActivity::class.java))
+                })
+                RefHomeShortcut("网络诊断", if (diagnosticLoading) "正在读取…" else "消息与网络", Icons.Rounded.Troubleshoot, Modifier.weight(1f), onDiagnostics, !diagnosticLoading)
+            }
         }
-        item {
+        item(key = "home-latency") {
+            RefLatencyPanel(siteDelays["Baidu"], siteDelays["Cloudflare"], siteDelays["Google"], testing, hazeState, glassEnabled, onDelay)
+        }
+        item(key = "home-network") {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                RefNetworkIdentityCard(runtime, if (state.panelReady) state.connections.size else cachedConnections, Modifier.weight(1f), hazeState, glassEnabled)
+                RefNetworkIdentityCard(runtime, connections, Modifier.weight(1f), hazeState, glassEnabled)
                 RefSpeedCard(upRate, downRate, Modifier.weight(1f), hazeState, glassEnabled)
             }
         }
-        item {
+        item(key = "home-resources") {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 RefSubscriptionCompact(providers, cachedSubscription, Modifier.weight(1f), hazeState, glassEnabled, onSubscription)
                 RefResourceCard(memory, cpuPercent, Modifier.weight(1f), hazeState, glassEnabled)
             }
         }
-        if (operation.isNotBlank() || message.isNotBlank()) {
-            item { Text(operation.ifBlank { message }, color = t.textSecondary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)) }
+    }
+}
+
+@Composable
+private fun RefHomeActions(running: Boolean, busy: Boolean, onToggle: () -> Unit, onReload: () -> Unit, onRestart: () -> Unit) {
+    val t = LocalHetuTokens.current
+    val scheme = MaterialTheme.colorScheme
+    val fontScale = androidx.compose.ui.platform.LocalDensity.current.fontScale
+    @Composable
+    fun MainAction(modifier: Modifier) {
+        Button(
+            onClick = onToggle, enabled = !busy, modifier = modifier.heightIn(min = 48.dp),
+            shape = CircleShape, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (running) t.controlBackground else scheme.primary,
+                contentColor = if (running) t.danger else scheme.onPrimary,
+            ),
+        ) {
+            Icon(if (running) Icons.Rounded.Stop else Icons.Rounded.PlayArrow, null, Modifier.size(20.dp))
+            Spacer(Modifier.width(7.dp))
+            Text(if (busy) "请稍候" else if (running) "停止" else "启动", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        }
+    }
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        if (maxWidth < 300.dp || fontScale > 1.1f) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                MainAction(Modifier.fillMaxWidth())
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    RefActionText("重载", running && !busy, onReload, Modifier.weight(1f), t.textSecondary, Icons.Rounded.Refresh)
+                    RefActionText("重启", running && !busy, onRestart, Modifier.weight(1f), t.textSecondary, Icons.Rounded.RestartAlt)
+                }
+            }
+        } else {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                MainAction(Modifier.weight(1.4f))
+                RefActionText("重载", running && !busy, onReload, Modifier.weight(.7f), t.textSecondary, Icons.Rounded.Refresh)
+                RefActionText("重启", running && !busy, onRestart, Modifier.weight(.7f), t.textSecondary, Icons.Rounded.RestartAlt)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RefHomeShortcut(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    modifier: Modifier,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+) {
+    val t = LocalHetuTokens.current
+    Surface(onClick = onClick, enabled = enabled, modifier = modifier, shape = RoundedCornerShape(18.dp), color = t.cardBackground) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Icon(icon, null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
+            Text(title, color = t.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(subtitle, color = t.textSecondary, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -904,26 +935,12 @@ private fun RefLatencyPanel(
             verticalArrangement = Arrangement.spacedBy(9.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("延迟", color = t.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                val spinner = androidx.compose.animation.core.rememberInfiniteTransition(label = "homeLatencyRefresh")
-                val rotation by spinner.animateFloat(
-                    initialValue = 0f,
-                    targetValue = 360f,
-                    animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-                        animation = androidx.compose.animation.core.tween(900, easing = androidx.compose.animation.core.LinearEasing),
-                    ),
-                    label = "homeLatencyRefreshRotation",
-                )
-                IconButton(onClick = onClick, enabled = !testing, modifier = Modifier.size(32.dp)) {
-                    Icon(
-                        Icons.Rounded.Refresh,
-                        "全部测速",
-                        tint = t.textSecondary,
-                        modifier = Modifier.size(18.dp).graphicsLayer {
-                            rotationZ = if (testing) rotation else 0f
-                            alpha = if (testing) .62f else 1f
-                        },
-                    )
+                Text("网络延迟", color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                TextButton(onClick = onClick, enabled = !testing, modifier = Modifier.heightIn(min = 48.dp)) {
+                    if (testing) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                    else Icon(Icons.Rounded.Speed, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(if (testing) "测速中" else "测速")
                 }
             }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -1022,7 +1039,7 @@ private fun RefNetworkIdentityCard(
 
     Surface(
         modifier = refHomeLiquidModifier(
-            modifier.height(112.dp)
+            modifier.heightIn(min = 128.dp)
                 .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .94f else 1f },
             hazeState,
             glassEnabled,
@@ -1053,7 +1070,7 @@ private fun RefNetworkIdentityCard(
                     Text(
                         if (renderedLan) "LAN" else "WAN",
                         color = Color(0xFF64748B),
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                     )
@@ -1067,7 +1084,7 @@ private fun RefNetworkIdentityCard(
                 }
             }
             Box(
-                Modifier.fillMaxWidth().height(42.dp),
+                Modifier.fillMaxWidth().heightIn(min = 42.dp),
                 contentAlignment = Alignment.CenterStart,
             ) {
                 Column(
@@ -1086,18 +1103,18 @@ private fun RefNetworkIdentityCard(
                     fontWeight = FontWeight.ExtraBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth().height(20.dp),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 22.dp),
                 )
                 Text(
                     if (renderedLan) "${runtime.lanInterface} · $connections 连接"
                     else "${countryEmoji(runtime.wanCountryCode)} ${runtime.wanRegion}",
                     color = Color(0xFF64748B),
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     lineHeight = 14.sp,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth().height(18.dp),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 18.dp),
                 )
                 }
             }
@@ -1111,7 +1128,7 @@ private fun RefSpeedCard(up: Long, down: Long, modifier: Modifier, hazeState: Ha
     val valueColor = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A)
     val shape = RoundedCornerShape(20.dp)
     Surface(
-        modifier = refHomeLiquidModifier(modifier.height(112.dp), hazeState, glassEnabled, shape),
+        modifier = refHomeLiquidModifier(modifier.heightIn(min = 128.dp), hazeState, glassEnabled, shape),
         shape = shape,
         color = Color.Transparent,
         shadowElevation = 0.dp,
@@ -1120,13 +1137,13 @@ private fun RefSpeedCard(up: Long, down: Long, modifier: Modifier, hazeState: Ha
             Modifier.fillMaxSize().padding(14.dp),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text("实时网速", color = Color(0xFF64748B), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-            Row(Modifier.fillMaxWidth().height(20.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("↑ 上行", color = Color(0xFF059669), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Text("实时网速", color = Color(0xFF64748B), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Row(Modifier.fillMaxWidth().heightIn(min = 22.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("↑ 上行", color = Color(0xFF059669), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                 Text(refSpeed(up), color = valueColor, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
             }
-            Row(Modifier.fillMaxWidth().height(20.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("↓ 下行", color = Color(0xFF2563EB), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Row(Modifier.fillMaxWidth().heightIn(min = 22.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("↓ 下行", color = Color(0xFF2563EB), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                 Text(refSpeed(down), color = valueColor, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
             }
         }
@@ -1158,7 +1175,7 @@ private fun RefSubscriptionCompact(
     val shape = RoundedCornerShape(20.dp)
     Surface(
         modifier = refHomeLiquidModifier(
-            modifier.height(112.dp)
+            modifier.heightIn(min = 128.dp)
                 .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .92f else 1f },
             hazeState,
             glassEnabled,
@@ -1175,13 +1192,13 @@ private fun RefSubscriptionCompact(
             Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            Row(Modifier.fillMaxWidth().height(20.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("订阅", color = Color(0xFF64748B), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Row(Modifier.fillMaxWidth().heightIn(min = 22.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("订阅", color = Color(0xFF64748B), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                 if (total > 0L) Surface(shape = RoundedCornerShape(999.dp), color = Color(0xFF2563EB).copy(alpha = .08f)) {
                     Text("剩余 ${((1f - ratio) * 100f).toInt()}%", Modifier.padding(horizontal = 7.dp, vertical = 2.dp), color = MaterialTheme.colorScheme.primary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
             }
-            Text(if (total > 0L) refBytes(used) else "—", color = valueColor, fontSize = 16.sp, lineHeight = 19.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, modifier = Modifier.height(20.dp))
+            Text(if (total > 0L) refBytes(used) else "—", color = valueColor, fontSize = 16.sp, lineHeight = 19.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, modifier = Modifier.heightIn(min = 22.dp))
             Box(Modifier.fillMaxWidth().height(4.dp).background(Color(0xFF94A3B8).copy(alpha = .12f), CircleShape)) {
                 if (total > 0L && ratio > 0f) {
                     Box(
@@ -1190,9 +1207,9 @@ private fun RefSubscriptionCompact(
                     )
                 }
             }
-            Row(Modifier.fillMaxWidth().height(18.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("已用流量", color = Color(0xFF94A3B8), fontSize = 11.sp, modifier = Modifier.weight(1f))
-                Text(if (total > 0L) "总 ${refBytes(total)}" else "$itemCount 个订阅", color = Color(0xFF64748B), fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+            Row(Modifier.fillMaxWidth().heightIn(min = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("已用流量", color = Color(0xFF94A3B8), fontSize = 12.sp, modifier = Modifier.weight(1f))
+                Text(if (total > 0L) "总 ${refBytes(total)}" else "$itemCount 个订阅", color = Color(0xFF64748B), fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1)
             }
         }
     }
@@ -1204,19 +1221,10 @@ private fun RefResourceCard(memory: Long, cpuPercent: Float, modifier: Modifier,
     val scheme = MaterialTheme.colorScheme
     val valueColor = if (scheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A)
     val progress = (cpuPercent / 100f).coerceIn(0f, 1f)
-    val pulseTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "resourceCpuPulse")
-    val pulse by pulseTransition.animateFloat(
-        initialValue = .42f,
-        targetValue = 1f,
-        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-            animation = androidx.compose.animation.core.tween(1200),
-            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
-        ),
-        label = "resourceCpuPulseAlpha",
-    )
+    val animatedProgress by animateFloatAsState(progress, label = "resourceCpuProgress")
     val shape = RoundedCornerShape(20.dp)
     Surface(
-        modifier = refHomeLiquidModifier(modifier.height(112.dp), hazeState, glassEnabled, shape),
+        modifier = refHomeLiquidModifier(modifier.heightIn(min = 128.dp), hazeState, glassEnabled, shape),
         shape = shape,
         color = Color.Transparent,
         shadowElevation = 0.dp,
@@ -1226,27 +1234,24 @@ private fun RefResourceCard(memory: Long, cpuPercent: Float, modifier: Modifier,
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Row(Modifier.fillMaxWidth().height(24.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("资源占用", color = Color(0xFF64748B), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Text("资源占用", color = Color(0xFF64748B), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                 Canvas(Modifier.size(24.dp)) {
-                    val halo = 10.3.dp.toPx() + 1.2.dp.toPx() * pulse
-                    drawCircle(Color(0xFF2563EB).copy(alpha = .035f + .055f * pulse), radius = halo, style = Stroke(width = 1.dp.toPx()))
-                    drawCircle(Color(0xFFE2E8F0).copy(alpha = .68f), style = Stroke(width = 2.dp.toPx()))
+                    drawCircle(t.outline.copy(alpha = .68f), style = Stroke(width = 2.dp.toPx()))
                     drawArc(
-                        color = Color(0xFF002FA7).copy(alpha = .62f + .18f * pulse),
+                        color = scheme.primary,
                         startAngle = -90f,
-                        sweepAngle = 360f * progress,
+                        sweepAngle = 360f * animatedProgress,
                         useCenter = false,
                         style = Stroke(width = 2.2.dp.toPx()),
                     )
-                    drawCircle(Color(0xFF2563EB).copy(alpha = if (progress > .02f) .18f + .12f * pulse else .08f), radius = 2.5.dp.toPx())
                 }
             }
-            Row(Modifier.fillMaxWidth().height(20.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("内存", color = Color(0xFF94A3B8), fontSize = 11.sp, modifier = Modifier.weight(1f))
+            Row(Modifier.fillMaxWidth().heightIn(min = 22.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("内存", color = Color(0xFF94A3B8), fontSize = 12.sp, modifier = Modifier.weight(1f))
                 Text(refBytes(memory), color = valueColor, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
             }
-            Row(Modifier.fillMaxWidth().height(20.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("CPU", color = Color(0xFF94A3B8), fontSize = 11.sp, modifier = Modifier.weight(1f))
+            Row(Modifier.fillMaxWidth().heightIn(min = 22.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("CPU", color = Color(0xFF94A3B8), fontSize = 12.sp, modifier = Modifier.weight(1f))
                 Text(String.format(java.util.Locale.US, "%.1f%%", cpuPercent), color = valueColor, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
             }
         }
@@ -1297,7 +1302,7 @@ private fun RefActionText(
     val shadowColor = if (danger) Color(0xFFF43F5E).copy(alpha = .12f) else Color(0xFF0F172A).copy(alpha = .055f)
     Row(
         modifier
-            .height(42.dp)
+            .heightIn(min = 48.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .86f else if (enabled) 1f else .50f }
             .shadow(7.dp, shape, clip = false, ambientColor = shadowColor, spotColor = shadowColor)
             .background(background, shape)
@@ -1312,23 +1317,13 @@ private fun RefActionText(
         horizontalArrangement = Arrangement.Center,
     ) {
         if (danger) {
-            val pulse = androidx.compose.animation.core.rememberInfiniteTransition(label = "stopPulse")
-            val dotAlpha by pulse.animateFloat(
-                initialValue = .52f,
-                targetValue = 1f,
-                animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-                    animation = androidx.compose.animation.core.tween(760),
-                    repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
-                ),
-                label = "stopPulseAlpha",
-            )
-            Box(Modifier.size(6.dp).graphicsLayer { alpha = dotAlpha }.background(Color(0xFFF43F5E), CircleShape))
+            Box(Modifier.size(6.dp).background(Color(0xFFF43F5E), CircleShape))
             Spacer(Modifier.width(6.dp))
         } else if (icon != null) {
             Icon(icon, null, tint = color.copy(alpha = .68f), modifier = Modifier.size(14.dp))
             Spacer(Modifier.width(6.dp))
         }
-        Text(text, color = color, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+        Text(text, color = color, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 
@@ -1435,12 +1430,48 @@ private fun RefPanel(
     var searchOpen by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     var connectionView by rememberSaveable { mutableStateOf("active") }
+    var confirmCloseAll by remember { mutableStateOf(false) }
+    var closingConnections by remember { mutableStateOf(false) }
     val expandedConnectionApps = remember { mutableStateMapOf<String, Boolean>() }
     val closedConnections = remember { mutableStateListOf<ProxyConnectionUi>() }
     var previousConnections by remember { mutableStateOf<List<ProxyConnectionUi>>(emptyList()) }
     val activeConnectionGroups = remember(state.connections) { refConnectionGroups(state.connections) }
     val closedConnectionSnapshot = closedConnections.toList()
     val closedConnectionGroups = remember(closedConnectionSnapshot) { refConnectionGroups(closedConnectionSnapshot) }
+    val connectionGroups = if (connectionView == "active") activeConnectionGroups else closedConnectionGroups
+    val filteredConnectionGroups = remember(connectionGroups, query) {
+        val needle = query.trim()
+        if (needle.isEmpty()) connectionGroups else connectionGroups.mapNotNull { group ->
+            if (group.title.contains(needle, true) || group.subtitle.contains(needle, true)) group
+            else group.connections.filter { item ->
+                item.host.contains(needle, true) || item.chain.contains(needle, true) ||
+                    item.rule.contains(needle, true) || item.network.contains(needle, true)
+            }.takeIf { it.isNotEmpty() }?.let { group.copy(connections = it) }
+        }
+    }
+
+    suspend fun closeSelectedConnections(items: List<ProxyConnectionUi>) {
+        if (closingConnections) return
+        closingConnections = true
+        try {
+            var failures = 0
+            items.forEach { item ->
+                try { repo.closeConnection(item.id) }
+                catch (cancel: CancellationException) { throw cancel }
+                catch (_: Exception) { failures++ }
+            }
+            onRefreshState()
+            capsuleError = failures > 0
+            capsuleText = if (failures > 0) "$failures 条连接未能关闭，请刷新后重试" else "连接已关闭"
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (error: Exception) {
+            capsuleError = true
+            capsuleText = error.message ?: "连接更新失败"
+        } finally {
+            closingConnections = false
+        }
+    }
 
     LaunchedEffect(capsuleText) {
         if (capsuleText.isNotBlank()) {
@@ -1476,6 +1507,13 @@ private fun RefPanel(
             query.isBlank() || node.name.contains(query, true) || node.type.contains(query, true)
         }
     }
+    val filteredProviders = remember(providers, query) { providers.filter { query.isBlank() || it.name.contains(query.trim(), true) } }
+    val filteredRules = remember(rules, query) { rules.filter {
+        query.isBlank() || it.type.contains(query.trim(), true) || it.payload.contains(query.trim(), true) || it.proxy.contains(query.trim(), true)
+    } }
+    val filteredRuleSets = remember(ruleSets, query) { ruleSets.filter {
+        query.isBlank() || it.name.contains(query.trim(), true) || it.behavior.contains(query.trim(), true)
+    } }
 
     suspend fun loadTab() {
         if (!state.running) return
@@ -1725,9 +1763,10 @@ private fun RefPanel(
             }
             if (error.isNotBlank()) item { RefNotice(error) }
             if (!state.running) {
-                item { RefNotice("代理未运行") }
+                item { RefEmptyState("代理未运行", "启动代理后，在这里查看节点、应用连接和分流规则。", Icons.Rounded.PowerSettingsNew) }
             } else when (tab) {
                 RefPanelTab.Groups -> {
+                    if (filteredGroups.isEmpty()) item { RefEmptyState("没有匹配的节点", if (query.isBlank()) "当前配置未提供策略组。" else "试试其他节点或策略组名称。", Icons.Rounded.Search) }
                     itemsIndexed(filteredGroups.chunked(2), key = { index, _ -> "${tab.name}-groups-$index" }, contentType = { _, _ -> "group-row" }) { _, pair ->
                         val expandedGroup = pair.firstOrNull { it.name == selectedGroupName }
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1847,7 +1886,7 @@ private fun RefPanel(
                     }
                 }
                 RefPanelTab.Overview -> item(key = "${tab.name}-traffic-overview", contentType = "traffic-overview") { RefTrafficOverview(state) }
-                RefPanelTab.Subscriptions -> items(providers, key = { "${tab.name}-provider-${it.name}-${it.updatedAt}-${it.upload}-${it.download}-${it.total}-${it.expire}" }, contentType = { "subscription-provider" }) { item ->
+                RefPanelTab.Subscriptions -> items(filteredProviders, key = { "${tab.name}-provider-${it.name}" }, contentType = { "subscription-provider" }) { item ->
                     RefProviderRow(
                         item = item,
                         refreshing = providerRefreshing[item.name] == true,
@@ -1880,63 +1919,60 @@ private fun RefPanel(
                     )
                 }
                 RefPanelTab.Connections -> {
-                    val shownGroups = if (connectionView == "active") activeConnectionGroups else closedConnectionGroups
                     item {
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 FilterChip(
                                     selected = connectionView == "active",
                                     onClick = { connectionView = "active" },
-                                    label = { Text("应用 ${activeConnectionGroups.size} · 连接 ${state.connections.size}") },
+                                    label = { Text("活动连接 ${state.connections.size}") },
                                 )
                                 FilterChip(
                                     selected = connectionView == "closed",
                                     onClick = { connectionView = "closed" },
                                     label = { Text("已关闭 ${closedConnections.size}") },
                                 )
-                                Spacer(Modifier.weight(1f))
+                            }
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    if (query.isBlank()) "${connectionGroups.size} 个应用 · 点按可查看详情" else "找到 ${filteredConnectionGroups.size} 个应用",
+                                    modifier = Modifier.weight(1f), color = t.textSecondary, style = MaterialTheme.typography.bodySmall,
+                                )
                                 if (connectionView == "active" && state.connections.isNotEmpty()) {
-                                    TextButton(onClick = { scope.launch { repo.closeAll(); onRefreshState() } }) {
-                                        Text("终止全部", color = t.danger)
+                                    TextButton(onClick = { confirmCloseAll = true }, enabled = !closingConnections) {
+                                        Text(if (closingConnections) "正在关闭…" else "终止全部", color = t.danger)
                                     }
                                 }
                             }
-                            if (connectionView == "active" && state.connections.isNotEmpty()) {
-                                Text(
-                                    "按应用聚合显示；点应用展开具体目标。一个应用同时访问多个域名时会产生多条底层连接。",
-                                    color = t.textMuted,
-                                    fontSize = 10.sp,
-                                    lineHeight = 14.sp,
-                                )
-                            }
                         }
                     }
-                    items(shownGroups, key = { "${tab.name}-app-" + it.key }, contentType = { "connection-app-group" }) { group ->
+                    if (filteredConnectionGroups.isEmpty()) item {
+                        RefEmptyState(
+                            if (query.isNotBlank()) "没有匹配的连接" else if (connectionView == "closed") "暂无已关闭连接" else "暂无活动连接",
+                            if (query.isNotBlank()) "可以搜索应用名称、域名或分流规则。" else if (connectionView == "closed") "在本次查看期间结束的连接会显示在这里。" else "应用产生网络请求后，连接会自动显示。",
+                            Icons.Rounded.Link,
+                        )
+                    }
+                    items(filteredConnectionGroups, key = { "${tab.name}-app-" + it.key }, contentType = { "connection-app-group" }) { group ->
                         RefConnectionAppCard(
                             group = group,
                             expanded = expandedConnectionApps[group.key] == true,
                             onToggle = {
                                 expandedConnectionApps[group.key] = expandedConnectionApps[group.key] != true
                             },
-                            onCloseAll = if (connectionView == "active") ({
-                                scope.launch {
-                                    group.connections.forEach { item -> runCatching { repo.closeConnection(item.id) } }
-                                    onRefreshState()
-                                }
+                            onCloseAll = if (connectionView == "active" && !closingConnections) ({
+                                scope.launch { closeSelectedConnections(group.connections) }
                             }) else null,
-                            onCloseConnection = if (connectionView == "active") ({ item ->
-                                scope.launch {
-                                    repo.closeConnection(item.id)
-                                    onRefreshState()
-                                }
+                            onCloseConnection = if (connectionView == "active" && !closingConnections) ({ item ->
+                                scope.launch { closeSelectedConnections(listOf(item)) }
                             }) else null,
                         )
                     }
                 }
-                RefPanelTab.Rules -> itemsIndexed(rules.chunked(15), key = { index, _ -> "${tab.name}-rule-group-$index" }, contentType = { _, _ -> "rule-group" }) { _, batch ->
+                RefPanelTab.Rules -> itemsIndexed(filteredRules.chunked(15), key = { index, _ -> "${tab.name}-rule-group-$index" }, contentType = { _, _ -> "rule-group" }) { _, batch ->
                     RefRuleGroupCard(batch)
                 }
-                RefPanelTab.RuleSets -> items(ruleSets, key = { "${tab.name}-ruleset-${it.name}" }, contentType = { "ruleset-row" }) { item ->
+                RefPanelTab.RuleSets -> items(filteredRuleSets, key = { "${tab.name}-ruleset-${it.name}" }, contentType = { "ruleset-row" }) { item ->
                     RefRuleSetRow(item, refreshing = ruleSetRefreshing[item.name] == true, success = ruleSetSucceeded[item.name] == true) {
                         if (ruleSetRefreshing[item.name] != true) scope.launch {
                             ruleSetRefreshing[item.name] = true
@@ -1976,6 +2012,36 @@ private fun RefPanel(
     }
 
 
+    if (confirmCloseAll) {
+        AlertDialog(
+            onDismissRequest = { confirmCloseAll = false },
+            icon = { Icon(Icons.Rounded.LinkOff, null) },
+            title = { Text("终止所有连接？") },
+            text = { Text("所有应用的现有连接都会断开。消息、通话和下载可能需要重新连接。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmCloseAll = false
+                    if (!closingConnections) scope.launch {
+                        closingConnections = true
+                        try {
+                            repo.closeAll()
+                            onRefreshState()
+                            capsuleError = false
+                            capsuleText = "现有连接已关闭"
+                        } catch (cancel: CancellationException) {
+                            throw cancel
+                        } catch (error: Exception) {
+                            capsuleError = true
+                            capsuleText = error.message ?: "关闭失败，请稍后重试"
+                        } finally {
+                            closingConnections = false
+                        }
+                    }
+                }) { Text("终止全部", color = t.danger) }
+            },
+            dismissButton = { TextButton(onClick = { confirmCloseAll = false }) { Text("取消") } },
+        )
+    }
 }
 
 
@@ -2376,7 +2442,7 @@ private fun RefPanelGlassHeader(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(
-            Modifier.fillMaxWidth().height(44.dp),
+            Modifier.fillMaxWidth().heightIn(min = 48.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -2387,7 +2453,7 @@ private fun RefPanelGlassHeader(
                 fontWeight = FontWeight.ExtraBold,
                 modifier = Modifier.weight(1f),
             )
-            RefPanelHeaderAction(
+            if (selected != RefPanelTab.Overview) RefPanelHeaderAction(
                 icon = if (searchOpen) Icons.Rounded.Close else Icons.Rounded.Search,
                 contentDescription = if (searchOpen) "关闭搜索" else "搜索",
                 active = searchOpen,
@@ -2400,7 +2466,7 @@ private fun RefPanelGlassHeader(
             onSelect = onSelect,
         )
         androidx.compose.animation.AnimatedVisibility(
-            visible = searchOpen,
+            visible = searchOpen && selected != RefPanelTab.Overview,
             enter = androidx.compose.animation.expandVertically(
                 expandFrom = Alignment.Top,
                 animationSpec = androidx.compose.animation.core.tween(240),
@@ -2416,7 +2482,13 @@ private fun RefPanelGlassHeader(
                 onValueChange = onQueryChange,
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                placeholder = { Text("搜索策略组或节点") },
+                placeholder = { Text(when (selected) {
+                    RefPanelTab.Connections -> "搜索应用、域名或分流规则"
+                    RefPanelTab.Subscriptions -> "搜索订阅名称"
+                    RefPanelTab.Rules -> "搜索规则、目标或策略"
+                    RefPanelTab.RuleSets -> "搜索规则集"
+                    else -> "搜索策略组或节点"
+                }) },
                 leadingIcon = { Icon(Icons.Rounded.Search, null, Modifier.size(18.dp)) },
                 shape = RoundedCornerShape(18.dp),
                 colors = TextFieldDefaults.colors(
@@ -2451,7 +2523,7 @@ private fun RefPanelHeaderAction(
     )
     val pressFill = if (dark) Color.White.copy(alpha = .08f) else Color(0xFFE2E8F0).copy(alpha = .60f)
     Box(
-        Modifier.size(36.dp)
+        Modifier.size(48.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .84f else 1f }
             .background(if (pressed) pressFill else Color.Transparent, CircleShape)
             .clip(CircleShape)
@@ -2486,7 +2558,7 @@ private fun RefPanelTabs(
     )
     val trackBorder = if (dark) Color.White.copy(alpha = .08f) else Color.White.copy(alpha = .82f)
     BoxWithConstraints(
-        Modifier.fillMaxWidth().height(38.dp)
+        Modifier.fillMaxWidth().height(48.dp)
             .background(trackBrush, CircleShape)
             .border(.5.dp, trackBorder, CircleShape)
             .padding(3.dp),
@@ -3458,10 +3530,11 @@ private fun refConnectionGroups(items: List<ProxyConnectionUi>): List<RefConnect
             first.packageName.isNotBlank() -> first.packageName
             first.uid > 0 -> "UID ${first.uid}" + if (process.isNotBlank()) " · $process" else ""
             process.isNotBlank() -> process
-            else -> "无法从 Mihomo 元数据识别进程"
+            else -> "未识别到应用信息"
         }
         RefConnectionAppGroup(key, title, subtitle, first.appIcon, connections)
-    }.sortedWith(compareByDescending<RefConnectionAppGroup> { it.connections.size }.thenBy { it.title.lowercase() })
+    // Keep an application's card in place while its live connection count changes.
+    }.sortedWith(compareBy<RefConnectionAppGroup> { it.title.lowercase() }.thenBy { it.key })
 }
 
 @Composable
@@ -3474,6 +3547,10 @@ private fun RefConnectionAppCard(
 ) {
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
+    var connectionPage by rememberSaveable(group.key) { mutableIntStateOf(0) }
+    val lastPage = ((group.connections.size - 1).coerceAtLeast(0)) / 30
+    val currentPage = connectionPage.coerceAtMost(lastPage)
+    val firstConnection = currentPage * 30
     Surface(
         shape = RoundedCornerShape(20.dp),
         color = t.cardBackground,
@@ -3532,7 +3609,7 @@ private fun RefConnectionAppCard(
                             )
                         }
                     }
-                    Text(group.subtitle, color = t.textSecondary, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(group.subtitle, color = t.textSecondary, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
                         "↑ ${refBytes(group.upload)}   ↓ ${refBytes(group.download)}",
                         color = t.textMuted,
@@ -3565,11 +3642,11 @@ private fun RefConnectionAppCard(
                     if (onCloseAll != null && group.connections.size > 1) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                             TextButton(onClick = onCloseAll) {
-                                Text("终止该应用全部连接", color = t.danger, fontSize = 11.sp)
+                                Text("终止这 ${group.connections.size} 条连接", color = t.danger, fontSize = 12.sp)
                             }
                         }
                     }
-                    group.connections.take(30).forEachIndexed { index, item ->
+                    group.connections.drop(firstConnection).take(30).forEachIndexed { index, item ->
                         androidx.compose.animation.AnimatedVisibility(
                             visible = expanded,
                             enter = androidx.compose.animation.fadeIn(
@@ -3582,12 +3659,13 @@ private fun RefConnectionAppCard(
                         }
                     }
                     if (group.connections.size > 30) {
-                        Text(
-                            "还有 ${group.connections.size - 30} 条连接未展开，避免一次渲染过多。",
-                            color = t.textMuted,
-                            fontSize = 10.sp,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
-                        )
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            TextButton(onClick = { connectionPage = currentPage - 1 }, enabled = currentPage > 0) { Text("上一页") }
+                            Text("${firstConnection + 1}–${(firstConnection + 30).coerceAtMost(group.connections.size)} / ${group.connections.size}",
+                                Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                color = t.textSecondary, style = MaterialTheme.typography.labelMedium)
+                            TextButton(onClick = { connectionPage = currentPage + 1 }, enabled = currentPage < lastPage) { Text("下一页") }
+                        }
                     }
                 }
             }
@@ -3617,7 +3695,7 @@ private fun RefConnectionRow(item: ProxyConnectionUi, onClose: (() -> Unit)?) {
             if (onClose != null) {
                 Spacer(Modifier.width(8.dp))
                 Box(
-                    Modifier.size(28.dp)
+                    Modifier.size(48.dp)
                         .graphicsLayer { scaleX = closeScale; scaleY = closeScale }
                         .background(if (dark) Color.White.copy(alpha = .07f) else Color(0xFFF1F5F9).copy(alpha = .82f), CircleShape)
                         .clip(CircleShape)
@@ -3806,11 +3884,11 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
                     trailingColor = if (state.running) Color(0xFF059669) else Color(0xFF64748B),
                 ) { context.startActivity(Intent(context, ReferenceFileManagerActivity::class.java)) }
                 RefDivider()
-                RefToolRow(Icons.Rounded.Article, Color(0xFF9333EA), "日志查看", "查看实时运行日志与调试") {
+                RefToolRow(Icons.Rounded.Article, Color(0xFF9333EA), "日志查看", "查看运行记录与排查问题") {
                     scope.launch { onLog(runCatching { inspector.runtimeLog() }.getOrElse { it.message ?: "日志读取失败" }) }
                 }
                 RefDivider()
-                RefToolRow(Icons.Rounded.Apps, Color(0xFFF97316), "应用名单", "Root 分应用代理范围", trailingText = "管理", trailingColor = Color(0xFF2563EB)) {
+                RefToolRow(Icons.Rounded.Apps, Color(0xFFF97316), "应用名单", "选择需要代理的应用", trailingText = "管理", trailingColor = Color(0xFF2563EB)) {
                     context.startActivity(Intent(context, ProxyAppSelectionActivity::class.java))
                 }
             }
@@ -3822,11 +3900,11 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
                     context.startActivity(Intent(context, ProxyNetworkAutomationActivity::class.java))
                 }
                 RefDivider()
-                RefToolRow(Icons.Rounded.WifiTethering, Color(0xFF10B981), "共享网络", "热点与局域网共享 · Root 规则", trailingText = "设置", trailingColor = Color(0xFF2563EB)) {
+                RefToolRow(Icons.Rounded.WifiTethering, Color(0xFF10B981), "共享网络", "让热点与局域网设备使用代理", trailingText = "设置", trailingColor = Color(0xFF2563EB)) {
                     context.startActivity(Intent(context, ProxySharedNetworkSettingsActivity::class.java))
                 }
                 RefDivider()
-                RefToolRow(Icons.Rounded.AltRoute, Color(0xFFEF4444), "绕过规则", "CIDR 与接口绕过 · Root 规则", trailingText = "设置", trailingColor = Color(0xFF2563EB)) {
+                RefToolRow(Icons.Rounded.AltRoute, Color(0xFFEF4444), "绕过规则", "排除指定网段与网络接口", trailingText = "设置", trailingColor = Color(0xFF2563EB)) {
                     context.startActivity(Intent(context, ProxyBypassRulesActivity::class.java))
                 }
             }
@@ -3834,15 +3912,15 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
         item { RefSectionLabel("订阅与数据") }
         item {
             RefGroup {
-                RefToolRow(Icons.Rounded.CloudDownload, Color(0xFF2563EB), "订阅管理", "链接 · 多配置 · YAML", trailingText = "管理", trailingColor = Color(0xFF2563EB)) {
+                RefToolRow(Icons.Rounded.CloudDownload, Color(0xFF2563EB), "订阅管理", "导入、更新与切换配置", trailingText = "管理", trailingColor = Color(0xFF2563EB)) {
                     context.startActivity(Intent(context, ProxySubscriptionActivity::class.java))
                 }
                 RefDivider()
-                RefToolRow(Icons.Rounded.Shield, Color(0xFF2563EB), "广告过滤", "代理串联 · 规则 REJECT · 独立兜底", trailingText = "管理", trailingColor = Color(0xFF2563EB)) {
+                RefToolRow(Icons.Rounded.Shield, Color(0xFF2563EB), "广告过滤", "订阅规则、放行与拦截记录", trailingText = "管理", trailingColor = Color(0xFF2563EB)) {
                     context.startActivity(Intent(context, ProxyAdblockChainActivity::class.java))
                 }
                 RefDivider()
-                RefToolRow(Icons.Rounded.Public, Color(0xFFF59E0B), "CNIP 设置", "国内 IPv4/IPv6 自动直连", trailingText = "设置", trailingColor = Color(0xFF2563EB)) {
+                RefToolRow(Icons.Rounded.Public, Color(0xFFF59E0B), "国内地址分流", "国内 IPv4/IPv6 自动直连", trailingText = "设置", trailingColor = Color(0xFF2563EB)) {
                     context.startActivity(Intent(context, ProxyCnIpSettingsActivity::class.java))
                 }
             }
@@ -3859,7 +3937,7 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
 }
 
 @Composable
-private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
+private fun RefSettings(state: ProxyComposeState, operation: String, onApplySettings: () -> Unit, onChanged: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("hetu", 0) }
     var modePicker by remember { mutableStateOf(false) }
@@ -3883,6 +3961,42 @@ private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item { RefTitleBar("设置") }
+        if (state.running) {
+            item {
+                RefGroup {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(if (state.runtimeSettingsPending) Icons.Rounded.Info else Icons.Rounded.CheckCircle,
+                                null, Modifier.size(20.dp), tint = if (state.runtimeSettingsPending) t.warning else t.success)
+                            Text(if (state.runtimeSettingsPending) "有设置等待应用" else "当前运行设置",
+                                color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
+                        }
+                        Text("当前 IPv6：${ProxyRuntimeSettings.ipv6Label(state.effectiveIpv6)}",
+                            color = t.textSecondary, style = MaterialTheme.typography.bodyMedium)
+                        if (state.effectiveIpv6 == "disable" || state.effectiveIpv6 == "strict") {
+                            Text(
+                                buildString {
+                                    if (state.effectiveIpv6 == "disable") append(if (state.ipv6Disabled) "系统 IPv6 已禁用 · " else "系统禁用状态待确认 · ")
+                                    append(if (state.ipv6ProtectionActive) "IPv6 外连已拦截" else "外连保护状态待确认")
+                                },
+                                color = if (state.ipv6ProtectionActive) t.success else t.warning,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                        if (state.runtimeSettingsPending) {
+                            Text("下面显示已保存的选项。应用后会短暂重连。", color = t.textSecondary, style = MaterialTheme.typography.bodySmall)
+                            Button(onClick = onApplySettings, enabled = operation.isBlank(), modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = CircleShape) {
+                                if (operation.isNotBlank()) {
+                                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                                    Spacer(Modifier.width(8.dp))
+                                }
+                                Text(if (operation.isNotBlank()) "正在应用…" else "应用设置并重启")
+                            }
+                        }
+                    }
+                }
+            }
+        }
         item { RefSectionLabel("核心与运行") }
         item {
             RefGroup {
@@ -3892,7 +4006,9 @@ private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
                 RefDivider()
                 RefValueRow("运行模式", state.mode, Icons.Rounded.Tune, Color(0xFF2563EB), highlightValue = true) { modePicker = true }
                 RefDivider()
-                RefValueRow("IPv6", state.ipv6, Icons.Rounded.Public, Color(0xFF10B981), highlightValue = true) { ipv6Picker = true }
+                RefValueRow("IPv6", ProxyRuntimeSettings.ipv6Label(state.ipv6) +
+                    if (state.running && state.effectiveIpv6.isNotBlank() && state.effectiveIpv6 != state.ipv6) " · 待应用" else "",
+                    Icons.Rounded.Public, Color(0xFF10B981), highlightValue = true) { ipv6Picker = true }
                 RefDivider()
                 RefSwitchRow(
                     icon = Icons.Rounded.Bolt,
@@ -3944,7 +4060,7 @@ private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
                     prefs.edit().putBoolean("enableBlur", enabled).apply()
                 }
                 RefDivider()
-                RefValueRow("主题与界面", "Miuix · Monet · OLED", Icons.Rounded.Palette, Color(0xFFEC4899)) {
+                RefValueRow("主题与界面", "主题、色彩与玻璃效果", Icons.Rounded.Palette, Color(0xFFEC4899)) {
                     context.startActivity(Intent(context, ThemeSettingsActivity::class.java))
                 }
             }
@@ -4124,6 +4240,8 @@ private fun RefInfoBottomSheet(
     onDismiss: () -> Unit,
 ) {
     val t = LocalHetuTokens.current
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+    var copied by remember(text) { mutableStateOf(false) }
     val terminal = title.contains("日志")
     val renderedText = remember(text, terminal) {
         if (!terminal) {
@@ -4169,9 +4287,13 @@ private fun RefInfoBottomSheet(
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(title, color = if (terminal) Color(0xFFF8FAFC) else t.textPrimary, fontSize = 20.sp, lineHeight = 25.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                TextButton(onClick = {
+                    clipboard.setText(androidx.compose.ui.text.AnnotatedString(text))
+                    copied = true
+                }) { Text(if (copied) "已复制" else "复制", color = if (terminal) Color(0xFF93C5FD) else MaterialTheme.colorScheme.primary) }
                 IconButton(
                     onClick = onDismiss,
-                    modifier = Modifier.size(width = 38.dp, height = 30.dp).background(if (terminal) Color.White.copy(alpha = .07f) else t.controlBackground.copy(alpha = .72f), RoundedCornerShape(12.dp)),
+                    modifier = Modifier.size(48.dp).background(if (terminal) Color.White.copy(alpha = .07f) else t.controlBackground.copy(alpha = .72f), CircleShape),
                 ) {
                     Icon(Icons.Rounded.Close, "关闭", tint = if (terminal) Color(0xFFCBD5E1) else t.textSecondary, modifier = Modifier.size(17.dp))
                 }
@@ -4230,7 +4352,6 @@ private fun RefGroup(content: @Composable ColumnScope.() -> Unit) {
         Modifier.fillMaxWidth()
             .shadow(if (dark) 0.dp else 5.dp, shape, clip = false, ambientColor = Color(0xFF0F172A).copy(alpha = .035f), spotColor = Color(0xFF0F172A).copy(alpha = .045f))
             .background(brush, shape)
-            .border(.7.dp, if (dark) t.outline.copy(alpha = .45f) else Color.White.copy(alpha = .92f), shape)
             .clip(shape),
         content = content,
     )
@@ -4240,31 +4361,31 @@ private fun RefGroup(content: @Composable ColumnScope.() -> Unit) {
 private fun RefSectionLabel(text: String) {
     Text(
         text,
-        color = Color(0xFF94A3B8),
-        fontSize = 11.sp,
-        lineHeight = 14.sp,
-        fontWeight = FontWeight.Bold,
-        letterSpacing = .6.sp,
-        modifier = Modifier.padding(start = 12.dp, top = 2.dp, bottom = 0.dp),
+        color = LocalHetuTokens.current.textSecondary,
+        fontSize = 13.sp,
+        lineHeight = 18.sp,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = .3.sp,
+        modifier = Modifier.padding(start = 4.dp, top = 6.dp, bottom = 2.dp),
     )
 }
 
 @Composable
 private fun RefGradientIcon(icon: ImageVector, accent: Color) {
+    val resolvedAccent = if (MaterialTheme.colorScheme.background.luminance() < .5f) androidx.compose.ui.graphics.lerp(accent, Color.White, .28f) else accent
     val shape = RoundedCornerShape(11.dp)
     val brush = Brush.linearGradient(
         listOf(
-            accent.copy(alpha = .76f),
-            accent,
+            resolvedAccent.copy(alpha = .14f),
+            resolvedAccent.copy(alpha = .07f),
         ),
     )
     Box(
-        Modifier.size(36.dp)
-            .shadow(7.dp, shape, clip = false, ambientColor = accent.copy(alpha = .24f), spotColor = accent.copy(alpha = .28f))
+        Modifier.size(38.dp)
             .background(brush, shape),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, null, tint = Color.White, modifier = Modifier.size(20.dp))
+        Icon(icon, null, tint = resolvedAccent, modifier = Modifier.size(21.dp))
     }
 }
 
@@ -4294,8 +4415,8 @@ private fun RefToolRow(
         RefGradientIcon(icon, accent)
         Spacer(Modifier.width(13.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(title, color = t.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-            Text(subtitle, color = Color(0xFF94A3B8), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title, color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text(subtitle, color = t.textSecondary, fontSize = 12.sp, lineHeight = 17.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
         Spacer(Modifier.width(8.dp))
         if (trailingText.isNotBlank()) {
@@ -4311,7 +4432,7 @@ private fun RefToolRow(
                     }
                 }
             } else {
-                Text(trailingText, color = Color(0xFF94A3B8), fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 110.dp))
+                Text(trailingText, color = t.textSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 88.dp))
                 Spacer(Modifier.width(4.dp))
                 Icon(Icons.Rounded.ChevronRight, null, tint = Color(0xFFCBD5E1), modifier = Modifier.size(15.dp))
             }
@@ -4343,11 +4464,17 @@ private fun RefValueRow(
             RefGradientIcon(icon, accent)
             Spacer(Modifier.width(13.dp))
         }
-        Text(title, color = t.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-        if (value.isNotBlank()) {
+        val stackedValue = value.length > 12
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(title, color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            if (stackedValue) Text(value, color = if (highlightValue) MaterialTheme.colorScheme.primary else t.textSecondary,
+                fontSize = 12.sp, lineHeight = 18.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+        if (value.isNotBlank() && !stackedValue) {
+            Spacer(Modifier.width(12.dp))
             Text(
                 value,
-                color = Color(0xFF94A3B8),
+                color = if (highlightValue) MaterialTheme.colorScheme.primary else t.textSecondary,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
@@ -4374,27 +4501,27 @@ private fun RefSwitchRow(
     val t = LocalHetuTokens.current
     val view = LocalView.current
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+        Modifier.fillMaxWidth().toggleable(checked, role = Role.Switch) { value ->
+            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+            onCheckedChange(value)
+        }.padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RefGradientIcon(icon, accent)
         Spacer(Modifier.width(13.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(title, color = t.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-            Text(subtitle, color = Color(0xFF94A3B8), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title, color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text(subtitle, color = t.textSecondary, fontSize = 12.sp, lineHeight = 17.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
         Spacer(Modifier.width(10.dp))
         Switch(
             checked = checked,
-            onCheckedChange = { value ->
-                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                onCheckedChange(value)
-            },
+            onCheckedChange = null,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Color.White,
-                checkedTrackColor = Color(0xFF2563EB),
+                checkedTrackColor = MaterialTheme.colorScheme.primary,
                 uncheckedThumbColor = Color.White,
-                uncheckedTrackColor = Color(0xFFE2E8F0),
+                uncheckedTrackColor = t.outline,
                 uncheckedBorderColor = Color.Transparent,
             ),
         )
@@ -4416,6 +4543,22 @@ private fun RefMetric(title: String, value: String, modifier: Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(value, color = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A), fontSize = 19.sp, lineHeight = 23.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(title, color = Color(0xFF94A3B8), fontSize = 11.sp, lineHeight = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+    }
+}
+
+@Composable
+private fun RefEmptyState(title: String, description: String, icon: ImageVector) {
+    val t = LocalHetuTokens.current
+    Surface(shape = RoundedCornerShape(22.dp), color = t.cardBackground) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 30.dp),
+            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Box(Modifier.size(52.dp).background(t.controlBackground, CircleShape), contentAlignment = Alignment.Center) {
+                Icon(icon, null, Modifier.size(26.dp), tint = t.textSecondary)
+            }
+            Text(title, color = t.textPrimary, style = MaterialTheme.typography.titleMedium)
+            Text(description, color = t.textSecondary, style = MaterialTheme.typography.bodyMedium,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        }
     }
 }
 

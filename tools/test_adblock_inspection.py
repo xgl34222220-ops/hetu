@@ -40,16 +40,18 @@ final class RootBridge {
         names = ('RuleStore', 'RuleProfiles', 'RuleUpdateGate', 'MessagingFilterPolicy',
                  'DnsPacket', 'DnsResponseFilter', 'ProxyAdblockRules', 'AdblockRuleInspection',
                  'ProxyRuntimeProfile', 'MihomoStartupConfig')
-        tests = ('RuleStoreSnapshotTest', 'AdblockRuleInspectionTest')
+        tests = ('RuleStoreSnapshotTest', 'AdblockRuleInspectionTest', 'RuleStoreParserTest')
         sources = [str(PACKAGE / (name + '.java')) for name in names]
-        sources += [str(ROOT / 'tests' / (name + '.java')) for name in tests]
+        sources += [str(ROOT / 'tests' / ('rule_parser_test.java' if name == 'RuleStoreParserTest' else name + '.java')) for name in tests]
         sources.append(str(bridge))
         compiler = ['java', '-jar', args.ecj] if args.ecj else [shutil.which('javac') or 'javac']
         subprocess.run(compiler + ['-source', '17', '-target', '17', '-encoding', 'UTF-8',
                                   '-cp', str(android_api), '-d', temp] + sources, check=True)
         for name in tests:
             subprocess.run(['java', '-cp', temp + os.pathsep + str(android_api),
-                            'io.github.xgl34222220.hetu.' + name], check=True)
+                            'io.github.xgl34222220.hetu.' + name]
+                           + ([str(path) for path in sorted((ROOT / 'android-app/app/src/main/assets/rules').glob('*.txt'))]
+                              if name == 'RuleStoreParserTest' else []), check=True)
 
 
 if __name__ == '__main__':

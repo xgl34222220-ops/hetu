@@ -17,7 +17,8 @@ final class MessagingFilterPolicy {
 
     static Set<String> subscriptionExceptions(Collection<String> userBlocks) {
         Set<String> result = new HashSet<>(Arrays.asList(TRANSPORT_HOSTS));
-        // An explicit user block still wins over these automatic subscription exceptions.
+        // Exported exceptions match suffixes. A user block anywhere inside an
+        // exception would otherwise be silently bypassed by that parent exception.
         if (userBlocks != null) result.removeIf(host -> blockedBy(userBlocks, host));
         return result;
     }
@@ -25,7 +26,7 @@ final class MessagingFilterPolicy {
     private static boolean blockedBy(Collection<String> blocks, String host) {
         for (String block : blocks) {
             if (block != null && !block.isEmpty()
-                    && (host.equals(block) || host.endsWith("." + block))) return true;
+                    && (host.equals(block) || host.endsWith("." + block) || block.endsWith("." + host))) return true;
         }
         return false;
     }

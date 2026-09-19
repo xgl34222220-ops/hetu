@@ -1,4 +1,4 @@
-adguard	1	AdGuard DNS Filter	https://cdn.jsdelivr.net/gh/AdguardTeam/AdGuardSDNSFilter@master/Filters/filter.txt;https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt;https://raw.githubusercontent.com/AdguardTeam/AdGuardSDNSFilter/master/Filters/filter.txt
+adguard	1	AdGuard DNS Filter	https://cdn.jsdelivr.net/gh/AdguardTeam/AdGuardSDNSFilter@gh-pages/Filters/filter.txt;https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt;https://raw.githubusercontent.com/AdguardTeam/AdGuardSDNSFilter/gh-pages/Filters/filter.txt
 adaway	0	AdAway 通用规则	https://adaway.org/hosts.txt
 china	1	秋风纯广告	https://cdn.jsdelivr.net/gh/TG-Twilight/AWAvenue-Ads-Rule@main/Filters/AWAvenue-Ads-Rule-hosts-Only.Ads.txt;https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/Filters/AWAvenue-Ads-Rule-hosts-Only.Ads.txt
 tracking	0	秋风隐私增强	https://cdn.jsdelivr.net/gh/TG-Twilight/AWAvenue-Ads-Rule@main/Filters/AWAvenue-Ads-Rule-hosts-No.Unwelcome.txt;https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/Filters/AWAvenue-Ads-Rule-hosts-No.Unwelcome.txt

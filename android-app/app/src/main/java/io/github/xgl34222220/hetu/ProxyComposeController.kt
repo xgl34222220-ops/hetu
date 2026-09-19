@@ -82,6 +82,10 @@ internal data class ProxyComposeState(
     val core: String = "Mihomo",
     val mode: String = "TPROXY",
     val ipv6: String = "enable",
+    val effectiveIpv6: String = "",
+    val ipv6Disabled: Boolean = false,
+    val ipv6ProtectionActive: Boolean = false,
+    val runtimeSettingsPending: Boolean = false,
     val autoOverwrite: Boolean = true,
     val config: String = "尚未选择配置",
     val message: String = "",
@@ -133,6 +137,9 @@ internal class ProxyComposeController(context: Context) {
                         .putInt("proxyRootRuntimeSchema", live.optInt("runtimeSchema", 0))
                         .putBoolean("proxyRootIpv4Rules", live.optBoolean("ipv4Rules", false))
                         .putBoolean("proxyRootIpv6Rules", live.optBoolean("ipv6Rules", false))
+                        .putString("proxyRootEffectiveIpv6", live.optString("ipv6Mode", ""))
+                        .putBoolean("proxyRootIpv6Disabled", live.optBoolean("ipv6DisabledByHetu", false))
+                        .putBoolean("proxyRootIpv6DisableGuard", live.optBoolean("ipv6DisableGuard", false))
                         .putString("proxyRootDnsMode", live.optString("dnsMode", ""))
                         .putBoolean("proxyRootDnsIpv4Rule", live.optBoolean("dnsIpv4Rule", false))
                         .putBoolean("proxyRootDnsIpv6Rule", live.optBoolean("dnsIpv6Rule", false))
@@ -144,10 +151,14 @@ internal class ProxyComposeController(context: Context) {
             } catch (error: Exception) {
                 if (fastRunning) JSONObject()
                     .put("running", true)
-                    .put("message", error.message ?: "数据面健康检查暂时不可用")
+                    .put("healthProbeFailed", true)
+                    .put("message", "运行状态暂时无法确认：${error.message ?: "请稍后重试"}")
                     .put("runtimeSchema", prefs.getInt("proxyRootRuntimeSchema", 0))
                     .put("ipv4Rules", prefs.getBoolean("proxyRootIpv4Rules", false))
                     .put("ipv6Rules", prefs.getBoolean("proxyRootIpv6Rules", false))
+                    .put("ipv6Mode", prefs.getString("proxyRootEffectiveIpv6", "") ?: "")
+                    .put("ipv6DisabledByHetu", prefs.getBoolean("proxyRootIpv6Disabled", false))
+                    .put("ipv6DisableGuard", prefs.getBoolean("proxyRootIpv6DisableGuard", false))
                     .put("dnsMode", prefs.getString("proxyRootDnsMode", "") ?: "")
                     .put("dnsIpv4Rule", prefs.getBoolean("proxyRootDnsIpv4Rule", false))
                     .put("dnsIpv6Rule", prefs.getBoolean("proxyRootDnsIpv6Rule", false))
@@ -162,6 +173,9 @@ internal class ProxyComposeController(context: Context) {
                 .put("runtimeSchema", prefs.getInt("proxyRootRuntimeSchema", 0))
                 .put("ipv4Rules", prefs.getBoolean("proxyRootIpv4Rules", false))
                 .put("ipv6Rules", prefs.getBoolean("proxyRootIpv6Rules", false))
+                .put("ipv6Mode", prefs.getString("proxyRootEffectiveIpv6", "") ?: "")
+                .put("ipv6DisabledByHetu", prefs.getBoolean("proxyRootIpv6Disabled", false))
+                .put("ipv6DisableGuard", prefs.getBoolean("proxyRootIpv6DisableGuard", false))
                 .put("dnsMode", prefs.getString("proxyRootDnsMode", "") ?: "")
                 .put("dnsIpv4Rule", prefs.getBoolean("proxyRootDnsIpv4Rule", false))
                 .put("dnsIpv6Rule", prefs.getBoolean("proxyRootDnsIpv6Rule", false))
@@ -198,6 +212,12 @@ internal class ProxyComposeController(context: Context) {
             core = profile.core.label,
             mode = profile.mode.label,
             ipv6 = profile.ipv6.id,
+            effectiveIpv6 = if (running) status.optString("ipv6Mode", "") else "",
+            ipv6Disabled = running && !status.optBoolean("healthProbeFailed", false) && status.optBoolean("ipv6DisabledByHetu", false),
+            ipv6ProtectionActive = running && !status.optBoolean("healthProbeFailed", false) &&
+                if (status.optString("ipv6Mode", "") == "strict") status.optBoolean("ipv6Rules", false)
+                else status.optBoolean("ipv6DisableGuard", false),
+            runtimeSettingsPending = ProxyRuntimeSettings.pending(running, ProxyRuntimeSettings.signature(prefs), prefs.getString("proxyRootAppliedSettings", "")),
             autoOverwrite = profile.autoOverwrite,
             config = selected?.name ?: "尚未选择配置",
             message = when {
@@ -205,6 +225,7 @@ internal class ProxyComposeController(context: Context) {
                     status.optString("message", ""),
                     prefs.getString("proxyAutoRecoveryError", "").orEmpty(),
                 ).filter { it.isNotBlank() }.distinct().joinToString("；")
+                status.optBoolean("healthProbeFailed", false) -> status.optString("message", "运行状态暂时无法确认")
                 !status.optBoolean("dataPlaneHealthy", false) ->
                     "核心仍在运行，但透明代理/DNS 数据面健康检查未完整通过"
                 else -> ""
@@ -228,7 +249,7 @@ internal class ProxyComposeController(context: Context) {
             dnsIpv6Rule = status.optBoolean("dnsIpv6Rule", false),
             dnsListenerReady = status.optBoolean("dnsListenerReady", false),
             watchdog = status.optBoolean("watchdog", false),
-            dataPlaneHealthy = status.optBoolean("dataPlaneHealthy", false),
+            dataPlaneHealthy = !status.optBoolean("healthProbeFailed", false) && status.optBoolean("dataPlaneHealthy", false),
         )
     }
 
@@ -258,15 +279,7 @@ internal class ProxyComposeController(context: Context) {
         if (!configs.hasConfiguredSubscription(selected)) {
             error("当前是河图内置占位配置，尚未填写真实订阅。请打开「面板 → 订阅」添加订阅，或导入一份完整可运行的 YAML 配置。")
         }
-        val previousOwner = prefs.getString("proxyRootSessionOwner", "").orEmpty()
-        prefs.edit().putString("proxyRootSessionOwner", "manual").apply()
-        try {
-            root.start(profile) { onProgress(it) }
-        } catch (error: Exception) {
-            if (previousOwner.isBlank()) prefs.edit().remove("proxyRootSessionOwner").apply()
-            else prefs.edit().putString("proxyRootSessionOwner", previousOwner).apply()
-            throw error
-        }
+        root.startManual(profile) { onProgress(it) }
     }
 
     suspend fun reload(): String = withContext(Dispatchers.IO) {
@@ -276,9 +289,8 @@ internal class ProxyComposeController(context: Context) {
     suspend fun restart(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
         LegacyAppMigrator.migrateIfNeeded(app)
         val profile = ProxyRuntimeProfile.load(prefs)
-        val result = root.replaceRunningAfterUpgrade(profile, onProgress)
+        val result = root.replaceRunningManually(profile, onProgress)
         prefs.edit()
-            .putString("proxyRootSessionOwner", "manual")
             .remove("proxyRootRuntimeRefreshPending")
             .remove("proxyRootUpgradeError")
             .apply()
@@ -287,7 +299,6 @@ internal class ProxyComposeController(context: Context) {
 
     suspend fun stop(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
         val result = root.stop { onProgress(it) }
-        prefs.edit().remove("proxyRootSessionOwner").apply()
         result
     }
     suspend fun select(group: String, node: String) = withContext(Dispatchers.IO) { api.select(group, node) }
@@ -417,7 +428,8 @@ internal class ProxyComposeController(context: Context) {
     fun ipv6Modes(): List<Pair<String, String>> = listOf(
         "enable" to "启用 IPv6",
         "bypass" to "IPv6 不进核心",
-        "disable" to "禁用系统 IPv6",
+        "strict" to "严格 IPv4 防泄漏",
+        "disable" to "禁用本机 IPv6",
     )
 
     fun setCore(id: String) { prefs.edit().putString("proxyBaseCore", id).apply() }

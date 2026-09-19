@@ -53,10 +53,10 @@ final class RootProxyManager {
         final ProxyConfigLibrary.Entry source;
         final RootProxyPolicy policy;
         final ProxyAdblockRules.Snapshot adblock;
-        final String startup;
+        final String startup,settingsSignature;
         final int tproxyPort,redirectPort,controllerPort;
-        Prepared(ProxyRuntimeProfile p,ProxyConfigLibrary.Entry s,RootProxyPolicy policy,ProxyAdblockRules.Snapshot adblock,String y,int tp,int rp,int cp){
-            profile=p;source=s;this.policy=policy;this.adblock=adblock;startup=y;tproxyPort=tp;redirectPort=rp;controllerPort=cp;
+        Prepared(ProxyRuntimeProfile p,ProxyConfigLibrary.Entry s,RootProxyPolicy policy,ProxyAdblockRules.Snapshot adblock,String y,int tp,int rp,int cp,String signature){
+            profile=p;source=s;this.policy=policy;this.adblock=adblock;startup=y;tproxyPort=tp;redirectPort=rp;controllerPort=cp;settingsSignature=signature;
         }
     }
 
@@ -271,6 +271,7 @@ final class RootProxyManager {
 
     private Prepared prepare(ProxyRuntimeProfile profile,int fixedControllerPort)throws Exception{
         RootBridge.requireWorkerThread();
+        String settingsSignature=ProxyRuntimeSettings.signature(profile,prefs.getAll());
         if(profile.core!=ProxyRuntimeProfile.Core.MIHOMO&&profile.core!=ProxyRuntimeProfile.Core.MIHOMO_SMART)
             throw new IOException(profile.core.label+" 的运行后端还未接入");
         ProxyRuntimeProfile.Capability capability=profile.capability();
@@ -293,7 +294,7 @@ final class RootProxyManager {
         Set<String> tunPackages=profile.mode==ProxyRuntimeProfile.Mode.TUN?selectedTunPackages():Collections.emptySet();
         MihomoStartupConfig.Result generated=MihomoStartupConfig.generate(source,profile,controllerSecret(),controllerPort,profile.appScope,tunPackages,policy.directPackages,ebpfInterface);
         writeStartupCopy(generated.yaml);
-        return new Prepared(profile,selected,policy,adblock,generated.yaml,generated.tproxyPort,generated.redirectPort,controllerPort);
+        return new Prepared(profile,selected,policy,adblock,generated.yaml,generated.tproxyPort,generated.redirectPort,controllerPort,settingsSignature);
     }
 
     private String topologyFingerprint(ProxyRuntimeProfile profile,RootProxyPolicy policy){
@@ -360,6 +361,7 @@ final class RootProxyManager {
             RootBridge.rootShell(context,"rm -f "+RootBridge.quote(CONFIG+".before-reload"),3000L);
             prefs.edit()
                     .putString("proxyRootTopologyFingerprint",nextFingerprint)
+                    .putString("proxyRootAppliedSettings",p.settingsSignature)
                     .putInt("proxyAdblockLastRuleCount",p.adblock==null?0:p.adblock.count)
                     .putString("proxyAdblockLastRevision",p.adblock==null?"":p.adblock.revision)
                     .apply();
@@ -407,6 +409,39 @@ final class RootProxyManager {
 
     JSONObject start(ProxyRuntimeProfile p)throws Exception{return startInternal(p,null,false);}
     JSONObject start(ProxyRuntimeProfile profile,Progress progress)throws Exception{return startInternal(profile,progress,false);}
+    JSONObject startManual(ProxyRuntimeProfile profile,Progress progress)throws Exception{return startOwned(profile,progress,false);}
+    JSONObject replaceRunningManually(ProxyRuntimeProfile profile,Progress progress)throws Exception{return startOwned(profile,progress,true);}
+    private JSONObject startOwned(ProxyRuntimeProfile profile,Progress progress,boolean replace)throws Exception{
+        CONTROL_LOCK.lock();
+        String previous=prefs.getString("proxyRootSessionOwner","");
+        try{
+            prefs.edit().putString("proxyRootSessionOwner","manual").apply();
+            return startInternal(profile,progress,replace);
+        }catch(Exception error){
+            if(previous==null||previous.isEmpty())prefs.edit().remove("proxyRootSessionOwner").apply();
+            else prefs.edit().putString("proxyRootSessionOwner",previous).apply();
+            throw error;
+        }finally{CONTROL_LOCK.unlock();}
+    }
+    JSONObject startIfAutomationAllowed(ProxyRuntimeProfile profile,java.util.function.BooleanSupplier currentDecision)throws Exception{
+        CONTROL_LOCK.lock();
+        try{
+            if(!prefs.getBoolean("networkMatchEnabled",false)||"manual".equals(prefs.getString("proxyRootSessionOwner",""))||!currentDecision.getAsBoolean())
+                return new JSONObject().put("ok",true).put("cancelled",true);
+            JSONObject result=startInternal(profile,null,false);
+            if(result.optBoolean("ok",false)&&!result.optBoolean("cancelled",false))
+                prefs.edit().putString("proxyRootSessionOwner","automation").apply();
+            return result;
+        }finally{CONTROL_LOCK.unlock();}
+    }
+    JSONObject stopIfAutomationOwned(java.util.function.BooleanSupplier currentDecision)throws Exception{
+        CONTROL_LOCK.lock();
+        try{
+            if(!prefs.getBoolean("networkMatchEnabled",false)||!"automation".equals(prefs.getString("proxyRootSessionOwner",""))||!currentDecision.getAsBoolean())
+                return new JSONObject().put("ok",true).put("cancelled",true);
+            return stop();
+        }finally{CONTROL_LOCK.unlock();}
+    }
     JSONObject startIfWanted(ProxyRuntimeProfile profile)throws Exception{
         CONTROL_LOCK.lock();
         try{
@@ -510,14 +545,19 @@ final class RootProxyManager {
             ProxyAdblockCoordinator.enter(context);adblockCoordinatorEntered=true;
         }
         stage(progress,"启动核心并等待订阅、规则与监听就绪（首次可能较慢）…");
+        synchronized(ProxyAdblockSession.LOCK){
         prefs.edit()
                 .putBoolean("proxyAdblockCounterArmed",false)
+                .putLong("proxyAdblockSessionGeneration",prefs.getLong("proxyAdblockSessionGeneration",0L)+1L)
                 .putLong("proxyAdblockSessionHits",0L)
                 .putLong("proxyAdblockLogOffset",0L)
                 .putLong("proxyAdblockLastHitAt",0L)
                 .remove("proxyAdblockLastDomain")
                 .remove("proxyAdblockRecentDomains")
+                .remove("proxyAdblockPendingLogLine")
+                .remove("proxyAdblockDiscardLogLine")
                 .apply();
+        }
         trace.next("coreAndNetwork");
         JSONObject result;
         try{result=runJsonWithTimeout(125000L,"start",
@@ -584,6 +624,7 @@ final class RootProxyManager {
                 .put("bypassCidrs",policy.cidrs)
                 .put("bypassInterfaces",policy.interfaces);
         if(!warning.isEmpty())result.put("warning",warning);
+        synchronized(ProxyAdblockSession.LOCK){
         prefs.edit()
                 .putBoolean("proxyRootWanted",true)
                 .putBoolean("proxyRootRuntimeRunning",true)
@@ -593,11 +634,15 @@ final class RootProxyManager {
                 .putInt("proxyAdblockLastRuleCount",p.adblock==null?0:p.adblock.count)
                 .putString("proxyAdblockLastRevision",p.adblock==null?"":p.adblock.revision)
                 .putString("proxyRootTopologyFingerprint",topologyFingerprint(profile,policy))
+                .putString("proxyRootAppliedSettings",p.settingsSignature)
+                .putString("proxyRootEffectiveIpv6",profile.ipv6.id)
+                .putLong("proxyRootHealthProbeElapsed",0L)
                 .putString("proxyRootValidatedFingerprint",validationKey)
                 .putString("proxyRootCapabilityFingerprint",capabilityKey)
                 .remove("proxyRootRuntimeRefreshPending")
                 .remove("proxyRootBootError")
                 .apply();
+        }
         ensureContinuityService(true);
         trace.outcome="ready";
         return result;
@@ -617,7 +662,12 @@ final class RootProxyManager {
         CONTROL_LOCK.lock();
         try{
             // Revoke recovery intent before shutdown; queued automatic starts recheck under this lock.
-            prefs.edit().putBoolean("proxyRootWanted",false).apply();
+            synchronized(ProxyAdblockSession.LOCK){
+                prefs.edit().putBoolean("proxyRootWanted",false)
+                        .putBoolean("proxyAdblockCounterArmed",false)
+                        .putLong("proxyAdblockSessionGeneration",prefs.getLong("proxyAdblockSessionGeneration",0L)+1L)
+                        .remove("proxyAdblockPendingLogLine").remove("proxyAdblockDiscardLogLine").apply();
+            }
             stage(progress,"停止守护、Kill Switch、核心并回滚透明代理规则…");
             JSONObject r=runJsonAllowMissing("stop",new JSONObject().put("ok",true).put("running",false).put("state","idle").put("message","Root 代理未运行"));
             ProxyAdblockCoordinator.exit(context);
@@ -626,6 +676,8 @@ final class RootProxyManager {
                     .putBoolean("proxyRootWanted",false)
                     .putBoolean("proxyRootRuntimeRunning",false)
                     .putBoolean("proxyAdblockCounterArmed",false)
+                    .putLong("proxyRootHealthProbeElapsed",0L)
+                    .remove("proxyRootSessionOwner")
                     .apply();
             ensureContinuityService(false);
             return r;

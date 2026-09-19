@@ -11,6 +11,7 @@ SESSION="$RUN/session.state"
 LOG="$RUN/core.log"
 CHECKLOG="$RUN/config-check.log"
 IPV6_STATE="$RUN/ipv6.state"
+V6_CONF=/proc/sys/net/ipv6/conf
 NET_STATE="$RUN/net.state"
 WATCHDOG_PID="$RUN/watchdog.pid"
 WATCHDOG_LOG="$RUN/watchdog.log"
@@ -272,16 +273,78 @@ stopcore(){
 # decide whether IPv6 traffic needs interception/protection.
 v6supported(){ [ -r /proc/net/if_inet6 ]; }
 savev6(){
-  mkdir -p "$RUN" || return 1; : > "$IPV6_STATE" || return 1; FOUND=0
-  for P in /proc/sys/net/ipv6/conf/*/disable_ipv6; do [ -r "$P" ] || continue; V=$(cat "$P" 2>/dev/null) || continue; printf '%s\t%s\n' "$P" "$V" >> "$IPV6_STATE" || return 1; FOUND=1; done
-  [ "$FOUND" = 1 ]
+  # Never replace an earlier session's baseline with values already set by us.
+  [ ! -f "$IPV6_STATE" ] || return 0
+  mkdir -p "$RUN" || return 1; V6_TMP="$IPV6_STATE.new.$$"; : > "$V6_TMP" || return 1; V6_FOUND=0
+  for V6_P in "$V6_CONF"/*/disable_ipv6; do
+    [ -r "$V6_P" ] || continue
+    read -r V6_V < "$V6_P" || { rm -f "$V6_TMP"; return 1; }
+    case "$V6_V" in 0|1) ;; *) rm -f "$V6_TMP"; return 1;; esac
+    printf '%s\t%s\n' "$V6_P" "$V6_V" >> "$V6_TMP" || { rm -f "$V6_TMP"; return 1; }; V6_FOUND=1
+  done
+  [ "$V6_FOUND" = 1 ] || { rm -f "$V6_TMP"; return 1; }
+  mv -f "$V6_TMP" "$IPV6_STATE"
 }
 restorev6(){
   [ -f "$IPV6_STATE" ] || return 0
-  while IFS="$(printf '\t')" read -r P V; do case "$P" in /proc/sys/net/ipv6/conf/*/disable_ipv6) ;; *) continue;; esac; case "$V" in 0|1) [ -w "$P" ] && printf '%s\n' "$V" > "$P" 2>/dev/null || true;; esac; done < "$IPV6_STATE"
+  V6_TAB=$(printf '\t'); V6_DEFAULT=0; V6_FAILED=0
+  while IFS="$V6_TAB" read -r V6_P V6_V; do
+    [ "$V6_P" != "$V6_CONF/default/disable_ipv6" ] || V6_DEFAULT="$V6_V"
+    # all changes every interface and default; restore it before individual values.
+    if [ "$V6_P" = "$V6_CONF/all/disable_ipv6" ]; then
+      case "$V6_V" in 0|1) printf '%s\n' "$V6_V" > "$V6_P" 2>/dev/null || V6_FAILED=1;; esac
+    fi
+  done < "$IPV6_STATE"
+  case "$V6_DEFAULT" in 0|1) ;; *) return 1;; esac
+  for V6_P in "$V6_CONF"/*/disable_ipv6; do
+    [ -e "$V6_P" ] || continue; [ "$V6_P" != "$V6_CONF/all/disable_ipv6" ] || continue
+    V6_OLD="$V6_DEFAULT"
+    while IFS="$V6_TAB" read -r V6_SAVED_P V6_SAVED_V; do
+      if [ "$V6_P" = "$V6_SAVED_P" ]; then V6_OLD="$V6_SAVED_V"; break; fi
+    done < "$IPV6_STATE"
+    case "$V6_OLD" in 0|1) printf '%s\n' "$V6_OLD" > "$V6_P" 2>/dev/null || V6_FAILED=1;; *) V6_FAILED=1;; esac
+  done
+  # Keep the journal if a real restoration failed, so a later stop can retry.
+  [ "$V6_FAILED" = 0 ] || return 1
   rm -f "$IPV6_STATE"
 }
-disablev6(){ savev6 || return 1; CH=0; for P in /proc/sys/net/ipv6/conf/*/disable_ipv6; do [ -w "$P" ] || continue; printf '1\n' > "$P" 2>/dev/null || { restorev6; return 1; }; CH=1; done; [ "$CH" = 1 ] || { restorev6; return 1; }; }
+v6disabled(){
+  V6_FOUND=0
+  for V6_P in "$V6_CONF"/*/disable_ipv6; do
+    [ -e "$V6_P" ] || continue; V6_FOUND=1
+    read -r V6_V < "$V6_P" 2>/dev/null || return 1
+    [ "$V6_V" = 1 ] || return 1
+  done
+  [ "$V6_FOUND" = 1 ]
+}
+enforcev6(){
+  [ -f "$IPV6_STATE" ] || return 1
+  V6_SAVED=$(cat "$IPV6_STATE") || return 1; V6_TAB=$(printf '\t'); V6_DEFAULT=0
+  while IFS="$V6_TAB" read -r V6_P V6_V; do
+    [ "$V6_P" != "$V6_CONF/default/disable_ipv6" ] || V6_DEFAULT="$V6_V"
+  done < "$IPV6_STATE"
+  case "$V6_DEFAULT" in 0|1) ;; *) return 1;; esac
+  # Journal late interfaces before any write to all, which otherwise destroys
+  # their prior state. A new interface's inherited 1 came from our default=1;
+  # restore the original default on stop, not Hetu's temporary value.
+  for V6_P in "$V6_CONF"/*/disable_ipv6; do
+    [ -e "$V6_P" ] || continue
+    case "
+$V6_SAVED
+" in *"
+$V6_P$V6_TAB"*) continue;; esac
+    read -r V6_V < "$V6_P" || return 1
+    case "$V6_V" in 0) ;; 1) V6_V="$V6_DEFAULT";; *) return 1;; esac
+    printf '%s\t%s\n' "$V6_P" "$V6_V" >> "$IPV6_STATE" || return 1
+  done
+  for V6_P in "$V6_CONF"/*/disable_ipv6; do
+    [ -e "$V6_P" ] || continue
+    read -r V6_V < "$V6_P" || return 1
+    [ "$V6_V" = 1 ] || printf '1\n' > "$V6_P" 2>/dev/null || return 1
+  done
+  v6disabled
+}
+disablev6(){ savev6 && enforcev6 && return 0; restorev6; return 1; }
 
 split_safe_uids(){
   LIST="$1"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS
@@ -390,8 +453,8 @@ probe_ingress(){
     [ "$NEED_RP" = 0 ] || probered6 "$RP" tcp || fail "IPv6 REDIRECT 不可用，可改用严格 IPv4 或 IPv6 不进核心"
     if [ "$NEED_DNS_REDIRECT" = 1 ]; then probered6 "$DP" tcp || fail "IPv6 TCP DNS REDIRECT 不可用"; probered6 "$DP" udp || fail "IPv6 UDP DNS REDIRECT 不可用"; fi
   fi
-  if v6supported && { [ "$V6" = strict ] || [ "$KILL" = 1 ]; }; then
-    has ip6tables || fail "严格 IPv4 或 Kill Switch 需要 ip6tables"
+  if v6supported && { [ "$V6" = strict ] || [ "$V6" = disable ] || [ "$KILL" = 1 ]; }; then
+    has ip6tables || fail "IPv6 禁用/严格 IPv4 或 Kill Switch 需要 ip6tables"
   fi
 }
 
@@ -415,7 +478,7 @@ preflight(){
   fi
 
   probe_ingress "$M" "$TP" "$RP" "$V6" "$TCP" "$UDP" "$DNS" "$QUIC" "$KILL" "$DP"
-  if [ "$V6" = disable ]; then TESTED=0; for P in /proc/sys/net/ipv6/conf/*/disable_ipv6; do [ -w "$P" ] && TESTED=1 && break; done; [ "$TESTED" = 1 ] || fail "系统不允许临时禁用 IPv6"; fi
+  if [ "$V6" = disable ] && v6supported; then TESTED=0; for P in "$V6_CONF"/*/disable_ipv6; do [ -e "$P" ] || continue; [ -w "$P" ] || fail "系统不允许完整禁用 IPv6"; TESTED=1; done; [ "$TESTED" = 1 ] || fail "系统不允许临时禁用 IPv6"; fi
   ok "Root 代理预检通过"
 }
 
@@ -567,6 +630,44 @@ install_v6_strict(){
   if [ "$SHARE" = 1 ]; then xt6 -t filter -N "$V6FWD" || return 1; iface_in xt6 filter "$V6FWD" "$IFACES" || return 1; bypass6 "$V6FWD" filter "$CIDRS" || return 1; xt6 -t filter -A "$V6FWD" -j REJECT || return 1; xt6 -t filter -A FORWARD -j "$V6FWD" || return 1; fi
 }
 
+# "Disable IPv6" is a device-wide policy, unlike the scoped strict mode. A
+# network handover/netd can turn interface IPv6 back on after the sysctl write.
+# Keep a guard that covers root/core sockets, bypass apps, and new interfaces;
+# never exempt marks, UIDs or public CIDRs here. The guard permits local-only loopback.
+install_v6_disable(){
+  V6_SHARE="$1"; v6supported || return 0
+  xt6 -t filter -N "$V6OUT" || return 1
+  xt6 -t filter -A "$V6OUT" -o lo -j RETURN || return 1
+  xt6 -t filter -A "$V6OUT" -j REJECT || return 1
+  xt6 -t filter -I OUTPUT 1 -j "$V6OUT" || return 1
+  if [ "$V6_SHARE" = 1 ]; then
+    xt6 -t filter -N "$V6FWD" || return 1
+    xt6 -t filter -A "$V6FWD" -j REJECT || return 1
+    xt6 -t filter -I FORWARD 1 -j "$V6FWD" || return 1
+  fi
+}
+v6_disable_guard_ready(){
+  V6_SHARE="$1"; v6supported || return 0
+  has ip6tables || return 1
+  xt6q -t filter -C OUTPUT -j "$V6OUT" >/dev/null 2>&1 || return 1
+  xt6q -t filter -C "$V6OUT" -j REJECT >/dev/null 2>&1 || return 1
+  if [ "$V6_SHARE" = 1 ]; then
+    xt6q -t filter -C FORWARD -j "$V6FWD" >/dev/null 2>&1 || return 1
+    xt6q -t filter -C "$V6FWD" -j REJECT >/dev/null 2>&1 || return 1
+  fi
+}
+maintainv6(){
+  # Only the active disable session owns this journal. Recheck after taking the
+  # transaction lock so a stop/mode change cannot be undone by the watchdog.
+  [ -f "$IPV6_STATE" ] || return 0
+  v6disabled && return 0
+  acquire_lock || return 1
+  if [ -f "$IPV6_STATE" ] && grep -qx 'IPV6=disable' "$SESSION" 2>/dev/null; then
+    enforcev6 || { release_lock; return 1; }
+  fi
+  release_lock
+}
+
 install_kill4(){
   S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; xt4 -t filter -N "$KOUT" >/dev/null 2>&1 || true; xt4 -t filter -F "$KOUT" || return 1; xt4 -t filter -A "$KOUT" -o lo -j RETURN || return 1; iface_out xt4 filter "$KOUT" "$IFACES" || return 1; direct_uid_returns xt4 filter "$KOUT" "$DUIDS" || return 1; blacklist_returns xt4 filter "$KOUT" "$S" "$UIDS" || return 1; bypass4 "$KOUT" filter "$CIDRS" || return 1; scoped_reject_all xt4 "$KOUT" "$S" "$UIDS" || return 1; xt4 -t filter -I OUTPUT 1 -j "$KOUT" || return 1
   if [ "$SHARE" = 1 ]; then xt4 -t filter -N "$KFWD" >/dev/null 2>&1 || true; xt4 -t filter -F "$KFWD" || return 1; iface_in xt4 filter "$KFWD" "$IFACES" || return 1; bypass4 "$KFWD" filter "$CIDRS" || return 1; xt4 -t filter -A "$KFWD" -j REJECT || return 1; xt4 -t filter -I FORWARD 1 -j "$KFWD" || return 1; fi
@@ -627,7 +728,7 @@ wait_ready(){
 write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$7"; CP="$8"; DUIDS="$9"; { printf 'MODE=%s\n' "$M"; printf 'IPV6=%s\n' "$V6"; printf 'DNS=%s\n' "$DNS"; printf 'DNS_PORT=%s\n' "$DP"; printf 'APP_SCOPE=%s\n' "$S"; printf 'SHARE=%s\n' "$SHARE"; printf 'KILL=%s\n' "$KILL"; printf 'CONTROLLER_PORT=%s\n' "$CP"; printf 'DIRECT_UIDS=%s\n' "$DUIDS"; } > "$SESSION.new.$" && mv -f "$SESSION.new.$" "$SESSION"; }
 watchdog(){
   COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS="$6"; IFACES="$7"; DUIDS="$8"
-  mkdir -p "$RUN" || exit 0; printf '%s\n' "$$" > "$WATCHDOG_PID"; MISS=0; while [ "$MISS" -lt 3 ]; do if core_maybe_alive "$COREPID" && kill -0 "$COREPID" >/dev/null 2>&1; then MISS=0; sleep 2; else MISS=$((MISS+1)); sleep 0.20; fi; done; acquire_lock || exit 0
+  mkdir -p "$RUN" || exit 0; printf '%s\n' "$$" > "$WATCHDOG_PID"; MISS=0; while [ "$MISS" -lt 3 ]; do if core_maybe_alive "$COREPID" && kill -0 "$COREPID" >/dev/null 2>&1; then MISS=0; maintainv6 || true; sleep 2; else MISS=$((MISS+1)); sleep 0.20; fi; done; acquire_lock || exit 0
   REC=$(cat "$PIDFILE" 2>/dev/null || true)
   if [ "$REC" = "$COREPID" ]; then
     cleanup; restorev6; rm -f "$PIDFILE"
@@ -650,7 +751,7 @@ start(){
   fi
   [ -x "$START_BIN" ] || fail "核心文件不存在或不可执行"; [ -r "$START_CFG" ] || fail "启动配置不存在"; mkdir -p "$RUN" || fail "无法创建运行目录"; if [ "$START_PREVALIDATED" != 1 ]; then validatecfg "$START_BIN" "$START_CFG" || fail "Mihomo 配置校验失败，当前网络未被接管"; fi; acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
   start_stage "cleanup-network"
-  stopwatchdog; cleanup; restorev6
+  stopwatchdog; cleanup; restorev6 || fail "上次 IPv6 状态尚未恢复，请重试停止后再启动"
   start_stage "stop-old-core"
   stopcore; sleep 0.20; rm -f "$CRASH_STATE" "$SESSION"
   start_stage "check-ports"
@@ -658,7 +759,10 @@ start(){
   markused "$BYPASS_MARK" && fail "安全出站 mark 已被其他网络规则占用，未接管网络"
   NEED_TP=0; case "$START_MODE" in tproxy) if [ "$START_TCP" = 1 ] || [ "$START_UDP" = 1 ]; then NEED_TP=1; fi;; enhance) [ "$START_UDP" = 1 ] && NEED_TP=1;; esac; if [ "$START_DNS" = tproxy ] && [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ]; then NEED_TP=1; fi
   if [ "$NEED_TP" = 1 ]; then allocnet || { cleanup; fail "找不到安全的 fwmark/路由表/规则优先级，已保持直连"; }; fi
-  if [ "$START_V6" = disable ]; then disablev6 || { cleanup; fail "禁用系统 IPv6 失败，已恢复原状态"; }; fi
+  if [ "$START_V6" = disable ] && v6supported; then
+    install_v6_disable "$START_SHARE" || { cleanup; fail "IPv6 禁用保护安装失败，未启动代理"; }
+    disablev6 || { cleanup; fail "禁用系统 IPv6 失败，已尝试恢复原状态"; }
+  fi
 
   mkdir -p "$RUN/rules" "$RUN/proxy_provider" "$RUN/ruleset" "$RUN/ui" || { cleanup; restorev6; rm -f "$SESSION"; fail "无法创建 Mihomo 运行缓存目录"; }
   start_stage "launch-core"
@@ -803,30 +907,39 @@ status(){
 
   IPV4OK=$MODE4
   IPV6OK=true
+  V6OFF=false; [ -f "$IPV6_STATE" ] && v6disabled && V6OFF=true
+  DISABLE6=false
   case "$IPV6V" in
     enable) if v6supported; then IPV6OK=$MODE6; fi;;
     strict) if v6supported; then IPV6OK=$STRICT6; fi;;
-    bypass|disable) IPV6OK=true;;
+    disable)
+      if v6supported; then
+        v6_disable_guard_ready "$SHAREV" && DISABLE6=true
+        # The guard prevents leaks while netd/sysctls are being reconciled, but
+        # do not report the requested device-wide disable as healthy yet.
+        IPV6OK=false; [ "$V6OFF" = true ] && [ "$DISABLE6" = true ] && IPV6OK=true
+      else DISABLE6=true; V6OFF=true; fi
+      ;;
+    bypass) IPV6OK=true;;
   esac
 
   WD=false
   W=$(cat "$WATCHDOG_PID" 2>/dev/null || true)
   case "$W" in ''|*[!0-9]*) ;; *) kill -0 "$W" >/dev/null 2>&1 && WD=true;; esac
-  V6OFF=false; [ -f "$IPV6_STATE" ] && V6OFF=true
   STALE=false
-  if [ "$STATUS_RUNNING" = false ] && { [ "$M4O" = true ] || [ "$N4O" = true ] || [ "$D4O" = true ] || [ "$M6O" = true ] || [ "$N6O" = true ] || [ "$D6O" = true ] || [ "$K4" = true ] || [ "$K6" = true ] || [ "$V6OFF" = true ]; }; then STALE=true; fi
+  if [ "$STATUS_RUNNING" = false ] && { [ "$M4O" = true ] || [ "$N4O" = true ] || [ "$D4O" = true ] || [ "$M6O" = true ] || [ "$N6O" = true ] || [ "$D6O" = true ] || [ "$K4" = true ] || [ "$K6" = true ] || [ "$STRICT6" = true ] || [ -f "$IPV6_STATE" ]; }; then STALE=true; fi
 
   HEALTH=false
   if [ "$STATUS_RUNNING" = true ] && [ "$IPV4OK" = true ] && [ "$IPV6OK" = true ] && [ "$DNS4" = true ] && [ "$DNS6" = true ] && [ "$DNSREADY" = true ] && [ "$WD" = true ]; then HEALTH=true; fi
   SM=""; ST=""; if loadnet >/dev/null 2>&1; then SM="$MARK"; ST="$TABLE"; fi
   SP=$(state_value PREF 2>/dev/null || true)
-  printf '{"ok":true,"runtimeSchema":3,"running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"dnsMode":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":false,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","log":"%s","configCheckLog":"%s"}\n' "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$DNSV" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$SHAREV" "$KILLV" "$LOG" "$CHECKLOG"
+  printf '{"ok":true,"runtimeSchema":3,"running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":false,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","log":"%s","configCheckLog":"%s"}\n' "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$SHAREV" "$KILLV" "$LOG" "$CHECKLOG"
 }
 
 case "${1:-status}" in
   preflight) [ "$#" = 18 ] || fail "参数错误"; preflight "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}" "${18}";;
   start) [ "$#" = 22 ] || fail "参数错误"; root; start "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}" "${18}" "${19}" "${20}" "${21}" "${22}";;
-  stop) root; acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"; stopwatchdog; cleanup; stopcore; restorev6; rm -f "$SESSION"; ok "Root 代理已停止并恢复网络状态";;
+  stop) root; acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"; stopwatchdog; cleanup; stopcore; restorev6 || fail "核心已停止，但 IPv6 原状态恢复失败，请重试停止"; rm -f "$SESSION"; ok "Root 代理已停止并恢复网络状态";;
   status) status;;
   watchdog) [ "$#" = 9 ] || exit 0; root; watchdog "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9";;
   *) fail "未知 Root 代理操作";;

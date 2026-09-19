@@ -1,5 +1,11 @@
 # 第三方来源与许可
 
+## AdGuard DNS Filter
+
+- 作者与上游：[AdGuard Team / AdGuardSDNSFilter](https://github.com/AdguardTeam/AdGuardSDNSFilter)。
+- 随 APK 分发未经修改的 `assets/rules/adguard.txt`，保留头部与各子列表归属；GPL-3.0 许可全文为 `assets/ADGUARD-LICENSE` 与源码根目录 `LICENSE`。
+- 下载地址、日期、精确哈希、解析语义与升级迁移详见 [test.89 过滤说明](adblock-test89.md)。
+
 ## AdAway 默认域名规则
 
 - 上游：https://github.com/AdAway/adaway.github.io

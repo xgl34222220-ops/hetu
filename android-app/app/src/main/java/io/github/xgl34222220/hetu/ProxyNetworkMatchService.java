@@ -18,10 +18,11 @@ public final class ProxyNetworkMatchService extends Service {
     private ConnectivityManager.NetworkCallback cb;
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private final ScheduledExecutorService metrics=Executors.newScheduledThreadPool(2);
-    private Network lastDefaultNetwork;
-    private boolean defaultNetworkSeen;
+    private final ProxyNetworkHandover<Network> networkHandover=new ProxyNetworkHandover<>();
+    private final ProxyTaskCoalescer evaluations=new ProxyTaskCoalescer(worker,this::evaluateNow);
+    private volatile boolean destroyed;
+    private long automaticStopGeneration;
     private volatile long lastAdblockMetricPoll;
-    private volatile long networkChangeGeneration;
     private volatile int bootRestoreAttempts;
     private ProxyRestoreScheduler bootRestores;
 
@@ -96,6 +97,8 @@ public final class ProxyNetworkMatchService extends Service {
     }
 
     @Override public void onDestroy(){
+        destroyed=true;
+        evaluations.close();
         bootRestores.close();
         if(cb!=null)try{cm.unregisterNetworkCallback(cb);}catch(Exception ignored){}
         worker.shutdownNow();
@@ -112,7 +115,7 @@ public final class ProxyNetworkMatchService extends Service {
                     scheduleBootRestore(250L);
                 evaluate();
             }
-            @Override public void onLost(Network n){networkChangeGeneration++;evaluate();}
+            @Override public void onLost(Network n){networkHandover.lost(n);evaluate();}
             @Override public void onCapabilitiesChanged(Network n,NetworkCapabilities c){evaluate();}
         };
         try{cm.registerDefaultNetworkCallback(cb);}
@@ -120,14 +123,11 @@ public final class ProxyNetworkMatchService extends Service {
     }
 
     private void handleDefaultNetwork(Network n){
-        boolean changed=defaultNetworkSeen&&lastDefaultNetwork!=null&&n!=null&&!lastDefaultNetwork.equals(n);
-        lastDefaultNetwork=n;
-        defaultNetworkSeen=true;
-        if(!changed||!prefs.getBoolean("proxyRootWanted",false))return;
-        final long generation=++networkChangeGeneration;
+        final long generation=networkHandover.available(n);
+        if(generation==0L||!prefs.getBoolean("proxyRootWanted",false))return;
         final long changedAt=System.currentTimeMillis();
-        metrics.schedule(()->worker.execute(()->{
-            if(generation!=networkChangeGeneration||!prefs.getBoolean("proxyRootWanted",false))return;
+        scheduleWorker(()->{
+            if(!networkHandover.isCurrent(n,generation)||!prefs.getBoolean("proxyRootWanted",false))return;
             Network active=cm.getActiveNetwork();
             if(active==null||!active.equals(n))return;
             NetworkCapabilities caps=cm.getNetworkCapabilities(active);
@@ -137,7 +137,7 @@ public final class ProxyNetworkMatchService extends Service {
                 JSONArray connections=controller.connections().optJSONArray("connections");
                 int closed=0;
                 for(int i=0;connections!=null&&i<connections.length();i++){
-                    if(generation!=networkChangeGeneration||!prefs.getBoolean("proxyRootWanted",false))return;
+                    if(!networkHandover.isCurrent(n,generation)||!prefs.getBoolean("proxyRootWanted",false))return;
                     JSONObject connection=connections.optJSONObject(i);
                     if(connection==null||!ProxyContinuity.startedBeforeNetworkChange(connection.optString("start",""),changedAt))continue;
                     String id=connection.optString("id","");
@@ -155,64 +155,108 @@ public final class ProxyNetworkMatchService extends Service {
                 prefs.edit().putString("proxyNetworkSessionResetError",
                         e.getMessage()==null?e.getClass().getSimpleName():e.getMessage()).apply();
             }
-        }),2500L,TimeUnit.MILLISECONDS);
+        },2500L);
     }
 
-    private void evaluate(){
-        worker.execute(()->{
-            try{
-                boolean automation=prefs.getBoolean("networkMatchEnabled",false);
-                Network n=cm.getActiveNetwork();
-                NetworkCapabilities c=n==null?null:cm.getNetworkCapabilities(n);
-                boolean wifi=c!=null&&c.hasTransport(NetworkCapabilities.TRANSPORT_WIFI);
-                boolean mobile=c!=null&&c.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR);
-                String ssid="",bssid="";
-                if(wifi)try{
-                    WifiManager wm=(WifiManager)getApplicationContext().getSystemService(WIFI_SERVICE);
-                    WifiInfo info=wm==null?null:wm.getConnectionInfo();
-                    if(info!=null){ssid=clean(info.getSSID());bssid=clean(info.getBSSID());}
-                }catch(SecurityException ignored){}
-                String env=wifi?("Wi‑Fi"+(ssid.isEmpty()?"":" · "+ssid)+(bssid.isEmpty()?"":" · "+bssid)):(mobile?"移动数据":"其他/离线");
-                prefs.edit().putString("networkMatchLastEnvironment",env).apply();
-                if(automation){
-                    boolean matched=(wifi&&matches(ssid,set("networkMatchSsids"),false)&&matches(bssid,set("networkMatchBssids"),true))||(mobile&&prefs.getBoolean("networkMatchMobile",false));
-                    String action=prefs.getString(matched?"networkMatchAction":"networkUnmatchAction",matched?"start":"none");
-                    String sig=env+"|"+matched+"|"+action;
-                    String old=prefs.getString("networkMatchLastSig","");
-                    boolean force=prefs.getBoolean("networkMatchForceEval",false);
-                    if(!sig.equals(old)||force){
-                        prefs.edit().putString("networkMatchLastSig",sig).putBoolean("networkMatchForceEval",false).apply();
-                        RootProxyManager root=new RootProxyManager(getApplicationContext());
-                        boolean running=coreAlive();
-                        String owner=prefs.getString("proxyRootSessionOwner","");
-                        if("start".equals(action)){
-                            if(!running&&!"manual".equals(owner)){
-                                root.start(ProxyRuntimeProfile.load(prefs));
-                                prefs.edit().putString("proxyRootSessionOwner","automation").apply();
-                            }
-                        }else if("stop".equals(action)){
-                            if(running&&"automation".equals(owner)){
-                                if(shouldStopAfterStabilize()){
-                                    prefs.edit()
-                                            .putString("proxyLastAutoStopReason","网络匹配在稳定确认后执行停止："+env)
-                                            .putLong("proxyLastAutoStopAt",System.currentTimeMillis())
-                                            .apply();
-                                    root.stop();
-                                    prefs.edit().remove("proxyRootSessionOwner").apply();
-                                }else{
-                                    prefs.edit().putString("networkMatchLastEnvironment",env+" · 网络切换抖动，已取消自动停止").apply();
-                                }
-                            }
+    private void scheduleWorker(Runnable task,long delayMs){
+        if(destroyed)return;
+        try{
+            metrics.schedule(()->{
+                if(destroyed)return;
+                try{worker.execute(()->{if(!destroyed)task.run();});}
+                catch(RejectedExecutionException stopped){}
+            },delayMs,TimeUnit.MILLISECONDS);
+        }catch(RejectedExecutionException stopped){}
+    }
+
+    private void evaluate(){evaluations.request();}
+
+    private void evaluateNow(){
+        try{
+            boolean automation=prefs.getBoolean("networkMatchEnabled",false);
+            Environment environment=readEnvironment();
+            String env=environment.label;
+            prefs.edit().putString("networkMatchLastEnvironment",env).apply();
+            if(automation){
+                String action=environment.action;
+                String sig=env+"|"+environment.matched+"|"+action;
+                String old=prefs.getString("networkMatchLastSig","");
+                boolean force=prefs.getBoolean("networkMatchForceEval",false);
+                if(!sig.equals(old)||force){
+                    automaticStopGeneration++;
+                    RootProxyManager root=new RootProxyManager(getApplicationContext());
+                    boolean running=coreAlive();
+                    String owner=prefs.getString("proxyRootSessionOwner","");
+                    if("start".equals(action)){
+                        if(!running&&!"manual".equals(owner)){
+                            JSONObject result=root.startIfAutomationAllowed(ProxyRuntimeProfile.load(prefs),
+                                    ()->!destroyed&&"start".equals(readEnvironment().action));
+                            if(!result.optBoolean("cancelled",false)&&!result.optBoolean("running",false)&&!result.optBoolean("ok",false))
+                                throw new IllegalStateException(result.optString("message","自动启动未完成"));
                         }
+                    }else if("stop".equals(action)&&running&&"automation".equals(owner)){
+                        scheduleAutomaticStop(automaticStopGeneration);
                     }
-                    ((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).notify(92,note(env+(matched?" · 已匹配":" · 未匹配")));
-                }else{
-                    ((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).notify(92,note(env+" · 长连接守护"));
+                    // A failed start must remain eligible for the next callback.
+                    prefs.edit().putString("networkMatchLastSig",sig).putBoolean("networkMatchForceEval",false).apply();
                 }
-            }catch(Exception e){
-                prefs.edit().putString("networkMatchLastEnvironment","执行失败："+(e.getMessage()==null?e.getClass().getSimpleName():e.getMessage())).apply();
+                ((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).notify(92,note(env+(environment.matched?" · 已匹配":" · 未匹配")));
+            }else{
+                automaticStopGeneration++;
+                ((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).notify(92,note(env+" · 长连接守护"));
             }
-        });
+        }catch(Exception e){
+            prefs.edit().putString("networkMatchLastEnvironment","执行失败："+(e.getMessage()==null?e.getClass().getSimpleName():e.getMessage())).apply();
+        }
+    }
+
+    private void scheduleAutomaticStop(long generation){
+        // Never sleep on the worker: network changes and manual actions must be
+        // able to invalidate this decision throughout the stabilization period.
+        scheduleWorker(()->{
+            if(generation!=automaticStopGeneration||!prefs.getBoolean("networkMatchEnabled",false)
+                    ||!"automation".equals(prefs.getString("proxyRootSessionOwner","")))return;
+            Environment current=readEnvironment();
+            prefs.edit().putString("networkMatchLastStableEnvironment",current.label).apply();
+            if(!"stop".equals(current.action))return;
+            try{
+                JSONObject result=new RootProxyManager(getApplicationContext()).stopIfAutomationOwned(
+                        ()->!destroyed&&generation==automaticStopGeneration&&"stop".equals(readEnvironment().action));
+                if(result.optBoolean("cancelled",false))return;
+                prefs.edit()
+                        .putString("proxyLastAutoStopReason","网络匹配在稳定确认后执行停止："+current.label)
+                        .putLong("proxyLastAutoStopAt",System.currentTimeMillis())
+                        .apply();
+            }catch(Exception error){
+                prefs.edit().remove("networkMatchLastSig").putString("networkMatchLastEnvironment",
+                        "自动停止失败："+(error.getMessage()==null?error.getClass().getSimpleName():error.getMessage())).apply();
+            }
+        },3500L);
+    }
+
+    private static final class Environment{
+        final String label;
+        final boolean matched;
+        final String action;
+        Environment(String label,boolean matched,String action){this.label=label;this.matched=matched;this.action=action;}
+    }
+
+    private Environment readEnvironment(){
+        Network n=cm==null?null:cm.getActiveNetwork();
+        NetworkCapabilities caps=n==null?null:cm.getNetworkCapabilities(n);
+        boolean wifi=caps!=null&&caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI);
+        boolean mobile=caps!=null&&caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR);
+        String ssid="",bssid="";
+        if(wifi)try{
+            WifiManager wm=(WifiManager)getApplicationContext().getSystemService(WIFI_SERVICE);
+            WifiInfo info=wm==null?null:wm.getConnectionInfo();
+            if(info!=null){ssid=clean(info.getSSID());bssid=clean(info.getBSSID());}
+        }catch(SecurityException ignored){}
+        boolean matched=(wifi&&matches(ssid,set("networkMatchSsids"),false)&&matches(bssid,set("networkMatchBssids"),true))
+                ||(mobile&&prefs.getBoolean("networkMatchMobile",false));
+        String action=prefs.getString(matched?"networkMatchAction":"networkUnmatchAction",matched?"start":"none");
+        String label=wifi?("Wi‑Fi"+(ssid.isEmpty()?"":" · "+ssid)+(bssid.isEmpty()?"":" · "+bssid)):(mobile?"移动数据":"其他/离线");
+        return new Environment(label,matched,action);
     }
 
     private boolean coreAlive(){
@@ -314,9 +358,20 @@ public final class ProxyNetworkMatchService extends Service {
             long interval=prefs.getBoolean("proxyAdblockUiVisible",false)?3000L:15000L;
             if(now-lastAdblockMetricPoll<interval)return;
             lastAdblockMetricPoll=now;
-            long offset=Math.max(0L,prefs.getLong("proxyAdblockLogOffset",0L));
+            final long offset,generation,previousHits;
+            final String pending,oldRecent;
+            final boolean discarding;
+            synchronized(ProxyAdblockSession.LOCK){
+                if(!prefs.getBoolean("proxyAdblockCounterArmed",false))return;
+                offset=Math.max(0L,prefs.getLong("proxyAdblockLogOffset",0L));
+                generation=prefs.getLong("proxyAdblockSessionGeneration",0L);
+                pending=prefs.getString("proxyAdblockPendingLogLine","");
+                discarding=prefs.getBoolean("proxyAdblockDiscardLogLine",false);
+                previousHits=prefs.getLong("proxyAdblockSessionHits",0L);
+                oldRecent=prefs.getString("proxyAdblockRecentDomains","");
+            }
             String path="/data/adb/hetu/run/core.log";
-            String command="set +e; S=$(wc -c < "+RootBridge.quote(path)+" 2>/dev/null || echo 0); "
+            String command="set +e; S=$(stat -c %s "+RootBridge.quote(path)+" 2>/dev/null || wc -c < "+RootBridge.quote(path)+" 2>/dev/null || echo 0); "
                     +"case \"$S\" in ''|*[!0-9]*) S=0;; esac; "
                     +"if [ \"$S\" -lt "+offset+" ]; then START=1; else START="+(offset+1)+"; fi; "
                     +"END=$S; LIMIT=$((START+1048576-1)); [ \"$END\" -gt \"$LIMIT\" ] && END=$LIMIT; "
@@ -329,13 +384,12 @@ public final class ProxyNetworkMatchService extends Service {
             long size;
             try{size=Long.parseLong(sizeText);}catch(Exception invalid){return;}
             String chunk=newline<0?"":result.output.substring(newline+1);
-            long hits=prefs.getLong("proxyAdblockSessionHits",0L);
-            long previousHits=hits;
+            ProxyLogLines lines=ProxyLogLines.read(pending,discarding,chunk,size<offset);
+            long hits=previousHits;
             LinkedHashSet<String> recent=new LinkedHashSet<>();
-            String oldRecent=prefs.getString("proxyAdblockRecentDomains","");
             if(oldRecent!=null&&!oldRecent.isEmpty())for(String item:oldRecent.split("\\n"))if(!item.trim().isEmpty())recent.add(item.trim());
             java.util.regex.Pattern domainPattern=java.util.regex.Pattern.compile("-->\\s+([^\\s\\\"]+)");
-            for(String line:chunk.split("\\r?\\n")){
+            for(String line:lines.complete.split("\\r?\\n")){
                 String lower=line.toLowerCase(Locale.ROOT);
                 if(!lower.contains("hetu-adblock")||!lower.contains("reject")||!lower.contains("match"))continue;
                 hits++;
@@ -363,33 +417,19 @@ public final class ProxyNetworkMatchService extends Service {
             SharedPreferences.Editor edit=prefs.edit()
                     .putLong("proxyAdblockSessionHits",hits)
                     .putLong("proxyAdblockLogOffset",size)
+                    .putString("proxyAdblockPendingLogLine",lines.pending)
+                    .putBoolean("proxyAdblockDiscardLogLine",lines.discarding)
                     .putString("proxyAdblockRecentDomains",recentText.toString());
             if(hits>previousHits&&!recent.isEmpty()){
                 String first=recent.iterator().next();
                 edit.putString("proxyAdblockLastDomain",first).putLong("proxyAdblockLastHitAt",System.currentTimeMillis());
             }
-            edit.apply();
+            synchronized(ProxyAdblockSession.LOCK){
+                if(destroyed||!ProxyAdblockSession.canCommit(generation,prefs.getLong("proxyAdblockSessionGeneration",0L),
+                        prefs.getBoolean("proxyAdblockCounterArmed",false),offset,prefs.getLong("proxyAdblockLogOffset",0L)))return;
+                edit.apply();
+            }
         }catch(Exception ignored){}
-    }
-
-    private boolean shouldStopAfterStabilize() {
-        SystemClock.sleep(3500L);
-        Network n=cm.getActiveNetwork();
-        NetworkCapabilities caps=n==null?null:cm.getNetworkCapabilities(n);
-        boolean wifi=caps!=null&&caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI);
-        boolean mobile=caps!=null&&caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR);
-        String ssid="",bssid="";
-        if(wifi)try{
-            WifiManager wm=(WifiManager)getApplicationContext().getSystemService(WIFI_SERVICE);
-            WifiInfo info=wm==null?null:wm.getConnectionInfo();
-            if(info!=null){ssid=clean(info.getSSID());bssid=clean(info.getBSSID());}
-        }catch(SecurityException ignored){}
-        boolean matched=(wifi&&matches(ssid,set("networkMatchSsids"),false)&&matches(bssid,set("networkMatchBssids"),true))
-                ||(mobile&&prefs.getBoolean("networkMatchMobile",false));
-        String action=prefs.getString(matched?"networkMatchAction":"networkUnmatchAction",matched?"start":"none");
-        prefs.edit().putString("networkMatchLastStableEnvironment",
-                wifi?("Wi‑Fi"+(ssid.isEmpty()?"":" · "+ssid)):(mobile?"移动数据":"其他/离线")).apply();
-        return "stop".equals(action);
     }
 
     private Set<String> set(String key){Set<String>s=prefs.getStringSet(key,Collections.emptySet());return s==null?Collections.emptySet():new HashSet<>(s);}

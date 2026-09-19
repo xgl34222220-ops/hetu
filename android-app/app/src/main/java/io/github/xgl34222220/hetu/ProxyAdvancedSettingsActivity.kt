@@ -39,6 +39,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.TreeSet
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import org.json.JSONObject
 
 class ProxyAdvancedSettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -70,10 +76,17 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
     var preflightText by remember { mutableStateOf<String?>(null) }
     var preflightPassed by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
+    var operationText by remember { mutableStateOf("") }
+    var runtimeStatus by remember { mutableStateOf<JSONObject?>(null) }
+    var statusError by remember { mutableStateOf("") }
+    val lifecycleOwner = LocalLifecycleOwner.current
     val profile = remember(revision) { ProxyRuntimeProfile.load(prefs) }
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val pageBg = if (dark) t.pageBackground else Color(0xFFF1F5F9)
+    val running = runtimeStatus?.optBoolean("running", false) ?: prefs.getBoolean("proxyRootRuntimeRunning", false)
+    val effectiveIpv6 = runtimeStatus?.optString("ipv6Mode", "").orEmpty()
+    val settingsPending = ProxyRuntimeSettings.pending(running, ProxyRuntimeSettings.signature(prefs), prefs.getString("proxyRootAppliedSettings", ""))
 
     fun refresh() { revision++ }
     fun putBool(key: String, value: Boolean) { prefs.edit().putBoolean(key, value).apply(); refresh() }
@@ -93,11 +106,45 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
         if (busy) return
         scope.launch {
             busy = true
-            val text = runCatching { withContext(Dispatchers.IO) { block() } }
-                .getOrElse { it.message ?: it.javaClass.simpleName }
-            busy = false
-            infoTitle = title
-            infoText = text.ifBlank { "完成" }
+            operationText = "正在执行$title…"
+            try {
+                val text = withContext(Dispatchers.IO) { block() }
+                infoTitle = title
+                infoText = text.ifBlank { "完成" }
+                refresh()
+            } catch (cancel: CancellationException) { throw cancel }
+            catch (error: Exception) { infoTitle = title; infoText = error.message ?: "操作失败" }
+            finally { busy = false; operationText = "" }
+        }
+    }
+
+    fun applySettings() {
+        if (busy) return
+        scope.launch {
+            busy = true
+            operationText = "正在应用设置…"
+            try {
+                ProxyComposeController(context).restart { stage -> scope.launch { operationText = stage } }
+                runtimeStatus = withContext(Dispatchers.IO) { root.status() }
+                statusError = ""
+                refresh()
+            } catch (cancel: CancellationException) { throw cancel }
+            catch (error: Exception) { infoTitle = "设置应用失败"; infoText = error.message ?: "请查看消息与网络诊断" }
+            finally { busy = false; operationText = "" }
+        }
+    }
+
+    LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                if (!busy) try {
+                    runtimeStatus = withContext(Dispatchers.IO) { root.status() }
+                    statusError = ""
+                    refresh()
+                } catch (cancel: CancellationException) { throw cancel }
+                catch (error: Exception) { statusError = "运行状态暂时无法确认" }
+                delay(10_000L)
+            }
         }
     }
 
@@ -105,33 +152,31 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
         if (busy) return
         scope.launch {
             busy = true
-            val result = runCatching {
-                withContext(Dispatchers.IO) {
+            try {
+                val json = withContext(Dispatchers.IO) {
                     val prepared = root.prepare(ProxyRuntimeProfile.load(prefs))
                     root.preflight(prepared)
                 }
-            }
-            busy = false
-            result.onSuccess { json ->
                 preflightPassed = json.optBoolean("ok", false)
                 preflightText = if (preflightPassed) {
                     "预检通过：当前设备支持这组 Root 代理设置"
                 } else {
                     json.optString("message", "预检未通过")
                 }
-            }.onFailure { error ->
+            } catch (cancel: CancellationException) { throw cancel }
+            catch (error: Exception) {
                 preflightPassed = false
                 preflightText = error.message ?: "预检执行失败"
-            }
+            } finally { busy = false }
         }
     }
 
     LaunchedEffect(focus) {
         val index = when (focus) {
-            "adblock" -> 4
-            "sharing" -> 10
-            "cnip" -> 12
-            "bypass" -> 14
+            "adblock" -> 5
+            "sharing" -> 11
+            "cnip" -> 13
+            "bypass" -> 15
             else -> 0
         }
         if (index > 0) listState.animateScrollToItem(index)
@@ -153,7 +198,7 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
                 Modifier.fillMaxWidth().statusBarsPadding().padding(top = 8.dp, bottom = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = onBack, modifier = Modifier.size(42.dp)) {
+                IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
                     Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回", tint = t.textPrimary)
                 }
                 Spacer(Modifier.width(4.dp))
@@ -170,15 +215,46 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
             }
         }
 
+        item {
+            AdvancedGroup {
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(if (running) "当前网络保护" else "网络保护设置", color = t.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                    Text("已选择：${ProxyRuntimeSettings.ipv6Label(profile.ipv6.id)}", color = t.textPrimary, fontSize = 14.sp, lineHeight = 20.sp)
+                    val actual = when {
+                        statusError.isNotBlank() -> statusError
+                        !running -> "代理未运行，设置将在下次启动时应用"
+                        effectiveIpv6.isBlank() -> "正在核对当前生效策略…"
+                        effectiveIpv6 == "disable" && runtimeStatus?.optBoolean("ipv6DisabledByHetu", false) == true && runtimeStatus?.optBoolean("ipv6DisableGuard", false) == true -> "本机 IPv6 已禁用，防泄漏规则已就绪"
+                        effectiveIpv6 == "disable" -> "IPv6 禁用尚未完整生效，请查看诊断"
+                        else -> "当前生效：${ProxyRuntimeSettings.ipv6Label(effectiveIpv6)}"
+                    }
+                    Text(actual, color = t.textSecondary, fontSize = 13.sp, lineHeight = 19.sp)
+                    if (profile.ipv6 == ProxyRuntimeProfile.Ipv6.DISABLE) {
+                        Text("这里控制手机自身的 IPv6。检测网站显示的代理服务器出口 IPv6，需要在节点端限制。", color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+                    }
+                    if (settingsPending) {
+                        Text("部分设置尚未应用，重启会重新建立现有连接。", color = MaterialTheme.colorScheme.primary, fontSize = 13.sp, lineHeight = 19.sp)
+                        Button(onClick = ::applySettings, enabled = !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = RoundedCornerShape(16.dp)) {
+                            Text("应用设置并重启", fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                    if (busy) {
+                        LinearProgressIndicator(Modifier.fillMaxWidth())
+                        Text(operationText.ifBlank { "正在检查运行环境…" }, color = t.textSecondary, fontSize = 13.sp, lineHeight = 19.sp)
+                    }
+                }
+            }
+        }
+
         item { AdvancedSectionLabel("流量接管") }
         item {
             AdvancedGroup {
                 Text(
-                    "Root 数据面 · 修改后重启代理生效",
+                    "修改后点击「应用设置并重启」使设置生效",
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
                     color = t.textSecondary,
-                    fontSize = 11.sp,
-                    lineHeight = 15.sp,
+                    fontSize = 12.sp,
+                    lineHeight = 18.sp,
                     fontWeight = FontWeight.Medium,
                 )
                 AdvancedDivider()
@@ -227,12 +303,12 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
             AdvancedGroup {
                 AdvancedValueRow(Icons.Rounded.Dns, Color(0xFF14B8A6), "DNS 劫持", when (profile.dnsHijack) {
                     ProxyRuntimeProfile.DnsHijack.OFF -> "关闭"
-                    ProxyRuntimeProfile.DnsHijack.REDIRECT -> "Redirect · 1053"
-                    else -> "TPROXY"
+                    ProxyRuntimeProfile.DnsHijack.REDIRECT -> "本地 DNS · ${MihomoStartupConfig.DNS_PORT}"
+                    else -> "自动接管本地 DNS"
                 }) {
                     showChoices("DNS 劫持", "proxyDnsHijack", listOf(
-                        AdvancedChoice("TPROXY（跟随透明代理端口）", "tproxy"),
-                        AdvancedChoice("Redirect 到本地 1053", "redirect"),
+                        AdvancedChoice("自动接管 DNS", "tproxy"),
+                        AdvancedChoice("转发到本地 DNS · ${MihomoStartupConfig.DNS_PORT}", "redirect"),
                         AdvancedChoice("关闭 DNS 劫持", "off"),
                     ))
                 }
@@ -242,14 +318,14 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
                 AdvancedValueRow(Icons.Rounded.Public, Color(0xFF10B981), "IPv6", when (profile.ipv6) {
                     ProxyRuntimeProfile.Ipv6.BYPASS -> "IPv6 不进核心"
                     ProxyRuntimeProfile.Ipv6.STRICT -> "严格 IPv4 防泄漏"
-                    ProxyRuntimeProfile.Ipv6.DISABLE -> "禁用系统 IPv6"
+                    ProxyRuntimeProfile.Ipv6.DISABLE -> "禁用本机 IPv6"
                     else -> "启用 IPv6"
                 }) {
                     showChoices("IPv6", "proxyBaseIpv6", listOf(
                         AdvancedChoice("启用 IPv6", "enable"),
                         AdvancedChoice("IPv6 不进核心", "bypass"),
                         AdvancedChoice("严格 IPv4 防泄漏", "strict"),
-                        AdvancedChoice("禁用系统 IPv6", "disable"),
+                        AdvancedChoice("禁用本机 IPv6", "disable"),
                     ))
                 }
             }
@@ -262,7 +338,7 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
                 AdvancedDivider()
                 AdvancedSwitchRow(Icons.Rounded.RestartAlt, Color(0xFF6366F1), "Root 开机自启", "开机后恢复上次保持运行的 Root 代理", prefs.getBoolean("proxyRootAutoStart", false)) { putBool("proxyRootAutoStart", it) }
                 AdvancedDivider()
-                AdvancedSwitchRow(Icons.Rounded.AutoFixHigh, Color(0xFF64748B), "自动覆写", "仅修改运行副本，不直接改源订阅", prefs.getBoolean("proxyBaseAutoOverwrite", true)) { putBool("proxyBaseAutoOverwrite", it) }
+                AdvancedInfoRow(Icons.Rounded.AutoFixHigh, Color(0xFF64748B), "运行配置副本", "代理设置应用到运行副本，保留原始订阅配置")
             }
         }
 
@@ -470,7 +546,7 @@ private fun AdvancedValueRow(icon: ImageVector, accent: Color, title: String, va
         AdvancedIcon(icon, accent); Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(title, color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            Text(value, color = t.textSecondary, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(value, color = t.textSecondary, fontSize = 13.sp, lineHeight = 18.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
         Icon(Icons.Rounded.ChevronRight, null, tint = Color(0xFFCBD5E1), modifier = Modifier.size(18.dp))
     }
@@ -483,7 +559,7 @@ private fun AdvancedSwitchRow(icon: ImageVector, accent: Color, title: String, s
         AdvancedIcon(icon, accent); Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(title, color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            Text(subtitle, color = t.textSecondary, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(subtitle, color = t.textSecondary, fontSize = 13.sp, lineHeight = 18.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
         }
         Switch(checked = checked, onCheckedChange = onChecked)
     }
@@ -496,7 +572,7 @@ private fun AdvancedInfoRow(icon: ImageVector, accent: Color, title: String, sub
         AdvancedIcon(icon, accent); Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(title, color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            Text(subtitle, color = t.textSecondary, fontSize = 11.sp)
+            Text(subtitle, color = t.textSecondary, fontSize = 13.sp, lineHeight = 18.sp)
         }
     }
 }

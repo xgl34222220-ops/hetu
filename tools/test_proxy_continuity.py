@@ -28,9 +28,9 @@ def main():
             raise RuntimeError('Unable to obtain production provider constants')
         stub = dest / 'ProxyAdblockRules.java'
         stub.write_text('package io.github.xgl34222220.hetu;\nfinal class ProxyAdblockRules {\n' + '\n'.join(constants) + '\n}\n')
-        names = ('ProxyContinuity', 'MessagingFilterPolicy', 'MihomoStartupConfig', 'ProxyRuntimeProfile', 'ProxyRestoreScheduler', 'DiagnosticReport', 'RootStartupProbe')
+        names = ('ProxyContinuity', 'MessagingFilterPolicy', 'MihomoStartupConfig', 'ProxyRuntimeProfile', 'ProxyRestoreScheduler', 'DiagnosticReport', 'RootStartupProbe', 'ProxyNetworkHandover', 'ProxyTaskCoalescer', 'ProxyLogLines', 'ProxyAdblockSession', 'ProxyRuntimeSettings', 'ProxyAsyncValue')
         sources = [str(PACKAGE / (name + '.java')) for name in names]
-        tests = ('ProxyContinuityTest', 'ProxyRestoreSchedulerTest', 'DiagnosticReportTest', 'ProxyCoreProbeTest', 'RootStartupProbeTest')
+        tests = ('ProxyContinuityTest', 'ProxyRestoreSchedulerTest', 'DiagnosticReportTest', 'ProxyCoreProbeTest', 'RootStartupProbeTest', 'ProxyNetworkEventsTest', 'ProxyLogLinesTest', 'ProxyRuntimeSettingsTest', 'MihomoIpv6PolicyTest', 'ProxyAsyncValueTest')
         sources += [str(stub)] + [str(ROOT / 'tests' / (name + '.java')) for name in tests]
         # Android's java.* stubs conflict with JVM modules in ECJ. Only the Android
         # API types are needed here; use the host JDK implementation of java.*.

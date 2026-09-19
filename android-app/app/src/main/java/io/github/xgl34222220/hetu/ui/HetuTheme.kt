@@ -25,7 +25,7 @@ import androidx.compose.ui.unit.sp
 import com.materialkolor.DynamicMaterialTheme
 import com.materialkolor.PaletteStyle
 
-/** BoxProxy semantic tokens shared by proxy and ad-block surfaces. */
+/** Hetu semantic tokens shared by proxy and ad-block surfaces. */
 @Immutable
 data class HetuTokens(
     val pageBackground: Color,
@@ -160,7 +160,10 @@ fun HetuTheme(content: @Composable () -> Unit) {
     )
 
     val density = LocalDensity.current
-    val scaledDensity = Density(density.density * scale, density.fontScale * scale)
+    // Density already scales dp and sp. Multiplying fontScale too applied the app
+    // size twice to text and caused clipping at larger sizes. Preserve the user's
+    // system accessibility font scale independently.
+    val scaledDensity = Density(density.density * scale, density.fontScale)
 
     @Composable
     fun ProvideTokens(inner: @Composable () -> Unit) {

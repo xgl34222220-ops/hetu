@@ -18,6 +18,8 @@ import javax.net.ssl.HttpsURLConnection;
 public final class RuleStore {
     private static final Object LOCK = new Object();
     private static final RuleUpdateGate UPDATE_GATE = new RuleUpdateGate();
+    private static final int ADGUARD_PARSER_VERSION = 2;
+    private static final long BUNDLED_ADGUARD_AT = 1789859691057L;
     private static final int MAX_SOURCE_BYTES = 32 * 1024 * 1024;
     private static final int MAX_COMBINED_BYTES = 128 * 1024 * 1024;
     private static final int MAX_DOMAINS = 1500000;
@@ -57,13 +59,14 @@ public final class RuleStore {
         final String generation, revision;
         final boolean fromModule;
         final long updatedAt;
+        final int adguardParserVersion;
         final Set<String> effective, allow, block, filterExceptions;
         final Map<String,Boolean> enabled;
         final Map<String,Set<String>> sourceRules;
         Snapshot(String g, String r, boolean m, Set<String> e, Set<String> a, Set<String> b, Set<String> exceptions,
-                 Map<String,Boolean> on, Map<String,Set<String>> sources, long updated) {
+                 Map<String,Boolean> on, Map<String,Set<String>> sources, long updated, int parserVersion) {
             generation=g; revision=r; fromModule=m;
-            updatedAt=updated;
+            updatedAt=updated;adguardParserVersion=parserVersion;
             effective=immutable(e); allow=immutable(a); block=immutable(b); filterExceptions=immutable(exceptions);
             enabled=Collections.unmodifiableMap(new LinkedHashMap<>(on));
             Map<String,Set<String>> copy=new LinkedHashMap<>();
@@ -99,6 +102,7 @@ public final class RuleStore {
             if (live!=null && root.getAbsolutePath().equals(liveRoot)) {
                 recoverImportedPreferences();
                 migrateDnsFilterDefaultsIfNeeded();
+                migrateBundledAdguardIfNeeded();
                 return;
             }
             ensureRoot();
@@ -116,6 +120,7 @@ public final class RuleStore {
                 commit(compose("",false,allow,block,enabled,sources,null));
             }
             migrateDnsFilterDefaultsIfNeeded();
+            migrateBundledAdguardIfNeeded();
         }
     }
     private void migrateDnsFilterDefaultsIfNeeded() throws Exception {
@@ -132,6 +137,25 @@ public final class RuleStore {
         }
         prefs.edit().putBoolean("dns_filter_v4_adguard_migrated",true).apply();
     }
+    private void migrateBundledAdguardIfNeeded() throws Exception {
+        Snapshot current=live;
+        if(current==null || !shouldRefreshBundledAdguard(current.fromModule,current.adguardParserVersion,
+                prefs.getLong("rule_source_adguard_success",0L),BUNDLED_ADGUARD_AT))return;
+        // Old snapshots discarded the original modifiers; reparsing their flattened
+        // domains cannot restore badfilter semantics. Rebuild just this built-in
+        // source from the bundled raw list, keeping every user selection/list.
+        Map<String,Set<String>> sources=new LinkedHashMap<>(current.sourceRules);
+        try(InputStream in=context.getAssets().open("rules/adguard.txt")) {
+            sources.put("adguard",parseRules(in,false));
+        }
+        commit(compose(current.revision,false,current.allow,current.block,current.enabled,sources,null,
+                ADGUARD_PARSER_VERSION));
+    }
+    static boolean shouldRefreshBundledAdguard(boolean fromModule,int parserVersion,long lastSuccess,long bundledAt) {
+        // Do not replace an already-correct or more recently downloaded snapshot.
+        return !fromModule && parserVersion<ADGUARD_PARSER_VERSION && lastSuccess<=bundledAt;
+    }
+
     /** Domain list and revision are captured from the same immutable generation. */
     static final class EffectiveRules {
         final String revision; final java.util.List<String> domains;
@@ -282,8 +306,6 @@ public final class RuleStore {
                 before=live;
             }
             Map<String,Set<String>> next=new LinkedHashMap<>(before.sourceRules);
-            File staging=new File(context.getCacheDir(),"rules-download-"+UUID.randomUUID());
-            if(!staging.mkdirs()) throw new IOException("无法建立规则下载目录");
             long batchDeadline=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(DOWNLOAD_BATCH_MILLIS);
             ArrayList<Source> enabled=new ArrayList<>();
             for(Source source:catalog.values()) if(Boolean.TRUE.equals(before.enabled.get(source.id))) enabled.add(source);
@@ -293,12 +315,15 @@ public final class RuleStore {
                 return false;
             }
 
+            File staging=new File(context.getCacheDir(),"rules-download-"+UUID.randomUUID());
+            if(!staging.mkdirs()) throw new IOException("无法建立规则下载目录");
             ExecutorService pool=Executors.newFixedThreadPool(Math.min(3,enabled.size()),r->{
                 Thread t=new Thread(r,"hetu-rule-fetch");t.setDaemon(true);return t;
             });
             LinkedHashMap<Source,Future<SourceFetch>> futures=new LinkedHashMap<>();
             ArrayList<String> failures=new ArrayList<>();
             ArrayList<String> successes=new ArrayList<>();
+            boolean adguardUpdated=false;
             try {
                 for(Source source:enabled) {
                     futures.put(source,pool.submit(()->fetchSource(source,staging,batchDeadline)));
@@ -320,6 +345,7 @@ public final class RuleStore {
                     SharedPreferences.Editor health=prefs.edit().putLong("rule_source_"+source.id+"_duration",fetched.durationMs);
                     if(fetched.ok()){
                         next.put(source.id,fetched.rules);
+                        if("adguard".equals(source.id))adguardUpdated=true;
                         successes.add(source.name+" "+fetched.rules.size()+" 条");
                         health.putLong("rule_source_"+source.id+"_success",System.currentTimeMillis())
                                 .putInt("rule_source_"+source.id+"_mirror",fetched.mirror)
@@ -339,14 +365,15 @@ public final class RuleStore {
                     return false;
                 }
 
-                Snapshot candidate=compose("",false,before.allow,before.block,before.enabled,next,null);
+                Snapshot candidate=compose("",false,before.allow,before.block,before.enabled,next,null,
+                        adguardUpdated?ADGUARD_PARSER_VERSION:before.adguardParserVersion);
                 synchronized(LOCK) {
                     checkInterrupted();
                     reload();
                     update.verify(before.generation,live.generation);
                     long now=System.currentTimeMillis();
                     String warning=failures.isEmpty()?"":"部分来源沿用旧快照："+join(failures);
-                    if(next.equals(before.sourceRules)) {
+                    if(next.equals(before.sourceRules) && candidate.adguardParserVersion==before.adguardParserVersion) {
                         prefs.edit().putLong("last_rule_check",now)
                                 .putString("last_rule_update_warning",warning)
                                 .putString("last_rule_update_success",join(successes)).apply();
@@ -384,7 +411,7 @@ public final class RuleStore {
                 download(source.urls.get(mirror),downloaded,mirrorDeadline);
                 try(InputStream in=new FileInputStream(downloaded)){parsed=parseRules(in,false);}
                 if(parsed!=null&&!parsed.isEmpty()){usedMirror=mirror;break;}
-            }catch(Throwable error){
+            }catch(Exception error){
                 if(error instanceof InterruptedException)Thread.currentThread().interrupt();
                 checkInterrupted();
                 lastError=error;parsed=null;
@@ -465,7 +492,7 @@ public final class RuleStore {
     public void importSettings(JSONObject json,boolean moduleInstalled) throws Exception {
         if(json==null || json.optInt("schema",-1)!=1) throw new IOException("不支持的配置文件版本");
         if(json.has("application")&&!"Hetu".equals(json.getString("application"))) throw new IOException("此配置文件不属于河图");
-        if(json.toString().getBytes(StandardCharsets.UTF_8).length>MAX_COMBINED_BYTES) throw new IOException("配置文件超过 32 MiB");
+        if(json.toString().getBytes(StandardCharsets.UTF_8).length>MAX_COMBINED_BYTES) throw new IOException("配置文件超过 128 MiB");
         // Fully validate before any root mutation. Black/white lists commit together.
         Set<String> allow=domainArray(json.getJSONArray("allow")), block=domainArray(json.getJSONArray("block"));
         Map<String,Boolean> flags=sourceFlags(json.getJSONArray("sources"),true);
@@ -521,6 +548,7 @@ public final class RuleStore {
             Snapshot restored=readGeneration(previous);
             writePointer(new JSONObject().put("current",previous).put("previous",live.generation));
             publish(restored); mirrorPrefs(restored);
+            migrateBundledAdguardIfNeeded();
         }
     }
 
@@ -582,12 +610,27 @@ public final class RuleStore {
                     domain=domain.substring(0,colon);
                 }
             } else if(domain.indexOf('/')>=0 || domain.indexOf(':')>=0 || domain.indexOf('?')>=0 || domain.indexOf('#')>=0) return null;
-            domain=IDN.toASCII(domain,IDN.USE_STD3_ASCII_RULES).toLowerCase(Locale.ROOT);
-            if(domain.endsWith(".")) domain=domain.substring(0,domain.length()-1);
-            if(domain.length()>253 || domain.indexOf('.')<0 || domain.equals("localhost.localdomain")) return null;
-            String[] labels=domain.split("\\.",-1);
-            for(String label:labels) if(label.length()<1 || label.length()>63 || !label.matches("[a-z0-9](?:[a-z0-9-]*[a-z0-9])?")) return null;
-            if(!labels[labels.length-1].matches(".*[a-z].*")) return null;
+            boolean ascii=true;
+            for(int i=0;i<domain.length();i++)if(domain.charAt(i)>127){ascii=false;break;}
+            if(!ascii)domain=IDN.toASCII(domain,IDN.USE_STD3_ASCII_RULES);
+            domain=domain.toLowerCase(Locale.ROOT);
+            if(domain.endsWith("."))domain=domain.substring(0,domain.length()-1);
+            if(domain.length()>253 || domain.indexOf('.')<0 || domain.equals("localhost.localdomain"))return null;
+            // Subscription snapshots contain hundreds of thousands of ASCII
+            // domains. Avoid IDN conversion and per-label regex compilation on
+            // that hot path while retaining the same hostname validation.
+            int labelLength=0;boolean lastLabelHasLetter=false;
+            for(int i=0;i<domain.length();i++) {
+                char c=domain.charAt(i);
+                if(c=='.') {
+                    if(labelLength==0||domain.charAt(i-1)=='-')return null;
+                    labelLength=0;lastLabelHasLetter=false;continue;
+                }
+                if(c>='a'&&c<='z')lastLabelHasLetter=true;
+                else if(!(c>='0'&&c<='9') && c!='-')return null;
+                if((labelLength==0&&c=='-')||++labelLength>63)return null;
+            }
+            if(labelLength==0||domain.endsWith("-")||!lastLabelHasLetter)return null;
             return domain;
         } catch(Exception invalid) { return null; }
     }
@@ -596,7 +639,7 @@ public final class RuleStore {
         checkInterrupted();
         RootBridge.Result result=RootBridge.run(context,120000L,args);
         checkInterrupted();
-        if(result.output==null || result.output.getBytes(StandardCharsets.UTF_8).length>MAX_COMBINED_BYTES) throw new IOException("模块返回内容为空或超过 32 MiB");
+        if(result.output==null || result.output.getBytes(StandardCharsets.UTF_8).length>MAX_COMBINED_BYTES) throw new IOException("模块返回内容为空或超过 128 MiB");
         JSONObject json;
         try { json=RootBridge.parseObject(result.output.trim()); }
         catch(Exception e) { throw new IOException("模块未返回有效结果，请确认已安装内置新版模块",e); }
@@ -605,6 +648,13 @@ public final class RuleStore {
     }
     private Snapshot compose(String revision,boolean fromModule,Set<String> allow,Set<String> block,
             Map<String,Boolean> enabled,Map<String,Set<String>> sources,Set<String> exact) throws IOException {
+        Snapshot current=live;
+        int parserVersion=current!=null && root.getAbsolutePath().equals(liveRoot)
+                ?current.adguardParserVersion:ADGUARD_PARSER_VERSION;
+        return compose(revision,fromModule,allow,block,enabled,sources,exact,parserVersion);
+    }
+    private Snapshot compose(String revision,boolean fromModule,Set<String> allow,Set<String> block,
+            Map<String,Boolean> enabled,Map<String,Set<String>> sources,Set<String> exact,int parserVersion) throws IOException {
         Set<String> exceptions=sourceExceptions(enabled,sources,block);
         Set<String> effective=exact;
         if(effective==null) {
@@ -616,7 +666,7 @@ public final class RuleStore {
             effective.removeIf(domain->suffixMatch(allow,domain)||suffixMatch(exceptions,domain));
         }
         if(effective.size()>MAX_DOMAINS) throw new IOException("合并后规则超过 "+MAX_DOMAINS+" 条");
-        return new Snapshot("",revision,fromModule,effective,allow,block,exceptions,enabled,sources,System.currentTimeMillis());
+        return new Snapshot("",revision,fromModule,effective,allow,block,exceptions,enabled,sources,System.currentTimeMillis(),parserVersion);
     }
     private static Set<String> sourceExceptions(Map<String,Boolean> enabled,Map<String,Set<String>> sources,Set<String> userBlocks){
         Set<String> out=MessagingFilterPolicy.subscriptionExceptions(userBlocks);
@@ -641,6 +691,7 @@ public final class RuleStore {
         boolean published=false;
         try {
             JSONObject cfg=new JSONObject().put("schema",1).put("fromModule",candidate.fromModule).put("revision",candidate.revision).put("updatedAt",candidate.updatedAt);
+            cfg.put("adguardParserVersion",candidate.adguardParserVersion);
             cfg.put("allow",array(candidate.allow)).put("block",array(candidate.block));
             JSONArray flags=new JSONArray();
             for(String source:catalog.keySet()) {
@@ -650,7 +701,7 @@ public final class RuleStore {
             }
             cfg.put("sources",flags); writeDomains(new File(dir,"effective"),candidate.effective,MAX_COMBINED_BYTES);
             writeBytes(new File(dir,"config.json"),cfg.toString().getBytes(StandardCharsets.UTF_8),MAX_COMBINED_BYTES);
-            Snapshot next=new Snapshot(id,candidate.revision,candidate.fromModule,candidate.effective,candidate.allow,candidate.block,candidate.filterExceptions,candidate.enabled,candidate.sourceRules,candidate.updatedAt);
+            Snapshot next=new Snapshot(id,candidate.revision,candidate.fromModule,candidate.effective,candidate.allow,candidate.block,candidate.filterExceptions,candidate.enabled,candidate.sourceRules,candidate.updatedAt,candidate.adguardParserVersion);
             String previous=live==null || !root.getAbsolutePath().equals(liveRoot)?"":live.generation;
             // Cancellation is checked immediately before the atomic switch. Once the
             // pointer commits, always publish that same generation to DNS readers.
@@ -689,7 +740,8 @@ public final class RuleStore {
         Map<String,Boolean> enabled=sourceFlags(cfg.getJSONArray("sources"),true);
         Set<String> allow=domainArray(cfg.getJSONArray("allow")),block=domainArray(cfg.getJSONArray("block"));
         return new Snapshot(id,cfg.optString("revision",""),cfg.optBoolean("fromModule",false),effective,
-                allow,block,sourceExceptions(enabled,sources,block),enabled,sources,cfg.optLong("updatedAt",new File(dir,"config.json").lastModified()));
+                allow,block,sourceExceptions(enabled,sources,block),enabled,sources,cfg.optLong("updatedAt",new File(dir,"config.json").lastModified()),
+                cfg.optInt("adguardParserVersion",0));
     }
     private void publish(Snapshot s) { liveRoot=root.getAbsolutePath(); live=s; }
     private void mirrorPrefs(Snapshot s) {
@@ -781,6 +833,26 @@ public final class RuleStore {
             text=StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
                     .onUnmappableCharacter(CodingErrorAction.REPORT).decode(java.nio.ByteBuffer.wrap(bytes)).toString();
         } catch(CharacterCodingException e) { throw new IOException("规则不是有效 UTF-8 文本",e); }
+        // Only domain-wide rules can be represented by our suffix providers.
+        // AdGuard modifiers may narrow a rule or even reverse its meaning; never
+        // strip them into unconditional blocks or global allow-list entries.
+        // A badfilter cancels the original rule text, not other hosts/domain
+        // entries for the same name, and must also work when listed first.
+        Set<String> disabledRules=new HashSet<>();
+        if(text.indexOf('$')>=0)try(BufferedReader reader=new BufferedReader(new StringReader(text))) {
+            String line;int count=0;
+            while((line=reader.readLine())!=null) {
+                checkInterrupted();
+                if(++count>1600000 || line.length()>8192) throw new IOException("规则行数或单行长度超过限制");
+                if(count==1 && line.startsWith("\uFEFF"))line=line.substring(1);
+                line=line.trim();
+                int modifier=line.indexOf('$');
+                if(modifier>=0 && line.substring(modifier+1).equalsIgnoreCase("badfilter")
+                        && (line.startsWith("||")||line.startsWith("@@||"))) {
+                    disabledRules.add(line.substring(0,modifier));
+                }
+            }
+        }
         Set<String> rules=new HashSet<>(); int lineNumber=0;
         try(BufferedReader reader=new BufferedReader(new StringReader(text))) {
             String line;
@@ -790,14 +862,15 @@ public final class RuleStore {
                 if(lineNumber==1 && line.startsWith("\uFEFF"))line=line.substring(1);
                 line=line.trim();
                 if(line.isEmpty()||line.startsWith("!")||line.startsWith("#")||line.startsWith("["))continue;
+                if(line.startsWith("<"))throw new IOException("订阅返回网页内容，保留原规则");
                 boolean exception=line.startsWith("@@");
                 String adblock=exception?line.substring(2):line;
                 if(adblock.startsWith("||")) {
-                    int marker=adblock.indexOf('^',2);
-                    if(marker<0)marker=adblock.indexOf('$',2);
-                    if(marker<0)marker=adblock.length();
-                    String raw=adblock.substring(2,marker).trim().toLowerCase(Locale.ROOT);
-                    if(raw.startsWith("*."))raw=raw.substring(2);
+                    if(disabledRules.contains(line))continue;
+                    // Requiring the final anchor also excludes path-specific,
+                    // unanchored, wildcard, and all modifier-bearing rules.
+                    if(!adblock.endsWith("^")||adblock.indexOf('$')>=0)continue;
+                    String raw=adblock.substring(2,adblock.length()-1);
                     if(raw.indexOf('*')>=0||raw.indexOf('/')>=0||raw.indexOf(':')>=0)continue;
                     String d=normalize(raw);if(d!=null)rules.add(exception?"@@"+d:d);
                     if(rules.size()>MAX_DOMAINS)throw new IOException("规则条数超过限制");
@@ -805,6 +878,7 @@ public final class RuleStore {
                 }
                 if(exception) {
                     // Internal persisted snapshots encode parsed exceptions as @@domain.
+                    if(!emptyAllowed)continue;
                     String raw=adblock.trim().toLowerCase(Locale.ROOT);
                     String d=normalize(raw);
                     if(d!=null)rules.add("@@"+d);
@@ -854,7 +928,7 @@ public final class RuleStore {
                     String location=connection.getHeaderField("Location");if(location==null)throw new IOException("订阅跳转地址缺失");url=new URL(url,location);continue;
                 }
                 if(status!=200)throw new IOException("规则下载失败：HTTP "+status);
-                long expected=connection.getContentLengthLong();if(expected>MAX_SOURCE_BYTES)throw new IOException("订阅超过 8 MiB");
+                long expected=connection.getContentLengthLong();if(expected>MAX_SOURCE_BYTES)throw new IOException("订阅超过 32 MiB");
                 String encoding=connection.getContentEncoding();if(encoding!=null&&!encoding.equalsIgnoreCase("identity"))throw new IOException("订阅返回不支持的压缩传输");
                 byte[] data;
                 try(InputStream input=connection.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()) {
@@ -866,7 +940,7 @@ public final class RuleStore {
                         connection.setReadTimeout((int)Math.min(25000,Math.max(1,left)));
                         length=input.read(buffer);if(length<0)break;
                         checkInterrupted();
-                        total+=length;if(total>MAX_SOURCE_BYTES)throw new IOException("订阅超过 8 MiB");
+                        total+=length;if(total>MAX_SOURCE_BYTES)throw new IOException("订阅超过 32 MiB");
                         out.write(buffer,0,length);
                     }
                     data=out.toByteArray();

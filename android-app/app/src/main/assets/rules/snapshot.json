@@ -1,7 +1,18 @@
 {
   "retrievedAt": "2026-09-12T23:55:57.804707+00:00",
-  "matchSemantics": "exact domains only; parent domain entries do not automatically include subdomains",
+  "matchSemantics": "Hetu DNS suffix providers; unconditional domain rules and exceptions only; unsupported AdGuard modifiers are not widened into global rules",
   "sources": [
+    {
+      "id": "adguard",
+      "url": "https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt",
+      "retrievedAt": "2026-09-19T23:14:51.057708+00:00",
+      "bytes": 4390977,
+      "sha256": "6f7ce8ac19c5c34cd910cd8d3b8e3430b0eee5121a3a5f63bbb84927ed09a0df",
+      "lines": 182579,
+      "license": "GPL-3.0",
+      "defaultEnabled": true,
+      "rules": 180025
+    },
     {
       "id": "adaway",
       "url": "https://adaway.org/hosts.txt",
@@ -11,7 +22,7 @@
       "domains": 6540,
       "contentChangedFromPreviousBundle": false,
       "license": "CC-BY-3.0",
-      "defaultEnabled": true
+      "defaultEnabled": false
     },
     {
       "id": "china",

@@ -49,7 +49,7 @@ public final class RuleStoreSnapshotTest {
                 Collections.singleton(revision+".blocked.test"),
                 Collections.singleton(revision+".allowed.test"),
                 Collections.emptySet(),Collections.singleton(revision+".exception.test"),
-                Collections.emptyMap(),Collections.emptyMap(),0L);
+                Collections.emptyMap(),Collections.emptyMap(),0L,2);
     }
     private static void verify(RuleStore.ExportRules snapshot) {
         String id=snapshot.revision;

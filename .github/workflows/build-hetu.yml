@@ -142,12 +142,12 @@ jobs:
           grep -q 'System.loadLibrary("hetu_core")' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoNative.java
           grep -q 'Java_io_github_xgl34222220_hetu_MihomoNative_invoke' native/bridge/jni_android.c
           grep -q 'Java_io_github_xgl34222220_hetu_preview_MihomoNative_invoke' native/bridge/jni_android.c
-          grep -q 'versionName = "0.4.0-test.88"' android-app/app/build.gradle.kts
-          grep -q 'versionCode = 488' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.4.0-test.89"' android-app/app/build.gradle.kts
+          grep -q 'versionCode = 489' android-app/app/build.gradle.kts
           test -f android-app/app/src/main/java/io/github/xgl34222220/hetu/LegacyAppMigrator.java
           grep -q 'LegacyAppMigrator.migrateIfNeeded(app)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
           grep -q 'controller.restart { operation = it }' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'replaceRunningAfterUpgrade(profile, onProgress)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
+          grep -Fq 'replaceRunningManually(profile, onProgress)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
           grep -q 'dataPlaneHealthy' android-app/app/src/main/assets/hetu-root.sh
           grep -q "printf 'DNS=%s" android-app/app/src/main/assets/hetu-root.sh
           grep -q "printf 'DNS_PORT=%s" android-app/app/src/main/assets/hetu-root.sh
@@ -178,7 +178,7 @@ jobs:
           grep -Fq 'Color(0xFFF8FBFF).copy(alpha = .34f)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
           grep -q 'ModalBottomSheet(' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
           ! grep -q 'AlertDialog(' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          grep -Fq '${it.updatedAt}-${it.upload}-${it.download}-${it.total}-${it.expire}' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
+          grep -Fq 'key = { "${tab.name}-provider-${it.name}" }' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           grep -Fq '.height(96.dp)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           grep -Fq 'Color(0xFF2563EB).copy(alpha = .08f)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
           ! grep -Fq 'Color(0xFFEFF6FF).copy(alpha = .90f)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt

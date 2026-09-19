@@ -94,6 +94,15 @@ final class MihomoStartupConfig {
         // as an ordinary transparent UDP flow. The source's 1053 listener is never reused.
         if(profile.dnsHijack!=ProxyRuntimeProfile.DnsHijack.OFF)
             yaml=ensureDnsListener(yaml,DNS_PORT);
+        // The app's explicit local IPv4-only policy overrides a subscription's
+        // ipv6:true. Both switches are needed: the global one controls core
+        // ingress/outbound resolution, while dns.ipv6:false returns empty AAAA.
+        // This does not control the remote proxy server's own egress family.
+        if(profile.ipv6==ProxyRuntimeProfile.Ipv6.DISABLE||profile.ipv6==ProxyRuntimeProfile.Ipv6.STRICT){
+            yaml=removeTopLevelScalar(yaml,"ipv6");
+            yaml=disableDnsIpv6(yaml);
+            yaml+="\nipv6: false\n";
+        }
         // Preserve every source rule in its original relative position. Hetu additions live
         // immediately before the final MATCH so WebRTC/DNS/privacy guards in the source stay authoritative.
         if(profile.adblockChain)
@@ -559,6 +568,35 @@ final class MihomoStartupConfig {
                 "中国 IP 自动直连需要普通 rules: 列表；当前源配置使用行内 rules 写法");
     }
 
+    /** Turn off AAAA answers without replacing the user's DNS policy or resolvers. */
+    private static String disableDnsIpv6(String source)throws IOException{
+        String[] lines=normalize(source).split("\n",-1);
+        int start=-1,end=lines.length,childIndent=Integer.MAX_VALUE;
+        for(int i=0;i<lines.length;i++){
+            if(indent(lines[i])!=0||!"dns".equals(keyOfMappingLine(lines[i].trim())))continue;
+            if(!lines[i].matches("^dns\\s*:\\s*(?:#.*)?$"))
+                throw new IOException("禁用 IPv6 需要普通 dns: 配置块；请展开行内 DNS 配置后重试");
+            start=i;break;
+        }
+        if(start<0)return trimOne(source)+"\ndns:\n  ipv6: false\n";
+        for(int i=start+1;i<lines.length;i++){
+            String t=lines[i].trim();
+            if(t.isEmpty()||t.startsWith("#"))continue;
+            int ind=indent(lines[i]);
+            if(ind==0){end=i;break;}
+            childIndent=Math.min(childIndent,ind);
+        }
+        if(childIndent==Integer.MAX_VALUE)childIndent=2;
+        StringBuilder out=new StringBuilder();
+        for(int i=0;i<lines.length;i++){
+            if(i>start&&i<end&&indent(lines[i])==childIndent
+                    &&"ipv6".equals(keyOfMappingLine(lines[i].trim())))continue;
+            out.append(lines[i]).append('\n');
+            if(i==start)out.append(spaces(childIndent)).append("ipv6: false\n");
+        }
+        return trimOne(out.toString());
+    }
+
     /** Ensure Mihomo's built-in DNS server owns a dedicated TCP+UDP loop used by DNS REDIRECT. */
     private static String ensureDnsListener(String source,int port)throws IOException{
         String[] lines=normalize(source).split("\n",-1);
@@ -617,7 +655,7 @@ final class MihomoStartupConfig {
         try{int v=Integer.parseInt(m.group(1));return v>0&&v<=65535?v:0;}catch(Exception ignored){return 0;}
     }
     private static String normalize(String s){return s.replace("\r\n","\n").replace('\r','\n');}
-    private static String removeTopLevelScalar(String source,String key){StringBuilder out=new StringBuilder();String[] lines=source.split("\n",-1);Pattern p=Pattern.compile("^"+Pattern.quote(key)+"\\s*:");for(String line:lines){if(indent(line)==0&&p.matcher(line).find())continue;out.append(line).append('\n');}return trimOne(out.toString());}
+    private static String removeTopLevelScalar(String source,String key){StringBuilder out=new StringBuilder();String[] lines=source.split("\n",-1);for(String line:lines){if(indent(line)==0&&key.equals(keyOfMappingLine(line.trim())))continue;out.append(line).append('\n');}return trimOne(out.toString());}
     private static String removeTopLevelKey(String source,String key){
         String[] lines=source.split("\n",-1);StringBuilder out=new StringBuilder();boolean skipping=false;Pattern start=Pattern.compile("^"+Pattern.quote(key)+"\\s*:(.*)$");Pattern nextKey=Pattern.compile("^[A-Za-z0-9_.-]+\\s*:");
         for(String line:lines){int ind=indent(line);String t=line.trim();if(!skipping&&ind==0){Matcher m=start.matcher(line);if(m.find()){String rest=m.group(1).trim();skipping=rest.isEmpty()||rest.startsWith("#");continue;}}if(skipping){if(t.isEmpty())continue;if(ind>0)continue;if(t.startsWith("-"))continue;if(t.startsWith("#")){out.append(line).append('\n');continue;}if(nextKey.matcher(line).find())skipping=false;else continue;}out.append(line).append('\n');}

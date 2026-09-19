@@ -2,6 +2,7 @@ package io.github.xgl34222220.hetu
 
 import android.content.Context
 import android.os.SystemClock
+import android.net.ConnectivityManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -9,6 +10,7 @@ import java.net.HttpURLConnection
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.net.URL
+import java.util.concurrent.Executors
 
 internal data class AdblockRuntimeStats(
     val count: Long = 0L,
@@ -35,8 +37,6 @@ internal class ProxyRuntimeInspector(context: Context) {
     private val app = context.applicationContext
     private val api = MihomoControllerClient(app)
     private val prefs = app.getSharedPreferences("hetu", Context.MODE_PRIVATE)
-    @Volatile private var wanCacheAt = 0L
-    @Volatile private var wanCache = Triple("—", "", "—")
 
     suspend fun sample(): ProxyRuntimeSnapshot = withContext(Dispatchers.IO) {
         val command = """
@@ -105,7 +105,9 @@ internal class ProxyRuntimeInspector(context: Context) {
                 append("\n--- runtime-refresh ---\nAPK 已更新；当前 Root 运行环境保持不动，下一次主动重启代理时应用新规则")
             }
         }
-        val combined = (text + appEvents).trim()
+        // Redact before truncation so a URL cut at the display boundary cannot
+        // leave a subscription token or controller credential in copied UI logs.
+        val combined = DiagnosticReport.redact((text + appEvents).trim(), prefs.getString("proxyControllerSecret", ""))
         if (combined.isBlank()) "暂无运行日志" else combined.takeLast(24_000)
     }
 
@@ -175,9 +177,37 @@ internal class ProxyRuntimeInspector(context: Context) {
     }
 
     private fun publicNetwork(): Triple<String, String, String> {
-        val now = SystemClock.elapsedRealtime()
-        if (now - wanCacheAt < 900_000L && wanCache.first != "—") return wanCache
-        val fresh = runCatching {
+        val active = runCatching {
+            (app.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager)?.activeNetwork
+        }.getOrNull()
+        // Selected settings are not yet the running policy. Invalidate only
+        // after application/restart, a real network change, or runtime stop.
+        val key = listOf(
+            active?.networkHandle?.toString() ?: "offline",
+            prefs.getString("proxyRootAppliedSettings", "").orEmpty(),
+            prefs.getBoolean("proxyRootRuntimeRunning", false).toString(),
+            prefs.getLong("proxyRootLastStartupAt", 0L).toString(),
+        ).joinToString("|")
+        return wanLookup.get(key, active != null)
+    }
+
+    private companion object {
+        // One process-wide worker/cache: recomposition or reopening the page
+        // must not create threads, parallel requests, or a new failure loop.
+        val wanWorker = Executors.newSingleThreadExecutor { task ->
+            Thread(task, "hetu-public-network").apply { isDaemon = true }
+        }
+        val wanLookup = ProxyAsyncValue<Triple<String, String, String>>(
+            wanWorker,
+            { SystemClock.elapsedRealtime() },
+            { fetchPublicNetwork() },
+            Triple("—", "", "—"),
+            900_000L,
+            60_000L,
+        )
+
+        fun fetchPublicNetwork(): Triple<String, String, String> {
+            val deadline = SystemClock.elapsedRealtime() + 6_000L
             val connection = (URL("https://ipwho.is/?fields=success,ip,country_code,region").openConnection() as HttpURLConnection).apply {
                 connectTimeout = 3_000
                 readTimeout = 3_000
@@ -186,22 +216,33 @@ internal class ProxyRuntimeInspector(context: Context) {
             }
             try {
                 if (connection.responseCode !in 200..299) error("HTTP ${connection.responseCode}")
-                val json = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
-                if (!json.optBoolean("success", true)) error("WAN lookup failed")
-                Triple(
-                    json.optString("ip", "—").ifBlank { "—" },
+                val body = connection.inputStream.bufferedReader().use { reader ->
+                    val text = StringBuilder()
+                    val buffer = CharArray(2_048)
+                    while (true) {
+                        val remaining = deadline - SystemClock.elapsedRealtime()
+                        if (remaining <= 0L) error("WAN lookup timed out")
+                        connection.readTimeout = minOf(3_000L, remaining).toInt()
+                        val count = reader.read(buffer)
+                        if (count < 0) break
+                        if (text.length + count > 16_384) error("WAN response exceeds limit")
+                        text.append(buffer, 0, count)
+                    }
+                    text.toString()
+                }
+                val json = JSONObject(body)
+                if (!json.optBoolean("success", false)) error("WAN lookup failed")
+                val address = json.optString("ip", "").trim()
+                if (address.isBlank()) error("WAN response has no address")
+                return Triple(
+                    address,
                     json.optString("country_code", ""),
                     json.optString("region", "—").ifBlank { "—" },
                 )
             } finally {
                 connection.disconnect()
             }
-        }.getOrNull()
-        if (fresh != null) {
-            wanCache = fresh
-            wanCacheAt = now
         }
-        return fresh ?: wanCache
     }
 
 }
