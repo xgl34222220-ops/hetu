@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Build;
+import android.os.SystemClock;
 import org.json.JSONObject;
 import java.io.*;
 import java.net.*;
@@ -31,6 +32,22 @@ final class RootProxyManager {
     private final ProxyConfigLibrary configs;
 
     interface Progress{void onStage(String text);}
+    private static final class StartupTrace {
+        final long startedAt=SystemClock.elapsedRealtime();
+        long phaseStartedAt=startedAt;
+        String phase="controlLock",outcome="failed";
+        final StringBuilder completed=new StringBuilder();
+        void next(String next){
+            long now=SystemClock.elapsedRealtime();
+            completed.append(phase).append("Ms=").append(now-phaseStartedAt).append('\n');
+            phase=next;phaseStartedAt=now;
+        }
+        String finish(){
+            long now=SystemClock.elapsedRealtime();
+            return "outcome="+outcome+" totalMs="+(now-startedAt)+"\n"+completed
+                    +phase+"Ms="+(now-phaseStartedAt);
+        }
+    }
     static final class Prepared{
         final ProxyRuntimeProfile profile;
         final ProxyConfigLibrary.Entry source;
@@ -136,6 +153,15 @@ final class RootProxyManager {
         }
     }
 
+    private RootStartupProbe.Result probeStartupRuntime(){
+        try{
+            RootBridge.requireWorkerThread();
+            RootBridge.Result result=RootBridge.rootShell(context,
+                    RootStartupProbe.command(ROOT+"/run/core.pid",BIN,CORE_TOKEN),4000L);
+            return RootStartupProbe.parse(result.ok(),result.output);
+        }catch(Exception ignored){return RootStartupProbe.parse(false,"");}
+    }
+
     private boolean coreAliveFast(){
         try{
             RootBridge.requireWorkerThread();
@@ -151,12 +177,14 @@ final class RootProxyManager {
 
     String ensureRuntimeBase(ProxyRuntimeProfile.Core requestedCore)throws Exception{
         RootBridge.requireWorkerThread();
+        CONTROL_LOCK.lock();
+        try{
         ProxyRuntimeProfile.Core core=requestedCore;
         if(core==ProxyRuntimeProfile.Core.MIHOMO_SMART&&!cores.installed(core))core=ProxyRuntimeProfile.Core.MIHOMO;
         File stage=new File(context.getCacheDir(),"hetu-runtime-init");
         if(!stage.isDirectory()&&!stage.mkdirs())throw new IOException("无法创建河图运行初始化目录");
         File script=new File(stage,"hetu-root.sh");
-        copyAsset("hetu-root.sh",script,true);
+        copyScriptAsset(script);
         String coreToken=expectedCoreToken(core);
         boolean deployCore=!runtimeCoreCurrent(coreToken);
         File binary=deployCore?coreFile(core,stage):null;
@@ -185,6 +213,7 @@ final class RootProxyManager {
         RootBridge.Result r=RootBridge.rootShell(context,cmd.toString(),45000L);
         if(!r.ok())throw new IOException("无法初始化河图运行目录："+r.output.trim());
         return ROOT;
+        }finally{CONTROL_LOCK.unlock();}
     }
 
     String refreshAdblockRuntime()throws Exception{
@@ -363,6 +392,9 @@ final class RootProxyManager {
     }
 
     JSONObject preflight(Prepared p)throws Exception{
+        RootBridge.requireWorkerThread();
+        CONTROL_LOCK.lock();
+        try{
         installRuntimeFiles(p,false);
         RootProxyPolicy policy=p.policy;
         return runJson("preflight",
@@ -370,6 +402,7 @@ final class RootProxyManager {
                 bit(p.profile.tcp),bit(p.profile.udp),p.profile.dnsHijack.id,bit(p.profile.quicBlocked),
                 String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(p.controllerPort),
                 policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges);
+        }finally{CONTROL_LOCK.unlock();}
     }
 
     JSONObject start(ProxyRuntimeProfile p)throws Exception{return startInternal(p,null,false);}
@@ -386,12 +419,17 @@ final class RootProxyManager {
     JSONObject replaceRunningAfterUpgrade(ProxyRuntimeProfile profile,Progress progress)throws Exception{return startInternal(profile,progress,true);}
 
     private JSONObject startInternal(ProxyRuntimeProfile profile,Progress progress,boolean replaceRunning)throws Exception{
+        StartupTrace trace=new StartupTrace();
         CONTROL_LOCK.lock();
         try{
-            boolean existingRunning=coreAliveFast();
+            trace.next("runtimeProbe");
+            RootStartupProbe.Result initial=probeStartupRuntime();
+            boolean existingRunning=ProxyContinuity.preserveRunning(initial.process,
+                    prefs.getBoolean("proxyRootRuntimeRunning",false)&&prefs.getBoolean("proxyRootWanted",false));
             if(existingRunning&&!replaceRunning){
                 prefs.edit().putBoolean("proxyRootWanted",true).putBoolean("proxyRootRuntimeRunning",true).apply();
                 ensureContinuityService(true);
+                trace.outcome="alreadyRunning";
                 return new JSONObject().put("ok",true).put("running",true).put("alreadyRunning",true)
                         .put("message","Root 代理已在运行，已忽略重复启动请求");
             }
@@ -405,6 +443,7 @@ final class RootProxyManager {
             }
         int restartControllerPort=(replaceRunning&&existingRunning)
                 ?prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT):0;
+        trace.next("configuration");
         Prepared p;
         try{
             p=prepare(profile,restartControllerPort);
@@ -417,8 +456,12 @@ final class RootProxyManager {
         }
         RootProxyPolicy policy=p.policy;
         stage(progress,"部署必要运行文件…");
-        installRuntimeFiles(p,true);
+        trace.next("deployment");
+        // The initial process probe also read the installed core token. Reuse that
+        // result instead of opening a second privileged shell just to read one file.
+        installRuntimeFiles(p,true,initial.installedCoreToken);
 
+        trace.next("validation");
         String validationKey=validationFingerprint(p);
         boolean validationKnown=validationKey.equals(prefs.getString("proxyRootValidatedFingerprint",""));
         boolean preserveLiveNeedsValidation=replaceRunning&&existingRunning&&!validationKnown;
@@ -453,11 +496,13 @@ final class RootProxyManager {
             stage(progress,"首次启动由核心直接校验，监听就绪后再接管网络…");
         }
 
+        trace.next("legacyCleanup");
         if(!prefs.getBoolean("hetuLegacyRetired",false))quiesceLegacyRuntime(progress);
         String capabilityKey=capabilityFingerprint(profile,policy);
         boolean capabilityKnown=capabilityKey.equals(prefs.getString("proxyRootCapabilityFingerprint",""));
         stage(progress,capabilityKnown?"设备能力未变化，跳过重复探测…":"检查网络能力并启动核心…");
 
+        trace.next("filterHandoff");
         boolean adblockCoordinatorEntered=false;
         boolean independentFallback=prefs.getBoolean("proxyAdblockFallbackEnabled",false);
         if(profile.adblockChain||independentFallback||DnsVpnService.running){
@@ -473,6 +518,7 @@ final class RootProxyManager {
                 .remove("proxyAdblockLastDomain")
                 .remove("proxyAdblockRecentDomains")
                 .apply();
+        trace.next("coreAndNetwork");
         JSONObject result;
         try{result=runJsonWithTimeout(125000L,"start",
                 BIN,CONFIG,profile.mode.id,String.valueOf(p.tproxyPort),String.valueOf(p.redirectPort),profile.ipv6.id,
@@ -482,6 +528,7 @@ final class RootProxyManager {
             if(!result.optBoolean("ok"))throw new IOException(result.optString("message","Root 代理启动失败"));
         }catch(Exception startFailure){if(adblockCoordinatorEntered)ProxyAdblockCoordinator.exit(context);throw startFailure;}
 
+        trace.next("finalProcessCheck");
         stage(progress,"确认核心进程、策略控制接口与守护状态…");
         if(!coreAliveFast()){
             if(adblockCoordinatorEntered)ProxyAdblockCoordinator.exit(context);
@@ -489,6 +536,7 @@ final class RootProxyManager {
             String detail=DiagnosticReport.redact(failure.output,prefs.getString("proxyControllerSecret",""));
             throw new IOException("启动命令已返回，但未检测到河图私有核心进程"+(detail.isEmpty()?"":"："+detail));
         }
+        trace.next("publishRuntime");
         if(!prefs.getBoolean("hetuLegacyRetired",false))retireLegacyInstallation(progress);
         // Publish only the port of a successfully running core.
         prefs.edit().putInt("proxyControllerPort",p.controllerPort).commit();
@@ -551,9 +599,16 @@ final class RootProxyManager {
                 .remove("proxyRootBootError")
                 .apply();
         ensureContinuityService(true);
+        trace.outcome="ready";
         return result;
         }finally{
-            CONTROL_LOCK.unlock();
+            try{
+                // A repeated Start/boot request is not a new startup; keep the
+                // useful timing of the last actual transaction for diagnostics.
+                if(!"alreadyRunning".equals(trace.outcome))prefs.edit()
+                        .putString("proxyRootLastStartupTiming",trace.finish())
+                        .putLong("proxyRootLastStartupAt",System.currentTimeMillis()).apply();
+            }finally{CONTROL_LOCK.unlock();}
         }
     }
 
@@ -646,10 +701,22 @@ final class RootProxyManager {
             if(values.containsKey(key))events.append('\n').append(key).append('=').append(values.get(key));
         }
         report.section("版本与最近运行事件",events.toString(),6000);
+        report.section("最近启动耗时（毫秒）", "time="+prefs.getLong("proxyRootLastStartupAt",0L)+"\n"
+                +prefs.getString("proxyRootLastStartupTiming","尚无启动记录"),2000);
+        try{
+            ProxyConfigLibrary.Entry source=configs.selected(ProxyRuntimeProfile.load(prefs).core);
+            if(source!=null){
+                byte[] contents=configs.read(source).getBytes(StandardCharsets.UTF_8);
+                report.section("源配置标识", "bytes="+contents.length+"\nsha256="
+                        +hex(MessageDigest.getInstance("SHA-256").digest(contents)),1000);
+            }
+        }catch(Exception ignored){report.section("源配置标识","当前源配置不可读",1000);}
         try{
             String cmd=String.join("\n",
                     "id",
                     "echo '--- actual core token ---'; cat "+RootBridge.quote(CORE_TOKEN)+" 2>/dev/null; echo",
+                    "echo '--- core version ---'; "+RootBridge.quote(BIN)+" -v 2>&1 | head -n 3",
+                    "echo '--- shell startup stages (uptime seconds) ---'; tail -n 24 "+RootBridge.quote(ROOT+"/run/startup-timing")+" 2>/dev/null || true",
                     "echo '--- session ---'; cat "+RootBridge.quote(ROOT+"/run/session.state")+" 2>/dev/null || true",
                     "echo '--- transport config ---'; grep -E '^(disable-keep-alive|keep-alive-idle|keep-alive-interval|find-process-mode|mode|ipv6):' "+RootBridge.quote(CONFIG)+" 2>/dev/null || true",
                     "echo '--- WeChat processes ---'; ps -A -o UID,PID,NAME 2>/dev/null | grep -F 'com.tencent.mm' || true",
@@ -706,9 +773,11 @@ final class RootProxyManager {
     private void writeStartupCopy(String text)throws IOException{
         File target=startupFile(),dir=target.getParentFile();
         if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("无法创建启动状态目录");
+        byte[] bytes=text.getBytes(StandardCharsets.UTF_8);
+        if(target.isFile()&&target.length()==bytes.length&&Arrays.equals(Files.readAllBytes(target.toPath()),bytes))return;
         File tmp=new File(dir,"startup-config.new");
         try(FileOutputStream out=new FileOutputStream(tmp,false)){
-            out.write(text.getBytes(StandardCharsets.UTF_8));out.getFD().sync();
+            out.write(bytes);out.getFD().sync();
         }
         try{Files.move(tmp.toPath(),target.toPath(),StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);}
         catch(Exception e){if(!tmp.renameTo(target)){tmp.delete();throw new IOException("无法保存最终启动配置");}}
@@ -853,13 +922,17 @@ final class RootProxyManager {
     }
 
     private void installRuntimeFiles(Prepared p,boolean includeConfig)throws Exception{
+        installRuntimeFiles(p,includeConfig,null);
+    }
+
+    private void installRuntimeFiles(Prepared p,boolean includeConfig,String probedCoreToken)throws Exception{
         RootBridge.requireWorkerThread();
         File stage=new File(context.getCacheDir(),"hetu-root-stage");
         if(!stage.isDirectory()&&!stage.mkdirs())throw new IOException("无法创建河图运行临时目录");
         File script=new File(stage,"hetu-root.sh");
-        copyAsset("hetu-root.sh",script,true);
+        copyScriptAsset(script);
         String coreToken=expectedCoreToken(p.profile.core);
-        boolean deployCore=!runtimeCoreCurrent(coreToken);
+        boolean deployCore=probedCoreToken==null?!runtimeCoreCurrent(coreToken):!coreToken.equals(probedCoreToken);
         File binary=deployCore?coreFile(p.profile.core,stage):null;
         File cfg=new File(stage,"startup-config");
         File adblock=p.adblock==null?null:p.adblock.file;
@@ -890,7 +963,7 @@ final class RootProxyManager {
             String dst=ROOT+"/run/ruleset/hetu-adblock.txt",tmp=dst+".new";
             String allowDst=ROOT+"/run/ruleset/hetu-adblock-allow.txt",allowTmp=allowDst+".new";
             String revisionFile=ROOT+"/run/state/adblock.revision";
-            cmd.append("; if [ ! -s ").append(RootBridge.quote(dst))
+            cmd.append("; if [ ! -f ").append(RootBridge.quote(dst))
                     .append(" ] || [ ! -f ").append(RootBridge.quote(allowDst))
                     .append(" ] || [ \"$(cat ").append(RootBridge.quote(revisionFile)).append(" 2>/dev/null)\" != ")
                     .append(RootBridge.quote(p.adblock.revision)).append(" ]; then")
@@ -934,6 +1007,22 @@ final class RootProxyManager {
         }
         throw new IOException("当前 CPU 架构没有内置 Mihomo："+Arrays.toString(Build.SUPPORTED_ABIS));
     }
+    private void copyScriptAsset(File out)throws IOException{
+        byte[] bytes;
+        try(InputStream in=context.getAssets().open("hetu-root.sh")){
+            ByteArrayOutputStream data=new ByteArrayOutputStream();
+            byte[] block=new byte[32768];int count;
+            while((count=in.read(block))!=-1)data.write(block,0,count);
+            bytes=data.toByteArray();
+        }
+        if(!out.isFile()||out.length()!=bytes.length||!Arrays.equals(Files.readAllBytes(out.toPath()),bytes)){
+            try(FileOutputStream target=new FileOutputStream(out,false)){
+                target.write(bytes);target.getFD().sync();
+            }
+        }
+        if(!out.setReadable(true,true)||!out.setExecutable(true,true))throw new IOException("无法设置运行脚本权限");
+    }
+
     private void copyAsset(String name,File out,boolean executable)throws IOException{
         try(InputStream in=context.getAssets().open(name);FileOutputStream fos=new FileOutputStream(out,false)){
             byte[] b=new byte[32768];int n;while((n=in.read(b))!=-1)fos.write(b,0,n);fos.getFD().sync();

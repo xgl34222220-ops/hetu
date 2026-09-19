@@ -134,7 +134,7 @@ jobs:
           ! grep -Fq 'Box(Modifier.statusBarsPadding().padding(top = 14.dp, bottom = 4.dp))' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           ! grep -Fq 'Modifier.fillMaxWidth().statusBarsPadding().padding(top = 16.dp, bottom = 10.dp).height(44.dp)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           ! grep -Fq 'Modifier.fillMaxWidth().statusBarsPadding().heightIn(min = 64.dp).padding(vertical = 8.dp)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          grep -q 'copyAsset("hetu-root.sh",script,true)' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
+          grep -q 'copyScriptAsset(script)' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
           test -f android-app/app/src/main/assets/rules/adaway.txt
           test -f android-app/app/src/main/assets/rules/china.txt
           test -f android-app/app/src/main/assets/rules/tracking.txt
@@ -142,8 +142,8 @@ jobs:
           grep -q 'System.loadLibrary("hetu_core")' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoNative.java
           grep -q 'Java_io_github_xgl34222220_hetu_MihomoNative_invoke' native/bridge/jni_android.c
           grep -q 'Java_io_github_xgl34222220_hetu_preview_MihomoNative_invoke' native/bridge/jni_android.c
-          grep -q 'versionName = "0.4.0-test.87"' android-app/app/build.gradle.kts
-          grep -q 'versionCode = 487' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.4.0-test.88"' android-app/app/build.gradle.kts
+          grep -q 'versionCode = 488' android-app/app/build.gradle.kts
           test -f android-app/app/src/main/java/io/github/xgl34222220/hetu/LegacyAppMigrator.java
           grep -q 'LegacyAppMigrator.migrateIfNeeded(app)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
           grep -q 'controller.restart { operation = it }' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
@@ -249,6 +249,7 @@ jobs:
           python3 tools/test_proxy_continuity.py --android-jar "$ANDROID_HOME/platforms/android-37.0/android.jar" --fixture "$RUNNER_TEMP/hetu-continuity.yaml"
           python3 tools/test_adblock_inspection.py --android-jar "$ANDROID_HOME/platforms/android-37.0/android.jar"
           python3 tools/test_root_ipv6.py
+          python3 tools/test_root_controller.py
 
       - name: Build Hetu JNI bridge and Root Mihomo
         shell: bash

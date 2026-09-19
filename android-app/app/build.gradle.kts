@@ -15,8 +15,8 @@ android {
         applicationId = "io.github.xgl34222220.hetu"
         minSdk = 26
         targetSdk = 35
-        versionCode = 487
-        versionName = "0.4.0-test.87"
+        versionCode = 488
+        versionName = "0.4.0-test.88"
     }
 
     buildFeatures {

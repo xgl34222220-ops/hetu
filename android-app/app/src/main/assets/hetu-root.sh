@@ -17,7 +17,9 @@ WATCHDOG_LOG="$RUN/watchdog.log"
 CRASH_STATE="$RUN/last-crash"
 START_STATE="$RUN/start-state"
 START_ERROR="$RUN/last-start-error"
+START_TIMING="$RUN/startup-timing"
 LOCK_DIR="$RUN/.txn.lock"
+CLEAN_SNAPSHOT_ACTIVE=0
 
 BYPASS_MARK=0x08000000
 BYPASS_MASK=0x08000000
@@ -50,7 +52,7 @@ KOUT=HETU_KOUT
 KFWD=HETU_KFWD
 
 ok(){ printf '{"ok":true,"message":"%s"}\n' "$1"; }
-start_stage(){ mkdir -p "$RUN" >/dev/null 2>&1 || true; printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$1" > "$START_STATE" 2>/dev/null || true; }
+start_stage(){ mkdir -p "$RUN" >/dev/null 2>&1 || true; printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$1" > "$START_STATE" 2>/dev/null || true; STAGE_UPTIME=unknown; read -r STAGE_UPTIME STAGE_UNUSED < /proc/uptime 2>/dev/null || true; printf '%s %s\n' "$STAGE_UPTIME" "$1" >> "$START_TIMING" 2>/dev/null || true; }
 fail(){ MSG="$1"; mkdir -p "$RUN" >/dev/null 2>&1 || true; printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$MSG" > "$START_ERROR" 2>/dev/null || true; printf '{"ok":false,"message":"%s"}\n' "$MSG"; exit 1; }
 root(){ [ "$(id -u)" = 0 ] || fail "需要 Root 权限"; }
 has(){ command -v "$1" >/dev/null 2>&1; }
@@ -126,8 +128,42 @@ allocnet(){
   savenet
 }
 
+# Only our private chains are removed. One table snapshot avoids three separate
+# iptables processes for every absent current/legacy chain on each start/stop.
+# A failed snapshot is unknown, never evidence that a chain is absent.
+cleanup_snapshot_begin(){
+  CLEAN4_MANGLE=$(xt4 -t mangle -S 2>/dev/null) || CLEAN4_MANGLE='?'
+  CLEAN4_NAT=$(xt4 -t nat -S 2>/dev/null) || CLEAN4_NAT='?'
+  CLEAN4_FILTER=$(xt4 -t filter -S 2>/dev/null) || CLEAN4_FILTER='?'
+  CLEAN6_MANGLE='?'; CLEAN6_NAT='?'; CLEAN6_FILTER='?'
+  if has ip6tables; then
+    CLEAN6_MANGLE=$(xt6 -t mangle -S 2>/dev/null) || CLEAN6_MANGLE='?'
+    CLEAN6_NAT=$(xt6 -t nat -S 2>/dev/null) || CLEAN6_NAT='?'
+    CLEAN6_FILTER=$(xt6 -t filter -S 2>/dev/null) || CLEAN6_FILTER='?'
+  fi
+  CLEAN_SNAPSHOT_ACTIVE=1
+}
+cleanup_chain_absent(){
+  [ "$CLEAN_SNAPSHOT_ACTIVE" = 1 ] || return 1
+  case "$1:$2" in
+    xt4:mangle|iptables:mangle) CLEAN_LOOKUP=$CLEAN4_MANGLE;;
+    xt4:nat|iptables:nat) CLEAN_LOOKUP=$CLEAN4_NAT;;
+    xt4:filter|iptables:filter) CLEAN_LOOKUP=$CLEAN4_FILTER;;
+    xt6:mangle|ip6tables:mangle) CLEAN_LOOKUP=$CLEAN6_MANGLE;;
+    xt6:nat|ip6tables:nat) CLEAN_LOOKUP=$CLEAN6_NAT;;
+    xt6:filter|ip6tables:filter) CLEAN_LOOKUP=$CLEAN6_FILTER;;
+    *) return 1;;
+  esac
+  [ "$CLEAN_LOOKUP" != '?' ] || return 1
+  case "
+$CLEAN_LOOKUP
+" in *"
+-N $3
+"*) return 1;; *) return 0;; esac
+}
 legacy_unhook(){
   B="$1"; T="$2"; BASECHAIN="$3"; CHAIN="$4"; N=0
+  cleanup_chain_absent "$B" "$T" "$CHAIN" && return 0
   while "$B" -w 1 -t "$T" -C "$BASECHAIN" -j "$CHAIN" >/dev/null 2>&1; do
     "$B" -w 1 -t "$T" -D "$BASECHAIN" -j "$CHAIN" >/dev/null 2>&1 || break
     N=$((N+1)); [ "$N" -lt 8 ] || break
@@ -159,6 +195,7 @@ cleanlegacy(){
 }
 unhook(){
   BIN="$1"; T="$2"; BASECHAIN="$3"; CHAIN="$4"
+  cleanup_chain_absent "$BIN" "$T" "$CHAIN" && return 0
   while "$BIN" -t "$T" -C "$BASECHAIN" -j "$CHAIN" >/dev/null 2>&1; do "$BIN" -t "$T" -D "$BASECHAIN" -j "$CHAIN" >/dev/null 2>&1 || break; done
   "$BIN" -t "$T" -F "$CHAIN" >/dev/null 2>&1 || true; "$BIN" -t "$T" -X "$CHAIN" >/dev/null 2>&1 || true
 }
@@ -188,14 +225,18 @@ cleanup6(){
     ip -6 route del local ::/0 dev lo table "$TABLE" >/dev/null 2>&1 || true
   fi
 }
-cleanup(){ MARK=""; MASK=""; TABLE=""; PREF=""; loadnet >/dev/null 2>&1 || true; cleanup4; cleanup6; cleanlegacy; ip link del hetu0 >/dev/null 2>&1 || true; rm -f "$NET_STATE"; MARK=""; MASK=""; TABLE=""; PREF=""; }
+cleanup(){ MARK=""; MASK=""; TABLE=""; PREF=""; loadnet >/dev/null 2>&1 || true; cleanup_snapshot_begin; cleanup4; cleanup6; cleanlegacy; CLEAN_SNAPSHOT_ACTIVE=0; ip link del hetu0 >/dev/null 2>&1 || true; rm -f "$NET_STATE"; MARK=""; MASK=""; TABLE=""; PREF=""; }
 
 pidcore(){
   P="$1"; [ -d "/proc/$P" ] || return 1
-  CMD=$(tr '\000' ' ' < "/proc/$P/cmdline" 2>/dev/null || true)
-  EXE=$(readlink "/proc/$P/exe" 2>/dev/null || true)
-  case "$CMD $EXE" in *"$BASE/bin/core"*) return 0;; *) return 1;; esac
+  EXE=$(readlink "/proc/$P/exe" 2>/dev/null) || { [ -d "/proc/$P" ] && return 2; return 1; }
+  # A su/timeout/shell command line may contain the core path as an argument.
+  # It must never be reported as the core or killed during orphan cleanup.
+  case "$EXE" in "$BASE/bin/core"|"$BASE/bin/core (deleted)") return 0;; *) return 1;; esac
 }
+# A readlink permission/race error is not proof that a tracked core has died.
+# Monitoring tolerates unknown identity; destructive cleanup still requires 0.
+core_maybe_alive(){ pidcore "$1"; case "$?" in 0|2) return 0;; *) return 1;; esac; }
 findcorepid(){
   for PROC in /proc/[0-9]*; do
     CAND=${PROC#/proc/}; case "$CAND" in ''|*[!0-9]*) continue;; esac
@@ -214,14 +255,12 @@ stopcore(){
   # Recover orphaned Hetu cores left by a killed/reinstalled app. Match the private
   # absolute path only; do not touch Mihomo/Clash processes owned by other apps.
   for PROC in /proc/[0-9]*; do
-    OPID=${PROC#/proc/}; [ "$OPID" != "$$" ] || continue; [ -r "$PROC/cmdline" ] || continue
-    OCMD=$(tr '\000' ' ' < "$PROC/cmdline" 2>/dev/null || true)
-    OEXE=$(readlink "$PROC/exe" 2>/dev/null || true)
-    case "$OCMD $OEXE" in *"$BASE/bin/core"*)
+    OPID=${PROC#/proc/}; [ "$OPID" != "$$" ] || continue
+    if pidcore "$OPID"; then
       kill "$OPID" >/dev/null 2>&1 || true
       N=0; while kill -0 "$OPID" >/dev/null 2>&1 && [ "$N" -lt 20 ]; do sleep 0.1; N=$((N+1)); done
-      kill -0 "$OPID" >/dev/null 2>&1 && kill -9 "$OPID" >/dev/null 2>&1 || true
-    ;; esac
+      if pidcore "$OPID" && kill -0 "$OPID" >/dev/null 2>&1; then kill -9 "$OPID" >/dev/null 2>&1 || true; fi
+    fi
   done
   rm -f "$PIDFILE" "$MODEFILE"
 }
@@ -383,6 +422,28 @@ preflight(){
 route4(){ ip route replace local 0.0.0.0/0 dev lo table "$TABLE" || return 1; ip rule add pref "$PREF" fwmark "$MARK/$MASK" table "$TABLE" || return 1; }
 route6(){ ip -6 route replace local ::/0 dev lo table "$TABLE" || return 1; ip -6 rule add pref "$PREF" fwmark "$MARK/$MASK" table "$TABLE" || return 1; }
 
+# With sharing enabled PREROUTING sees replies to the core's own outbound
+# sockets as well as forwarded clients. Do not redirect those local-destination
+# packets into TPROXY again. Excluding lo is essential: OUTPUT marks deliberately
+# route app traffic through lo and the policy route itself has type LOCAL.
+# NAT DNS interception runs separately, so port 53 remains protected.
+local_destination_return(){
+  LOCAL_BIN="$1"; LOCAL_CHAIN="$2"; LOCAL_FAMILY="$3"
+  "$LOCAL_BIN" -t mangle -A "$LOCAL_CHAIN" ! -i lo -m addrtype --dst-type LOCAL -j RETURN >/dev/null 2>&1 && return 0
+  # Older kernels can lack xt_addrtype. Fall back to the addresses currently
+  # assigned to this device, never whole interface prefixes or remote ranges.
+  # The reply-direction guard also covers addresses acquired after a handover;
+  # without either dynamic matcher, shared interception cannot be installed
+  # safely. DNS NAT rules still inspect these packets in their separate table.
+  "$LOCAL_BIN" -t mangle -A "$LOCAL_CHAIN" ! -i lo -m conntrack --ctdir REPLY -j RETURN >/dev/null 2>&1 || return 1
+  LOCAL_ROWS=$(ip -o "$LOCAL_FAMILY" address show 2>/dev/null) || return 1
+  LOCAL_ADDRESSES=$(printf '%s\n' "$LOCAL_ROWS" | awk '{split($4,a,"/"); if(a[1]!="") print a[1]}')
+  for LOCAL_ADDRESS in $LOCAL_ADDRESSES; do
+    case "$LOCAL_ADDRESS" in *[!0-9a-fA-F:.]*|'') return 1;; esac
+    "$LOCAL_BIN" -t mangle -A "$LOCAL_CHAIN" ! -i lo -d "$LOCAL_ADDRESS" -j RETURN || return 1
+  done
+}
+
 install_mangle4(){
   P="$1"; M="$2"; TCP="$3"; UDP="$4"; DNS="$5"; S="$6"; UIDS="$7"; SHARE="$8"; CIDRS="$9"; IFACES="${10}"; DUIDS="${11}"
   NEED=0; case "$M" in tproxy) if [ "$TCP" = 1 ] || [ "$UDP" = 1 ]; then NEED=1; fi;; enhance) [ "$UDP" = 1 ] && NEED=1;; esac; [ "$NEED" = 1 ] || return 0
@@ -392,6 +453,7 @@ install_mangle4(){
   direct_uid_returns xt4 mangle "$MOUT" "$DUIDS" || return 1
   iface_out xt4 mangle "$MOUT" "$IFACES" || return 1; blacklist_returns xt4 mangle "$MOUT" "$S" "$UIDS" || return 1
   xt4 -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt4 mangle "$MPRE" "$IFACES" || return 1
+  [ "$SHARE" = 0 ] || local_destination_return xt4 "$MPRE" -4 || return 1
   if [ "$DNS" = tproxy ] || [ "$DNS" = redirect ]; then
     xt4 -t mangle -A "$MOUT" -p tcp --dport 53 -j RETURN || return 1
     xt4 -t mangle -A "$MOUT" -p udp --dport 53 -j RETURN || return 1
@@ -413,6 +475,7 @@ install_mangle6(){
   direct_uid_returns xt6 mangle "$MOUT" "$DUIDS" || return 1
   iface_out xt6 mangle "$MOUT" "$IFACES" || return 1; blacklist_returns xt6 mangle "$MOUT" "$S" "$UIDS" || return 1
   xt6 -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt6 mangle "$MPRE" "$IFACES" || return 1
+  [ "$SHARE" = 0 ] || local_destination_return xt6 "$MPRE" -6 || return 1
   if [ "$DNS" = tproxy ] || [ "$DNS" = redirect ]; then
     xt6 -t mangle -A "$MOUT" -p tcp --dport 53 -j RETURN || return 1
     xt6 -t mangle -A "$MOUT" -p udp --dport 53 -j RETURN || return 1
@@ -518,7 +581,7 @@ hexport(){ printf '%04X' "$1" 2>/dev/null; }
 tcp_listen(){ P="$1"; if has ss && ss -lnt 2>/dev/null | grep -Eq "[:.]${P}([[:space:]]|$)"; then return 0; fi; if has netstat && netstat -lnt 2>/dev/null | grep -Eq "[:.]${P}([[:space:]]|$)"; then return 0; fi; H=$(hexport "$P") || return 1; awk -v x=":$H" '$2 ~ x"$" && $4=="0A" {found=1} END{exit(found?0:1)}' /proc/net/tcp /proc/net/tcp6 2>/dev/null; }
 udp_listen(){ P="$1"; if has ss && ss -lnu 2>/dev/null | grep -Eq "[:.]${P}([[:space:]]|$)"; then return 0; fi; if has netstat && netstat -lnu 2>/dev/null | grep -Eq "[:.]${P}([[:space:]]|$)"; then return 0; fi; H=$(hexport "$P") || return 1; awk -v x=":$H" '$2 ~ x"$" {found=1} END{exit(found?0:1)}' /proc/net/udp /proc/net/udp6 2>/dev/null; }
 ready(){
-  PID="$1"; M="$2"; TP="$3"; RP="$4"; TCP="$5"; UDP="$6"; DNS="$7"; DP="$8"; CP="$9"; pidcore "$PID" && kill -0 "$PID" >/dev/null 2>&1 || return 1; tcp_listen "$CP" || return 1
+  PID="$1"; M="$2"; TP="$3"; RP="$4"; TCP="$5"; UDP="$6"; DNS="$7"; DP="$8"; CP="$9"; core_maybe_alive "$PID" && kill -0 "$PID" >/dev/null 2>&1 || return 1; tcp_listen "$CP" || return 1
   case "$M" in tproxy) [ "$TCP" = 0 ] || tcp_listen "$TP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; redirect) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1;; enhance) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; tun|ebpf) ip link show hetu0 >/dev/null 2>&1 || return 1;; esac
   if [ "$DNS" = tproxy ] || [ "$DNS" = redirect ]; then tcp_listen "$DP" || return 1; udp_listen "$DP" || return 1; fi; return 0
 }
@@ -554,7 +617,7 @@ wait_ready(){
   N=0
   while [ "$N" -lt 900 ]; do
     ready "$PID" "$M" "$TP" "$RP" "$TCP" "$UDP" "$DNS" "$DP" "$CP" && return 0
-    pidcore "$PID" && kill -0 "$PID" >/dev/null 2>&1 || return 2
+    core_maybe_alive "$PID" && kill -0 "$PID" >/dev/null 2>&1 || return 2
     sleep 0.1
     N=$((N+1))
   done
@@ -564,7 +627,7 @@ wait_ready(){
 write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$7"; CP="$8"; DUIDS="$9"; { printf 'MODE=%s\n' "$M"; printf 'IPV6=%s\n' "$V6"; printf 'DNS=%s\n' "$DNS"; printf 'DNS_PORT=%s\n' "$DP"; printf 'APP_SCOPE=%s\n' "$S"; printf 'SHARE=%s\n' "$SHARE"; printf 'KILL=%s\n' "$KILL"; printf 'CONTROLLER_PORT=%s\n' "$CP"; printf 'DIRECT_UIDS=%s\n' "$DUIDS"; } > "$SESSION.new.$" && mv -f "$SESSION.new.$" "$SESSION"; }
 watchdog(){
   COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS="$6"; IFACES="$7"; DUIDS="$8"
-  mkdir -p "$RUN" || exit 0; printf '%s\n' "$$" > "$WATCHDOG_PID"; MISS=0; while [ "$MISS" -lt 3 ]; do if pidcore "$COREPID" && kill -0 "$COREPID" >/dev/null 2>&1; then MISS=0; sleep 2; else MISS=$((MISS+1)); sleep 0.20; fi; done; acquire_lock || exit 0
+  mkdir -p "$RUN" || exit 0; printf '%s\n' "$$" > "$WATCHDOG_PID"; MISS=0; while [ "$MISS" -lt 3 ]; do if core_maybe_alive "$COREPID" && kill -0 "$COREPID" >/dev/null 2>&1; then MISS=0; sleep 2; else MISS=$((MISS+1)); sleep 0.20; fi; done; acquire_lock || exit 0
   REC=$(cat "$PIDFILE" 2>/dev/null || true)
   if [ "$REC" = "$COREPID" ]; then
     cleanup; restorev6; rm -f "$PIDFILE"
@@ -578,6 +641,7 @@ start_watchdog(){ COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS=
 
 start(){
   START_BIN="$1"; START_CFG="$2"; START_MODE="$3"; START_TP="$4"; START_RP="$5"; START_V6="$6"; START_TCP="$7"; START_UDP="$8"; START_DNS="$9"; START_QUIC="${10}"; START_DP="${11}"; START_CP="${12}"; START_SCOPE="${13}"; START_UIDS="${14}"; START_SHARE="${15}"; START_KILL="${16}"; START_CIDRS="${17}"; START_IFACES="${18}"; START_DIRECT_UIDS="${19}"; START_PREVALIDATED="${20:-0}"; START_FAST_CAPS="${21:-0}"
+  mkdir -p "$RUN" || fail "无法创建运行目录"; : > "$START_TIMING"
   rm -f "$START_ERROR"; start_stage "preflight"
   if [ "$START_FAST_CAPS" != 1 ]; then
     preflight "$START_MODE" "$START_TP" "$START_RP" "$START_V6" "$START_TCP" "$START_UDP" "$START_DNS" "$START_QUIC" "$START_DP" "$START_CP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_KILL" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" >/dev/null
@@ -585,7 +649,11 @@ start(){
     start_stage "preflight-cached"
   fi
   [ -x "$START_BIN" ] || fail "核心文件不存在或不可执行"; [ -r "$START_CFG" ] || fail "启动配置不存在"; mkdir -p "$RUN" || fail "无法创建运行目录"; if [ "$START_PREVALIDATED" != 1 ]; then validatecfg "$START_BIN" "$START_CFG" || fail "Mihomo 配置校验失败，当前网络未被接管"; fi; acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
-  stopwatchdog; cleanup; restorev6; stopcore; sleep 0.20; rm -f "$CRASH_STATE" "$SESSION"
+  start_stage "cleanup-network"
+  stopwatchdog; cleanup; restorev6
+  start_stage "stop-old-core"
+  stopcore; sleep 0.20; rm -f "$CRASH_STATE" "$SESSION"
+  start_stage "check-ports"
   check_start_ports "$START_MODE" "$START_TP" "$START_RP" "$START_TCP" "$START_UDP" "$START_DNS" "$START_DP" "$START_CP"
   markused "$BYPASS_MARK" && fail "安全出站 mark 已被其他网络规则占用，未接管网络"
   NEED_TP=0; case "$START_MODE" in tproxy) if [ "$START_TCP" = 1 ] || [ "$START_UDP" = 1 ]; then NEED_TP=1; fi;; enhance) [ "$START_UDP" = 1 ] && NEED_TP=1;; esac; if [ "$START_DNS" = tproxy ] && [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ]; then NEED_TP=1; fi
@@ -646,7 +714,7 @@ status(){
   STATUS_RUNNING=false; STATUS_PID=0
   if [ -f "$PIDFILE" ]; then
     X=$(cat "$PIDFILE" 2>/dev/null || true)
-    case "$X" in ''|*[!0-9]*) ;; *) if pidcore "$X" && kill -0 "$X" >/dev/null 2>&1; then STATUS_RUNNING=true; STATUS_PID="$X"; fi;; esac
+    case "$X" in ''|*[!0-9]*) ;; *) if core_maybe_alive "$X" && kill -0 "$X" >/dev/null 2>&1; then STATUS_RUNNING=true; STATUS_PID="$X"; fi;; esac
   fi
   if [ "$STATUS_RUNNING" = false ]; then
     RECOVER_PID=$(findcorepid 2>/dev/null || true)
