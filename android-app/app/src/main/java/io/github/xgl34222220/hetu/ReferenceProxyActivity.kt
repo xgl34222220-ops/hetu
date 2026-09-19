@@ -921,7 +921,26 @@ private fun RefNetworkIdentityCard(runtime: ProxyRuntimeSnapshot, connections: I
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Row(Modifier.fillMaxWidth().height(24.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(if (renderedLan) "LAN" else "WAN", color = Color(0xFF64748B), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                androidx.compose.animation.AnimatedContent(
+                    targetState = renderedLan,
+                    modifier = Modifier.weight(1f),
+                    transitionSpec = {
+                        (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(150)) +
+                            androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(170)) { it / 3 })
+                            .togetherWith(
+                                androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(100)) +
+                                    androidx.compose.animation.slideOutVertically(androidx.compose.animation.core.tween(120)) { -it / 3 },
+                            )
+                    },
+                    label = "lanWanLabel",
+                ) { lan ->
+                    Text(
+                        if (lan) "LAN" else "WAN",
+                        color = Color(0xFF64748B),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
                 Box(
                     Modifier.size(24.dp).background(Color(0xFFF1F5F9), CircleShape)
                         .border(.6.dp, Color.White.copy(alpha = .90f), CircleShape),
