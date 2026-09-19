@@ -218,11 +218,6 @@ final class MihomoStartupConfig {
                 .replace("https://120.53.53.53/dns-query","https://223.6.6.6/dns-query");
     }
 
-    /**
-     * Runtime-only WebRTC privacy guard. STUN discovery must never escape through a
-     * user DIRECT rule. Blocking only the known UDP discovery ports preserves TCP/TURN
-     * fallback while preventing public-IP ICE candidates from bypassing the proxy.
-     */
     /** Merge the local effective Hetu ad-block snapshot into the private startup copy. */
     private static String ensureAdblock(String source)throws IOException{
         String yaml=normalize(source);
@@ -336,7 +331,7 @@ final class MihomoStartupConfig {
         return trimOne(out.toString());
     }
 
-    /** Merge Hetu CN IP providers into the private startup copy without editing the subscription. */    /** Merge Hetu CN IP providers into the private startup copy without editing the subscription. */
+    /** Merge Hetu CN IP providers into the private startup copy without editing the subscription. */
     private static String ensureCnIpDirect(String source)throws IOException{
         String yaml=normalize(source);
         yaml=injectCnProviders(yaml);
@@ -404,7 +399,7 @@ final class MihomoStartupConfig {
                 "中国 IP 自动直连需要普通 rules: 列表；当前源配置使用行内 rules 写法");
     }
 
-    /** Ensure Mihomo's built-in DNS server owns a dedicated TCP+UDP loop used by DNS REDIRECT. */    /** Ensure Mihomo's built-in DNS server owns a dedicated TCP+UDP loop used by DNS REDIRECT. */
+    /** Ensure Mihomo's built-in DNS server owns a dedicated TCP+UDP loop used by DNS REDIRECT. */
     private static String ensureDnsListener(String source,int port)throws IOException{
         String[] lines=normalize(source).split("\n",-1);
         int start=-1,end=lines.length,childIndent=Integer.MAX_VALUE;
