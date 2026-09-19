@@ -456,7 +456,17 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                 }
             }
 
-            items(subscriptions, key = { it.name }) { item ->
+            items(
+                subscriptions,
+                key = { item ->
+                    val provider = liveProviders[item.name] ?: liveProviders.entries.firstOrNull { it.key.equals(item.name, true) }?.value
+                    "sub-${item.name}-${provider?.updatedAt.orEmpty()}-${provider?.upload ?: 0L}-${provider?.download ?: 0L}-${provider?.total ?: 0L}"
+                },
+            ) { item ->
+                val provider = liveProviders[item.name] ?: liveProviders.entries.firstOrNull { it.key.equals(item.name, true) }?.value
+                val host = subscriptionHost(item)
+                val ratio = provider?.takeIf { it.hasSubscriptionInfo && it.total > 0L }?.ratio?.coerceIn(0f, 1f)
+                val remainingPercent = ratio?.let { ((1f - it) * 100f).toInt() }
                 Surface(
                     onClick = {
                         addingSubscription = false
@@ -465,22 +475,85 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                         editorUrl = if (item.placeholder) "" else item.url
                         editorError = ""
                     },
-                    shape = RoundedCornerShape(24.dp),
+                    shape = RoundedCornerShape(20.dp),
                     color = tokens.cardBackground,
+                    border = BorderStroke(.7.dp, if (dark) tokens.outline.copy(alpha = .30f) else Color(0xFFE2E8F0).copy(alpha = .70f)),
                     shadowElevation = 1.dp,
                 ) {
-                    Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Surface(shape = RoundedCornerShape(15.dp), color = tokens.elevatedCardBackground, modifier = Modifier.size(44.dp)) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(if (item.placeholder) Icons.Rounded.LinkOff else Icons.Rounded.Link, null, tint = if (item.placeholder) tokens.warning else scheme.primary, modifier = Modifier.size(21.dp))
+                    Column(Modifier.fillMaxWidth().padding(15.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                Modifier.size(36.dp).background(scheme.primary.copy(alpha = .08f), CircleShape),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    if (item.placeholder) Icons.Rounded.LinkOff else Icons.Rounded.Link,
+                                    null,
+                                    tint = if (item.placeholder) tokens.warning else scheme.primary,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
+                            Spacer(Modifier.width(10.dp))
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(item.name, color = tokens.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(host, color = tokens.textSecondary, fontSize = 10.sp, fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                            if (provider != null) {
+                                Surface(shape = CircleShape, color = scheme.primary.copy(alpha = .08f)) {
+                                    Text("${provider.nodes.size} 节点", Modifier.padding(horizontal = 7.dp, vertical = 3.dp), color = scheme.primary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            Spacer(Modifier.width(5.dp))
+                            Icon(Icons.Rounded.Edit, "编辑", tint = tokens.textMuted, modifier = Modifier.size(17.dp))
+                        }
+
+                        Box(
+                            Modifier.fillMaxWidth().height(6.dp)
+                                .background(if (dark) Color.White.copy(alpha = .06f) else Color(0xFFF1F5F9), CircleShape),
+                        ) {
+                            if (ratio != null && ratio > 0f) {
+                                Box(
+                                    Modifier.fillMaxWidth(ratio.coerceIn(.001f, 1f)).fillMaxHeight()
+                                        .background(Brush.horizontalGradient(listOf(Color(0xFF2563EB), Color(0xFF22D3EE))), CircleShape),
+                                )
                             }
                         }
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(item.name, color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(subscriptionSummary(item), color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            val usage = if (provider != null && provider.hasSubscriptionInfo && provider.total > 0L) {
+                                "${subscriptionBytes(provider.used)} / ${subscriptionBytes(provider.total)}"
+                            } else "流量 —"
+                            Text(
+                                usage,
+                                color = tokens.textPrimary,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                maxLines = 1,
+                            )
+                            if (remainingPercent != null) {
+                                Spacer(Modifier.width(7.dp))
+                                Surface(shape = CircleShape, color = if (dark) Color(0xFF064E3B).copy(alpha = .34f) else Color(0xFFECFDF5)) {
+                                    Text(
+                                        "剩余 $remainingPercent%",
+                                        Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        color = if (dark) Color(0xFF6EE7B7) else Color(0xFF059669),
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.weight(1f))
+                            Text(
+                                provider?.expire?.takeIf { it > 0L }?.let { "${subscriptionExpireDate(it)} 到期" } ?: "到期 —",
+                                color = tokens.textSecondary,
+                                fontSize = 9.sp,
+                                maxLines = 1,
+                            )
                         }
-                        Icon(Icons.Rounded.Edit, "编辑", tint = tokens.textSecondary, modifier = Modifier.size(20.dp))
+                        if (provider?.updatedAt?.isNotBlank() == true) {
+                            Text("更新 ${provider.updatedAt}", color = tokens.textMuted, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
                     }
                 }
             }
@@ -794,6 +867,31 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
             }
         }
     }
+}
+
+private fun subscriptionHost(item: ProxySubscriptionUi): String {
+    if (item.placeholder) return "未配置"
+    return runCatching { Uri.parse(item.url).host }.getOrNull().orEmpty().ifBlank { "链接已隐藏" }
+}
+
+private fun subscriptionBytes(bytes: Long): String {
+    if (bytes <= 0L) return "0 B"
+    val units = arrayOf("B", "KB", "MB", "GB", "TB")
+    var value = bytes.toDouble()
+    var index = 0
+    while (value >= 1024.0 && index < units.lastIndex) {
+        value /= 1024.0
+        index++
+    }
+    return if (index <= 1) "${value.toInt()} ${units[index]}" else String.format(java.util.Locale.US, "%.1f %s", value, units[index])
+}
+
+private fun subscriptionExpireDate(expire: Long): String {
+    if (expire <= 0L) return "—"
+    val millis = if (expire < 10_000_000_000L) expire * 1000L else expire
+    return runCatching {
+        java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date(millis))
+    }.getOrDefault("—")
 }
 
 private fun subscriptionSummary(item: ProxySubscriptionUi): String {
