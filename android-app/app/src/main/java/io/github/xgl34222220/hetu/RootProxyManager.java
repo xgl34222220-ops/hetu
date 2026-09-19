@@ -795,7 +795,7 @@ final class RootProxyManager {
             cmd.append("; if [ ! -s ").append(RootBridge.quote(dst))
                     .append(" ] || [ ! -f ").append(RootBridge.quote(allowDst))
                     .append(" ] || [ \"$(cat ").append(RootBridge.quote(revisionFile)).append(" 2>/dev/null)\" != ")
-                    .append(RootBridge.quote(adblock.revision)).append(" ]; then")
+                    .append(RootBridge.quote(p.adblock.revision)).append(" ]; then")
                     .append(" cp ").append(RootBridge.quote(adblock.getAbsolutePath())).append(' ').append(RootBridge.quote(tmp))
                     .append("; chmod 600 ").append(RootBridge.quote(tmp)).append("; chown 0:0 ").append(RootBridge.quote(tmp))
                     .append("; mv -f ").append(RootBridge.quote(tmp)).append(' ').append(RootBridge.quote(dst));
@@ -804,7 +804,7 @@ final class RootProxyManager {
                         .append("; chmod 600 ").append(RootBridge.quote(allowTmp)).append("; chown 0:0 ").append(RootBridge.quote(allowTmp))
                         .append("; mv -f ").append(RootBridge.quote(allowTmp)).append(' ').append(RootBridge.quote(allowDst));
             }
-            cmd.append("; printf %s ").append(RootBridge.quote(adblock.revision)).append(" > ").append(RootBridge.quote(revisionFile))
+            cmd.append("; printf %s ").append(RootBridge.quote(p.adblock.revision)).append(" > ").append(RootBridge.quote(revisionFile))
                     .append("; chmod 600 ").append(RootBridge.quote(revisionFile)).append("; chown 0:0 ").append(RootBridge.quote(revisionFile))
                     .append("; fi");
         }
