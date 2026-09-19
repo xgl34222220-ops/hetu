@@ -28,16 +28,18 @@ public final class BootReceiver extends BroadcastReceiver {
             return;
         }
 
-        if (!Intent.ACTION_BOOT_COMPLETED.equals(action)) return;
+        boolean bootOrUnlock=Intent.ACTION_BOOT_COMPLETED.equals(action)||Intent.ACTION_USER_UNLOCKED.equals(action);
+        if (!bootOrUnlock) return;
         if (prefs.getBoolean("proxyRootAutoStart", false) && prefs.getBoolean("proxyRootWanted", false)) {
-            final PendingResult pending = goAsync();
-            new Thread(() -> {
-                try {
-                    new RootProxyManager(context.getApplicationContext()).start(ProxyRuntimeProfile.load(prefs));
-                } catch (Exception e) {
-                    prefs.edit().putString("proxyRootBootError", "Root 代理开机恢复失败：" + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage())).apply();
-                } finally { pending.finish(); }
-            }, "hetu-root-boot").start();
+            try {
+                Intent restore=new Intent(context,ProxyNetworkMatchService.class)
+                        .setAction(ProxyNetworkMatchService.ACTION_BOOT_RESTORE);
+                if (android.os.Build.VERSION.SDK_INT>=26) context.startForegroundService(restore);
+                else context.startService(restore);
+                prefs.edit().putLong("proxyRootBootRestoreRequestedAt",System.currentTimeMillis()).remove("proxyRootBootError").apply();
+            } catch (Exception e) {
+                prefs.edit().putString("proxyRootBootError","开机守护服务未启动："+e.getClass().getSimpleName()).apply();
+            }
             return;
         }
 

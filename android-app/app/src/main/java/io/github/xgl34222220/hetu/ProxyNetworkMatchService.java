@@ -10,6 +10,7 @@ import java.util.concurrent.*;
 import org.json.JSONObject;
 
 public final class ProxyNetworkMatchService extends Service {
+    static final String ACTION_BOOT_RESTORE="io.github.xgl34222220.hetu.BOOT_RESTORE";
     private static final String CHANNEL="hetu-network-match";
     private SharedPreferences prefs;
     private ConnectivityManager cm;
@@ -20,6 +21,8 @@ public final class ProxyNetworkMatchService extends Service {
     private boolean defaultNetworkSeen;
     private volatile long lastAdblockMetricPoll;
     private volatile long networkChangeGeneration;
+    private volatile int bootRestoreAttempts;
+    private volatile boolean bootRestoreInFlight;
 
     @Override public void onCreate(){
         super.onCreate();
@@ -33,11 +36,67 @@ public final class ProxyNetworkMatchService extends Service {
     }
 
     @Override public int onStartCommand(Intent i,int f,int id){
+        String action=i==null?"":i.getAction();
         if(!prefs.getBoolean("networkMatchEnabled",false)&&!prefs.getBoolean("proxyRootWanted",false)){
             stopSelf();return START_NOT_STICKY;
         }
+        if(ACTION_BOOT_RESTORE.equals(action)){
+            prefs.edit().putLong("proxyRootBootServiceAt",System.currentTimeMillis()).apply();
+            scheduleBootRestore(350L);
+        }
         evaluate();
         return START_STICKY;
+    }
+
+    private void scheduleBootRestore(long delayMs){
+        if(bootRestoreInFlight)return;
+        bootRestoreInFlight=true;
+        metrics.schedule(()->worker.execute(()->{
+            try{restoreWantedProxyAfterBoot();}
+            finally{bootRestoreInFlight=false;}
+        }),Math.max(0L,delayMs),TimeUnit.MILLISECONDS);
+    }
+
+    private void restoreWantedProxyAfterBoot(){
+        if(!prefs.getBoolean("proxyRootAutoStart",false)||!prefs.getBoolean("proxyRootWanted",false))return;
+        if(coreAlive()){
+            prefs.edit()
+                    .putBoolean("proxyRootRuntimeRunning",true)
+                    .putLong("proxyRootBootRestoreSuccessAt",System.currentTimeMillis())
+                    .remove("proxyRootBootError")
+                    .apply();
+            return;
+        }
+        Network network=cm==null?null:cm.getActiveNetwork();
+        NetworkCapabilities caps=network==null||cm==null?null:cm.getNetworkCapabilities(network);
+        boolean internet=caps!=null&&caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+        if(!internet){
+            prefs.edit().putString("proxyRootBootError","等待开机网络就绪…").apply();
+            if(++bootRestoreAttempts<=12)scheduleBootRestore(Math.min(5000L,750L+bootRestoreAttempts*350L));
+            return;
+        }
+        try{
+            JSONObject result=new RootProxyManager(getApplicationContext()).start(ProxyRuntimeProfile.load(prefs));
+            if(result.optBoolean("ok",false)||result.optBoolean("running",false)){
+                bootRestoreAttempts=0;
+                prefs.edit()
+                        .putBoolean("proxyRootRuntimeRunning",true)
+                        .putLong("proxyRootBootRestoreSuccessAt",System.currentTimeMillis())
+                        .remove("proxyRootBootError")
+                        .apply();
+                return;
+            }
+            throw new IllegalStateException(result.optString("message","开机恢复未完成"));
+        }catch(Exception error){
+            String detail=error.getMessage()==null?error.getClass().getSimpleName():error.getMessage();
+            if(detail.length()>260)detail=detail.substring(0,260)+"…";
+            prefs.edit()
+                    .putBoolean("proxyRootRuntimeRunning",false)
+                    .putString("proxyRootBootError","Root 代理开机恢复失败："+detail)
+                    .putLong("proxyRootBootRestoreAttemptAt",System.currentTimeMillis())
+                    .apply();
+            if(++bootRestoreAttempts<=8)scheduleBootRestore(Math.min(8000L,1200L+bootRestoreAttempts*800L));
+        }
     }
 
     @Override public void onDestroy(){
@@ -50,7 +109,12 @@ public final class ProxyNetworkMatchService extends Service {
 
     private void register(){
         cb=new ConnectivityManager.NetworkCallback(){
-            @Override public void onAvailable(Network n){handleDefaultNetwork(n);evaluate();}
+            @Override public void onAvailable(Network n){
+                handleDefaultNetwork(n);
+                if(prefs.getBoolean("proxyRootAutoStart",false)&&prefs.getBoolean("proxyRootWanted",false)&&!prefs.getBoolean("proxyRootRuntimeRunning",false))
+                    scheduleBootRestore(250L);
+                evaluate();
+            }
             @Override public void onLost(Network n){networkChangeGeneration++;evaluate();}
             @Override public void onCapabilitiesChanged(Network n,NetworkCapabilities c){evaluate();}
         };
