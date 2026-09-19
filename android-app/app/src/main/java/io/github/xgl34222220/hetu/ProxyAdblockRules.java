@@ -5,6 +5,7 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
+import org.json.JSONObject;
 
 /** Exports Hetu DNS block/allow snapshots for Mihomo local domain providers. */
 final class ProxyAdblockRules {
@@ -25,30 +26,44 @@ final class ProxyAdblockRules {
         }
     }
 
-    static synchronized Snapshot export(Context context) throws Exception {
-        RuleStore rules=new RuleStore(context.getApplicationContext());
-        rules.reload();
-        String revision=rules.currentRevision();
+    private static String persistedGeneration(Context context){
+        File pointer=new File(context.getFilesDir(),"rules-v2/current.json");
+        if(!pointer.isFile())return "";
+        try(FileInputStream in=new FileInputStream(pointer)){
+            ByteArrayOutputStream out=new ByteArrayOutputStream();
+            byte[] buffer=new byte[4096];int n,total=0;
+            while((n=in.read(buffer))!=-1){
+                total+=n;if(total>256*1024)return "";
+                out.write(buffer,0,n);
+            }
+            return new JSONObject(new String(out.toByteArray(),StandardCharsets.UTF_8)).optString("current","");
+        }catch(Exception ignored){return "";}
+    }
 
+    static synchronized Snapshot export(Context context) throws Exception {
         File dir=new File(context.getCacheDir(),"hetu-dns-filter");
         if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("无法创建河图 DNS 过滤规则目录");
         File target=new File(dir,"hetu-adblock.txt");
         File allowTarget=new File(dir,"hetu-adblock-allow.txt");
         File meta=new File(dir,"hetu-adblock.meta");
 
-        if(target.isFile()&&allowTarget.isFile()&&meta.isFile()){
+        String persisted=persistedGeneration(context);
+        if(!persisted.isEmpty()&&target.isFile()&&allowTarget.isFile()&&meta.isFile()){
             Properties cached=new Properties();
             try(FileInputStream in=new FileInputStream(meta)){cached.load(in);}
             catch(Exception ignored){cached.clear();}
-            if(revision.equals(cached.getProperty("revision",""))){
+            if(persisted.equals(cached.getProperty("revision",""))){
                 try{
                     int count=Integer.parseInt(cached.getProperty("count","-1"));
                     int allowCount=Integer.parseInt(cached.getProperty("allowCount","-1"));
-                    if(count>=0&&allowCount>=0)return new Snapshot(target,allowTarget,count,allowCount,revision);
+                    if(count>=0&&allowCount>=0)return new Snapshot(target,allowTarget,count,allowCount,persisted);
                 }catch(NumberFormatException ignored){}
             }
         }
 
+        RuleStore rules=new RuleStore(context.getApplicationContext());
+        rules.reload();
+        String revision=rules.currentRevision();
         ArrayList<String> domains=new ArrayList<>(rules.effectiveDomains());
         ArrayList<String> allow=new ArrayList<>(rules.effectiveAllowDomains());
         Collections.sort(domains);

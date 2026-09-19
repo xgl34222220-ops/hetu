@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.locks.ReentrantLock;
+import java.security.MessageDigest;
 
 /** Root transparent-proxy control plane plus private localhost Clash API bootstrap. */
 final class RootProxyManager {
@@ -346,6 +347,28 @@ final class RootProxyManager {
         }
     }
 
+    private static String hex(byte[] bytes){
+        StringBuilder out=new StringBuilder(bytes.length*2);
+        for(byte b:bytes)out.append(String.format(Locale.ROOT,"%02x",b&0xff));
+        return out.toString();
+    }
+
+    private String validationFingerprint(Prepared p)throws Exception{
+        MessageDigest digest=MessageDigest.getInstance("SHA-256");
+        digest.update(p.startup.getBytes(StandardCharsets.UTF_8));
+        digest.update((byte)0);
+        digest.update(expectedCoreToken(p.profile.core).getBytes(StandardCharsets.UTF_8));
+        if(p.adblock!=null){
+            digest.update((byte)0);
+            digest.update(p.adblock.revision.getBytes(StandardCharsets.UTF_8));
+        }
+        return hex(digest.digest());
+    }
+
+    private String capabilityFingerprint(ProxyRuntimeProfile profile,RootProxyPolicy policy){
+        return "caps-v1|"+Build.FINGERPRINT+"|"+topologyFingerprint(profile,policy);
+    }
+
     JSONObject preflight(Prepared p)throws Exception{
         installRuntimeFiles(p,false);
         RootProxyPolicy policy=p.policy;
@@ -392,30 +415,47 @@ final class RootProxyManager {
             p=prepare(profile,restartControllerPort);
         }
         RootProxyPolicy policy=p.policy;
-        stage(progress,"部署 Root 核心与事务控制器…");
+        stage(progress,"部署必要运行文件…");
         installRuntimeFiles(p,true);
-        stage(progress,"用 Mihomo 校验最终启动配置…");
-        try{
-            validateRuntimeConfig();
-            if(profile.adblockChain)prefs.edit().remove("proxyAdblockLastError").apply();
-        }catch(Exception fullFailure){
-            if(!profile.adblockChain)throw fullFailure;
-            stage(progress,"串联广告配置校验失败，尝试不修改源 YAML 启动代理…");
-            ProxyRuntimeProfile fallbackProfile=withoutAdblock(profile);
-            Prepared fallback=prepare(fallbackProfile,restartControllerPort);
-            installRuntimeFiles(fallback,true);
-            try{validateRuntimeConfig();}
-            catch(Exception fallbackFailure){
-                throw new IOException((fullFailure.getMessage()==null?"最终配置校验失败":fullFailure.getMessage())+"；关闭广告串联后仍失败："+(fallbackFailure.getMessage()==null?"未知错误":fallbackFailure.getMessage()),fullFailure);
+
+        String validationKey=validationFingerprint(p);
+        boolean validationKnown=validationKey.equals(prefs.getString("proxyRootValidatedFingerprint",""));
+        boolean preserveLiveNeedsValidation=replaceRunning&&existingRunning&&!validationKnown;
+        if(preserveLiveNeedsValidation){
+            stage(progress,"配置有变化，先校验后再替换当前核心…");
+            try{
+                validateRuntimeConfig();
+                prefs.edit().putString("proxyRootValidatedFingerprint",validationKey).apply();
+                if(profile.adblockChain)prefs.edit().remove("proxyAdblockLastError").apply();
+            }catch(Exception fullFailure){
+                if(!profile.adblockChain)throw fullFailure;
+                stage(progress,"广告串联校验失败，尝试保留原 YAML 重新校验…");
+                ProxyRuntimeProfile fallbackProfile=withoutAdblock(profile);
+                Prepared fallback=prepare(fallbackProfile,restartControllerPort);
+                installRuntimeFiles(fallback,true);
+                String fallbackValidationKey=validationFingerprint(fallback);
+                try{validateRuntimeConfig();}
+                catch(Exception fallbackFailure){
+                    throw new IOException((fullFailure.getMessage()==null?"最终配置校验失败":fullFailure.getMessage())+"；关闭广告串联后仍失败："+(fallbackFailure.getMessage()==null?"未知错误":fallbackFailure.getMessage()),fullFailure);
+                }
+                prefs.edit().putString("proxyRootValidatedFingerprint",fallbackValidationKey).apply();
+                rememberAdblockFallback(fullFailure);
+                profile=fallbackProfile;
+                p=fallback;
+                policy=p.policy;
+                validationKey=fallbackValidationKey;
+                stage(progress,"代理配置可用；本次仅关闭串联广告过滤继续启动…");
             }
-            rememberAdblockFallback(fullFailure);
-            profile=fallbackProfile;
-            p=fallback;
-            policy=p.policy;
-            stage(progress,"代理配置可用；本次仅关闭串联广告过滤继续启动…");
+        }else if(validationKnown){
+            stage(progress,"配置未变化，使用已验证快启动路径…");
+        }else{
+            stage(progress,"首次启动由核心直接校验，监听就绪后再接管网络…");
         }
+
         if(!prefs.getBoolean("hetuLegacyRetired",false))quiesceLegacyRuntime(progress);
-        stage(progress,"检查网络能力并启动核心…");
+        String capabilityKey=capabilityFingerprint(profile,policy);
+        boolean capabilityKnown=capabilityKey.equals(prefs.getString("proxyRootCapabilityFingerprint",""));
+        stage(progress,capabilityKnown?"设备能力未变化，跳过重复探测…":"检查网络能力并启动核心…");
 
         boolean adblockCoordinatorEntered=false;
         boolean independentFallback=prefs.getBoolean("proxyAdblockFallbackEnabled",false);
@@ -437,7 +477,7 @@ final class RootProxyManager {
                 BIN,CONFIG,profile.mode.id,String.valueOf(p.tproxyPort),String.valueOf(p.redirectPort),profile.ipv6.id,
                 bit(profile.tcp),bit(profile.udp),profile.dnsHijack.id,bit(profile.quicBlocked),
                 String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(p.controllerPort),
-                policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,"1");
+                policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,"1",bit(capabilityKnown));
             if(!result.optBoolean("ok"))throw new IOException(result.optString("message","Root 代理启动失败"));
         }catch(Exception startFailure){if(adblockCoordinatorEntered)ProxyAdblockCoordinator.exit(context);throw startFailure;}
 
@@ -502,7 +542,10 @@ final class RootProxyManager {
                 .putInt("proxyAdblockLastRuleCount",p.adblock==null?0:p.adblock.count)
                 .putString("proxyAdblockLastRevision",p.adblock==null?"":p.adblock.revision)
                 .putString("proxyRootTopologyFingerprint",topologyFingerprint(profile,policy))
+                .putString("proxyRootValidatedFingerprint",validationKey)
+                .putString("proxyRootCapabilityFingerprint",capabilityKey)
                 .remove("proxyRootRuntimeRefreshPending")
+                .remove("proxyRootBootError")
                 .apply();
         ensureContinuityService(true);
         return result;
