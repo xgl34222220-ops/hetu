@@ -259,12 +259,6 @@ final class MihomoStartupConfig {
         return false;
     }
 
-    private static String spaces(int count){
-        char[] chars=new char[Math.max(0,count)];
-        Arrays.fill(chars,' ');
-        return new String(chars);
-    }
-
     private static void appendTun(StringBuilder out,ProxyRuntimeProfile profile,ProxyRuntimeProfile.AppScope scope,
             Set<String> packages,Set<String> directPackages,boolean autoRoute,boolean packageFilter){
         out.append("tun:\n");
