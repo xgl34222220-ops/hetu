@@ -1501,34 +1501,25 @@ private fun RefPanel(
             capsuleError = false
             return
         }
-        var completed = 0
-        var failed = 0
-        capsuleText = "节点测速 0/${nodes.size}"
+        nodes.forEach { testing[it.name] = true }
+        capsuleText = "节点批量测速中 · ${nodes.size} 个"
         capsuleError = false
+        val measured = try {
+            repo.globalDelay()
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (_: Exception) {
+            emptyMap()
+        }
+        var failed = 0
         try {
-            for (chunk in nodes.chunked(6)) {
-                coroutineScope {
-                    chunk.mapIndexed { index, node ->
-                        async {
-                            delay(index * 45L)
-                            testing[node.name] = true
-                            try {
-                                val value = repo.delay(node.name)
-                                delays[node.name] = value
-                                if (value <= 0L) failed++
-                            } catch (cancel: CancellationException) {
-                                throw cancel
-                            } catch (_: Exception) {
-                                delays[node.name] = -1L
-                                failed++
-                            } finally {
-                                testing.remove(node.name)
-                                completed++
-                                capsuleText = "节点测速 $completed/${nodes.size}"
-                            }
-                        }
-                    }.awaitAll()
-                }
+            nodes.forEachIndexed { index, node ->
+                val value = measured[node.name] ?: -1L
+                delays[node.name] = value
+                if (value <= 0L) failed++
+                testing.remove(node.name)
+                capsuleText = "节点测速 ${index + 1}/${nodes.size}"
+                if (index < nodes.lastIndex) delay(12L)
             }
         } finally {
             nodes.forEach { testing.remove(it.name) }
@@ -1551,11 +1542,10 @@ private fun RefPanel(
         var failed = 0
         capsuleText = "订阅更新 0/${targets.size}"
         capsuleError = false
+        targets.forEach { providerRefreshing[it.name] = true }
         coroutineScope {
-            targets.mapIndexed { index, item ->
+            targets.map { item ->
                 async {
-                    delay(index * 70L)
-                    providerRefreshing[item.name] = true
                     try {
                         val updated = repo.refreshProvider(item.name)
                         if (updated != null) providers = providers.map { if (it.name == updated.name) updated else it }
@@ -1594,12 +1584,12 @@ private fun RefPanel(
         var failed = 0
         capsuleText = "规则集更新 0/${targets.size}"
         capsuleError = false
-        for (chunk in targets.chunked(3)) {
+        ruleSetRefreshing.clear()
+        targets.forEach { ruleSetRefreshing[it.name] = true }
+        for (chunk in targets.chunked(8)) {
             coroutineScope {
-                chunk.mapIndexed { index, item ->
+                chunk.map { item ->
                     async {
-                        delay(index * 80L)
-                        ruleSetRefreshing[item.name] = true
                         try {
                             val updated = repo.refreshRuleSet(item.name)
                             if (updated != null) ruleSets = ruleSets.map { if (it.name == updated.name) updated else it }

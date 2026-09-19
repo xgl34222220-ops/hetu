@@ -121,64 +121,91 @@ internal class ProxyDashboardRepository(context: Context) {
  */
 suspend fun globalDelay(): Map<String, Long> = withContext(Dispatchers.IO) {
     val raw = api.proxies()
-    val providers = remoteProviders(api.proxyProviders())
-    val providerByNode = HashMap<String, DashboardProviderUi>()
-    providers.forEach { provider ->
-        provider.nodes.forEach { node -> providerByNode.putIfAbsent(node, provider) }
-    }
 
     val leaves = LinkedHashSet<String>()
     val previous = HashMap<String, Long>()
+    val groups = ArrayList<Triple<String, JSONObject, Set<String>>>()
+
     val names = raw.keys()
     while (names.hasNext()) {
         val name = names.next()
-        if (name == "GLOBAL") continue
         val item = raw.optJSONObject(name) ?: continue
-        if (item.optJSONArray("all") != null) continue
+        val all = item.optJSONArray("all")
+        if (all != null) {
+            val members = LinkedHashSet<String>()
+            for (i in 0 until all.length()) {
+                all.optString(i).takeIf { it.isNotBlank() }?.let(members::add)
+            }
+            val url = item.optString("testUrl", "")
+            if (members.isNotEmpty() && url.isNotBlank()) groups += Triple(name, item, members)
+            continue
+        }
+        if (name == "GLOBAL") continue
         val type = item.optString("type", "").lowercase()
         if (type in setOf("direct", "reject", "rejectdrop", "pass", "compatible")) continue
         leaves += name
         latestDelay(item)?.takeIf { it > 0L }?.let { previous[name] = it }
     }
 
-    val groupProbe = HashMap<String, Pair<String, String>>()
-    val groupNames = raw.keys()
-    while (groupNames.hasNext()) {
-        val groupName = groupNames.next()
-        val group = raw.optJSONObject(groupName) ?: continue
-        val all = group.optJSONArray("all") ?: continue
-        val url = group.optString("testUrl", "")
-        val expected = group.optString("expectedStatus", "200-399").ifBlank { "200-399" }
-        if (url.isBlank()) continue
-        for (i in 0 until all.length()) {
-            val node = all.optString(i)
-            if (node.isNotBlank()) groupProbe.putIfAbsent(node, url to expected)
-        }
+    // Greedily choose the fewest useful policy groups to cover the real leaf nodes.
+    // A common "节点选择" group containing all subscription nodes therefore becomes one API call.
+    val uncovered = LinkedHashSet(leaves)
+    val selected = ArrayList<Triple<String, JSONObject, Set<String>>>()
+    val remaining = groups.toMutableList()
+    while (uncovered.isNotEmpty() && remaining.isNotEmpty()) {
+        val best = remaining.maxByOrNull { (_, _, members) -> members.count { it in uncovered } } ?: break
+        val gain = best.third.count { it in uncovered }
+        if (gain <= 0) break
+        selected += best
+        best.third.forEach(uncovered::remove)
+        remaining.remove(best)
     }
 
     val result = LinkedHashMap<String, Long>()
-    for (chunk in leaves.toList().chunked(6)) {
-        val measured = coroutineScope {
-            chunk.map { node ->
-                async {
-                    val provider = providerByNode[node]
-                    val group = groupProbe[node]
-                    val value = try {
-                        when {
-                            provider != null -> api.delay(node, provider.testUrl, provider.expectedStatus)
-                            group != null -> api.delay(node, group.first, group.second)
-                            else -> api.delay(node)
-                        }
-                    } catch (cancel: CancellationException) {
-                        throw cancel
-                    } catch (_: Exception) {
-                        -1L
-                    }
-                    node to if (value > 0L) value else (previous[node] ?: -1L)
+    coroutineScope {
+        selected.map { (groupName, group, _) ->
+            async {
+                val response = try {
+                    api.groupDelay(
+                        groupName,
+                        group.optString("testUrl", ""),
+                        group.optString("expectedStatus", "200-399").ifBlank { "200-399" },
+                    )
+                } catch (cancel: CancellationException) {
+                    throw cancel
+                } catch (_: Exception) {
+                    JSONObject()
                 }
-            }.awaitAll()
+                val keys = response.keys()
+                while (keys.hasNext()) {
+                    val name = keys.next()
+                    val value = response.optLong(name, -1L)
+                    if (value > 0L) synchronized(result) { result[name] = value }
+                }
+            }
+        }.awaitAll()
+    }
+
+    // Only nodes not covered by a policy group need individual fallback probes.
+    if (uncovered.isNotEmpty()) {
+        for (chunk in uncovered.toList().chunked(8)) {
+            coroutineScope {
+                chunk.map { node ->
+                    async {
+                        val value = try { api.delay(node) }
+                        catch (cancel: CancellationException) { throw cancel }
+                        catch (_: Exception) { -1L }
+                        node to value
+                    }
+                }.awaitAll().forEach { (name, value) ->
+                    if (value > 0L) result[name] = value
+                }
+            }
         }
-        measured.forEach { (name, value) -> result[name] = value }
+    }
+
+    leaves.forEach { name ->
+        if ((result[name] ?: -1L) <= 0L) result[name] = previous[name] ?: -1L
     }
     result
 }

@@ -96,6 +96,12 @@ jobs:
           grep -Fq 'isRefreshing = homeRefreshing' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           ! grep -Fq 'capsuleText = "全部刷新完成"' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           grep -Fq 'suspend fun refreshGroupDelaysAnimated()' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
+          grep -Fq 'api.groupDelay(' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
+          grep -Fq 'val uncovered = LinkedHashSet(leaves)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
+          grep -Fq 'nodes.forEach { testing[it.name] = true }' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
+          grep -Fq 'repo.globalDelay()' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
+          grep -Fq 'targets.forEach { providerRefreshing[it.name] = true }' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
+          grep -Fq 'targets.chunked(8)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           grep -Fq 'suspend fun refreshProvidersAnimated()' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           grep -Fq 'suspend fun refreshRuleSetsAnimated()' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           grep -Fq 'providerRefreshing[item.name] = true' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
@@ -127,8 +133,8 @@ jobs:
           grep -q 'System.loadLibrary("hetu_core")' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoNative.java
           grep -q 'Java_io_github_xgl34222220_hetu_MihomoNative_invoke' native/bridge/jni_android.c
           grep -q 'Java_io_github_xgl34222220_hetu_preview_MihomoNative_invoke' native/bridge/jni_android.c
-          grep -q 'versionName = "0.4.0-test.82"' android-app/app/build.gradle.kts
-          grep -q 'versionCode = 482' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.4.0-test.83"' android-app/app/build.gradle.kts
+          grep -q 'versionCode = 483' android-app/app/build.gradle.kts
           test -f android-app/app/src/main/java/io/github/xgl34222220/hetu/LegacyAppMigrator.java
           grep -q 'LegacyAppMigrator.migrateIfNeeded(app)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
           grep -q 'controller.restart { operation = it }' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
