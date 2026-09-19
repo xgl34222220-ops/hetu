@@ -226,13 +226,13 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
         },
     ) {
         LazyColumn(
-            Modifier.fillMaxSize(),
+            Modifier.fillMaxSize().statusBarsPadding(),
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 94.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             item("header") {
                 Row(
-                    Modifier.fillMaxWidth().statusBarsPadding().heightIn(min = 64.dp).padding(vertical = 8.dp),
+                    Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {

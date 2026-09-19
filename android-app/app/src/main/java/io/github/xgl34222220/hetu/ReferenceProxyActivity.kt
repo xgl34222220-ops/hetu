@@ -638,7 +638,7 @@ private fun RefHome(
     val memory = runtime.rssBytes.takeIf { it > 0L } ?: state.memoryBytes
 
     LazyColumn(
-        Modifier.fillMaxSize(),
+        Modifier.fillMaxSize().statusBarsPadding(),
         contentPadding = PaddingValues(
             start = 16.dp,
             top = 8.dp,
@@ -649,7 +649,7 @@ private fun RefHome(
     ) {
         item {
             Row(
-                Modifier.fillMaxWidth().statusBarsPadding().padding(top = 16.dp, bottom = 10.dp).height(44.dp),
+                Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 10.dp).height(44.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -1476,7 +1476,7 @@ private fun RefPanel(
                 modifier = Modifier.fillMaxSize(),
             ) {
             LazyColumn(
-            Modifier.fillMaxSize(),
+            Modifier.fillMaxSize().statusBarsPadding(),
             contentPadding = PaddingValues(
                 start = 16.dp,
                 top = 8.dp,
@@ -1486,7 +1486,7 @@ private fun RefPanel(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             item {
-                Box(Modifier.statusBarsPadding().padding(top = 14.dp, bottom = 4.dp)) {
+                Box(Modifier.padding(top = 14.dp, bottom = 4.dp)) {
                     RefPanelGlassHeader(
                         selected = tab,
                         onSelect = onSelectedTabChange,
@@ -3536,7 +3536,7 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
 
 
     LazyColumn(
-        Modifier.fillMaxSize().background(if (dark) t.pageBackground else Color(0xFFF1F5F9)),
+        Modifier.fillMaxSize().statusBarsPadding().background(if (dark) t.pageBackground else Color(0xFFF1F5F9)),
         contentPadding = PaddingValues(
             start = 16.dp,
             top = 8.dp,
@@ -3626,7 +3626,7 @@ private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     LazyColumn(
-        Modifier.fillMaxSize().background(if (dark) t.pageBackground else Color(0xFFF1F5F9)),
+        Modifier.fillMaxSize().statusBarsPadding().background(if (dark) t.pageBackground else Color(0xFFF1F5F9)),
         contentPadding = PaddingValues(
             start = 16.dp,
             top = 8.dp,
@@ -4200,7 +4200,7 @@ private fun RefTitleBar(title: String) {
         fontSize = 26.sp,
         lineHeight = 32.sp,
         fontWeight = FontWeight.Bold,
-        modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(top = 12.dp, bottom = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp),
     )
 }
 
