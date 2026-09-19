@@ -60,7 +60,7 @@ jobs:
           grep -q 'System.loadLibrary("hetu_core")' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoNative.java
           grep -q 'Java_io_github_xgl34222220_hetu_MihomoNative_invoke' native/bridge/jni_android.c
           grep -q 'Java_io_github_xgl34222220_hetu_preview_MihomoNative_invoke' native/bridge/jni_android.c
-          grep -q 'versionName = "0.4.0-test.67"' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.4.0-test.68"' android-app/app/build.gradle.kts
           test -f android-app/app/src/main/java/io/github/xgl34222220/hetu/LegacyAppMigrator.java
           grep -q 'LegacyAppMigrator.migrateIfNeeded(app)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
           grep -q 'controller.restart { operation = it }' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
@@ -96,6 +96,15 @@ jobs:
           ! grep -q 'AlertDialog(' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
           grep -Fq '${it.updatedAt}-${it.upload}-${it.download}-${it.total}-${it.expire}' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           grep -Fq '.height(90.dp)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
+          grep -Fq 'Color(0xFF2563EB).copy(alpha = .08f)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
+          ! grep -Fq 'Color(0xFFEFF6FF).copy(alpha = .90f)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
+          grep -Fq 'liveProviders by remember' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
+          grep -Fq 'subscriptionBytes(provider.used)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
+          grep -Fq '1.5.dp else .7.dp' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
+          grep -Fq 'YAML 语法大纲' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
+          grep -Fq 'YamlAccessoryKey("Tab")' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
+          grep -Fq 'YamlAccessoryKey("撤销"' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
+          grep -Fq 'TextButton(onClick = ::saveYaml' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
           grep -Fq '.background(t.pageBackground)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceFileManagerActivity.kt
           grep -Fq '.background(tokens.pageBackground)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreActivity.kt
           grep -q 'head -c \$((END-START+1))' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
