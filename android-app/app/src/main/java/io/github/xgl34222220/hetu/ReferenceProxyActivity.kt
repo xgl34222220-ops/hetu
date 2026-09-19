@@ -2392,7 +2392,6 @@ private fun RefGroupCard(
 }
 
 @Composable
-private fun RefInlineGroupExpansion@Composable
 private fun RefInlineGroupExpansion(
     group: ProxyGroupUi,
     selected: String,
