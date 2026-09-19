@@ -1427,6 +1427,7 @@ private fun RefPanel(
     val selectedLocal = remember { mutableStateMapOf<String, String>() }
     val testing = remember { mutableStateMapOf<String, Boolean>() }
     val providerRefreshing = remember { mutableStateMapOf<String, Boolean>() }
+    val providerSucceeded = remember { mutableStateMapOf<String, Boolean>() }
     val ruleSetRefreshing = remember { mutableStateMapOf<String, Boolean>() }
     val ruleSetSucceeded = remember { mutableStateMapOf<String, Boolean>() }
     var capsuleText by remember { mutableStateOf("") }
@@ -1493,6 +1494,138 @@ private fun RefPanel(
         }
     }
 
+    suspend fun refreshGroupDelaysAnimated() {
+        val nodes = state.groups.flatMap { it.nodes }.distinctBy { it.name }
+        if (nodes.isEmpty()) {
+            capsuleText = "没有可测速节点"
+            capsuleError = false
+            return
+        }
+        var completed = 0
+        var failed = 0
+        capsuleText = "节点测速 0/${nodes.size}"
+        capsuleError = false
+        try {
+            for (chunk in nodes.chunked(6)) {
+                coroutineScope {
+                    chunk.mapIndexed { index, node ->
+                        async {
+                            delay(index * 45L)
+                            testing[node.name] = true
+                            try {
+                                val value = repo.delay(node.name)
+                                delays[node.name] = value
+                                if (value <= 0L) failed++
+                            } catch (cancel: CancellationException) {
+                                throw cancel
+                            } catch (_: Exception) {
+                                delays[node.name] = -1L
+                                failed++
+                            } finally {
+                                testing.remove(node.name)
+                                completed++
+                                capsuleText = "节点测速 $completed/${nodes.size}"
+                            }
+                        }
+                    }.awaitAll()
+                }
+            }
+        } finally {
+            nodes.forEach { testing.remove(it.name) }
+        }
+        capsuleError = failed > 0
+        capsuleText = if (failed == 0) "节点测速完成 · ${nodes.size}/${nodes.size}" else "节点测速完成 · ${nodes.size - failed} 成功 / $failed 失败"
+        view.performHapticFeedback(if (failed == 0) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.CLOCK_TICK)
+    }
+
+    suspend fun refreshProvidersAnimated() {
+        if (providers.isEmpty()) providers = repo.providers()
+        val targets = providers
+        if (targets.isEmpty()) {
+            capsuleText = "没有远程订阅"
+            capsuleError = false
+            return
+        }
+        providerSucceeded.clear()
+        var completed = 0
+        var failed = 0
+        capsuleText = "订阅更新 0/${targets.size}"
+        capsuleError = false
+        coroutineScope {
+            targets.mapIndexed { index, item ->
+                async {
+                    delay(index * 70L)
+                    providerRefreshing[item.name] = true
+                    try {
+                        val updated = repo.refreshProvider(item.name)
+                        if (updated != null) providers = providers.map { if (it.name == updated.name) updated else it }
+                        providerSucceeded[item.name] = true
+                        scope.launch {
+                            delay(1400)
+                            providerSucceeded.remove(item.name)
+                        }
+                    } catch (cancel: CancellationException) {
+                        throw cancel
+                    } catch (_: Exception) {
+                        failed++
+                    } finally {
+                        providerRefreshing.remove(item.name)
+                        completed++
+                        capsuleText = "订阅更新 $completed/${targets.size}"
+                    }
+                }
+            }.awaitAll()
+        }
+        capsuleError = failed > 0
+        capsuleText = if (failed == 0) "订阅更新完成 · ${targets.size}/${targets.size}" else "订阅更新完成 · ${targets.size - failed} 成功 / $failed 失败"
+        view.performHapticFeedback(if (failed == 0) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.CLOCK_TICK)
+    }
+
+    suspend fun refreshRuleSetsAnimated() {
+        if (ruleSets.isEmpty()) ruleSets = repo.ruleSets()
+        val targets = ruleSets.filter { it.vehicleType.equals("HTTP", true) }
+        if (targets.isEmpty()) {
+            capsuleText = "没有可更新的远程规则集"
+            capsuleError = false
+            return
+        }
+        ruleSetSucceeded.clear()
+        var completed = 0
+        var failed = 0
+        capsuleText = "规则集更新 0/${targets.size}"
+        capsuleError = false
+        for (chunk in targets.chunked(3)) {
+            coroutineScope {
+                chunk.mapIndexed { index, item ->
+                    async {
+                        delay(index * 80L)
+                        ruleSetRefreshing[item.name] = true
+                        try {
+                            val updated = repo.refreshRuleSet(item.name)
+                            if (updated != null) ruleSets = ruleSets.map { if (it.name == updated.name) updated else it }
+                            ruleSetSucceeded[item.name] = true
+                            scope.launch {
+                                delay(1400)
+                                ruleSetSucceeded.remove(item.name)
+                            }
+                        } catch (cancel: CancellationException) {
+                            throw cancel
+                        } catch (_: Exception) {
+                            failed++
+                        } finally {
+                            ruleSetRefreshing.remove(item.name)
+                            completed++
+                            capsuleText = "规则集更新 $completed/${targets.size}"
+                        }
+                    }
+                }.awaitAll()
+            }
+        }
+        capsuleError = failed > 0
+        capsuleText = if (failed == 0) "规则集更新完成 · ${targets.size}/${targets.size}" else "规则集更新完成 · ${targets.size - failed} 成功 / $failed 失败"
+        view.performHapticFeedback(if (failed == 0) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.CLOCK_TICK)
+    }
+
     fun refresh() {
         if (refreshing) return
         scope.launch {
@@ -1504,56 +1637,30 @@ private fun RefPanel(
                     onRefreshState()
                     return@launch
                 }
-                coroutineScope {
-                    val stateTask = async {
-                        try { onRefreshState(); "" }
-                        catch (cancel: CancellationException) { throw cancel }
-                        catch (e: Exception) { e.message ?: "运行状态刷新失败" }
-                    }
-                    val delayTask = async {
-                        try { repo.globalDelay() to "" }
-                        catch (cancel: CancellationException) { throw cancel }
-                        catch (e: Exception) { emptyMap<String, Long>() to (e.message ?: "节点测速失败") }
-                    }
-                    val subscriptionTask = async {
-                        try { repo.refreshSubscriptions() to "" }
-                        catch (cancel: CancellationException) { throw cancel }
-                        catch (e: Exception) { emptyList<DashboardProviderUi>() to (e.message ?: "订阅刷新失败") }
-                    }
-                    val rulesTask = async {
-                        try { repo.rules() to "" }
-                        catch (cancel: CancellationException) { throw cancel }
-                        catch (e: Exception) { emptyList<ProxyRuleUi>() to (e.message ?: "规则刷新失败") }
-                    }
-                    val ruleSetTask = async {
-                        try { repo.refreshRuleSets() to "" }
-                        catch (cancel: CancellationException) { throw cancel }
-                        catch (e: Exception) { emptyList<DashboardRuleSetUi>() to (e.message ?: "规则集刷新失败") }
-                    }
-
-                    val stateError = stateTask.await()
-                    val (freshDelays, delayError) = delayTask.await()
-                    val (freshProviders, subscriptionError) = subscriptionTask.await()
-                    val (freshRules, rulesError) = rulesTask.await()
-                    val (freshRuleSets, ruleSetError) = ruleSetTask.await()
-
-                    if (freshDelays.isNotEmpty()) delays.putAll(freshDelays)
-                    if (freshProviders.isNotEmpty()) providers = freshProviders
-                    if (freshRules.isNotEmpty()) rules = freshRules
-                    if (freshRuleSets.isNotEmpty()) ruleSets = freshRuleSets
-
-                    val errors = listOf(stateError, delayError, subscriptionError, rulesError, ruleSetError).filter { it.isNotBlank() }
-                    if (errors.isEmpty()) {
-                        capsuleText = "全部刷新完成"
+                when (tab) {
+                    RefPanelTab.Groups -> refreshGroupDelaysAnimated()
+                    RefPanelTab.Subscriptions -> refreshProvidersAnimated()
+                    RefPanelTab.RuleSets -> refreshRuleSetsAnimated()
+                    RefPanelTab.Rules -> {
+                        rules = repo.rules()
                         capsuleError = false
-                    } else {
-                        error = errors.joinToString("；")
+                        capsuleText = "规则列表已刷新"
+                    }
+                    RefPanelTab.Overview -> {
+                        onRefreshState()
+                        capsuleError = false
+                        capsuleText = "流量状态已刷新"
+                    }
+                    RefPanelTab.Connections -> {
+                        onRefreshState()
+                        capsuleError = false
+                        capsuleText = "连接状态已刷新"
                     }
                 }
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (e: Exception) {
-                error = e.message ?: "全部刷新失败"
+                error = e.message ?: "刷新失败"
             } finally {
                 refreshing = false
             }
@@ -1724,12 +1831,18 @@ private fun RefPanel(
                     RefProviderRow(
                         item = item,
                         refreshing = providerRefreshing[item.name] == true,
+                        success = providerSucceeded[item.name] == true,
                         onRefresh = {
                             if (providerRefreshing[item.name] != true) scope.launch {
                                 providerRefreshing[item.name] = true
                                 try {
                                     val updated = repo.refreshProvider(item.name)
                                     if (updated != null) providers = providers.map { if (it.name == updated.name) updated else it }
+                                    providerSucceeded[item.name] = true
+                                    scope.launch {
+                                        delay(1400)
+                                        providerSucceeded.remove(item.name)
+                                    }
                                     capsuleError = false
                                     capsuleText = "订阅更新成功"
                                     view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
@@ -3184,7 +3297,7 @@ private fun RefRateCard(title: String, value: Long, icon: ImageVector, color: Co
 }
 
 @Composable
-private fun RefProviderRow(item: DashboardProviderUi, refreshing: Boolean, onRefresh: () -> Unit, onClick: () -> Unit) {
+private fun RefProviderRow(item: DashboardProviderUi, refreshing: Boolean, success: Boolean, onRefresh: () -> Unit, onClick: () -> Unit) {
     val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val spinTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "providerRefreshSpin${item.name}")
@@ -3211,10 +3324,25 @@ private fun RefProviderRow(item: DashboardProviderUi, refreshing: Boolean, onRef
         Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(item.name, color = t.textPrimary, fontSize = 17.sp, lineHeight = 21.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                Surface(onClick = { if (!refreshing) onRefresh() }, shape = RoundedCornerShape(999.dp), color = Color(0xFFEFF6FF), border = BorderStroke(1.dp, Color(0xFFDBEAFE))) {
+                Surface(
+                    onClick = { if (!refreshing) onRefresh() },
+                    shape = RoundedCornerShape(999.dp),
+                    color = if (success) Color(0xFFECFDF5) else Color(0xFFEFF6FF),
+                    border = BorderStroke(1.dp, if (success) Color(0xFFA7F3D0) else Color(0xFFDBEAFE)),
+                ) {
                     Row(Modifier.padding(horizontal = 9.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(if (item.hasSubscriptionInfo) "$remainingPercent%" else "同步", color = scheme.primary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        Icon(Icons.Rounded.Sync, "同步更新", tint = scheme.primary, modifier = Modifier.size(14.dp).graphicsLayer { rotationZ = if (refreshing) spin else 0f })
+                        Text(
+                            if (success) "已更新" else if (item.hasSubscriptionInfo) "$remainingPercent%" else "同步",
+                            color = if (success) Color(0xFF059669) else scheme.primary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Icon(
+                            if (success) Icons.Rounded.CheckCircle else Icons.Rounded.Sync,
+                            if (success) "更新完成" else "同步更新",
+                            tint = if (success) Color(0xFF10B981) else scheme.primary,
+                            modifier = Modifier.size(14.dp).graphicsLayer { rotationZ = if (refreshing) spin else 0f },
+                        )
                     }
                 }
             }
