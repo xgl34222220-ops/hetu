@@ -57,6 +57,15 @@ jobs:
           grep -q 'scoped_reject_unmarked_udp' android-app/app/src/main/assets/hetu-root.sh
           grep -q 'insertRulesBeforeFinalMatch' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
           grep -q 'insertRuleBeforeSourceAdblockAnchor' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
+          grep -Fq 'embeddedMihomoRevision()' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
+          ! grep -Fq 'asset:"+BuildConfig.VERSION_CODE' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
+          grep -Fq 'reloadCurrentConfig()' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
+          grep -Fq 'static synchronized Snapshot export' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockRules.java
+          grep -Fq 'hetu-adblock.meta' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockRules.java
+          grep -Fq 'START_PREVALIDATED' android-app/app/src/main/assets/hetu-root.sh
+          grep -Fq 'directUidRanges,"1"' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
+          ! grep -Fq 'runCatching { controller.ensureRuntimeFiles() }' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
+          grep -Fq 'message = controller.reload()' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           grep -q 'isSourceAdblockRule' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
           grep -Fq 'RULE-SET,去广告,广告拦截' tests/MihomoStartupConfigTest.java
           grep -Fq 'source privacy guards and whitelists stay ahead of Hetu adblock' tests/MihomoStartupConfigTest.java
@@ -90,8 +99,8 @@ jobs:
           grep -q 'System.loadLibrary("hetu_core")' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoNative.java
           grep -q 'Java_io_github_xgl34222220_hetu_MihomoNative_invoke' native/bridge/jni_android.c
           grep -q 'Java_io_github_xgl34222220_hetu_preview_MihomoNative_invoke' native/bridge/jni_android.c
-          grep -q 'versionName = "0.4.0-test.77"' android-app/app/build.gradle.kts
-          grep -q 'versionCode = 477' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.4.0-test.78"' android-app/app/build.gradle.kts
+          grep -q 'versionCode = 478' android-app/app/build.gradle.kts
           test -f android-app/app/src/main/java/io/github/xgl34222220/hetu/LegacyAppMigrator.java
           grep -q 'LegacyAppMigrator.migrateIfNeeded(app)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
           grep -q 'controller.restart { operation = it }' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt

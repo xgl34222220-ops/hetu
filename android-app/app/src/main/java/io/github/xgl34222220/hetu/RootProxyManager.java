@@ -107,12 +107,21 @@ final class RootProxyManager {
         return iface;
     }
 
+    private String embeddedMihomoRevision(){
+        try(InputStream in=context.getAssets().open("mihomo-revision.txt");
+            BufferedReader reader=new BufferedReader(new InputStreamReader(in,StandardCharsets.UTF_8))){
+            String revision=reader.readLine();
+            if(revision!=null&&revision.trim().matches("[0-9a-fA-F]{7,64}"))return revision.trim().toLowerCase(Locale.ROOT);
+        }catch(Exception ignored){}
+        return "unknown";
+    }
+
     private String expectedCoreToken(ProxyRuntimeProfile.Core core){
         if(cores.installed(core)){
             File file=cores.file(core);
             return "file:"+core.id+":"+file.length()+":"+file.lastModified();
         }
-        return "asset:"+BuildConfig.VERSION_CODE+":"+core.id;
+        return "asset:"+core.id+":"+embeddedMihomoRevision()+":fmt1";
     }
 
     private boolean runtimeCoreCurrent(String token){
@@ -233,6 +242,10 @@ final class RootProxyManager {
     }
 
     Prepared prepare(ProxyRuntimeProfile profile)throws Exception{
+        return prepare(profile,0);
+    }
+
+    private Prepared prepare(ProxyRuntimeProfile profile,int fixedControllerPort)throws Exception{
         RootBridge.requireWorkerThread();
         if(profile.core!=ProxyRuntimeProfile.Core.MIHOMO&&profile.core!=ProxyRuntimeProfile.Core.MIHOMO_SMART)
             throw new IOException(profile.core.label+" 的运行后端还未接入");
@@ -252,12 +265,85 @@ final class RootProxyManager {
         RootProxyPolicy policy=RootProxyPolicy.load(context,prefs,profile);
         ProxyAdblockRules.Snapshot adblock=profile.adblockChain?ProxyAdblockRules.export(context):null;
         if(profile.adblockChain&&adblock.count<=0)throw new IOException("代理串联去广告已开启，但当前没有有效广告规则；请先启用或更新规则源");
-        int controllerPort=chooseControllerPort();
+        int controllerPort=(fixedControllerPort>=29090&&fixedControllerPort<=29149)?fixedControllerPort:chooseControllerPort();
         String ebpfInterface=profile.mode==ProxyRuntimeProfile.Mode.EBPF?detectDefaultInterface():"";
         Set<String> tunPackages=profile.mode==ProxyRuntimeProfile.Mode.TUN?selectedTunPackages():Collections.emptySet();
         MihomoStartupConfig.Result generated=MihomoStartupConfig.generate(source,profile,controllerSecret(),controllerPort,profile.appScope,tunPackages,policy.directPackages,ebpfInterface);
         writeStartupCopy(generated.yaml);
         return new Prepared(profile,selected,policy,adblock,generated.yaml,generated.tproxyPort,generated.redirectPort,controllerPort);
+    }
+
+    private String topologyFingerprint(ProxyRuntimeProfile profile,RootProxyPolicy policy){
+        return profile.core.id+"|"+profile.mode.id+"|"+profile.ipv6.id+"|"+profile.dnsHijack.id
+                +"|tcp="+bit(profile.tcp)+"|udp="+bit(profile.udp)+"|quic="+bit(profile.quicBlocked)
+                +"|scope="+policy.appScope+"|uids="+policy.uidRanges+"|share="+bit(policy.sharedNetwork)
+                +"|kill="+bit(policy.killSwitch)+"|cidrs="+policy.cidrs+"|ifaces="+policy.interfaces
+                +"|direct="+policy.directUidRanges;
+    }
+
+    private void installHotReloadFiles(Prepared p)throws Exception{
+        File cfg=startupFile();
+        if(!cfg.isFile())throw new IOException("热重载配置尚未生成");
+        String suffix=".reload."+Long.toHexString(System.nanoTime());
+        String backup=CONFIG+".before-reload";
+        String candidate=CONFIG+suffix;
+        StringBuilder cmd=new StringBuilder("set -e; mkdir -p ")
+                .append(RootBridge.quote(ROOT+"/run/state")).append(' ').append(RootBridge.quote(ROOT+"/run/ruleset"))
+                .append("; cp ").append(RootBridge.quote(CONFIG)).append(' ').append(RootBridge.quote(backup))
+                .append("; cp ").append(RootBridge.quote(cfg.getAbsolutePath())).append(' ').append(RootBridge.quote(candidate))
+                .append("; chmod 600 ").append(RootBridge.quote(candidate)).append("; chown 0:0 ").append(RootBridge.quote(candidate))
+                .append("; mv -f ").append(RootBridge.quote(candidate)).append(' ').append(RootBridge.quote(CONFIG));
+        if(p.adblock!=null){
+            String dst=ROOT+"/run/ruleset/hetu-adblock.txt",tmp=dst+suffix;
+            String allowDst=ROOT+"/run/ruleset/hetu-adblock-allow.txt",allowTmp=allowDst+suffix;
+            cmd.append("; cp ").append(RootBridge.quote(p.adblock.file.getAbsolutePath())).append(' ').append(RootBridge.quote(tmp))
+                    .append("; chmod 600 ").append(RootBridge.quote(tmp)).append("; chown 0:0 ").append(RootBridge.quote(tmp))
+                    .append("; mv -f ").append(RootBridge.quote(tmp)).append(' ').append(RootBridge.quote(dst));
+            if(p.adblock.allowFile!=null){
+                cmd.append("; cp ").append(RootBridge.quote(p.adblock.allowFile.getAbsolutePath())).append(' ').append(RootBridge.quote(allowTmp))
+                        .append("; chmod 600 ").append(RootBridge.quote(allowTmp)).append("; chown 0:0 ").append(RootBridge.quote(allowTmp))
+                        .append("; mv -f ").append(RootBridge.quote(allowTmp)).append(' ').append(RootBridge.quote(allowDst));
+            }
+        }
+        RootBridge.Result installed=RootBridge.rootShell(context,cmd.toString(),15000L);
+        if(!installed.ok())throw new IOException("无法写入热重载配置："+installed.output.trim());
+    }
+
+    String reloadCurrentConfig()throws Exception{
+        CONTROL_LOCK.lock();
+        try{
+            RootBridge.requireWorkerThread();
+            if(!coreAliveFast())throw new IOException("代理未运行，无法热重载");
+            ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
+            int port=prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT);
+            Prepared p=prepare(profile,port);
+            String nextFingerprint=topologyFingerprint(profile,p.policy);
+            String liveFingerprint=prefs.getString("proxyRootTopologyFingerprint","");
+            if(liveFingerprint!=null&&!liveFingerprint.isEmpty()&&!liveFingerprint.equals(nextFingerprint))
+                throw new IOException("运行模式、应用范围、DNS、IPv6、TCP/UDP 或绕过策略已变化，请使用「重启」应用这些网络层设置");
+
+            installHotReloadFiles(p);
+            MihomoControllerClient controller=new MihomoControllerClient(context);
+            try{
+                controller.reloadConfig(CONFIG);
+            }catch(Exception error){
+                RootBridge.rootShell(context,
+                        "if [ -f "+RootBridge.quote(CONFIG+".before-reload")+" ]; then mv -f "
+                                +RootBridge.quote(CONFIG+".before-reload")+" "+RootBridge.quote(CONFIG)+"; fi",
+                        5000L);
+                try{controller.reloadConfig(CONFIG);}catch(Exception ignored){}
+                throw error;
+            }
+            RootBridge.rootShell(context,"rm -f "+RootBridge.quote(CONFIG+".before-reload"),3000L);
+            prefs.edit()
+                    .putString("proxyRootTopologyFingerprint",nextFingerprint)
+                    .putInt("proxyAdblockLastRuleCount",p.adblock==null?0:p.adblock.count)
+                    .putString("proxyAdblockLastRevision",p.adblock==null?"":p.adblock.revision)
+                    .apply();
+            return "运行配置已热重载";
+        }finally{
+            CONTROL_LOCK.unlock();
+        }
     }
 
     JSONObject preflight(Prepared p)throws Exception{
@@ -273,6 +359,7 @@ final class RootProxyManager {
     JSONObject start(ProxyRuntimeProfile p)throws Exception{return startInternal(p,null,false);}
     JSONObject start(ProxyRuntimeProfile profile,Progress progress)throws Exception{return startInternal(profile,progress,false);}
     JSONObject replaceRunningAfterUpgrade(ProxyRuntimeProfile profile)throws Exception{return startInternal(profile,null,true);}
+    JSONObject replaceRunningAfterUpgrade(ProxyRuntimeProfile profile,Progress progress)throws Exception{return startInternal(profile,progress,true);}
 
     private JSONObject startInternal(ProxyRuntimeProfile profile,Progress progress,boolean replaceRunning)throws Exception{
         CONTROL_LOCK.lock();
@@ -292,15 +379,17 @@ final class RootProxyManager {
             } else {
                 stage(progress,"检查配置、应用范围与绕过策略…");
             }
+        int restartControllerPort=(replaceRunning&&existingRunning)
+                ?prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT):0;
         Prepared p;
         try{
-            p=prepare(profile);
+            p=prepare(profile,restartControllerPort);
         }catch(Exception prepareFailure){
             if(!profile.adblockChain||!adblockPreparationFailure(prepareFailure))throw prepareFailure;
             rememberAdblockFallback(prepareFailure);
             stage(progress,"广告串联与当前 YAML 结构不兼容，先保留原配置启动代理…");
             profile=withoutAdblock(profile);
-            p=prepare(profile);
+            p=prepare(profile,restartControllerPort);
         }
         RootProxyPolicy policy=p.policy;
         stage(progress,"部署 Root 核心与事务控制器…");
@@ -313,7 +402,7 @@ final class RootProxyManager {
             if(!profile.adblockChain)throw fullFailure;
             stage(progress,"串联广告配置校验失败，尝试不修改源 YAML 启动代理…");
             ProxyRuntimeProfile fallbackProfile=withoutAdblock(profile);
-            Prepared fallback=prepare(fallbackProfile);
+            Prepared fallback=prepare(fallbackProfile,restartControllerPort);
             installRuntimeFiles(fallback,true);
             try{validateRuntimeConfig();}
             catch(Exception fallbackFailure){
@@ -326,13 +415,7 @@ final class RootProxyManager {
             stage(progress,"代理配置可用；本次仅关闭串联广告过滤继续启动…");
         }
         if(!prefs.getBoolean("hetuLegacyRetired",false))quiesceLegacyRuntime(progress);
-        stage(progress,"检查 TUN / TPROXY / eBPF / UID / IPv6 能力…");
-        JSONObject pre=runJson("preflight",
-                profile.mode.id,String.valueOf(p.tproxyPort),String.valueOf(p.redirectPort),profile.ipv6.id,
-                bit(profile.tcp),bit(profile.udp),profile.dnsHijack.id,bit(profile.quicBlocked),
-                String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(p.controllerPort),
-                policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges);
-        if(!pre.optBoolean("ok"))throw new IOException(pre.optString("message","Root 代理预检失败"));
+        stage(progress,"检查网络能力并启动核心…");
 
         boolean adblockCoordinatorEntered=false;
         boolean independentFallback=prefs.getBoolean("proxyAdblockFallbackEnabled",false);
@@ -354,7 +437,7 @@ final class RootProxyManager {
                 BIN,CONFIG,profile.mode.id,String.valueOf(p.tproxyPort),String.valueOf(p.redirectPort),profile.ipv6.id,
                 bit(profile.tcp),bit(profile.udp),profile.dnsHijack.id,bit(profile.quicBlocked),
                 String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(p.controllerPort),
-                policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges);
+                policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,"1");
             if(!result.optBoolean("ok"))throw new IOException(result.optString("message","Root 代理启动失败"));
         }catch(Exception startFailure){if(adblockCoordinatorEntered)ProxyAdblockCoordinator.exit(context);throw startFailure;}
 
@@ -366,12 +449,10 @@ final class RootProxyManager {
         if(!prefs.getBoolean("hetuLegacyRetired",false))retireLegacyInstallation(progress);
         // Publish only the port of a successfully running core.
         prefs.edit().putInt("proxyControllerPort",p.controllerPort).commit();
-        MihomoControllerClient controller=new MihomoControllerClient(context);
-        if(!controller.waitReady(5000)){
-            prefs.edit().putString("proxyRootEgressWarning","Root 代理核心已运行；本地控制接口仍在初始化，后台会继续验证").apply();
-        }else{
-            prefs.edit().remove("proxyRootEgressWarning").apply();
-        }
+        // The shell transaction already verified the controller TCP listener. Do not block
+        // the Start/Restart button on another synchronous HTTP readiness loop; the normal
+        // dashboard refresh verifies the API asynchronously.
+        prefs.edit().remove("proxyRootEgressWarning").apply();
         // Connectivity probing is intentionally asynchronous. A slow captive portal or
         // blocked 204 endpoint must never keep the Start button spinning after the core
         // and transparent routing are already healthy.
@@ -420,6 +501,7 @@ final class RootProxyManager {
                 .putBoolean("proxyAdblockLastEffective",profile.adblockChain)
                 .putInt("proxyAdblockLastRuleCount",p.adblock==null?0:p.adblock.count)
                 .putString("proxyAdblockLastRevision",p.adblock==null?"":p.adblock.revision)
+                .putString("proxyRootTopologyFingerprint",topologyFingerprint(profile,policy))
                 .remove("proxyRootRuntimeRefreshPending")
                 .apply();
         ensureContinuityService(true);
@@ -708,15 +790,23 @@ final class RootProxyManager {
         }
         if(adblock!=null){
             String dst=ROOT+"/run/ruleset/hetu-adblock.txt",tmp=dst+".new";
-            cmd.append("; cp ").append(RootBridge.quote(adblock.getAbsolutePath())).append(' ').append(RootBridge.quote(tmp))
+            String allowDst=ROOT+"/run/ruleset/hetu-adblock-allow.txt",allowTmp=allowDst+".new";
+            String revisionFile=ROOT+"/run/state/adblock.revision";
+            cmd.append("; if [ ! -s ").append(RootBridge.quote(dst))
+                    .append(" ] || [ ! -f ").append(RootBridge.quote(allowDst))
+                    .append(" ] || [ \"$(cat ").append(RootBridge.quote(revisionFile)).append(" 2>/dev/null)\" != ")
+                    .append(RootBridge.quote(adblock.revision)).append(" ]; then")
+                    .append(" cp ").append(RootBridge.quote(adblock.getAbsolutePath())).append(' ').append(RootBridge.quote(tmp))
                     .append("; chmod 600 ").append(RootBridge.quote(tmp)).append("; chown 0:0 ").append(RootBridge.quote(tmp))
                     .append("; mv -f ").append(RootBridge.quote(tmp)).append(' ').append(RootBridge.quote(dst));
             if(adblockAllow!=null){
-                String allowDst=ROOT+"/run/ruleset/hetu-adblock-allow.txt",allowTmp=allowDst+".new";
                 cmd.append("; cp ").append(RootBridge.quote(adblockAllow.getAbsolutePath())).append(' ').append(RootBridge.quote(allowTmp))
                         .append("; chmod 600 ").append(RootBridge.quote(allowTmp)).append("; chown 0:0 ").append(RootBridge.quote(allowTmp))
                         .append("; mv -f ").append(RootBridge.quote(allowTmp)).append(' ').append(RootBridge.quote(allowDst));
             }
+            cmd.append("; printf %s ").append(RootBridge.quote(adblock.revision)).append(" > ").append(RootBridge.quote(revisionFile))
+                    .append("; chmod 600 ").append(RootBridge.quote(revisionFile)).append("; chown 0:0 ").append(RootBridge.quote(revisionFile))
+                    .append("; fi");
         }
         if(p.profile.cnIpDirect){
             String dst4=ROOT+"/run/ruleset/hetu-cn-v4.txt",dst6=ROOT+"/run/ruleset/hetu-cn-v6.txt";

@@ -25,22 +25,49 @@ final class ProxyAdblockRules {
         }
     }
 
-    static Snapshot export(Context context) throws Exception {
+    static synchronized Snapshot export(Context context) throws Exception {
         RuleStore rules=new RuleStore(context.getApplicationContext());
         rules.reload();
-        ArrayList<String> domains=new ArrayList<>(rules.effectiveDomains());
-        ArrayList<String> allow=new ArrayList<>(rules.effectiveAllowDomains());
-        Collections.sort(domains);
-        Collections.sort(allow);
-        if(domains.size()>1500000)throw new IOException("广告规则超过 150 万条安全上限");
+        String revision=rules.currentRevision();
 
         File dir=new File(context.getCacheDir(),"hetu-dns-filter");
         if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("无法创建河图 DNS 过滤规则目录");
         File target=new File(dir,"hetu-adblock.txt");
         File allowTarget=new File(dir,"hetu-adblock-allow.txt");
+        File meta=new File(dir,"hetu-adblock.meta");
+
+        if(target.isFile()&&allowTarget.isFile()&&meta.isFile()){
+            Properties cached=new Properties();
+            try(FileInputStream in=new FileInputStream(meta)){cached.load(in);}
+            catch(Exception ignored){cached.clear();}
+            if(revision.equals(cached.getProperty("revision",""))){
+                try{
+                    int count=Integer.parseInt(cached.getProperty("count","-1"));
+                    int allowCount=Integer.parseInt(cached.getProperty("allowCount","-1"));
+                    if(count>=0&&allowCount>=0)return new Snapshot(target,allowTarget,count,allowCount,revision);
+                }catch(NumberFormatException ignored){}
+            }
+        }
+
+        ArrayList<String> domains=new ArrayList<>(rules.effectiveDomains());
+        ArrayList<String> allow=new ArrayList<>(rules.effectiveAllowDomains());
+        Collections.sort(domains);
+        Collections.sort(allow);
+        if(domains.size()>1500000)throw new IOException("广告规则超过 150 万条安全上限");
         writeProvider(domains,target);
         writeProvider(allow,allowTarget);
-        return new Snapshot(target,allowTarget,domains.size(),allow.size(),rules.currentRevision());
+
+        Properties saved=new Properties();
+        saved.setProperty("revision",revision);
+        saved.setProperty("count",String.valueOf(domains.size()));
+        saved.setProperty("allowCount",String.valueOf(allow.size()));
+        File metaTmp=new File(dir,"hetu-adblock.meta.new");
+        try(FileOutputStream out=new FileOutputStream(metaTmp,false)){
+            saved.store(out,null);out.getFD().sync();
+        }
+        try{Files.move(metaTmp.toPath(),meta.toPath(),StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);}
+        catch(Exception atomic){if(!metaTmp.renameTo(meta)){metaTmp.delete();throw new IOException("无法保存广告规则缓存索引",atomic);}}
+        return new Snapshot(target,allowTarget,domains.size(),allow.size(),revision);
     }
 
     private static void writeProvider(List<String> domains,File target)throws IOException{

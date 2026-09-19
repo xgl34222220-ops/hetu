@@ -269,11 +269,14 @@ internal class ProxyComposeController(context: Context) {
         }
     }
 
+    suspend fun reload(): String = withContext(Dispatchers.IO) {
+        root.reloadCurrentConfig()
+    }
+
     suspend fun restart(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
         LegacyAppMigrator.migrateIfNeeded(app)
         val profile = ProxyRuntimeProfile.load(prefs)
-        onProgress("校验新运行环境，确认可用后再替换当前核心…")
-        val result = root.replaceRunningAfterUpgrade(profile)
+        val result = root.replaceRunningAfterUpgrade(profile, onProgress)
         prefs.edit()
             .putString("proxyRootSessionOwner", "manual")
             .remove("proxyRootRuntimeRefreshPending")

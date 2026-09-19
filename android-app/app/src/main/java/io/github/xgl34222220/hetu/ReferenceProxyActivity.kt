@@ -300,8 +300,8 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
             operation = if (state.running) "正在停止…" else "正在启动…"
             try {
                 if (state.running) controller.stop { operation = it } else controller.start { operation = it }
-                delay(250)
-                refresh()
+                operation = ""
+                launch { delay(120); refresh() }
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
@@ -319,7 +319,6 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                 }
             } finally {
                 operation = ""
-                runCatching { refresh() }
             }
         }
     }
@@ -329,10 +328,9 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
         scope.launch {
             operation = "正在重载…"
             try {
-                inspector.reloadConfig()
-                message = "运行配置已重载"
-                delay(180)
-                refresh()
+                message = controller.reload()
+                operation = ""
+                launch { delay(100); refresh() }
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
@@ -349,8 +347,8 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
             operation = "正在重启…"
             try {
                 controller.restart { operation = it }
-                delay(250)
-                refresh()
+                operation = ""
+                launch { delay(120); refresh() }
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
@@ -401,10 +399,6 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
         launch {
             delay(420)
             runCatching { repo.ensureIcons() }
-        }
-        launch {
-            delay(520)
-            runCatching { controller.ensureRuntimeFiles() }
         }
         while (true) {
             delay(3000)
