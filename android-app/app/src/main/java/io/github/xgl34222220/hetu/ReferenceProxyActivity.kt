@@ -1431,8 +1431,6 @@ private fun RefPanel(
                                         expanded = selectedGroupName == group.name,
                                         delay = delays[selected] ?: group.nodes.firstOrNull { it.name == selected }?.lastDelay,
                                         testing = selected.isNotBlank() && testing[selected] == true,
-                                        hazeState = hazeState,
-                                        backdrop = backdrop,
                                         glassEnabled = glassEnabled,
                                         modifier = Modifier.weight(1f),
                                         onClick = {
@@ -2244,7 +2242,6 @@ private fun RefPanelOverview(state: ProxyComposeState, delays: Map<String, Long>
     }
 }
 
-@OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
 private fun RefGroupCard(
     group: ProxyGroupUi,
@@ -2252,8 +2249,6 @@ private fun RefGroupCard(
     expanded: Boolean,
     delay: Long?,
     testing: Boolean,
-    hazeState: HazeState,
-    backdrop: LayerBackdrop?,
     glassEnabled: Boolean,
     modifier: Modifier,
     onClick: () -> Unit,
@@ -2271,63 +2266,15 @@ private fun RefGroupCard(
     val shape = RoundedCornerShape(22.dp)
     val nodeName = selected.ifBlank { "未选择" }
     val nodeFlag = refNodeFlag(nodeName)
-    val runtimeLiquid = glassEnabled && backdrop != null && isRuntimeShaderSupported()
-    val activeHaze = glassEnabled && !runtimeLiquid
     val premiumBrush = when {
         glassEnabled && dark -> Brush.verticalGradient(
-            listOf(Color.White.copy(alpha = .085f), Color(0xFF60A5FA).copy(alpha = .030f)),
+            listOf(Color(0xFF1B2431).copy(alpha = .94f), Color(0xFF151D29).copy(alpha = .90f)),
         )
         glassEnabled -> Brush.verticalGradient(
-            listOf(Color.White.copy(alpha = .94f), Color(0xFFF8FAFE).copy(alpha = .85f)),
+            listOf(Color.White.copy(alpha = .95f), Color(0xFFF6F9FE).copy(alpha = .86f)),
         )
         dark -> Brush.verticalGradient(listOf(t.elevatedCardBackground, t.cardBackground))
         else -> Brush.verticalGradient(listOf(Color.White, Color(0xFFFAFBFD)))
-    }
-    val shellTint = if (dark) Color(0xFF111827).copy(alpha = .30f) else Color(0xFFF8FBFF).copy(alpha = .44f)
-    val glassModifier = when {
-        runtimeLiquid -> Modifier.drawBackdrop(
-            backdrop = requireNotNull(backdrop),
-            shape = { shape },
-            effects = {
-                padding = maxOf(padding, 24.dp.toPx())
-                colorControls(
-                    brightness = if (dark) -.012f else .022f,
-                    contrast = 1.045f,
-                    saturation = 1.72f,
-                )
-                blur(20.dp.toPx(), 20.dp.toPx())
-                liquidGlassLens(
-                    refractionHeight = 13.dp.toPx(),
-                    refractionAmount = 9.dp.toPx(),
-                    depthEffect = true,
-                    chromaticAberration = .032f,
-                )
-            },
-            highlight = {
-                (if (dark) Highlight.GlassStrokeSmallDark else Highlight.GlassStrokeSmallLight)
-                    .copy(alpha = if (dark) .68f else .84f)
-            },
-            onDrawSurface = {
-                drawRect(shellTint)
-                drawRect(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = if (dark) .055f else .22f),
-                            Color.Transparent,
-                        ),
-                        center = Offset(size.width * .16f, 0f),
-                        radius = size.width * .74f,
-                    ),
-                )
-            },
-        )
-        activeHaze -> Modifier
-            .hazeEffect(state = hazeState, style = HazeMaterials.ultraThin()) {
-                blurRadius = 20.dp
-                noiseFactor = .014f
-            }
-            .background(premiumBrush)
-        else -> Modifier.background(premiumBrush)
     }
     val arrowRotation by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
@@ -2350,16 +2297,16 @@ private fun RefGroupCard(
                 ambientColor = Color(0xFF0F172A).copy(alpha = if (dark) .12f else .032f),
                 spotColor = Color(0xFF0F172A).copy(alpha = if (dark) .15f else .065f),
             )
-            .clip(shape)
-            .then(glassModifier)
+            .background(premiumBrush, shape)
             .border(
                 if (expanded) 1.25.dp else .9.dp,
                 if (expanded) Color(0xFF2563EB).copy(alpha = .52f)
                 else if (glassEnabled) {
-                    if (dark) Color.White.copy(alpha = .13f) else Color.White.copy(alpha = .76f)
+                    if (dark) Color.White.copy(alpha = .13f) else Color.White.copy(alpha = .82f)
                 } else if (dark) Color.White.copy(alpha = .10f) else Color(0xFFE2E8F0).copy(alpha = .80f),
                 shape,
             )
+            .clip(shape)
             .clickable(interactionSource = source, indication = null, onClick = onClick)
             .padding(start = 16.dp, top = 10.dp, end = 14.dp, bottom = 9.dp),
         verticalArrangement = Arrangement.SpaceBetween,
@@ -2445,6 +2392,7 @@ private fun RefGroupCard(
 }
 
 @Composable
+private fun RefInlineGroupExpansion@Composable
 private fun RefInlineGroupExpansion(
     group: ProxyGroupUi,
     selected: String,

@@ -52,6 +52,11 @@ jobs:
           test -f android-app/app/src/main/assets/hetu-route.sh
           sh -n android-app/app/src/main/assets/hetu-root.sh
           sh -n android-app/app/src/main/assets/hetu-route.sh
+          grep -q 'WROUT=HETU_WROUT' android-app/app/src/main/assets/hetu-root.sh
+          grep -q 'install-webrtc-guard' android-app/app/src/main/assets/hetu-root.sh
+          grep -q 'ensureWebRtcLeakGuard' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
+          grep -Fq 'AND,((NETWORK,UDP),(DST-PORT,3478)),REJECT' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
+          ! grep -Fq 'val runtimeLiquid = glassEnabled && backdrop != null' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           grep -q 'copyAsset("hetu-root.sh",script,true)' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
           test -f android-app/app/src/main/assets/rules/adaway.txt
           test -f android-app/app/src/main/assets/rules/china.txt
@@ -60,7 +65,8 @@ jobs:
           grep -q 'System.loadLibrary("hetu_core")' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoNative.java
           grep -q 'Java_io_github_xgl34222220_hetu_MihomoNative_invoke' native/bridge/jni_android.c
           grep -q 'Java_io_github_xgl34222220_hetu_preview_MihomoNative_invoke' native/bridge/jni_android.c
-          grep -q 'versionName = "0.4.0-test.70"' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.4.0-test.71"' android-app/app/build.gradle.kts
+          grep -q 'versionCode = 471' android-app/app/build.gradle.kts
           test -f android-app/app/src/main/java/io/github/xgl34222220/hetu/LegacyAppMigrator.java
           grep -q 'LegacyAppMigrator.migrateIfNeeded(app)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
           grep -q 'controller.restart { operation = it }' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt

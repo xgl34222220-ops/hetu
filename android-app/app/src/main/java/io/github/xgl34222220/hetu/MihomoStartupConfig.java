@@ -98,6 +98,9 @@ final class MihomoStartupConfig {
         // Build serial ad blocking after runtime providers are prepared; the rule injector keeps explicit DIRECT whitelists first, then adblock, then broad routing.
         if(profile.adblockChain)
             yaml=ensureAdblock(yaml);
+        // WebRTC leak protection is a runtime security invariant. Keep STUN UDP above
+        // user DIRECT/CN/MATCH rules so a source YAML cannot expose the physical WAN IP.
+        yaml=ensureWebRtcLeakGuard(yaml);
 
         int tp=0,rp=0;
         StringBuilder override=new StringBuilder();
@@ -215,6 +218,41 @@ final class MihomoStartupConfig {
         return source
                 .replace("https://1.12.12.12/dns-query","https://223.6.6.6/dns-query")
                 .replace("https://120.53.53.53/dns-query","https://223.6.6.6/dns-query");
+    }
+
+    /**
+     * Runtime-only WebRTC privacy guard. STUN discovery must never escape through a
+     * user DIRECT rule. Blocking only the known UDP discovery ports preserves TCP/TURN
+     * fallback while preventing public-IP ICE candidates from bypassing the proxy.
+     */
+    private static String ensureWebRtcLeakGuard(String source)throws IOException{
+        String[] lines=normalize(source).split("\n",-1);
+        int index=-1;Matcher found=null;Pattern top=Pattern.compile("^rules\\s*:(.*)$");
+        for(int i=0;i<lines.length;i++){
+            if(indent(lines[i])!=0)continue;
+            Matcher m=top.matcher(lines[i]);
+            if(m.find()){index=i;found=m;break;}
+        }
+        String guard=
+                "  - AND,((NETWORK,UDP),(DST-PORT,3478)),REJECT\n"+
+                "  - AND,((NETWORK,UDP),(DST-PORT,5349)),REJECT\n"+
+                "  - AND,((NETWORK,UDP),(DST-PORT,19302-19309)),REJECT\n";
+        if(index<0){
+            String base=trimOne(source);
+            return base+(base.isEmpty()?"":"\n")+"rules:\n"+guard;
+        }
+        String rest=found.group(1).trim();
+        if(rest.startsWith("#"))rest="";
+        // Do not rewrite uncommon inline rule arrays here. The Root STUN guard still
+        // protects transparent modes, while ordinary multi-line rules get full dual-layer protection.
+        if(!rest.isEmpty()&&!rest.equals("[]"))return source;
+
+        StringBuilder out=new StringBuilder();
+        for(int i=0;i<lines.length;i++){
+            out.append(lines[i]).append('\n');
+            if(i==index)out.append(guard);
+        }
+        return trimOne(out.toString());
     }
 
     /** Merge the local effective Hetu ad-block snapshot into the private startup copy. */
