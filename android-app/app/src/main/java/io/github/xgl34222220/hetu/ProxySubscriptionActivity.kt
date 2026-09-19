@@ -336,51 +336,73 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
             }
 
             items(configLibrary, key = { "config-" + it.name }) { config ->
-                Surface(
-                    onClick = {
-                        if (!config.selected && !loading) {
-                            loading = true
-                            scope.launch {
-                                runCatching { controller.selectConfig(config.name) }
-                                    .onSuccess { message = "已切换到 ${config.name}"; revision++ }
-                                    .onFailure { message = it.message ?: "切换配置失败" }
-                                loading = false
+                val cardShape = RoundedCornerShape(20.dp)
+                val selectedBrush = if (dark) {
+                    Brush.horizontalGradient(listOf(Color(0xFF172554).copy(alpha = .52f), tokens.cardBackground))
+                } else {
+                    Brush.horizontalGradient(listOf(Color(0xFFEFF6FF).copy(alpha = .72f), Color.White.copy(alpha = .86f)))
+                }
+                Box(
+                    Modifier.fillMaxWidth()
+                        .shadow(
+                            1.dp,
+                            cardShape,
+                            clip = false,
+                            ambientColor = Color(0xFF0F172A).copy(alpha = .025f),
+                            spotColor = Color(0xFF0F172A).copy(alpha = .035f),
+                        )
+                        .background(
+                            if (config.selected) selectedBrush
+                            else Brush.verticalGradient(listOf(tokens.cardBackground.copy(alpha = .82f), tokens.cardBackground.copy(alpha = .68f))),
+                            cardShape,
+                        )
+                        .border(
+                            if (config.selected) 1.5.dp else .7.dp,
+                            if (config.selected) scheme.primary.copy(alpha = .88f)
+                            else if (dark) tokens.outline.copy(alpha = .34f) else Color(0xFFCBD5E1).copy(alpha = .50f),
+                            cardShape,
+                        )
+                        .clip(cardShape)
+                        .clickable(enabled = !loading) {
+                            if (!config.selected) {
+                                loading = true
+                                scope.launch {
+                                    runCatching { controller.selectConfig(config.name) }
+                                        .onSuccess { message = "已切换到 ${config.name}"; revision++ }
+                                        .onFailure { message = it.message ?: "切换配置失败" }
+                                    loading = false
+                                }
                             }
                         }
-                    },
-                    shape = RoundedCornerShape(22.dp),
-                    color = if (config.selected) scheme.primaryContainer.copy(alpha = .34f) else tokens.cardBackground,
-                    shadowElevation = 1.dp,
+                        .padding(horizontal = 15.dp, vertical = 13.dp),
                 ) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(14.dp),
-                            color = tokens.elevatedCardBackground,
-                            modifier = Modifier.size(42.dp),
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    if (config.selected) Icons.Rounded.CheckCircle else Icons.Rounded.Description,
-                                    null,
-                                    tint = if (config.selected) scheme.primary else tokens.textSecondary,
-                                    modifier = Modifier.size(21.dp),
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            Modifier.size(23.dp)
+                                .border(
+                                    if (config.selected) 0.dp else 1.3.dp,
+                                    if (config.selected) Color.Transparent else tokens.textMuted.copy(alpha = .60f),
+                                    CircleShape,
                                 )
+                                .background(if (config.selected) scheme.primary else Color.Transparent, CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (config.selected) {
+                                Icon(Icons.Rounded.Check, "当前使用", tint = Color.White, modifier = Modifier.size(14.dp))
                             }
                         }
-                        Spacer(Modifier.width(12.dp))
+                        Spacer(Modifier.width(11.dp))
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                            Text(config.name, color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(config.name, color = tokens.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(
                                 when {
                                     config.selected -> "当前使用"
-                                    config.bundled -> "河图内置模板"
-                                    else -> "已保存 · 点击切换"
+                                    config.bundled -> "河图内置模板 · 点击切换"
+                                    else -> "自定义配置 · 点击切换生效"
                                 },
                                 color = if (config.selected) scheme.primary else tokens.textSecondary,
-                                style = MaterialTheme.typography.bodySmall,
+                                fontSize = 11.sp,
+                                maxLines = 1,
                             )
                         }
                         if (!config.bundled) {
@@ -397,9 +419,12 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                                     }
                                 },
                                 enabled = !loading,
+                                modifier = Modifier.size(34.dp),
                             ) {
-                                Icon(Icons.Rounded.DeleteOutline, "删除配置", tint = tokens.textSecondary)
+                                Icon(Icons.Rounded.DeleteOutline, "删除配置", tint = Color(0xFFE11D48), modifier = Modifier.size(18.dp))
                             }
+                        } else if (!config.selected) {
+                            Text("切换生效", color = tokens.textMuted, fontSize = 10.sp, fontWeight = FontWeight.Medium)
                         }
                     }
                 }
