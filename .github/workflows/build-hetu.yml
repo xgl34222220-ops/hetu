@@ -95,7 +95,7 @@ jobs:
           grep -q 'ModalBottomSheet(' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
           ! grep -q 'AlertDialog(' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
           grep -Fq '${it.updatedAt}-${it.upload}-${it.download}-${it.total}-${it.expire}' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq '.height(90.dp)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
+          grep -Fq '.height(96.dp)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           grep -Fq 'Color(0xFF2563EB).copy(alpha = .08f)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
           ! grep -Fq 'Color(0xFFEFF6FF).copy(alpha = .90f)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
           grep -Fq 'liveProviders by remember' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
