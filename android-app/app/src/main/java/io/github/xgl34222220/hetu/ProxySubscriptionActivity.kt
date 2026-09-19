@@ -791,9 +791,18 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
 
             fun saveYaml() {
                 if (yamlSaving) return
+                val currentText = editorState.text.toString()
+                yamlLocalLint(currentText)?.let { issue ->
+                    yamlError = "第 ${issue.line} 行：${issue.message}"
+                    scope.launch {
+                        val target = (((issue.line - 1).coerceAtLeast(0)) * lineHeightPx).toInt()
+                        editorScroll.animateScrollTo(target.coerceAtMost(editorScroll.maxValue))
+                    }
+                    return
+                }
                 yamlSaving = true
                 scope.launch {
-                    val result = runCatching { controller.saveConfigText(editorState.text.toString()) }
+                    val result = runCatching { controller.saveConfigText(currentText) }
                     result.onSuccess {
                         yamlOpen = false
                         revision++
@@ -839,8 +848,8 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                             Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回")
                         }
                         Column(Modifier.weight(1f)) {
-                            Text("编辑当前 YAML", color = tokens.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
-                            Text("$lineCount 行 · 保存后重启代理生效", color = tokens.textSecondary, fontSize = 10.sp)
+                            Text(configName, color = tokens.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
+                            Text("$lineCount 行 · YAML 编辑 · 保存后重启代理生效", color = tokens.textSecondary, fontSize = 10.sp)
                         }
                         IconButton(onClick = { outlineOpen = true }, enabled = outlineItems.isNotEmpty() && !yamlSaving) {
                             Icon(Icons.Rounded.FormatListBulleted, "语法大纲", tint = scheme.primary)
@@ -936,7 +945,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                YamlAccessoryKey("Tab") { insertYamlText("  ") }
+                                YamlAccessoryKey("2空格") { insertYamlText("  ") }
                                 YamlAccessoryKey(":") { insertYamlText(": ") }
                                 YamlAccessoryKey("-") { insertYamlText("- ") }
                                 YamlAccessoryKey("#") { insertYamlText("# ") }
@@ -1118,6 +1127,24 @@ private fun YamlAccessoryKey(label: String, enabled: Boolean = true, onClick: ()
             maxLines = 1,
         )
     }
+}
+
+private data class YamlLintIssue(val line: Int, val message: String)
+
+private fun yamlLocalLint(text: String): YamlLintIssue? {
+    text.lines().forEachIndexed { index, raw ->
+        if (raw.isBlank()) return@forEachIndexed
+        val leading = raw.takeWhile { it == ' ' || it == '\t' }
+        if ('\t' in leading) {
+            return YamlLintIssue(index + 1, "缩进包含 Tab，请改用 2 个空格")
+        }
+        val spaces = leading.length
+        val trimmed = raw.trimStart()
+        if (!trimmed.startsWith("#") && spaces % 2 != 0) {
+            return YamlLintIssue(index + 1, "缩进为 ${spaces} 个空格，河图要求按 2 空格层级缩进")
+        }
+    }
+    return null
 }
 
 private fun yamlErrorLine(message: String): Int? {
