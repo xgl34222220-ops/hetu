@@ -12,7 +12,7 @@ import java.util.concurrent.Semaphore;
 /** Authenticated localhost-only Mihomo Clash API client for strategy, delay, providers, rules and connections UI. */
 final class MihomoControllerClient {
     private static final int LIMIT=6*1024*1024;
-    private static final Semaphore DELAY_SLOTS=new Semaphore(3,true);
+    private static final Semaphore DELAY_SLOTS=new Semaphore(12,true);
     private static final String[] DEFAULT_DELAY_URLS={
         "https://connectivitycheck.platform.hicloud.com/generate_204",
         "https://www.gstatic.com/generate_204",

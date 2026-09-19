@@ -1514,9 +1514,12 @@ private fun RefPanel(
         var failed = 0
         try {
             nodes.forEachIndexed { index, node ->
-                val value = measured[node.name] ?: -1L
-                delays[node.name] = value
-                if (value <= 0L) failed++
+                val value = measured[node.name]
+                if (value != null && value > 0L) {
+                    delays[node.name] = value
+                } else {
+                    failed++
+                }
                 testing.remove(node.name)
                 capsuleText = "节点测速 ${index + 1}/${nodes.size}"
                 if (index < nodes.lastIndex) delay(12L)
@@ -1586,7 +1589,7 @@ private fun RefPanel(
         capsuleError = false
         ruleSetRefreshing.clear()
         targets.forEach { ruleSetRefreshing[it.name] = true }
-        for (chunk in targets.chunked(8)) {
+        for (chunk in targets.chunked(16)) {
             coroutineScope {
                 chunk.map { item ->
                     async {
