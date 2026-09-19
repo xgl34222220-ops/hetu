@@ -54,6 +54,7 @@ final class MihomoStartupConfig {
         int sourceTp=detectScalarPort(source,"tproxy-port");
         int sourceRp=detectScalarPort(source,"redir-port");
         String yaml=normalize(source);
+        yaml=sanitizeStrictDomainCompatibility(yaml);
         yaml=normalizeDeprecatedEncryptedDns(yaml);
         // Runtime mode is authoritative. The selected source config remains byte-for-byte untouched.
         yaml=removeTopLevelKey(yaml,"listeners");
@@ -153,6 +154,115 @@ final class MihomoStartupConfig {
         override.append("secret: '").append(controllerSecret.replace("'","''")).append("'\n");
         override.append("# --- end Hetu runtime isolation ---\n");
         return new Result(yaml+override,tp,rp);
+    }
+
+    /**
+     * Mihomo 1.19.30 tightened domain-pattern validation. Old configs sometimes put
+     * human-readable labels (for example "Mijia Cloud") or partial wildcards into
+     * domain-only lists. Keep the user's source untouched, but omit invalid legacy
+     * entries from Hetu's private runtime copy so one stale item cannot brick startup.
+     */
+    private static String sanitizeStrictDomainCompatibility(String source){
+        String[] lines=normalize(source).split("\n",-1);
+        String top="";
+        String child="";
+        String grandchild="";
+        int listIndent=-1;
+        boolean domainList=false;
+        StringBuilder out=new StringBuilder();
+        for(int i=0;i<lines.length;i++){
+            String raw=lines[i];
+            String trimmed=raw.trim();
+            int ind=indent(raw);
+            if(trimmed.isEmpty()||trimmed.startsWith("#")){
+                out.append(raw).append('\n');
+                continue;
+            }
+            if(ind==0){
+                top=keyOfMappingLine(trimmed);
+                child="";grandchild="";domainList=false;listIndent=-1;
+            }else if(ind==2){
+                child=keyOfMappingLine(trimmed);
+                grandchild="";
+                domainList=("sniffer".equals(top)&&("skip-domain".equals(child)||"force-domain".equals(child)))
+                        ||("dns".equals(top)&&"fake-ip-filter".equals(child));
+                listIndent=domainList?ind:-1;
+            }else if(ind==4&&"dns".equals(top)&&"fallback-filter".equals(child)){
+                grandchild=keyOfMappingLine(trimmed);
+                domainList="domain".equals(grandchild);
+                listIndent=domainList?ind:-1;
+            }
+
+            if(domainList&&listIndent>=0&&ind>listIndent&&trimmed.startsWith("- ")){
+                String scalar=stripYamlInlineComment(trimmed.substring(2).trim());
+                String value=unquoteYamlScalar(scalar);
+                if(!isStrictDomainPattern(value)){
+                    out.append(spaces(ind)).append("# Hetu 1.19.30 compatibility: skipped invalid domain entry: ")
+                            .append(value.replace("\n"," ").replace("\r"," ")).append('\n');
+                    continue;
+                }
+            }
+            out.append(raw).append('\n');
+        }
+        return trimOne(out.toString());
+    }
+
+    private static String keyOfMappingLine(String trimmed){
+        if(trimmed.startsWith("-"))return "";
+        int colon=trimmed.indexOf(':');
+        if(colon<=0)return "";
+        return unquoteYamlScalar(trimmed.substring(0,colon).trim());
+    }
+
+    private static String stripYamlInlineComment(String value){
+        boolean single=false,dbl=false;
+        for(int i=0;i<value.length();i++){
+            char c=value.charAt(i);
+            if(c=='\''&&!dbl)single=!single;
+            else if(c=='"'&&!single)dbl=!dbl;
+            else if(c=='#'&&!single&&!dbl&&(i==0||Character.isWhitespace(value.charAt(i-1))))
+                return value.substring(0,i).trim();
+        }
+        return value.trim();
+    }
+
+    private static String unquoteYamlScalar(String value){
+        String v=value==null?"":value.trim();
+        if(v.length()>=2&&((v.charAt(0)=='"'&&v.charAt(v.length()-1)=='"')||(v.charAt(0)=='\''&&v.charAt(v.length()-1)=='\'')))
+            return v.substring(1,v.length()-1).trim();
+        return v;
+    }
+
+    private static boolean isStrictDomainPattern(String value){
+        if(value==null)return false;
+        String v=value.trim();
+        if(v.isEmpty()||!v.equals(value)||v.endsWith(".")||v.startsWith(".")||containsWhitespace(v))return false;
+        String lower=v.toLowerCase(Locale.ROOT);
+        if(lower.startsWith("rule-set:")||lower.startsWith("geosite:")||lower.startsWith("regexp:"))return true;
+        String[] parts=v.split("\\.",-1);
+        if(parts.length==0)return false;
+        for(int i=0;i<parts.length;i++){
+            String part=parts[i];
+            if(part.isEmpty())return false;
+            if("+".equals(part)){
+                if(i!=0||parts.length<2)return false;
+                continue;
+            }
+            if("*".equals(part))continue;
+            if(part.indexOf('+')>=0||part.indexOf('*')>=0)return false;
+        }
+        return true;
+    }
+
+    private static boolean containsWhitespace(String value){
+        for(int i=0;i<value.length();i++)if(Character.isWhitespace(value.charAt(i)))return true;
+        return false;
+    }
+
+    private static String spaces(int count){
+        char[] chars=new char[Math.max(0,count)];
+        Arrays.fill(chars,' ');
+        return new String(chars);
     }
 
     private static void appendTun(StringBuilder out,ProxyRuntimeProfile profile,ProxyRuntimeProfile.AppScope scope,

@@ -54,6 +54,12 @@ public final class MihomoStartupConfigTest {
   ProxyRuntimeProfile bothProfile=new ProxyRuntimeProfile(ProxyRuntimeProfile.Core.MIHOMO,ProxyRuntimeProfile.Mode.TPROXY,ProxyRuntimeProfile.Ipv6.BYPASS,ProxyRuntimeProfile.AppScope.BLACKLIST,ProxyRuntimeProfile.DnsHijack.TPROXY,true,true,true,false,true,true);
   MihomoStartupConfig.Result both=MihomoStartupConfig.generate(cnSource,bothProfile);
   check(both.yaml.indexOf("RULE-SET,hetu-adblock")<both.yaml.indexOf("RULE-SET,hetu-cn-v4")&&both.yaml.indexOf("RULE-SET,hetu-cn-v4")<both.yaml.indexOf("MATCH,DIRECT"),"adblock executes before CNIP and source fallback");
+  String legacyDomainSource="mode: rule\nsniffer:\n  enable: true\n  skip-domain:\n    - Mijia Cloud\n    - \"+.io.mi.com\"\n"
+      +"dns:\n  fake-ip-filter:\n    - \"+.local\"\n    - \"time.*.com\"\nrules:\n  - MATCH,DIRECT\n";
+  MihomoStartupConfig.Result legacyDomain=MihomoStartupConfig.generate(legacyDomainSource,p(ProxyRuntimeProfile.Mode.TPROXY,true));
+  check(!legacyDomain.yaml.contains("\n    - Mijia Cloud\n"),"Mihomo 1.19.30 invalid human label removed from runtime copy");
+  check(legacyDomain.yaml.contains("Hetu 1.19.30 compatibility: skipped invalid domain entry: Mijia Cloud"),"runtime copy records skipped legacy domain");
+  check(legacyDomain.yaml.contains("\"+.io.mi.com\"")&&legacyDomain.yaml.contains("\"+.local\"")&&legacyDomain.yaml.contains("\"time.*.com\""),"valid strict domain patterns are preserved");
   boolean denied=false;try{MihomoStartupConfig.generate(source,p(ProxyRuntimeProfile.Mode.EBPF,true));}catch(Exception expected){denied=true;}check(denied,"unsupported eBPF is not faked");
   System.out.println("MihomoStartupConfigTest passed: "+checks);
  }

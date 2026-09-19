@@ -1193,6 +1193,79 @@ private fun SubscriptionMetric(
 
 private data class YamlLintIssue(val line: Int, val message: String)
 
+private fun yamlMihomoStrictDomainIssue(text: String): YamlLintIssue? {
+    var top = ""
+    var child = ""
+    var grandchild = ""
+    var listIndent = -1
+    var domainList = false
+    text.lines().forEachIndexed { index, raw ->
+        val trimmed = raw.trim()
+        if (trimmed.isBlank() || trimmed.startsWith("#")) return@forEachIndexed
+        val indent = raw.length - raw.trimStart().length
+        fun mappingKey(value: String): String {
+            if (value.startsWith("-")) return ""
+            val colon = value.indexOf(':')
+            if (colon <= 0) return ""
+            return value.substring(0, colon).trim().trim('"', '\'')
+        }
+        when (indent) {
+            0 -> {
+                top = mappingKey(trimmed); child = ""; grandchild = ""; domainList = false; listIndent = -1
+            }
+            2 -> {
+                child = mappingKey(trimmed); grandchild = ""
+                domainList = (top == "sniffer" && (child == "skip-domain" || child == "force-domain")) ||
+                    (top == "dns" && child == "fake-ip-filter")
+                listIndent = if (domainList) indent else -1
+            }
+            4 -> if (top == "dns" && child == "fallback-filter") {
+                grandchild = mappingKey(trimmed)
+                domainList = grandchild == "domain"
+                listIndent = if (domainList) indent else -1
+            }
+        }
+        if (domainList && listIndent >= 0 && indent > listIndent && trimmed.startsWith("- ")) {
+            var scalar = trimmed.removePrefix("- ").trim()
+            var single = false
+            var double = false
+            var cut = -1
+            scalar.forEachIndexed { i, c ->
+                if (c == '\'' && !double) single = !single
+                else if (c == '"' && !single) double = !double
+                else if (c == '#' && !single && !double && (i == 0 || scalar[i - 1].isWhitespace())) {
+                    cut = i
+                    return@forEachIndexed
+                }
+            }
+            if (cut >= 0) scalar = scalar.substring(0, cut).trim()
+            val value = scalar.trim().trim('"', '\'')
+            if (!yamlStrictDomainPatternValid(value)) {
+                return YamlLintIssue(index + 1, "Mihomo 1.19.30 不接受此域名表达式：$value")
+            }
+        }
+    }
+    return null
+}
+
+private fun yamlStrictDomainPatternValid(value: String): Boolean {
+    if (value.isBlank() || value != value.trim() || value.endsWith('.') || value.startsWith('.') || value.any { it.isWhitespace() }) return false
+    val lower = value.lowercase(java.util.Locale.ROOT)
+    if (lower.startsWith("rule-set:") || lower.startsWith("geosite:") || lower.startsWith("regexp:")) return true
+    val parts = value.split('.')
+    if (parts.any { it.isEmpty() }) return false
+    parts.forEachIndexed { index, part ->
+        if (part == "+") {
+            if (index != 0 || parts.size < 2) return false
+        } else if (part == "*") {
+            // complete wildcard label is supported
+        } else if ('+' in part || '*' in part) {
+            return false
+        }
+    }
+    return true
+}
+
 private fun yamlLocalLint(text: String): YamlLintIssue? {
     val compactMapping = Regex("""^(?:-\s+)?(?:["'][^"']+["']|[A-Za-z0-9_.-]+):\S""")
     text.lines().forEachIndexed { index, raw ->
@@ -1212,6 +1285,7 @@ private fun yamlLocalLint(text: String): YamlLintIssue? {
             return YamlLintIssue(index + 1, "冒号后缺少空格，建议写成 key: value")
         }
     }
+    yamlMihomoStrictDomainIssue(text)?.let { return it }
     return null
 }
 
