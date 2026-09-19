@@ -487,7 +487,14 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                 val host = subscriptionHost(item)
                 val ratio = provider?.takeIf { it.hasSubscriptionInfo && it.total > 0L }?.ratio?.coerceIn(0f, 1f)
                 val remainingPercent = ratio?.let { ((1f - it) * 100f).toInt() }
+                val ticketShape = RoundedCornerShape(22.dp)
+                val ticketBrush = if (dark) {
+                    Brush.verticalGradient(listOf(Color(0xFF1B2431).copy(alpha = .90f), Color(0xFF151D29).copy(alpha = .84f)))
+                } else {
+                    Brush.verticalGradient(listOf(Color.White.copy(alpha = .95f), Color(0xFFF8FAFC).copy(alpha = .85f)))
+                }
                 Surface(
+                    modifier = Modifier.background(ticketBrush, ticketShape),
                     onClick = {
                         addingSubscription = false
                         editSubscription = item
@@ -495,8 +502,8 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                         editorUrl = if (item.placeholder) "" else item.url
                         editorError = ""
                     },
-                    shape = RoundedCornerShape(20.dp),
-                    color = tokens.cardBackground,
+                    shape = ticketShape,
+                    color = Color.Transparent,
                     border = BorderStroke(.7.dp, if (dark) tokens.outline.copy(alpha = .30f) else Color(0xFFE2E8F0).copy(alpha = .70f)),
                     shadowElevation = 1.dp,
                 ) {
@@ -565,7 +572,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                             }
                             Spacer(Modifier.weight(1f))
                             Text(
-                                provider?.expire?.takeIf { it > 0L }?.let { "${subscriptionExpireDate(it)} 到期" } ?: "到期 —",
+                                provider?.expire?.takeIf { it > 0L }?.let { subscriptionExpireLabel(it) } ?: "到期 —",
                                 color = tokens.textSecondary,
                                 fontSize = 9.sp,
                                 maxLines = 1,
@@ -1193,8 +1200,8 @@ private fun subscriptionUpdatedLabel(raw: String): String {
     val zone = java.time.ZoneId.systemDefault()
     val time = java.time.Instant.ofEpochMilli(millis).atZone(zone)
     val today = java.time.Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
-    return if (time.toLocalDate() == today) {
-        "今天 " + time.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")) + " 更新"
+    return if (time.toLocalDate() == today && age < 6L * 60L * 60L * 1000L) {
+        time.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")) + " 更新"
     } else {
         time.format(java.time.format.DateTimeFormatter.ofPattern("MM-dd HH:mm")) + " 更新"
     }
@@ -1223,6 +1230,19 @@ private fun subscriptionExpireDate(expire: Long): String {
     return runCatching {
         java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date(millis))
     }.getOrDefault("—")
+}
+
+private fun subscriptionExpireLabel(expire: Long): String {
+    if (expire <= 0L) return "到期 —"
+    val millis = if (expire < 10_000_000_000L) expire * 1000L else expire
+    val remaining = millis - System.currentTimeMillis()
+    if (remaining <= 0L) return "已到期"
+    val days = kotlin.math.ceil(remaining / 86_400_000.0).toInt()
+    return when {
+        days <= 1 -> "明天到期"
+        days <= 30 -> "${days} 天后到期"
+        else -> "${subscriptionExpireDate(expire)} 到期"
+    }
 }
 
 private fun subscriptionSummary(item: ProxySubscriptionUi): String {

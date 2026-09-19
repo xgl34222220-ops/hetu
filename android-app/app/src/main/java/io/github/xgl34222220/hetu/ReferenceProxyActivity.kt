@@ -592,7 +592,7 @@ private fun RefHome(
             start = 16.dp,
             top = 8.dp,
             end = 16.dp,
-            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 94.dp,
+            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 92.dp,
         ),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -1392,7 +1392,7 @@ private fun RefPanel(
                 start = 16.dp,
                 top = 8.dp,
                 end = 16.dp,
-                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 94.dp,
+                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 92.dp,
             ),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -1431,6 +1431,7 @@ private fun RefPanel(
                                         expanded = selectedGroupName == group.name,
                                         delay = delays[selected] ?: group.nodes.firstOrNull { it.name == selected }?.lastDelay,
                                         testing = selected.isNotBlank() && testing[selected] == true,
+                                        hazeState = hazeState,
                                         glassEnabled = glassEnabled,
                                         modifier = Modifier.weight(1f),
                                         onClick = {
@@ -1458,17 +1459,11 @@ private fun RefPanel(
                                 visible = expandedGroup != null,
                                 enter = androidx.compose.animation.expandVertically(
                                     expandFrom = Alignment.Top,
-                                    animationSpec = androidx.compose.animation.core.tween(
-                                        durationMillis = 300,
-                                        easing = androidx.compose.animation.core.CubicBezierEasing(.16f, 1f, .30f, 1f),
-                                    ),
+                                    animationSpec = spring(dampingRatio = .72f, stiffness = 360f),
                                     clip = false,
                                 ) + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(180)) +
                                     androidx.compose.animation.slideInVertically(
-                                        animationSpec = androidx.compose.animation.core.tween(
-                                            durationMillis = 300,
-                                            easing = androidx.compose.animation.core.CubicBezierEasing(.16f, 1f, .30f, 1f),
-                                        ),
+                                        animationSpec = spring(dampingRatio = .74f, stiffness = 420f),
                                     ) { -it / 10 },
                                 exit = androidx.compose.animation.shrinkVertically(
                                     shrinkTowards = Alignment.Top,
@@ -2242,6 +2237,7 @@ private fun RefPanelOverview(state: ProxyComposeState, delays: Map<String, Long>
     }
 }
 
+@OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
 private fun RefGroupCard(
     group: ProxyGroupUi,
@@ -2249,6 +2245,7 @@ private fun RefGroupCard(
     expanded: Boolean,
     delay: Long?,
     testing: Boolean,
+    hazeState: HazeState,
     glassEnabled: Boolean,
     modifier: Modifier,
     onClick: () -> Unit,
@@ -2271,11 +2268,17 @@ private fun RefGroupCard(
             listOf(Color(0xFF1B2431).copy(alpha = .94f), Color(0xFF151D29).copy(alpha = .90f)),
         )
         glassEnabled -> Brush.verticalGradient(
-            listOf(Color.White.copy(alpha = .95f), Color(0xFFF6F9FE).copy(alpha = .86f)),
+            listOf(Color.White.copy(alpha = .95f), Color(0xFFF8FAFC).copy(alpha = .85f)),
         )
         dark -> Brush.verticalGradient(listOf(t.elevatedCardBackground, t.cardBackground))
         else -> Brush.verticalGradient(listOf(Color.White, Color(0xFFFAFBFD)))
     }
+    val safeGlassModifier = if (glassEnabled) {
+        Modifier.hazeEffect(state = hazeState, style = HazeMaterials.ultraThin()) {
+            blurRadius = 16.dp
+            noiseFactor = .010f
+        }
+    } else Modifier
     val arrowRotation by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
         animationSpec = androidx.compose.animation.core.tween(
@@ -2297,6 +2300,8 @@ private fun RefGroupCard(
                 ambientColor = Color(0xFF0F172A).copy(alpha = if (dark) .12f else .032f),
                 spotColor = Color(0xFF0F172A).copy(alpha = if (dark) .15f else .065f),
             )
+            .clip(shape)
+            .then(safeGlassModifier)
             .background(premiumBrush, shape)
             .border(
                 if (expanded) 1.25.dp else .9.dp,
@@ -2306,7 +2311,6 @@ private fun RefGroupCard(
                 } else if (dark) Color.White.copy(alpha = .10f) else Color(0xFFE2E8F0).copy(alpha = .80f),
                 shape,
             )
-            .clip(shape)
             .clickable(interactionSource = source, indication = null, onClick = onClick)
             .padding(start = 16.dp, top = 10.dp, end = 14.dp, bottom = 9.dp),
         verticalArrangement = Arrangement.SpaceBetween,
@@ -2516,7 +2520,7 @@ private fun RefInlineNodeCard(
         active -> Color(0xFFBFDBFE)
         else -> Color.White.copy(alpha = .88f)
     }
-    Box(modifier.height(64.dp)) {
+    Box(modifier.height(72.dp)) {
         androidx.compose.animation.AnimatedVisibility(
             visible = revealed,
             modifier = Modifier.fillMaxSize(),
@@ -2552,11 +2556,11 @@ private fun RefInlineNodeCard(
                             node.name,
                             color = if (active && !dark) Color(0xFF2563EB) else t.textPrimary,
                             fontSize = 12.sp,
-                            lineHeight = 15.sp,
+                            lineHeight = 14.sp,
                             fontWeight = if (active) FontWeight.ExtraBold else FontWeight.Bold,
-                            maxLines = 1,
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).padding(end = if (active) 12.dp else 0.dp),
                         )
                     }
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -3301,9 +3305,15 @@ private fun RefRuleGroupCard(items: List<ProxyRuleUi>) {
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val shape = RoundedCornerShape(22.dp)
+    val ruleGlassBrush = if (dark) {
+        Brush.verticalGradient(listOf(Color(0xFF1B2431).copy(alpha = .88f), Color(0xFF151D29).copy(alpha = .82f)))
+    } else {
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = .95f), Color(0xFFF8FAFC).copy(alpha = .85f)))
+    }
     Surface(
+        modifier = Modifier.background(ruleGlassBrush, shape),
         shape = shape,
-        color = t.cardBackground,
+        color = Color.Transparent,
         border = BorderStroke(.5.dp, if (dark) t.outline.copy(alpha = .32f) else Color(0xFFF1F5F9)),
         shadowElevation = 0.dp,
     ) {
@@ -3442,7 +3452,7 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
             start = 16.dp,
             top = 8.dp,
             end = 16.dp,
-            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 94.dp,
+            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 92.dp,
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -3532,7 +3542,7 @@ private fun RefSettings(state: ProxyComposeState, onChanged: () -> Unit) {
             start = 16.dp,
             top = 8.dp,
             end = 16.dp,
-            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 94.dp,
+            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 92.dp,
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
