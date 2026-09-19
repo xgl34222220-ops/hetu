@@ -273,6 +273,7 @@ private fun ThemeSettingsScreen(onBack: () -> Unit, onThemeChanged: () -> Unit) 
             }
         }
     }
+}
 
 @Composable
 private fun ThemeSection(title: String, content: @Composable ColumnScope.() -> Unit) {
