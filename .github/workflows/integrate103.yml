@@ -2,7 +2,7 @@ name: Integrate test103 presentation workbench
 on:
   push:
     branches: [feature/hetu-rebrand-root-app]
-    paths: [tools/integrate103.py]
+    paths: [tools/integrate103.py, .github/workflows/integrate103.yml]
   workflow_dispatch:
 permissions:
   contents: write
@@ -17,9 +17,10 @@ jobs:
           python3 tools/integrate103.py
           python3 tools/test_ui_audit_invariants.py
           git diff --check
+          git restore -- .github/workflows/build-hetu.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add android-app .github/workflows/build-hetu.yml
+          git add android-app
           git commit -m 'ui: deduplicate home, add native editor workbench and monitoring tickets (test.103)'
           git push origin HEAD:feature/hetu-rebrand-root-app
           mkdir -p "$RUNNER_TEMP/workbench103"
