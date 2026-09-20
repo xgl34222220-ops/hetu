@@ -30,7 +30,7 @@ import dev.chrisbanes.haze.hazeSource
 /** One ambient capture per activity. Card effects never sample their own text or controls. */
 val LocalCrystalBackdrop = staticCompositionLocalOf<HazeState?> { null }
 val LocalCrystalBlurEnabled = staticCompositionLocalOf { false }
-enum class CrystalDepth { Card, InsetItem, Popover }
+enum class CrystalDepth { Card, InsetItem, Popover, Sunken }
 
 @Composable
 fun CrystalEnvironment(content: @Composable () -> Unit) {
@@ -48,7 +48,7 @@ fun CrystalEnvironment(content: @Composable () -> Unit) {
         Box(Modifier.fillMaxSize()) {
             Box(Modifier.matchParentSize().then(if (enabled) Modifier.hazeSource(backdrop, key = "crystal-ambient") else Modifier)
                 .crystalPageBackground())
-            content()
+            CrystalPopoverHost(content)
         }
     }
 }
@@ -80,21 +80,24 @@ fun Modifier.crystalMaterial(
     val t = LocalHetuTokens.current
     val primary = MaterialTheme.colorScheme.primary
     val dark = t.pageBackground.luminance() < .5f
-    val radius = when (depth) { CrystalDepth.Popover -> 24.dp; CrystalDepth.InsetItem -> 12.dp; else -> 24.dp }
-    val topAlpha = when (depth) { CrystalDepth.Popover -> .78f; CrystalDepth.InsetItem -> .85f; else -> .96f }
-    val bottomAlpha = when (depth) { CrystalDepth.Popover -> .65f; CrystalDepth.InsetItem -> .70f; else -> .86f }
+    val radius = when (depth) { CrystalDepth.Popover -> 24.dp; CrystalDepth.InsetItem, CrystalDepth.Sunken -> 12.dp; else -> 20.dp }
+    val topAlpha = when (depth) { CrystalDepth.Popover -> .75f; CrystalDepth.InsetItem -> .85f; CrystalDepth.Sunken -> .78f; else -> .96f }
+    val bottomAlpha = when (depth) { CrystalDepth.Popover -> .65f; CrystalDepth.InsetItem -> .74f; CrystalDepth.Sunken -> .78f; else -> .85f }
     val accent = if (selection) primary else if (tint.isSpecified && tint.alpha > .05f) tint else Color.Unspecified
-    val upper = if (dark) Color(0xFF283543).copy(alpha = .87f) else Color.White.copy(alpha = topAlpha)
-    val lower = if (dark) Color(0xFF18232F).copy(alpha = .78f) else Color(0xFFF8FAFE).copy(alpha = bottomAlpha)
+    val upper = if (dark) Color(0xFF283543).copy(alpha = .87f) else (if (depth == CrystalDepth.Sunken) Color(0xFFEEF2F6) else Color.White).copy(alpha = topAlpha)
+    val lower = if (dark) Color(0xFF18232F).copy(alpha = .78f) else (if (depth == CrystalDepth.Sunken) Color(0xFFEEF2F6) else Color(0xFFF8FAFE)).copy(alpha = bottomAlpha)
     val fill = Brush.verticalGradient(listOf(upper, lower))
     // Suppress Haze's default opaque tint; the translucent fill above is the only wash.
-    val style = HazeStyle(backgroundColor = if (depth == CrystalDepth.Popover) Color.Transparent else t.pageBackground, tints = emptyList(), blurRadius = radius,
+    val style = HazeStyle(backgroundColor = Color.Transparent, tints = emptyList(), blurRadius = radius,
         noiseFactor = .005f, fallbackTint = HazeTint(Color.Transparent))
-    val shadowSize = when(depth) { CrystalDepth.Popover -> 14.dp; CrystalDepth.InsetItem -> 2.dp; else -> 7.dp }
+    val shadowSize = when(depth) { CrystalDepth.Popover -> 14.dp; CrystalDepth.InsetItem -> 2.dp; CrystalDepth.Sunken -> 0.dp; else -> 7.dp }
     val blur = if (blurEnabled && backdrop != null) Modifier.hazeEffect(backdrop, style) {
         canDrawArea = { true }
     } else Modifier
-    return shadow(shadowSize, shape, clip = false,
+    val contact = if (depth == CrystalDepth.Sunken) Modifier else Modifier.shadow(
+        1.dp, shape, clip = false, ambientColor = Color(0xFF0F172A).copy(alpha = .03f),
+        spotColor = Color(0xFF0F172A).copy(alpha = .03f))
+    return then(contact).shadow(shadowSize, shape, clip = false,
         ambientColor = Color(0xFF0F172A).copy(alpha = if (depth == CrystalDepth.Popover) .10f else .04f),
         spotColor = Color(0xFF0F172A).copy(alpha = if (depth == CrystalDepth.Popover) .14f else .06f))
         .clip(shape).then(blur).background(fill, shape)
@@ -112,6 +115,8 @@ fun Modifier.crystalMaterial(
                 center = Offset(0f, size.height*.38f), radius = maxOf(size.width*.75f, 1f))
             onDrawWithContent {
                 drawRect(ambient); drawRect(mint)
+                if (depth == CrystalDepth.Sunken) drawRect(Brush.verticalGradient(
+                    listOf(Color(0xFF0F172A).copy(alpha = .04f), Color.Transparent), endY = 5.dp.toPx()))
                 drawContent()
                 drawOutline(outline, rim, style = Stroke(width = 1f))
                 if (size.minDimension > 8.dp.toPx()) inset(1.5.dp.toPx()) {

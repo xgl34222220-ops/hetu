@@ -12,6 +12,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -24,52 +27,43 @@ import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.*
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupPositionProvider
-import androidx.compose.ui.window.PopupProperties
 import dev.chrisbanes.haze.HazeState
 import io.github.xgl34222220.hetu.ui.*
 
-/** Anchored popup semantics (outside/back dismissal, focus), not a white Material menu. */
+/** Activity-hosted glass menu. Background capture and menu share the same window. */
 @Composable
 internal fun CrystalHomeMenu(onLog: () -> Unit, onConnections: () -> Unit, onDiagnostics: () -> Unit,
     onAdblock: () -> Unit, diagnosticLoading: Boolean, hazeState: HazeState? = null, glassEnabled: Boolean = false) {
-    var open by remember { mutableStateOf(false) }
-    val density = LocalDensity.current
-    val gap = with(density) { 4.dp.roundToPx() }
-    val margin = with(density) { 8.dp.roundToPx() }
-    val position = remember(gap, margin) {
-        object : PopupPositionProvider {
-            override fun calculatePosition(anchorBounds: IntRect, windowSize: IntSize,
-                layoutDirection: LayoutDirection, popupContentSize: IntSize): IntOffset {
-                val preferred = if (layoutDirection == LayoutDirection.Ltr) anchorBounds.right - popupContentSize.width + margin else anchorBounds.left - margin
-                val x = preferred.coerceIn(margin, (windowSize.width-popupContentSize.width-margin).coerceAtLeast(margin))
-                val below = anchorBounds.bottom + gap
-                val y = if (below + popupContentSize.height <= windowSize.height-margin) below
-                    else (anchorBounds.top-popupContentSize.height-gap).coerceAtLeast(margin)
-                return IntOffset(x,y)
-            }
-        }
-    }
+    val host = LocalCrystalPopover.current
+    val owner = remember { Any() }
+    val focus = remember { androidx.compose.ui.focus.FocusRequester() }
+    var anchor by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }
+    val logAction by rememberUpdatedState(onLog)
+    val connectionsAction by rememberUpdatedState(onConnections)
+    val diagnosticsAction by rememberUpdatedState(onDiagnostics)
+    val adblockAction by rememberUpdatedState(onAdblock)
+    val loading by rememberUpdatedState(diagnosticLoading)
+    DisposableEffect(host, owner) { onDispose { host?.dismiss(owner, restoreFocus = false) } }
     Box {
-        IconButton(onClick = { open = true }, modifier = Modifier.size(48.dp)) {
-            Icon(Icons.Rounded.MoreHoriz, "更多工具", tint = LocalHetuTokens.current.textSecondary)
-        }
-        if (open) Popup(popupPositionProvider = position, onDismissRequest = { open = false },
-            properties = PopupProperties(focusable = true, dismissOnBackPress = true, dismissOnClickOutside = true)) {
-            var appeared by remember { mutableStateOf(false) }
-            LaunchedEffect(Unit) { appeared = true }
-            val progress by animateFloatAsState(if(appeared) 1f else 0f,
-                tween(if(LocalHetuMotionEnabled.current) 160 else 0), label = "popoverReveal")
-            Box(Modifier.padding(12.dp).graphicsLayer {
-                alpha = progress; scaleX = .96f + .04f*progress; scaleY = scaleX
-                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(1f,0f)
-            }) {
+        IconButton(onClick = {
+            host?.show(owner, anchor, { runCatching { focus.requestFocus() } }) { dismiss ->
+                var appeared by remember { mutableStateOf(false) }
+                LaunchedEffect(Unit) { appeared = true }
+                val progress by animateFloatAsState(if (appeared) 1f else 0f,
+                    tween(if (LocalHetuMotionEnabled.current) 180 else 0), label = "popoverReveal")
                 CrystalMenuContent(
-                    onLog = { open = false; onLog() }, onConnections = { open = false; onConnections() },
-                    onDiagnostics = { open = false; onDiagnostics() }, onAdblock = { open = false; onAdblock() },
-                    diagnosticLoading = diagnosticLoading, backdrop = hazeState, blurEnabled = glassEnabled)
+                    onLog = { dismiss(); logAction() }, onConnections = { dismiss(); connectionsAction() },
+                    onDiagnostics = { dismiss(); diagnosticsAction() }, onAdblock = { dismiss(); adblockAction() },
+                    diagnosticLoading = loading, backdrop = hazeState, blurEnabled = glassEnabled,
+                    modifier = Modifier.graphicsLayer {
+                        alpha = progress; scaleX = .97f + .03f * progress; scaleY = scaleX
+                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(1f, 0f)
+                    })
             }
+        }, modifier = Modifier.size(48.dp).focusRequester(focus).onGloballyPositioned {
+            anchor = it.boundsInWindow(); host?.move(owner, anchor)
+        }) {
+            Icon(Icons.Rounded.MoreHoriz, "更多工具", tint = LocalHetuTokens.current.textSecondary)
         }
     }
 }

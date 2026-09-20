@@ -717,9 +717,7 @@ internal fun RefHome(
     val connections = if (state.panelReady) state.connections.size else cachedConnections
 
     LazyColumn(
-        Modifier.fillMaxSize().statusBarsPadding().background(
-            t.pageBackground,
-        ),
+        Modifier.fillMaxSize().statusBarsPadding(),
         contentPadding = PaddingValues(
             start = 16.dp, top = 8.dp, end = 16.dp,
             bottom = hetuContentBottomPadding(),
@@ -2686,7 +2684,7 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
 
 
     LazyColumn(
-        Modifier.fillMaxSize().statusBarsPadding().background(t.pageBackground),
+        Modifier.fillMaxSize().statusBarsPadding(),
         contentPadding = PaddingValues(
             start = 16.dp,
             top = 8.dp,
@@ -2777,7 +2775,7 @@ private fun RefSettings(state: ProxyComposeState, operation: String, onApplySett
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     LazyColumn(
-        Modifier.fillMaxSize().statusBarsPadding().background(t.pageBackground),
+        Modifier.fillMaxSize().statusBarsPadding(),
         contentPadding = PaddingValues(
             start = 16.dp,
             top = 8.dp,

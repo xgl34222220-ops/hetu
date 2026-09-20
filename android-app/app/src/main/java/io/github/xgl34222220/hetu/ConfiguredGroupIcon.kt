@@ -55,8 +55,10 @@ internal fun ConfiguredGroupIcon(group: ProxyGroupUi, modifier: Modifier = Modif
     }
     val loaded by produceState<GroupIconLoad>(cached?.let { GroupIconLoad.Ready(it, true) } ?: GroupIconLoad.Loading,
         key, group.iconPath, epoch, visible) {
-        if (!configured || !visible) return@produceState
+        // produceState keeps its previous value when the URL key changes. Reset
+        // before early returns so a removed/changed icon cannot reuse another image.
         value = repository.peek(key)?.let { GroupIconLoad.Ready(it, true) } ?: GroupIconLoad.Loading
+        if (!configured || !visible) return@produceState
         // A failed first attempt must not remain stuck until the entire process dies.
         // Only visible composed cards retry; cache, per-URL single flight and bounds remain.
         repeat(3) { attempt ->

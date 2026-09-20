@@ -159,13 +159,10 @@ internal fun LiquidGroupWell(group: ProxyGroupUi, selected: String, delays: Map<
     onSelect: (String) -> Unit, onDelay: (String) -> Unit, onTestAll: () -> Unit) {
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val shape = RoundedCornerShape(22.dp)
+    val shape = RoundedCornerShape(20.dp)
     val well = if (dark) Color(0xFF18212E) else Color(0xFFEEF2F6)
     Column(Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 16.dp).testTag("sunken-well:${group.name}")
-        .clip(shape).background(Brush.verticalGradient(listOf(if (dark) Color(0xFF141C27) else Color(0xFFE8EEF4), well,
-            if (dark) Color(0xFF202A37) else Color(0xFFF2F5F8))), shape)
-        .border(.7.dp, if (dark) Color.White.copy(alpha = .07f) else Color(0xFFCBD5E1).copy(alpha = .6f), shape)
-        .drawWithContent { drawContent(); drawRect(Brush.verticalGradient(listOf(Color(0xFF0F172A).copy(alpha = .045f), Color.Transparent), endY = 5.dp.toPx())) }
+        .crystalMaterial(shape, depth = CrystalDepth.Sunken)
         .padding(horizontal = 12.dp, vertical = 9.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth().heightIn(min = 40.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {

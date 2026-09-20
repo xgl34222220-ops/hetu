@@ -382,14 +382,10 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
 
             items(configLibrary, key = { "config-" + it.name }) { config ->
                 val cardShape = RoundedCornerShape(20.dp)
-                val selectedBrush = if (dark) {
-                    Brush.horizontalGradient(listOf(Color(0xFF172554).copy(alpha = .50f), Color(0xFF1B2431).copy(alpha = .82f)))
-                } else {
-                    Brush.horizontalGradient(listOf(Color(0xFFEFF6FF).copy(alpha = .76f), Color(0xFFF8FAFE).copy(alpha = .86f)))
-                }
                 Box(
                     Modifier.fillMaxWidth()
-                        .crystalMaterial(cardShape, selection = config.selected)
+                        .crystalMaterial(cardShape, selection = config.selected,
+                            depth = if (config.selected) CrystalDepth.Card else CrystalDepth.Sunken)
                         .clickable(enabled = !loading) {
                             if (!config.selected) {
                                 loading = true
