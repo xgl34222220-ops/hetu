@@ -68,51 +68,15 @@ internal fun LatencyChip(value: Long?, testing: Boolean, onClick: (() -> Unit)? 
 
 @Composable
 internal fun StrategyGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolean, value: Long?, testing: Boolean,
-    modifier: Modifier = Modifier, onExpand: () -> Unit, onDelay: () -> Unit) {
-    val t = LocalHetuTokens.current
-    val primary = MaterialTheme.colorScheme.primary
-    val shape = RoundedCornerShape(18.dp)
-    Column(modifier.background(t.cardBackground, shape)
-        .border(1.dp, if (expanded) primary.copy(alpha = .28f) else t.outline.copy(alpha = .35f), shape)
-        .testTag("strategy:${group.name}")) {
-        // Independent sibling hit regions, not a tiny child inside a clickable parent.
-        Column(Modifier.fillMaxWidth().clickable(role = Role.Button, onClickLabel = if (expanded) "收起策略组" else "展开策略组", onClick = onExpand)
-            .padding(start = 14.dp, top = 14.dp, end = 14.dp, bottom = 4.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ConfiguredGroupIcon(group, Modifier.size(32.dp))
-                Text(group.name, Modifier.weight(1f), color = t.textPrimary, fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold)
-                Icon(if (expanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown, null,
-                    Modifier.size(18.dp), tint = if (expanded) primary else t.textSecondary)
-            }
-            Text(selected.ifBlank { "未选择" }, color = t.textSecondary, fontSize = 13.sp, lineHeight = 19.sp,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 38.dp))
-        }
-        Row(Modifier.fillMaxWidth().padding(start = 14.dp, end = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            val flag = refNodeFlag(selected)
-            if (flag.isNotBlank() && !selected.contains(flag)) Text(flag, fontSize = 16.sp)
-            Spacer(Modifier.weight(1f))
-            LatencyChip(value, testing, onDelay, Modifier.testTag("strategy-delay:${group.name}"))
-        }
-    }
+    modifier: Modifier = Modifier, onExpand: () -> Unit, onDelay: () -> Unit,
+    hazeState: dev.chrisbanes.haze.HazeState? = null, glassEnabled: Boolean = false) {
+    LiquidStrategyCard(group, selected, expanded, value, testing, modifier, onExpand, onDelay, hazeState, glassEnabled)
 }
 
 @Composable
 internal fun NodeChoiceCard(node: ProxyNodeUi, active: Boolean, value: Long?, testing: Boolean,
     modifier: Modifier = Modifier, onSelect: () -> Unit, onDelay: () -> Unit) {
-    val t = LocalHetuTokens.current
-    val primary = MaterialTheme.colorScheme.primary
-    Row(modifier.fillMaxWidth().heightIn(min = 72.dp)
-        .background(if (active) t.selectionBackground.copy(alpha = .45f) else t.cardBackground, RoundedCornerShape(14.dp))
-        .border(1.dp, if (active) primary.copy(alpha = .4f) else t.outline.copy(alpha = .28f), RoundedCornerShape(14.dp))
-        .testTag("node:${node.name}"), verticalAlignment = Alignment.CenterVertically) {
-        Row(Modifier.weight(1f).heightIn(min = 72.dp).clickable(role = Role.RadioButton, onClick = onSelect)
-            .semantics { selected = active }.padding(12.dp), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (active) Icon(Icons.Rounded.CheckCircle, "已选择", Modifier.size(18.dp), tint = primary)
-            Text(node.name, color = t.textPrimary, fontSize = 14.sp, lineHeight = 20.sp)
-        }
-        LatencyChip(value, testing, onDelay, Modifier.padding(end = 6.dp).testTag("node-delay:${node.name}"))
-    }
+    LiquidNodeCard(node, active, value, testing, modifier, onSelect, onDelay)
 }
 
 @Composable
@@ -124,7 +88,7 @@ internal fun WorkspaceBento(runtime: ProxyRuntimeSnapshot, connections: Int, up:
     val shape = RoundedCornerShape(18.dp)
     val ratio = if (total > 0) (used.toDouble() / total).toFloat().coerceIn(0f, 1f) else 0f
     @Composable fun Cell(title: String, modifier: Modifier, onClick: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
-        Column(modifier.heightIn(min = 132.dp).then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+        Column(modifier.heightIn(min = 112.dp).then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(title, color = t.textSecondary, fontSize = 12.sp, lineHeight = 17.sp)
             content()

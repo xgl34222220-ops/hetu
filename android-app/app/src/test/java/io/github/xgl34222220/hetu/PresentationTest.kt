@@ -40,6 +40,23 @@ class PresentationTest {
             assertArrayEquals(before, source.toByteArray())
         }
     }
+    @Test fun manyUnrelatedAliasesDoNotDropConfiguredBrandIcons() {
+        val source = buildString {
+            append("template: &node {type: http, interval: 3600}\nproxy-providers:\n")
+            repeat(120) { append("  provider-$it: {<<: *node}\n") }
+            append("proxy-groups:\n  - {name: Google, icon: 'https://icons.example/google.png'}\n")
+            append("  - {name: Microsoft, icon: 'https://icons.example/microsoft.svg'}\n")
+        }
+        assertEquals(listOf("Google", "Microsoft"), ProxyGroupIcons.parse(source).keys.toList())
+        val bundled = BundledProxyConfig.open().bufferedReader().use { it.readText() }
+        val icons = ProxyGroupIcons.parse(bundled)
+        assertTrue("Bundled alias-rich config lost its icons", icons.size >= 10)
+    }
+    @Test fun recursiveTemplateProjectionTerminatesAndExplicitIconWins() {
+        val source = "template: &self {<<: *self, icon: 'https://icons.example/template.svg'}\n" +
+            "proxy-groups: [{<<: *self, name: Google, icon: 'https://icons.example/explicit.svg'}]"
+        assertEquals("https://icons.example/explicit.svg", ProxyGroupIcons.parse(source)["Google"])
+    }
     @Test fun rasterAndSvgKeepOriginalColorsAndAspectRatio() {
         val bmp = Bitmap.createBitmap(24, 12, Bitmap.Config.ARGB_8888).apply { eraseColor(0xffd32f89.toInt()) }
         for (format in listOf(Bitmap.CompressFormat.PNG, Bitmap.CompressFormat.WEBP_LOSSLESS)) {

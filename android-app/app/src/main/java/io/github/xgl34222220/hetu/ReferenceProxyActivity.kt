@@ -736,9 +736,10 @@ internal fun RefHome(
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text("河图", color = t.textPrimary, fontSize = 22.sp, lineHeight = 28.sp,
                         fontWeight = FontWeight.Bold, letterSpacing = (-.7).sp)
-                    Text("网络与广告过滤", color = t.textSecondary, style = MaterialTheme.typography.bodySmall)
                 }
-                RefPanelHeaderAction(Icons.Rounded.Article, "运行日志", onClick = onLog)
+                LiquidHomeMenu(onLog, onConnections, onDiagnostics, {
+                    context.startActivity(Intent(context, ProxyAdblockChainActivity::class.java))
+                }, diagnosticLoading)
                 RefPanelHeaderAction(Icons.Rounded.Refresh, "刷新状态", onClick = onRefresh)
             }
         }
@@ -748,20 +749,9 @@ internal fun RefHome(
                 modifier = refHomeLiquidModifier(Modifier.fillMaxWidth(), hazeState, glassEnabled, shape),
                 shape = shape, color = Color.Transparent,
             ) {
-                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        Box(
-                            Modifier.size(52.dp).background(
-                                (if (state.running) t.success else scheme.primary).copy(alpha = .11f),
-                                RoundedCornerShape(18.dp),
-                            ), contentAlignment = Alignment.Center,
-                        ) {
-                            if (busy) CircularProgressIndicator(Modifier.size(25.dp), strokeWidth = 2.5.dp)
-                            else Icon(
-                                if (state.running) Icons.Rounded.Shield else Icons.Rounded.PowerSettingsNew,
-                                null, Modifier.size(27.dp), tint = if (state.running) t.success else scheme.primary,
-                            )
-                        }
+                        LiquidStatusGlyph(state.running, busy)
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(
                                 if (busy) "正在处理" else if (state.running) "代理运行中" else "代理已停止",
@@ -804,15 +794,6 @@ internal fun RefHome(
                 }
             }
         }
-        item(key = "home-shortcuts") {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                RefHomeShortcut("应用连接", if (state.running) "$connections 条连接" else "查看连接", Icons.Rounded.Apps, Modifier.weight(1f), onConnections)
-                RefHomeShortcut("广告过滤", "规则与拦截", Icons.Rounded.Shield, Modifier.weight(1f), {
-                    context.startActivity(Intent(context, ProxyAdblockChainActivity::class.java))
-                })
-                RefHomeShortcut("网络诊断", if (diagnosticLoading) "正在读取…" else "消息与网络", Icons.Rounded.Troubleshoot, Modifier.weight(1f), onDiagnostics, !diagnosticLoading)
-            }
-        }
         item(key = "home-latency") {
             RefLatencyPanel(siteDelays["Baidu"], siteDelays["Cloudflare"], siteDelays["Google"], testing, hazeState, glassEnabled, onDelay)
         }
@@ -836,41 +817,7 @@ internal fun RefHome(
 
 @Composable
 private fun RefHomeActions(running: Boolean, busy: Boolean, onToggle: () -> Unit, onReload: () -> Unit, onRestart: () -> Unit) {
-    val t = LocalHetuTokens.current
-    val scheme = MaterialTheme.colorScheme
-    val fontScale = androidx.compose.ui.platform.LocalDensity.current.fontScale
-    @Composable
-    fun MainAction(modifier: Modifier) {
-        Button(
-            onClick = onToggle, enabled = !busy, modifier = modifier.heightIn(min = 48.dp),
-            shape = RoundedCornerShape(15.dp), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = if (running) t.dangerContainer else scheme.primary,
-                contentColor = if (running) t.danger else scheme.onPrimary,
-            ),
-        ) {
-            Icon(if (running) Icons.Rounded.Stop else Icons.Rounded.PlayArrow, null, Modifier.size(20.dp))
-            Spacer(Modifier.width(7.dp))
-            Text(if (busy) "请稍候" else if (running) "停止" else "启动", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-        }
-    }
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        if (maxWidth < 300.dp || fontScale > 1.1f) {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                MainAction(Modifier.fillMaxWidth())
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    RefActionText("重载", running && !busy, onReload, Modifier.weight(1f), t.textSecondary, Icons.Rounded.Refresh)
-                    RefActionText("重启", running && !busy, onRestart, Modifier.weight(1f), t.textSecondary, Icons.Rounded.RestartAlt)
-                }
-            }
-        } else {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                MainAction(Modifier.weight(1.4f))
-                RefActionText("重载", running && !busy, onReload, Modifier.weight(.7f), t.textSecondary, Icons.Rounded.Refresh)
-                RefActionText("重启", running && !busy, onRestart, Modifier.weight(.7f), t.textSecondary, Icons.Rounded.RestartAlt)
-            }
-        }
-    }
+    LiquidHomeActions(running, busy, onToggle, onReload, onRestart)
 }
 
 @Composable
@@ -1380,7 +1327,7 @@ private fun RefPanel(
     }
 
     BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding()) {
-        val groupColumns = hetuCompactColumns(maxWidth - 32.dp, 152.dp)
+        val groupColumns = liquidColumns(maxWidth - 32.dp)
         Column(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     RefPanelGlassHeader(
@@ -1427,6 +1374,10 @@ private fun RefPanel(
                     if (filteredGroups.isEmpty()) item { RefEmptyState("没有匹配的节点", if (query.isBlank()) "当前配置未提供策略组。" else "试试其他节点或策略组名称。", Icons.Rounded.Search) }
                     itemsIndexed(filteredGroups.chunked(groupColumns), key = { index, _ -> "${tab.name}-groups-$index" }, contentType = { _, _ -> "group-row" }) { _, pair ->
                         val expandedGroup = pair.firstOrNull { it.name == selectedGroupName }
+                        // Keep the last content through the exit animation; a nullable let
+                        // otherwise removes the entire well before shrinkVertically runs.
+                        var closingGroup by remember(pair.map { it.name }) { mutableStateOf<ProxyGroupUi?>(null) }
+                        SideEffect { if (expandedGroup != null) closingGroup = expandedGroup }
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 pair.forEach { group ->
@@ -1466,7 +1417,7 @@ private fun RefPanel(
                                 visible = expandedGroup != null,
                                 enter = androidx.compose.animation.expandVertically(
                                     expandFrom = Alignment.Top,
-                                    animationSpec = spring(dampingRatio = .9f, stiffness = 420f),
+                                    animationSpec = spring(dampingRatio = .78f, stiffness = 380f),
                                     clip = false,
                                 ) + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(180)) +
                                     androidx.compose.animation.slideInVertically(
@@ -1481,7 +1432,7 @@ private fun RefPanel(
                                     clip = false,
                                 ) + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(140)),
                             ) {
-                                expandedGroup?.let { group ->
+                                (expandedGroup ?: closingGroup)?.let { group ->
                                     val selected = selectedLocal[group.name] ?: group.now
                                     RefInlineGroupExpansion(
                                         group = group,
@@ -2164,38 +2115,13 @@ private fun RefPanelOverview(state: ProxyComposeState, delays: Map<String, Long>
 @Composable
 private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolean, delay: Long?, testing: Boolean,
     hazeState: HazeState, glassEnabled: Boolean, modifier: Modifier, onClick: () -> Unit, onDelay: () -> Unit) {
-    StrategyGroupCard(group, selected, expanded, delay, testing, modifier, onClick, onDelay)
+    StrategyGroupCard(group, selected, expanded, delay, testing, modifier, onClick, onDelay, hazeState, glassEnabled)
 }
 
 @Composable
 private fun RefInlineGroupExpansion(group: ProxyGroupUi, selected: String, delays: Map<String, Long>,
     testing: Map<String, Boolean>, onSelect: (String) -> Unit, onDelay: (String) -> Unit, onTestAll: () -> Unit) {
-    val t = LocalHetuTokens.current
-    Column(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("${group.name} · 可选节点", color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                Text("当前：$selected", color = t.textSecondary, fontSize = 12.sp, lineHeight = 17.sp)
-            }
-            TextButton(onClick = onTestAll, modifier = Modifier.heightIn(min = 48.dp)) {
-                Icon(Icons.Rounded.Speed, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("全测速", fontSize = 12.sp)
-            }
-        }
-        BoxWithConstraints {
-            val columns = hetuCompactColumns(maxWidth, 220.dp)
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                group.nodes.chunked(columns).forEach { pair ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        pair.forEach { node ->
-                            NodeChoiceCard(node, node.name == selected, delays[node.name] ?: node.lastDelay,
-                                testing[node.name] == true, Modifier.weight(1f), { onSelect(node.name) }, { onDelay(node.name) })
-                        }
-                        if (pair.size < columns) Spacer(Modifier.weight(1f))
-                    }
-                }
-            }
-        }
-    }
+    LiquidGroupWell(group, selected, delays, testing, onSelect, onDelay, onTestAll)
 }
 
 @Composable

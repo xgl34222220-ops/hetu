@@ -29,6 +29,7 @@ internal fun ConfiguredGroupIcon(group: ProxyGroupUi, modifier: Modifier = Modif
     val key = group.iconUrl.ifBlank { group.iconPath }
     val cached = remember(key) { repository.peek(key) }
     val loaded by produceState<GroupIconLoad>(cached?.let { GroupIconLoad.Ready(it, true) } ?: GroupIconLoad.Loading, key, group.iconPath) {
+        value = cached?.let { GroupIconLoad.Ready(it, true) } ?: GroupIconLoad.Loading
         if (configured) value = repository.load(key, group.iconPath)
     }
     val ready = loaded as? GroupIconLoad.Ready

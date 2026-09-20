@@ -10,7 +10,8 @@ for name, expected in json.loads((root / "tests/ui-runtime-baseline.json").read_
 main = (src / "ReferenceProxyActivity.kt").read_text()
 cards = (src / "WorkspaceCards.kt").read_text()
 icon = (src / "ConfiguredGroupIcon.kt").read_text()
-assert "ConfiguredGroupIcon(group" in cards
+liquid = (src / "LiquidWorkspace.kt").read_text()
+assert "LiquidStrategyCard(group" in cards and "ConfiguredGroupIcon(group" in liquid
 assert 'testTag("configured-icon:' in icon and "ContentScale.Fit" in icon
 assert "upgradeRuntimeApplyAttempted" not in main
 assert main.count("controller.restart {") == 1, "Only explicit user restart may call controller.restart"
@@ -21,3 +22,8 @@ assert "BoxProxy Design System" not in (src / "ThemeSettingsActivity.kt").read_t
 assert "setEditorLanguage(HetuYamlLanguage())" in (src / "ProxySubscriptionActivity.kt").read_text()
 assert "RuleMetricSummary(" in (src / "ProxyAdblockChainActivity.kt").read_text()
 print("UI audit source/runtime invariants passed")
+
+assert 'item(key = "home-shortcuts")' not in main
+assert 'Text("网络与广告过滤"' not in main
+assert "expandedGroup ?: closingGroup" in main
+assert "LiquidConfigIndicator(config.selected)" in (src / "ProxySubscriptionActivity.kt").read_text()

@@ -17,6 +17,10 @@ import kotlinx.coroutines.withContext
 import org.yaml.snakeyaml.LoaderOptions
 import org.yaml.snakeyaml.Yaml
 import org.yaml.snakeyaml.constructor.SafeConstructor
+import org.yaml.snakeyaml.nodes.*
+import java.io.StringReader
+import java.util.Collections
+import java.util.IdentityHashMap
 import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -29,16 +33,36 @@ internal object ProxyGroupIcons {
     fun parse(source: String): Map<String, String> {
         val options = LoaderOptions().apply {
             codePointLimit = 4_194_304
-            maxAliasesForCollections = 64
+            maxAliasesForCollections = 4096
+            nestingDepthLimit = 64
             isAllowDuplicateKeys = false
         }
-        val root = Yaml(SafeConstructor(options)).load<Any?>(source) as? Map<*, *> ?: return emptyMap()
-        val groups = root["proxy-groups"] as? List<*> ?: return emptyMap()
+        // Compose the bounded YAML graph, not the entire configuration's objects.
+        // Only scalar name/icon fields and bounded merge chains are projected.
+        // Unrelated provider templates must not erase all strategy icons after 64 aliases.
+        val root = Yaml(SafeConstructor(options)).compose(StringReader(source)) as? MappingNode ?: return emptyMap()
+        val groups = root.value.lastOrNull { (it.keyNode as? ScalarNode)?.value == "proxy-groups" }
+            ?.valueNode as? SequenceNode ?: return emptyMap()
+        fun field(node: Node, key: String, seen: MutableSet<Node>, depth: Int = 0): String? {
+            if (depth > 12 || !seen.add(node)) return null
+            val row = node as? MappingNode ?: return null
+            row.value.lastOrNull { (it.keyNode as? ScalarNode)?.value == key }?.let {
+                return (it.valueNode as? ScalarNode)?.value
+            }
+            for (entry in row.value) {
+                if ((entry.keyNode as? ScalarNode)?.value != "<<") continue
+                val merged = entry.valueNode
+                val candidates = if (merged is SequenceNode) merged.value else listOf(merged)
+                for (candidate in candidates) field(candidate, key, seen, depth + 1)?.let { return it }
+            }
+            return null
+        }
+        fun read(node: Node, key: String): String? = field(node, key,
+            Collections.newSetFromMap(IdentityHashMap<Node, Boolean>()))
         val result = linkedMapOf<String, String>()
-        for (entry in groups) {
-            val row = entry as? Map<*, *> ?: continue
-            val name = row["name"] as? String ?: continue
-            val icon = row["icon"] as? String ?: continue
+        for (entry in groups.value) {
+            val name = read(entry, "name") ?: continue
+            val icon = read(entry, "icon") ?: continue
             if (name.isNotBlank() && icon.isNotBlank()) result[name] = icon
         }
         return result

@@ -62,9 +62,12 @@ class HomeScreenRenderTest {
             compose.waitForIdle()
             compose.onNodeWithText("代理运行中",true).assertExists()
             compose.onNodeWithText("停止",true).assertExists()
+            compose.onNodeWithText("网络与广告过滤",true).assertDoesNotExist()
+            compose.onNodeWithText("应用连接",true).assertDoesNotExist()
+            compose.onNodeWithContentDescription("更多工具").assertExists()
             compose.runOnIdle { assertEquals(0,restarts);assertEquals(0,toggles);assertEquals(0,reloads) }
             capture("home-${w}-${scale}-${if(dark) "dark" else "light"}-top")
-            compose.onNode(hasScrollToIndexAction()).performScrollToIndex(4)
+            compose.onNode(hasScrollToIndexAction()).performScrollToIndex(3)
             compose.onNodeWithText("已用流量",true).assertExists()
             compose.onNodeWithText("CPU",true).performScrollTo().assertIsDisplayed()
             capture("home-${w}-${scale}-${if(dark) "dark" else "light"}-bottom")

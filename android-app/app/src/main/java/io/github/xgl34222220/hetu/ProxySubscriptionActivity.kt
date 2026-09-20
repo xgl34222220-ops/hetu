@@ -350,19 +350,8 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                             Text("运行中的 Mihomo 暂未上报订阅流量；配置管理功能仍可正常使用。", color = tokens.textSecondary, fontSize = 11.sp, lineHeight = 16.sp)
                         }
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            FilledTonalButton(
-                                onClick = { importLauncher.launch(arrayOf("*/*")) },
-                                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                                shape = CircleShape,
-                                colors = ButtonDefaults.filledTonalButtonColors(
-                                    containerColor = if (dark) Color.White.copy(alpha = .07f) else Color(0xFFE2E8F0).copy(alpha = .62f),
-                                    contentColor = if (dark) tokens.textPrimary else Color(0xFF334155),
-                                ),
-                            ) {
-                                Icon(Icons.Rounded.FileOpen, null, Modifier.size(18.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("导入配置", fontWeight = FontWeight.Bold)
-                            }
+                            LiquidPill("导入配置", Icons.Rounded.FileOpen,
+                                { importLauncher.launch(arrayOf("*/*")) }, Modifier.weight(1f))
                             Button(
                                 onClick = {
                                     addingSubscription = true
@@ -433,26 +422,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                         .padding(horizontal = 15.dp, vertical = 13.dp),
                 ) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            Modifier.size(24.dp).background(Color.Transparent),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            if (config.selected) {
-                                Box(
-                                    Modifier.size(20.dp)
-                                        .shadow(5.dp, CircleShape, clip = false, ambientColor = scheme.primary.copy(alpha = .14f), spotColor = scheme.primary.copy(alpha = .18f))
-                                        .background(scheme.primary, CircleShape),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Icon(Icons.Rounded.Check, "当前使用", tint = Color.White, modifier = Modifier.size(13.dp))
-                                }
-                            } else {
-                                Box(
-                                    Modifier.size(18.dp)
-                                        .border(1.2.dp, tokens.textMuted.copy(alpha = .52f), CircleShape),
-                                )
-                            }
-                        }
+                        LiquidConfigIndicator(config.selected)
                         Spacer(Modifier.width(11.dp))
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text(config.name, color = tokens.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
