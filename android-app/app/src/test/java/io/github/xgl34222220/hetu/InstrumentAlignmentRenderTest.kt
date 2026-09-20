@@ -119,7 +119,7 @@ class InstrumentAlignmentRenderTest {
         capture("aligned102-unknown")
         compose.runOnIdle { stopped = true }; compose.waitForIdle()
         compose.onNodeWithText("实时", substring = false).assertDoesNotExist()
-        compose.onNodeWithTag("instrument-speed-badge", true).assertTextEquals("停止")
+        compose.onNodeWithTag("instrument-speed-badge", true).onChild().assertTextEquals("停止")
         capture("aligned102-stopped")
     }
 

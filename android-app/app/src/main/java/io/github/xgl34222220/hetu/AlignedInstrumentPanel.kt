@@ -3,7 +3,6 @@ package io.github.xgl34222220.hetu
 import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
@@ -16,7 +15,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
@@ -54,27 +52,39 @@ internal fun instrumentUploadShare(up: Long, down: Long): Float? {
     return (up.toDouble() / (up.toDouble() + down.toDouble())).toFloat().coerceIn(0f, 1f)
 }
 
+/** Shared slot geometry also supplies row height without an intrinsic remeasure. */
+private object InstrumentSlots {
+    val header = 22.sp
+    val value = 26.sp
+    val support = 20.sp
+    val gap = 6.dp
+    val padding = 12.dp
+    val rail = 2.dp
+    @Composable fun height(): Dp = with(LocalDensity.current) {
+        header.toDp() + value.toDp() + support.toDp()
+    } + gap * 3 + padding * 2 + rail
+}
+
 /** The four quadrants share this exact layout, even for loading/unknown/long data. */
 @Composable
 private fun AlignedInstrumentCell(reading: InstrumentReading, modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null, onLongClick: (() -> Unit)? = null) {
     val t = LocalHetuTokens.current
     val density = LocalDensity.current
-    val headerHeight = with(density) { 22.sp.toDp() }
-    val valueHeight = with(density) { 26.sp.toDp() }
-    val supportingHeight = with(density) { 20.sp.toDp() }
+    val headerHeight = with(density) { InstrumentSlots.header.toDp() }
+    val valueHeight = with(density) { InstrumentSlots.value.toDp() }
+    val supportingHeight = with(density) { InstrumentSlots.support.toDp() }
     @OptIn(ExperimentalFoundationApi::class)
     val action = if (onClick != null) Modifier.combinedClickable(
         role = Role.Button, onClick = onClick, onLongClick = onLongClick,
         onClickLabel = if (reading.id == "network") "切换局域网与网络出口" else "查看订阅",
         onLongClickLabel = if (onLongClick != null) "查看完整网络详情" else null,
     ) else Modifier
-    Column(modifier.then(action).testTag("instrument-${reading.id}").padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        // One shared first-baseline for title and accessory; badges never resize the row.
+    Column(modifier.then(action).testTag("instrument-${reading.id}").padding(InstrumentSlots.padding),
+        verticalArrangement = Arrangement.spacedBy(InstrumentSlots.gap)) {
         Layout(modifier = Modifier.fillMaxWidth().height(headerHeight).testTag("instrument-${reading.id}-header"),
             content = {
-                Text(reading.title, Modifier.testTag("instrument-${reading.id}-title"), color = t.textSecondary,
+                Text(reading.title, Modifier.fillMaxWidth().testTag("instrument-${reading.id}-title"), color = t.textSecondary,
                     fontSize = 11.sp, lineHeight = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
                 Box(Modifier.clip(CircleShape).background(reading.accent.copy(alpha = .085f))
                     .padding(horizontal = 6.dp, vertical = 2.dp).testTag("instrument-${reading.id}-badge")) {
@@ -108,7 +118,7 @@ private fun AlignedInstrumentCell(reading: InstrumentReading, modifier: Modifier
 private fun InstrumentBaselineLine(text: String, tag: String, height: Dp, baseline: TextUnit,
     style: TextStyle, autoSize: Boolean = false) {
     Layout(modifier = Modifier.fillMaxWidth().height(height).testTag("$tag-slot"), content = {
-        BasicText(text, Modifier.testTag(tag), style = style, maxLines = 1, softWrap = false,
+        BasicText(text, Modifier.fillMaxWidth().testTag(tag), style = style, maxLines = 1, softWrap = false,
             overflow = TextOverflow.Ellipsis,
             autoSize = if (autoSize) TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = 16.sp, stepSize = .5.sp) else null)
     }) { measurable, constraints ->
@@ -128,7 +138,7 @@ private fun InstrumentAlignedRail(reading: InstrumentReading) {
         else -> "instrument-${reading.id}-rail"
     }
     val progress = reading.fraction
-    Canvas(Modifier.fillMaxWidth().height(2.dp).clip(CircleShape).testTag(testId).semantics {
+    Canvas(Modifier.fillMaxWidth().height(InstrumentSlots.rail).clip(CircleShape).testTag(testId).semantics {
         stateDescription = when (reading.rail) {
             "quota" -> if (progress == null) "订阅额度未上报" else "已用流量占总额度的比例"
             "cpu" -> if (progress == null) "暂无 CPU 采样" else "CPU 占比"
@@ -149,7 +159,6 @@ private fun InstrumentAlignedRail(reading: InstrumentReading) {
                     size = size.copy(width = size.width * progress))
             }
         } else if (reading.rail == "status") {
-            // A fixed status marker, never a synthetic strength/quality percentage.
             drawCircle(reading.accent.copy(alpha = .8f), radius = size.height / 2f,
                 center = Offset(size.height / 2f, size.height / 2f))
         }
@@ -205,7 +214,6 @@ internal fun AlignedInstrumentPanel(runtime: ProxyRuntimeSnapshot, connections: 
             if (runtime.running && cpu.isFinite() && cpu >= 0f) String.format(Locale.US, "CPU %.1f %%", cpu) else "CPU 未采样",
             primary, "cpu", cpuRatio),
     )
-    // One shell, no per-quadrant white cards, no physical central gutter.
     BoxWithConstraints(Modifier.fillMaxWidth().crystalMaterial(RoundedCornerShape(24.dp)).testTag("workspace-bento")) {
         val single = maxWidth < 280.dp || (maxWidth / 2f - 24.dp).value < 116f * LocalDensity.current.fontScale
         val onNetwork = {
@@ -226,7 +234,7 @@ internal fun AlignedInstrumentPanel(runtime: ProxyRuntimeSnapshot, connections: 
             } else {
                 readings.chunked(2).forEachIndexed { index, pair ->
                     if (index > 0) PanelDivider()
-                    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+                    Row(Modifier.fillMaxWidth().height(InstrumentSlots.height())) {
                         Cell(pair[0], Modifier.weight(1f))
                         Box(Modifier.width(.5.dp).fillMaxHeight().background(t.textMuted.copy(alpha = .14f)))
                         Cell(pair[1], Modifier.weight(1f))
