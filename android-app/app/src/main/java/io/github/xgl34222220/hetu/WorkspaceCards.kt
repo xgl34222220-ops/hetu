@@ -19,6 +19,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.*
@@ -201,7 +202,6 @@ private fun DividerLine() { HorizontalDivider(Modifier.padding(horizontal = 16.d
 
 @Composable
 private fun MetricLine(label: String, value: String, color: Color = LocalHetuTokens.current.textSecondary) {
-    // Value on its own line avoids label/unit competition on wide system fonts.
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(label, color = color, fontSize = 12.sp, lineHeight = 17.sp)
         HetuNumber(value, style = MaterialTheme.typography.titleSmall.copy(fontSize = 16.sp, lineHeight = 21.sp))
@@ -214,7 +214,7 @@ internal fun RuleMetricSummary(rules: Int, sources: Int, hits: Long?, modifier: 
     val nf = remember { java.text.NumberFormat.getIntegerInstance(java.util.Locale.US) }
     Column(modifier.fillMaxWidth().testTag("rule-metrics"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("有效规则", color = t.textSecondary, fontSize = 12.sp)
-        HetuNumber(nf.format(rules), Modifier.testTag("rule-count"), style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, lineHeight = 26.sp))
+        HetuNumber(nf.format(rules), Modifier.fillMaxWidth().heightIn(min = with(LocalDensity.current) { 28.sp.toDp() }).testTag("rule-count"), style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, lineHeight = 26.sp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             Column(Modifier.weight(1f)) { Text("已启用规则源", color = t.textSecondary, fontSize = 12.sp); HetuNumber(nf.format(sources)) }
             Column(Modifier.weight(1f)) { Text("域名命中", color = t.textSecondary, fontSize = 12.sp); HetuNumber(hits?.let { nf.format(it) } ?: "—") }
