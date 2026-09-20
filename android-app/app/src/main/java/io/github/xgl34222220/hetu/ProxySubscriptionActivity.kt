@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu
 
+import io.github.xgl34222220.hetu.ui.CrystalSurface as Surface
 import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
@@ -388,26 +389,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                 }
                 Box(
                     Modifier.fillMaxWidth()
-                        .shadow(
-                            1.dp,
-                            cardShape,
-                            clip = false,
-                            ambientColor = Color(0xFF0F172A).copy(alpha = .025f),
-                            spotColor = Color(0xFF0F172A).copy(alpha = .035f),
-                        )
-                        .background(
-                            if (config.selected) selectedBrush
-                            else if (dark) Brush.verticalGradient(listOf(Color(0xFF1B2431).copy(alpha = .88f), Color(0xFF151D29).copy(alpha = .82f)))
-                            else Brush.verticalGradient(listOf(Color.White.copy(alpha = .94f), Color(0xFFF8FAFE).copy(alpha = .85f))),
-                            cardShape,
-                        )
-                        .border(
-                            if (config.selected) 1.5.dp else .7.dp,
-                            if (config.selected) scheme.primary.copy(alpha = .88f)
-                            else if (dark) tokens.outline.copy(alpha = .34f) else Color(0xFFCBD5E1).copy(alpha = .50f),
-                            cardShape,
-                        )
-                        .clip(cardShape)
+                        .crystalMaterial(cardShape, selection = config.selected)
                         .clickable(enabled = !loading) {
                             if (!config.selected) {
                                 loading = true

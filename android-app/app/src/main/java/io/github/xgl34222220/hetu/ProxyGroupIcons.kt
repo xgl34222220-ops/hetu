@@ -25,6 +25,8 @@ import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.Proxy
+import java.net.InetSocketAddress
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 
@@ -77,6 +79,7 @@ internal sealed interface GroupIconLoad {
 
 /** Process-wide, single-flight image cache. No core/controller calls belong here. */
 internal class ProxyGroupIconRepository private constructor(context: Context) {
+    private val app = context.applicationContext
     private val directory = File(context.cacheDir, "proxy/group-icons-v2").apply { mkdirs() }
     private val legacyDirectory = File(context.cacheDir, "proxy/group-icons")
     private val memory = object : LruCache<String, Bitmap>(8 * 1024 * 1024) {
@@ -128,12 +131,22 @@ internal class ProxyGroupIconRepository private constructor(context: Context) {
         if (!file.isFile || file.length() !in 1..MAX_BYTES) null else decode(file.readBytes())
     }.getOrNull()
 
+    internal fun imageProxy(): Proxy {
+        val prefs = app.getSharedPreferences("hetu", Context.MODE_PRIVATE)
+        if (!prefs.getBoolean("proxyRootRuntimeRunning", false)) return Proxy.NO_PROXY
+        val controller = prefs.getInt("proxyControllerPort", MihomoStartupConfig.CONTROLLER_PORT)
+        val port = MihomoStartupConfig.egressProbePort(controller)
+        if (port !in 1024..65535) throw IOException("图标代理端口未就绪")
+        // No direct fallback when an active proxy is requested. Cached icons remain usable.
+        return Proxy(Proxy.Type.HTTP, InetSocketAddress("127.0.0.1", port))
+    }
+
     private fun fetch(address: String): ByteArray {
         var url = URL(address)
         val deadline = SystemClock.elapsedRealtime() + 12_000L
         repeat(6) {
             if (url.protocol != "https" || url.userInfo != null) throw IOException("图标只支持无凭据 HTTPS 地址")
-            val connection = url.openConnection() as HttpURLConnection
+            val connection = url.openConnection(imageProxy()) as HttpURLConnection
             connection.connectTimeout = 5_000
             connection.readTimeout = 7_000
             connection.instanceFollowRedirects = false

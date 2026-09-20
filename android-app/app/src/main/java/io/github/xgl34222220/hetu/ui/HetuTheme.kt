@@ -214,7 +214,7 @@ fun HetuTheme(content: @Composable () -> Unit) {
             LocalHetuTokens provides tokens,
             LocalHetuMotionEnabled provides motionEnabled,
             LocalDensity provides scaledDensity,
-            content = inner,
+            content = { CrystalEnvironment(content = inner) },
         )
     }
 

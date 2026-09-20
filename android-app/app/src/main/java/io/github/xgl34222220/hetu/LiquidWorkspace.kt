@@ -63,7 +63,7 @@ internal fun LiquidBrandTray(group: ProxyGroupUi) {
             if (dark) accent.copy(alpha = .09f) else androidx.compose.ui.graphics.lerp(Color.White, accent, .095f))), shape)
         .border(.6.dp, accent.copy(alpha = .13f), shape).clip(shape), contentAlignment = Alignment.Center) {
         // Never tint or substitute the configured bitmap with a guessed flag.
-        ConfiguredGroupIcon(group, Modifier.size(22.dp))
+        ConfiguredGroupIcon(group, Modifier.size(28.dp))
     }
 }
 
@@ -82,17 +82,9 @@ internal fun LiquidStrategyCard(group: ProxyGroupUi, selected: String, expanded:
     val angle by animateFloatAsState(if (expanded) 180f else 0f, tween(if (motion) 250 else 0), label = "groupArrow")
     val sink by animateDpAsState(if (expanded) 2.dp else 0.dp, tween(if (motion) 180 else 0), label = "groupSink")
     val shape = RoundedCornerShape(22.dp)
-    val frosted = if (glassEnabled && hazeState != null) Modifier.hazeEffect(hazeState, HazeMaterials.ultraThin()) {
-        blurRadius = 16.dp; noiseFactor = .008f
-    } else Modifier
     Column(modifier.offset(y = sink).heightIn(min = 88.dp)
         .graphicsLayer { scaleX = scale; scaleY = scale }
-        .shadow(3.dp, shape, clip = false, ambientColor = Color(0xFF0F172A).copy(alpha = .025f), spotColor = Color(0xFF0F172A).copy(alpha = .045f))
-        .clip(shape).then(frosted)
-        .background(Brush.verticalGradient(if (dark) listOf(t.elevatedCardBackground.copy(alpha = .96f), t.cardBackground.copy(alpha = .88f))
-            else listOf(Color.White.copy(alpha = .95f), Color(0xFFF8FAFC).copy(alpha = .85f))), shape)
-        .border(if (expanded) 1.dp else .7.dp,
-            if (expanded) primary.copy(alpha = .25f) else if (dark) Color.White.copy(alpha = .10f) else Color.White.copy(alpha = .92f), shape)
+        .crystalMaterial(shape, selection = expanded)
         .testTag("strategy:${group.name}")) {
         Row(Modifier.fillMaxWidth().heightIn(min = 40.dp)
             .clickable(interactionSource = interactions, indication = null, role = Role.Button,
@@ -137,10 +129,7 @@ internal fun LiquidNodeCard(node: ProxyNodeUi, active: Boolean, value: Long?, te
     val shape = RoundedCornerShape(14.dp)
     Box(modifier.heightIn(min = 76.dp).testTag("node:${node.name}")
         .graphicsLayer { this.alpha = alpha; scaleX = scale; scaleY = scale }
-        .shadow(if (active) 3.dp else 1.dp, shape, clip = false,
-            ambientColor = primary.copy(alpha = if (active) .05f else .015f), spotColor = primary.copy(alpha = if (active) .09f else .025f))
-        .background(if (active) (if (dark) primary.copy(alpha = .14f) else Color(0xFFEFF6FF)) else t.cardBackground, shape)
-        .border(if (active) 1.dp else .6.dp, if (active) primary.copy(alpha = .26f) else Color.White.copy(alpha = if (dark) .08f else .85f), shape)
+        .crystalMaterial(shape, depth = CrystalDepth.InsetItem, selection = active)
         .clip(shape)) {
         Column {
             Row(Modifier.fillMaxWidth().heightIn(min = 28.dp).clickable(interactionSource = interaction, indication = null,
@@ -263,17 +252,9 @@ internal fun LiquidStatusGlyph(running: Boolean, busy: Boolean) {
 }
 
 @Composable
-internal fun LiquidHomeMenu(onLog: () -> Unit, onConnections: () -> Unit, onDiagnostics: () -> Unit, onAdblock: () -> Unit, diagnosticLoading: Boolean) {
-    var expanded by remember { mutableStateOf(false) }
-    Box {
-        IconButton(onClick = { expanded = true }) { Icon(Icons.Rounded.MoreHoriz, "更多工具", tint = LocalHetuTokens.current.textSecondary) }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            DropdownMenuItem(text = { Text("运行日志") }, onClick = { expanded = false; onLog() }, leadingIcon = { Icon(Icons.Rounded.Article, null) })
-            DropdownMenuItem(text = { Text("应用连接") }, onClick = { expanded = false; onConnections() }, leadingIcon = { Icon(Icons.Rounded.Apps, null) })
-            DropdownMenuItem(text = { Text("广告过滤") }, onClick = { expanded = false; onAdblock() }, leadingIcon = { Icon(Icons.Rounded.Shield, null) })
-            DropdownMenuItem(text = { Text("网络诊断") }, enabled = !diagnosticLoading, onClick = { expanded = false; onDiagnostics() }, leadingIcon = { Icon(Icons.Rounded.Troubleshoot, null) })
-        }
-    }
+internal fun LiquidHomeMenu(onLog: () -> Unit, onConnections: () -> Unit, onDiagnostics: () -> Unit,
+    onAdblock: () -> Unit, diagnosticLoading: Boolean, hazeState: HazeState? = null, glassEnabled: Boolean = false) {
+    CrystalHomeMenu(onLog, onConnections, onDiagnostics, onAdblock, diagnosticLoading, hazeState, glassEnabled)
 }
 
 @Composable

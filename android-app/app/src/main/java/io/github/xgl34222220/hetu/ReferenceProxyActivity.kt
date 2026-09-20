@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu
 
+import io.github.xgl34222220.hetu.ui.CrystalSurface as Surface
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.os.Bundle
@@ -93,6 +94,8 @@ import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.squircle.squircleClip
 import io.github.xgl34222220.hetu.ui.HetuGlassDock
 import io.github.xgl34222220.hetu.ui.HetuTheme
+import io.github.xgl34222220.hetu.ui.crystalMaterial
+import io.github.xgl34222220.hetu.ui.crystalPageBackground
 import io.github.xgl34222220.hetu.ui.DockItem
 import io.github.xgl34222220.hetu.ui.LocalHetuTokens
 import io.github.xgl34222220.hetu.ui.*
@@ -526,7 +529,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
             // Match LuoShu's backdrop architecture: the full-screen page backdrop must live
             // INSIDE the layerBackdrop source. Keeping it only on the parent leaves transparent
             // pixels near the Home tail, which the RuntimeShader can stretch into a white strip.
-            Box(Modifier.matchParentSize().background(shellBackground))
+            Box(Modifier.matchParentSize().crystalPageBackground())
             key(page) {
                 pageStateHolder.SaveableStateProvider(page.name) {
                 val pageEnter = remember { Animatable(0f) }
@@ -674,13 +677,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
 @OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
 private fun refHomeLiquidModifier(base: Modifier, hazeState: HazeState, glassEnabled: Boolean, shape: RoundedCornerShape): Modifier {
-    val t = LocalHetuTokens.current
-    return base.shadow(2.dp, shape, clip = false,
-            ambientColor = Color.Black.copy(alpha = .02f), spotColor = Color.Black.copy(alpha = .03f))
-        .clip(shape).then(if (glassEnabled) Modifier.hazeEffect(state = hazeState, style = HazeMaterials.ultraThin()) {
-            blurRadius = 16.dp; noiseFactor = .005f
-        } else Modifier)
-        .background(t.cardBackground.copy(alpha = if (glassEnabled) .96f else 1f), shape)
+    return base.crystalMaterial(shape)
 }
 
 @Composable
@@ -739,7 +736,7 @@ internal fun RefHome(
                 }
                 LiquidHomeMenu(onLog, onConnections, onDiagnostics, {
                     context.startActivity(Intent(context, ProxyAdblockChainActivity::class.java))
-                }, diagnosticLoading)
+                }, diagnosticLoading, hazeState, glassEnabled)
                 RefPanelHeaderAction(Icons.Rounded.Refresh, "刷新状态", onClick = onRefresh)
             }
         }
@@ -3205,21 +3202,7 @@ private fun RefSheetDragHandle() {
 
 @Composable
 private fun RefGroup(content: @Composable ColumnScope.() -> Unit) {
-    val t = LocalHetuTokens.current
-    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val shape = RoundedCornerShape(22.dp)
-    val brush = if (dark) {
-        Brush.verticalGradient(listOf(t.elevatedCardBackground, t.cardBackground))
-    } else {
-        Brush.verticalGradient(listOf(Color.White, Color(0xFFFAFBFD)))
-    }
-    Column(
-        Modifier.fillMaxWidth()
-            .shadow(if (dark) 0.dp else 5.dp, shape, clip = false, ambientColor = Color(0xFF0F172A).copy(alpha = .035f), spotColor = Color(0xFF0F172A).copy(alpha = .045f))
-            .background(brush, shape)
-            .clip(shape),
-        content = content,
-    )
+    Column(Modifier.fillMaxWidth().crystalMaterial(RoundedCornerShape(22.dp)), content = content)
 }
 
 @Composable

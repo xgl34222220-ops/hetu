@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu
 
+import io.github.xgl34222220.hetu.ui.CrystalSurface as Surface
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -47,18 +48,18 @@ internal fun LatencyChip(value: Long?, testing: Boolean, onClick: (() -> Unit)? 
     val background = when (band) { "good" -> t.successContainer; "fair" -> t.warningContainer; "failed", "slow" -> t.dangerContainer; else -> t.controlBackground }
     var showBusy by remember { mutableStateOf(false) }
     LaunchedEffect(testing) { if (testing) { delay(150); showBusy = true } else showBusy = false }
-    val target = if (showBusy) "测速中" else when { value == null -> "未测速"; value <= 0L -> "超时"; else -> "$value ms" }
+    val target = if (showBusy) "测速中" else when { value == null -> "— ms"; value <= 0L -> "超时"; else -> "$value ms" }
     val motion = LocalHetuMotionEnabled.current
     Box(modifier.then(if (onClick != null) Modifier.sizeIn(minWidth = 72.dp, minHeight = 48.dp)
         .clickable(enabled = !testing, role = Role.Button, onClickLabel = "测速", onClick = onClick) else Modifier),
         contentAlignment = Alignment.Center) {
-        Surface(shape = CircleShape, color = if (showBusy) t.controlBackground else background,
+        Surface(shape = CircleShape, color = if (showBusy || value == null) Color.Transparent else background,
             modifier = Modifier.semantics { stateDescription = if (showBusy) "正在测速" else "$band $target" }) {
             Row(Modifier.padding(horizontal = 9.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (showBusy) HetuBusyIndicator(Modifier.size(12.dp), t.textSecondary)
                 AnimatedContent(target, transitionSpec = { fadeIn(tween(if (motion) 150 else 0)).togetherWith(fadeOut(tween(if (motion) 90 else 0))) }, label = "latency") {
-                    HetuNumber(it, color = if (showBusy) t.textSecondary else foreground,
+                    HetuNumber(it, monospaced = true, color = if (showBusy || value == null) t.textSecondary.copy(alpha = .65f) else foreground,
                         style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.SemiBold))
                 }
             }
@@ -104,7 +105,7 @@ internal fun WorkspaceBento(runtime: ProxyRuntimeSnapshot, connections: Int, up:
                 "failed" -> "检测失败"
                 else -> "未检测"
             }
-            HetuNumber(display, style = MaterialTheme.typography.titleMedium.copy(fontSize = 15.sp, lineHeight = 21.sp))
+            HetuNumber(display, monospaced = lan || runtime.wanState in listOf("success", "stale"), style = MaterialTheme.typography.titleMedium.copy(fontSize = 15.sp, lineHeight = 21.sp))
             val checked = if (runtime.wanCheckedAt > 0) java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(runtime.wanCheckedAt)) else ""
             Text(if (lan) "${runtime.lanInterface} · $connections 连接" else when (runtime.wanState) {
                 "success" -> "${countryEmoji(runtime.wanCountryCode)} ${runtime.wanRegion} · $checked"

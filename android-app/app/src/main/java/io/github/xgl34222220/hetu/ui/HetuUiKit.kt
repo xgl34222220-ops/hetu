@@ -72,7 +72,7 @@ fun hetuContentBottomPadding(): Dp {
     val dock = LocalHetuDockHeight.current
     val system = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     // Dock is measured including inset. Do not add navigationBars for a second time.
-    return if (dock > 0.dp) dock + 16.dp else system + 16.dp
+    return if (dock > 0.dp) dock + 30.dp else system + 16.dp
 }
 
 @Composable
@@ -87,10 +87,11 @@ fun HetuNumber(
     modifier: Modifier = Modifier,
     color: Color = LocalHetuTokens.current.textPrimary,
     style: TextStyle = MaterialTheme.typography.titleMedium,
+    monospaced: Boolean = false,
 ) {
     // Full text is never silently clipped or ellipsized. Width/layout adapts instead.
     Text(text, modifier, color = color,
-        style = style.copy(fontFeatureSettings = "tnum", fontFamily = FontFamily.Monospace),
+        style = style.copy(fontFeatureSettings = "tnum", fontFamily = if (monospaced) FontFamily.Monospace else FontFamily.SansSerif),
         softWrap = true, overflow = TextOverflow.Visible)
 }
 
