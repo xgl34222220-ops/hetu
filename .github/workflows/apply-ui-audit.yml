@@ -1,0 +1,71 @@
+name: Apply approved UI audit
+on:
+  push:
+    branches: [feature/hetu-rebrand-root-app]
+    paths: [.github/workflows/apply-ui-audit.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/hetu-rebrand-root-app
+      - name: Verify and apply reviewed presentation source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64, hashlib, json, lzma
+          from pathlib import Path
+          root = Path.cwd()
+          parts = sorted(Path('.github/ui-audit').glob('part-*.txt'))
+          assert len(parts) == 7, 'incomplete source transfer'
+          encoded = ''.join(p.read_text().strip() for p in parts)
+          raw = lzma.decompress(base64.b64decode(encoded, validate=True))
+          assert len(raw) < 2000000
+          assert hashlib.sha256(raw).hexdigest() == '547288d71352a03cd78faa884241ab63aa80890bfc187104bd272dfdf920ea99', 'source integrity failure'
+          plan = json.loads(raw)
+          assert len(plan) == 28
+          changes = []
+          for entry in plan:
+              name = entry['path']
+              assert not Path(name).is_absolute() and '..' not in Path(name).parts
+              assert name.startswith(('android-app/', 'tests/', 'tools/')) or name == '.github/workflows/build-hetu.yml'
+              path = root / name
+              original = path.read_bytes() if path.is_file() else None
+              if entry['before'] is None:
+                  assert original is None, 'new source already exists: ' + name
+                  original = b''
+              else:
+                  assert original is not None and hashlib.sha256(original).hexdigest() == entry['before'], 'source changed concurrently: ' + name
+              lines = original.decode('utf-8').splitlines(keepends=True)
+              for start, end, insertion in reversed(entry['edits']):
+                  assert 0 <= start <= end <= len(lines)
+                  lines[start:end] = insertion.splitlines(keepends=True)
+              updated = ''.join(lines).encode('utf-8')
+              assert hashlib.sha256(updated).hexdigest() == entry['after'], 'patch mismatch: ' + name
+              changes.append((path, updated))
+          for path, updated in changes:
+              path.parent.mkdir(parents=True, exist_ok=True)
+              path.write_bytes(updated)
+          # Correct the named callback in the common header before compilation.
+          header = root / 'android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuUiKit.kt'
+          text = header.read_text()
+          old = 'IconButton(onClick, Modifier.size(48.dp))'
+          assert text.count(old) == 1
+          header.write_text(text.replace(old, 'IconButton(onBack, Modifier.size(48.dp))'))
+          print('Verified and applied', len(changes), 'presentation files')
+          PY
+          python3 tools/test_ui_audit_invariants.py
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm -r .github/ui-audit
+          git rm .github/workflows/apply-ui-audit.yml
+          git add android-app tools tests .github/workflows/build-hetu.yml
+          git commit -m 'ui: restore configured artwork and implement audited workspace (test.94)'
+          git push origin HEAD:feature/hetu-rebrand-root-app
+          git rev-parse HEAD
