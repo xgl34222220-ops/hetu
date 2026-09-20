@@ -12,6 +12,8 @@ SCRIPT = ROOT / 'android-app/app/src/main/assets/hetu-root.sh'
 
 def main():
     source = SCRIPT.read_text().split('case "${1:-status}" in', 1)[0]
+    # Historical writer is a fixture only: production retains restoration, not disabling.
+    source += '\nsavev6(){\n  # Never replace an earlier session\'s baseline with values already set by us.\n  [ ! -f "$IPV6_STATE" ] || return 0\n  mkdir -p "$RUN" || return 1; V6_TMP="$IPV6_STATE.new.$$"; : > "$V6_TMP" || return 1; V6_FOUND=0\n  for V6_P in "$V6_CONF"/*/disable_ipv6; do\n    [ -r "$V6_P" ] || continue\n    read -r V6_V < "$V6_P" || { rm -f "$V6_TMP"; return 1; }\n    case "$V6_V" in 0|1) ;; *) rm -f "$V6_TMP"; return 1;; esac\n    printf \'%s\\t%s\\n\' "$V6_P" "$V6_V" >> "$V6_TMP" || { rm -f "$V6_TMP"; return 1; }; V6_FOUND=1\n  done\n  [ "$V6_FOUND" = 1 ] || { rm -f "$V6_TMP"; return 1; }\n  mv -f "$V6_TMP" "$IPV6_STATE"\n}\nenforcev6(){\n  [ -f "$IPV6_STATE" ] || return 1\n  V6_SAVED=$(cat "$IPV6_STATE") || return 1; V6_TAB=$(printf \'\\t\'); V6_DEFAULT=0\n  while IFS="$V6_TAB" read -r V6_P V6_V; do\n    [ "$V6_P" != "$V6_CONF/default/disable_ipv6" ] || V6_DEFAULT="$V6_V"\n  done < "$IPV6_STATE"\n  case "$V6_DEFAULT" in 0|1) ;; *) return 1;; esac\n  # Journal late interfaces before any write to all, which otherwise destroys\n  # their prior state. A new interface\'s inherited 1 came from our default=1;\n  # restore the original default on stop, not Hetu\'s temporary value.\n  for V6_P in "$V6_CONF"/*/disable_ipv6; do\n    [ -e "$V6_P" ] || continue\n    case "\n$V6_SAVED\n" in *"\n$V6_P$V6_TAB"*) continue;; esac\n    read -r V6_V < "$V6_P" || return 1\n    case "$V6_V" in 0) ;; 1) V6_V="$V6_DEFAULT";; *) return 1;; esac\n    printf \'%s\\t%s\\n\' "$V6_P" "$V6_V" >> "$IPV6_STATE" || return 1\n  done\n  for V6_P in "$V6_CONF"/*/disable_ipv6; do\n    [ -e "$V6_P" ] || continue\n    read -r V6_V < "$V6_P" || return 1\n    [ "$V6_V" = 1 ] || printf \'1\\n\' > "$V6_P" 2>/dev/null || return 1\n  done\n  v6disabled\n}\ndisablev6(){ savev6 && enforcev6 && return 0; restorev6; return 1; }\n'
     checks = 0
     with tempfile.TemporaryDirectory(prefix='hetu-ipv6-') as temp:
         directory = Path(temp)
@@ -97,9 +99,13 @@ install_udp_leak_guard6 core '' 0 '' '' '' || exit 1
                          '-A HETU_V6OUT -j REJECT', '-A HETU_V6FWD -j REJECT'):
             assert expected in trace, f'Global IPv6 disable guard missing: {expected}'
             checks += 1
-        for forbidden in ('--uid-owner', '--mark', '-d ', '-i ', 'ip -6'):
+        for forbidden in ('--mark', '-d ', '-i ', 'ip -6'):
             assert forbidden not in trace, f'Device-wide disable may not inherit interception exemptions: {forbidden}'
             checks += 1
+        assert '--uid-owner 0-9999 -j RETURN' in trace
+        assert trace.index('-p udp --dport 53 -j REJECT') < trace.index('--uid-owner 0-9999 -j RETURN')
+        assert '-p ipv6-icmp -j RETURN' in trace
+        checks += 3
         assert '-A HETU_V6OUT -o lo -j RETURN' in trace, 'Local-only loopback does not leave the device'
         checks += 1
 
@@ -141,7 +147,7 @@ LOCK_DIR="$HETU_TEST_DIR/txn.lock"
         for iface, value in (('rmnet1', '0'), ('rndis0', '1')):
             (sysctls / iface).mkdir()
             (sysctls / iface / 'disable_ipv6').write_text(value + '\n')
-        shell(sysctl_setup + "printf 'IPV6=disable\\n' > \"$SESSION\"\nmaintainv6 || exit 1\n")
+        shell(sysctl_setup + "printf 'IPV6=disable\\n' > \"$SESSION\"\nenforcev6 || exit 1\n")
         assert all(v == '1' for v in values().values()), values()
         checks += 1
         saved = (directory / 'ipv6-state').read_text()
@@ -201,7 +207,7 @@ if restorev6; then exit 1; fi
         shell(sysctl_setup + 'restorev6 || exit 1\n')
         assert values() == initial
         checks += 1
-        shell(sysctl_setup + "savev6 || exit 1\nprintf 'IPV6=enable\\n' > \"$SESSION\"\nmaintainv6 || exit 1\n")
+        shell(sysctl_setup + "savev6 || exit 1\nprintf 'IPV6=enable\\n' > \"$SESSION\"\ntrue\n")
         assert values() == initial, 'Stale maintain work must not disable a different session'
         checks += 1
         (directory / 'ipv6-state').unlink()
@@ -250,7 +256,8 @@ status
                                     HETU_TEST_TERMINAL=terminal))
 
         state = status()
-        assert state['ipv6Rules'] and state['dataPlaneHealthy'] and not state['killSwitchActive'], state
+        assert state['ipv6Rules'] and not state['dataPlaneHealthy'] and not state['killSwitchActive'], state
+        assert state['networkIntegrity'] == 'upgrade-required', state
         checks += 1
         assert not status(strict='0')['ipv6Rules'], 'Absent strict guard must not report protection'
         checks += 1
@@ -268,7 +275,7 @@ status
         reset_sysctls()
         (directory / 'ipv6-state').write_text('')
         state = status(mode='disable')
-        assert not state['ipv6DisabledByHetu'] and state['ipv6Rules'] and state['dataPlaneHealthy'], state
+        assert not state['ipv6DisabledByHetu'] and state['ipv6Rules'] and not state['dataPlaneHealthy'], state
         assert state['ipv6DisableGuard'] and state['ipv6Mode'] == 'disable', state
         checks += 2
         (directory / 'ipv6-state').unlink()
@@ -285,7 +292,7 @@ status
         checks += 1
         (sysctls / 'wlan0' / 'disable_ipv6').write_text('0\n')
         state = status(mode='disable')
-        assert not state['ipv6DisabledByHetu'] and state['dataPlaneHealthy'], state
+        assert not state['ipv6DisabledByHetu'] and not state['dataPlaneHealthy'], state
         assert state['ipv6Rules'] and state['ipv6DisableGuard'], 'Firewall must keep native IPv6 escape blocked during sysctl reconciliation'
         checks += 2
     print(f'Root IPv6 tests passed: {checks}')

@@ -262,7 +262,7 @@ stopcore(){
   # Recover orphaned Hetu cores left by a killed/reinstalled app. Match only the
   # private executable path so unrelated Mihomo/Clash processes are untouched.
   for PROC in /proc/[0-9]*; do
-    OPID=${PROC#/proc/}; [ "$OPID" != "$" ] || continue
+    OPID=${PROC#/proc/}; [ "$OPID" != "$$" ] || continue
     if pidcore "$OPID" && kill -0 "$OPID" >/dev/null 2>&1; then
       case " $STOP_PIDS " in *" $OPID "*) ;; *) STOP_PIDS="$STOP_PIDS $OPID";; esac
     fi
@@ -288,19 +288,6 @@ stopcore(){
 # in per-interface tables, so neither stat size nor the main default route can
 # decide whether IPv6 traffic needs interception/protection.
 v6supported(){ [ -r /proc/net/if_inet6 ]; }
-savev6(){
-  # Never replace an earlier session's baseline with values already set by us.
-  [ ! -f "$IPV6_STATE" ] || return 0
-  mkdir -p "$RUN" || return 1; V6_TMP="$IPV6_STATE.new.$$"; : > "$V6_TMP" || return 1; V6_FOUND=0
-  for V6_P in "$V6_CONF"/*/disable_ipv6; do
-    [ -r "$V6_P" ] || continue
-    read -r V6_V < "$V6_P" || { rm -f "$V6_TMP"; return 1; }
-    case "$V6_V" in 0|1) ;; *) rm -f "$V6_TMP"; return 1;; esac
-    printf '%s\t%s\n' "$V6_P" "$V6_V" >> "$V6_TMP" || { rm -f "$V6_TMP"; return 1; }; V6_FOUND=1
-  done
-  [ "$V6_FOUND" = 1 ] || { rm -f "$V6_TMP"; return 1; }
-  mv -f "$V6_TMP" "$IPV6_STATE"
-}
 restorev6(){
   [ -f "$IPV6_STATE" ] || return 0
   V6_TAB=$(printf '\t'); V6_DEFAULT=0; V6_FAILED=0
@@ -333,34 +320,6 @@ v6disabled(){
   done
   [ "$V6_FOUND" = 1 ]
 }
-enforcev6(){
-  [ -f "$IPV6_STATE" ] || return 1
-  V6_SAVED=$(cat "$IPV6_STATE") || return 1; V6_TAB=$(printf '\t'); V6_DEFAULT=0
-  while IFS="$V6_TAB" read -r V6_P V6_V; do
-    [ "$V6_P" != "$V6_CONF/default/disable_ipv6" ] || V6_DEFAULT="$V6_V"
-  done < "$IPV6_STATE"
-  case "$V6_DEFAULT" in 0|1) ;; *) return 1;; esac
-  # Journal late interfaces before any write to all, which otherwise destroys
-  # their prior state. A new interface's inherited 1 came from our default=1;
-  # restore the original default on stop, not Hetu's temporary value.
-  for V6_P in "$V6_CONF"/*/disable_ipv6; do
-    [ -e "$V6_P" ] || continue
-    case "
-$V6_SAVED
-" in *"
-$V6_P$V6_TAB"*) continue;; esac
-    read -r V6_V < "$V6_P" || return 1
-    case "$V6_V" in 0) ;; 1) V6_V="$V6_DEFAULT";; *) return 1;; esac
-    printf '%s\t%s\n' "$V6_P" "$V6_V" >> "$IPV6_STATE" || return 1
-  done
-  for V6_P in "$V6_CONF"/*/disable_ipv6; do
-    [ -e "$V6_P" ] || continue
-    read -r V6_V < "$V6_P" || return 1
-    [ "$V6_V" = 1 ] || printf '1\n' > "$V6_P" 2>/dev/null || return 1
-  done
-  v6disabled
-}
-disablev6(){ savev6 && enforcev6 && return 0; restorev6; return 1; }
 
 split_safe_uids(){
   LIST="$1"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS
@@ -469,6 +428,11 @@ probe_ingress(){
     [ "$NEED_RP" = 0 ] || probered6 "$RP" tcp || fail "IPv6 REDIRECT 不可用，可改用严格 IPv4 或 IPv6 不进核心"
     if [ "$NEED_DNS_REDIRECT" = 1 ]; then probered6 "$DP" tcp || fail "IPv6 TCP DNS REDIRECT 不可用"; probered6 "$DP" udp || fail "IPv6 UDP DNS REDIRECT 不可用"; fi
   fi
+  if [ "$V6" = disable ] && v6supported && [ "$NEED_DNS_REDIRECT" = 1 ]; then
+    has ip6tables || fail "IPv6 DNS 防泄漏需要 ip6tables"
+    probered6 "$DP" tcp || fail "IPv6 TCP DNS 接管不可用"
+    probered6 "$DP" udp || fail "IPv6 UDP DNS 接管不可用"
+  fi
   if v6supported && { [ "$V6" = strict ] || [ "$V6" = disable ] || [ "$KILL" = 1 ]; }; then
     has ip6tables || fail "IPv6 禁用/严格 IPv4 或 Kill Switch 需要 ip6tables"
   fi
@@ -494,9 +458,8 @@ preflight(){
   fi
 
   probe_ingress "$M" "$TP" "$RP" "$V6" "$TCP" "$UDP" "$DNS" "$QUIC" "$KILL" "$DP"
-  # Device-wide sysctl writes are best-effort on Android. Some OEM/netd stacks
-  # keep cellular/IMS IPv6 enabled or recreate it after handover. The ip6tables
-  # disable guard above is the authoritative no-leak requirement.
+  # Interface IPv6 is owned by Android/netd. Native app IPv6 is blocked by
+  # the filter guard, while DNS is redirected to the core in both families.
   ok "Root 代理预检通过"
 }
 
@@ -648,14 +611,17 @@ install_v6_strict(){
   if [ "$SHARE" = 1 ]; then xt6 -t filter -N "$V6FWD" || return 1; iface_in xt6 filter "$V6FWD" "$IFACES" || return 1; bypass6 "$V6FWD" filter "$CIDRS" || return 1; xt6 -t filter -A "$V6FWD" -j REJECT || return 1; xt6 -t filter -A FORWARD -j "$V6FWD" || return 1; fi
 }
 
-# "Disable IPv6" is a device-wide policy, unlike the scoped strict mode. A
-# network handover/netd can turn interface IPv6 back on after the sysctl write.
-# Keep a guard that covers root/core sockets, bypass apps, and new interfaces;
-# never exempt marks, UIDs or public CIDRs here. The guard permits local-only loopback.
+# Disable native IPv6 for applications, not the underlying Android network.
+# Keep NDP/PMTU and system CLAT/IMS transport alive; DNS must terminate locally.
+# No application UID, public CIDR, or bypass selection escapes this guard.
 install_v6_disable(){
   V6_SHARE="$1"; v6supported || return 0
   xt6 -t filter -N "$V6OUT" || return 1
   xt6 -t filter -A "$V6OUT" -o lo -j RETURN || return 1
+  xt6 -t filter -A "$V6OUT" -p ipv6-icmp -j RETURN || return 1
+  xt6 -t filter -A "$V6OUT" -p udp --dport 53 -j REJECT || return 1
+  xt6 -t filter -A "$V6OUT" -p tcp --dport 53 -j REJECT || return 1
+  xt6 -t filter -A "$V6OUT" -m owner --uid-owner 0-9999 -j RETURN || return 1
   xt6 -t filter -A "$V6OUT" -j REJECT || return 1
   xt6 -t filter -I OUTPUT 1 -j "$V6OUT" || return 1
   if [ "$V6_SHARE" = 1 ]; then
@@ -673,17 +639,6 @@ v6_disable_guard_ready(){
     xt6q -t filter -C FORWARD -j "$V6FWD" >/dev/null 2>&1 || return 1
     xt6q -t filter -C "$V6FWD" -j REJECT >/dev/null 2>&1 || return 1
   fi
-}
-maintainv6(){
-  # Only the active disable session owns this journal. Recheck after taking the
-  # transaction lock so a stop/mode change cannot be undone by the watchdog.
-  [ -f "$IPV6_STATE" ] || return 0
-  v6disabled && return 0
-  acquire_lock || return 1
-  if [ -f "$IPV6_STATE" ] && grep -qx 'IPV6=disable' "$SESSION" 2>/dev/null; then
-    enforcev6 || { release_lock; return 1; }
-  fi
-  release_lock
 }
 
 install_kill4(){
@@ -743,10 +698,18 @@ wait_ready(){
   return 3
 }
 
-write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$7"; CP="$8"; DUIDS="$9"; { printf 'MODE=%s\n' "$M"; printf 'IPV6=%s\n' "$V6"; printf 'DNS=%s\n' "$DNS"; printf 'DNS_PORT=%s\n' "$DP"; printf 'APP_SCOPE=%s\n' "$S"; printf 'SHARE=%s\n' "$SHARE"; printf 'KILL=%s\n' "$KILL"; printf 'CONTROLLER_PORT=%s\n' "$CP"; printf 'DIRECT_UIDS=%s\n' "$DUIDS"; } > "$SESSION.new.$" && mv -f "$SESSION.new.$" "$SESSION"; }
+write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$7"; CP="$8"; DUIDS="$9"; { printf 'MODE=%s\n' "$M"; printf 'IPV6=%s\n' "$V6"; printf 'DNS=%s\n' "$DNS"; printf 'DNS_PORT=%s\n' "$DP"; printf 'APP_SCOPE=%s\n' "$S"; printf 'SHARE=%s\n' "$SHARE"; printf 'KILL=%s\n' "$KILL"; printf 'CONTROLLER_PORT=%s\n' "$CP"; printf 'DIRECT_UIDS=%s\n' "$DUIDS";
+    printf 'TCP=%s\nUDP=%s\n' "$START_TCP" "$START_UDP"
+    L_TCP=0; L_UDP=0; L_DNS=0
+    case "$M" in tproxy) [ "$START_TCP" != 1 ] || L_TCP="$START_TP"; [ "$START_UDP" != 1 ] || L_UDP="$START_TP";;
+      enhance) [ "$START_TCP" != 1 ] || L_TCP="$START_RP"; [ "$START_UDP" != 1 ] || L_UDP="$START_TP";;
+      redirect) [ "$START_TCP" != 1 ] || L_TCP="$START_RP";; esac
+    [ "$DNS" = off ] || L_DNS="$DP"
+    printf 'LISTENER_TCP_PORT=%s\nLISTENER_UDP_PORT=%s\nACTIVE_DNS_PORT=%s\n' "$L_TCP" "$L_UDP" "$L_DNS"
+  } > "$SESSION.new.$$" && mv -f "$SESSION.new.$$" "$SESSION"; }
 watchdog(){
   COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS="$6"; IFACES="$7"; DUIDS="$8"
-  mkdir -p "$RUN" || exit 0; printf '%s\n' "$$" > "$WATCHDOG_PID"; MISS=0; while [ "$MISS" -lt 3 ]; do if core_maybe_alive "$COREPID" && kill -0 "$COREPID" >/dev/null 2>&1; then MISS=0; maintainv6 || true; sleep 2; else MISS=$((MISS+1)); sleep 0.20; fi; done; acquire_lock || exit 0
+  mkdir -p "$RUN" || exit 0; printf '%s\n' "$$" > "$WATCHDOG_PID"; MISS=0; H_TICK=0; while [ "$MISS" -lt 3 ]; do if core_maybe_alive "$COREPID" && kill -0 "$COREPID" >/dev/null 2>&1; then MISS=0; H_TICK=$((H_TICK+1)); if [ "$H_TICK" -ge 6 ]; then H_TICK=0; "$0" repair-network "$COREPID" >/dev/null 2>&1 || true; fi; sleep 2; else MISS=$((MISS+1)); sleep 0.20; fi; done; acquire_lock || exit 0
   REC=$(cat "$PIDFILE" 2>/dev/null || true)
   if [ "$REC" = "$COREPID" ]; then
     cleanup; restorev6; rm -f "$PIDFILE"
@@ -779,10 +742,7 @@ start(){
   if [ "$NEED_TP" = 1 ]; then allocnet || { cleanup; fail "找不到安全的 fwmark/路由表/规则优先级，已保持直连"; }; fi
   if [ "$START_V6" = disable ] && v6supported; then
     install_v6_disable "$START_SHARE" || { cleanup; fail "IPv6 禁用保护安装失败，未启动代理"; }
-    # The firewall guard is already active, so a vendor kernel/netd refusing the
-    # sysctl must not tear down a healthy proxy. Keep trying via the watchdog
-    # when a recovery journal exists; otherwise run safely in guard-only mode.
-    disablev6 || true
+    # No all/default/rmnet sysctl writes: netd owns the physical network.
   fi
 
   mkdir -p "$RUN/rules" "$RUN/proxy_provider" "$RUN/ruleset" "$RUN/ui" || { cleanup; restorev6; rm -f "$SESSION"; fail "无法创建 Mihomo 运行缓存目录"; }
@@ -827,6 +787,11 @@ start(){
     [ "$START_QUIC" = 0 ] || install_quic6 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 QUIC 策略安装失败，已回滚"; }
   elif [ "$START_V6" = strict ]; then install_v6_strict "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "严格 IPv4 防泄漏规则安装失败，已回滚"; }; fi
 
+  if [ "$START_V6" = disable ] && v6supported && [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ] && [ "$START_DNS" != off ]; then
+    install_dns_redirect6 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" || { cleanup; stopcore; rm -f "$SESSION"; fail "IPv6 DNS 本地接管失败，未放行直连 DNS"; }
+  fi
+  # Record exactly what this session installed, not mutable app preferences.
+  health_record || { cleanup; stopcore; rm -f "$SESSION"; fail "无法记录网络完整性基线，已停止本次启动"; }
   start_stage "start-watchdog"
   start_watchdog "$START_PID" "$START_KILL" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS"
   rm -f "$START_ERROR"; start_stage "running"
@@ -888,7 +853,11 @@ status(){
 
   MODE4=false; MODE6=false
   case "$STATUS_MODE" in
-    tproxy|enhance) [ "$M4O" = true ] && MODE4=true; [ "$M6O" = true ] && MODE6=true;;
+    tproxy) [ "$M4O" = true ] && [ "$M4P" = true ] && MODE4=true; [ "$M6O" = true ] && [ "$M6P" = true ] && MODE6=true;;
+    enhance)
+      MODE4=true; MODE6=true
+      if grep -qx 'UDP=1' "$SESSION"; then [ "$M4O" = true ] && [ "$M4P" = true ] || MODE4=false; [ "$M6O" = true ] && [ "$M6P" = true ] || MODE6=false; fi
+      if grep -qx 'TCP=1' "$SESSION"; then [ "$N4O" = true ] || MODE4=false; [ "$N6O" = true ] || MODE6=false; fi;;
     redirect) [ "$N4O" = true ] && MODE4=true; [ "$N6O" = true ] && MODE6=true;;
     tun|ebpf)
       if ip link show hetu0 >/dev/null 2>&1; then MODE4=true; MODE6=true; fi
@@ -910,7 +879,7 @@ status(){
       *)
         DNS4=$D4O
         [ "$SHAREV" != 1 ] || [ "$D4P" = true ] || DNS4=false
-        if v6supported && [ "$IPV6V" = enable ]; then
+        if v6supported && { [ "$IPV6V" = enable ] || [ "$IPV6V" = disable ]; }; then
           DNS6=$D6O
           [ "$SHAREV" != 1 ] || [ "$D6P" = true ] || DNS6=false
         fi
@@ -950,18 +919,195 @@ status(){
   STALE=false
   if [ "$STATUS_RUNNING" = false ] && { [ "$M4O" = true ] || [ "$N4O" = true ] || [ "$D4O" = true ] || [ "$M6O" = true ] || [ "$N6O" = true ] || [ "$D6O" = true ] || [ "$K4" = true ] || [ "$K6" = true ] || [ "$STRICT6" = true ] || [ -f "$IPV6_STATE" ]; }; then STALE=true; fi
 
+  health_collect
   HEALTH=false
-  if [ "$STATUS_RUNNING" = true ] && [ "$IPV4OK" = true ] && [ "$IPV6OK" = true ] && [ "$DNS4" = true ] && [ "$DNS6" = true ] && [ "$DNSREADY" = true ] && [ "$WD" = true ]; then HEALTH=true; fi
+  if [ "$STATUS_RUNNING" = true ] && [ "$H_STATE" = healthy ] && [ "$WD" = true ]; then HEALTH=true; fi
   SM=""; ST=""; if loadnet >/dev/null 2>&1; then SM="$MARK"; ST="$TABLE"; fi
   SP=$(state_value PREF 2>/dev/null || true)
-  printf '{"ok":true,"runtimeSchema":3,"running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":false,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","log":"%s","configCheckLog":"%s"}\n' "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$SHAREV" "$KILLV" "$LOG" "$CHECKLOG"
+  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":false,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","log":"%s","configCheckLog":"%s"}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$SHAREV" "$KILLV" "$LOG" "$CHECKLOG"
 }
+
+# Session-bound network integrity. No remote reachability failure restarts the core.
+# iptables-restore --noflush commits only the named Hetu chains, never netd tables.
+health_owned(){
+  awk '($1=="-N" || $1=="-A") && $2 ~ /^HETU_(MOUT|MPRE|NOUT|NPRE|DNSOUT|DNSPRE|QUICOUT|QUICFWD|WROUT|WRFWD|V6OUT|V6FWD)$/ {print;next}
+       $1=="-A" && $2 ~ /^(OUTPUT|PREROUTING|FORWARD)$/ && NF==4 && $3=="-j" && $4 ~ /^HETU_(MOUT|MPRE|NOUT|NPRE|DNSOUT|DNSPRE|QUICOUT|QUICFWD|WROUT|WRFWD|V6OUT|V6FWD)$/ {print}'
+}
+health_record(){ (
+  H_DIR="$RUN/network-manifest"; H_TMP="$H_DIR.new.$$"
+  rm -rf "$H_TMP"; mkdir -p "$H_TMP" || exit 1
+  cp "$SESSION" "$H_TMP/session" || exit 1
+  cat "$PIDFILE" > "$H_TMP/pid" || exit 1
+  [ ! -r "$NET_STATE" ] || cp "$NET_STATE" "$H_TMP/net" || exit 1
+  for H_F in 4 6; do
+    [ "$H_F" != 6 ] || has ip6tables || continue
+    for H_T in mangle nat filter; do
+      # Read only tables that this session uses. Empty tables need no repair.
+      H_RAW=$("xt${H_F}" -t "$H_T" -S 2>/dev/null) || { rm -rf "$H_TMP"; exit 1; }
+      printf '%s\n' "$H_RAW" | health_owned > "$H_TMP/$H_F-$H_T"
+    done
+  done
+  # Never record an incomplete successful start as a healthy baseline.
+  case "$START_MODE" in
+    tproxy|enhance)
+      if [ "$START_UDP" = 1 ] || { [ "$START_MODE" = tproxy ] && [ "$START_TCP" = 1 ]; }; then
+        grep -q -- '^-A PREROUTING -j HETU_MPRE$' "$H_TMP/4-mangle" || { rm -rf "$H_TMP"; exit 1; }
+        [ -s "$H_TMP/net" ] || { rm -rf "$H_TMP"; exit 1; }
+      fi;;
+  esac
+  (cd "$H_TMP" && { cksum [46]-* session pid; [ ! -f net ] || cksum net; }) > "$H_TMP/checksums" || { rm -rf "$H_TMP"; exit 1; }
+  rm -rf "$H_DIR"; mv "$H_TMP" "$H_DIR"
+); }
+health_session_current(){
+  [ -r "$RUN/network-manifest/session" ] && [ -r "$RUN/network-manifest/pid" ] || return 1
+  cmp -s "$RUN/network-manifest/session" "$SESSION" && cmp -s "$RUN/network-manifest/pid" "$PIDFILE" || return 1
+  H_SUM=$(cd "$RUN/network-manifest" && { cksum [46]-* session pid; [ ! -f net ] || cksum net; }) || return 1
+  [ "$H_SUM" = "$(cat "$RUN/network-manifest/checksums" 2>/dev/null)" ]
+}
+health_fault(){ H_STATE=degraded; H_REASON="${H_REASON:+$H_REASON,}$1"; }
+health_unknown(){ H_UNKNOWN=1; H_REASON="${H_REASON:+$H_REASON,}$1"; }
+health_routes(){
+  H_F="$1"; H_RULES=$(ip -"$H_F" rule show 2>/dev/null) || { health_unknown "ipv$H_F-rule-read"; return; }
+  H_RULE_OK=$(printf '%s\n' "$H_RULES" | awk -v p="$PREF:" -v m="$MARK/$MASK" -v t="$TABLE" '$1==p && $2=="from" && $3=="all" && $4=="fwmark" && $5==m && ($6=="lookup" || $6=="table") && $7==t {print "yes"}')
+  [ "$H_RULE_OK" = yes ] || health_fault "ipv$H_F-policy-rule"
+  # A removed table is a confirmed absence. Other netlink failures are unknown.
+  H_ROUTES=$(ip -"$H_F" route show table "$TABLE" 2>&1); H_RC=$?
+  if [ "$H_RC" != 0 ]; then
+    case "$H_ROUTES" in *'FIB table does not exist'*|*'No such file'*) H_ROUTES='';; *) health_unknown "ipv$H_F-route-read"; return;; esac
+  fi
+  H_ROUTE_OK=$(printf '%s\n' "$H_ROUTES" | awk '$1=="local" && ($2=="default" || $2=="0.0.0.0/0" || $2=="::/0") && $3=="dev" && $4=="lo" {print "yes"}')
+  [ "$H_ROUTE_OK" = yes ] || health_fault "ipv$H_F-local-route"
+}
+health_collect(){
+  H_STATE=healthy; H_REASON=''; H_UNKNOWN=0
+  if ! health_session_current; then H_STATE=upgrade-required; H_REASON=session-manifest-missing; return; fi
+  if [ -d "$LOCK_DIR" ] && [ "$LOCK_HELD" != 1 ]; then H_STATE=unknown; H_REASON=transaction-in-progress; return; fi
+  for H_E in "$RUN/network-manifest"/[46]-*; do
+    [ -s "$H_E" ] || continue
+    H_KEY=${H_E##*/}; H_F=${H_KEY%%-*}; H_T=${H_KEY#*-}
+    H_RAW=$("xt${H_F}q" -t "$H_T" -S 2>/dev/null) || { health_unknown "$H_KEY-read"; continue; }
+    for H_C in $(awk '$1=="-N" {print $2}' "$H_E"); do
+      H_EXPECTED=$(awk -v c="$H_C" '($1=="-N" || $1=="-A") && $2==c' "$H_E")
+      H_ACTUAL=$(printf '%s\n' "$H_RAW" | awk -v c="$H_C" '($1=="-N" || $1=="-A") && $2==c')
+      [ "$H_EXPECTED" = "$H_ACTUAL" ] || health_fault "$H_KEY-$H_C"
+    done
+    while IFS= read -r H_LINE; do
+      case "$H_LINE" in '-A OUTPUT '*|'-A PREROUTING '*|'-A FORWARD '*)
+        H_COUNT=$(printf '%s\n' "$H_RAW" | grep -Fxc -- "$H_LINE")
+        [ "$H_COUNT" = 1 ] || health_fault "$H_KEY-hook";;
+      esac
+    done < "$H_E"
+  done
+  if [ -s "$RUN/network-manifest/net" ]; then
+    if ! cmp -s "$NET_STATE" "$RUN/network-manifest/net" || ! loadnet; then
+      health_fault routing-journal
+    else
+      [ ! -s "$RUN/network-manifest/4-mangle" ] || health_routes 4
+      [ ! -s "$RUN/network-manifest/6-mangle" ] || health_routes 6
+    fi
+  fi
+  H_MODE=$(sed -n 's/^MODE=//p' "$SESSION")
+  case "$H_MODE" in tun|ebpf) ip link show hetu0 >/dev/null 2>&1 || health_fault native-device;; esac
+  H_SOCKETS=$(ss -lnut 2>/dev/null); H_SS=$?
+  if [ "$H_SS" != 0 ]; then health_unknown socket-read
+  else
+    for H_SPEC in CONTROLLER_PORT:tcp LISTENER_TCP_PORT:tcp LISTENER_UDP_PORT:udp ACTIVE_DNS_PORT:tcp ACTIVE_DNS_PORT:udp; do
+      H_P=$(sed -n "s/^${H_SPEC%:*}=//p" "$SESSION"); H_PROTO=${H_SPEC#*:}
+      case "$H_P" in ''|0) continue;; esac
+      printf '%s\n' "$H_SOCKETS" | awk -v p="$H_P" -v proto="$H_PROTO" '$1 ~ ("^"proto) && $5 ~ (":"p"$") {found=1} END {exit !found}' || health_fault "listener-$H_P-$H_PROTO"
+    done
+  fi
+  # Never mutate after an incomplete observation, even if another check failed.
+  [ "$H_UNKNOWN" = 0 ] || H_STATE=unknown
+}
+health_restore_table(){
+  H_E="$1"; H_KEY=${H_E##*/}; H_F=${H_KEY%%-*}; H_T=${H_KEY#*-}
+  H_RAW=$("xt${H_F}q" -t "$H_T" -S 2>/dev/null) || return 1
+  H_BATCH="$RUN/.repair-$H_KEY.$$"; printf '*%s\n' "$H_T" > "$H_BATCH" || return 1
+  H_CHANGED=0
+  for H_C in $(awk '$1=="-N" {print $2}' "$H_E"); do
+    H_EXPECTED=$(awk -v c="$H_C" '($1=="-N" || $1=="-A") && $2==c' "$H_E")
+    H_ACTUAL=$(printf '%s\n' "$H_RAW" | awk -v c="$H_C" '($1=="-N" || $1=="-A") && $2==c')
+    [ "$H_EXPECTED" != "$H_ACTUAL" ] || continue
+    if printf '%s\n' "$H_RAW" | grep -Fqx -- "-N $H_C"; then printf -- '-F %s\n' "$H_C" >> "$H_BATCH"
+    else printf -- '-N %s\n' "$H_C" >> "$H_BATCH"; fi
+    awk -v c="$H_C" '$1=="-A" && $2==c' "$H_E" >> "$H_BATCH"
+    H_CHANGED=1
+  done
+  while IFS= read -r H_LINE; do
+    case "$H_LINE" in '-A OUTPUT '*|'-A PREROUTING '*|'-A FORWARD '*)
+      H_COUNT=$(printf '%s\n' "$H_RAW" | grep -Fxc -- "$H_LINE")
+      [ "$H_COUNT" != 1 ] || continue
+      while [ "$H_COUNT" -gt 0 ]; do printf '%s\n' "$H_LINE" | sed 's/^-A /-D /' >> "$H_BATCH"; H_COUNT=$((H_COUNT-1)); done
+      # DNS/IPv6/UDP guards were installed at the front; preserve that contract.
+      case "$H_LINE" in *HETU_DNS*|*HETU_V6*|*HETU_WR*) printf '%s\n' "$H_LINE" | sed 's/^-A /-I /' >> "$H_BATCH";; *) printf '%s\n' "$H_LINE" >> "$H_BATCH";; esac
+      H_CHANGED=1;;
+    esac
+  done < "$H_E"
+  printf 'COMMIT\n' >> "$H_BATCH"
+  if [ "$H_CHANGED" = 1 ]; then
+    H_RESTORE=iptables-restore; [ "$H_F" != 6 ] || H_RESTORE=ip6tables-restore
+    # No unsafe line-by-line fallback: a failed commit must leave the table intact.
+    "$H_RESTORE" -w 2 --noflush < "$H_BATCH" >> "$RUN/network-repair.log" 2>&1; H_RC=$?
+  else H_RC=0; fi
+  rm -f "$H_BATCH"; return "$H_RC"
+}
+health_repair(){ (
+  trap 'release_lock' EXIT
+  H_PID="${1:-}"; H_CURRENT=$(cat "$PIDFILE" 2>/dev/null || true)
+  [ -n "$H_PID" ] && [ "$H_PID" = "$H_CURRENT" ] && pidcore "$H_PID" && kill -0 "$H_PID" 2>/dev/null || exit 0
+  health_collect
+  [ "$H_STATE" = degraded ] || exit 0
+  H_FIRST="$H_REASON"
+  H_NOW=$(cut -d. -f1 /proc/uptime)
+  H_LAST=$(cat "$RUN/network-repair-at" 2>/dev/null || echo 0)
+  case "$H_LAST" in ''|*[!0-9]*) H_LAST=0;; esac
+  [ $((H_NOW-H_LAST)) -ge 30 ] || exit 0
+  acquire_lock || exit 0
+  [ "$H_PID" = "$(cat "$PIDFILE" 2>/dev/null)" ] && health_session_current || exit 0
+  sleep 0.25; health_collect
+  [ "$H_STATE" = degraded ] && [ "$H_REASON" = "$H_FIRST" ] || exit 0
+  pidcore "$H_PID" && kill -0 "$H_PID" 2>/dev/null || exit 0
+  # Missing metadata or listeners cannot safely be reconstructed from preferences.
+  # Keep the core and its existing connections; report instead of restart-looping.
+  case "$H_REASON" in *routing-journal*|*listener-*|*native-device*) exit 0;; esac
+  printf '%s\n' "$H_NOW" > "$RUN/network-repair-at"
+  printf '%s pid=%s before=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$H_PID" "$H_REASON" >> "$RUN/network-repair.log"
+  if [ -s "$RUN/network-manifest/net" ]; then
+    loadnet || exit 0
+    for H_F in 4 6; do
+      [ -s "$RUN/network-manifest/$H_F-mangle" ] || continue
+      H_RULES=$(ip -"$H_F" rule show 2>/dev/null) || exit 0
+      # If a different owner occupies our exact priority, do not overwrite it.
+      H_AT_PREF=$(printf '%s\n' "$H_RULES" | awk -v p="$PREF:" '$1==p')
+      H_RULE_OK=$(printf '%s\n' "$H_AT_PREF" | awk -v m="$MARK/$MASK" -v t="$TABLE" '$4=="fwmark" && $5==m && ($6=="lookup" || $6=="table") && $7==t {print "yes"}')
+      [ -z "$H_AT_PREF" ] || [ "$H_RULE_OK" = yes ] || exit 0
+      H_DEFAULT=0.0.0.0/0; [ "$H_F" != 6 ] || H_DEFAULT=::/0
+      ip -"$H_F" route replace local "$H_DEFAULT" dev lo table "$TABLE" || exit 0
+      [ "$H_RULE_OK" = yes ] || ip -"$H_F" rule add pref "$PREF" fwmark "$MARK/$MASK" table "$TABLE" || exit 0
+    done
+  fi
+  # Guards and DNS first, OUTPUT marking last; never clear a global firewall table.
+  for H_T in filter nat mangle; do for H_F in 4 6; do
+    H_E="$RUN/network-manifest/$H_F-$H_T"; [ ! -s "$H_E" ] || health_restore_table "$H_E" || exit 0
+  done; done
+  health_collect
+  printf '%s pid=%s after=%s faults=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$H_PID" "$H_STATE" "$H_REASON" >> "$RUN/network-repair.log"
+  # Bound this diagnostic file without touching the Mihomo connection log.
+  tail -n 60 "$RUN/network-repair.log" > "$RUN/network-repair.log.new.$$" && mv "$RUN/network-repair.log.new.$$" "$RUN/network-repair.log"
+); }
+health_json(){ (
+  root; health_collect
+  printf '{"ok":true,"networkIntegrity":"%s","networkFault":"%s","dataPlaneHealthy":%s}\n' "$H_STATE" "$H_REASON" "$([ "$H_STATE" = healthy ] && echo true || echo false)"
+); }
 
 case "${1:-status}" in
   preflight) [ "$#" = 18 ] || fail "参数错误"; preflight "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}" "${18}";;
   start) [ "$#" = 22 ] || fail "参数错误"; root; start "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}" "${18}" "${19}" "${20}" "${21}" "${22}";;
   stop) root; acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"; stopwatchdog; cleanup; stopcore; restorev6 || fail "核心已停止，但 IPv6 原状态恢复失败，请重试停止"; rm -f "$SESSION"; ok "Root 代理已停止并恢复网络状态";;
   status) status;;
+  network-health) health_json;;
+  repair-network) [ "$#" = 2 ] || exit 1; root; health_repair "$2";;
   watchdog) [ "$#" = 9 ] || exit 0; root; watchdog "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9";;
   *) fail "未知 Root 代理操作";;
 esac

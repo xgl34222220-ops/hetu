@@ -718,6 +718,11 @@ final class RootProxyManager {
         }catch(Exception ignored){return 0;}
     }
 
+    JSONObject networkHealth()throws Exception{
+        // Old deployed scripts intentionally require one explicit restart after upgrade.
+        return runJsonWithTimeout(8000L,"network-health");
+    }
+
     JSONObject status()throws Exception{
         JSONObject state=runJsonAllowMissing("status",new JSONObject().put("ok",true).put("running",false).put("state","idle").put("message","尚未启动"));
         int livePort=liveControllerPort(state);
@@ -752,7 +757,8 @@ final class RootProxyManager {
                 "proxyAutoRecoverySuccess","proxyAutoRecoveryError","proxyLastNetworkSessionReset",
                 "proxyLastNetworkSessionResetCount","proxyLastNetworkSessionResetReason","proxyNetworkSessionResetError",
                 "proxyLastAutoStopAt","proxyLastAutoStopReason","proxyAdblockLastRevision","proxyAdblockLastError",
-                "proxyAdblockHotReloadAt","proxyAdblockLastHitAt","proxyRootEgressProbeLastError"}){
+                "proxyAdblockHotReloadAt","proxyAdblockLastHitAt","proxyRootEgressProbeLastError",
+                "proxyNetworkIntegrity","proxyNetworkFault","proxyNetworkCheckedAt","proxyPolicyEgressState","proxyPolicyEgressCheckedAt"}){
             if(values.containsKey(key))events.append('\n').append(key).append('=').append(values.get(key));
         }
         report.section("版本与最近运行事件",events.toString(),6000);
@@ -786,6 +792,11 @@ final class RootProxyManager {
             report.section("Root 网络状态","exit="+r.code+"\n"+r.output,18000);
         }catch(Exception e){report.section("Root 网络状态",String.valueOf(e),1000);}
         try{
+            report.section("网络完整性（不等同于外部网站可达）",networkHealth().toString(),2500);
+            RootBridge.Result repairs=RootBridge.rootShell(context,"tail -n 30 "+RootBridge.quote(ROOT+"/run/network-repair.log")+" 2>/dev/null; true",3000L);
+            report.section("网络原位修复记录",repairs.output,5000);
+        }catch(Exception error){report.section("网络完整性",String.valueOf(error),1000);}
+        try{
             int wechatUid=-1;
             try{wechatUid=context.getPackageManager().getApplicationInfo("com.tencent.mm",0).uid;}catch(Exception ignored){}
             org.json.JSONArray connections=new MihomoControllerClient(context).connections().optJSONArray("connections");
@@ -794,7 +805,13 @@ final class RootProxyManager {
             for(int i=0;connections!=null&&i<connections.length()&&count<25;i++){
                 JSONObject connection=connections.optJSONObject(i);
                 JSONObject metadata=connection==null?null:connection.optJSONObject("metadata");
-                if(metadata==null||!DiagnosticReport.isWechat(metadata.optString("process"),metadata.optString("host"),metadata.optInt("uid",-1),wechatUid))continue;
+                if(metadata==null)continue;
+                String destination=metadata.optString("host","").toLowerCase(java.util.Locale.ROOT);
+                String process=metadata.optString("process","").toLowerCase(java.util.Locale.ROOT);
+                boolean affected=destination.contains("github")||destination.contains("google")||destination.contains("gstatic")
+                        ||destination.contains("telegram")||destination.contains("twitter")||destination.equals("x.com")
+                        ||destination.endsWith(".x.com")||process.contains("telegram")||process.contains("twitter")||process.contains("chrome");
+                if(!affected&&!DiagnosticReport.isWechat(metadata.optString("process"),metadata.optString("host"),metadata.optInt("uid",-1),wechatUid))continue;
                 count++;
                 matched.append("#").append(count).append(" process=").append(metadata.optString("process"))
                         .append(" uid=").append(metadata.optInt("uid",-1))
@@ -807,7 +824,7 @@ final class RootProxyManager {
                         .append(" chains=").append(connection.optJSONArray("chains")).append('\n');
             }
             if(count==0)matched.append("当前未识别到微信连接；这不代表微信未联网，可能走应用绕过、OEM推送或已断连。\n");
-            report.section("微信当前连接（仅连接元数据，无聊天内容）",matched.toString(),6000);
+            report.section("消息与常见代理应用连接（仅元数据）",matched.toString(),6000);
         }catch(Exception e){report.section("微信当前连接","Controller 读取失败："+e.getMessage(),1000);}
         try{
             String cmd="echo '--- recent core log ---'; tail -c 9000 "+RootBridge.quote(ROOT+"/run/core.log")
