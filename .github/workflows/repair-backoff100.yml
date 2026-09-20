@@ -1,0 +1,68 @@
+name: Repair early boot backoff test100
+on:
+  push:
+    branches: [feature/hetu-rebrand-root-app]
+    paths: [.github/workflows/repair-backoff100.yml]
+permissions:
+  contents: write
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply bounded repair backoff fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          R=Path('.')
+          p=R/'android-app/app/src/main/assets/hetu-root.sh'
+          s=p.read_text()
+          old='''  H_NOW=$(cut -d. -f1 /proc/uptime)
+            H_LAST=$(cat "$RUN/network-repair-at" 2>/dev/null || echo 0)
+            case "$H_LAST" in ''|*[!0-9]*) H_LAST=0;; esac
+            [ $((H_NOW-H_LAST)) -ge 30 ] || exit 0
+            acquire_lock || exit 0
+          '''
+          new='''  health_repair_due || exit 0
+            acquire_lock || exit 0
+            # Another repair may have finished while this one waited for the lock.
+            health_repair_due || exit 0
+          '''
+          helper='''health_repair_due(){
+            monotonic_seconds || return 1
+            H_NOW="$MONO_SECONDS"
+            # Missing history is NOT a repair at boot time zero. A new session can fail
+            # within the first 30 seconds of boot, especially during network creation.
+            [ -r "$RUN/network-repair-at" ] || return 0
+            read -r H_LAST < "$RUN/network-repair-at" || return 0
+            case "$H_LAST" in ''|*[!0-9]*) return 0;; esac
+            [ "$H_NOW" -ge "$H_LAST" ] || return 0
+            [ $((H_NOW-H_LAST)) -ge 30 ]
+          }
+          '''
+          assert s.count(old)==1 and s.count('health_repair(){ (')==1
+          s=s.replace(old,new).replace('health_repair(){ (',helper+'health_repair(){ (')
+          p.write_text(s)
+          p=R/'tools/test_network_integrity.py';s=p.read_text();needle='root(){ :; }; pidcore(){ return 0; };'
+          assert s.count(needle)==1
+          s=s.replace(needle,'''# Deterministic early-boot run still executes the real collection/repair code.
+          if [ -n "${HETU_TEST_UPTIME:-}" ]; then
+            monotonic_seconds(){ MONO_SECONDS="$HETU_TEST_UPTIME"; }
+          fi
+          '''+needle)
+          p.write_text(s)
+          p=R/'tests/ui-runtime-baseline.json';m=json.loads(p.read_text());name='android-app/app/src/main/assets/hetu-root.sh';m[name]=hashlib.sha256((R/name).read_bytes()).hexdigest();p.write_text(json.dumps(m,ensure_ascii=False,indent=2)+'\n')
+          assert m[name]=='b4fb0f7cd2e6287fa41156fa388424da2036228aa4737503a4f40b9a3702c4eb'
+          PY
+          HETU_TEST_UPTIME=5 python3 tools/test_network_integrity.py
+          python3 tools/test_startup_lifecycle.py
+          python3 tools/test_ui_audit_invariants.py
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add android-app/app/src/main/assets/hetu-root.sh tools/test_network_integrity.py tests/ui-runtime-baseline.json
+          git commit -m 'fix: allow first network repair during early boot; retain subsequent backoff'
+          git push origin HEAD:feature/hetu-rebrand-root-app
