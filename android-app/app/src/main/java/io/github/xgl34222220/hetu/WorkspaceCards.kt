@@ -83,7 +83,7 @@ internal fun NodeChoiceCard(node: ProxyNodeUi, active: Boolean, value: Long?, te
 @Composable
 internal fun WorkspaceBento(runtime: ProxyRuntimeSnapshot, connections: Int, up: Long, down: Long,
     used: Long, total: Long, count: Int, memory: Long, cpu: Float, onSubscription: () -> Unit) {
-    InstrumentBento(runtime, connections, up, down, used, total, count, memory, cpu, onSubscription)
+    AlignedInstrumentPanel(runtime, connections, up, down, used, total, count, memory, cpu, onSubscription)
 }
 
 @Composable
