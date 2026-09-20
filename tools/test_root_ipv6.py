@@ -285,8 +285,8 @@ status
         checks += 1
         (sysctls / 'wlan0' / 'disable_ipv6').write_text('0\n')
         state = status(mode='disable')
-        assert not state['ipv6DisabledByHetu'] and not state['dataPlaneHealthy'], state
-        assert state['ipv6DisableGuard'], 'Firewall still prevents native IPv6 escape during sysctl reconciliation'
+        assert not state['ipv6DisabledByHetu'] and state['dataPlaneHealthy'], state
+        assert state['ipv6Rules'] and state['ipv6DisableGuard'], 'Firewall must keep native IPv6 escape blocked during sysctl reconciliation'
         checks += 2
     print(f'Root IPv6 tests passed: {checks}')
 
