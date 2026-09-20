@@ -142,10 +142,15 @@ jobs:
           grep -q 'System.loadLibrary("hetu_core")' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoNative.java
           grep -q 'Java_io_github_xgl34222220_hetu_MihomoNative_invoke' native/bridge/jni_android.c
           grep -q 'Java_io_github_xgl34222220_hetu_preview_MihomoNative_invoke' native/bridge/jni_android.c
-          grep -q 'versionName = "0.4.0-test.92"' android-app/app/build.gradle.kts
-          grep -q 'versionCode = 492' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.4.0-test.93"' android-app/app/build.gradle.kts
+          grep -q 'versionCode = 493' android-app/app/build.gradle.kts
           grep -Fq 'android:icon="@drawable/ic_hetu_official"' android-app/app/src/main/AndroidManifest.xml
           grep -Fq 'android:roundIcon="@drawable/ic_hetu_official"' android-app/app/src/main/AndroidManifest.xml
+          grep -Fq 'RefHomeBentoMatrix(' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
+          grep -Fq 'Color(0xFFE5484D)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
+          grep -Fq 'Color(0xFFE6F7ED) to Color(0xFF18794E)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
+          grep -Fq 'proxyRootRuntimeRefreshPending' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
+          grep -Fq 'calculateBottomPadding() + 96.dp' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           test -f android-app/app/src/main/res/drawable/ic_hetu_official.webp
           test -f design/app-icons/official-icon.webp
           test -f android-app/app/src/main/java/io/github/xgl34222220/hetu/LegacyAppMigrator.java
