@@ -2,7 +2,7 @@ name: Integrate same-window glass test101
 on:
   push:
     branches: [feature/hetu-rebrand-root-app]
-    paths: [tools/apply_glass101.py]
+    paths: [tools/apply_glass101.py, .github/workflows/apply-glass101.yml]
 permissions:
   contents: write
 jobs:
@@ -16,9 +16,10 @@ jobs:
           python3 tools/apply_glass101.py
           python3 tools/test_ui_audit_invariants.py
           git diff --check
+          git restore .github/workflows/build-hetu.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add android-app .github/workflows/build-hetu.yml
+          git add android-app
           git commit -m 'ui: same-window frosted menu and unified sunken material (test.101)'
           git push origin HEAD:feature/hetu-rebrand-root-app
           mkdir -p export
