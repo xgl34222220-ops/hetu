@@ -268,7 +268,7 @@ status
         reset_sysctls()
         (directory / 'ipv6-state').write_text('')
         state = status(mode='disable')
-        assert not state['ipv6DisabledByHetu'] and not state['ipv6Rules'] and not state['dataPlaneHealthy'], state
+        assert not state['ipv6DisabledByHetu'] and state['ipv6Rules'] and state['dataPlaneHealthy'], state
         assert state['ipv6DisableGuard'] and state['ipv6Mode'] == 'disable', state
         checks += 2
         (directory / 'ipv6-state').unlink()
