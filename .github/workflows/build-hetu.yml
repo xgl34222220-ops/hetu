@@ -37,8 +37,8 @@ jobs:
           python3 tools/test_ui_audit_invariants.py
           test ! -d module
           test ! -d android-app/app/src/main/java/io/github/xgl34222220/bichen
-          grep -Fq 'versionName = "0.4.0-test.95"' android-app/app/build.gradle.kts
-          grep -Fq 'versionCode = 495' android-app/app/build.gradle.kts
+          grep -Fq 'versionName = "0.4.0-test.96"' android-app/app/build.gradle.kts
+          grep -Fq 'versionCode = 496' android-app/app/build.gradle.kts
           grep -Fq 'android:icon="@drawable/ic_hetu_official"' android-app/app/src/main/AndroidManifest.xml
           sh -n android-app/app/src/main/assets/hetu-root.sh
           sh -n android-app/app/src/main/assets/hetu-route.sh
