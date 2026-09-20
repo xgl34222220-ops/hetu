@@ -1,0 +1,31 @@
+name: Integrate startup lifecycle test100
+on:
+  push:
+    branches: [feature/hetu-rebrand-root-app]
+    paths: [tools/apply_lifecycle100.py]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Apply bounded source edits and run lifecycle tests
+        run: |
+          set -euo pipefail
+          python3 tools/apply_lifecycle100.py
+          sh -n android-app/app/src/main/assets/hetu-root.sh
+          python3 tools/test_startup_lifecycle.py
+          python3 tools/test_ui_audit_invariants.py
+          python3 tools/test_network_integrity.py
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add android-app tests/ui-runtime-baseline.json
+          git commit -m 'fix: bound startup, preserve live connections and reject stale observations (test.100)'
+          git push origin HEAD:feature/hetu-rebrand-root-app
