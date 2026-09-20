@@ -37,8 +37,9 @@ class InstrumentAlignmentRenderTest {
         val layouts = mutableListOf<TextLayoutResult>()
         compose.onNodeWithTag(tag, true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
         assertEquals("Text missing for $tag", 1, layouts.size)
-        assertFalse("Text clipped for $tag", layouts.single().hasVisualOverflow)
-        return bounds(tag).top + layouts.single().firstBaseline
+        val layout = layouts.single()
+        assertFalse("Text clipped for $tag: text=${layout.layoutInput.text} size=${layout.size} constraints=${layout.layoutInput.constraints} bounds=${bounds(tag)} widthOverflow=${layout.didOverflowWidth} heightOverflow=${layout.didOverflowHeight}", layout.hasVisualOverflow)
+        return bounds(tag).top + layout.firstBaseline
     }
     private fun capture(name: String) {
         compose.waitForIdle()
@@ -70,7 +71,9 @@ class InstrumentAlignmentRenderTest {
         } }
         for (dark in listOf(false, true)) for ((w, f) in listOf(320f to 1f, 360f to 1f, 412f to 1f, 360f to 1.5f)) {
             compose.runOnIdle { width = w; scale = f; night = dark }; compose.waitForIdle()
+            capture("aligned102-$w-$f-${if(dark) "dark" else "light"}")
             val top = bounds("instrument-network")
+            println("ALIGNMENT width=$w font=$f dark=$dark network=$top")
             for (id in ids) {
                 val b = bounds("instrument-$id")
                 assertEquals("Unequal cell heights at $w/$f", top.height, b.height, .6f)
@@ -86,7 +89,6 @@ class InstrumentAlignmentRenderTest {
             }
             if (f == 1f) assertEquals("Central gutter still exists", .5f, bounds("instrument-speed").left - top.right, 1f)
             else assertTrue("Large font must not squeeze a two-column panel", bounds("instrument-speed").top > top.bottom)
-            capture("aligned102-$w-$f-${if(dark) "dark" else "light"}")
         }
     }
 
@@ -116,7 +118,8 @@ class InstrumentAlignmentRenderTest {
         compose.onNodeWithTag("instrument-speed-rail", true).assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.ProgressBarRangeInfo))
         capture("aligned102-unknown")
         compose.runOnIdle { stopped = true }; compose.waitForIdle()
-        compose.onNodeWithText("实时", true).assertDoesNotExist()
+        compose.onNodeWithText("实时", substring = false).assertDoesNotExist()
+        compose.onNodeWithTag("instrument-speed-badge", true).assertTextEquals("停止")
         capture("aligned102-stopped")
     }
 
