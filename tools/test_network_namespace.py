@@ -15,7 +15,10 @@ listeners=[]
 for proto,port in ((socket.SOCK_STREAM,29090),(socket.SOCK_STREAM,19898),(socket.SOCK_DGRAM,19898),(socket.SOCK_STREAM,11053),(socket.SOCK_DGRAM,11053)):
     sock=socket.socket(socket.AF_INET,proto);sock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
     if port==19898:sock.setsockopt(socket.SOL_IP,19,1) # IP_TRANSPARENT
-    sock.bind(('0.0.0.0',port))
+    # This echo fixture has no IP_PKTINFO receive/send handling. Bind the DNS
+    # REDIRECT destination explicitly so its UDP response uses 127.0.0.1 rather
+    # than choosing the underlay source and missing conntrack's reverse NAT tuple.
+    sock.bind(('127.0.0.1' if port==11053 else '0.0.0.0',port))
     if proto==socket.SOCK_STREAM:sock.listen(16)
     listeners.append(sock)
 def echo():
@@ -63,12 +66,11 @@ health_record || exit 1
         assert status['networkIntegrity']=='healthy',status
         packet()
         run('iptables','-t','mangle','-C','OUTPUT','-j','OEM_KEEP');run('iptables','-t','mangle','-C','OEM_KEEP','-j','RETURN')
-    # IPv6 app guard preserves infrastructure but rejects normal app UID flows.
     shell('install_v6_disable 0 || exit 1')
     rules=run('ip6tables','-t','filter','-S','HETU_V6OUT')
     assert '0-9999' in rules and '--dport 53' in rules and '-j REJECT' in rules
-    # Simulate this phone's missing IPv6 NAT table without unloading host modules.
-    # All filter and IPv4 operations below still use the real isolated kernel.
+    # Missing IPv6 NAT is simulated without unloading host modules. All IPv4
+    # and IPv6 filter operations still use the real isolated network namespace.
     no_nat='''
 xt6(){ if [ "$1" = -t ] && [ "$2" = nat ]; then echo "Table does not exist" >&2; return 3; fi; command ip6tables -w 2 "$@"; }
 xt6q(){ xt6 "$@"; }
@@ -94,13 +96,13 @@ health_json
     for typ in ('SOCK_STREAM','SOCK_DGRAM'):
         query=f'import socket; s=socket.socket(socket.AF_INET,socket.{typ}); s.settimeout(2); s.connect(("192.0.2.53",53)); s.send(b"test-dns"); assert s.recv(32)==b"dns-ok"'
         result=subprocess.run(['setpriv','--reuid','10001','--regid','10001','--clear-groups',sys.executable,'-c',query],text=True,capture_output=True,timeout=6)
-        assert result.returncode==0,result.stderr
-    packet()  # Ordinary TCP still reaches TPROXY under the no-NAT policy.
-    # Inspect the actual enforced DNS rejection before the system UID exemption.
+        assert result.returncode==0,(typ,result.stderr)
+        print('IPv4 DNS redirect request/reply verified:',typ,flush=True)
+    packet()
     rules=run('ip6tables','-t','filter','-S','HETU_V6OUT').splitlines()
     for proto in ('udp','tcp'):
         rejected=next(i for i,x in enumerate(rules) if f'-p {proto}' in x and '--dport 53' in x and '-j REJECT' in x)
         infrastructure=next(i for i,x in enumerate(rules) if '0-9999' in x)
         assert rejected<infrastructure
     print('No IPv6 NAT: manifest healthy; real IPv4 TCP+UDP DNS redirected locally; application TCP delivered; IPv6 DNS reject rules retained')
-print('Real Linux netns: 5 rule/route/chain faults repaired; 6 TCP app packets delivered; OEM chains preserved')
+print('Real Linux netns: 5 rule/route/chain faults repaired; 7 TCP app packets delivered; OEM chains preserved')
