@@ -78,7 +78,6 @@ internal class ProxyGroupIconRepository private constructor(context: Context) {
             val key = MessageDigest.getInstance("SHA-256").digest(url.toByteArray()).joinToString("") { "%02x".format(it) }
             val target = File(directory, "$key.png")
             decodeFile(target)?.let { memory.put(url, it); return@withLock GroupIconLoad.Ready(it, true) }
-            // Existing local cache is useful during migration and while offline.
             if (legacyPath.isNotBlank()) decodeFile(File(legacyPath))?.let {
                 memory.put(url, it); return@withLock GroupIconLoad.Ready(it, true)
             }
@@ -155,6 +154,12 @@ internal class ProxyGroupIconRepository private constructor(context: Context) {
                 val svg = SVG.getFromString(document)
                 // AndroidSVG does not execute scripts. No external resource resolver is registered.
                 val aspect = svg.documentAspectRatio.takeIf { it.isFinite() && it > 0f } ?: 1f
+                // Intrinsic dimensions need a viewBox before scaling to our raster.
+                if (svg.documentViewBox == null && svg.documentWidth > 0f && svg.documentHeight > 0f) {
+                    svg.setDocumentViewBox(0f, 0f, svg.documentWidth, svg.documentHeight)
+                }
+                svg.setDocumentWidth("100%")
+                svg.setDocumentHeight("100%")
                 val width = if (aspect >= 1f) 192 else (192 * aspect).toInt().coerceAtLeast(1)
                 val height = if (aspect >= 1f) (192 / aspect).toInt().coerceAtLeast(1) else 192
                 return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { svg.renderToCanvas(Canvas(it)) }

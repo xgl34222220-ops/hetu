@@ -2,7 +2,6 @@ package io.github.xgl34222220.hetu
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Color as AndroidColor
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -53,6 +52,11 @@ class PresentationTest {
         val rendered = ProxyGroupIconRepository.decode(svg.toByteArray())
         assertEquals(2f, rendered.width.toFloat()/rendered.height, .01f)
         assertEquals(0xffd32f89.toInt(), rendered.getPixel(rendered.width/2, rendered.height/2))
+        val fixed = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"12\"><rect width=\"24\" height=\"12\" fill=\"#d32f89\"/></svg>"
+        val fitted = ProxyGroupIconRepository.decode(fixed.toByteArray())
+        assertEquals(2f, fitted.width.toFloat()/fitted.height, .01f)
+        assertEquals(0xffd32f89.toInt(), fitted.getPixel(fitted.width/2, fitted.height/2))
+        assertEquals(0xffd32f89.toInt(), fitted.getPixel(fitted.width-2, fitted.height-2))
     }
     @Test fun redirectExtensionlessAndConcurrentRequestsAreCachedOffline() = runBlocking {
         val cert = HeldCertificate.Builder().addSubjectAlternativeName("localhost").build()
@@ -61,7 +65,6 @@ class PresentationTest {
         val trusted = HandshakeCertificates.Builder().addTrustedCertificate(cert.certificate).build()
         val oldFactory = HttpsURLConnection.getDefaultSSLSocketFactory()
         try {
-            // Test-only trust of this local server. Production TLS validation is untouched.
             server.useHttps(serverTls.sslSocketFactory(), false)
             server.start()
             HttpsURLConnection.setDefaultSSLSocketFactory(trusted.sslSocketFactory())
@@ -73,8 +76,10 @@ class PresentationTest {
             val url = server.url("/no-extension").toString()
             val results = (0..5).map { async { repo.load(url) } }.awaitAll()
             assertTrue(results.all { it is GroupIconLoad.Ready })
-            assertEquals(2, server.requestCount) // one redirect + one file, not six downloads
+            assertEquals(2, server.requestCount)
             assertTrue(File(repo.diskPath(url)).isFile)
+            val downloaded = (results.first() as GroupIconLoad.Ready).bitmap
+            assertEquals(0xff119955.toInt(), downloaded.getPixel(downloaded.width/2, downloaded.height/2))
             server.shutdown()
             val offline = repo.load(url) as GroupIconLoad.Ready
             assertTrue(offline.cached)

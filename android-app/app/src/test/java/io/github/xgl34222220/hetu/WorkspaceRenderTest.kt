@@ -2,6 +2,8 @@ package io.github.xgl34222220.hetu
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -10,7 +12,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
@@ -19,7 +20,7 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.core.app.ApplicationProvider
 import io.github.xgl34222220.hetu.ui.*
 import kotlinx.coroutines.runBlocking
@@ -37,7 +38,7 @@ import java.io.File
 @Config(sdk = [35], qualifiers = "w480dp-h2400dp-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class WorkspaceRenderTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private val context get() = ApplicationProvider.getApplicationContext<Context>()
     private fun configuredGroup(): ProxyGroupUi {
         val url = "https://icons.example/audit-brand.png"
@@ -47,9 +48,25 @@ class WorkspaceRenderTest {
         runBlocking { assertTrue(ProxyGroupIconRepository.get(context).load(url, path.absolutePath) is GroupIconLoad.Ready) }
         return ProxyGroupUi("🇯🇵 AI 平台", "Selector", "A long original strategy selection", emptyList(), url, path.absolutePath)
     }
+    private fun raster(tag: String): Bitmap {
+        compose.waitForIdle()
+        val bounds = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInWindow
+        assertTrue("Empty render bounds: $tag $bounds", bounds.width > 0 && bounds.height > 0)
+        // Native Skia rasterizes the real Android view tree synchronously on the UI thread.
+        // PixelCopy's device redraw callback does not run on a paused host test looper.
+        return compose.runOnIdle {
+            val decor = compose.activity.window.decorView
+            val location = IntArray(2).also { decor.getLocationInWindow(it) }
+            Bitmap.createBitmap(kotlin.math.ceil(bounds.width).toInt(), kotlin.math.ceil(bounds.height).toInt(), Bitmap.Config.ARGB_8888).also {
+                val canvas = Canvas(it)
+                canvas.translate(location[0] - bounds.left, location[1] - bounds.top)
+                decor.draw(canvas)
+            }
+        }
+    }
     private fun capture(tag: String, filename: String) {
-        val image = compose.onNodeWithTag(tag, useUnmergedTree = true).captureToImage().asAndroidBitmap()
-        val target = File("build/reports/ui-audit/$filename.png").apply { parentFile.mkdirs() }
+        val image = raster(tag)
+        val target = File("build/reports/ui-audit/$filename.png").apply { parentFile?.mkdirs() }
         target.outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
     private fun assertUnclipped(tag: String) {
@@ -57,7 +74,7 @@ class WorkspaceRenderTest {
         val results = mutableListOf<TextLayoutResult>()
         node.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(results) }
         assertTrue("No text layout for $tag", results.isNotEmpty())
-        assertTrue("Text visually clipped for $tag", results.none { it.hasVisualOverflow })
+        assertTrue("Text visually clipped for $tag: " + results.joinToString { "size=${it.size} constraints=${it.layoutInput.constraints} lines=${it.lineCount} text=${it.layoutInput.text}" }, results.none { it.hasVisualOverflow })
     }
     @Test fun configuredIconsAndLongNumbersRenderAcrossWidthFontAndTheme() {
         val group = configuredGroup()
@@ -66,12 +83,11 @@ class WorkspaceRenderTest {
         var dark by mutableStateOf(false)
         var rules by mutableIntStateOf(180547)
         compose.setContent {
-            // Exercise the production theme and card components; no substitute drawing.
             key(dark) {
                 context.getSharedPreferences("hetu",0).edit().putString("appearance",if (dark) "dark" else "light").commit()
                 HetuTheme {
                     CompositionLocalProvider(LocalDensity provides Density(1f,font), LocalHetuMotionEnabled provides false) {
-                        Column(Modifier.width(width.dp).background(LocalHetuTokens.current.pageBackground).padding(16.dp).testTag("audit-root"),
+                        Column(Modifier.width(width.dp).background(LocalHetuTokens.current.pageBackground).verticalScroll(rememberScrollState()).padding(16.dp).testTag("audit-root"),
                             verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text("河图 · 界面回归", style = MaterialTheme.typography.headlineLarge)
                             StrategyGroupCard(group, "[1.0x] A long original strategy selection — 保留完整名称", false, 96, false, onExpand={}, onDelay={})
@@ -89,8 +105,7 @@ class WorkspaceRenderTest {
             compose.onNodeWithTag("configured-icon:${group.name}", useUnmergedTree=true).assertExists()
             compose.onNodeWithTag("rule-count", useUnmergedTree=true).assertTextEquals(if(scale==1.5f) "1,000,000" else "180,547")
             assertUnclipped("rule-count")
-            // Correct configured image, not a guessed flag or a blue-tinted replacement.
-            val icon = compose.onNodeWithTag("configured-icon:${group.name}",true).captureToImage().asAndroidBitmap()
+            val icon = raster("configured-icon:${group.name}")
             assertEquals("Original brand color changed",0xffd32f89.toInt(),icon.getPixel(icon.width/2,icon.height/2))
             val root = compose.onNodeWithTag("audit-root",true).fetchSemanticsNode().boundsInRoot
             val number = compose.onNodeWithTag("rule-count",true).fetchSemanticsNode().boundsInRoot
@@ -157,12 +172,18 @@ class WorkspaceRenderTest {
         compose.setContent { HetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f,1f),LocalHetuDockHeight provides 108.dp) {
             val bottom=hetuContentBottomPadding()
             SideEffect { padding=bottom.value }
-            LazyColumn(Modifier.width(360.dp).height(600.dp),contentPadding=PaddingValues(bottom=bottom)) {
+            LazyColumn(Modifier.width(360.dp).height(600.dp).testTag("dock-list"),contentPadding=PaddingValues(bottom=bottom)) {
                 items(20) { i -> Button(onClick={click++},modifier=Modifier.fillMaxWidth().height(56.dp).testTag("row-$i")) { Text("条目 $i") } }
             }
         } } }
         compose.runOnIdle { assertEquals(124f,padding,.01f) }
-        compose.onNodeWithTag("row-19").performScrollTo().assertIsDisplayed().performClick()
+        // Lazy items outside the viewport do not yet have semantics nodes.
+        compose.onNodeWithTag("dock-list").performScrollToIndex(19)
+        compose.onNodeWithTag("row-19").assertIsDisplayed().performClick()
+        val listBounds = compose.onNodeWithTag("dock-list").fetchSemanticsNode().boundsInRoot
+        val rowBounds = compose.onNodeWithTag("row-19").fetchSemanticsNode().boundsInRoot
+        assertTrue("Last row behind measured dock", rowBounds.bottom <= listBounds.bottom - 108f)
+        capture("dock-list", "last-row-safe-area")
         compose.runOnIdle { assertEquals(1,click) }
     }
 }
