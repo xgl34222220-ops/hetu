@@ -102,6 +102,10 @@ def main():
 RUN="$HETU_TEST_DIR/run"; BASE="$HETU_TEST_DIR"; PIDFILE="$RUN/core.pid"; NET_STATE="$RUN/net.state"
 SESSION="$RUN/session.state"; MODEFILE="$RUN/mode"; LOCK_DIR="$RUN/.txn.lock"; WATCHDOG_PID="$RUN/watchdog.pid"
 IPV6_STATE="$RUN/ipv6.state"; V6_CONF="$HETU_TEST_DIR/conf"
+# Deterministic early-boot run still executes the real collection/repair code.
+if [ -n "${HETU_TEST_UPTIME:-}" ]; then
+  monotonic_seconds(){ MONO_SECONDS="$HETU_TEST_UPTIME"; }
+fi
 root(){ :; }; pidcore(){ return 0; }; core_maybe_alive(){ return 0; }; findcorepid(){ return 1; }; v6supported(){ return 0; }
 '''
   def shell(body,**extra):

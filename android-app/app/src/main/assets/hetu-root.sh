@@ -1157,6 +1157,17 @@ health_restore_table(){
   else H_RC=0; fi
   rm -f "$H_BATCH"; return "$H_RC"
 }
+health_repair_due(){
+  monotonic_seconds || return 1
+  H_NOW="$MONO_SECONDS"
+  # Missing history is NOT a repair at boot time zero. A new session can fail
+  # within the first 30 seconds of boot, especially during network creation.
+  [ -r "$RUN/network-repair-at" ] || return 0
+  read -r H_LAST < "$RUN/network-repair-at" || return 0
+  case "$H_LAST" in ''|*[!0-9]*) return 0;; esac
+  [ "$H_NOW" -ge "$H_LAST" ] || return 0
+  [ $((H_NOW-H_LAST)) -ge 30 ]
+}
 health_repair(){ (
   trap 'release_lock' EXIT
   H_PID="${1:-}"; H_CURRENT=$(cat "$PIDFILE" 2>/dev/null || true)
@@ -1164,11 +1175,10 @@ health_repair(){ (
   health_collect
   [ "$H_STATE" = degraded ] || exit 0
   H_FIRST="$H_REASON"
-  H_NOW=$(cut -d. -f1 /proc/uptime)
-  H_LAST=$(cat "$RUN/network-repair-at" 2>/dev/null || echo 0)
-  case "$H_LAST" in ''|*[!0-9]*) H_LAST=0;; esac
-  [ $((H_NOW-H_LAST)) -ge 30 ] || exit 0
+  health_repair_due || exit 0
   acquire_lock || exit 0
+  # Another repair may have finished while this one waited for the lock.
+  health_repair_due || exit 0
   [ "$H_PID" = "$(cat "$PIDFILE" 2>/dev/null)" ] && health_session_current || exit 0
   sleep 0.25; health_collect
   [ "$H_STATE" = degraded ] && [ "$H_REASON" = "$H_FIRST" ] || exit 0
