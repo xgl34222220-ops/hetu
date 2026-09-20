@@ -22,7 +22,7 @@ public final class ProxyNetworkMatchService extends Service {
     private final ProxyTaskCoalescer evaluations=new ProxyTaskCoalescer(worker,this::evaluateNow);
     private volatile boolean destroyed;
     private long automaticStopGeneration;
-    private long lastPolicyProbeAt=-90000L;
+    private volatile long lastPolicyProbeAt=-90000L;
     private volatile long lastAdblockMetricPoll;
     private volatile int bootRestoreAttempts;
     private ProxyRestoreScheduler bootRestores;
@@ -126,36 +126,18 @@ public final class ProxyNetworkMatchService extends Service {
     private void handleDefaultNetwork(Network n){
         final long generation=networkHandover.available(n);
         if(generation==0L||!prefs.getBoolean("proxyRootWanted",false))return;
-        final long changedAt=System.currentTimeMillis();
         scheduleWorker(()->{
-            if(!networkHandover.isCurrent(n,generation)||!prefs.getBoolean("proxyRootWanted",false))return;
+            if(destroyed||!networkHandover.isCurrent(n,generation)||!prefs.getBoolean("proxyRootWanted",false))return;
             Network active=cm.getActiveNetwork();
             if(active==null||!active.equals(n))return;
-            NetworkCapabilities caps=cm.getNetworkCapabilities(active);
-            if(caps==null||!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))return;
-            try{
-                MihomoControllerClient controller=new MihomoControllerClient(getApplicationContext());
-                JSONArray connections=controller.connections().optJSONArray("connections");
-                int closed=0;
-                for(int i=0;connections!=null&&i<connections.length();i++){
-                    if(!networkHandover.isCurrent(n,generation)||!prefs.getBoolean("proxyRootWanted",false))return;
-                    JSONObject connection=connections.optJSONObject(i);
-                    if(connection==null||!ProxyContinuity.startedBeforeNetworkChange(connection.optString("start",""),changedAt))continue;
-                    String id=connection.optString("id","");
-                    if(id.isEmpty())continue;
-                    controller.closeConnection(id);
-                    closed++;
-                }
-                prefs.edit()
-                        .putLong("proxyLastNetworkSessionReset",System.currentTimeMillis())
-                        .putInt("proxyLastNetworkSessionResetCount",closed)
-                        .putString("proxyLastNetworkSessionResetReason","old-connections-only-after-network-change")
-                        .remove("proxyNetworkSessionResetError")
-                        .apply();
-            }catch(Exception e){
-                prefs.edit().putString("proxyNetworkSessionResetError",
-                        e.getMessage()==null?e.getClass().getSimpleName():e.getMessage()).apply();
-            }
+            long ticket=RootProxyManager.observationTicket();
+            // A new BEST network does not prove that the old one disconnected.
+            // Do not DELETE every connection merely because its start precedes a callback.
+            RootProxyManager.publishObservation(ticket,()->prefs.edit()
+                    .putLong("proxyLastNetworkObservationAt",System.currentTimeMillis())
+                    .putString("proxyLastNetworkObservationReason","default-changed-connections-preserved")
+                    .putBoolean("proxyRootEgressPending",true).apply());
+            lastPolicyProbeAt=-90000L;
         },2500L);
     }
 
@@ -265,12 +247,16 @@ public final class ProxyNetworkMatchService extends Service {
     }
 
     private ProxyContinuity.ProcessState probeCoreState(){
+        final long ticket=RootProxyManager.observationTicket();
+        if(ticket<0L)return ProxyContinuity.ProcessState.UNKNOWN;
         try{
             String command=ProxyContinuity.coreProbeCommand("/data/adb/hetu/run/core.pid","/data/adb/hetu/bin/core");
             RootBridge.Result result=RootBridge.rootShell(getApplicationContext(),command,3500L);
             ProxyContinuity.ProcessState state=ProxyContinuity.processState(result.ok(),result.output);
             if(state!=ProxyContinuity.ProcessState.UNKNOWN){
-                prefs.edit().putBoolean("proxyRootRuntimeRunning",state==ProxyContinuity.ProcessState.ALIVE).apply();
+                if(!RootProxyManager.publishObservation(ticket,()->prefs.edit()
+                        .putBoolean("proxyRootRuntimeRunning",state==ProxyContinuity.ProcessState.ALIVE).apply()))
+                    return ProxyContinuity.ProcessState.UNKNOWN;
             }
             return state;
         }catch(Exception ignored){
@@ -280,7 +266,7 @@ public final class ProxyNetworkMatchService extends Service {
 
     private void maintainProxyRuntime(){
         try{
-            if(!prefs.getBoolean("proxyRootWanted",false))return;
+            if(destroyed||!prefs.getBoolean("proxyRootWanted",false)||RootProxyManager.observationTicket()<0L)return;
             ProxyContinuity.ProcessState state=probeCoreState();
             if(state==ProxyContinuity.ProcessState.UNKNOWN){
                 prefs.edit().putLong("proxyLastUnknownProcessProbeAt",System.currentTimeMillis()).apply();
@@ -320,6 +306,8 @@ public final class ProxyNetworkMatchService extends Service {
 
     private void checkLiveNetworkIntegrity(){
         if(destroyed||!prefs.getBoolean("proxyRootWanted",false))return;
+        final long ticket=RootProxyManager.observationTicket();
+        if(ticket<0L)return;
         try{
             JSONObject health=new RootProxyManager(getApplicationContext()).networkHealth();
             String integrity=health.optString("networkIntegrity","unknown");
@@ -330,14 +318,16 @@ public final class ProxyNetworkMatchService extends Service {
             if("healthy".equals(integrity))editor.remove("proxyAutoRecoveryError");
             else if("degraded".equals(integrity))editor.putString("proxyAutoRecoveryError","核心存活，网络接管不完整："+health.optString("networkFault"));
             // Unknown/old-script observations are never treated as proof of failure.
-            editor.apply();
+            RootProxyManager.publishObservation(ticket,editor::apply);
         }catch(Exception ignored){
-            prefs.edit().putString("proxyNetworkIntegrity","unknown").apply();
+            RootProxyManager.publishObservation(ticket,()->prefs.edit().putString("proxyNetworkIntegrity","unknown").apply());
         }
     }
 
     private void probeEgressIfPending(){
         if(destroyed||!prefs.getBoolean("proxyRootWanted",false))return;
+        final long ticket=RootProxyManager.observationTicket();
+        if(ticket<0L)return;
         Network network=cm==null?null:cm.getActiveNetwork();
         if(network==null)return;
         long now=android.os.SystemClock.elapsedRealtime();
@@ -374,7 +364,7 @@ public final class ProxyNetworkMatchService extends Service {
             edit.putBoolean("proxyRootEgressPending",true).putString("proxyRootEgressProbeLastError",error)
                     .putString("proxyRootEgressWarning","按规则出口暂未验证通过；未重启核心、未改节点："+error);
         }
-        edit.apply();
+        RootProxyManager.publishObservation(ticket,edit::apply);
     }
 
     private void updateAdblockMetrics(){

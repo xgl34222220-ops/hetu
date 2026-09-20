@@ -77,6 +77,7 @@ release_lock(){
 trap 'release_lock' EXIT
 
 acquire_lock(){
+  [ "$LOCK_HELD" != 1 ] || return 0
   mkdir -p "$RUN" || return 1
   N=0
   while ! mkdir "$LOCK_DIR" >/dev/null 2>&1; do
@@ -132,15 +133,23 @@ allocnet(){
 # Only our private chains are removed. One table snapshot avoids three separate
 # iptables processes for every absent current/legacy chain on each start/stop.
 # A failed snapshot is unknown, never evidence that a chain is absent.
+cleanup_snapshot_read(){
+  CS_RAW=$("$1" -t "$2" -S 2>&1); CS_RC=$?
+  if [ "$CS_RC" = 0 ]; then printf '%s\n' "$CS_RAW"; return 0; fi
+  case "$CS_RAW" in
+    *"can't initialize"*"Table does not exist"*) return 0;;
+    *) return 1;;
+  esac
+}
 cleanup_snapshot_begin(){
-  CLEAN4_MANGLE=$(xt4 -t mangle -S 2>/dev/null) || CLEAN4_MANGLE='?'
-  CLEAN4_NAT=$(xt4 -t nat -S 2>/dev/null) || CLEAN4_NAT='?'
-  CLEAN4_FILTER=$(xt4 -t filter -S 2>/dev/null) || CLEAN4_FILTER='?'
+  CLEAN4_MANGLE=$(cleanup_snapshot_read xt4 mangle) || CLEAN4_MANGLE='?'
+  CLEAN4_NAT=$(cleanup_snapshot_read xt4 nat) || CLEAN4_NAT='?'
+  CLEAN4_FILTER=$(cleanup_snapshot_read xt4 filter) || CLEAN4_FILTER='?'
   CLEAN6_MANGLE='?'; CLEAN6_NAT='?'; CLEAN6_FILTER='?'
   if has ip6tables; then
-    CLEAN6_MANGLE=$(xt6 -t mangle -S 2>/dev/null) || CLEAN6_MANGLE='?'
-    CLEAN6_NAT=$(xt6 -t nat -S 2>/dev/null) || CLEAN6_NAT='?'
-    CLEAN6_FILTER=$(xt6 -t filter -S 2>/dev/null) || CLEAN6_FILTER='?'
+    CLEAN6_MANGLE=$(cleanup_snapshot_read xt6 mangle) || CLEAN6_MANGLE='?'
+    CLEAN6_NAT=$(cleanup_snapshot_read xt6 nat) || CLEAN6_NAT='?'
+    CLEAN6_FILTER=$(cleanup_snapshot_read xt6 filter) || CLEAN6_FILTER='?'
   fi
   CLEAN_SNAPSHOT_ACTIVE=1
 }
@@ -485,7 +494,7 @@ install_disabled_dns6(){
 
 preflight(){
   M="$1"; TP="$2"; RP="$3"; V6="$4"; TCP="$5"; UDP="$6"; DNS="$7"; QUIC="$8"; DP="$9"; CP="${10}"; SCOPE="${11}"; UIDS="${12}"; SHARE="${13}"; KILL="${14}"; CIDRS="${15}"; IFACES="${16}"; DIRECT_UIDS="${17}"
-  root; mode "$M" || fail "运行模式无效"; ipv6mode "$V6" || fail "IPv6 模式无效"; dnsmode "$DNS" || fail "DNS 劫持模式无效"; scope "$SCOPE" || fail "应用范围无效"
+  root; acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"; mode "$M" || fail "运行模式无效"; ipv6mode "$V6" || fail "IPv6 模式无效"; dnsmode "$DNS" || fail "DNS 劫持模式无效"; scope "$SCOPE" || fail "应用范围无效"
   bool "$TCP" || fail "TCP 开关无效"; bool "$UDP" || fail "UDP 开关无效"; bool "$QUIC" || fail "QUIC 开关无效"; bool "$SHARE" || fail "共享网络开关无效"; bool "$KILL" || fail "Kill Switch 开关无效"
   port "$DP" || fail "DNS 监听端口无效"; port "$CP" || fail "控制接口端口无效"; has ip || fail "系统缺少 ip 命令"; has iptables || fail "系统缺少 iptables"
   split_safe_uids "$UIDS" || fail "应用 UID 列表无效"; split_safe_uids "$DIRECT_UIDS" || fail "DIRECT UID 列表无效"; split_safe_cidrs "$CIDRS" || fail "CIDR 绕过列表无效"; split_safe_ifaces "$IFACES" || fail "接口绕过列表无效"
@@ -697,14 +706,41 @@ install_kill6(){
 
 validatecfg(){ BIN="$1"; CFG="$2"; : > "$CHECKLOG"; "$BIN" -t -d "$RUN" -f "$CFG" >>"$CHECKLOG" 2>&1; }
 hexport(){ printf '%04X' "$1" 2>/dev/null; }
-tcp_listen(){ P="$1"; if has ss && ss -lnt 2>/dev/null | grep -Eq "[:.]${P}([[:space:]]|$)"; then return 0; fi; if has netstat && netstat -lnt 2>/dev/null | grep -Eq "[:.]${P}([[:space:]]|$)"; then return 0; fi; H=$(hexport "$P") || return 1; awk -v x=":$H" '$2 ~ x"$" && $4=="0A" {found=1} END{exit(found?0:1)}' /proc/net/tcp /proc/net/tcp6 2>/dev/null; }
-udp_listen(){ P="$1"; if has ss && ss -lnu 2>/dev/null | grep -Eq "[:.]${P}([[:space:]]|$)"; then return 0; fi; if has netstat && netstat -lnu 2>/dev/null | grep -Eq "[:.]${P}([[:space:]]|$)"; then return 0; fi; H=$(hexport "$P") || return 1; awk -v x=":$H" '$2 ~ x"$" {found=1} END{exit(found?0:1)}' /proc/net/udp /proc/net/udp6 2>/dev/null; }
+# One ss invocation per readiness/port-check sample. /proc is a bounded fallback.
+LISTEN_SNAPSHOT_VALID=0
+LISTEN_PORTS=''
+listen_snapshot(){
+  LISTEN_SNAPSHOT_VALID=0; LISTEN_PORTS=''
+  if has ss; then
+    LS_RAW=$(ss -lnut 2>/dev/null); LS_RC=$?
+    if [ "$LS_RC" = 0 ]; then
+      LISTEN_PORTS=$(printf '%s\n' "$LS_RAW" | awk '
+        ($1=="tcp" || $1=="udp" || $1=="tcp6" || $1=="udp6") && NF>=5 {
+          proto=substr($1,1,3); n=split($5,a,":"); p=a[n];
+          if(p ~ /^[0-9]+$/) printf " %s:%s ",proto,p
+        }')
+      LISTEN_SNAPSHOT_VALID=1; return 0
+    fi
+  fi
+  [ -r /proc/net/tcp ] && [ -r /proc/net/udp ] || return 1
+  LISTEN_PORTS=$(awk '
+    function dec(h, i,n,c) {n=0; for(i=1;i<=length(h);i++){c=index("0123456789ABCDEF",toupper(substr(h,i,1)))-1; if(c<0)return -1; n=n*16+c} return n}
+    FNR>1 && (FILENAME ~ /udp/ || $4=="0A") {
+      n=split($2,a,":");p=dec(a[n]);if(p>=0)printf " %s:%s ",(FILENAME ~ /udp/?"udp":"tcp"),p
+    }' /proc/net/tcp /proc/net/tcp6 /proc/net/udp /proc/net/udp6 2>/dev/null) || return 1
+  LISTEN_SNAPSHOT_VALID=1
+}
+tcp_listen(){ [ "$LISTEN_SNAPSHOT_VALID" = 1 ] || listen_snapshot || return 1; case "$LISTEN_PORTS" in *" tcp:$1 "*) return 0;; *) return 1;; esac; }
+udp_listen(){ [ "$LISTEN_SNAPSHOT_VALID" = 1 ] || listen_snapshot || return 1; case "$LISTEN_PORTS" in *" udp:$1 "*) return 0;; *) return 1;; esac; }
+
 ready(){
+  listen_snapshot || return 1
   PID="$1"; M="$2"; TP="$3"; RP="$4"; TCP="$5"; UDP="$6"; DNS="$7"; DP="$8"; CP="$9"; core_maybe_alive "$PID" && kill -0 "$PID" >/dev/null 2>&1 || return 1; tcp_listen "$CP" || return 1
   case "$M" in tproxy) [ "$TCP" = 0 ] || tcp_listen "$TP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; redirect) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1;; enhance) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; tun|ebpf) ip link show hetu0 >/dev/null 2>&1 || return 1;; esac
   if [ "$DNS" = tproxy ] || [ "$DNS" = redirect ]; then tcp_listen "$DP" || return 1; udp_listen "$DP" || return 1; fi; return 0
 }
 check_start_ports(){
+  listen_snapshot || fail "无法读取端口状态，未盲目启动核心"
   M="$1"; TP="$2"; RP="$3"; TCP="$4"; UDP="$5"; DNS="$6"; DP="$7"; CP="$8"
   tcp_listen "$CP" && fail "控制接口端口 $CP 已被其他程序占用，请关闭冲突进程后重试"
   case "$M" in
@@ -726,21 +762,24 @@ check_start_ports(){
   fi
 }
 
+monotonic_seconds(){
+  read -r MONO_RAW MONO_UNUSED < /proc/uptime || return 1
+  MONO_SECONDS=${MONO_RAW%%.*}
+  case "$MONO_SECONDS" in ''|*[!0-9]*) return 1;; esac
+}
 wait_ready(){
   PID="$1"; M="$2"; TP="$3"; RP="$4"; TCP="$5"; UDP="$6"; DNS="$7"; DP="$8"; CP="$9"
-  # A real user config may have dozens of remote proxy/rule providers. On the first
-  # run inside Hetu's private HomeDir their caches are cold; Mihomo keeps the process
-  # alive while initial configuration is still loading. Do not mistake that for a dead
-  # listener after only 8 seconds. Keep network rules detached until every required
-  # listener is actually ready, so a slow cold start cannot black-hole traffic.
-  N=0
-  while [ "$N" -lt 900 ]; do
+  monotonic_seconds || return 3
+  READY_DEADLINE=$((MONO_SECONDS+90))
+  # 900 sleeps did NOT mean 90s: every old iteration performed several process
+  # launches and socket queries. The outer timeout could kill startup before rollback.
+  while :; do
     ready "$PID" "$M" "$TP" "$RP" "$TCP" "$UDP" "$DNS" "$DP" "$CP" && return 0
     core_maybe_alive "$PID" && kill -0 "$PID" >/dev/null 2>&1 || return 2
+    monotonic_seconds || return 3
+    [ "$MONO_SECONDS" -lt "$READY_DEADLINE" ] || return 3
     sleep 0.1
-    N=$((N+1))
   done
-  return 3
 }
 
 write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$7"; CP="$8"; DUIDS="$9"; { printf 'MODE=%s\n' "$M"; printf 'IPV6=%s\n' "$V6"; printf 'DNS=%s\n' "$DNS"; printf 'DNS_PORT=%s\n' "$DP"; printf 'APP_SCOPE=%s\n' "$S"; printf 'SHARE=%s\n' "$SHARE"; printf 'KILL=%s\n' "$KILL"; printf 'CONTROLLER_PORT=%s\n' "$CP"; printf 'DIRECT_UIDS=%s\n' "$DUIDS";
@@ -770,6 +809,7 @@ start_watchdog(){ COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS=
 start(){
   START_BIN="$1"; START_CFG="$2"; START_MODE="$3"; START_TP="$4"; START_RP="$5"; START_V6="$6"; START_TCP="$7"; START_UDP="$8"; START_DNS="$9"; START_QUIC="${10}"; START_DP="${11}"; START_CP="${12}"; START_SCOPE="${13}"; START_UIDS="${14}"; START_SHARE="${15}"; START_KILL="${16}"; START_CIDRS="${17}"; START_IFACES="${18}"; START_DIRECT_UIDS="${19}"; START_PREVALIDATED="${20:-0}"; START_FAST_CAPS="${21:-0}"
   mkdir -p "$RUN" || fail "无法创建运行目录"; : > "$START_TIMING"
+  acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
   rm -f "$START_ERROR"; start_stage "preflight"
   if [ "$START_FAST_CAPS" != 1 ]; then
     preflight "$START_MODE" "$START_TP" "$START_RP" "$START_V6" "$START_TCP" "$START_UDP" "$START_DNS" "$START_QUIC" "$START_DP" "$START_CP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_KILL" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" >/dev/null

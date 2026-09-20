@@ -25,7 +25,9 @@ final class RootProxyManager {
     private static final String LEGACY_ROOT="/data/adb/bichen/proxy";
     private static final String LEGACY_MODULE="/data/adb/modules/bichen";
     private static final String LEGACY_MODULE_UPDATE="/data/adb/modules_update/bichen";
-    private static final ReentrantLock CONTROL_LOCK=new ReentrantLock(true);
+    private static final ProxyControlEpoch CONTROL_LOCK=new ProxyControlEpoch();
+    static long observationTicket(){return CONTROL_LOCK.observe();}
+    static boolean publishObservation(long ticket,Runnable publish){return CONTROL_LOCK.publish(ticket,publish);}
     private final Context context;
     private final SharedPreferences prefs;
     private final ProxyCoreStore cores;
@@ -446,7 +448,7 @@ final class RootProxyManager {
         }finally{CONTROL_LOCK.unlock();}
     }
     JSONObject startIfWanted(ProxyRuntimeProfile profile)throws Exception{
-        CONTROL_LOCK.lock();
+        if(!CONTROL_LOCK.tryLock())return new JSONObject().put("ok",true).put("cancelled",true).put("reason","control-busy");
         try{
             if(!prefs.getBoolean("proxyRootWanted",false))
                 return new JSONObject().put("ok",true).put("running",false).put("cancelled",true);
@@ -755,7 +757,7 @@ final class RootProxyManager {
                 "proxyRootRuntimeRunning","proxyRootRuntimeRefreshPending","proxyRootBootError",
                 "proxyRootBootRestoreSuccessAt","proxyLastUnknownProcessProbeAt","proxyAutoRecoveryAttempt",
                 "proxyAutoRecoverySuccess","proxyAutoRecoveryError","proxyLastNetworkSessionReset",
-                "proxyLastNetworkSessionResetCount","proxyLastNetworkSessionResetReason","proxyNetworkSessionResetError",
+                "proxyLastNetworkSessionResetCount","proxyLastNetworkSessionResetReason","proxyLastNetworkObservationAt","proxyLastNetworkObservationReason","proxyNetworkSessionResetError",
                 "proxyLastAutoStopAt","proxyLastAutoStopReason","proxyAdblockLastRevision","proxyAdblockLastError",
                 "proxyAdblockHotReloadAt","proxyAdblockLastHitAt","proxyRootEgressProbeLastError",
                 "proxyNetworkIntegrity","proxyNetworkFault","proxyNetworkCheckedAt","proxyPolicyEgressState","proxyPolicyEgressCheckedAt"}){
