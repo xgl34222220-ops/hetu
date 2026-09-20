@@ -52,7 +52,7 @@ internal fun instrumentUploadShare(up: Long, down: Long): Float? {
     return (up.toDouble() / (up.toDouble() + down.toDouble())).toFloat().coerceIn(0f, 1f)
 }
 
-/** Shared slot geometry also supplies row height without an intrinsic remeasure. */
+/** One geometry source for both cell contents and their enclosing row. */
 private object InstrumentSlots {
     val header = 22.sp
     val value = 26.sp
@@ -60,9 +60,13 @@ private object InstrumentSlots {
     val gap = 6.dp
     val padding = 12.dp
     val rail = 2.dp
-    @Composable fun height(): Dp = with(LocalDensity.current) {
-        header.toDp() + value.toDp() + support.toDp()
-    } + gap * 3 + padding * 2 + rail
+    @Composable fun fontHeight(size: TextUnit): Dp {
+        val density = LocalDensity.current
+        // Keep room for the full line even when platform text scaling and the
+        // sp-to-dp adapter differ. Never compress a 1.5x line into a smaller slot.
+        return maxOf(with(density) { size.toDp() }, (size.value * density.fontScale).dp)
+    }
+    @Composable fun height(): Dp = fontHeight(header) + fontHeight(value) + fontHeight(support) + gap * 3 + padding * 2 + rail
 }
 
 /** The four quadrants share this exact layout, even for loading/unknown/long data. */
@@ -70,10 +74,9 @@ private object InstrumentSlots {
 private fun AlignedInstrumentCell(reading: InstrumentReading, modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null, onLongClick: (() -> Unit)? = null) {
     val t = LocalHetuTokens.current
-    val density = LocalDensity.current
-    val headerHeight = with(density) { InstrumentSlots.header.toDp() }
-    val valueHeight = with(density) { InstrumentSlots.value.toDp() }
-    val supportingHeight = with(density) { InstrumentSlots.support.toDp() }
+    val headerHeight = InstrumentSlots.fontHeight(InstrumentSlots.header)
+    val valueHeight = InstrumentSlots.fontHeight(InstrumentSlots.value)
+    val supportingHeight = InstrumentSlots.fontHeight(InstrumentSlots.support)
     @OptIn(ExperimentalFoundationApi::class)
     val action = if (onClick != null) Modifier.combinedClickable(
         role = Role.Button, onClick = onClick, onLongClick = onLongClick,
