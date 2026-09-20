@@ -142,8 +142,8 @@ jobs:
           grep -q 'System.loadLibrary("hetu_core")' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoNative.java
           grep -q 'Java_io_github_xgl34222220_hetu_MihomoNative_invoke' native/bridge/jni_android.c
           grep -q 'Java_io_github_xgl34222220_hetu_preview_MihomoNative_invoke' native/bridge/jni_android.c
-          grep -q 'versionName = "0.4.0-test.89"' android-app/app/build.gradle.kts
-          grep -q 'versionCode = 489' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.4.0-test.90"' android-app/app/build.gradle.kts
+          grep -q 'versionCode = 490' android-app/app/build.gradle.kts
           test -f android-app/app/src/main/java/io/github/xgl34222220/hetu/LegacyAppMigrator.java
           grep -q 'LegacyAppMigrator.migrateIfNeeded(app)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
           grep -q 'controller.restart { operation = it }' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
@@ -220,7 +220,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: MetaCubeX/mihomo
-          ref: ac017cdd246ce8bd547653d927e7bf77d7ee73d5
+          ref: v1.19.31
           path: .upstream
 
       - uses: actions/setup-go@v5
@@ -258,6 +258,9 @@ jobs:
           python3 tools/prepare_root_mihomo.py .upstream
           cp -r native/bridge .upstream/hetubridge
           cd .upstream
+          MIHOMO_VERSION="1.19.31"
+          MIHOMO_BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          MIHOMO_ROOT_LDFLAGS="-s -w -X github.com/metacubex/mihomo/constant.Version=$MIHOMO_VERSION -X github.com/metacubex/mihomo/constant.BuildTime=$MIHOMO_BUILD_TIME -extldflags=-Wl,-z,max-page-size=16384"
           go test -v ./component/keepalive
           HETU_RUNTIME_FIXTURE="$RUNNER_TEMP/hetu-continuity.yaml" go test -tags with_gvisor,hetu_root -v ./hetubridge ./component/keepalive
           NDK="$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin"
@@ -273,11 +276,11 @@ jobs:
             -o ../android-app/app/src/main/jniLibs/x86_64/libhetu_core.so ./hetubridge
           CGO_ENABLED=1 GOOS=android GOARCH=arm64 CC="$NDK/aarch64-linux-android26-clang" \
             go build -tags with_gvisor,hetu_root -trimpath \
-            -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' \
+            -ldflags="$MIHOMO_ROOT_LDFLAGS" \
             -o ../android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo .
           CGO_ENABLED=1 GOOS=android GOARCH=amd64 CC="$NDK/x86_64-linux-android26-clang" \
             go build -tags with_gvisor,hetu_root -trimpath \
-            -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' \
+            -ldflags="$MIHOMO_ROOT_LDFLAGS" \
             -o ../android-app/app/src/main/assets/mihomo-root/x86_64/mihomo .
           cp LICENSE ../android-app/app/src/main/assets/MIHOMO-LICENSE
           git rev-parse HEAD > ../android-app/app/src/main/assets/mihomo-revision.txt

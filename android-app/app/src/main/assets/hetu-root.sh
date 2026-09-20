@@ -251,17 +251,33 @@ stopwatchdog(){
   rm -f "$WATCHDOG_PID"
 }
 stopcore(){
-  if [ -f "$PIDFILE" ]; then P=$(cat "$PIDFILE" 2>/dev/null || true); case "$P" in ''|*[!0-9]*) ;; *)
-    if pidcore "$P" && kill -0 "$P" >/dev/null 2>&1; then kill "$P" >/dev/null 2>&1 || true; N=0; while kill -0 "$P" >/dev/null 2>&1 && [ "$N" -lt 20 ]; do sleep 0.1; N=$((N+1)); done; if pidcore "$P" && kill -0 "$P" >/dev/null 2>&1; then kill -9 "$P" >/dev/null 2>&1 || true; fi; fi;; esac; fi
-  # Recover orphaned Hetu cores left by a killed/reinstalled app. Match the private
-  # absolute path only; do not touch Mihomo/Clash processes owned by other apps.
+  # Terminate every Hetu-private core in parallel. Older revisions waited up to
+  # two seconds for the tracked PID and then another two seconds for each orphan,
+  # which could turn a restart into an 8-10 second stall.
+  STOP_PIDS=""
+  if [ -f "$PIDFILE" ]; then
+    P=$(cat "$PIDFILE" 2>/dev/null || true)
+    case "$P" in ''|*[!0-9]*) ;; *) if pidcore "$P" && kill -0 "$P" >/dev/null 2>&1; then STOP_PIDS="$P"; fi;; esac
+  fi
+  # Recover orphaned Hetu cores left by a killed/reinstalled app. Match only the
+  # private executable path so unrelated Mihomo/Clash processes are untouched.
   for PROC in /proc/[0-9]*; do
-    OPID=${PROC#/proc/}; [ "$OPID" != "$$" ] || continue
-    if pidcore "$OPID"; then
-      kill "$OPID" >/dev/null 2>&1 || true
-      N=0; while kill -0 "$OPID" >/dev/null 2>&1 && [ "$N" -lt 20 ]; do sleep 0.1; N=$((N+1)); done
-      if pidcore "$OPID" && kill -0 "$OPID" >/dev/null 2>&1; then kill -9 "$OPID" >/dev/null 2>&1 || true; fi
+    OPID=${PROC#/proc/}; [ "$OPID" != "$" ] || continue
+    if pidcore "$OPID" && kill -0 "$OPID" >/dev/null 2>&1; then
+      case " $STOP_PIDS " in *" $OPID "*) ;; *) STOP_PIDS="$STOP_PIDS $OPID";; esac
     fi
+  done
+  for P in $STOP_PIDS; do kill "$P" >/dev/null 2>&1 || true; done
+  N=0
+  while [ "$N" -lt 10 ]; do
+    STOP_ALIVE=0
+    for P in $STOP_PIDS; do if pidcore "$P" && kill -0 "$P" >/dev/null 2>&1; then STOP_ALIVE=1; break; fi; done
+    [ "$STOP_ALIVE" = 1 ] || break
+    sleep 0.05
+    N=$((N+1))
+  done
+  for P in $STOP_PIDS; do
+    if pidcore "$P" && kill -0 "$P" >/dev/null 2>&1; then kill -9 "$P" >/dev/null 2>&1 || true; fi
   done
   rm -f "$PIDFILE" "$MODEFILE"
 }
@@ -478,7 +494,9 @@ preflight(){
   fi
 
   probe_ingress "$M" "$TP" "$RP" "$V6" "$TCP" "$UDP" "$DNS" "$QUIC" "$KILL" "$DP"
-  if [ "$V6" = disable ] && v6supported; then TESTED=0; for P in "$V6_CONF"/*/disable_ipv6; do [ -e "$P" ] || continue; [ -w "$P" ] || fail "系统不允许完整禁用 IPv6"; TESTED=1; done; [ "$TESTED" = 1 ] || fail "系统不允许临时禁用 IPv6"; fi
+  # Device-wide sysctl writes are best-effort on Android. Some OEM/netd stacks
+  # keep cellular/IMS IPv6 enabled or recreate it after handover. The ip6tables
+  # disable guard above is the authoritative no-leak requirement.
   ok "Root 代理预检通过"
 }
 
@@ -753,7 +771,7 @@ start(){
   start_stage "cleanup-network"
   stopwatchdog; cleanup; restorev6 || fail "上次 IPv6 状态尚未恢复，请重试停止后再启动"
   start_stage "stop-old-core"
-  stopcore; sleep 0.20; rm -f "$CRASH_STATE" "$SESSION"
+  stopcore; rm -f "$CRASH_STATE" "$SESSION"
   start_stage "check-ports"
   check_start_ports "$START_MODE" "$START_TP" "$START_RP" "$START_TCP" "$START_UDP" "$START_DNS" "$START_DP" "$START_CP"
   markused "$BYPASS_MARK" && fail "安全出站 mark 已被其他网络规则占用，未接管网络"
@@ -761,7 +779,10 @@ start(){
   if [ "$NEED_TP" = 1 ]; then allocnet || { cleanup; fail "找不到安全的 fwmark/路由表/规则优先级，已保持直连"; }; fi
   if [ "$START_V6" = disable ] && v6supported; then
     install_v6_disable "$START_SHARE" || { cleanup; fail "IPv6 禁用保护安装失败，未启动代理"; }
-    disablev6 || { cleanup; fail "禁用系统 IPv6 失败，已尝试恢复原状态"; }
+    # The firewall guard is already active, so a vendor kernel/netd refusing the
+    # sysctl must not tear down a healthy proxy. Keep trying via the watchdog
+    # when a recovery journal exists; otherwise run safely in guard-only mode.
+    disablev6 || true
   fi
 
   mkdir -p "$RUN/rules" "$RUN/proxy_provider" "$RUN/ruleset" "$RUN/ui" || { cleanup; restorev6; rm -f "$SESSION"; fail "无法创建 Mihomo 运行缓存目录"; }
@@ -915,9 +936,9 @@ status(){
     disable)
       if v6supported; then
         v6_disable_guard_ready "$SHAREV" && DISABLE6=true
-        # The guard prevents leaks while netd/sysctls are being reconciled, but
-        # do not report the requested device-wide disable as healthy yet.
-        IPV6OK=false; [ "$V6OFF" = true ] && [ "$DISABLE6" = true ] && IPV6OK=true
+        # The firewall guard is the effective no-leak state. V6OFF separately
+        # reports whether Android also accepted the best-effort sysctl shutdown.
+        IPV6OK=$DISABLE6
       else DISABLE6=true; V6OFF=true; fi
       ;;
     bypass) IPV6OK=true;;

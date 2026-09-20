@@ -3976,8 +3976,13 @@ private fun RefSettings(state: ProxyComposeState, operation: String, onApplySett
                         if (state.effectiveIpv6 == "disable" || state.effectiveIpv6 == "strict") {
                             Text(
                                 buildString {
-                                    if (state.effectiveIpv6 == "disable") append(if (state.ipv6Disabled) "系统 IPv6 已禁用 · " else "系统禁用状态待确认 · ")
-                                    append(if (state.ipv6ProtectionActive) "IPv6 外连已拦截" else "外连保护状态待确认")
+                                    if (state.effectiveIpv6 == "disable") {
+                                        if (state.ipv6ProtectionActive) append("IPv6 外联已禁用")
+                                        else append("IPv6 外联保护待确认")
+                                        append(if (state.ipv6Disabled) " · 系统协议栈已关闭" else " · 系统接口可能保留 IPv6 地址")
+                                    } else {
+                                        append(if (state.ipv6ProtectionActive) "IPv6 外联已拦截" else "外联保护状态待确认")
+                                    }
                                 },
                                 color = if (state.ipv6ProtectionActive) t.success else t.warning,
                                 style = MaterialTheme.typography.bodySmall,

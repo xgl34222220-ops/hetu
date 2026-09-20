@@ -224,13 +224,15 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
                         statusError.isNotBlank() -> statusError
                         !running -> "代理未运行，设置将在下次启动时应用"
                         effectiveIpv6.isBlank() -> "正在核对当前生效策略…"
-                        effectiveIpv6 == "disable" && runtimeStatus?.optBoolean("ipv6DisabledByHetu", false) == true && runtimeStatus?.optBoolean("ipv6DisableGuard", false) == true -> "本机 IPv6 已禁用，防泄漏规则已就绪"
-                        effectiveIpv6 == "disable" -> "IPv6 禁用尚未完整生效，请查看诊断"
+                        effectiveIpv6 == "disable" && runtimeStatus?.optBoolean("ipv6DisableGuard", false) == true ->
+                            if (runtimeStatus?.optBoolean("ipv6DisabledByHetu", false) == true) "IPv6 外联已禁用，系统协议栈也已关闭"
+                            else "IPv6 外联已禁用；系统接口可能仍保留 IPv6 地址"
+                        effectiveIpv6 == "disable" -> "IPv6 防泄漏保护尚未生效，请查看诊断"
                         else -> "当前生效：${ProxyRuntimeSettings.ipv6Label(effectiveIpv6)}"
                     }
                     Text(actual, color = t.textSecondary, fontSize = 13.sp, lineHeight = 19.sp)
                     if (profile.ipv6 == ProxyRuntimeProfile.Ipv6.DISABLE) {
-                        Text("这里控制手机自身的 IPv6。检测网站显示的代理服务器出口 IPv6，需要在节点端限制。", color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+                        Text("禁用模式以 IPv6 外联防泄漏规则为准。部分 ROM 会为蜂窝/IMS 保留 IPv6 地址；只要上方显示“IPv6 外联已禁用”，本机就不会通过 IPv6 绕过。检测网站若显示代理节点的出口 IPv6，则需要在节点端限制。", color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
                     }
                     if (settingsPending) {
                         Text("部分设置尚未应用，重启会重新建立现有连接。", color = MaterialTheme.colorScheme.primary, fontSize = 13.sp, lineHeight = 19.sp)
