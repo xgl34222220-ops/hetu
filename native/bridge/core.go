@@ -26,10 +26,10 @@ import (
 	"github.com/metacubex/mihomo/tunnel"
 	"github.com/metacubex/mihomo/tunnel/statistic"
 	"golang.org/x/sys/unix"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
-const coreRevision = "ac017cdd246ce8bd547653d927e7bf77d7ee73d5"
+const coreRevision = "ab405bad5beeeac8b003bb01f60f134f6df54471"
 const filterName = "__hetu_exact_filter"
 const dnsGuardName = "__hetu_dns_guard"
 const filterSubRule = "__hetu_filter_branch"
