@@ -1,0 +1,42 @@
+name: Integrate crystal material test96
+on:
+  push:
+    branches: [feature/hetu-rebrand-root-app]
+    paths: ['maintenance/crystal96/**', '.github/workflows/apply-crystal96.yml']
+permissions:
+  contents: write
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply guarded presentation edits
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC=android-app/app/src/main/java/io/github/xgl34222220/hetu
+          TEST=android-app/app/src/test/java/io/github/xgl34222220/hetu
+          cp maintenance/crystal96/CrystalMaterial.kt "$SRC/ui/CrystalMaterial.kt"
+          cp maintenance/crystal96/CrystalWorkspace.kt "$SRC/CrystalWorkspace.kt"
+          cp maintenance/crystal96/CrystalMaterialRenderTest.kt "$TEST/CrystalMaterialRenderTest.kt"
+          cp maintenance/crystal96/apply_crystal_test96.py tools/apply_crystal_test96.py
+          python3 tools/apply_crystal_test96.py
+          python3 tools/test_ui_audit_invariants.py
+          git diff --check
+          rm tools/apply_crystal_test96.py
+          rm -r maintenance/crystal96
+          rm .github/workflows/apply-crystal96.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add android-app .github/workflows maintenance
+          git commit -m 'ui: unify crystal surfaces, frosted popover and numeric typography (test.96)'
+          git push origin HEAD:feature/hetu-rebrand-root-app
+          mkdir -p "$RUNNER_TEMP/hetu96-source"
+          git archive --format=tar HEAD | gzip > "$RUNNER_TEMP/hetu96-source/source.tar.gz"
+          git rev-parse HEAD > "$RUNNER_TEMP/hetu96-source/commit.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Hetu-test96-source
+          path: ${{ runner.temp }}/hetu96-source/
+          if-no-files-found: error
+          retention-days: 3
