@@ -128,7 +128,7 @@ jobs:
           ! grep -Fq 'modifier = Modifier.background(ticketBrush, ticketShape)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
           grep -Fq 'val yamlCardBrush = if (dark)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
           grep -Fq 'Color(0xFFE2E8F0).copy(alpha = .62f)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          grep -Fq '+ 94.dp' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
+          ! grep -Fq '+ 94.dp' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           grep -Fq 'Modifier.fillMaxSize().statusBarsPadding()' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           grep -Fq 'Modifier.fillMaxSize().statusBarsPadding()' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
           ! grep -Fq 'Box(Modifier.statusBarsPadding().padding(top = 14.dp, bottom = 4.dp))' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
@@ -190,7 +190,7 @@ jobs:
           grep -q 'ModalBottomSheet(' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
           ! grep -q 'AlertDialog(' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
           grep -Fq 'key = { "${tab.name}-provider-${it.name}" }' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq '.height(96.dp)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
+          grep -Fq '.height(82.dp)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           grep -Fq 'Color(0xFF2563EB).copy(alpha = .08f)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
           ! grep -Fq 'Color(0xFFEFF6FF).copy(alpha = .90f)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
           grep -Fq 'liveProviders by remember' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
@@ -214,7 +214,7 @@ jobs:
           grep -Fq 'yamlEditor?.undo()' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
           grep -Fq 'yamlEditor?.redo()' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
           ! grep -Fq 'BasicTextField(' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          grep -Fq 'RefGroupCornerVisual(group, Modifier.size(32.dp))' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
+          ! grep -Fq 'RefGroupCornerVisual(group, Modifier.size(32.dp))' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
           grep -Fq 'val activeLens = false' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
           grep -Fq '.background(t.pageBackground)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceFileManagerActivity.kt
           grep -Fq '.background(tokens.pageBackground)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreActivity.kt
