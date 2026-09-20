@@ -1,0 +1,31 @@
+name: Liquid restoration workspace
+on:
+  push:
+    branches: [fix/hetu-liquid-restore-95]
+    paths: [.github/workflows/liquid-restore-workspace.yml]
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: a10cc03ae261808e01347ae666001a43a6754fd0
+      - name: Archive exact source and signing tools (no private credentials)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/liquid-workspace"
+          git archive --format=zip HEAD -o "$RUNNER_TEMP/liquid-workspace/source.zip"
+          BT=$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -1)
+          test -x "$BT/apksigner"
+          tar -czf "$RUNNER_TEMP/liquid-workspace/build-tools.tar.gz" -C "$BT" .
+          git rev-parse HEAD > "$RUNNER_TEMP/liquid-workspace/source-commit.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Liquid-Workspace
+          path: ${{ runner.temp }}/liquid-workspace/
+          retention-days: 2
+          if-no-files-found: error
