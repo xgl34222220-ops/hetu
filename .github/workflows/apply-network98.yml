@@ -1,0 +1,30 @@
+name: Integrate network reliability test98
+on:
+  push:
+    branches: [feature/hetu-rebrand-root-app]
+    paths: ['maintenance/network98/**', '.github/workflows/apply-network98.yml']
+permissions:
+  contents: write
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify and apply network-only patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 maintenance/network98/apply.py
+          sh -n android-app/app/src/main/assets/hetu-root.sh
+          python3 tools/test_ui_audit_invariants.py
+          python3 tools/test_network_integrity.py
+          python3 tools/test_root_ipv6.py
+          git diff --check
+          test -z "$(git diff --name-only -- .github)"
+          rm -r maintenance/network98
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add android-app tools/test_root_ipv6.py tools/test_network_integrity.py tools/test_network_namespace.py tests/ui-runtime-baseline.json docs/test98-network.md maintenance/network98
+          git commit -m 'fix: audit and repair forwarding in place; preserve Android IPv6 infrastructure (test.98)'
+          git push origin HEAD:feature/hetu-rebrand-root-app
