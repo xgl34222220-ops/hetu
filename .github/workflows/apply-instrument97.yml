@@ -1,0 +1,40 @@
+name: Integrate test97 instruments
+on:
+  push:
+    branches: [feature/hetu-rebrand-root-app]
+    paths: ['maintenance/instrument97/**', '.github/workflows/apply-instrument97.yml']
+permissions:
+  contents: write
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply presentation edits with runtime fence
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC=android-app/app/src/main/java/io/github/xgl34222220/hetu
+          TEST=android-app/app/src/test/java/io/github/xgl34222220/hetu
+          cp maintenance/instrument97/InstrumentWorkspace.kt "$SRC/InstrumentWorkspace.kt"
+          cp maintenance/instrument97/InstrumentRenderTest.kt "$TEST/InstrumentRenderTest.kt"
+          printf 'package io.github.xgl34222220.hetu\n\n/** Preserve exact ordering, including duplicate rules. */\ninternal fun instrumentRuleBatches(rules: List<ProxyRuleUi>): List<List<ProxyRuleUi>> = rules.chunked(15)\n' > "$SRC/InstrumentRules.kt"
+          cp maintenance/instrument97/apply97.py tools/apply97.py
+          python3 tools/apply97.py
+          rm tools/apply97.py
+          python3 tools/test_ui_audit_invariants.py
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add android-app
+          git commit -m 'ui: independent glass instruments, subscription tickets and icon retry (test.97)'
+          git push origin HEAD:feature/hetu-rebrand-root-app
+          mkdir -p "$RUNNER_TEMP/hetu97-source"
+          git archive --format=tar HEAD | gzip > "$RUNNER_TEMP/hetu97-source/source.tar.gz"
+          git rev-parse HEAD > "$RUNNER_TEMP/hetu97-source/commit.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Hetu-test97-source
+          path: ${{ runner.temp }}/hetu97-source/
+          retention-days: 3
+          if-no-files-found: error
