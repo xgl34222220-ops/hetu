@@ -1,0 +1,28 @@
+name: Apply test95 visual restoration
+on:
+  push:
+    branches: [feature/hetu-rebrand-root-app]
+    paths: [tools/restore_liquid_test95.py]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Apply checked visual source edits
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/restore_liquid_test95.py
+          python3 tools/test_ui_audit_invariants.py
+          git diff --check
+          test -z "$(git diff --name-only -- .github)"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add android-app tools/test_ui_audit_invariants.py
+          git commit -m 'fix: restore liquid group wells and original configured icons (test.95)'
+          git push origin HEAD:feature/hetu-rebrand-root-app
