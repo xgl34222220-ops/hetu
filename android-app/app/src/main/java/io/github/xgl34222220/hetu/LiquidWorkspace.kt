@@ -161,7 +161,7 @@ internal fun LiquidGroupWell(group: ProxyGroupUi, selected: String, delays: Map<
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val shape = RoundedCornerShape(22.dp)
     val well = if (dark) Color(0xFF18212E) else Color(0xFFEEF2F6)
-    Column(Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 10.dp).testTag("sunken-well:${group.name}")
+    Column(Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 16.dp).testTag("sunken-well:${group.name}")
         .clip(shape).background(Brush.verticalGradient(listOf(if (dark) Color(0xFF141C27) else Color(0xFFE8EEF4), well,
             if (dark) Color(0xFF202A37) else Color(0xFFF2F5F8))), shape)
         .border(.7.dp, if (dark) Color.White.copy(alpha = .07f) else Color(0xFFCBD5E1).copy(alpha = .6f), shape)

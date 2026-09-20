@@ -44,6 +44,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.blur
@@ -787,6 +788,7 @@ internal fun RefHome(
                             }
                         }
                     }
+                    EngineThroughput(upRate, downRate)
                     RefHomeActions(state.running, busy, onToggle, onReload, onRestart)
                 }
             }
@@ -1575,7 +1577,7 @@ private fun RefPanel(
                         )
                     }
                 }
-                RefPanelTab.Rules -> itemsIndexed(filteredRules.chunked(15), key = { index, _ -> "${tab.name}-rule-group-$index" }, contentType = { _, _ -> "rule-group" }) { _, batch ->
+                RefPanelTab.Rules -> itemsIndexed(instrumentRuleBatches(filteredRules), key = { index, _ -> "${tab.name}-rule-group-$index" }, contentType = { _, _ -> "rule-group" }) { _, batch ->
                     RefRuleGroupCard(batch)
                 }
                 RefPanelTab.RuleSets -> items(filteredRuleSets, key = { "${tab.name}-ruleset-${it.name}" }, contentType = { "ruleset-row" }) { item ->
@@ -2150,7 +2152,7 @@ private fun RefLeafNodeCard(node: ProxyNodeUi, delay: Long?, modifier: Modifier,
     val scheme = MaterialTheme.colorScheme
     val shape = RoundedCornerShape(14.dp)
     Column(
-        modifier.background(t.cardBackground, shape).border(.7.dp, t.outline.copy(alpha = .45f), shape).clickable(onClick = onClick).padding(11.dp),
+        modifier.crystalMaterial(shape, depth = CrystalDepth.InsetItem).clickable(onClick = onClick).padding(11.dp),
         verticalArrangement = Arrangement.spacedBy(7.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -2304,7 +2306,7 @@ private fun RefTrafficOverview(state: ProxyComposeState) {
 @Composable
 private fun RefRateCard(title: String, value: Long, icon: ImageVector, color: Color, modifier: Modifier) {
     val t = LocalHetuTokens.current
-    Surface(modifier = modifier, shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 1.dp) {
+    Surface(modifier = modifier.crystalMaterial(RoundedCornerShape(22.dp), tint = color), shape = RoundedCornerShape(22.dp), color = Color.Transparent, shadowElevation = 0.dp) {
         Row(
             Modifier.fillMaxWidth().padding(14.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -2315,7 +2317,7 @@ private fun RefRateCard(title: String, value: Long, icon: ImageVector, color: Co
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 Text(title, color = Color(0xFF94A3B8), fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                Text(refSpeed(value), color = t.textPrimary, fontSize = 19.sp, lineHeight = 23.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
+                HetuNumber(refSpeed(value), color = t.textPrimary, style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold))
             }
         }
     }
@@ -2323,32 +2325,7 @@ private fun RefRateCard(title: String, value: Long, icon: ImageVector, color: Co
 
 @Composable
 internal fun RefProviderRow(item: DashboardProviderUi, refreshing: Boolean, success: Boolean, onRefresh: () -> Unit, onClick: () -> Unit) {
-    val t = LocalHetuTokens.current
-    Surface(shape = RoundedCornerShape(18.dp), color = t.cardBackground) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f).heightIn(min = 48.dp).clickable(onClick = onClick), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(item.name, color = t.textPrimary, fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold)
-                    Text("到期 ${refExpireDate(item.expire)}", color = t.textSecondary, fontSize = 12.sp)
-                }
-                IconButton(onClick = onRefresh, enabled = !refreshing, modifier = Modifier.size(48.dp)) {
-                    if (refreshing) HetuBusyIndicator()
-                    else Icon(if (success) Icons.Rounded.CheckCircle else Icons.Rounded.Refresh,
-                        "${item.name} ${if (success) "更新完成" else "更新订阅"}", tint = if (success) t.success else MaterialTheme.colorScheme.primary)
-                }
-            }
-            if (refreshing || success) Text(if (refreshing) "正在更新 ${item.name}" else "${item.name} 更新完成", color = if (success) t.success else t.textSecondary, fontSize = 12.sp)
-            if (item.hasSubscriptionInfo && item.total > 0L) {
-                Text("剩余流量", color = t.textSecondary, fontSize = 12.sp)
-                HetuNumber(refBytes(item.remaining), color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp))
-                HetuReadOnlyProgress(item.ratio)
-                Text("已用 ${refBytes(item.used)} / 总 ${refBytes(item.total)} · 剩余 ${((1f-item.ratio)*100).toInt()}%", color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
-                Text("上传 ${refBytes(item.upload)} · 下载 ${refBytes(item.download)}", color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
-            } else Text("订阅未上报流量信息", color = t.textSecondary, fontSize = 12.sp)
-            Text(refUpdatedAt(item.updatedAt), color = t.textSecondary, fontSize = 12.sp)
-        }
-    }
+    InstrumentSubscriptionTicket(item.name, item, refreshing = refreshing, success = success, onEdit = onClick, onRefresh = onRefresh)
 }
 
 private fun refExpireDays(expire: Long): String {
@@ -2587,21 +2564,13 @@ private fun RefConnectionRow(item: ProxyConnectionUi, onClose: (() -> Unit)?) {
 }
 
 @Composable
-private fun RefRuleGroupCard(items: List<ProxyRuleUi>) {
+internal fun RefRuleGroupCard(items: List<ProxyRuleUi>) {
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val shape = RoundedCornerShape(22.dp)
-    val ruleGlassBrush = if (dark) {
-        Brush.verticalGradient(listOf(Color(0xFF1B2431).copy(alpha = .88f), Color(0xFF151D29).copy(alpha = .82f)))
-    } else {
-        Brush.verticalGradient(listOf(Color.White.copy(alpha = .95f), Color(0xFFF8FAFC).copy(alpha = .85f)))
-    }
     Surface(
-        modifier = Modifier.background(ruleGlassBrush, shape),
-        shape = shape,
-        color = Color.Transparent,
-        border = BorderStroke(.5.dp, if (dark) t.outline.copy(alpha = .32f) else t.pageBackground),
-        shadowElevation = 0.dp,
+        modifier = Modifier.fillMaxWidth().crystalMaterial(shape).testTag("rules-inset-group"),
+        shape = shape, color = Color.Transparent, shadowElevation = 0.dp,
     ) {
         Column(Modifier.fillMaxWidth()) {
             items.forEachIndexed { index, item ->
@@ -2642,7 +2611,7 @@ private fun RefRuleGroupCard(items: List<ProxyRuleUi>) {
                                     lineHeight = 15.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                                    maxLines = if (open) 5 else 1,
+                                    maxLines = if (open) Int.MAX_VALUE else 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
                             }

@@ -343,7 +343,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                                 )
                             }
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                Text("${subscriptionBytes(liveUsed)} / ${subscriptionBytes(liveTotal)}", color = tokens.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                                Text("${subscriptionBytes(liveUsed)} / ${subscriptionBytes(liveTotal)}", color = tokens.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.SansSerif)
                                 Spacer(Modifier.weight(1f))
                                 Text("$liveNodeCount 个节点", color = tokens.textSecondary, fontSize = 11.sp)
                             }
@@ -470,124 +470,15 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                 }
             }
 
-            items(
-                subscriptions,
-                key = { item ->
-                    val provider = liveProviders[item.name] ?: liveProviders.entries.firstOrNull { it.key.equals(item.name, true) }?.value
-                    "sub-${item.name}-${provider?.updatedAt.orEmpty()}-${provider?.upload ?: 0L}-${provider?.download ?: 0L}-${provider?.total ?: 0L}"
-                },
-            ) { item ->
+            items(subscriptions, key = { "sub-${it.name}" }) { item ->
                 val provider = liveProviders[item.name] ?: liveProviders.entries.firstOrNull { it.key.equals(item.name, true) }?.value
-                val host = subscriptionHost(item)
-                val ratio = provider?.takeIf { it.hasSubscriptionInfo && it.total > 0L }?.ratio?.coerceIn(0f, 1f)
-                val remainingPercent = ratio?.let { ((1f - it) * 100f).toInt() }
-                val ticketShape = RoundedCornerShape(22.dp)
-                val ticketBrush = if (dark) {
-                    Brush.verticalGradient(listOf(Color(0xFF1B2431).copy(alpha = .90f), Color(0xFF151D29).copy(alpha = .84f)))
-                } else {
-                    Brush.verticalGradient(listOf(Color.White.copy(alpha = .95f), Color(0xFFF8FAFC).copy(alpha = .85f)))
-                }
-                Box(
-                    Modifier.fillMaxWidth()
-                        .shadow(
-                            8.dp,
-                            ticketShape,
-                            clip = false,
-                            ambientColor = Color(0xFF0F172A).copy(alpha = if (dark) .09f else .028f),
-                            spotColor = Color(0xFF0F172A).copy(alpha = if (dark) .12f else .050f),
-                        )
-                        .background(ticketBrush, ticketShape)
-                        .border(
-                            .8.dp,
-                            if (dark) Color.White.copy(alpha = .10f) else Color.White.copy(alpha = .78f),
-                            ticketShape,
-                        )
-                        .clip(ticketShape)
-                        .clickable {
-                            addingSubscription = false
-                            editSubscription = item
-                            editorName = item.name
-                            editorUrl = if (item.placeholder) "" else item.url
-                            editorError = ""
-                        }
-                        .padding(15.dp),
-                ) {
-                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                Modifier.size(36.dp).background(scheme.primary.copy(alpha = .08f), CircleShape),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    if (item.placeholder) Icons.Rounded.LinkOff else Icons.Rounded.Link,
-                                    null,
-                                    tint = if (item.placeholder) tokens.warning else scheme.primary,
-                                    modifier = Modifier.size(18.dp),
-                                )
-                            }
-                            Spacer(Modifier.width(10.dp))
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Text(item.name, color = tokens.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(host, color = tokens.textSecondary, fontSize = 10.sp, fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            }
-                            if (provider != null) {
-                                Surface(shape = CircleShape, color = scheme.primary.copy(alpha = .08f)) {
-                                    Text("${provider.nodes.size} 节点", Modifier.padding(horizontal = 7.dp, vertical = 3.dp), color = scheme.primary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                            Spacer(Modifier.width(5.dp))
-                            Icon(Icons.Rounded.Edit, "编辑", tint = tokens.textMuted, modifier = Modifier.size(17.dp))
-                        }
-
-                        Box(
-                            Modifier.fillMaxWidth().height(6.dp)
-                                .background(if (dark) Color.White.copy(alpha = .06f) else Color(0xFFE2E8F0).copy(alpha = .56f), CircleShape),
-                        ) {
-                            if (ratio != null && ratio > 0f) {
-                                Box(
-                                    Modifier.fillMaxWidth(ratio.coerceIn(.001f, 1f)).fillMaxHeight()
-                                        .background(Brush.horizontalGradient(listOf(Color(0xFF2563EB), Color(0xFF22D3EE))), CircleShape),
-                                )
-                            }
-                        }
-
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            val usage = if (provider != null && provider.hasSubscriptionInfo && provider.total > 0L) {
-                                "${subscriptionBytes(provider.used)} / ${subscriptionBytes(provider.total)}"
-                            } else "流量 —"
-                            Text(
-                                usage,
-                                color = tokens.textPrimary,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace,
-                                maxLines = 1,
-                            )
-                            if (remainingPercent != null) {
-                                Spacer(Modifier.width(7.dp))
-                                Surface(shape = CircleShape, color = if (dark) Color(0xFF064E3B).copy(alpha = .34f) else Color(0xFFD1FAE5).copy(alpha = .42f)) {
-                                    Text(
-                                        "剩余 $remainingPercent%",
-                                        Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                        color = if (dark) Color(0xFF6EE7B7) else Color(0xFF059669),
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold,
-                                    )
-                                }
-                            }
-                            Spacer(Modifier.weight(1f))
-                            Text(
-                                provider?.expire?.takeIf { it > 0L }?.let { subscriptionExpireLabel(it) } ?: "到期 —",
-                                color = tokens.textSecondary,
-                                fontSize = 9.sp,
-                                maxLines = 1,
-                            )
-                        }
-                        if (provider?.updatedAt?.isNotBlank() == true) {
-                            Text(subscriptionUpdatedLabel(provider.updatedAt), color = tokens.textMuted, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                    }
-                }
+                InstrumentSubscriptionTicket(item.name, provider, subscriptionHost(item), item.placeholder, onEdit = {
+                    addingSubscription = false
+                    editSubscription = item
+                    editorName = item.name
+                    editorUrl = if (item.placeholder) "" else item.url
+                    editorError = ""
+                })
             }
 
             item("yaml-heading") {

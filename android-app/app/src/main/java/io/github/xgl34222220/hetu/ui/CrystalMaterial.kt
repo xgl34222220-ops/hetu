@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.inset
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -79,15 +80,15 @@ fun Modifier.crystalMaterial(
     val t = LocalHetuTokens.current
     val primary = MaterialTheme.colorScheme.primary
     val dark = t.pageBackground.luminance() < .5f
-    val radius = when (depth) { CrystalDepth.Popover -> 24.dp; CrystalDepth.InsetItem -> 8.dp; else -> 20.dp }
-    val topAlpha = when (depth) { CrystalDepth.Popover -> .76f; CrystalDepth.InsetItem -> .87f; else -> .94f }
-    val bottomAlpha = when (depth) { CrystalDepth.Popover -> .67f; CrystalDepth.InsetItem -> .74f; else -> .85f }
+    val radius = when (depth) { CrystalDepth.Popover -> 24.dp; CrystalDepth.InsetItem -> 12.dp; else -> 24.dp }
+    val topAlpha = when (depth) { CrystalDepth.Popover -> .78f; CrystalDepth.InsetItem -> .85f; else -> .96f }
+    val bottomAlpha = when (depth) { CrystalDepth.Popover -> .65f; CrystalDepth.InsetItem -> .70f; else -> .86f }
     val accent = if (selection) primary else if (tint.isSpecified && tint.alpha > .05f) tint else Color.Unspecified
     val upper = if (dark) Color(0xFF283543).copy(alpha = .87f) else Color.White.copy(alpha = topAlpha)
     val lower = if (dark) Color(0xFF18232F).copy(alpha = .78f) else Color(0xFFF8FAFE).copy(alpha = bottomAlpha)
     val fill = Brush.verticalGradient(listOf(upper, lower))
     // Suppress Haze's default opaque tint; the translucent fill above is the only wash.
-    val style = HazeStyle(backgroundColor = t.pageBackground, tints = emptyList(), blurRadius = radius,
+    val style = HazeStyle(backgroundColor = if (depth == CrystalDepth.Popover) Color.Transparent else t.pageBackground, tints = emptyList(), blurRadius = radius,
         noiseFactor = .005f, fallbackTint = HazeTint(Color.Transparent))
     val shadowSize = when(depth) { CrystalDepth.Popover -> 14.dp; CrystalDepth.InsetItem -> 2.dp; else -> 7.dp }
     val blur = if (blurEnabled && backdrop != null) Modifier.hazeEffect(backdrop, style) {
@@ -105,14 +106,19 @@ fun Modifier.crystalMaterial(
                 if (dark) Color(0xFF61778C).copy(alpha = .25f) else Color(0xFFC4D3E2).copy(alpha = .65f)))
             val ambient = Brush.radialGradient(listOf(
                 (if (accent.isSpecified) accent else if (dark) Color(0xFF2A6496) else Color(0xFF7BAFDE))
-                    .copy(alpha = if (selection) .12f else .065f), Color.Transparent),
+                    .copy(alpha = if (selection) .15f else .105f), Color.Transparent),
                 center = Offset(size.width*.94f, size.height*.88f), radius = maxOf(size.width*.9f, 1f))
-            val mint = Brush.radialGradient(listOf(Color(0xFF5AB8AD).copy(alpha = if (dark) .025f else .038f), Color.Transparent),
+            val mint = Brush.radialGradient(listOf(Color(0xFF5AB8AD).copy(alpha = if (dark) .04f else .065f), Color.Transparent),
                 center = Offset(0f, size.height*.38f), radius = maxOf(size.width*.75f, 1f))
             onDrawWithContent {
                 drawRect(ambient); drawRect(mint)
                 drawContent()
                 drawOutline(outline, rim, style = Stroke(width = 1f))
+                if (size.minDimension > 8.dp.toPx()) inset(1.5.dp.toPx()) {
+                    val inner = shape.createOutline(size, layoutDirection, this)
+                    drawOutline(inner, Brush.verticalGradient(listOf(
+                        Color.White.copy(alpha = if (dark) .08f else .52f), Color.Transparent)), style = Stroke(1f))
+                }
                 if (selection) drawOutline(outline, primary.copy(alpha = .62f), style = Stroke(1.5.dp.toPx()))
             }
         }

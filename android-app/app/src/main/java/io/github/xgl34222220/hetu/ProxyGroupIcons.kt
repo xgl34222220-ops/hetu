@@ -98,7 +98,7 @@ internal class ProxyGroupIconRepository private constructor(context: Context) {
 
     fun peek(url: String): Bitmap? = memory.get(url)
 
-    suspend fun load(url: String, legacyPath: String = ""): GroupIconLoad = withContext(Dispatchers.IO) {
+    suspend fun load(url: String, legacyPath: String = "", retry: Boolean = false): GroupIconLoad = withContext(Dispatchers.IO) {
         peek(url)?.let { return@withContext GroupIconLoad.Ready(it, true) }
         gates.getOrPut(url) { Mutex() }.withLock {
             peek(url)?.let { return@withLock GroupIconLoad.Ready(it, true) }
@@ -108,7 +108,7 @@ internal class ProxyGroupIconRepository private constructor(context: Context) {
             if (legacyPath.isNotBlank()) decodeFile(File(legacyPath))?.let {
                 memory.put(url, it); return@withLock GroupIconLoad.Ready(it, true)
             }
-            if (SystemClock.elapsedRealtime() < (retries[url] ?: 0L)) return@withLock GroupIconLoad.Failed
+            if (!retry && SystemClock.elapsedRealtime() < (retries[url] ?: 0L)) return@withLock GroupIconLoad.Failed
             try {
                 val bitmap = slots.withPermit { decode(fetch(url)) }
                 val temporary = File(directory, "$key.new")
