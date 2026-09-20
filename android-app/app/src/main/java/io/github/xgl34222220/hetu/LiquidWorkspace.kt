@@ -180,10 +180,12 @@ internal fun LiquidGroupWell(group: ProxyGroupUi, selected: String, delays: Map<
         .padding(horizontal = 12.dp, vertical = 9.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth().heightIn(min = 40.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("切换落地节点", color = t.textSecondary, fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Bold)
+                Text("切换落地节点", color = t.textSecondary, fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.testTag("well-title:${group.name}"))
                 Text("点击即生效", color = t.textMuted, fontSize = 10.sp, lineHeight = 13.sp)
             }
-            LiquidPill("全测速", Icons.Rounded.Bolt, onTestAll, Modifier.widthIn(min = 76.dp), compact = true)
+            LiquidPill("全测速", Icons.Rounded.Bolt, onTestAll,
+                Modifier.widthIn(min = 76.dp).testTag("well-testall:${group.name}"), compact = true)
         }
         BoxWithConstraints {
             val columns = liquidColumns(maxWidth)
@@ -220,7 +222,11 @@ internal fun LiquidPill(text: String, icon: ImageVector, onClick: () -> Unit, mo
         .clip(CircleShape).clickable(enabled = enabled, interactionSource = interaction, indication = null, role = Role.Button) {
             view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK); onClick()
         }, contentAlignment = Alignment.Center) {
-        Row(Modifier.fillMaxWidth().heightIn(min = if (compact) 30.dp else 38.dp)
+        // A compact accessory wraps its label. fillMaxWidth here would consume the
+        // header's whole width before the weighted title is measured, forcing it
+        // into a vertical column. Full-width home actions still fill their slot.
+        Row(Modifier.then(if (compact) Modifier else Modifier.fillMaxWidth())
+            .heightIn(min = if (compact) 30.dp else 38.dp)
             .background(Brush.verticalGradient(listOf(fill, fill.copy(alpha = fill.alpha * .75f))), CircleShape)
             .border(.6.dp, if (danger) t.danger.copy(alpha = .10f) else Color.White.copy(alpha = if (dark) .08f else .68f), CircleShape)
             .padding(horizontal = if (compact) 9.dp else 10.dp, vertical = 7.dp),
