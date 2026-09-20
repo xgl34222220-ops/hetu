@@ -33,6 +33,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p network-reports
+          python3 tools/test_startup_lifecycle.py | tee network-reports/startup-lifecycle.txt
           python3 tools/test_network_integrity.py | tee network-reports/fault-injection.txt
           python3 tools/test_optional_ipv6_nat.py | tee network-reports/optional-ipv6-nat.txt
           command -v iptables
@@ -59,8 +60,8 @@ jobs:
           python3 tools/test_ui_audit_invariants.py
           test ! -d module
           test ! -d android-app/app/src/main/java/io/github/xgl34222220/bichen
-          grep -Fq 'versionName = "0.4.0-test.99"' android-app/app/build.gradle.kts
-          grep -Fq 'versionCode = 499' android-app/app/build.gradle.kts
+          grep -Fq 'versionName = "0.4.0-test.100"' android-app/app/build.gradle.kts
+          grep -Fq 'versionCode = 500' android-app/app/build.gradle.kts
           grep -Fq 'android:icon="@drawable/ic_hetu_official"' android-app/app/src/main/AndroidManifest.xml
           sh -n android-app/app/src/main/assets/hetu-root.sh
           sh -n android-app/app/src/main/assets/hetu-route.sh
