@@ -23,13 +23,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  network-kernel:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - name: Fault injection and real isolated kernel packet test
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p network-reports
+          python3 tools/test_network_integrity.py | tee network-reports/fault-injection.txt
+          command -v iptables
+          command -v iptables-restore
+          sudo python3 tools/test_network_namespace.py 2>&1 | tee network-reports/kernel-packets.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Hetu-Network-Regression
+          path: network-reports/
+          retention-days: 14
+          if-no-files-found: warn
 
+  build:
+    needs: network-kernel
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
       - name: Verify source identity and runtime boundary
         shell: bash
         run: |
@@ -37,8 +58,8 @@ jobs:
           python3 tools/test_ui_audit_invariants.py
           test ! -d module
           test ! -d android-app/app/src/main/java/io/github/xgl34222220/bichen
-          grep -Fq 'versionName = "0.4.0-test.97"' android-app/app/build.gradle.kts
-          grep -Fq 'versionCode = 497' android-app/app/build.gradle.kts
+          grep -Fq 'versionName = "0.4.0-test.98"' android-app/app/build.gradle.kts
+          grep -Fq 'versionCode = 498' android-app/app/build.gradle.kts
           grep -Fq 'android:icon="@drawable/ic_hetu_official"' android-app/app/src/main/AndroidManifest.xml
           sh -n android-app/app/src/main/assets/hetu-root.sh
           sh -n android-app/app/src/main/assets/hetu-route.sh
@@ -49,12 +70,10 @@ jobs:
           repository: MetaCubeX/mihomo
           ref: v1.19.31
           path: .upstream
-
       - uses: actions/setup-go@v5
         with:
           go-version: stable
           cache-dependency-path: .upstream/go.sum
-
       - name: Prepare Android SDK and NDK
         shell: bash
         run: |
@@ -65,19 +84,16 @@ jobs:
           test -x "$SDKMANAGER"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" 'platform-tools' 'platforms;android-37.0' 'build-tools;37.0.0' 'ndk;28.2.13676358'
-
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-
       - name: Verify message filtering and connection continuity
         run: |
           python3 tools/test_proxy_continuity.py --android-jar "$ANDROID_HOME/platforms/android-37.0/android.jar" --fixture "$RUNNER_TEMP/hetu-continuity.yaml"
           python3 tools/test_adblock_inspection.py --android-jar "$ANDROID_HOME/platforms/android-37.0/android.jar"
           python3 tools/test_root_ipv6.py
           python3 tools/test_root_controller.py
-
       - name: Build Hetu JNI bridge and Root Mihomo
         shell: bash
         run: |
@@ -111,16 +127,13 @@ jobs:
             -o ../android-app/app/src/main/assets/mihomo-root/x86_64/mihomo .
           cp LICENSE ../android-app/app/src/main/assets/MIHOMO-LICENSE
           git rev-parse HEAD > ../android-app/app/src/main/assets/mihomo-revision.txt
-
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.5.0'
           cache-read-only: false
-
       - name: Render UI regressions and build Hetu debug APK
         working-directory: android-app
         run: gradle :app:testDebugUnitTest :app:assembleDebug --stacktrace
-
       - name: Verify APK identity and payload
         shell: bash
         run: |
@@ -140,14 +153,12 @@ jobs:
           ! unzip -l "$APK" | grep -q 'assets/tproxy-root'
           unzip -l "$APK" | grep -q 'assets/rules/adaway.txt'
           ! unzip -l "$APK" | grep -q 'libbichen_core.so'
-
       - uses: actions/upload-artifact@v4
         with:
           name: Hetu-Debug
           path: android-app/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
-
       - name: Upload UI test reports and real rendered frames
         if: always()
         uses: actions/upload-artifact@v4
