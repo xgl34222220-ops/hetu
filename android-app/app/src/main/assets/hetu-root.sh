@@ -228,6 +228,14 @@ cleanup6(){
 }
 cleanup(){ MARK=""; MASK=""; TABLE=""; PREF=""; loadnet >/dev/null 2>&1 || true; cleanup_snapshot_begin; cleanup4; cleanup6; cleanlegacy; CLEAN_SNAPSHOT_ACTIVE=0; ip link del hetu0 >/dev/null 2>&1 || true; rm -f "$NET_STATE"; MARK=""; MASK=""; TABLE=""; PREF=""; }
 
+# Cheap built-in prefilter: do not fork readlink for every Android process.
+# Same-inode catches renamed comm; tracked PIDs always bypass this prefilter.
+core_candidate(){
+  [ "$BASE/bin/core" -ef "${CORE_PROCFS:-/proc}/$1/exe" ] && return 0
+  CORE_COMM=''
+  read -r CORE_COMM < "${CORE_PROCFS:-/proc}/$1/comm" 2>/dev/null || return 1
+  case "$CORE_COMM" in core|mihomo|mihomo-*) return 0;; *) return 1;; esac
+}
 pidcore(){
   P="$1"; [ -d "/proc/$P" ] || return 1
   EXE=$(readlink "/proc/$P/exe" 2>/dev/null) || { [ -d "/proc/$P" ] && return 2; return 1; }
@@ -241,7 +249,7 @@ core_maybe_alive(){ pidcore "$1"; case "$?" in 0|2) return 0;; *) return 1;; esa
 findcorepid(){
   for PROC in /proc/[0-9]*; do
     CAND=${PROC#/proc/}; case "$CAND" in ''|*[!0-9]*) continue;; esac
-    if pidcore "$CAND" && kill -0 "$CAND" >/dev/null 2>&1; then printf '%s\n' "$CAND"; return 0; fi
+    if core_candidate "$CAND" && pidcore "$CAND" && kill -0 "$CAND" >/dev/null 2>&1; then printf '%s\n' "$CAND"; return 0; fi
   done
   return 1
 }
@@ -263,10 +271,11 @@ stopcore(){
   # private executable path so unrelated Mihomo/Clash processes are untouched.
   for PROC in /proc/[0-9]*; do
     OPID=${PROC#/proc/}; [ "$OPID" != "$$" ] || continue
-    if pidcore "$OPID" && kill -0 "$OPID" >/dev/null 2>&1; then
+    if core_candidate "$OPID" && pidcore "$OPID" && kill -0 "$OPID" >/dev/null 2>&1; then
       case " $STOP_PIDS " in *" $OPID "*) ;; *) STOP_PIDS="$STOP_PIDS $OPID";; esac
     fi
   done
+  if [ -d "$RUN" ]; then start_stage "stop-core-signals"; fi
   for P in $STOP_PIDS; do kill "$P" >/dev/null 2>&1 || true; done
   N=0
   while [ "$N" -lt 10 ]; do
@@ -430,12 +439,48 @@ probe_ingress(){
   fi
   if [ "$V6" = disable ] && v6supported && [ "$NEED_DNS_REDIRECT" = 1 ]; then
     has ip6tables || fail "IPv6 DNS 防泄漏需要 ip6tables"
-    probered6 "$DP" tcp || fail "IPv6 TCP DNS 接管不可用"
-    probered6 "$DP" udp || fail "IPv6 UDP DNS 接管不可用"
+    # DNS redirection is optional in disable mode; filter REJECT remains mandatory.
+    # Re-evaluate the optional NAT capability in start(), even with cached preflight.
   fi
   if v6supported && { [ "$V6" = strict ] || [ "$V6" = disable ] || [ "$KILL" = 1 ]; }; then
     has ip6tables || fail "IPv6 禁用/严格 IPv4 或 Kill Switch 需要 ip6tables"
   fi
+}
+
+# This decision is deliberately outside the cached preflight fast path.
+# Never load kernel modules or change netd's DNS/IPv6 settings to obtain NAT.
+select_dns6_policy(){
+  START_DNS6=off
+  [ "$START_DNS" != off ] && v6supported || return 0
+  case "$START_MODE" in tun|ebpf) START_DNS6=core; return 0;; esac
+  case "$START_V6" in enable) START_DNS6=redirect; return 0;; disable) ;; *) return 0;; esac
+  has ip6tables || fail "IPv6 DNS 防泄漏需要 ip6tables"
+  DNS6_PROBE=$(xt6q -t nat -S 2>&1); DNS6_PROBE_RC=$?
+  if [ "$DNS6_PROBE_RC" != 0 ]; then
+    case "$DNS6_PROBE" in
+      *"Table does not exist"*|*"table does not exist"*) START_DNS6=blocked-no-nat; return 0;;
+      *) fail "IPv6 DNS 能力读取失败，未改动当前代理；请查看 Root 权限或防火墙锁";;
+    esac
+  fi
+  if probered6 "$START_DP" tcp && probered6 "$START_DP" udp; then
+    START_DNS6=redirect
+  else
+    START_DNS6=blocked-no-redirect
+  fi
+}
+install_disabled_dns6(){
+  case "$START_DNS6" in
+    redirect) install_dns_redirect6 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES";;
+    blocked-no-nat|blocked-no-redirect)
+      # Verify the actual fail-closed guard; do not treat optional NAT failure as
+      # permission to send system/app IPv6 DNS directly to an external resolver.
+      v6_disable_guard_ready "$START_SHARE" || return 1
+      xt6q -t filter -C "$V6OUT" -p udp --dport 53 -j REJECT >/dev/null 2>&1 || return 1
+      xt6q -t filter -C "$V6OUT" -p tcp --dport 53 -j REJECT >/dev/null 2>&1 || return 1
+      ;;
+    off|core) return 0;;
+    *) return 1;;
+  esac
 }
 
 preflight(){
@@ -699,6 +744,7 @@ wait_ready(){
 }
 
 write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$7"; CP="$8"; DUIDS="$9"; { printf 'MODE=%s\n' "$M"; printf 'IPV6=%s\n' "$V6"; printf 'DNS=%s\n' "$DNS"; printf 'DNS_PORT=%s\n' "$DP"; printf 'APP_SCOPE=%s\n' "$S"; printf 'SHARE=%s\n' "$SHARE"; printf 'KILL=%s\n' "$KILL"; printf 'CONTROLLER_PORT=%s\n' "$CP"; printf 'DIRECT_UIDS=%s\n' "$DUIDS";
+    printf 'DNS6_POLICY=%s\n' "${START_DNS6:-redirect}"
     printf 'TCP=%s\nUDP=%s\n' "$START_TCP" "$START_UDP"
     L_TCP=0; L_UDP=0; L_DNS=0
     case "$M" in tproxy) [ "$START_TCP" != 1 ] || L_TCP="$START_TP"; [ "$START_UDP" != 1 ] || L_UDP="$START_TP";;
@@ -730,6 +776,8 @@ start(){
   else
     start_stage "preflight-cached"
   fi
+  start_stage "ipv6-dns-capability"
+  select_dns6_policy
   [ -x "$START_BIN" ] || fail "核心文件不存在或不可执行"; [ -r "$START_CFG" ] || fail "启动配置不存在"; mkdir -p "$RUN" || fail "无法创建运行目录"; if [ "$START_PREVALIDATED" != 1 ]; then validatecfg "$START_BIN" "$START_CFG" || fail "Mihomo 配置校验失败，当前网络未被接管"; fi; acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
   start_stage "cleanup-network"
   stopwatchdog; cleanup; restorev6 || fail "上次 IPv6 状态尚未恢复，请重试停止后再启动"
@@ -788,7 +836,7 @@ start(){
   elif [ "$START_V6" = strict ]; then install_v6_strict "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "严格 IPv4 防泄漏规则安装失败，已回滚"; }; fi
 
   if [ "$START_V6" = disable ] && v6supported && [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ] && [ "$START_DNS" != off ]; then
-    install_dns_redirect6 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" || { cleanup; stopcore; rm -f "$SESSION"; fail "IPv6 DNS 本地接管失败，未放行直连 DNS"; }
+    install_disabled_dns6 || { cleanup; stopcore; rm -f "$SESSION"; fail "IPv6 DNS 防泄漏安装失败，未放行直连 DNS"; }
   fi
   # Record exactly what this session installed, not mutable app preferences.
   health_record || { cleanup; stopcore; rm -f "$SESSION"; fail "无法记录网络完整性基线，已停止本次启动"; }
@@ -817,6 +865,8 @@ status(){
   SHAREV=$(sed -n 's/^SHARE=//p' "$SESSION" 2>/dev/null | head -n 1)
   KILLV=$(sed -n 's/^KILL=//p' "$SESSION" 2>/dev/null | head -n 1)
   DNSV=$(sed -n 's/^DNS=//p' "$SESSION" 2>/dev/null | head -n 1); [ -n "$DNSV" ] || DNSV=off
+  DNS6POLICY=$(sed -n 's/^DNS6_POLICY=//p' "$SESSION" 2>/dev/null | head -n 1)
+  case "$DNS6POLICY" in redirect|blocked-no-nat|blocked-no-redirect|off|core) ;; *) DNS6POLICY=unknown;; esac
   DPV=$(sed -n 's/^DNS_PORT=//p' "$SESSION" 2>/dev/null | head -n 1); case "$DPV" in ''|*[!0-9]*) DPV=1053;; esac
   IPV6V=$(sed -n 's/^IPV6=//p' "$SESSION" 2>/dev/null | head -n 1); [ -n "$IPV6V" ] || IPV6V=enable
   CPV=$(sed -n 's/^CONTROLLER_PORT=//p' "$SESSION" 2>/dev/null | head -n 1)
@@ -880,8 +930,14 @@ status(){
         DNS4=$D4O
         [ "$SHAREV" != 1 ] || [ "$D4P" = true ] || DNS4=false
         if v6supported && { [ "$IPV6V" = enable ] || [ "$IPV6V" = disable ]; }; then
-          DNS6=$D6O
-          [ "$SHAREV" != 1 ] || [ "$D6P" = true ] || DNS6=false
+          case "$DNS6POLICY" in
+            blocked-no-nat|blocked-no-redirect)
+              DNS6=false
+              if v6_disable_guard_ready "$SHAREV" &&
+                 xt6q -t filter -C "$V6OUT" -p tcp --dport 53 -j REJECT >/dev/null 2>&1 &&
+                 xt6q -t filter -C "$V6OUT" -p udp --dport 53 -j REJECT >/dev/null 2>&1; then DNS6=true; fi;;
+            *) DNS6=$D6O; [ "$SHAREV" != 1 ] || [ "$D6P" = true ] || DNS6=false;;
+          esac
         fi
         ;;
     esac
@@ -924,7 +980,7 @@ status(){
   if [ "$STATUS_RUNNING" = true ] && [ "$H_STATE" = healthy ] && [ "$WD" = true ]; then HEALTH=true; fi
   SM=""; ST=""; if loadnet >/dev/null 2>&1; then SM="$MARK"; ST="$TABLE"; fi
   SP=$(state_value PREF 2>/dev/null || true)
-  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":false,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","log":"%s","configCheckLog":"%s"}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$SHAREV" "$KILLV" "$LOG" "$CHECKLOG"
+  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":false,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","log":"%s","configCheckLog":"%s"}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$SHAREV" "$KILLV" "$LOG" "$CHECKLOG"
 }
 
 # Session-bound network integrity. No remote reachability failure restarts the core.
@@ -939,10 +995,18 @@ health_record(){ (
   cp "$SESSION" "$H_TMP/session" || exit 1
   cat "$PIDFILE" > "$H_TMP/pid" || exit 1
   [ ! -r "$NET_STATE" ] || cp "$NET_STATE" "$H_TMP/net" || exit 1
+  H_IPV6=$(sed -n 's/^IPV6=//p' "$SESSION")
+  H_DNS6=$(sed -n 's/^DNS6_POLICY=//p' "$SESSION")
   for H_F in 4 6; do
     [ "$H_F" != 6 ] || has ip6tables || continue
     for H_T in mangle nat filter; do
-      # Read only tables that this session uses. Empty tables need no repair.
+      # Missing optional IPv6 tables are not a failed session. Required tables
+      # still fail closed on ANY read error and remain checked by the watchdog.
+      if [ "$H_F" = 6 ]; then
+        [ "$H_IPV6" != bypass ] || continue
+        [ "$H_T" != mangle ] || [ "$H_IPV6" = enable ] || continue
+        [ "$H_T" != nat ] || [ "$H_IPV6" = enable ] || [ "$H_DNS6" = redirect ] || continue
+      fi
       H_RAW=$("xt${H_F}" -t "$H_T" -S 2>/dev/null) || { rm -rf "$H_TMP"; exit 1; }
       printf '%s\n' "$H_RAW" | health_owned > "$H_TMP/$H_F-$H_T"
     done
@@ -980,6 +1044,7 @@ health_routes(){
 }
 health_collect(){
   H_STATE=healthy; H_REASON=''; H_UNKNOWN=0
+  if [ ! -r "$SESSION" ] && [ ! -r "$PIDFILE" ]; then H_STATE=stopped; H_REASON=not-running; return; fi
   if ! health_session_current; then H_STATE=upgrade-required; H_REASON=session-manifest-missing; return; fi
   if [ -d "$LOCK_DIR" ] && [ "$LOCK_HELD" != 1 ]; then H_STATE=unknown; H_REASON=transaction-in-progress; return; fi
   for H_E in "$RUN/network-manifest"/[46]-*; do
@@ -1098,7 +1163,9 @@ health_repair(){ (
 ); }
 health_json(){ (
   root; health_collect
-  printf '{"ok":true,"networkIntegrity":"%s","networkFault":"%s","dataPlaneHealthy":%s}\n' "$H_STATE" "$H_REASON" "$([ "$H_STATE" = healthy ] && echo true || echo false)"
+  H_DNS6=$(sed -n 's/^DNS6_POLICY=//p' "$SESSION" 2>/dev/null || true)
+  case "$H_DNS6" in redirect|blocked-no-nat|blocked-no-redirect|off|core) ;; *) H_DNS6=unknown;; esac
+  printf '{"ok":true,"networkIntegrity":"%s","networkFault":"%s","ipv6DnsPolicy":"%s","dataPlaneHealthy":%s}\n' "$H_STATE" "$H_REASON" "$H_DNS6" "$([ "$H_STATE" = healthy ] && echo true || echo false)"
 ); }
 
 case "${1:-status}" in
