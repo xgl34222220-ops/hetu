@@ -47,11 +47,13 @@ jobs:
                   lines[start:end] = insertion.splitlines(keepends=True)
               updated = ''.join(lines).encode('utf-8')
               assert hashlib.sha256(updated).hexdigest() == entry['after'], 'patch mismatch: ' + name
-              changes.append((path, updated))
+              # GITHUB_TOKEN may write source, but cannot edit workflow definitions.
+              # The connected authorized workflow action applies that file separately.
+              if not name.startswith('.github/workflows/'):
+                  changes.append((path, updated))
           for path, updated in changes:
               path.parent.mkdir(parents=True, exist_ok=True)
               path.write_bytes(updated)
-          # Correct the named callback in the common header before compilation.
           header = root / 'android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuUiKit.kt'
           text = header.read_text()
           old = 'IconButton(onClick, Modifier.size(48.dp))'
@@ -64,8 +66,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git rm -r .github/ui-audit
-          git rm .github/workflows/apply-ui-audit.yml
-          git add android-app tools tests .github/workflows/build-hetu.yml
+          git add android-app tools tests
           git commit -m 'ui: restore configured artwork and implement audited workspace (test.94)'
           git push origin HEAD:feature/hetu-rebrand-root-app
           git rev-parse HEAD
