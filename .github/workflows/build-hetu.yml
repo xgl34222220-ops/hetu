@@ -30,203 +30,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify Hetu source invariants
+      - name: Verify source identity and runtime boundary
         shell: bash
         run: |
           set -euo pipefail
+          python3 tools/test_ui_audit_invariants.py
           test ! -d module
-          test -d android-app/app/src/main/java/io/github/xgl34222220/hetu
           test ! -d android-app/app/src/main/java/io/github/xgl34222220/bichen
-          grep -q 'namespace = "io.github.xgl34222220.hetu"' android-app/app/build.gradle.kts
-          grep -q 'applicationId = "io.github.xgl34222220.hetu"' android-app/app/build.gradle.kts
-          grep -q 'version = release(37)' android-app/app/build.gradle.kts
-          grep -q 'minorApiLevel = 0' android-app/app/build.gradle.kts
-          grep -q 'android:label="河图"' android-app/app/src/main/AndroidManifest.xml
-          grep -q 'private static final String ROOT="/data/adb/hetu";' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-          ! grep -R '/data/adb/hetu/proxy' android-app/app/src/main native README.md
-          ! grep -R 'io.github.xgl34222220.bichen' android-app/app/src/main native README.md --exclude=LegacyAppMigrator.java
-          grep -q 'io.github.xgl34222220.bichen' android-app/app/src/main/java/io/github/xgl34222220/hetu/LegacyAppMigrator.java
-          ! grep -R 'ModuleInstaller\|ModuleArchive' android-app/app/src/main
-          test -f android-app/app/src/main/assets/sources.tsv
-          test -f android-app/app/src/main/assets/hetu-root.sh
-          test ! -f android-app/app/src/main/assets/proxy-root-v3.sh
-          test ! -f android-app/app/src/main/assets/proxy-root.sh
-          test ! -f android-app/app/src/main/assets/tproxy-root.sh
-          test -f android-app/app/src/main/assets/hetu-route.sh
+          grep -Fq 'versionName = "0.4.0-test.94"' android-app/app/build.gradle.kts
+          grep -Fq 'versionCode = 494' android-app/app/build.gradle.kts
+          grep -Fq 'android:icon="@drawable/ic_hetu_official"' android-app/app/src/main/AndroidManifest.xml
           sh -n android-app/app/src/main/assets/hetu-root.sh
           sh -n android-app/app/src/main/assets/hetu-route.sh
-          grep -q 'WROUT=HETU_WROUT' android-app/app/src/main/assets/hetu-root.sh
-          grep -q 'install-udp-leak-guard' android-app/app/src/main/assets/hetu-root.sh
-          grep -q 'scoped_reject_unmarked_udp' android-app/app/src/main/assets/hetu-root.sh
-          grep -q 'insertRulesBeforeFinalMatch' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
-          grep -q 'insertRuleBeforeSourceAdblockAnchor' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
-          grep -Fq 'embeddedMihomoRevision()' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-          ! grep -Fq 'asset:"+BuildConfig.VERSION_CODE' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-          grep -Fq 'reloadCurrentConfig()' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-          grep -Fq 'static synchronized Snapshot export' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockRules.java
-          grep -Fq 'hetu-adblock.meta' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockRules.java
-          grep -Fq 'START_PREVALIDATED' android-app/app/src/main/assets/hetu-root.sh
-          grep -Fq 'directUidRanges,"1"' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-          ! grep -Fq 'runCatching { controller.ensureRuntimeFiles() }' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'message = controller.reload()' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'sanitizeStrictDomainCompatibility(yaml)' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
-          grep -Fq 'Hetu 1.19.30 compatibility: skipped invalid domain entry' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
-          grep -Fq 'Mijia Cloud' tests/MihomoStartupConfigTest.java
-          grep -Fq 'yamlMihomoStrictDomainIssue(text)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          grep -Fq 'Mihomo 1.19.30 不接受此域名表达式' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          grep -Fq 'RuleStore.currentExportRules()' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockRules.java
-          grep -Fq 'proxyRootValidatedFingerprint' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-          grep -Fq 'proxyRootCapabilityFingerprint' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-          grep -Fq 'START_FAST_CAPS' android-app/app/src/main/assets/hetu-root.sh
-          grep -Fq 'preflight-cached' android-app/app/src/main/assets/hetu-root.sh
-          grep -Fq 'ACTION_BOOT_RESTORE' android-app/app/src/main/java/io/github/xgl34222220/hetu/BootReceiver.java
-          grep -Fq 'ACTION_BOOT_RESTORE' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
-          grep -q 'android.intent.action.USER_UNLOCKED' android-app/app/src/main/AndroidManifest.xml
-          ! grep -Fq 'new Thread(() ->' android-app/app/src/main/java/io/github/xgl34222220/hetu/BootReceiver.java
-          grep -q 'isSourceAdblockRule' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
-          grep -Fq 'RULE-SET,去广告,广告拦截' tests/MihomoStartupConfigTest.java
-          grep -Fq 'source privacy guards and whitelists stay ahead of Hetu adblock' tests/MihomoStartupConfigTest.java
-          ! grep -q 'ensureWebRtcLeakGuard' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
-          ! grep -Fq 'ALLOW_PROVIDER_NAME+",DIRECT"' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
-          ! grep -q 'extractDirectProcessPackages(source)' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-          ! grep -Fq 'val runtimeLiquid = glassEnabled && backdrop != null' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'Modifier.hazeEffect(state = hazeState, style = HazeMaterials.ultraThin())' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          ! grep -Fq 'blurRadius = 16.dp' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'Box(modifier.height(72.dp))' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'subscriptionExpireLabel' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          grep -Fq 'blurRadius = 20.dp' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'suspend fun refreshHomeAll()' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'isRefreshing = homeRefreshing' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          ! grep -Fq 'capsuleText = "全部刷新完成"' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'suspend fun refreshGroupDelaysAnimated()' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          ! grep -Fq 'api.groupDelay(' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
-          grep -Fq 'api.healthCheckProxyProvider(provider.name)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
-          grep -Fq 'provider != null -> api.delay(node, provider.testUrl, provider.expectedStatus)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
-          grep -Fq 'DELAY_SLOTS=new Semaphore(12,true)' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java
-          grep -Fq 'val targets = state.groups.mapNotNull' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'repo.delay(node)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          ! grep -Fq 'repo.globalDelay()' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'failed 失败' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt || true
-          grep -Fq 'failed 未更新' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'targets.forEach { providerRefreshing[it.name] = true }' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'targets.chunked(16)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          ! grep -Fq 'delays[node.name] = value' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt || true
-          grep -Fq 'suspend fun refreshProvidersAnimated()' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'suspend fun refreshRuleSetsAnimated()' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'providerRefreshing[item.name] = true' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'ruleSetRefreshing[item.name] = true' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'testing[node.name] = true' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'success = providerSucceeded[item.name] == true' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'repo.refreshProvider(item.name)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'repo.refreshRuleSet(item.name)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'fun pullRefreshAll()' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          grep -Fq 'onRefresh = ::pullRefreshAll' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          grep -Fq '.then(if (blurEnabled) Modifier.hazeSource(haze) else Modifier)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'Modifier.size(24.dp).background(Color.Transparent)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          grep -Fq '.background(ticketBrush, ticketShape)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          grep -Fq '.clickable {' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          ! grep -Fq 'modifier = Modifier.background(ticketBrush, ticketShape)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          grep -Fq 'val yamlCardBrush = if (dark)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          grep -Fq 'Color(0xFFE2E8F0).copy(alpha = .62f)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          ! grep -Fq '+ 94.dp' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'Modifier.fillMaxSize().statusBarsPadding()' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'Modifier.fillMaxSize().statusBarsPadding()' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          ! grep -Fq 'Box(Modifier.statusBarsPadding().padding(top = 14.dp, bottom = 4.dp))' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          ! grep -Fq 'Modifier.fillMaxWidth().statusBarsPadding().padding(top = 16.dp, bottom = 10.dp).height(44.dp)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          ! grep -Fq 'Modifier.fillMaxWidth().statusBarsPadding().heightIn(min = 64.dp).padding(vertical = 8.dp)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          grep -q 'copyScriptAsset(script)' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-          test -f android-app/app/src/main/assets/rules/adaway.txt
-          test -f android-app/app/src/main/assets/rules/china.txt
-          test -f android-app/app/src/main/assets/rules/tracking.txt
-          test -f android-app/app/src/main/assets/rules/hagezi.txt
-          grep -q 'System.loadLibrary("hetu_core")' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoNative.java
-          grep -q 'Java_io_github_xgl34222220_hetu_MihomoNative_invoke' native/bridge/jni_android.c
-          grep -q 'Java_io_github_xgl34222220_hetu_preview_MihomoNative_invoke' native/bridge/jni_android.c
-          grep -q 'versionName = "0.4.0-test.93"' android-app/app/build.gradle.kts
-          grep -q 'versionCode = 493' android-app/app/build.gradle.kts
-          grep -Fq 'android:icon="@drawable/ic_hetu_official"' android-app/app/src/main/AndroidManifest.xml
-          grep -Fq 'android:roundIcon="@drawable/ic_hetu_official"' android-app/app/src/main/AndroidManifest.xml
-          grep -Fq 'RefHomeBentoMatrix(' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'Color(0xFFE5484D)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'Color(0xFFE6F7ED) to Color(0xFF18794E)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'proxyRootRuntimeRefreshPending' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'calculateBottomPadding() + 96.dp' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          test -f android-app/app/src/main/res/drawable/ic_hetu_official.webp
-          test -f design/app-icons/official-icon.webp
-          test -f android-app/app/src/main/java/io/github/xgl34222220/hetu/LegacyAppMigrator.java
-          grep -q 'LegacyAppMigrator.migrateIfNeeded(app)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
-          grep -q 'controller.restart { operation = it }' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'replaceRunningManually(profile, onProgress)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
-          grep -q 'dataPlaneHealthy' android-app/app/src/main/assets/hetu-root.sh
-          grep -q "printf 'DNS=%s" android-app/app/src/main/assets/hetu-root.sh
-          grep -q "printf 'DNS_PORT=%s" android-app/app/src/main/assets/hetu-root.sh
-          grep -q 'dataPlaneHealthy' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
-          grep -Fq 'name: hetu-egress-probe' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
-          grep -Fq '.openConnection(proxy)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeInspector.kt
-          grep -q 'old-connections-only-after-network-change' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
-          ! grep -Fq '.closeAll()' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
-          grep -q 'getBoolean("floatingBottomBar", true)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
-          grep -q 'getBoolean("enableBlur", true)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
-          grep -q 'getBoolean("liquidGlass", true)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
-          ! grep -q 'val floating = true' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
-          ! grep -q 'val enableBlur = true' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
-          ! grep -q 'val activeGlass = true' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
-          ! grep -q 'topBarBlurStyle' android-app/app/src/main/java/io/github/xgl34222220/hetu/ThemeSettingsActivity.kt
-          ! grep -q 'predictiveBack' android-app/app/src/main/java/io/github/xgl34222220/hetu/ThemeSettingsActivity.kt
-          grep -q 'controllerPort = status.optInt' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
-          grep -Fq '127.0.0.1:${state.controllerPort}' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -q 'val renderGlass = activeGlass && enableBlur' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
-          ! grep -q '<alpha' android-app/app/src/main/res/anim/hetu_route_open_enter.xml
-          ! grep -q '<scale' android-app/app/src/main/res/anim/hetu_route_open_enter.xml
-          ! grep -q '<alpha' android-app/app/src/main/res/anim/hetu_route_open_exit.xml
-          ! grep -q '<scale' android-app/app/src/main/res/anim/hetu_route_open_exit.xml
-          ! grep -Fq 'Color(0xFFE2E8F0).copy(alpha = .80f)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          ! grep -Fq 'RefSmallTool("运行日志"' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'color = Color.Transparent,' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -q 'android:launchMode="singleTop"' android-app/app/src/main/AndroidManifest.xml
-          grep -Fq 'val indicatorPosition = remember { Animatable(targetIndex.toFloat()) }' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
-          grep -Fq 'blur(24.dp.toPx(), 24.dp.toPx())' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
-          grep -Fq 'Color(0xFFF8FBFF).copy(alpha = .34f)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
-          grep -q 'ModalBottomSheet(' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          ! grep -q 'AlertDialog(' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          grep -Fq 'key = { "${tab.name}-provider-${it.name}" }' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq '.height(82.dp)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'Color(0xFF2563EB).copy(alpha = .08f)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
-          ! grep -Fq 'Color(0xFFEFF6FF).copy(alpha = .90f)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
-          grep -Fq 'liveProviders by remember' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          grep -Fq 'subscriptionBytes(provider.used)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          grep -Fq '1.5.dp else .7.dp' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          grep -Fq 'YAML 语法大纲' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          grep -Fq 'YamlAccessoryKey("撤销"' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          grep -Fq 'TextButton(onClick = ::saveYaml' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          grep -Fq 'YamlAccessoryKey("2空格")' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          grep -Fq 'yamlLocalLint(currentText)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          grep -Fq 'subscriptionUpdatedLabel(provider.updatedAt)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          grep -Fq 'root.validateConfigText(text)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
-          grep -Fq 'void validateConfigText(String text)' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-          grep -Fq 'editor-bom:0.24.6' android-app/app/build.gradle.kts
-          grep -Fq 'implementation("io.github.rosemoe:editor")' android-app/app/build.gradle.kts
-          grep -Fq 'CodeEditor(viewContext)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          grep -Fq 'setLineNumberEnabled(true)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          grep -Fq 'setWordwrap(false)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          grep -Fq 'setTabWidth(2)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          grep -Fq 'YamlAccessoryKey("2空格")' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          grep -Fq 'yamlEditor?.undo()' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          grep -Fq 'yamlEditor?.redo()' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          ! grep -Fq 'BasicTextField(' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
-          ! grep -Fq 'RefGroupCornerVisual(group, Modifier.size(32.dp))' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
-          grep -Fq 'val activeLens = false' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
-          grep -Fq '.background(t.pageBackground)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceFileManagerActivity.kt
-          grep -Fq '.background(tokens.pageBackground)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreActivity.kt
-          grep -q 'head -c \$((END-START+1))' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
-          test ! -f android-app/app/src/main/java/io/github/xgl34222220/hetu/LuoShuProxyV3Activity.kt
-          test ! -f android-app/app/src/main/java/io/github/xgl34222220/hetu/LuoShuProxyV2Activity.kt
-          test ! -f android-app/app/src/main/java/io/github/xgl34222220/hetu/ProMaxProxyActivity.kt
-          test ! -f android-app/app/src/main/java/io/github/xgl34222220/hetu/LuoShuProxyActivity.kt
-          test ! -f android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardActivity.kt
-          test ! -f android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyWorkspaceActivity.kt
-          test ! -f android-app/app/src/main/java/io/github/xgl34222220/hetu/ComposeProxyActivity.kt
-          test ! -f android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyActivity.java
+          git diff --check
 
       - uses: actions/checkout@v4
         with:
@@ -301,9 +117,9 @@ jobs:
           gradle-version: '9.5.0'
           cache-read-only: false
 
-      - name: Build Hetu debug APK
+      - name: Render UI regressions and build Hetu debug APK
         working-directory: android-app
-        run: gradle :app:assembleDebug --stacktrace
+        run: gradle :app:testDebugUnitTest :app:assembleDebug --stacktrace
 
       - name: Verify APK identity and payload
         shell: bash
@@ -330,4 +146,16 @@ jobs:
           name: Hetu-Debug
           path: android-app/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload UI test reports and real rendered frames
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hetu-UI-Regression
+          path: |
+            android-app/app/build/reports/ui-audit/
+            android-app/app/build/reports/tests/testDebugUnitTest/
+            android-app/app/build/test-results/testDebugUnitTest/
+          if-no-files-found: warn
           retention-days: 14
