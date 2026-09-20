@@ -1,5 +1,7 @@
 package io.github.xgl34222220.hetu
 
+import io.github.xgl34222220.hetu.ui.*
+
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -90,24 +92,12 @@ private fun ThemeSettingsScreen(onBack: () -> Unit, onThemeChanged: () -> Unit) 
 
     LazyColumn(
         Modifier.fillMaxSize().background(t.pageBackground),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 92.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = hetuContentBottomPadding()),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item {
-            Row(
-                Modifier.fillMaxWidth().statusBarsPadding().heightIn(min = 60.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回", tint = t.textPrimary)
-                }
-                Spacer(Modifier.width(4.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("主题与界面", color = t.textPrimary, fontSize = 25.sp, lineHeight = 31.sp, fontWeight = FontWeight.Bold)
-                    Text("BoxProxy Design System", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
-                }
-            }
-        }
+        item { Column(Modifier.statusBarsPadding()) {
+            HetuPageHeader("主题与界面", onBack, subtitle = "河图界面偏好")
+        } }
 
         item { ThemeSection("基础主题") {
             ThemeValueRow(Icons.Rounded.DashboardCustomize, "界面风格", uiStyle) {
@@ -280,7 +270,7 @@ private fun ThemeSection(title: String, content: @Composable ColumnScope.() -> U
     val t = LocalHetuTokens.current
     Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
         Text(title, color = t.textSecondary, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 4.dp))
-        Surface(shape = RoundedCornerShape(20.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+        Surface(shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
             Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp), content = content)
         }
     }
@@ -290,7 +280,7 @@ private fun ThemeSection(title: String, content: @Composable ColumnScope.() -> U
 private fun ThemeValueRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, value: String, onClick: () -> Unit) {
     val t = LocalHetuTokens.current
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+        HetuListIcon(icon)
         Spacer(Modifier.width(12.dp))
         Text(title, color = t.textPrimary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
         Text(value, color = t.textSecondary, style = MaterialTheme.typography.bodySmall)
@@ -303,7 +293,7 @@ private fun ThemeValueRow(icon: androidx.compose.ui.graphics.vector.ImageVector,
 private fun ThemeSwitchRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, subtitle: String, checked: Boolean, onChecked: (Boolean) -> Unit) {
     val t = LocalHetuTokens.current
     Row(Modifier.fillMaxWidth().padding(vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+        HetuListIcon(icon)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(title, color = t.textPrimary, style = MaterialTheme.typography.bodyMedium)

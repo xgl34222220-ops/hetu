@@ -18,6 +18,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -27,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.xgl34222220.hetu.ui.HetuComposeController
+import io.github.xgl34222220.hetu.ui.*
 import io.github.xgl34222220.hetu.ui.HetuTheme
 import io.github.xgl34222220.hetu.ui.LocalHetuTokens
 import io.github.xgl34222220.hetu.ui.RuleSourceItem
@@ -116,18 +118,9 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
     val runtimeInspector = remember { ProxyRuntimeInspector(context) }
     val scope = rememberCoroutineScope()
     val updateView = androidx.compose.ui.platform.LocalView.current
-    val updateSpinTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "adblockUpdateSpin")
-    val updateSpin by updateSpinTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-            androidx.compose.animation.core.tween(760, easing = androidx.compose.animation.core.LinearEasing),
-        ),
-        label = "adblockUpdateSpinValue",
-    )
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val pageBg = if (dark) t.pageBackground else Color(0xFFF1F5F9)
+    val pageBg = t.pageBackground
     var revision by remember { mutableIntStateOf(0) }
     var busy by remember { mutableStateOf(false) }
     var updatingRules by remember { mutableStateOf(false) }
@@ -333,31 +326,22 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
             start = 16.dp,
             top = 8.dp,
             end = 16.dp,
-            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 92.dp,
+            bottom = hetuContentBottomPadding(),
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item("header") {
-            Row(
-                Modifier.fillMaxWidth().statusBarsPadding().padding(top = 8.dp, bottom = 5.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onBack, modifier = Modifier.size(42.dp)) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回", tint = t.textPrimary)
-                }
-                Spacer(Modifier.width(4.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("DNS 广告过滤", color = t.textPrimary, fontSize = 24.sp, lineHeight = 30.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("AdGuard DNS 语法 · hosts · 纯域名 · 例外规则优先", color = t.textSecondary, fontSize = 11.sp)
-                }
-                IconButton(onClick = { revision++ }, enabled = !busy, modifier = Modifier.size(42.dp)) {
+            Column(Modifier.statusBarsPadding()) {
+            HetuPageHeader("DNS 广告过滤", onBack, subtitle = "域名规则与运行状态") {
+                IconButton(onClick = { revision++ }, enabled = !busy, modifier = Modifier.size(48.dp)) {
                     Icon(Icons.Rounded.Refresh, "刷新", tint = MaterialTheme.colorScheme.primary)
                 }
+            }
             }
         }
 
         item("master") {
-            Surface(shape = RoundedCornerShape(24.dp), color = if (dark) t.elevatedCardBackground else Color.White, shadowElevation = if (dark) 0.dp else 1.dp) {
+            Surface(shape = RoundedCornerShape(18.dp), color = if (dark) t.elevatedCardBackground else Color.White, shadowElevation = if (dark) 0.dp else 1.dp) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(44.dp).background(MaterialTheme.colorScheme.primary.copy(alpha = .10f), RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
@@ -376,7 +360,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                                     else -> "代理仅负责转发，不执行河图广告规则"
                                 },
                                 color = if (snapshot.effective) Color(0xFF059669) else t.textSecondary,
-                                fontSize = 11.sp,
+                                fontSize = 12.sp,
                             )
                         }
                         Switch(
@@ -390,17 +374,18 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                         )
                     }
                     HorizontalDivider(color = if (dark) t.outline else Color(0xFFF1F5F9))
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        ChainMetric("有效规则", snapshot.rules.count.toString(), Modifier.weight(1f))
-                        ChainMetric("规则源", snapshot.rules.sources.count { it.enabled }.toString(), Modifier.weight(1f))
-                        ChainMetric("域名命中", if (!snapshot.running) "—" else if (displayedHitCount > 0L) displayedHitCount.toString() else "0", Modifier.weight(1f))
-                    }
+                    RuleMetricSummary(
+                        rules = snapshot.rules.count,
+                        sources = snapshot.rules.sources.count { it.enabled },
+                        hits = if (snapshot.running) displayedHitCount else null,
+                    )
                 }
             }
         }
 
 
         item("runtime-verify") {
+            var detailsExpanded by rememberSaveable { mutableStateOf(false) }
             val statusText = when {
                 snapshot.running && snapshot.lastError.isNotBlank() -> if (snapshot.effective) "过滤链正在运行 · 最近规则更新未确认" else "本次过滤未完整加载"
                 snapshot.effective && snapshot.rules.count == 0 -> "过滤链已加载 · 当前规则为空"
@@ -416,7 +401,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                 else -> Color(0xFF64748B)
             }
             Surface(
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(18.dp),
                 color = if (dark) t.elevatedCardBackground else Color.White,
                 shadowElevation = if (dark) 0.dp else 2.dp,
             ) {
@@ -436,11 +421,16 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                         Spacer(Modifier.width(10.dp))
                         Column(Modifier.weight(1f)) {
                             Text("运行链验证", color = t.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                            Text(statusText, color = statusColor, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            Text(statusText, color = statusColor, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                         }
-                        TextButton(onClick = { if (!busy) revision++ }) { Text("重新检测", fontSize = 11.sp) }
+                        TextButton(onClick = { if (!busy) revision++ }) { Text("重新检测", fontSize = 12.sp) }
                     }
-                    HorizontalDivider(color = if (dark) t.outline.copy(alpha = .35f) else Color(0xFFF1F5F9))
+                    TextButton(onClick = { detailsExpanded = !detailsExpanded }, modifier = Modifier.heightIn(min = 48.dp)) {
+                        Text(if (detailsExpanded) "收起验证详情" else "展开验证详情")
+                        Icon(if (detailsExpanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore, null)
+                    }
+                    if (detailsExpanded || snapshot.lastError.isNotBlank()) {
+                    HorizontalDivider(color = t.outline.copy(alpha = .25f))
                     ChainVerifyRow("本地规则库", snapshot.rules.count > 0, if (snapshot.rules.count > 0) "${snapshot.rules.count} 条有效规则" else "当前没有启用的拦截规则", allowNeutral = true)
                     ChainVerifyRow("启动配置注入", snapshot.startupInjected, if (snapshot.startupInjected) "hetu-adblock 已写入运行副本" else "当前启动副本没有广告 provider")
                     ChainVerifyRow("Mihomo 规则链", snapshot.controllerLoaded, if (snapshot.controllerLoaded) "Controller 已看到 REJECT 规则" else "当前 Controller 未看到广告规则")
@@ -456,36 +446,30 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                     if (displayedRecentDomains.isNotEmpty()) {
                         Surface(shape = RoundedCornerShape(12.dp), color = if (dark) Color.White.copy(alpha = .04f) else Color(0xFFF8FAFC)) {
                             Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text("最近拦截", color = t.textPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                Text("最近拦截", color = t.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 displayedRecentDomains.take(6).forEach { domain ->
-                                    Text(domain, color = t.textSecondary, fontSize = 10.sp, lineHeight = 14.sp)
+                                    Text(domain, color = t.textSecondary, fontSize = 12.sp, lineHeight = 17.sp)
                                 }
                             }
                         }
                     }
+                    }
                     if (snapshot.lastError.isNotBlank()) {
-                        Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFFF59E0B).copy(alpha = .10f)) {
-                            Text(
-                                "最近一次规则应用问题：${snapshot.lastError}",
-                                Modifier.fillMaxWidth().padding(10.dp),
-                                color = Color(0xFFB45309),
-                                fontSize = 10.sp,
-                                lineHeight = 15.sp,
-                            )
-                        }
+                        HetuTaskFeedback("规则应用未确认：" + snapshot.lastError, error = true, busy = false)
+
                     }
                 }
             }
         }
 
         item("profile") {
-            Surface(shape = RoundedCornerShape(20.dp), color = if (dark) t.elevatedCardBackground else Color.White, shadowElevation = if (dark) 0.dp else 1.dp) {
+            Surface(shape = RoundedCornerShape(18.dp), color = if (dark) t.elevatedCardBackground else Color.White, shadowElevation = if (dark) 0.dp else 1.dp) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Rounded.Tune, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(19.dp))
                         Spacer(Modifier.width(8.dp))
                         Text("保护强度", color = t.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                        Text(snapshot.rules.profile, color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text(snapshot.rules.profile, color = MaterialTheme.colorScheme.primary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                         listOf("lite" to "轻量", "balanced" to "均衡", "enhanced" to "加强").forEach { (id, label) ->
@@ -509,7 +493,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                             )
                         }
                     }
-                    Text("轻量：国内纯广告；均衡：AdGuard DNS + 国内规则；加强：AdGuard DNS + HaGeZi + 隐私/追踪增强。例外规则和用户白名单始终优先。", color = t.textSecondary, fontSize = 10.sp, lineHeight = 15.sp)
+                    Text("轻量：国内纯广告；均衡：AdGuard DNS + 国内规则；加强：AdGuard DNS + HaGeZi + 隐私/追踪增强。例外规则和用户白名单始终优先。", color = t.textSecondary, fontSize = 12.sp, lineHeight = 15.sp)
                 }
             }
         }
@@ -518,8 +502,8 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
             Surface(shape = RoundedCornerShape(18.dp), color = t.selectionBackground) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Text("执行顺序", color = t.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    Text("应用流量 → Root DIRECT 应用 / 明确域名白名单 → 广告后缀 RULE-SET → 普通地区/规则集分流 → 最终兜底", color = t.textSecondary, fontSize = 11.sp, lineHeight = 17.sp)
-                    Text("串联模式使用 Mihomo +. 域名后缀匹配，可覆盖多级子域；独立 DNS 去广告在代理运行时暂停。", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    Text("应用流量 → Root DIRECT 应用 / 明确域名白名单 → 广告后缀 RULE-SET → 普通地区/规则集分流 → 最终兜底", color = t.textSecondary, fontSize = 12.sp, lineHeight = 17.sp)
+                    Text("串联模式使用 Mihomo +. 域名后缀匹配，可覆盖多级子域；独立 DNS 去广告在代理运行时暂停。", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -540,17 +524,17 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                                 snapshot.vpnFallbackRunning -> "DNS 过滤正在运行"
                                 else -> "已启用 · 等待恢复"
                             }
-                            Text(fallbackState, color = t.textSecondary, fontSize = 11.sp)
+                            Text(fallbackState, color = t.textSecondary, fontSize = 12.sp)
                         }
                         Switch(checked = fallbackEnabled, onCheckedChange = { applyFallback(it) }, enabled = !busy)
                     }
-                    Text("类似 AdGuard Home 的 DNS 层过滤思路：域名后缀规则 + 白名单优先；Root 代理运行时由 Mihomo 规则链接管，代理停止后由本地 DNS 过滤继续。", color = t.textSecondary, fontSize = 10.sp, lineHeight = 15.sp)
+                    Text("类似 AdGuard Home 的 DNS 层过滤思路：域名后缀规则 + 白名单优先；Root 代理运行时由 Mihomo 规则链接管，代理停止后由本地 DNS 过滤继续。", color = t.textSecondary, fontSize = 12.sp, lineHeight = 15.sp)
                 }
             }
         }
 
         item("cname-protection") {
-            Surface(shape = RoundedCornerShape(20.dp), color = if (dark) t.elevatedCardBackground else Color.White, shadowElevation = if (dark) 0.dp else 1.dp) {
+            Surface(shape = RoundedCornerShape(18.dp), color = if (dark) t.elevatedCardBackground else Color.White, shadowElevation = if (dark) 0.dp else 1.dp) {
                 Row(Modifier.fillMaxWidth().padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         Modifier.size(40.dp).background(MaterialTheme.colorScheme.primary.copy(alpha = .09f), RoundedCornerShape(12.dp)),
@@ -561,7 +545,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                     Spacer(Modifier.width(11.dp))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         Text("CNAME 别名链保护", color = t.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                        Text("独立 DNS 模式会继续检查别名最终目标，防止广告/跟踪域名通过 CNAME 绕过。", color = t.textSecondary, fontSize = 10.sp, lineHeight = 14.sp)
+                        Text("独立 DNS 模式会继续检查别名最终目标，防止广告/跟踪域名通过 CNAME 绕过。", color = t.textSecondary, fontSize = 12.sp, lineHeight = 17.sp)
                     }
                     Switch(
                         checked = cnameProtection,
@@ -593,7 +577,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                                     if (source.mirror >= 0) append(" · 镜像 ${source.mirror + 1}")
                                 },
                                 color = t.textSecondary,
-                                fontSize = 10.sp,
+                                fontSize = 12.sp,
                             )
                             if (source.lastError.isNotBlank()) {
                                 Text(
@@ -618,7 +602,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                     Spacer(Modifier.width(11.dp))
                     Column(Modifier.weight(1f)) {
                         Text("用户黑白名单", color = t.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                        Text("白名单 ${snapshot.rules.allow.size} · 黑名单 ${snapshot.rules.block.size} · 与独立去广告共用同一规则库", color = t.textSecondary, fontSize = 11.sp)
+                        Text("白名单 ${snapshot.rules.allow.size} · 黑名单 ${snapshot.rules.block.size} · 与独立去广告共用同一规则库", color = t.textSecondary, fontSize = 12.sp)
                     }
                 }
             }
@@ -661,12 +645,9 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                     disabledContentColor = Color.White,
                 ),
             ) {
-                Icon(
-                    if (updateSuccess) Icons.Rounded.Check else Icons.Rounded.Sync,
-                    if (updatingRules) "正在更新" else null,
-                    modifier = Modifier.size(19.dp).graphicsLayer { rotationZ = if (updatingRules) updateSpin else 0f },
-                    tint = Color.White,
-                )
+                if (updatingRules) HetuBusyIndicator(Modifier.size(19.dp), Color.White)
+                else Icon(if (updateSuccess) Icons.Rounded.Check else Icons.Rounded.Sync,
+                    null, modifier = Modifier.size(19.dp), tint = Color.White)
                 Spacer(Modifier.width(8.dp))
                 Text(
                     when {
@@ -681,9 +662,9 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
 
         if (notice.isNotBlank() || snapshot.message.isNotBlank()) {
             item("notice") {
-                Surface(shape = RoundedCornerShape(16.dp), color = t.controlBackground) {
-                    Text((notice.ifBlank { snapshot.message }), Modifier.fillMaxWidth().padding(13.dp), color = t.textSecondary, fontSize = 11.sp, lineHeight = 17.sp)
-                }
+                HetuTaskFeedback(notice.ifBlank { snapshot.message },
+                    error = snapshot.message.isNotBlank() && notice.isBlank(), busy = busy)
+
             }
         }
     }
@@ -720,35 +701,13 @@ private fun ChainVerifyRow(label: String, ok: Boolean, detail: String, allowNeut
             )
         }
         Spacer(Modifier.width(8.dp))
-        Text(label, color = t.textPrimary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(88.dp))
-        Text(detail, color = t.textSecondary, fontSize = 10.sp, lineHeight = 14.sp, modifier = Modifier.weight(1f))
-    }
-}
-
-@Composable
-private fun ChainMetric(label: String, value: String, modifier: Modifier = Modifier) {
-    val t = LocalHetuTokens.current
-    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val accent = if (dark) Color(0xFF60A5FA) else Color(0xFF2563EB)
-    Surface(
-        modifier = modifier.height(70.dp),
-        shape = RoundedCornerShape(16.dp),
-        color = if (dark) t.controlBackground.copy(alpha = .72f) else Color.White,
-        tonalElevation = 0.dp,
-        shadowElevation = if (dark) 0.dp else 3.dp,
-    ) {
-        Column(
-            Modifier.fillMaxSize().padding(horizontal = 11.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Text(value, color = accent, fontSize = 20.sp, lineHeight = 23.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
-            Spacer(Modifier.height(2.dp))
-            Text(label, color = Color(0xFF94A3B8), fontSize = 10.sp, lineHeight = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1)
-        }
+        Text(label, color = t.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(.38f))
+        Text(detail, color = t.textSecondary, fontSize = 12.sp, lineHeight = 17.sp, modifier = Modifier.weight(1f))
     }
 }
 
 @Composable
 private fun ChainSectionLabel(text: String) {
-    Text(text, color = Color(0xFF94A3B8), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = .6.sp, modifier = Modifier.padding(start = 12.dp, top = 2.dp))
+    val t = LocalHetuTokens.current
+    Text(text, color = t.textSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = .6.sp, modifier = Modifier.padding(start = 12.dp, top = 2.dp))
 }

@@ -1,5 +1,7 @@
 package io.github.xgl34222220.hetu
 
+import io.github.xgl34222220.hetu.ui.*
+
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -76,7 +78,7 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
     val profile = remember(selected, reload) { ProxyRuntimeProfile.load(prefs) }
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val pageBg = if (dark) t.pageBackground else Color(0xFFF1F5F9)
+    val pageBg = if (dark) t.pageBackground else MaterialTheme.colorScheme.background
     val shimmer = androidx.compose.animation.core.rememberInfiniteTransition(label = "appSkeletonShimmer")
     val shimmerX by shimmer.animateFloat(initialValue = -1f, targetValue = 2f, animationSpec = androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(1400, easing = androidx.compose.animation.core.LinearEasing)), label = "appSkeletonShimmerX")
     val shimmerBrush = Brush.linearGradient(
@@ -111,7 +113,7 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(pageBg),
-        contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 92.dp),
+        contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = hetuContentBottomPadding()),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item("header") {
@@ -121,8 +123,8 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
                 }
                 Spacer(Modifier.width(4.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("应用名单", color = t.textPrimary, fontSize = 24.sp, lineHeight = 30.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("Root 分应用代理 · 与去广告应用放行页面分离", color = t.textSecondary, fontSize = 11.sp)
+                    Text("应用名单", color = t.textPrimary, fontSize = 22.sp, lineHeight = 30.sp, fontWeight = FontWeight.ExtraBold)
+                    Text("Root 分应用代理 · 与去广告应用放行页面分离", color = t.textSecondary, fontSize = 12.sp)
                 }
                 IconButton(onClick = { reload++ }, modifier = Modifier.size(42.dp)) {
                     Icon(Icons.Rounded.Refresh, "刷新应用", tint = MaterialTheme.colorScheme.primary)
@@ -131,7 +133,7 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
         }
 
         item("scope") {
-            Surface(shape = RoundedCornerShape(22.dp), color = if (dark) t.elevatedCardBackground else Color.White, shadowElevation = if (dark) 0.dp else 1.dp) {
+            Surface(shape = RoundedCornerShape(18.dp), color = if (dark) t.elevatedCardBackground else Color.White, shadowElevation = if (dark) 0.dp else 1.dp) {
                 Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.Top) {
                     Box(Modifier.size(42.dp).background(MaterialTheme.colorScheme.primary.copy(alpha = .10f), RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
                         Icon(Icons.Rounded.Apps, null, tint = MaterialTheme.colorScheme.primary)
@@ -140,7 +142,7 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(scopeTitle, color = t.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                         Text(scopeDescription, color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
-                        Text("已选择 ${selected.size} 个应用 · 修改后下次启动/重启 Root 代理生效", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        Text("已选择 ${selected.size} 个应用 · 修改后下次启动/重启 Root 代理生效", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -163,7 +165,7 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
                 FilterChip(selected = showSystem, onClick = { showSystem = !showSystem }, label = { Text("系统应用") })
                 FilterChip(selected = selectedOnly, onClick = { selectedOnly = !selectedOnly }, label = { Text("已选择") })
                 Spacer(Modifier.weight(1f))
-                Text("${visible.size}/${apps.size}", color = t.textSecondary, fontSize = 11.sp)
+                Text("${visible.size}/${apps.size}", color = t.textSecondary, fontSize = 12.sp)
             }
         }
 
@@ -222,7 +224,7 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(app.label, color = t.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(app.packageName, color = t.textSecondary, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(app.packageName, color = t.textSecondary, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     val checkScale by animateFloatAsState(if (checked) 1f else .78f, spring(dampingRatio = .50f, stiffness = 620f), label = "appCheck${app.packageName}")
                     Checkbox(
@@ -239,7 +241,7 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
                 Row(Modifier.fillMaxWidth().padding(13.dp), verticalAlignment = Alignment.Top) {
                     Icon(Icons.Rounded.Info, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(19.dp))
                     Spacer(Modifier.width(9.dp))
-                    Text("Root 数据面会把包名解析为 UID。为避免破坏系统网络，系统 UID 会被自动忽略；已卸载应用也会在启动时跳过。", color = t.textSecondary, fontSize = 11.sp, lineHeight = 17.sp)
+                    Text("Root 数据面会把包名解析为 UID。为避免破坏系统网络，系统 UID 会被自动忽略；已卸载应用也会在启动时跳过。", color = t.textSecondary, fontSize = 12.sp, lineHeight = 17.sp)
                 }
             }
         }

@@ -115,7 +115,7 @@ fun HetuGlassDock(
             else listOf(Color(0xFFF1F5F9), Color(0xFFE8EEF6)),
         )
     }
-    val shellTint = if (dark) scheme.surface.copy(alpha = .26f) else Color(0xFFF8FBFF).copy(alpha = .34f)
+    val shellTint = if (dark) scheme.surface.copy(alpha = .70f) else scheme.surface.copy(alpha = .72f)
     val liquidShellModifier = if (runtimeLiquid) {
         Modifier.drawBackdrop(
             backdrop = requireNotNull(backdrop),
@@ -125,14 +125,14 @@ fun HetuGlassDock(
                 colorControls(
                     brightness = if (dark) -.015f else .025f,
                     contrast = 1.05f,
-                    saturation = 1.80f,
+                    saturation = 1.10f,
                 )
                 blur(24.dp.toPx(), 24.dp.toPx())
                 liquidGlassLens(
-                    refractionHeight = 17.dp.toPx(),
-                    refractionAmount = 13.dp.toPx(),
+                    refractionHeight = 10.dp.toPx(),
+                    refractionAmount = 6.dp.toPx(),
                     depthEffect = true,
-                    chromaticAberration = .045f,
+                    chromaticAberration = .01f,
                 )
             },
             highlight = {
@@ -185,7 +185,7 @@ fun HetuGlassDock(
             modifier = Modifier
                 .fillMaxSize()
                 .shadow(
-                    if (floating) 14.dp else 4.dp,
+                    if (floating) 6.dp else 2.dp,
                     shape,
                     clip = false,
                     ambientColor = Color(0xFF0F172A).copy(alpha = if (dark) .12f else .035f),
@@ -211,8 +211,8 @@ fun HetuGlassDock(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(start = 6.dp, top = 6.dp, end = 6.dp, bottom = if (floating) 6.dp else bottomInset + 6.dp),
-            indicatorColor = if (dark) Color(0xFF2563EB).copy(alpha = .18f) else Color(0xFF2563EB).copy(alpha = .08f),
-            indicatorBorderColor = if (dark) Color(0xFF60A5FA).copy(alpha = .22f) else Color(0xFF2563EB).copy(alpha = .18f),
+            indicatorColor = if (dark) scheme.primary.copy(alpha = .18f) else scheme.primary.copy(alpha = .08f),
+            indicatorBorderColor = if (dark) scheme.primary.copy(alpha = .22f) else scheme.primary.copy(alpha = .18f),
             indicatorShadow = 0.dp,
             selectedColor = scheme.primary,
             unselectedColor = scheme.onSurfaceVariant.copy(alpha = .90f),
@@ -247,7 +247,14 @@ private fun DockItems(
         val indicatorPosition = remember { Animatable(targetIndex.toFloat()) }
         var travelDirection by remember { mutableFloatStateOf(0f) }
         var previousIndex by remember { mutableIntStateOf(targetIndex) }
-        LaunchedEffect(targetIndex) {
+        val motion = LocalHetuMotionEnabled.current
+        LaunchedEffect(targetIndex, motion) {
+            if (!motion) {
+                indicatorPosition.snapTo(targetIndex.toFloat())
+                liquidStretch.snapTo(0f)
+                previousIndex = targetIndex
+                return@LaunchedEffect
+            }
             if (targetIndex != previousIndex) {
                 travelDirection = if (targetIndex > previousIndex) 1f else -1f
                 previousIndex = targetIndex

@@ -1,5 +1,7 @@
 package io.github.xgl34222220.hetu
 
+import io.github.xgl34222220.hetu.ui.*
+
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -35,6 +37,7 @@ import androidx.compose.material.icons.rounded.Downloading
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material3.*
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -83,6 +86,7 @@ private fun CoreManagerScreen(onBack: () -> Unit) {
     var busyCore by remember { mutableStateOf("") }
     var progress by remember { mutableStateOf("") }
     var notice by remember { mutableStateOf("") }
+    var explanationOpen by remember { mutableStateOf(false) }
 
     LaunchedEffect(revision) {
         loading = true
@@ -101,51 +105,48 @@ private fun CoreManagerScreen(onBack: () -> Unit) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(tokens.pageBackground),
         contentPadding = PaddingValues(
-            start = 20.dp,
-            end = 20.dp,
-            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 92.dp,
+            start = 16.dp,
+            end = 16.dp,
+            bottom = hetuContentBottomPadding(),
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item("header") {
-            Row(
-                Modifier.fillMaxWidth().statusBarsPadding().padding(top = 12.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Surface(shape = CircleShape, color = tokens.cardBackground, modifier = Modifier.size(46.dp), shadowElevation = 1.dp) {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回", tint = MaterialTheme.colorScheme.primary) }
-                }
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("内核管理", color = tokens.textPrimary, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                    Text("内核版本与 Root 运行能力", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
-                }
-                Surface(shape = CircleShape, color = tokens.cardBackground, modifier = Modifier.size(46.dp), shadowElevation = 1.dp) {
-                    IconButton(onClick = { if (busyCore.isBlank()) revision++ }) { Icon(Icons.Rounded.Refresh, "检查更新", tint = MaterialTheme.colorScheme.primary) }
+            Column(Modifier.statusBarsPadding()) {
+                HetuPageHeader("内核管理", onBack, subtitle = "安装版本与后端能力分别展示") {
+                    IconButton(onClick = { if (busyCore.isBlank()) revision++ }, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Rounded.Refresh, "检查更新")
+                    }
                 }
             }
         }
         item("intro") {
-            Surface(shape = RoundedCornerShape(24.dp), color = tokens.cardBackground, shadowElevation = 1.dp) {
+            Surface(shape = RoundedCornerShape(18.dp), color = tokens.cardBackground, shadowElevation = 1.dp) {
                 Column(Modifier.fillMaxWidth().padding(17.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Rounded.Memory, null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(9.dp))
-                        Text("核心按设备 ABI 从发布源直接拉取", color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall)
+                        Text("按当前设备架构获取核心", color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall)
                     }
+                    TextButton(onClick = { explanationOpen = !explanationOpen }, modifier = Modifier.heightIn(min = 48.dp)) {
+                        Text(if (explanationOpen) "收起说明" else "查看核心使用说明")
+                    }
+                    if (explanationOpen) {
                     Text("Mihomo 没有下载更新时自动回退到 App 内置版本；下载更新后优先使用下载版。其他核心先完成下载与版本管理，运行后端未接入时不会假报可用。", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
+                    }
                     OutlinedButton(
                         onClick = { context.startActivity(Intent(context, ProxyAdvancedSettingsActivity::class.java)) },
-                        modifier = Modifier.fillMaxWidth().height(46.dp),
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                         shape = RoundedCornerShape(17.dp),
                     ) {
                         Icon(Icons.Rounded.Tune, null, Modifier.size(18.dp))
                         Spacer(Modifier.width(7.dp))
                         Text("Root 网络高级设置")
                     }
-                    if (progress.isNotBlank()) Text(progress, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
-                    else if (notice.isNotBlank()) Text(notice, color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
-                    if (loading) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+                    if (progress.isNotBlank() || notice.isNotBlank() || loading) {
+                        HetuTaskFeedback(progress.ifBlank { if (loading) "正在检查发布源" else notice },
+                            error = notice.contains("失败") && progress.isBlank(), busy = loading || busyCore.isNotBlank())
+                    }
                 }
             }
         }
@@ -202,7 +203,7 @@ private fun CoreStatusCard(
     onRemove: () -> Unit,
 ) {
     val tokens = LocalHetuTokens.current
-    Surface(shape = RoundedCornerShape(24.dp), color = tokens.cardBackground, shadowElevation = 1.dp) {
+    Surface(shape = RoundedCornerShape(18.dp), color = tokens.cardBackground, shadowElevation = 1.dp) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(shape = RoundedCornerShape(14.dp), color = tokens.elevatedCardBackground, modifier = Modifier.size(44.dp)) {
@@ -217,18 +218,18 @@ private fun CoreStatusCard(
                         if (item.bundled) {
                             Spacer(Modifier.width(7.dp))
                             Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = .55f)) {
-                                Text("内置", Modifier.padding(horizontal = 7.dp, vertical = 2.dp), color = MaterialTheme.colorScheme.primary, fontSize = 10.sp)
+                                Text("内置", Modifier.padding(horizontal = 7.dp, vertical = 2.dp), color = MaterialTheme.colorScheme.primary, fontSize = 12.sp)
                             }
                         }
                     }
-                    Text(if (item.runtimeReady) "当前后端可运行" else "已纳入下载管理 · 运行后端待接入", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
+                    Text((if (item.downloaded) "已安装下载版本" else if (item.bundled) "已内置" else "未安装") + " · " + if (item.runtimeReady) "支持此运行后端" else "运行后端待接入", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
                 }
                 if (busy) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .3f))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                CoreVersionText("当前", item.installedVersion, Modifier.weight(1f))
-                CoreVersionText("远程", item.latestVersion.ifBlank { "—" }, Modifier.weight(1f))
+                CoreVersionText("本机版本", item.installedVersion.ifBlank { "未安装" }, Modifier.weight(1f))
+                CoreVersionText("可下载版本", item.latestVersion.ifBlank { "—" }, Modifier.weight(1f))
             }
             if (item.source.isNotBlank()) Text("来源：${item.source}", color = tokens.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (item.message.isNotBlank()) Text(item.message, color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
@@ -239,10 +240,10 @@ private fun CoreStatusCard(
                     item.bundled -> "下载更新"
                     else -> "下载"
                 }
-                Button(
+                FilledTonalButton(
                     onClick = onInstall,
                     enabled = enabled && item.canDownload,
-                    modifier = Modifier.weight(1f).height(46.dp),
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                     shape = RoundedCornerShape(17.dp),
                 ) {
                     Icon(if (busy) Icons.Rounded.Downloading else Icons.Rounded.CloudDownload, null, Modifier.size(18.dp))
@@ -253,7 +254,7 @@ private fun CoreStatusCard(
                     OutlinedButton(
                         onClick = onRemove,
                         enabled = enabled,
-                        modifier = Modifier.height(46.dp),
+                        modifier = Modifier.heightIn(min = 48.dp),
                         shape = RoundedCornerShape(17.dp),
                     ) {
                         Icon(Icons.Rounded.DeleteOutline, null, Modifier.size(18.dp))
@@ -271,6 +272,6 @@ private fun CoreVersionText(label: String, value: String, modifier: Modifier = M
     val tokens = LocalHetuTokens.current
     Column(modifier) {
         Text(label, color = tokens.textSecondary, style = MaterialTheme.typography.labelSmall)
-        Text(value, color = tokens.textPrimary, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(value, color = tokens.textPrimary, style = MaterialTheme.typography.bodyMedium, softWrap = true)
     }
 }

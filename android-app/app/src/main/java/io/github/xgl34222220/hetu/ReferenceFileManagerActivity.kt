@@ -1,5 +1,7 @@
 package io.github.xgl34222220.hetu
 
+import io.github.xgl34222220.hetu.ui.*
+
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -122,7 +124,7 @@ private fun ReferenceFileManagerScreen(onClose: () -> Unit) {
 
     LazyColumn(
         Modifier.fillMaxSize().background(t.pageBackground),
-        contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 92.dp),
+        contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = hetuContentBottomPadding()),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {
@@ -131,7 +133,7 @@ private fun ReferenceFileManagerScreen(onClose: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = ::goBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回") }
-                Text("文件管理", color = t.textPrimary, fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Text("文件管理", color = t.textPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                 IconButton(onClick = { refresh++ }) { Icon(Icons.Rounded.Refresh, "刷新") }
             }
         }
@@ -193,7 +195,7 @@ private fun ReferenceFileManagerScreen(onClose: () -> Unit) {
         }
         AlertDialog(
             onDismissRequest = { previewTitle = null },
-            shape = RoundedCornerShape(22.dp),
+            shape = RoundedCornerShape(18.dp),
             title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
             text = {
                 Box(Modifier.fillMaxWidth().heightIn(max = 500.dp).verticalScroll(rememberScrollState())) {

@@ -32,6 +32,9 @@ internal data class ProxyRuntimeSnapshot(
     val wanAddress: String = "—",
     val wanCountryCode: String = "",
     val wanRegion: String = "—",
+    val wanState: String = "idle",
+    val wanCheckedAt: Long = 0L,
+    val wanError: String = "",
 )
 
 /** Lightweight runtime inspector used by the proxy dashboard. */
@@ -66,6 +69,7 @@ internal class ProxyRuntimeInspector(context: Context) {
         val json = if (result.ok()) runCatching { JSONObject(result.output.trim()) }.getOrNull() else null
         val local = localNetwork()
         val wan = publicNetwork()
+        val lookup = wanLookup.view()
         ProxyRuntimeSnapshot(
             running = json?.optBoolean("running", false) == true,
             pid = json?.optInt("pid", 0) ?: 0,
@@ -78,6 +82,10 @@ internal class ProxyRuntimeInspector(context: Context) {
             wanAddress = wan.first,
             wanCountryCode = wan.second,
             wanRegion = wan.third,
+            wanState = lookup.state,
+            wanCheckedAt = if (lookup.succeededAt > 0L) System.currentTimeMillis() - (SystemClock.elapsedRealtime() - lookup.succeededAt) else 0L,
+            wanError = if (lookup.failure.isNotBlank() && prefs.getBoolean("proxyRootRuntimeRefreshPending", false))
+                "运行组件待应用，可手动重启代理" else if (lookup.failure.isNotBlank()) "出口检测失败，稍后自动重试" else "",
         )
     }
 

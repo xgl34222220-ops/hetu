@@ -41,20 +41,24 @@ data class HetuTokens(
     val outline: Color = Color.Unspecified,
     val controlBackground: Color = Color.Unspecified,
     val selectionBackground: Color = Color.Unspecified,
+    val textOnPage: Color = Color(0xFF626B76),
+    val successContainer: Color = Color(0xFFE6F7ED),
+    val warningContainer: Color = Color(0xFFFFF4DB),
+    val dangerContainer: Color = Color(0xFFFDECEE),
 )
 
 val LocalHetuTokens = staticCompositionLocalOf {
     HetuTokens(
-        pageBackground = Color(0xFFF4F6F9),
+        pageBackground = Color(0xFFF4F5F7),
         cardBackground = Color(0xFFFFFFFF),
         elevatedCardBackground = Color(0xFFF1F5F9),
         heroBackground = Color(0xFFEDF4FF),
-        textPrimary = Color(0xFF0F172A),
-        textSecondary = Color(0xFF64748B),
-        textMuted = Color(0xFF94A3B8),
-        success = Color(0xFF10B981),
-        warning = Color(0xFFF59E0B),
-        danger = Color(0xFFEF4444),
+        textPrimary = Color(0xFF111827),
+        textSecondary = Color(0xFF71767F),
+        textMuted = Color(0xFF71767F),
+        success = Color(0xFF18794E),
+        warning = Color(0xFF946200),
+        danger = Color(0xFFC52A34),
         outline = Color(0xFFE2E8F0),
         controlBackground = Color(0xFFF1F5F9),
         selectionBackground = Color(0xFFDBEAFE),
@@ -87,8 +91,8 @@ private val ExpressiveShapes = Shapes(
 
 private val HetuTypography = Typography(
     displaySmall = TextStyle(fontSize = 30.sp, lineHeight = 36.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.4).sp),
-    headlineLarge = TextStyle(fontSize = 27.sp, lineHeight = 34.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.35).sp),
-    headlineMedium = TextStyle(fontSize = 23.sp, lineHeight = 30.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.3).sp),
+    headlineLarge = TextStyle(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.35).sp),
+    headlineMedium = TextStyle(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.3).sp),
     headlineSmall = TextStyle(fontSize = 20.sp, lineHeight = 27.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.2).sp),
     titleLarge = TextStyle(fontSize = 19.sp, lineHeight = 25.sp, fontWeight = FontWeight.SemiBold),
     titleMedium = TextStyle(fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold),
@@ -97,8 +101,8 @@ private val HetuTypography = Typography(
     bodyMedium = TextStyle(fontSize = 14.sp, lineHeight = 20.sp),
     bodySmall = TextStyle(fontSize = 12.5.sp, lineHeight = 18.sp),
     labelLarge = TextStyle(fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold),
-    labelMedium = TextStyle(fontSize = 11.5.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium),
-    labelSmall = TextStyle(fontSize = 10.5.sp, lineHeight = 15.sp, fontWeight = FontWeight.Medium, letterSpacing = .1.sp),
+    labelMedium = TextStyle(fontSize = 12.sp, lineHeight = 17.sp, fontWeight = FontWeight.Medium),
+    labelSmall = TextStyle(fontSize = 12.sp, lineHeight = 17.sp, fontWeight = FontWeight.Normal),
 )
 
 private fun paletteStyle(raw: String): PaletteStyle = when (raw) {
@@ -141,17 +145,17 @@ fun HetuTheme(content: @Composable () -> Unit) {
     val baseLight = lightColorScheme(
         primary = fixedPrimary,
         primaryContainer = Color(0xFFDBEAFE),
-        secondary = Color(0xFF2563EB),
-        background = Color(0xFFF4F6F9),
+        secondary = fixedPrimary,
+        background = Color(0xFFF4F5F7),
         surface = Color.White,
-        error = Color(0xFFEF4444),
-        onBackground = Color(0xFF0F172A),
-        onSurface = Color(0xFF0F172A),
+        error = Color(0xFFC52A34),
+        onBackground = Color(0xFF111827),
+        onSurface = Color(0xFF111827),
     )
     val baseDark = darkColorScheme(
         primary = fixedPrimary,
         primaryContainer = Color(0xFF1E3A8A),
-        secondary = Color(0xFF3B82F6),
+        secondary = fixedPrimary,
         background = if (pureBlack) Color.Black else Color(0xFF121212),
         surface = Color(0xFF1E1E1E),
         error = Color(0xFFF87171),
@@ -159,6 +163,7 @@ fun HetuTheme(content: @Composable () -> Unit) {
         onSurface = Color(0xFFF8FAFC),
     )
 
+    val motionEnabled = rememberHetuMotionEnabled()
     val density = LocalDensity.current
     // Density already scales dp and sp. Multiplying fontScale too applied the app
     // size twice to text and caused clipping at larger sizes. Preserve the user's
@@ -175,34 +180,39 @@ fun HetuTheme(content: @Composable () -> Unit) {
                 elevatedCardBackground = Color(0xFF242424),
                 heroBackground = Color(0xFF172338),
                 textPrimary = Color(0xFFF8FAFC),
-                textSecondary = Color(0xFF94A3B8),
-                textMuted = Color(0xFF64748B),
-                success = Color(0xFF34D399),
+                textSecondary = Color(0xFFB4BDCA),
+                textMuted = Color(0xFFADB7C4),
+                success = Color(0xFF89DCAE),
                 warning = Color(0xFFFBBF24),
                 danger = Color(0xFFF87171),
                 outline = Color(0xFF30343B),
                 controlBackground = Color(0xFF24272D),
-                selectionBackground = if (enableMonet) scheme.primaryContainer.copy(alpha = .55f) else Color(0xFF1E3A8A),
+                selectionBackground = scheme.primaryContainer.copy(alpha = .55f),
+                textOnPage = Color(0xFFB4BDCA),
+                successContainer = Color(0xFF17382B),
+                warningContainer = Color(0xFF3C311E),
+                dangerContainer = Color(0xFF43232A),
             )
         } else {
             HetuTokens(
-                pageBackground = Color(0xFFF4F6F9),
+                pageBackground = Color(0xFFF4F5F7),
                 cardBackground = Color(0xFFFFFFFF),
                 elevatedCardBackground = Color(0xFFF1F5F9),
                 heroBackground = Color(0xFFEDF4FF),
-                textPrimary = Color(0xFF0F172A),
-                textSecondary = Color(0xFF64748B),
-                textMuted = Color(0xFF94A3B8),
-                success = Color(0xFF10B981),
-                warning = Color(0xFFF59E0B),
-                danger = Color(0xFFEF4444),
+                textPrimary = Color(0xFF111827),
+                textSecondary = Color(0xFF71767F),
+                textMuted = Color(0xFF71767F),
+                success = Color(0xFF18794E),
+                warning = Color(0xFF946200),
+                danger = Color(0xFFC52A34),
                 outline = Color(0xFFE2E8F0),
                 controlBackground = Color(0xFFF1F5F9),
-                selectionBackground = if (enableMonet) scheme.primaryContainer.copy(alpha = .72f) else Color(0xFFDBEAFE),
+                selectionBackground = scheme.primaryContainer.copy(alpha = .72f),
             )
         }
         CompositionLocalProvider(
             LocalHetuTokens provides tokens,
+            LocalHetuMotionEnabled provides motionEnabled,
             LocalDensity provides scaledDensity,
             content = inner,
         )
@@ -231,7 +241,7 @@ fun HetuTheme(content: @Composable () -> Unit) {
             style = paletteStyle(prefs.getString("colorPalette", "TonalSpot") ?: "TonalSpot"),
             shapes = shapes,
             typography = HetuTypography,
-            animate = true,
+            animate = motionEnabled,
         ) {
             ProvideTokens(content)
         }

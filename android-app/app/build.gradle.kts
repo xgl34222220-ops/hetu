@@ -15,8 +15,16 @@ android {
         applicationId = "io.github.xgl34222220.hetu"
         minSdk = 26
         targetSdk = 35
-        versionCode = 493
-        versionName = "0.4.0-test.93"
+        versionCode = 494
+        versionName = "0.4.0-test.94"
+    }
+
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+        unitTests.all {
+            it.maxHeapSize = "2g"
+            it.systemProperty("robolectric.graphicsMode", "NATIVE")
+        }
     }
 
     buildFeatures {
@@ -69,4 +77,19 @@ dependencies {
     implementation("top.yukonga.miuix.kmp:miuix-squircle-android:0.9.3")
     implementation(platform("io.github.rosemoe:editor-bom:0.24.6"))
     implementation("io.github.rosemoe:editor")
+}
+
+// Presentation-only: safe YAML icon projection, SVG decoding, rendered regression tests.
+dependencies {
+    implementation("org.yaml:snakeyaml:2.3")
+    implementation("com.caverock:androidsvg-aar:1.4")
+    testImplementation(platform("androidx.compose:compose-bom:2026.03.00"))
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    testImplementation("com.squareup.okhttp3:okhttp-tls:4.12.0")
+    testImplementation("org.robolectric:robolectric:4.16")
+    testImplementation("androidx.test:core:1.7.0")
+    testImplementation("androidx.test.ext:junit:1.3.0")
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }

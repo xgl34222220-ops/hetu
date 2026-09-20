@@ -95,6 +95,9 @@ import io.github.xgl34222220.hetu.ui.HetuGlassDock
 import io.github.xgl34222220.hetu.ui.HetuTheme
 import io.github.xgl34222220.hetu.ui.DockItem
 import io.github.xgl34222220.hetu.ui.LocalHetuTokens
+import io.github.xgl34222220.hetu.ui.*
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
 import io.github.xgl34222220.hetu.ui.glass.liquidGlassLens
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
@@ -130,7 +133,7 @@ class ReferenceProxyActivity : ComponentActivity() {
 }
 
 private enum class RefProxyPage { Home, Panel, Tools, Settings }
-private data class RefSubscriptionCache(val used: Long = 0L, val total: Long = 0L, val count: Int = 0)
+internal data class RefSubscriptionCache(val used: Long = 0L, val total: Long = 0L, val count: Int = 0)
 private enum class RefPanelTab(val label: String) {
     Groups("节点"), Overview("概览"), Subscriptions("订阅"), Connections("连接"), Rules("规则"), RuleSets("规则集")
 }
@@ -193,6 +196,8 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
         wanAddress = if (cachedWanViaCore) prefs.getString("proxyUiLastWan", "—") ?: "—" else "—",
         wanCountryCode = if (cachedWanViaCore) prefs.getString("proxyUiLastWanCountry", "") ?: "" else "",
         wanRegion = if (cachedWanViaCore) prefs.getString("proxyUiLastWanRegion", "—") ?: "—" else "—",
+        wanState = if (cachedWanViaCore) "stale" else "idle",
+        wanCheckedAt = if (cachedWanViaCore) prefs.getLong("proxyUiLastWanCheckedAt", 0L) else 0L,
     )) }
     var providers by remember { mutableStateOf<List<DashboardProviderUi>>(emptyList()) }
     var cachedSubscription by remember { mutableStateOf(RefSubscriptionCache(
@@ -218,7 +223,6 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
     var lastDown by remember { mutableLongStateOf(0L) }
     var lastAt by remember { mutableLongStateOf(0L) }
     var operation by remember { mutableStateOf("") }
-    var upgradeRuntimeApplyAttempted by remember { mutableStateOf(false) }
     var homeRefreshing by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("") }
     var testing by remember { mutableStateOf(false) }
@@ -291,7 +295,8 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                 .putString("proxyUiLastWan", sampled.wanAddress)
                 .putString("proxyUiLastWanCountry", sampled.wanCountryCode)
                 .putString("proxyUiLastWanRegion", sampled.wanRegion)
-                .putBoolean("proxyUiLastWanViaCore", true)
+                .putBoolean("proxyUiLastWanViaCore", sampled.wanState == "success" || sampled.wanState == "stale")
+                .putLong("proxyUiLastWanCheckedAt", sampled.wanCheckedAt)
                 .putFloat("proxyUiLastCpu", cpuPercent)
                 .putLong("proxyUiLastUpRate", upRate)
                 .putLong("proxyUiLastDownRate", downRate)
@@ -472,28 +477,8 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
         }
     }
 
-    // Package replacement keeps a live Root core untouched. Once the user opens Hetu,
-    // validate and replace that stale runtime so new listeners/network fixes become live.
-    LaunchedEffect(resumeRevision, state.running) {
-        if (!upgradeRuntimeApplyAttempted &&
-            state.running &&
-            prefs.getBoolean("proxyRootRuntimeRefreshPending", false) &&
-            operation.isBlank()
-        ) {
-            upgradeRuntimeApplyAttempted = true
-            operation = "正在应用新版本运行组件…"
-            try {
-                controller.restart { stage -> operation = stage }
-                operation = ""
-                refresh()
-            } catch (cancel: CancellationException) {
-                throw cancel
-            } catch (error: Exception) {
-                message = "新版本运行组件暂未应用：" + (error.message ?: "请手动重启代理")
-                operation = ""
-            }
-        }
-    }
+    // Rendering/returning to a page must never restart or redeploy a running core.
+    // Pending runtime upgrades are surfaced by the existing manual restart action.
 
     // Auto site probes are opt-in. The default is off; manual refresh remains available.
     // This prevents Hetu itself from constantly adding probe traffic to Mihomo.
@@ -527,11 +512,11 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
         }
     }
 
-    val shellBackground = if (MaterialTheme.colorScheme.background.luminance() < .5f) {
-        LocalHetuTokens.current.pageBackground
-    } else {
-        Color(0xFFF4F5F7)
-    }
+    val shellBackground = LocalHetuTokens.current.pageBackground
+    val layoutDensity = LocalDensity.current
+    var measuredDockHeight by remember { mutableStateOf(0.dp) }
+    val fallbackDockHeight = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 84.dp
+    CompositionLocalProvider(LocalHetuDockHeight provides if (panelDetailVisible) 0.dp else measuredDockHeight.takeIf { it > 0.dp } ?: fallbackDockHeight) {
     Box(Modifier.fillMaxSize().background(shellBackground)) {
         Box(
             Modifier.fillMaxSize()
@@ -659,10 +644,14 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                 onSelect = { page = dockPages[it] },
                 hazeState = haze,
                 backdrop = liquidBackdrop.takeIf { liquid },
-                modifier = Modifier.align(Alignment.BottomCenter),
+                modifier = Modifier.align(Alignment.BottomCenter).onSizeChanged {
+                    measuredDockHeight = with(layoutDensity) { it.height.toDp() }
+                },
             )
         }
     }
+
+    } // measured dock composition local
 
     logText?.let { text ->
         RefInfoBottomSheet(
@@ -684,53 +673,18 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
 
 @OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
-private fun refHomeLiquidModifier(
-    base: Modifier,
-    hazeState: HazeState,
-    glassEnabled: Boolean,
-    shape: RoundedCornerShape,
-): Modifier {
-    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val brush = if (dark) {
-        Brush.verticalGradient(
-            listOf(
-                Color(0xFF1B2431).copy(alpha = .91f),
-                Color(0xFF151D29).copy(alpha = .84f),
-            ),
-        )
-    } else {
-        Brush.verticalGradient(
-            listOf(
-                Color.White.copy(alpha = .94f),
-                Color(0xFFF8FAFE).copy(alpha = .85f),
-            ),
-        )
-    }
-    return base
-        .shadow(
-            8.dp,
-            shape,
-            clip = false,
-            ambientColor = Color(0xFF0F172A).copy(alpha = if (dark) .10f else .028f),
-            spotColor = Color(0xFF0F172A).copy(alpha = if (dark) .13f else .050f),
-        )
-        .clip(shape)
-        .then(
-            if (glassEnabled) Modifier.hazeEffect(state = hazeState, style = HazeMaterials.ultraThin()) {
-                blurRadius = 20.dp
-                noiseFactor = .012f
-            } else Modifier,
-        )
-        .background(brush, shape)
-        .border(
-            .8.dp,
-            if (dark) Color.White.copy(alpha = .10f) else Color.White.copy(alpha = .78f),
-            shape,
-        )
+private fun refHomeLiquidModifier(base: Modifier, hazeState: HazeState, glassEnabled: Boolean, shape: RoundedCornerShape): Modifier {
+    val t = LocalHetuTokens.current
+    return base.shadow(2.dp, shape, clip = false,
+            ambientColor = Color.Black.copy(alpha = .02f), spotColor = Color.Black.copy(alpha = .03f))
+        .clip(shape).then(if (glassEnabled) Modifier.hazeEffect(state = hazeState, style = HazeMaterials.ultraThin()) {
+            blurRadius = 16.dp; noiseFactor = .005f
+        } else Modifier)
+        .background(t.cardBackground.copy(alpha = if (glassEnabled) .96f else 1f), shape)
 }
 
 @Composable
-private fun RefHome(
+internal fun RefHome(
     state: ProxyComposeState,
     runtime: ProxyRuntimeSnapshot,
     providers: List<DashboardProviderUi>,
@@ -766,11 +720,11 @@ private fun RefHome(
 
     LazyColumn(
         Modifier.fillMaxSize().statusBarsPadding().background(
-            if (MaterialTheme.colorScheme.background.luminance() < .5f) t.pageBackground else Color(0xFFF4F5F7),
+            t.pageBackground,
         ),
         contentPadding = PaddingValues(
             start = 16.dp, top = 8.dp, end = 16.dp,
-            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 96.dp,
+            bottom = hetuContentBottomPadding(),
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -832,19 +786,16 @@ private fun RefHome(
                         }
                     }
                     if (busy || message.isNotBlank()) {
-                        Text(
-                            operation.ifBlank { message },
-                            modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite },
-                            color = if (busy) scheme.primary else t.textSecondary,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
+                        HetuTaskFeedback(operation.ifBlank { message },
+                            error = !busy && (message.contains("失败") || message.contains("异常") || message.contains("error", true)),
+                            busy = busy)
                     }
-                    if (state.running && state.runtimeSettingsPending) {
+                    if (state.running && (state.runtimeSettingsPending || context.getSharedPreferences("hetu", 0).getBoolean("proxyRootRuntimeRefreshPending", false))) {
                         Surface(onClick = onSettings, color = t.warning.copy(alpha = .10f), shape = RoundedCornerShape(12.dp)) {
                             Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Icon(Icons.Rounded.Info, null, Modifier.size(18.dp), tint = t.warning)
-                                Text("设置有更新，重启后生效", Modifier.weight(1f), color = t.textPrimary, style = MaterialTheme.typography.bodySmall)
+                                Text("运行组件或设置待应用，请手动重启", Modifier.weight(1f), color = t.textPrimary, style = MaterialTheme.typography.bodySmall)
                                 Icon(Icons.Rounded.ChevronRight, null, Modifier.size(18.dp), tint = t.textSecondary)
                             }
                         }
@@ -891,11 +842,11 @@ private fun RefHomeActions(running: Boolean, busy: Boolean, onToggle: () -> Unit
     @Composable
     fun MainAction(modifier: Modifier) {
         Button(
-            onClick = onToggle, enabled = !busy, modifier = modifier.heightIn(min = 44.dp),
+            onClick = onToggle, enabled = !busy, modifier = modifier.heightIn(min = 48.dp),
             shape = RoundedCornerShape(15.dp), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = if (running) Color(0xFFFFECEC) else scheme.primary,
-                contentColor = if (running) Color(0xFFE5484D) else scheme.onPrimary,
+                containerColor = if (running) t.dangerContainer else scheme.primary,
+                contentColor = if (running) t.danger else scheme.onPrimary,
             ),
         ) {
             Icon(if (running) Icons.Rounded.Stop else Icons.Rounded.PlayArrow, null, Modifier.size(20.dp))
@@ -966,7 +917,7 @@ private fun RefLatencyPanel(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("网络延迟", color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                TextButton(onClick = onClick, enabled = !testing, modifier = Modifier.heightIn(min = 44.dp)) {
+                TextButton(onClick = onClick, enabled = !testing, modifier = Modifier.heightIn(min = 48.dp)) {
                     if (testing) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                     else Icon(Icons.Rounded.Speed, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
@@ -984,463 +935,29 @@ private fun RefLatencyPanel(
 
 @Composable
 private fun RefLatencyColumn(label: String, value: Long?, testing: Boolean, modifier: Modifier) {
-    val valueColor = when {
-        value == null -> Color(0xFF94A3B8)
-        value <= 0L -> Color(0xFFF43F5E)
-        value < 100L -> Color(0xFF10B981)
-        value <= 300L -> Color(0xFFF59E0B)
-        else -> Color(0xFFF43F5E)
-    }
-    val alpha by animateFloatAsState(
-        targetValue = if (testing) .58f else 1f,
-        animationSpec = androidx.compose.animation.core.tween(180),
-        label = "homeLatencyTestingAlpha",
-    )
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(label, color = Color(0xFF64748B), fontSize = 11.sp, lineHeight = 15.sp, maxLines = 1)
-        Row(
-            Modifier.height(22.dp).graphicsLayer { this.alpha = alpha },
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Box(Modifier.width(46.dp), contentAlignment = Alignment.CenterEnd) {
-                androidx.compose.animation.AnimatedContent(
-                    targetState = value,
-                    transitionSpec = {
-                        androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(180))
-                            .togetherWith(androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(120)))
-                    },
-                    label = "latencyValueFade${label}",
-                ) { shown ->
-                    Text(
-                        when {
-                            shown == null -> "--"
-                            shown <= 0L -> "超时"
-                            else -> shown.toString()
-                        },
-                        color = when {
-                            shown == null -> Color(0xFF94A3B8)
-                            shown <= 0L -> Color(0xFFF43F5E)
-                            shown < 100L -> Color(0xFF10B981)
-                            shown <= 300L -> Color(0xFFF59E0B)
-                            else -> Color(0xFFF43F5E)
-                        },
-                        fontSize = if (shown != null && shown > 0L) 18.sp else 14.sp,
-                        lineHeight = 21.sp,
-                        fontWeight = FontWeight.Black,
-                        maxLines = 1,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                    )
-                }
-            }
-            Text(
-                if (value != null && value > 0L) "ms" else "",
-                color = Color(0xFF94A3B8),
-                fontSize = 10.sp,
-                lineHeight = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                modifier = Modifier.width(14.dp),
-            )
-        }
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(label, color = LocalHetuTokens.current.textSecondary, fontSize = 12.sp, lineHeight = 17.sp)
+        LatencyChip(value, testing)
     }
 }
 
 @Composable
 private fun RefHomeBentoMatrix(
-    runtime: ProxyRuntimeSnapshot,
-    connections: Int,
-    up: Long,
-    down: Long,
-    providers: List<DashboardProviderUi>,
-    cached: RefSubscriptionCache,
-    memory: Long,
-    cpuPercent: Float,
-    hazeState: HazeState,
-    glassEnabled: Boolean,
+    runtime: ProxyRuntimeSnapshot, connections: Int, up: Long, down: Long,
+    providers: List<DashboardProviderUi>, cached: RefSubscriptionCache,
+    memory: Long, cpuPercent: Float, hazeState: HazeState, glassEnabled: Boolean,
     onSubscription: () -> Unit,
 ) {
-    val t = LocalHetuTokens.current
-    val scheme = MaterialTheme.colorScheme
-    val dark = scheme.background.luminance() < .5f
-    val muted = if (dark) t.textSecondary else Color(0xFF71767F)
-    val valueColor = if (dark) t.textPrimary else Color(0xFF111827)
-    val divider = if (dark) Color.White.copy(alpha = .07f) else Color(0xFF111827).copy(alpha = .045f)
-    val shape = RoundedCornerShape(18.dp)
-    val view = LocalView.current
-    var showLan by rememberSaveable { mutableStateOf(false) }
-
     val tracked = providers.filter { it.hasSubscriptionInfo && it.total > 0L }
-    val liveUsed = tracked.sumOf { it.used }
-    val liveTotal = tracked.sumOf { it.total }
-    val used = if (liveTotal > 0L) liveUsed else cached.used
-    val total = if (liveTotal > 0L) liveTotal else cached.total
-    val count = if (providers.isNotEmpty()) providers.size else cached.count
-    val ratio = if (total <= 0L) 0f else (used.toDouble() / total.toDouble()).toFloat().coerceIn(0f, 1f)
-    val remaining = ((1f - ratio) * 100f).toInt().coerceIn(0, 100)
-
-    Surface(
-        modifier = refHomeLiquidModifier(Modifier.fillMaxWidth(), hazeState, glassEnabled, shape),
-        shape = shape,
-        color = Color.Transparent,
-        shadowElevation = 0.dp,
-    ) {
-        Column(Modifier.fillMaxWidth()) {
-            Row(Modifier.fillMaxWidth().heightIn(min = 116.dp)) {
-                Column(
-                    Modifier.weight(1f).fillMaxHeight()
-                        .clickable {
-                            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                            showLan = !showLan
-                        }
-                        .padding(15.dp),
-                    verticalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(if (showLan) "LAN" else "出口", color = muted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                        Icon(Icons.Rounded.SwapHoriz, "切换 LAN/出口", tint = scheme.primary, modifier = Modifier.size(17.dp))
-                    }
-                    val address = if (showLan) runtime.lanAddress else runtime.wanAddress
-                    val detail = if (showLan) "${runtime.lanInterface} · $connections 连接"
-                    else if (address == "—" && runtime.running) "正在通过 Mihomo 获取出口"
-                    else "${countryEmoji(runtime.wanCountryCode)} ${runtime.wanRegion}"
-                    androidx.compose.animation.AnimatedContent(
-                        targetState = address to detail,
-                        transitionSpec = {
-                            androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(170))
-                                .togetherWith(androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(120)))
-                        },
-                        label = "bentoNetworkIdentity",
-                    ) { shown ->
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(
-                                if (shown.first == "—" && runtime.running) "获取中…" else shown.first,
-                                color = valueColor,
-                                fontSize = 15.sp,
-                                lineHeight = 19.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(shown.second, color = muted, fontSize = 11.sp, lineHeight = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                    }
-                }
-                Box(Modifier.width(1.dp).fillMaxHeight().padding(vertical = 12.dp).background(divider))
-                Column(
-                    Modifier.weight(1f).fillMaxHeight().padding(15.dp),
-                    verticalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text("实时网速", color = muted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text("↑ 上行", color = Color(0xFF18794E), fontSize = 11.sp, modifier = Modifier.weight(1f))
-                        Text(refSpeed(up), color = valueColor, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
-                    }
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text("↓ 下行", color = Color(0xFF2563EB), fontSize = 11.sp, modifier = Modifier.weight(1f))
-                        Text(refSpeed(down), color = valueColor, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
-                    }
-                }
-            }
-            Box(Modifier.fillMaxWidth().height(1.dp).padding(horizontal = 12.dp).background(divider))
-            Row(Modifier.fillMaxWidth().heightIn(min = 116.dp)) {
-                Column(
-                    Modifier.weight(1f).fillMaxHeight().clickable {
-                        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                        onSubscription()
-                    }.padding(15.dp),
-                    verticalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("订阅", color = muted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                        if (total > 0L) {
-                            Surface(shape = CircleShape, color = scheme.primary.copy(alpha = .08f)) {
-                                Text("剩余 $remaining%", Modifier.padding(horizontal = 7.dp, vertical = 3.dp), color = scheme.primary, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
-                            }
-                        }
-                    }
-                    Text(
-                        if (total > 0L) refBytes(used) else "—",
-                        color = valueColor,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                    )
-                    Box(Modifier.fillMaxWidth().height(4.dp).background(muted.copy(alpha = .10f), CircleShape)) {
-                        if (total > 0L && ratio > 0f) Box(Modifier.fillMaxWidth(ratio.coerceAtLeast(.001f)).fillMaxHeight().background(scheme.primary, CircleShape))
-                    }
-                    Text(if (total > 0L) "总 ${refBytes(total)}" else "$count 个订阅", color = muted, fontSize = 11.sp)
-                }
-                Box(Modifier.width(1.dp).fillMaxHeight().padding(vertical = 12.dp).background(divider))
-                Column(
-                    Modifier.weight(1f).fillMaxHeight().padding(15.dp),
-                    verticalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text("资源占用", color = muted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text("内存", color = muted, fontSize = 11.sp, modifier = Modifier.weight(1f))
-                        Text(refBytes(memory), color = valueColor, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
-                    }
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text("CPU", color = muted, fontSize = 11.sp, modifier = Modifier.weight(1f))
-                        Text(String.format(java.util.Locale.US, "%.1f%%", cpuPercent), color = valueColor, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
-                    }
-                    LinearProgressIndicator(
-                        progress = { (cpuPercent / 100f).coerceIn(0f, 1f) },
-                        modifier = Modifier.fillMaxWidth().height(3.dp).clip(CircleShape),
-                        color = scheme.primary,
-                        trackColor = muted.copy(alpha = .10f),
-                    )
-                }
-            }
-        }
-    }
+    val total = tracked.sumOf { it.total }
+    WorkspaceBento(runtime, connections, up, down,
+        if (total > 0L) tracked.sumOf { it.used } else cached.used,
+        if (total > 0L) total else cached.total,
+        if (providers.isNotEmpty()) providers.size else cached.count,
+        memory, cpuPercent, onSubscription)
 }
 
-@Composable
-private fun RefNetworkIdentityCard(
-    runtime: ProxyRuntimeSnapshot,
-    connections: Int,
-    modifier: Modifier,
-    hazeState: HazeState,
-    glassEnabled: Boolean,
-) {
-    val t = LocalHetuTokens.current
-    val view = LocalView.current
-    val scope = rememberCoroutineScope()
-    val density = androidx.compose.ui.platform.LocalDensity.current.density
-    var renderedLan by rememberSaveable { mutableStateOf(true) }
-    var flipping by remember { mutableStateOf(false) }
-    val flip = remember { Animatable(0f) }
-    val source = remember { MutableInteractionSource() }
-    val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .97f else 1f, spring(dampingRatio = .74f, stiffness = 560f), label = "networkCardPress")
-    val shape = RoundedCornerShape(20.dp)
-    val valueColor = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A)
-
-    Surface(
-        modifier = refHomeLiquidModifier(
-            modifier.heightIn(min = 128.dp)
-                .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .94f else 1f },
-            hazeState,
-            glassEnabled,
-            shape,
-        ).clickable(interactionSource = source, indication = null) {
-                if (!flipping) {
-                    view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                    scope.launch {
-                        flipping = true
-                        flip.animateTo(90f, androidx.compose.animation.core.tween(105, easing = androidx.compose.animation.core.FastOutSlowInEasing))
-                        renderedLan = !renderedLan
-                        flip.snapTo(-90f)
-                        flip.animateTo(0f, spring(dampingRatio = .72f, stiffness = 520f))
-                        flipping = false
-                    }
-                }
-            },
-        shape = shape,
-        color = Color.Transparent,
-        shadowElevation = 0.dp,
-    ) {
-        Column(
-            Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Row(Modifier.fillMaxWidth().height(24.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f).widthIn(min = 40.dp), contentAlignment = Alignment.CenterStart) {
-                    Text(
-                        if (renderedLan) "LAN" else "出口",
-                        color = Color(0xFF64748B),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                    )
-                }
-                Box(
-                    Modifier.size(24.dp).background(Color(0xFF2563EB).copy(alpha = .08f), CircleShape)
-                        .border(.6.dp, Color(0xFF2563EB).copy(alpha = .12f), CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Icons.Rounded.SwapHoriz, "切换 LAN/出口", tint = Color(0xFF2563EB), modifier = Modifier.size(14.dp))
-                }
-            }
-            Box(
-                Modifier.fillMaxWidth().heightIn(min = 42.dp),
-                contentAlignment = Alignment.CenterStart,
-            ) {
-                Column(
-                    Modifier.fillMaxWidth().widthIn(min = 130.dp).graphicsLayer {
-                        rotationY = flip.value
-                        cameraDistance = 18f * density
-                        alpha = .94f + .06f * (1f - kotlin.math.abs(flip.value) / 90f)
-                    },
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                Text(
-                    if (renderedLan) runtime.lanAddress else runtime.wanAddress,
-                    color = valueColor,
-                    fontSize = 15.sp,
-                    lineHeight = 18.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 22.dp),
-                )
-                Text(
-                    if (renderedLan) "${runtime.lanInterface} · $connections 连接"
-                    else "${countryEmoji(runtime.wanCountryCode)} ${runtime.wanRegion}",
-                    color = Color(0xFF64748B),
-                    fontSize = 12.sp,
-                    lineHeight = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 18.dp),
-                )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun RefSpeedCard(up: Long, down: Long, modifier: Modifier, hazeState: HazeState, glassEnabled: Boolean) {
-    val t = LocalHetuTokens.current
-    val valueColor = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A)
-    val shape = RoundedCornerShape(20.dp)
-    Surface(
-        modifier = refHomeLiquidModifier(modifier.heightIn(min = 128.dp), hazeState, glassEnabled, shape),
-        shape = shape,
-        color = Color.Transparent,
-        shadowElevation = 0.dp,
-    ) {
-        Column(
-            Modifier.fillMaxSize().padding(14.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text("实时网速", color = Color(0xFF64748B), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            Row(Modifier.fillMaxWidth().heightIn(min = 22.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("↑ 上行", color = Color(0xFF059669), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                Text(refSpeed(up), color = valueColor, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
-            }
-            Row(Modifier.fillMaxWidth().heightIn(min = 22.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("↓ 下行", color = Color(0xFF2563EB), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                Text(refSpeed(down), color = valueColor, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
-            }
-        }
-    }
-}
-
-@Composable
-private fun RefSubscriptionCompact(
-    items: List<DashboardProviderUi>,
-    cached: RefSubscriptionCache,
-    modifier: Modifier,
-    hazeState: HazeState,
-    glassEnabled: Boolean,
-    onClick: () -> Unit,
-) {
-    val t = LocalHetuTokens.current
-    val haptic = LocalHapticFeedback.current
-    val tracked = items.filter { it.hasSubscriptionInfo && it.total > 0L }
-    val liveUsed = tracked.sumOf { it.used }
-    val liveTotal = tracked.sumOf { it.total }
-    val used = if (liveTotal > 0L) liveUsed else cached.used
-    val total = if (liveTotal > 0L) liveTotal else cached.total
-    val itemCount = if (items.isNotEmpty()) items.size else cached.count
-    val ratio = if (total <= 0L) 0f else (used.toDouble() / total.toDouble()).toFloat().coerceIn(0f, 1f)
-    val valueColor = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A)
-    val source = remember { MutableInteractionSource() }
-    val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .96f else 1f, spring(dampingRatio = .74f, stiffness = 560f), label = "subscriptionCompactPress")
-    val shape = RoundedCornerShape(20.dp)
-    Surface(
-        modifier = refHomeLiquidModifier(
-            modifier.heightIn(min = 128.dp)
-                .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .92f else 1f },
-            hazeState,
-            glassEnabled,
-            shape,
-        ).clickable(interactionSource = source, indication = null) {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                onClick()
-            },
-        shape = shape,
-        color = Color.Transparent,
-        shadowElevation = 0.dp,
-    ) {
-        Column(
-            Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Row(Modifier.fillMaxWidth().heightIn(min = 22.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("订阅", color = Color(0xFF64748B), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                if (total > 0L) Surface(shape = RoundedCornerShape(999.dp), color = Color(0xFF2563EB).copy(alpha = .08f)) {
-                    Text("剩余 ${((1f - ratio) * 100f).toInt()}%", Modifier.padding(horizontal = 7.dp, vertical = 2.dp), color = MaterialTheme.colorScheme.primary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-            Text(if (total > 0L) refBytes(used) else "—", color = valueColor, fontSize = 16.sp, lineHeight = 19.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, modifier = Modifier.heightIn(min = 22.dp))
-            Box(Modifier.fillMaxWidth().height(4.dp).background(Color(0xFF94A3B8).copy(alpha = .12f), CircleShape)) {
-                if (total > 0L && ratio > 0f) {
-                    Box(
-                        Modifier.fillMaxWidth(ratio.coerceIn(.001f, 1f)).fillMaxHeight()
-                            .background(Brush.horizontalGradient(listOf(Color(0xFF3B82F6), Color(0xFF6366F1))), CircleShape),
-                    )
-                }
-            }
-            Row(Modifier.fillMaxWidth().heightIn(min = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("已用流量", color = Color(0xFF94A3B8), fontSize = 12.sp, modifier = Modifier.weight(1f))
-                Text(if (total > 0L) "总 ${refBytes(total)}" else "$itemCount 个订阅", color = Color(0xFF64748B), fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1)
-            }
-        }
-    }
-}
-
-@Composable
-private fun RefResourceCard(memory: Long, cpuPercent: Float, modifier: Modifier, hazeState: HazeState, glassEnabled: Boolean) {
-    val t = LocalHetuTokens.current
-    val scheme = MaterialTheme.colorScheme
-    val valueColor = if (scheme.background.luminance() < .5f) t.textPrimary else Color(0xFF0F172A)
-    val progress = (cpuPercent / 100f).coerceIn(0f, 1f)
-    val animatedProgress by animateFloatAsState(progress, label = "resourceCpuProgress")
-    val shape = RoundedCornerShape(20.dp)
-    Surface(
-        modifier = refHomeLiquidModifier(modifier.heightIn(min = 128.dp), hazeState, glassEnabled, shape),
-        shape = shape,
-        color = Color.Transparent,
-        shadowElevation = 0.dp,
-    ) {
-        Column(
-            Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Row(Modifier.fillMaxWidth().height(24.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("资源占用", color = Color(0xFF64748B), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                Canvas(Modifier.size(24.dp)) {
-                    drawCircle(t.outline.copy(alpha = .68f), style = Stroke(width = 2.dp.toPx()))
-                    drawArc(
-                        color = scheme.primary,
-                        startAngle = -90f,
-                        sweepAngle = 360f * animatedProgress,
-                        useCenter = false,
-                        style = Stroke(width = 2.2.dp.toPx()),
-                    )
-                }
-            }
-            Row(Modifier.fillMaxWidth().heightIn(min = 22.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("内存", color = Color(0xFF94A3B8), fontSize = 12.sp, modifier = Modifier.weight(1f))
-                Text(refBytes(memory), color = valueColor, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
-            }
-            Row(Modifier.fillMaxWidth().heightIn(min = 22.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("CPU", color = Color(0xFF94A3B8), fontSize = 12.sp, modifier = Modifier.weight(1f))
-                Text(String.format(java.util.Locale.US, "%.1f%%", cpuPercent), color = valueColor, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
-            }
-        }
-    }
-}
-
-private fun countryEmoji(code: String): String {
+internal fun countryEmoji(code: String): String {
     val upper = code.trim().uppercase(java.util.Locale.ROOT)
     if (upper.length != 2 || upper.any { it !in 'A'..'Z' }) return "🌐"
     val first = Character.toChars(0x1F1E6 + (upper[0] - 'A'))
@@ -1449,63 +966,16 @@ private fun countryEmoji(code: String): String {
 }
 
 @Composable
-private fun RefActionText(
-    text: String,
-    enabled: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier,
-    color: Color = LocalHetuTokens.current.textPrimary,
-    icon: ImageVector? = null,
-    danger: Boolean = false,
-) {
+private fun RefActionText(text: String, enabled: Boolean, onClick: () -> Unit, modifier: Modifier,
+    color: Color = LocalHetuTokens.current.textPrimary, icon: ImageVector? = null, danger: Boolean = false) {
     val t = LocalHetuTokens.current
-    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val view = LocalView.current
-    val source = remember(text) { MutableInteractionSource() }
-    val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        if (pressed) .95f else 1f,
-        spring(dampingRatio = .68f, stiffness = 650f),
-        label = "heroAction$text",
-    )
-    val shape = CircleShape
-    val background = when {
-        danger && dark -> Color(0xFF4C1724).copy(alpha = .78f)
-        danger -> Color(0xFFFFF1F2).copy(alpha = .82f)
-        dark -> Color.White.copy(alpha = .075f)
-        else -> Color.White.copy(alpha = .76f)
-    }
-    val borderColor = when {
-        danger && dark -> Color(0xFFFB7185).copy(alpha = .18f)
-        danger -> Color(0xFFFFE4E6)
-        dark -> Color.White.copy(alpha = .09f)
-        else -> Color.White.copy(alpha = .90f)
-    }
-    val shadowColor = if (danger) Color(0xFFF43F5E).copy(alpha = .12f) else Color(0xFF0F172A).copy(alpha = .055f)
-    Row(
-        modifier
-            .heightIn(min = 44.dp)
-            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .86f else if (enabled) 1f else .50f }
-            .shadow(7.dp, shape, clip = false, ambientColor = shadowColor, spotColor = shadowColor)
-            .background(background, shape)
-            .border(.7.dp, borderColor, shape)
-            .clip(shape)
-            .clickable(enabled = enabled, interactionSource = source, indication = null) {
-                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                onClick()
-            }
-            .padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
-    ) {
-        if (danger) {
-            Box(Modifier.size(6.dp).background(Color(0xFFF43F5E), CircleShape))
-            Spacer(Modifier.width(6.dp))
-        } else if (icon != null) {
-            Icon(icon, null, tint = color.copy(alpha = .68f), modifier = Modifier.size(14.dp))
-            Spacer(Modifier.width(6.dp))
+    Surface(onClick = onClick, enabled = enabled, modifier = modifier.heightIn(min = 48.dp),
+        color = if (danger) t.dangerContainer else t.controlBackground,
+        shape = RoundedCornerShape(15.dp), shadowElevation = 0.dp) {
+        Row(Modifier.padding(horizontal = 10.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+            if (icon != null) { Icon(icon, null, Modifier.size(18.dp), tint = color); Spacer(Modifier.width(6.dp)) }
+            Text(text, color = color, fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.Medium)
         }
-        Text(text, color = color, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 
@@ -1656,7 +1126,7 @@ private fun RefPanel(
     }
 
     LaunchedEffect(capsuleText) {
-        if (capsuleText.isNotBlank()) {
+        if (capsuleText.isNotBlank() && !capsuleError) {
             delay(2500)
             capsuleText = ""
             capsuleError = false
@@ -1909,24 +1379,10 @@ private fun RefPanel(
         onDetailVisibleChanged(false)
     }
 
-    Box(Modifier.fillMaxSize()) {
-            PullToRefreshBox(
-                isRefreshing = refreshing,
-                onRefresh = ::refresh,
-                modifier = Modifier.fillMaxSize(),
-            ) {
-            LazyColumn(
-            Modifier.fillMaxSize().statusBarsPadding(),
-            contentPadding = PaddingValues(
-                start = 16.dp,
-                top = 8.dp,
-                end = 16.dp,
-                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 96.dp,
-            ),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            item {
-                Box(Modifier.padding(top = 14.dp, bottom = 4.dp)) {
+    BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding()) {
+        val groupColumns = hetuCompactColumns(maxWidth - 32.dp, 152.dp)
+        Column(Modifier.fillMaxSize()) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     RefPanelGlassHeader(
                         selected = tab,
                         onSelect = onSelectedTabChange,
@@ -1941,15 +1397,35 @@ private fun RefPanel(
                         hazeState = hazeState,
                         backdrop = backdrop,
                     )
+
+                if (capsuleText.isNotBlank() || refreshing || error.isNotBlank()) {
+                    HetuTaskFeedback(capsuleText.ifBlank { error.ifBlank { "正在更新${tab.label}…" } },
+                        error = capsuleError || (error.isNotBlank() && capsuleText.isBlank()),
+                        busy = refreshing || providerRefreshing.values.any { it } || ruleSetRefreshing.values.any { it } || testing.values.any { it })
                 }
             }
-            if (error.isNotBlank()) item { RefNotice(error) }
+            PullToRefreshBox(
+                isRefreshing = refreshing,
+                onRefresh = ::refresh,
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                indicator = {},
+            ) {
+            LazyColumn(
+            Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                top = 8.dp,
+                end = 16.dp,
+                bottom = hetuContentBottomPadding(),
+            ),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             if (!state.running) {
                 item { RefEmptyState("代理未运行", "启动代理后，在这里查看节点、应用连接和分流规则。", Icons.Rounded.PowerSettingsNew) }
             } else when (tab) {
                 RefPanelTab.Groups -> {
                     if (filteredGroups.isEmpty()) item { RefEmptyState("没有匹配的节点", if (query.isBlank()) "当前配置未提供策略组。" else "试试其他节点或策略组名称。", Icons.Rounded.Search) }
-                    itemsIndexed(filteredGroups.chunked(2), key = { index, _ -> "${tab.name}-groups-$index" }, contentType = { _, _ -> "group-row" }) { _, pair ->
+                    itemsIndexed(filteredGroups.chunked(groupColumns), key = { index, _ -> "${tab.name}-groups-$index" }, contentType = { _, _ -> "group-row" }) { _, pair ->
                         val expandedGroup = pair.firstOrNull { it.name == selectedGroupName }
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1984,13 +1460,13 @@ private fun RefPanel(
                                         },
                                     )
                                 }
-                                if (pair.size == 1) Spacer(Modifier.weight(1f))
+                                if (pair.size < groupColumns) Spacer(Modifier.weight(1f))
                             }
                             androidx.compose.animation.AnimatedVisibility(
                                 visible = expandedGroup != null,
                                 enter = androidx.compose.animation.expandVertically(
                                     expandFrom = Alignment.Top,
-                                    animationSpec = spring(dampingRatio = .72f, stiffness = 360f),
+                                    animationSpec = spring(dampingRatio = .9f, stiffness = 420f),
                                     clip = false,
                                 ) + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(180)) +
                                     androidx.compose.animation.slideInVertically(
@@ -2091,7 +1567,7 @@ private fun RefPanel(
                                     view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                                 } catch (e: Exception) {
                                     capsuleError = true
-                                    capsuleText = e.message ?: "订阅更新失败，请检查网络"
+                                    capsuleText = "${item.name} 更新失败：${e.message.orEmpty()}"
                                 } finally {
                                     providerRefreshing.remove(item.name)
                                 }
@@ -2162,7 +1638,7 @@ private fun RefPanel(
                                 val updated = repo.refreshRuleSet(item.name)
                                 if (updated != null) ruleSets = ruleSets.map { if (it.name == updated.name) updated else it }
                                 capsuleError = false
-                                capsuleText = "规则集更新完成"
+                                capsuleText = "${item.name} 更新完成"
                                 ruleSetSucceeded[item.name] = true
                                 view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
                                 delay(70)
@@ -2171,7 +1647,7 @@ private fun RefPanel(
                                 ruleSetSucceeded.remove(item.name)
                             } catch (e: Exception) {
                                 capsuleError = true
-                                capsuleText = e.message ?: "规则集更新失败，请检查网络"
+                                capsuleText = "${item.name} 更新失败：${e.message.orEmpty()}"
                             } finally {
                                 ruleSetRefreshing.remove(item.name)
                             }
@@ -2181,17 +1657,9 @@ private fun RefPanel(
             }
             }
         }
-        androidx.compose.animation.AnimatedVisibility(
-            visible = capsuleText.isNotBlank(),
-            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 58.dp),
-            enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(160)) +
-                androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(190)) { -it / 2 },
-            exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(150)) +
-                androidx.compose.animation.slideOutVertically(androidx.compose.animation.core.tween(170)) { -it / 3 },
-        ) {
-            RefFloatingCapsule(capsuleText, capsuleError)
-        }
-    }
+        } // column: header remains above list, never overlaps tabs
+    } // measured content width
+
 
 
     if (confirmCloseAll) {
@@ -2226,41 +1694,6 @@ private fun RefPanel(
     }
 }
 
-
-@Composable
-private fun RefFloatingCapsule(text: String, error: Boolean) {
-    val t = LocalHetuTokens.current
-    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val accent = if (error) Color(0xFFE5484D) else Color(0xFF18794E)
-    val pulse = androidx.compose.animation.core.rememberInfiniteTransition(label = "capsulePulse")
-    val progress by pulse.animateFloat(
-        initialValue = .35f,
-        targetValue = 1f,
-        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-            animation = androidx.compose.animation.core.tween(850),
-            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
-        ),
-        label = "capsuleProgress",
-    )
-    Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = if (dark) t.elevatedCardBackground.copy(alpha = .96f) else Color.White.copy(alpha = .96f),
-        border = BorderStroke(1.dp, accent.copy(alpha = .10f)),
-        shadowElevation = 5.dp,
-    ) {
-        Row(
-            Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Canvas(Modifier.size(14.dp)) {
-                drawCircle(accent.copy(alpha = .12f), style = Stroke(width = 2.dp.toPx()))
-                drawArc(accent, -90f, 270f * progress, false, style = Stroke(width = 2.dp.toPx()))
-            }
-            Text(text, color = t.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1)
-        }
-    }
-}
 
 @Composable
 private fun RefGroupDetailPage(
@@ -2315,7 +1748,8 @@ private fun RefGroupDetailPage(
         delay != null && delay > 0L
     }
     val anyTesting = group.nodes.any { testing[it.name] == true }
-    val pageBackground = if (dark) t.pageBackground else Color(0xFFF4F6F9)
+    val pageBackground = t.pageBackground
+    val nodeColumns = hetuCompactColumns(androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp - 32.dp, 220.dp)
 
     Column(
         Modifier.fillMaxSize().offset(x = enterX).background(pageBackground).navigationBarsPadding(),
@@ -2329,7 +1763,7 @@ private fun RefGroupDetailPage(
                 Modifier.fillMaxWidth().statusBarsPadding().height(56.dp).padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
+                IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
                     Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回", tint = t.textPrimary, modifier = Modifier.size(21.dp))
                 }
                 Text(
@@ -2341,7 +1775,7 @@ private fun RefGroupDetailPage(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                IconButton(onClick = onRefresh, modifier = Modifier.size(38.dp)) {
+                IconButton(onClick = onRefresh, modifier = Modifier.size(48.dp)) {
                     Icon(Icons.Rounded.Refresh, "刷新", tint = t.textSecondary, modifier = Modifier.size(18.dp))
                 }
             }
@@ -2357,9 +1791,9 @@ private fun RefGroupDetailPage(
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                         Column(Modifier.weight(1f)) {
                             Text(
-                                "节点选择",
+                                group.name + " · 可选节点",
                                 color = t.textPrimary,
-                                fontSize = 23.sp,
+                                fontSize = 22.sp,
                                 lineHeight = 29.sp,
                                 fontWeight = FontWeight.ExtraBold,
                             )
@@ -2367,12 +1801,12 @@ private fun RefGroupDetailPage(
                                 Text(
                                     "${refGroupTypeCompact(group.type).uppercase()} · $testedCount/${group.nodes.size}",
                                     color = Color(0xFF94A3B8),
-                                    fontSize = 11.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                 )
                                 IconButton(
                                     onClick = { searchOpen = !searchOpen; if (!searchOpen) query = "" },
-                                    modifier = Modifier.size(30.dp),
+                                    modifier = Modifier.size(48.dp),
                                 ) {
                                     Icon(
                                         if (searchOpen) Icons.Rounded.Close else Icons.Rounded.Search,
@@ -2384,9 +1818,9 @@ private fun RefGroupDetailPage(
                             }
                         }
                         Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                            Text("⚡ ${refSpeed(liveRate)}", color = Color(0xFF94A3B8), fontSize = 10.sp, fontWeight = FontWeight.Medium)
+                            Text("⚡ ${refSpeed(liveRate)}", color = Color(0xFF94A3B8), fontSize = 12.sp, fontWeight = FontWeight.Medium)
                             if (anyTesting) {
-                                Text("$testedCount/${group.nodes.size}", color = Color(0xFFF59E0B), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                Text("$testedCount/${group.nodes.size}", color = Color(0xFFF59E0B), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                         Spacer(Modifier.width(10.dp))
@@ -2394,7 +1828,7 @@ private fun RefGroupDetailPage(
                         val rocketPressed by rocketSource.collectIsPressedAsState()
                         val rocketScale by animateFloatAsState(if (rocketPressed) .94f else 1f, label = "rocketPress")
                         Box(
-                            Modifier.size(44.dp)
+                            Modifier.size(48.dp)
                                 .graphicsLayer { scaleX = rocketScale; scaleY = rocketScale }
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(Color(0xFFFFF7ED))
@@ -2430,13 +1864,13 @@ private fun RefGroupDetailPage(
                                 shape = CircleShape,
                                 color = if (active) Color(0xFFEBF3FF) else t.cardBackground,
                                 shadowElevation = if (active) 1.dp else 0.dp,
-                                modifier = Modifier.clickable { activeTag = tag },
+                                modifier = Modifier.heightIn(min = 48.dp).clickable { activeTag = tag },
                             ) {
                                 Text(
                                     tag,
                                     Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
                                     color = if (active) scheme.primary else t.textSecondary,
-                                    fontSize = 11.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = if (active) FontWeight.Bold else FontWeight.SemiBold,
                                     maxLines = 1,
                                 )
@@ -2461,7 +1895,7 @@ private fun RefGroupDetailPage(
                     }
                 }
             } else {
-                itemsIndexed(filteredNodes.chunked(2), key = { index, _ -> "detail-row-$index" }) { _, pair ->
+                itemsIndexed(filteredNodes.chunked(nodeColumns), key = { index, _ -> "detail-row-$index" }) { _, pair ->
                     Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                         pair.forEach { node ->
                             RefDetailNodeCard(
@@ -2480,7 +1914,7 @@ private fun RefGroupDetailPage(
                                 },
                             )
                         }
-                        if (pair.size == 1) Spacer(Modifier.weight(1f))
+                        if (pair.size < nodeColumns) Spacer(Modifier.weight(1f))
                     }
                 }
             }
@@ -2489,92 +1923,9 @@ private fun RefGroupDetailPage(
 }
 
 @Composable
-private fun RefDetailNodeCard(
-    node: ProxyNodeUi,
-    active: Boolean,
-    delay: Long?,
-    testing: Boolean,
-    modifier: Modifier,
-    onSelect: () -> Unit,
-    onDelay: () -> Unit,
-) {
-    val t = LocalHetuTokens.current
-    val scheme = MaterialTheme.colorScheme
-    val dark = scheme.background.luminance() < .5f
-    val source = remember(node.name) { MutableInteractionSource() }
-    val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .96f else 1f, spring(dampingRatio = .72f, stiffness = 580f), label = "detailNode${node.name}")
-    val shape = RoundedCornerShape(16.dp)
-    val premiumBrush = if (dark) {
-        Brush.verticalGradient(
-            listOf(
-                t.elevatedCardBackground.copy(alpha = .94f),
-                t.cardBackground.copy(alpha = .86f),
-            ),
-        )
-    } else {
-        Brush.verticalGradient(
-            listOf(
-                Color.White.copy(alpha = .95f),
-                Color(0xFFF8FAFC).copy(alpha = .82f),
-            ),
-        )
-    }
-    Column(
-        modifier.height(64.dp)
-            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .94f else 1f }
-            .shadow(if (active) 5.dp else 3.dp, shape, clip = false)
-            .background(premiumBrush, shape)
-            .border(
-                if (active) 1.8.dp else .8.dp,
-                if (active) Color(0xFF2563EB) else Color.White.copy(alpha = if (dark) .10f else .92f),
-                shape,
-            )
-            .clip(shape)
-            .clickable(interactionSource = source, indication = null, onClick = onSelect)
-            .padding(horizontal = 11.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.SpaceBetween,
-    ) {
-        val flag = refNodeFlag(node.name)
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            if (flag.isNotBlank()) {
-                Text(flag, fontSize = 14.sp)
-                Spacer(Modifier.width(4.dp))
-            }
-            Text(
-                node.name,
-                color = t.textPrimary,
-                fontSize = 13.sp,
-                lineHeight = 16.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) {
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = active,
-                    enter = androidx.compose.animation.scaleIn(
-                        initialScale = .15f,
-                        animationSpec = spring(dampingRatio = .56f, stiffness = 520f),
-                    ) + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(140)),
-                    exit = androidx.compose.animation.scaleOut(targetScale = .45f) + androidx.compose.animation.fadeOut(),
-                ) {
-                    Box(
-                        Modifier.size(16.dp).background(Color(0xFF2563EB), CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(Icons.Rounded.Check, "已选择", tint = Color.White, modifier = Modifier.size(11.dp))
-                    }
-                }
-            }
-        }
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(if (active) "当前节点" else "节点", color = if (active) Color(0xFF2563EB) else Color(0xFF94A3B8), fontSize = 10.sp)
-            Spacer(Modifier.weight(1f))
-            RefDelayBadge(delay, testing, onDelay)
-        }
-    }
+private fun RefDetailNodeCard(node: ProxyNodeUi, active: Boolean, delay: Long?, testing: Boolean,
+    modifier: Modifier, onSelect: () -> Unit, onDelay: () -> Unit) {
+    NodeChoiceCard(node, active, delay, testing, modifier, onSelect, onDelay)
 }
 
 private fun refNodeProtocol(node: ProxyNodeUi): String {
@@ -2614,14 +1965,14 @@ private fun RefPanelGlassHeader(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(
-            Modifier.fillMaxWidth().heightIn(min = 44.dp),
+            Modifier.fillMaxWidth().heightIn(min = 48.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 "面板",
                 color = t.textPrimary,
-                fontSize = 24.sp,
-                lineHeight = 30.sp,
+                fontSize = 22.sp,
+                lineHeight = 28.sp,
                 fontWeight = FontWeight.ExtraBold,
                 modifier = Modifier.weight(1f),
             )
@@ -2724,6 +2075,7 @@ private fun RefPanelTabs(
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
     val view = LocalView.current
+    val tabFontScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
     val tabs = RefPanelTab.entries
     val trackBrush = Brush.verticalGradient(
         if (dark) listOf(Color.White.copy(alpha = .085f), Color.White.copy(alpha = .035f))
@@ -2731,7 +2083,7 @@ private fun RefPanelTabs(
     )
     val trackBorder = if (dark) Color.White.copy(alpha = .08f) else Color.White.copy(alpha = .82f)
     BoxWithConstraints(
-        Modifier.fillMaxWidth().height(48.dp)
+        Modifier.fillMaxWidth().height(48.dp * tabFontScale)
             .background(trackBrush, CircleShape)
             .border(.5.dp, trackBorder, CircleShape)
             .padding(3.dp),
@@ -2745,7 +2097,7 @@ private fun RefPanelTabs(
         )
         val indicatorShape = RoundedCornerShape(18.dp)
         val lensBrush = Brush.verticalGradient(
-            if (dark) listOf(Color.White.copy(alpha = .10f), Color(0xFF2563EB).copy(alpha = .18f))
+            if (dark) listOf(Color.White.copy(alpha = .10f), scheme.primary.copy(alpha = .18f))
             else listOf(Color.White.copy(alpha = .98f), Color(0xFFF8FAFC).copy(alpha = .94f)),
         )
         Box(
@@ -2780,7 +2132,7 @@ private fun RefPanelTabs(
                 ) {
                     Text(
                         tab.label,
-                        color = if (active) Color(0xFF2563EB) else if (dark) t.textSecondary else Color(0xFF64748B),
+                        color = if (active) scheme.primary else if (dark) t.textSecondary else Color(0xFF64748B),
                         fontSize = 12.sp,
                         fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
                         maxLines = 1,
@@ -2810,285 +2162,36 @@ private fun RefPanelOverview(state: ProxyComposeState, delays: Map<String, Long>
 
 @OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
-private fun RefGroupCard(
-    group: ProxyGroupUi,
-    selected: String,
-    expanded: Boolean,
-    delay: Long?,
-    testing: Boolean,
-    hazeState: HazeState,
-    glassEnabled: Boolean,
-    modifier: Modifier,
-    onClick: () -> Unit,
-    onDelay: () -> Unit,
-) {
-    val t = LocalHetuTokens.current
-    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val source = remember(group.name) { MutableInteractionSource() }
-    val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        if (pressed) .97f else 1f,
-        spring(dampingRatio = .74f, stiffness = 580f),
-        label = "group${group.name}",
-    )
-    val shape = RoundedCornerShape(18.dp)
-    val nodeName = selected.ifBlank { "未选择" }
-    val nodeFlag = refNodeFlag(nodeName)
-    val background = if (dark) t.cardBackground else Color.White
-    val arrowRotation by animateFloatAsState(
-        targetValue = if (expanded) 180f else 0f,
-        animationSpec = spring(dampingRatio = .78f, stiffness = 420f),
-        label = "groupArrow${group.name}",
-    )
-
-    Column(
-        modifier
-            .height(82.dp)
-            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .94f else 1f }
-            .shadow(
-                if (expanded) 4.dp else 2.dp,
-                shape,
-                clip = false,
-                ambientColor = Color(0xFF0F172A).copy(alpha = if (dark) .10f else .025f),
-                spotColor = Color(0xFF0F172A).copy(alpha = if (dark) .12f else .035f),
-            )
-            .background(background, shape)
-            .border(
-                1.dp,
-                if (expanded) MaterialTheme.colorScheme.primary.copy(alpha = .20f)
-                else if (dark) Color.White.copy(alpha = .07f) else Color(0xFF111827).copy(alpha = .04f),
-                shape,
-            )
-            .clip(shape)
-            .clickable(interactionSource = source, indication = null, onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 11.dp),
-        verticalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                group.name,
-                color = t.textPrimary,
-                fontSize = 14.sp,
-                lineHeight = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            Box(
-                Modifier.clickable(
-                    enabled = !testing,
-                    interactionSource = remember(group.name, "delay") { MutableInteractionSource() },
-                    indication = null,
-                ) { onDelay() },
-            ) { RefDelayBadge(delay, testing, null) }
-        }
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            if (nodeFlag.isNotBlank()) {
-                Text(nodeFlag, fontSize = 14.sp)
-                Spacer(Modifier.width(5.dp))
-            }
-            Text(
-                nodeName,
-                color = if (dark) t.textSecondary else Color(0xFF71767F),
-                fontSize = 12.sp,
-                lineHeight = 16.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            Icon(
-                Icons.Rounded.KeyboardArrowDown,
-                if (expanded) "收起" else "展开",
-                tint = if (expanded) MaterialTheme.colorScheme.primary else Color(0xFF94A3B8),
-                modifier = Modifier.size(17.dp).graphicsLayer { rotationZ = arrowRotation },
-            )
-        }
-    }
+private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolean, delay: Long?, testing: Boolean,
+    hazeState: HazeState, glassEnabled: Boolean, modifier: Modifier, onClick: () -> Unit, onDelay: () -> Unit) {
+    StrategyGroupCard(group, selected, expanded, delay, testing, modifier, onClick, onDelay)
 }
 
 @Composable
-private fun RefInlineGroupExpansion(
-    group: ProxyGroupUi,
-    selected: String,
-    delays: Map<String, Long>,
-    testing: Map<String, Boolean>,
-    onSelect: (String) -> Unit,
-    onDelay: (String) -> Unit,
-    onTestAll: () -> Unit,
-) {
+private fun RefInlineGroupExpansion(group: ProxyGroupUi, selected: String, delays: Map<String, Long>,
+    testing: Map<String, Boolean>, onSelect: (String) -> Unit, onDelay: (String) -> Unit, onTestAll: () -> Unit) {
     val t = LocalHetuTokens.current
-    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val shape = RoundedCornerShape(18.dp)
-    val wellColor = if (dark) Color(0xFF18212E) else Color(0xFFEEF2F6)
-    val wellBorder = if (dark) Color.White.copy(alpha = .08f) else Color(0xFFCBD5E1).copy(alpha = .62f)
-    val wellBrush = if (dark) {
-        Brush.verticalGradient(listOf(Color(0xFF141C27), wellColor, Color(0xFF202A37)))
-    } else {
-        Brush.verticalGradient(listOf(Color(0xFFE7EDF4), wellColor, Color(0xFFF2F5F8)))
-    }
-    Surface(
-        modifier = Modifier.padding(top = 6.dp, bottom = 16.dp).fillMaxWidth().zIndex(0f),
-        shape = shape,
-        color = Color.Transparent,
-        border = BorderStroke(.8.dp, wellBorder),
-        shadowElevation = 0.dp,
-        tonalElevation = 0.dp,
-    ) {
-        Column(
-            Modifier.fillMaxWidth().background(wellBrush, shape).padding(start = 14.dp, top = 16.dp, end = 14.dp, bottom = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(9.dp),
-        ) {
-            // A thin top compression line gives the well a visual inset without a second white shell.
-            Box(
-                Modifier.fillMaxWidth().height(3.dp)
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(Color.Transparent, Color(0xFF0F172A).copy(alpha = if (dark) .20f else .10f), Color.Transparent),
-                        ),
-                        CircleShape,
-                    ),
-            )
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                    Text("切换落地节点", color = if (dark) t.textSecondary else Color(0xFF64748B), fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.width(6.dp))
-                    Text("· 点击即生效", color = Color(0xFF94A3B8), fontSize = 11.sp, lineHeight = 16.sp, fontWeight = FontWeight.Normal)
-                }
-                val allTestSource = remember(group.name) { MutableInteractionSource() }
-                val allPressed by allTestSource.collectIsPressedAsState()
-                val allScale by animateFloatAsState(if (allPressed) .95f else 1f, label = "allDelay${group.name}")
-                Row(
-                    Modifier.graphicsLayer { scaleX = allScale; scaleY = allScale }
-                        .shadow(2.dp, CircleShape, clip = false, ambientColor = Color(0xFF0F172A).copy(alpha = .04f), spotColor = Color(0xFF0F172A).copy(alpha = .05f))
-                        .background(if (dark) Color.White.copy(alpha = .08f) else Color.White.copy(alpha = .92f), CircleShape)
-                        .border(.6.dp, if (dark) Color.White.copy(alpha = .08f) else Color.White.copy(alpha = .92f), CircleShape)
-                        .clip(CircleShape)
-                        .clickable(interactionSource = allTestSource, indication = null, onClick = onTestAll)
-                        .padding(horizontal = 10.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    Text("全测速", color = Color(0xFF2563EB), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("⚡", color = Color(0xFFF59E0B), fontSize = 10.sp)
-                }
+    Column(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("${group.name} · 可选节点", color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                Text("当前：$selected", color = t.textSecondary, fontSize = 12.sp, lineHeight = 17.sp)
             }
-            group.nodes.withIndex().toList().chunked(2).forEach { pair ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    pair.forEach { entry ->
-                        val node = entry.value
-                        RefInlineNodeCard(
-                            index = entry.index,
-                            node = node,
-                            active = node.name == selected,
-                            delay = delays[node.name] ?: node.lastDelay,
-                            testing = testing[node.name] == true,
-                            modifier = Modifier.weight(1f),
-                            onSelect = { onSelect(node.name) },
-                            onDelay = { onDelay(node.name) },
-                        )
-                    }
-                    if (pair.size == 1) Spacer(Modifier.weight(1f))
-                }
+            TextButton(onClick = onTestAll, modifier = Modifier.heightIn(min = 48.dp)) {
+                Icon(Icons.Rounded.Speed, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("全测速", fontSize = 12.sp)
             }
         }
-    }
-}
-
-@Composable
-private fun RefInlineNodeCard(
-    index: Int,
-    node: ProxyNodeUi,
-    active: Boolean,
-    delay: Long?,
-    testing: Boolean,
-    modifier: Modifier,
-    onSelect: () -> Unit,
-    onDelay: () -> Unit,
-) {
-    val t = LocalHetuTokens.current
-    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val shape = RoundedCornerShape(14.dp)
-    val source = remember(node.name) { MutableInteractionSource() }
-    val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .97f else 1f, spring(dampingRatio = .72f, stiffness = 580f), label = "inlineNode${node.name}")
-    var revealed by remember(node.name) { mutableStateOf(false) }
-    LaunchedEffect(node.name) {
-        delay((index * 15L).coerceAtMost(180L))
-        revealed = true
-    }
-    val backgroundBrush = when {
-        dark && active -> Brush.verticalGradient(listOf(Color(0xFF172554), Color(0xFF111C38)))
-        dark -> Brush.verticalGradient(listOf(Color(0xFF242E3C), Color(0xFF202936)))
-        active -> Brush.verticalGradient(listOf(Color(0xFFF7FBFF), Color(0xFFEFF6FF)))
-        else -> Brush.verticalGradient(listOf(Color.White, Color.White))
-    }
-    val borderColor = when {
-        dark && active -> Color(0xFF60A5FA).copy(alpha = .44f)
-        dark -> Color.White.copy(alpha = .08f)
-        active -> Color(0xFFBFDBFE)
-        else -> Color.White.copy(alpha = .88f)
-    }
-    Box(modifier.height(72.dp)) {
-        androidx.compose.animation.AnimatedVisibility(
-            visible = revealed,
-            modifier = Modifier.fillMaxSize(),
-            enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(180)) +
-                androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(230)) { it / 3 },
-        ) {
-            Box(
-                Modifier.fillMaxSize()
-                    .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .90f else 1f }
-                    .shadow(
-                        0.dp,
-                        shape,
-                        clip = false,
-                        ambientColor = if (active) Color(0xFF2563EB).copy(alpha = .07f) else Color(0xFF0F172A).copy(alpha = .035f),
-                        spotColor = if (active) Color(0xFF2563EB).copy(alpha = .10f) else Color(0xFF0F172A).copy(alpha = .05f),
-                    )
-                    .background(backgroundBrush, shape)
-                    .border(if (active) 1.dp else .7.dp, borderColor, shape)
-                    .clip(shape)
-                    .clickable(interactionSource = source, indication = null, onClick = onSelect),
-            ) {
-                Column(
-                    Modifier.fillMaxSize().padding(horizontal = 11.dp, vertical = 9.dp),
-                    verticalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        val flag = refNodeFlag(node.name)
-                        if (flag.isNotBlank()) {
-                            Text(flag, fontSize = 14.sp)
-                            Spacer(Modifier.width(5.dp))
+        BoxWithConstraints {
+            val columns = hetuCompactColumns(maxWidth, 220.dp)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                group.nodes.chunked(columns).forEach { pair ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        pair.forEach { node ->
+                            NodeChoiceCard(node, node.name == selected, delays[node.name] ?: node.lastDelay,
+                                testing[node.name] == true, Modifier.weight(1f), { onSelect(node.name) }, { onDelay(node.name) })
                         }
-                        Text(
-                            node.name,
-                            color = if (active && !dark) Color(0xFF2563EB) else t.textPrimary,
-                            fontSize = 12.sp,
-                            lineHeight = 14.sp,
-                            fontWeight = if (active) FontWeight.ExtraBold else FontWeight.Bold,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f).padding(end = if (active) 12.dp else 0.dp),
-                        )
+                        if (pair.size < columns) Spacer(Modifier.weight(1f))
                     }
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(if (active) "已选" else "节点", color = if (active) Color(0xFF2563EB) else Color(0xFF94A3B8), fontSize = 10.sp, fontWeight = FontWeight.Medium)
-                        Spacer(Modifier.weight(1f))
-                        RefDelayBadge(delay, testing, onDelay, selected = active)
-                    }
-                }
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = active,
-                    modifier = Modifier.align(Alignment.TopEnd).padding(top = 5.dp, end = 5.dp),
-                    enter = androidx.compose.animation.scaleIn(initialScale = .15f, animationSpec = spring(dampingRatio = .56f, stiffness = 520f)) + androidx.compose.animation.fadeIn(),
-                    exit = androidx.compose.animation.scaleOut(targetScale = .45f) + androidx.compose.animation.fadeOut(),
-                ) {
-                    Icon(Icons.Rounded.Check, "已选择", tint = Color(0xFF2563EB), modifier = Modifier.size(13.dp).graphicsLayer { alpha = .92f })
                 }
             }
         }
@@ -3096,54 +2199,7 @@ private fun RefInlineNodeCard(
 }
 
 @Composable
-private fun RefGroupCornerVisual(group: ProxyGroupUi, modifier: Modifier) {
-    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val knownFlags = listOf("🇭🇰", "🇹🇼", "🇯🇵", "🇸🇬", "🇰🇷", "🇺🇸", "🇬🇧", "🇩🇪", "🇫🇷")
-    val flag = knownFlags.firstOrNull { group.name.contains(it) } ?: refNodeFlag(group.name)
-    val palette = refGroupBadgePalette(group.name, dark)
-    val shape = RoundedCornerShape(10.dp)
-    Box(
-        modifier
-            .shadow(
-                2.dp,
-                shape,
-                clip = false,
-                ambientColor = palette.third.copy(alpha = .06f),
-                spotColor = palette.third.copy(alpha = .08f),
-            )
-            .background(palette.first, shape)
-            .border(.7.dp, palette.second, shape)
-            .clip(shape),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (flag.isNotBlank()) {
-            Text(flag, fontSize = 20.sp, lineHeight = 23.sp)
-        } else {
-            RefGroupVisualIcon(group, palette.third, Modifier.fillMaxSize())
-        }
-    }
-}
-
-@Composable
-private fun RefGroupVisualIcon(group: ProxyGroupUi, tint: Color, modifier: Modifier) {
-    val bitmap = remember(group.iconPath) {
-        runCatching {
-            group.iconPath.takeIf { it.isNotBlank() }?.let { BitmapFactory.decodeFile(it)?.asImageBitmap() }
-        }.getOrNull()
-    }
-    Box(modifier, contentAlignment = Alignment.Center) {
-        if (bitmap != null) {
-            Image(
-                bitmap = bitmap,
-                contentDescription = group.name,
-                modifier = Modifier.fillMaxSize().padding(5.dp),
-                contentScale = ContentScale.Fit,
-            )
-        } else {
-            Icon(refScenarioIcon(group.name, group.type), null, tint = tint, modifier = Modifier.size(21.dp))
-        }
-    }
-}
+private fun RefGroupCornerVisual(group: ProxyGroupUi, modifier: Modifier) { ConfiguredGroupIcon(group, modifier) }
 
 private fun refGroupBadgePalette(name: String, dark: Boolean): Triple<Color, Color, Color> {
     val value = name.lowercase(java.util.Locale.ROOT)
@@ -3186,7 +2242,7 @@ private fun RefLeafNodeCard(node: ProxyNodeUi, delay: Long?, modifier: Modifier,
     }
 }
 
-private fun refScenarioIcon(name: String, type: String): ImageVector = when {
+internal fun refScenarioIcon(name: String, type: String): ImageVector = when {
     name.contains("chatgpt", true) || name.contains("openai", true) || name.contains("ai", true) -> Icons.Rounded.SmartToy
     name.contains("youtube", true) -> Icons.Rounded.PlayCircle
     name.contains("tiktok", true) -> Icons.Rounded.MusicNote
@@ -3218,7 +2274,7 @@ private fun refGroupTypeCompact(type: String): String = when (type.lowercase()) 
     else -> type.ifBlank { "Group" }
 }
 
-private fun refNodeFlag(name: String): String {
+internal fun refNodeFlag(name: String): String {
     val value = name.trim()
     if (listOf("🇭🇰", "🇹🇼", "🇯🇵", "🇸🇬", "🇰🇷", "🇺🇸", "🇬🇧", "🇩🇪", "🇫🇷").any(value::contains)) return ""
     val upper = value.uppercase(java.util.Locale.ROOT)
@@ -3238,68 +2294,7 @@ private fun refNodeFlag(name: String): String {
 
 @Composable
 private fun RefDelayBadge(value: Long?, testing: Boolean, onClick: (() -> Unit)?, selected: Boolean = false) {
-    val text = refDelay(value)
-    val (background, textColor) = when {
-        value == null -> Color(0xFFF4F5F7) to Color(0xFF64748B)
-        value <= 0L -> Color(0xFFFFF1F2) to Color(0xFFE11D48)
-        value < 100L -> Color(0xFFE6F7ED) to Color(0xFF18794E)
-        value <= 300L -> Color(0xFFFFFBEB) to Color(0xFFD97706)
-        else -> Color(0xFFFFF1F2) to Color(0xFFE11D48)
-    }
-    val source = remember(onClick) { MutableInteractionSource() }
-    val pressed by source.collectIsPressedAsState()
-    val pulseTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "latencyPulse")
-    val pulse by pulseTransition.animateFloat(
-        initialValue = .62f,
-        targetValue = 1f,
-        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-            animation = androidx.compose.animation.core.tween(620),
-            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
-        ),
-        label = "latencyPulseAlpha",
-    )
-    val pressScale by animateFloatAsState(if (pressed) .90f else 1f, spring(dampingRatio = .68f, stiffness = 680f), label = "latencyPress")
-    val shape = CircleShape
-    val finalBackground = if (selected) Color.White else background
-    val finalTextColor = if (selected) Color(0xFF2563EB) else textColor
-    Row(
-        Modifier.width(if (onClick != null) 68.dp else 62.dp).height(22.dp)
-            .graphicsLayer {
-                scaleX = pressScale
-                scaleY = pressScale
-                alpha = if (pressed) .84f else if (testing) .76f + .24f * pulse else 1f
-            }
-            .shadow(if (onClick != null) 2.dp else 0.dp, shape, clip = false, ambientColor = finalTextColor.copy(alpha = .10f), spotColor = finalTextColor.copy(alpha = .12f))
-            .background(if (testing) finalBackground.copy(alpha = .82f) else finalBackground, shape)
-            .border(.7.dp, if (selected) Color(0xFFDBEAFE) else if (testing) finalTextColor.copy(alpha = .22f + .22f * pulse) else finalTextColor.copy(alpha = if (onClick != null) .10f else .04f), shape)
-            .then(if (onClick != null) Modifier.clickable(enabled = !testing, interactionSource = source, indication = null, onClick = onClick) else Modifier)
-            .padding(horizontal = 7.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
-    ) {
-        Text(
-            text,
-            color = finalTextColor,
-            fontSize = 10.sp,
-            lineHeight = 13.sp,
-            fontWeight = FontWeight.ExtraBold,
-            maxLines = 1,
-            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-        )
-        if (onClick != null) {
-            Spacer(Modifier.width(3.dp))
-            if (testing) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(9.dp),
-                    strokeWidth = 1.25.dp,
-                    color = finalTextColor,
-                    trackColor = finalTextColor.copy(alpha = .14f),
-                )
-            } else {
-                Icon(Icons.Rounded.Bolt, "单独测速", tint = finalTextColor.copy(alpha = .86f), modifier = Modifier.size(10.dp))
-            }
-        }
-    }
+    LatencyChip(value, testing, onClick)
 }
 
 @Composable
@@ -3312,16 +2307,6 @@ private fun RefTrafficOverview(state: ProxyComposeState) {
     var lastAt by remember { mutableLongStateOf(0L) }
     var upRate by remember { mutableLongStateOf(0L) }
     var downRate by remember { mutableLongStateOf(0L) }
-    val pulse = androidx.compose.animation.core.rememberInfiniteTransition(label = "trafficIdlePulse")
-    val idlePhase by pulse.animateFloat(
-        initialValue = 0f,
-        targetValue = 6.2831855f,
-        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-            animation = androidx.compose.animation.core.tween(3200, easing = androidx.compose.animation.core.LinearEasing),
-        ),
-        label = "trafficIdlePhase",
-    )
-
     LaunchedEffect(state.uploadTotal, state.downloadTotal) {
         val now = SystemClock.elapsedRealtime()
         if (lastAt > 0L && now > lastAt && state.uploadTotal >= lastUpload && state.downloadTotal >= lastDownload) {
@@ -3344,139 +2329,52 @@ private fun RefTrafficOverview(state: ProxyComposeState) {
         }
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+
+    val peak = history.maxOfOrNull { maxOf(it.second, it.third) } ?: 0L
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             RefRateCard("上行速度", upRate, Icons.Rounded.ArrowUpward, t.success, Modifier.weight(1f))
             RefRateCard("下行速度", downRate, Icons.Rounded.ArrowDownward, scheme.primary, Modifier.weight(1f))
         }
-        Surface(shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 1.dp) {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 13.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("总流量", color = t.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                Text("上行 ${refBytes(state.uploadTotal)}", color = t.success, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
-                Text("  /  ", color = Color(0xFFCBD5E1), fontSize = 11.sp)
-                Text("下行 ${refBytes(state.downloadTotal)}", color = scheme.primary, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
-            }
-        }
-        Surface(shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 1.dp) {
-            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("最近 60 秒流量", color = t.textPrimary, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-                    Text("↑ 上行   ↓ 下行", color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
-                }
+        Surface(shape = RoundedCornerShape(18.dp), color = t.cardBackground) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("近 60 秒网速", color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                Text("峰值 ${refSpeed(peak)} · 上行 / 下行", color = t.textSecondary, fontSize = 12.sp)
                 val points = history.toList()
-                Canvas(Modifier.fillMaxWidth().height(138.dp)) {
-                    fun closeArea(coords: List<Offset>): Path {
-                        val path = Path()
-                        if (coords.isEmpty()) return path
-                        path.moveTo(coords.first().x, coords.first().y)
-                        coords.drop(1).forEach { path.lineTo(it.x, it.y) }
-                        path.lineTo(coords.last().x, size.height)
-                        path.lineTo(coords.first().x, size.height)
-                        path.close()
-                        return path
-                    }
-                    fun smooth(coords: List<Offset>, area: Boolean): Path {
-                        val path = Path()
-                        if (coords.isEmpty()) return path
-                        path.moveTo(coords.first().x, coords.first().y)
-                        for (i in 0 until coords.lastIndex) {
-                            val p0 = if (i == 0) coords[i] else coords[i - 1]
-                            val p1 = coords[i]
-                            val p2 = coords[i + 1]
-                            val p3 = if (i + 2 < coords.size) coords[i + 2] else p2
-                            val c1 = Offset(p1.x + (p2.x - p0.x) / 6f, p1.y + (p2.y - p0.y) / 6f)
-                            val c2 = Offset(p2.x - (p3.x - p1.x) / 6f, p2.y - (p3.y - p1.y) / 6f)
-                            path.cubicTo(c1.x, c1.y, c2.x, c2.y, p2.x, p2.y)
-                        }
-                        if (area) {
-                            path.lineTo(coords.last().x, size.height)
-                            path.lineTo(coords.first().x, size.height)
-                            path.close()
-                        }
-                        return path
-                    }
-
-                    val peak = points.maxOfOrNull { maxOf(it.second, it.third) } ?: 0L
-                    val simulate = points.size < 2 || peak < 4096L
-                    if (!simulate) {
+                Canvas(Modifier.fillMaxWidth().height(116.dp)) {
+                    for (line in 0..2) drawLine(t.outline.copy(alpha = .45f), Offset(0f, size.height * line / 2f), Offset(size.width, size.height * line / 2f), 1.dp.toPx())
+                    if (points.size >= 2) {
                         val maxRate = peak.coerceAtLeast(1L).toFloat()
                         val end = points.last().first
-                        val start = end - 60_000L
-                        fun series(index: Int): List<Offset> = points.map { point ->
-                            val x = (((point.first - start).coerceIn(0L, 60_000L)).toFloat() / 60_000f) * size.width
-                            val value = if (index == 1) point.second else point.third
-                            val y = size.height - (value.toFloat() / maxRate * size.height * .86f)
-                            Offset(x, y)
-                        }
-                        val upload = series(1)
-                        val download = series(2)
-                        drawPath(smooth(upload, true), brush = Brush.verticalGradient(listOf(t.success.copy(alpha = .20f), Color.Transparent), 0f, size.height))
-                        drawPath(smooth(download, true), brush = Brush.verticalGradient(listOf(scheme.primary.copy(alpha = .20f), Color.Transparent), 0f, size.height))
-                        drawPath(smooth(upload, false), color = t.success, style = Stroke(width = 2.15.dp.toPx()))
-                        drawPath(smooth(download, false), color = scheme.primary, style = Stroke(width = 2.15.dp.toPx()))
-                    } else {
-                        fun wave(phaseOffset: Float, base: Float, amplitude: Float): List<Offset> = (0..28).map { i ->
-                            val ratio = i / 28f
-                            val angle = ratio * 8.2f + idlePhase + phaseOffset
-                            val harmonic = kotlin.math.sin((angle * 1.67f).toDouble()).toFloat() * .34f
-                            val y = size.height * base - (kotlin.math.sin(angle.toDouble()).toFloat() + harmonic) * size.height * amplitude
-                            Offset(size.width * ratio, y)
-                        }
-                        val upload = wave(0f, .76f, .028f)
-                        val download = wave(1.18f, .82f, .036f)
-                        drawPath(closeArea(upload), brush = Brush.verticalGradient(listOf(t.success.copy(alpha = .18f), Color.Transparent), size.height * .68f, size.height))
-                        drawPath(closeArea(download), brush = Brush.verticalGradient(listOf(scheme.primary.copy(alpha = .20f), Color.Transparent), size.height * .70f, size.height))
-                        drawPath(smooth(upload, false), color = t.success.copy(alpha = .78f), style = Stroke(width = 1.8.dp.toPx()))
-                        drawPath(smooth(download, false), color = scheme.primary.copy(alpha = .84f), style = Stroke(width = 1.8.dp.toPx()))
-                    }
-                }
-            }
-        }
-        val tcpCount = state.connections.count { it.network.contains("tcp", ignoreCase = true) }
-        val udpCount = state.connections.count { it.network.contains("udp", ignoreCase = true) }
-        val protocolCount = tcpCount + udpCount
-        val tcpPercent = if (protocolCount > 0) (tcpCount * 100 / protocolCount) else 0
-        val udpPercent = if (protocolCount > 0) (udpCount * 100 / protocolCount) else 0
-        val tcpRatio = if (protocolCount > 0) tcpCount.toFloat() / protocolCount.toFloat() else 0f
-        val inboundCount = state.connections.count { it.inbound.isNotBlank() }
-        val routedHits = state.connections.count { it.rule.isNotBlank() || it.chain.isNotBlank() }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Surface(
-                modifier = Modifier.weight(1f).height(92.dp),
-                shape = RoundedCornerShape(18.dp),
-                color = t.cardBackground,
-                shadowElevation = 1.dp,
-            ) {
-                Column(Modifier.fillMaxSize().padding(13.dp), verticalArrangement = Arrangement.SpaceBetween) {
-                    Text("连接协议", color = Color(0xFF94A3B8), fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                    Text("TCP $tcpPercent%  ·  UDP $udpPercent%", color = t.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
-                    Box(Modifier.fillMaxWidth().height(4.dp).background(Color(0xFFE2E8F0), CircleShape)) {
-                        if (protocolCount > 0) {
-                            Row(Modifier.fillMaxSize().clip(CircleShape)) {
-                                if (tcpCount > 0) Box(Modifier.weight(tcpRatio.coerceAtLeast(.01f)).fillMaxHeight().background(Color(0xFF2563EB)))
-                                if (udpCount > 0) Box(Modifier.weight((1f - tcpRatio).coerceAtLeast(.01f)).fillMaxHeight().background(Color(0xFFF59E0B)))
+                        fun drawSeries(upload: Boolean, color: Color) {
+                            val path = Path()
+                            points.forEachIndexed { index, point ->
+                                val x = ((point.first - (end - 60_000L)).coerceIn(0L, 60_000L) / 60_000f) * size.width
+                                val y = size.height - (if (upload) point.second else point.third) / maxRate * (size.height - 4.dp.toPx())
+                                if (index == 0) path.moveTo(x,y) else path.lineTo(x,y)
                             }
+                            drawPath(path, color, style = Stroke(2.dp.toPx()))
                         }
+                        drawSeries(true, t.success); drawSeries(false, scheme.primary)
                     }
                 }
-            }
-            Surface(
-                modifier = Modifier.weight(1f).height(92.dp),
-                shape = RoundedCornerShape(18.dp),
-                color = t.cardBackground,
-                shadowElevation = 1.dp,
-            ) {
-                Column(Modifier.fillMaxSize().padding(13.dp), verticalArrangement = Arrangement.SpaceBetween) {
-                    Text("活动会话", color = Color(0xFF94A3B8), fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                    Text(state.connections.size.toString(), color = Color(0xFF002FA7), fontSize = 22.sp, lineHeight = 25.sp, fontWeight = FontWeight.Black)
-                    Text("入站 $inboundCount  ·  分流命中 $routedHits", color = Color(0xFF64748B), fontSize = 10.sp, lineHeight = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("−60 秒", color = t.textSecondary, fontSize = 12.sp)
+                    Text("现在", color = t.textSecondary, fontSize = 12.sp)
                 }
+                Text(if (points.size < 2) "正在收集真实采样" else "仅绘制实际采样；无流量时保持平直", color = t.textSecondary, fontSize = 12.sp)
             }
         }
-
+        Surface(shape = RoundedCornerShape(18.dp), color = t.cardBackground) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("会话累计", color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                HetuNumber("↑ ${refBytes(state.uploadTotal)}   ↓ ${refBytes(state.downloadTotal)}")
+                val tcp = state.connections.count { it.network.contains("tcp", true) }
+                val udp = state.connections.count { it.network.contains("udp", true) }
+                Text("${state.connections.size} 个连接 · TCP $tcp · UDP $udp", color = t.textSecondary, fontSize = 12.sp)
+                Text("入站 ${state.connections.count { it.inbound.isNotBlank() }} · 分流命中 ${state.connections.count { it.rule.isNotBlank() || it.chain.isNotBlank() }}", color = t.textSecondary, fontSize = 12.sp)
+            }
+        }
     }
 }
 
@@ -3501,92 +2399,31 @@ private fun RefRateCard(title: String, value: Long, icon: ImageVector, color: Co
 }
 
 @Composable
-private fun RefProviderRow(item: DashboardProviderUi, refreshing: Boolean, success: Boolean, onRefresh: () -> Unit, onClick: () -> Unit) {
+internal fun RefProviderRow(item: DashboardProviderUi, refreshing: Boolean, success: Boolean, onRefresh: () -> Unit, onClick: () -> Unit) {
     val t = LocalHetuTokens.current
-    val scheme = MaterialTheme.colorScheme
-    val spinTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "providerRefreshSpin${item.name}")
-    val spin by spinTransition.animateFloat(
-        initialValue = 0f, targetValue = 360f,
-        animationSpec = androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(760, easing = androidx.compose.animation.core.LinearEasing)),
-        label = "providerRefreshRotation${item.name}",
-    )
-    val source = remember(item.name) { MutableInteractionSource() }
-    val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .98f else 1f, spring(dampingRatio = .78f, stiffness = 520f), label = "provider${item.name}")
-    val shape = RoundedCornerShape(22.dp)
-    val usedRatio = if (item.hasSubscriptionInfo && item.total > 0L) item.ratio.coerceIn(0f, 1f) else 0f
-    val progress by animateFloatAsState(usedRatio, spring(dampingRatio = .82f, stiffness = 300f), label = "providerProgress${item.name}")
-    val remainingPercent = if (item.hasSubscriptionInfo && item.total > 0L) ((1f - usedRatio) * 100f).toInt() else 0
-    Surface(
-        modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .92f else 1f }
-            .clip(shape)
-            .clickable(interactionSource = source, indication = null, onClick = onClick),
-        shape = shape,
-        color = t.cardBackground,
-        shadowElevation = 1.dp,
-    ) {
-        Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Surface(shape = RoundedCornerShape(18.dp), color = t.cardBackground) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(item.name, color = t.textPrimary, fontSize = 17.sp, lineHeight = 21.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                Surface(
-                    onClick = { if (!refreshing) onRefresh() },
-                    shape = RoundedCornerShape(999.dp),
-                    color = if (success) Color(0xFFECFDF5) else Color(0xFFEFF6FF),
-                    border = BorderStroke(1.dp, if (success) Color(0xFFA7F3D0) else Color(0xFFDBEAFE)),
-                ) {
-                    Row(Modifier.padding(horizontal = 9.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(
-                            if (success) "已更新" else if (item.hasSubscriptionInfo) "$remainingPercent%" else "同步",
-                            color = if (success) Color(0xFF059669) else scheme.primary,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Icon(
-                            if (success) Icons.Rounded.CheckCircle else Icons.Rounded.Sync,
-                            if (success) "更新完成" else "同步更新",
-                            tint = if (success) Color(0xFF10B981) else scheme.primary,
-                            modifier = Modifier.size(14.dp).graphicsLayer { rotationZ = if (refreshing) spin else 0f },
-                        )
-                    }
+                Column(Modifier.weight(1f).heightIn(min = 48.dp).clickable(onClick = onClick), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(item.name, color = t.textPrimary, fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold)
+                    Text("到期 ${refExpireDate(item.expire)}", color = t.textSecondary, fontSize = 12.sp)
+                }
+                IconButton(onClick = onRefresh, enabled = !refreshing, modifier = Modifier.size(48.dp)) {
+                    if (refreshing) HetuBusyIndicator()
+                    else Icon(if (success) Icons.Rounded.CheckCircle else Icons.Rounded.Refresh,
+                        "${item.name} ${if (success) "更新完成" else "更新订阅"}", tint = if (success) t.success else MaterialTheme.colorScheme.primary)
                 }
             }
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("到期 ${refExpireDate(item.expire)}", color = Color(0xFF94A3B8), fontSize = 11.sp, modifier = Modifier.weight(1f), maxLines = 1)
-                Text(refUpdatedAt(item.updatedAt), color = Color(0xFF94A3B8), fontSize = 11.sp, maxLines = 1)
-            }
+            if (refreshing || success) Text(if (refreshing) "正在更新 ${item.name}" else "${item.name} 更新完成", color = if (success) t.success else t.textSecondary, fontSize = 12.sp)
             if (item.hasSubscriptionInfo && item.total > 0L) {
-                Box(Modifier.fillMaxWidth().height(6.dp).background(Color(0xFFF4F5F7), CircleShape)) {
-                    if (progress > 0f) {
-                        Box(
-                            Modifier.fillMaxWidth(progress.coerceIn(.001f, 1f)).fillMaxHeight()
-                                .background(Brush.horizontalGradient(listOf(Color(0xFF3B82F6), Color(0xFF6366F1))), CircleShape),
-                        )
-                    }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(refBytes(item.upload), color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
-                        Text("已上传", color = Color(0xFF94A3B8), fontSize = 10.sp)
-                    }
-                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(refBytes(item.download), color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
-                        Text("已下载", color = Color(0xFF94A3B8), fontSize = 10.sp)
-                    }
-                    Surface(modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp), color = Color(0xFFEFF6FF), border = BorderStroke(1.dp, Color(0xFFDBEAFE))) {
-                        Column(Modifier.padding(horizontal = 7.dp, vertical = 7.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(refBytes(item.remaining), color = Color(0xFF2563EB), fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
-                            Text("剩余流量", color = Color(0xFF2563EB), fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
-                        }
-                    }
-                }
-                HorizontalDivider(color = Color(0xFFF4F5F7))
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("已用 ${refBytes(item.used)}", color = Color(0xFF64748B), fontSize = 11.sp, modifier = Modifier.weight(1f))
-                    Text("总计 ${refBytes(item.total)}", color = Color(0xFF64748B), fontSize = 11.sp)
-                }
-            } else {
-                Text("该订阅没有上报流量信息", color = t.textMuted, style = MaterialTheme.typography.bodySmall)
-            }
+                Text("剩余流量", color = t.textSecondary, fontSize = 12.sp)
+                HetuNumber(refBytes(item.remaining), color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp))
+                HetuReadOnlyProgress(item.ratio)
+                Text("已用 ${refBytes(item.used)} / 总 ${refBytes(item.total)} · 剩余 ${((1f-item.ratio)*100).toInt()}%", color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+                Text("上传 ${refBytes(item.upload)} · 下载 ${refBytes(item.download)}", color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+            } else Text("订阅未上报流量信息", color = t.textSecondary, fontSize = 12.sp)
+            Text(refUpdatedAt(item.updatedAt), color = t.textSecondary, fontSize = 12.sp)
         }
     }
 }
@@ -3675,7 +2512,7 @@ private fun RefConnectionAppCard(
             ) {
                 Box(
                     Modifier.size(46.dp)
-                        .background(if (dark) Color.White.copy(alpha = .06f) else Color(0xFFF4F5F7), RoundedCornerShape(13.dp))
+                        .background(if (dark) Color.White.copy(alpha = .06f) else t.pageBackground, RoundedCornerShape(13.dp))
                         .clip(RoundedCornerShape(13.dp)),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -3704,7 +2541,7 @@ private fun RefConnectionAppCard(
                             color = t.textPrimary,
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
-                            maxLines = 1,
+                            maxLines = if (expanded) Int.MAX_VALUE else 2,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f),
                         )
@@ -3715,13 +2552,13 @@ private fun RefConnectionAppCard(
                             Text(
                                 "${group.connections.size} 连接",
                                 color = MaterialTheme.colorScheme.primary,
-                                fontSize = 10.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                             )
                         }
                     }
-                    Text(group.subtitle, color = t.textSecondary, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (group.subtitle != group.title) Text(group.subtitle, color = t.textSecondary, fontSize = 12.sp, maxLines = if (expanded) Int.MAX_VALUE else 1, overflow = TextOverflow.Ellipsis)
                     Text(
                         "↑ ${refBytes(group.upload)}   ↓ ${refBytes(group.download)}",
                         color = t.textMuted,
@@ -3762,9 +2599,9 @@ private fun RefConnectionAppCard(
                         androidx.compose.animation.AnimatedVisibility(
                             visible = expanded,
                             enter = androidx.compose.animation.fadeIn(
-                                androidx.compose.animation.core.tween(150, delayMillis = (index * 12).coerceAtMost(180)),
+                                androidx.compose.animation.core.tween(150, delayMillis = 0),
                             ) + androidx.compose.animation.slideInVertically(
-                                androidx.compose.animation.core.tween(180, delayMillis = (index * 12).coerceAtMost(180)),
+                                androidx.compose.animation.core.tween(180, delayMillis = 0),
                             ) { it / 5 },
                         ) {
                             RefConnectionRow(item, onCloseConnection?.let { action -> { action(item) } })
@@ -3809,7 +2646,7 @@ private fun RefConnectionRow(item: ProxyConnectionUi, onClose: (() -> Unit)?) {
                 Box(
                     Modifier.size(48.dp)
                         .graphicsLayer { scaleX = closeScale; scaleY = closeScale }
-                        .background(if (dark) Color.White.copy(alpha = .07f) else Color(0xFFF4F5F7).copy(alpha = .82f), CircleShape)
+                        .background(if (dark) Color.White.copy(alpha = .07f) else t.pageBackground.copy(alpha = .82f), CircleShape)
                         .clip(CircleShape)
                         .clickable(interactionSource = closeSource, indication = null, onClick = onClose),
                     contentAlignment = Alignment.Center,
@@ -3840,7 +2677,7 @@ private fun RefRuleGroupCard(items: List<ProxyRuleUi>) {
         modifier = Modifier.background(ruleGlassBrush, shape),
         shape = shape,
         color = Color.Transparent,
-        border = BorderStroke(.5.dp, if (dark) t.outline.copy(alpha = .32f) else Color(0xFFF4F5F7)),
+        border = BorderStroke(.5.dp, if (dark) t.outline.copy(alpha = .32f) else t.pageBackground),
         shadowElevation = 0.dp,
     ) {
         Column(Modifier.fillMaxWidth()) {
@@ -3918,7 +2755,7 @@ private fun RefRuleGroupCard(items: List<ProxyRuleUi>) {
                     HorizontalDivider(
                         modifier = Modifier.padding(horizontal = 14.dp),
                         thickness = .5.dp,
-                        color = if (dark) t.outline.copy(alpha = .28f) else Color(0xFFF4F5F7).copy(alpha = .84f),
+                        color = if (dark) t.outline.copy(alpha = .28f) else t.pageBackground.copy(alpha = .84f),
                     )
                 }
             }
@@ -3927,37 +2764,21 @@ private fun RefRuleGroupCard(items: List<ProxyRuleUi>) {
 }
 
 @Composable
-private fun RefRuleSetRow(item: DashboardRuleSetUi, refreshing: Boolean, success: Boolean, onRefresh: () -> Unit) {
+internal fun RefRuleSetRow(item: DashboardRuleSetUi, refreshing: Boolean, success: Boolean, onRefresh: () -> Unit) {
     val t = LocalHetuTokens.current
-    val scheme = MaterialTheme.colorScheme
-    val spinTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "ruleSetRefreshSpin${item.name}")
-    val spin by spinTransition.animateFloat(
-        initialValue = 0f, targetValue = 360f,
-        animationSpec = androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(760, easing = androidx.compose.animation.core.LinearEasing)),
-        label = "ruleSetRefreshRotation${item.name}",
-    )
-    Surface(shape = RoundedCornerShape(20.dp), color = t.cardBackground, shadowElevation = 1.dp) {
-        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(item.name, color = t.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Spacer(Modifier.width(7.dp))
-                    Surface(shape = RoundedCornerShape(6.dp), color = Color(0xFFEBF3FF)) {
-                        Text(
-                            if (item.ruleCount > 0) "${item.ruleCount} 条规则" else "规则数 —",
-                            Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
-                            color = scheme.primary,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                        )
-                    }
-                }
-                Text(listOf(item.behavior, item.format, item.vehicleType).filter { it.isNotBlank() }.joinToString(" / "), color = Color(0xFF64748B), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(refUpdatedAt(item.updatedAt), color = Color(0xFF94A3B8), fontSize = 11.sp, maxLines = 1)
+    Surface(shape = RoundedCornerShape(18.dp), color = t.cardBackground) {
+        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text(item.name, color = t.textPrimary, fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold)
+                HetuNumber("${java.text.NumberFormat.getIntegerInstance(java.util.Locale.US).format(item.ruleCount)} 条规则",
+                    style = MaterialTheme.typography.bodyMedium)
+                Text(listOf(item.behavior, item.format, item.vehicleType).filter { it.isNotBlank() }.joinToString(" / "), color = t.textSecondary, fontSize = 12.sp)
+                Text(if (refreshing) "正在更新" else if (success) "更新完成 · ${refUpdatedAt(item.updatedAt)}" else refUpdatedAt(item.updatedAt), color = if (success) t.success else t.textSecondary, fontSize = 12.sp)
             }
-            IconButton(onClick = { if (!refreshing) onRefresh() }, modifier = Modifier.size(38.dp)) {
-                Icon(if (success) Icons.Rounded.CheckCircle else Icons.Rounded.Download, if (success) "更新完成" else "远端更新", tint = if (success) Color(0xFF10B981) else scheme.primary, modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = if (refreshing) spin else 0f })
+            IconButton(onClick = onRefresh, enabled = !refreshing, modifier = Modifier.size(48.dp)) {
+                if (refreshing) HetuBusyIndicator()
+                else Icon(if (success) Icons.Rounded.CheckCircle else Icons.Rounded.Refresh,
+                    "${item.name} 更新规则集", tint = if (success) t.success else MaterialTheme.colorScheme.primary)
             }
         }
     }
@@ -3973,12 +2794,12 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
 
 
     LazyColumn(
-        Modifier.fillMaxSize().statusBarsPadding().background(if (dark) t.pageBackground else Color(0xFFF4F5F7)),
+        Modifier.fillMaxSize().statusBarsPadding().background(t.pageBackground),
         contentPadding = PaddingValues(
             start = 16.dp,
             top = 8.dp,
             end = 16.dp,
-            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 96.dp,
+            bottom = hetuContentBottomPadding(),
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -4060,15 +2881,16 @@ private fun RefSettings(state: ProxyComposeState, operation: String, onApplySett
     var blurEnabled by remember { mutableStateOf(prefs.getBoolean("enableBlur", true)) }
     var latencyInterval by remember { mutableIntStateOf(prefs.getInt("latencyAutoRefreshSeconds", 0).takeIf { it == 0 || it == 30 || it == 60 } ?: 0) }
 
+    val pending = state.runtimeSettingsPending || prefs.getBoolean("proxyRootRuntimeRefreshPending", false)
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     LazyColumn(
-        Modifier.fillMaxSize().statusBarsPadding().background(if (dark) t.pageBackground else Color(0xFFF4F5F7)),
+        Modifier.fillMaxSize().statusBarsPadding().background(t.pageBackground),
         contentPadding = PaddingValues(
             start = 16.dp,
             top = 8.dp,
             end = 16.dp,
-            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 96.dp,
+            bottom = hetuContentBottomPadding(),
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -4078,9 +2900,9 @@ private fun RefSettings(state: ProxyComposeState, operation: String, onApplySett
                 RefGroup {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Icon(if (state.runtimeSettingsPending) Icons.Rounded.Info else Icons.Rounded.CheckCircle,
-                                null, Modifier.size(20.dp), tint = if (state.runtimeSettingsPending) t.warning else t.success)
-                            Text(if (state.runtimeSettingsPending) "有设置等待应用" else "当前运行设置",
+                            Icon(if (pending) Icons.Rounded.Info else Icons.Rounded.CheckCircle,
+                                null, Modifier.size(20.dp), tint = if (pending) t.warning else t.success)
+                            Text(if (pending) "有设置等待应用" else "当前运行设置",
                                 color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
                         }
                         Text("当前 IPv6：${ProxyRuntimeSettings.ipv6Label(state.effectiveIpv6)}",
@@ -4089,20 +2911,20 @@ private fun RefSettings(state: ProxyComposeState, operation: String, onApplySett
                             Text(
                                 buildString {
                                     if (state.effectiveIpv6 == "disable") {
-                                        if (state.ipv6ProtectionActive) append("IPv6 外联已禁用")
+                                        if (state.ipv6ProtectionActive) append("IPv6 保护规则已加载")
                                         else append("IPv6 外联保护待确认")
                                         append(if (state.ipv6Disabled) " · 系统协议栈已关闭" else " · 系统接口可能保留 IPv6 地址")
                                     } else {
-                                        append(if (state.ipv6ProtectionActive) "IPv6 外联已拦截" else "外联保护状态待确认")
+                                        append(if (state.ipv6ProtectionActive) "IPv6 保护规则已加载" else "外联保护状态待确认")
                                     }
                                 },
                                 color = if (state.ipv6ProtectionActive) t.success else t.warning,
                                 style = MaterialTheme.typography.bodySmall,
                             )
                         }
-                        if (state.runtimeSettingsPending) {
+                        if (pending) {
                             Text("下面显示已保存的选项。应用后会短暂重连。", color = t.textSecondary, style = MaterialTheme.typography.bodySmall)
-                            Button(onClick = onApplySettings, enabled = operation.isBlank(), modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp), shape = CircleShape) {
+                            Button(onClick = onApplySettings, enabled = operation.isBlank(), modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = CircleShape) {
                                 if (operation.isNotBlank()) {
                                     CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                                     Spacer(Modifier.width(8.dp))
@@ -4488,23 +3310,7 @@ private fun RefSectionLabel(text: String) {
 }
 
 @Composable
-private fun RefGradientIcon(icon: ImageVector, accent: Color) {
-    val resolvedAccent = if (MaterialTheme.colorScheme.background.luminance() < .5f) androidx.compose.ui.graphics.lerp(accent, Color.White, .28f) else accent
-    val shape = RoundedCornerShape(11.dp)
-    val brush = Brush.linearGradient(
-        listOf(
-            resolvedAccent.copy(alpha = .14f),
-            resolvedAccent.copy(alpha = .07f),
-        ),
-    )
-    Box(
-        Modifier.size(36.dp)
-            .background(brush, shape),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(icon, null, tint = resolvedAccent, modifier = Modifier.size(20.dp))
-    }
-}
+private fun RefGradientIcon(icon: ImageVector, accent: Color) { HetuListIcon(icon) }
 
 @Composable
 private fun RefToolRow(
@@ -4517,6 +3323,7 @@ private fun RefToolRow(
     trailingColor: Color = Color(0xFF2563EB),
     onClick: () -> Unit,
 ) {
+    val resolvedTrailing = if (trailingColor == Color(0xFF2563EB)) MaterialTheme.colorScheme.primary else trailingColor
     val t = LocalHetuTokens.current
     val source = remember(title) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
@@ -4538,14 +3345,14 @@ private fun RefToolRow(
         Spacer(Modifier.width(8.dp))
         if (trailingText.isNotBlank()) {
             if (trailingBadge) {
-                Surface(shape = CircleShape, color = trailingColor.copy(alpha = .10f), tonalElevation = 0.dp) {
+                Surface(shape = CircleShape, color = resolvedTrailing.copy(alpha = .10f), tonalElevation = 0.dp) {
                     Row(
                         Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(5.dp),
                     ) {
-                        Box(Modifier.size(6.dp).background(trailingColor, CircleShape))
-                        Text(trailingText, color = trailingColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Box(Modifier.size(6.dp).background(resolvedTrailing, CircleShape))
+                        Text(trailingText, color = resolvedTrailing, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             } else {
@@ -4722,13 +3529,13 @@ private fun refUpdatedAt(value: String): String {
     return "更新于 $compact"
 }
 
-private fun refDelay(value: Long?): String = when {
+internal fun refDelay(value: Long?): String = when {
     value == null -> "--"
     value <= 0L -> "超时"
     else -> "$value ms"
 }
 
-private fun refBytes(value: Long): String {
+internal fun refBytes(value: Long): String {
     if (value <= 0L) return "0 B"
     val units = arrayOf("B", "KB", "MB", "GB", "TB")
     var v = value.toDouble()
@@ -4740,9 +3547,9 @@ private fun refBytes(value: Long): String {
     return if (i == 0) "${v.toLong()} ${units[i]}" else String.format(java.util.Locale.US, "%.1f %s", v, units[i])
 }
 
-private fun refSpeed(value: Long): String = "${refBytes(value)}/s"
+internal fun refSpeed(value: Long): String = "${refBytes(value)}/s"
 
-private fun refDuration(seconds: Long): String {
+internal fun refDuration(seconds: Long): String {
     if (seconds <= 0L) return "0s"
     val days = seconds / 86_400
     val hours = (seconds % 86_400) / 3_600

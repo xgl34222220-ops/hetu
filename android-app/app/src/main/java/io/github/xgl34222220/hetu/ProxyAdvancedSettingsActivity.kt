@@ -1,5 +1,7 @@
 package io.github.xgl34222220.hetu
 
+import io.github.xgl34222220.hetu.ui.*
+
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -83,7 +85,7 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
     val profile = remember(revision) { ProxyRuntimeProfile.load(prefs) }
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val pageBg = if (dark) t.pageBackground else Color(0xFFF1F5F9)
+    val pageBg = if (dark) t.pageBackground else MaterialTheme.colorScheme.background
     val running = runtimeStatus?.optBoolean("running", false) ?: prefs.getBoolean("proxyRootRuntimeRunning", false)
     val effectiveIpv6 = runtimeStatus?.optString("ipv6Mode", "").orEmpty()
     val settingsPending = ProxyRuntimeSettings.pending(running, ProxyRuntimeSettings.signature(prefs), prefs.getString("proxyRootAppliedSettings", ""))
@@ -189,31 +191,11 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
             start = 16.dp,
             top = 8.dp,
             end = 16.dp,
-            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 92.dp,
+            bottom = hetuContentBottomPadding(),
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item {
-            Row(
-                Modifier.fillMaxWidth().statusBarsPadding().padding(top = 8.dp, bottom = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回", tint = t.textPrimary)
-                }
-                Spacer(Modifier.width(4.dp))
-                Text(
-                    "高级代理配置",
-                    color = t.textPrimary,
-                    fontSize = 22.sp,
-                    lineHeight = 28.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
+        item { Column(Modifier.statusBarsPadding()) { HetuPageHeader("高级代理配置", onBack) } }
 
         item {
             AdvancedGroup {
@@ -225,14 +207,14 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
                         !running -> "代理未运行，设置将在下次启动时应用"
                         effectiveIpv6.isBlank() -> "正在核对当前生效策略…"
                         effectiveIpv6 == "disable" && runtimeStatus?.optBoolean("ipv6DisableGuard", false) == true ->
-                            if (runtimeStatus?.optBoolean("ipv6DisabledByHetu", false) == true) "IPv6 外联已禁用，系统协议栈也已关闭"
-                            else "IPv6 外联已禁用；系统接口可能仍保留 IPv6 地址"
+                            if (runtimeStatus?.optBoolean("ipv6DisabledByHetu", false) == true) "IPv6 保护规则已加载；系统禁用状态已确认"
+                            else "IPv6 保护规则已加载；系统接口可能保留地址"
                         effectiveIpv6 == "disable" -> "IPv6 防泄漏保护尚未生效，请查看诊断"
                         else -> "当前生效：${ProxyRuntimeSettings.ipv6Label(effectiveIpv6)}"
                     }
                     Text(actual, color = t.textSecondary, fontSize = 13.sp, lineHeight = 19.sp)
                     if (profile.ipv6 == ProxyRuntimeProfile.Ipv6.DISABLE) {
-                        Text("禁用模式以 IPv6 外联防泄漏规则为准。部分 ROM 会为蜂窝/IMS 保留 IPv6 地址；只要上方显示“IPv6 外联已禁用”，本机就不会通过 IPv6 绕过。检测网站若显示代理节点的出口 IPv6，则需要在节点端限制。", color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+                        Text("这里显示规则和系统开关的核对结果，不代替端到端网络检测。蜂窝/IMS 可能保留地址；代理节点自身的 IPv6 出口需在节点端管理。", color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
                     }
                     if (settingsPending) {
                         Text("部分设置尚未应用，重启会重新建立现有连接。", color = MaterialTheme.colorScheme.primary, fontSize = 13.sp, lineHeight = 19.sp)
@@ -454,16 +436,7 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
 @Composable
 private fun AdvancedPreflightSheet(passed: Boolean, text: String, onDismiss: () -> Unit) {
     val t = LocalHetuTokens.current
-    val pulseTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "preflightShieldPulse")
-    val pulse by pulseTransition.animateFloat(
-        initialValue = .94f,
-        targetValue = 1.06f,
-        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-            animation = androidx.compose.animation.core.tween(850),
-            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
-        ),
-        label = "preflightShieldScale",
-    )
+    val pulse = 1f // completed preflight is a static result, not an ongoing operation
     val accent = if (passed) Color(0xFF10B981) else Color(0xFFF59E0B)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -510,36 +483,32 @@ private fun AdvancedPreflightSheet(passed: Boolean, text: String, onDismiss: () 
                     lineHeight = 19.sp,
                 )
             }
-            Text("下滑即可关闭", color = Color(0xFF94A3B8), fontSize = 10.sp, fontWeight = FontWeight.Medium)
+            Text("下滑即可关闭", color = Color(0xFF94A3B8), fontSize = 12.sp, fontWeight = FontWeight.Medium)
         }
     }
 }
 
 @Composable
 private fun AdvancedSectionLabel(text: String) {
-    Text(text, color = Color(0xFF94A3B8), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = .6.sp, modifier = Modifier.padding(start = 12.dp, top = 2.dp))
+    Text(text, color = LocalHetuTokens.current.textOnPage, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = .6.sp, modifier = Modifier.padding(start = 12.dp, top = 2.dp))
 }
 
 @Composable
 private fun AdvancedGroup(content: @Composable ColumnScope.() -> Unit) {
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    Surface(shape = RoundedCornerShape(20.dp), color = if (dark) t.elevatedCardBackground else Color.White, shadowElevation = if (dark) 0.dp else 1.dp) {
+    Surface(shape = RoundedCornerShape(18.dp), color = if (dark) t.elevatedCardBackground else Color.White, shadowElevation = if (dark) 0.dp else 1.dp) {
         Column(Modifier.fillMaxWidth(), content = content)
     }
 }
 
 @Composable
 private fun AdvancedDivider() {
-    HorizontalDivider(Modifier.padding(start = 62.dp, end = 14.dp), color = if (MaterialTheme.colorScheme.background.luminance() < .5f) LocalHetuTokens.current.outline else Color(0xFFF1F5F9))
+    HorizontalDivider(Modifier.padding(start = 62.dp, end = 14.dp), color = if (MaterialTheme.colorScheme.background.luminance() < .5f) LocalHetuTokens.current.outline else MaterialTheme.colorScheme.background)
 }
 
 @Composable
-private fun AdvancedIcon(icon: ImageVector, accent: Color) {
-    Box(Modifier.size(36.dp).background(accent.copy(alpha = .12f), RoundedCornerShape(11.dp)), contentAlignment = Alignment.Center) {
-        Icon(icon, null, tint = accent, modifier = Modifier.size(20.dp))
-    }
-}
+private fun AdvancedIcon(icon: ImageVector, accent: Color) { HetuListIcon(icon) }
 
 @Composable
 private fun AdvancedValueRow(icon: ImageVector, accent: Color, title: String, value: String, onClick: () -> Unit) {
@@ -631,10 +600,10 @@ private fun SetEditorDialog(state: SetEditorState, onDismiss: () -> Unit, onSave
                 shape = RoundedCornerShape(18.dp),
             )
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FilledTonalButton(onClick = onDismiss, modifier = Modifier.weight(1f).height(44.dp), shape = CircleShape) {
+                FilledTonalButton(onClick = onDismiss, modifier = Modifier.weight(1f).heightIn(min = 48.dp), shape = CircleShape) {
                     Text("取消", fontWeight = FontWeight.Bold)
                 }
-                Button(onClick = { onSave(text) }, modifier = Modifier.weight(1f).height(44.dp), shape = CircleShape) {
+                Button(onClick = { onSave(text) }, modifier = Modifier.weight(1f).heightIn(min = 48.dp), shape = CircleShape) {
                     Text("保存", fontWeight = FontWeight.Bold)
                 }
             }
@@ -750,7 +719,7 @@ private fun AdvancedInfoSheet(title: String, text: String, onDismiss: () -> Unit
                                 .padding(top = 12.dp, end = 8.dp, bottom = 12.dp),
                             color = Color(0xFF475569),
                             fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                            fontSize = 10.sp,
+                            fontSize = 12.sp,
                             lineHeight = 18.sp,
                             textAlign = androidx.compose.ui.text.style.TextAlign.End,
                         )
@@ -761,7 +730,7 @@ private fun AdvancedInfoSheet(title: String, text: String, onDismiss: () -> Unit
                                 .horizontalScroll(androidx.compose.foundation.rememberScrollState())
                                 .padding(horizontal = 12.dp, vertical = 12.dp),
                             fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             lineHeight = 18.sp,
                             softWrap = false,
                         )
@@ -782,7 +751,7 @@ private fun AdvancedInfoSheet(title: String, text: String, onDismiss: () -> Unit
             Text(
                 "下滑即可关闭",
                 color = Color(0xFF94A3B8),
-                fontSize = 10.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.align(Alignment.CenterHorizontally),
             )

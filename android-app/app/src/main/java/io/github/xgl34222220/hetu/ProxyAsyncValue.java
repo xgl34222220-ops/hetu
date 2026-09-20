@@ -19,6 +19,24 @@ final class ProxyAsyncValue<T> {
     private long nextAttempt;
     private boolean inFlight;
     private T value;
+    private boolean hasValue;
+    private long succeededAt;
+    private String failure = "";
+
+    static final class View<T> {
+        final T value;
+        final String state;
+        final long succeededAt;
+        final String failure;
+        View(T value, String state, long succeededAt, String failure) {
+            this.value=value; this.state=state; this.succeededAt=succeededAt; this.failure=failure;
+        }
+    }
+    synchronized View<T> view() {
+        String state=hasValue ? ((inFlight || !failure.isEmpty() || clock.getAsLong()-succeededAt>=lifetime) ? "stale" : "success")
+                : (inFlight ? "loading" : !failure.isEmpty() ? "failed" : "idle");
+        return new View<>(value,state,succeededAt,failure);
+    }
 
     ProxyAsyncValue(Executor executor, LongSupplier clock, Fetch<T> fetch, T unknown,
                     long lifetime, long retryDelay) {
@@ -36,6 +54,7 @@ final class ProxyAsyncValue<T> {
             key = currentKey;
             generation++;
             value = unknown;
+            hasValue=false; succeededAt=0L; failure="";
             nextAttempt = 0L;
         }
         long now = clock.getAsLong();
@@ -46,6 +65,7 @@ final class ProxyAsyncValue<T> {
             executor.execute(() -> refresh(ticket));
         } catch (RejectedExecutionException stopped) {
             inFlight = false;
+            failure="检测任务暂不可用";
             nextAttempt = now + retryDelay;
         }
         return value;
@@ -53,11 +73,13 @@ final class ProxyAsyncValue<T> {
 
     private void refresh(long ticket) {
         T fresh = null;
-        try { fresh = fetch.run(); } catch (Exception unavailable) { }
+        String problem="";
+        try { fresh = fetch.run(); } catch (Exception unavailable) { problem=unavailable.getClass().getSimpleName(); }
         synchronized (this) {
             inFlight = false;
             if (ticket != generation) return;
-            if (fresh != null) value = fresh;
+            if (fresh != null) { value = fresh; hasValue=true; succeededAt=clock.getAsLong(); failure=""; }
+            else failure=problem.isEmpty()?"检测未返回结果":problem;
             nextAttempt = clock.getAsLong() + (fresh == null ? retryDelay : lifetime);
         }
     }

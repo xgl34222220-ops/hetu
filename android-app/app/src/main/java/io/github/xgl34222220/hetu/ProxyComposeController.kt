@@ -114,7 +114,7 @@ internal class ProxyComposeController(context: Context) {
     private val root = RootProxyManager(app)
     private val configs = ProxyConfigLibrary(app)
     private val api = MihomoControllerClient(app)
-    private val icons = ProxyIconStore(app)
+    private val icons = ProxyGroupIconRepository.get(app)
     private val appIconCache = android.util.LruCache<String, Bitmap>(96)
     private val appIdentityCache = android.util.LruCache<String, AppIdentity>(192)
 
@@ -405,9 +405,9 @@ internal class ProxyComposeController(context: Context) {
             val part = coroutineScope {
                 chunk.map { url ->
                     async {
-                        if (icons.cached(url) != null) return@async false
+                        if (icons.peek(url) != null) return@async false
                         try {
-                            icons.fetchMissing(url) != null
+                            icons.load(url, icons.diskPath(url)) is GroupIconLoad.Ready
                         } catch (cancel: CancellationException) {
                             throw cancel
                         } catch (_: Exception) {
@@ -554,7 +554,7 @@ internal class ProxyComposeController(context: Context) {
                 now = group.optString("now", "未选择"),
                 nodes = nodes,
                 iconUrl = iconUrl,
-                iconPath = icons.cached(iconUrl)?.absolutePath.orEmpty(),
+                iconPath = icons.diskPath(iconUrl),
             )
         }
         return result.sortedBy { it.name.lowercase(Locale.ROOT) }
@@ -727,26 +727,15 @@ internal class ProxyComposeController(context: Context) {
         return out.sortedBy { it.name.lowercase(Locale.ROOT) }
     }
 
+    private var lastIconSource: String? = null
+    private var lastIconMap: Map<String, String> = emptyMap()
+    @Synchronized
     private fun parseGroupIcons(text: String): Map<String, String> {
-        val out = LinkedHashMap<String, String>()
-        var inGroups = false
-        var name: String? = null
-        for (raw in text.replace("\r\n", "\n").replace('\r', '\n').lines()) {
-            val trimmed = raw.trim()
-            val indent = raw.indexOfFirst { !it.isWhitespace() }.let { if (it < 0) raw.length else it }
-            if (!inGroups) {
-                if (indent == 0 && trimmed.startsWith("proxy-groups:")) inGroups = true
-                continue
-            }
-            if (trimmed.isEmpty() || trimmed.startsWith("#")) continue
-            if (indent == 0) break
-            if (trimmed.startsWith("- name:")) name = yamlScalar(trimmed.substringAfter("- name:"))
-            else if (name != null && trimmed.startsWith("icon:")) {
-                val value = yamlScalar(trimmed.substringAfter("icon:"))
-                if (value.startsWith("https://")) out[name] = value
-            }
-        }
-        return out
+        if (lastIconSource == text) return lastIconMap
+        val parsed = ProxyGroupIcons.parse(text)
+        lastIconMap = parsed
+        lastIconSource = text
+        return parsed
     }
 
     private fun yamlScalar(value: String): String {
@@ -764,66 +753,4 @@ internal class ProxyComposeController(context: Context) {
         if (out.length >= 2 && ((out.first() == '\'' && out.last() == '\'') || (out.first() == '"' && out.last() == '"'))) out = out.substring(1, out.length - 1)
         return out.replace("''", "'")
     }
-}
-
-private class ProxyIconStore(context: Context) {
-    private val dir = File(context.cacheDir, "proxy/group-icons").apply { mkdirs() }
-
-    fun cached(url: String): File? {
-        if (!url.startsWith("https://")) return null
-        val file = File(dir, key(url) + ".img")
-        return file.takeIf { it.isFile && it.length() in 1..MAX_BYTES && BitmapFactory.decodeFile(it.absolutePath) != null }
-    }
-
-    fun fetchMissing(url: String): File? {
-        if (!url.startsWith("https://")) return null
-        val target = File(dir, key(url) + ".img")
-        cached(url)?.let { return it }
-        val tmp = File(dir, target.name + ".new")
-        val connection = (URL(url).openConnection() as? HttpsURLConnection) ?: return null
-        connection.connectTimeout = 5_000
-        connection.readTimeout = 7_000
-        connection.instanceFollowRedirects = true
-        connection.setRequestProperty("User-Agent", "Hetu/Android")
-        try {
-            connection.connect()
-            if (connection.responseCode !in 200..299) return cached(url)
-            val declared = connection.contentLengthLong
-            if (declared > MAX_BYTES) return cached(url)
-            connection.inputStream.use { input ->
-                FileOutputStream(tmp, false).use { output ->
-                    val buffer = ByteArray(16 * 1024)
-                    var total = 0L
-                    while (true) {
-                        val n = input.read(buffer)
-                        if (n < 0) break
-                        total += n
-                        if (total > MAX_BYTES) throw IOException("图标文件过大")
-                        output.write(buffer, 0, n)
-                    }
-                    output.fd.sync()
-                }
-            }
-            if (BitmapFactory.decodeFile(tmp.absolutePath) == null) throw IOException("图标格式无效")
-            if (target.exists()) target.delete()
-            if (!tmp.renameTo(target)) {
-                tmp.copyTo(target, overwrite = true)
-                tmp.delete()
-            }
-            return target
-        } catch (cancel: CancellationException) {
-            tmp.delete(); throw cancel
-        } catch (_: Exception) {
-            tmp.delete(); return cached(url)
-        } finally {
-            connection.disconnect()
-        }
-    }
-
-    private fun key(url: String): String {
-        val digest = MessageDigest.getInstance("SHA-256").digest(url.toByteArray(Charsets.UTF_8))
-        return digest.joinToString("") { "%02x".format(it) }
-    }
-
-    private companion object { const val MAX_BYTES = 1_572_864L }
 }

@@ -1,5 +1,7 @@
 package io.github.xgl34222220.hetu
 
+import io.github.xgl34222220.hetu.ui.*
+
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -64,7 +66,7 @@ private fun ProxyNetworkAutomationPage(onBack: () -> Unit) {
     val bssids = remember(revision) { TreeSet(prefs.getStringSet("networkMatchBssids", emptySet()).orEmpty()) }
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val pageBg = if (dark) t.pageBackground else Color(0xFFF1F5F9)
+    val pageBg = if (dark) t.pageBackground else MaterialTheme.colorScheme.background
 
     fun refresh() { revision++ }
     fun service(action: String) {
@@ -108,7 +110,7 @@ private fun ProxyNetworkAutomationPage(onBack: () -> Unit) {
             start = 16.dp,
             top = 8.dp,
             end = 16.dp,
-            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 92.dp,
+            bottom = hetuContentBottomPadding(),
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -117,15 +119,15 @@ private fun ProxyNetworkAutomationPage(onBack: () -> Unit) {
                 IconButton(onClick = onBack, modifier = Modifier.size(42.dp)) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回", tint = t.textPrimary) }
                 Spacer(Modifier.width(4.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("网络匹配", color = t.textPrimary, fontSize = 24.sp, lineHeight = 30.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("按当前网络环境自动控制 Root 代理", color = t.textSecondary, fontSize = 11.sp)
+                    Text("网络匹配", color = t.textPrimary, fontSize = 22.sp, lineHeight = 30.sp, fontWeight = FontWeight.ExtraBold)
+                    Text("按当前网络环境自动控制 Root 代理", color = t.textSecondary, fontSize = 12.sp)
                 }
                 IconButton(onClick = { requestWifiPermissions() }) { Icon(Icons.Rounded.Refresh, "刷新", tint = MaterialTheme.colorScheme.primary) }
             }
         }
 
         item {
-            Surface(shape = RoundedCornerShape(24.dp), color = if (dark) t.elevatedCardBackground else Color.White, shadowElevation = if (dark) 0.dp else 1.dp) {
+            Surface(shape = RoundedCornerShape(18.dp), color = if (dark) t.elevatedCardBackground else Color.White, shadowElevation = if (dark) 0.dp else 1.dp) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(42.dp).background(MaterialTheme.colorScheme.primary.copy(alpha = .10f), RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
@@ -133,15 +135,15 @@ private fun ProxyNetworkAutomationPage(onBack: () -> Unit) {
                         }
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
-                            Text("当前环境", color = t.textSecondary, fontSize = 11.sp)
+                            Text("当前环境", color = t.textSecondary, fontSize = 12.sp)
                             Text(environment, color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         }
                     }
-                    HorizontalDivider(color = if (dark) t.outline else Color(0xFFF1F5F9))
+                    HorizontalDivider(color = if (dark) t.outline else MaterialTheme.colorScheme.background)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text("自动网络匹配", color = t.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                            Text(if (enabled) "监听服务正在运行" else "关闭后不会自动启停代理", color = t.textSecondary, fontSize = 11.sp)
+                            Text(if (enabled) "监听服务正在运行" else "关闭后不会自动启停代理", color = t.textSecondary, fontSize = 12.sp)
                         }
                         Switch(checked = enabled, onCheckedChange = { value ->
                             if (value) {
@@ -210,7 +212,7 @@ private fun ProxyNetworkAutomationPage(onBack: () -> Unit) {
 }
 
 @Composable
-private fun NetworkSectionLabel(text: String) = Text(text, color = Color(0xFF94A3B8), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = .6.sp, modifier = Modifier.padding(start = 12.dp, top = 2.dp))
+private fun NetworkSectionLabel(text: String) = Text(text, color = Color(0xFF94A3B8), fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = .6.sp, modifier = Modifier.padding(start = 12.dp, top = 2.dp))
 
 @Composable
 private fun NetworkGroup(content: @Composable ColumnScope.() -> Unit) {
@@ -220,7 +222,7 @@ private fun NetworkGroup(content: @Composable ColumnScope.() -> Unit) {
 }
 
 @Composable
-private fun NetworkDivider() = HorizontalDivider(Modifier.padding(start = 62.dp, end = 14.dp), color = if (MaterialTheme.colorScheme.background.luminance() < .5f) LocalHetuTokens.current.outline else Color(0xFFF1F5F9))
+private fun NetworkDivider() = HorizontalDivider(Modifier.padding(start = 62.dp, end = 14.dp), color = if (MaterialTheme.colorScheme.background.luminance() < .5f) LocalHetuTokens.current.outline else MaterialTheme.colorScheme.background)
 
 @Composable
 private fun NetworkIcon(icon: ImageVector, accent: Color) {
@@ -233,7 +235,7 @@ private fun NetworkValueRow(icon: ImageVector, accent: Color, title: String, val
     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         NetworkIcon(icon, accent); Spacer(Modifier.width(12.dp))
         Text(title, color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-        Text(value, color = t.textSecondary, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(value, color = t.textSecondary, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.width(7.dp)); Icon(Icons.Rounded.ChevronRight, null, tint = Color(0xFFCBD5E1), modifier = Modifier.size(18.dp))
     }
 }
@@ -245,7 +247,7 @@ private fun NetworkSwitchRow(icon: ImageVector, accent: Color, title: String, su
         NetworkIcon(icon, accent); Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(title, color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            Text(subtitle, color = t.textSecondary, fontSize = 11.sp)
+            Text(subtitle, color = t.textSecondary, fontSize = 12.sp)
         }
         Switch(checked = checked, onCheckedChange = onChecked)
     }
@@ -302,12 +304,12 @@ private fun NetworkSetEditor(state: NetworkEditor, onDismiss: () -> Unit, onSave
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 FilledTonalButton(
                     onClick = onDismiss,
-                    modifier = Modifier.weight(1f).height(44.dp),
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                     shape = RoundedCornerShape(999.dp),
                 ) { Text("取消", fontWeight = FontWeight.Bold) }
                 Button(
                     onClick = { onSave(text) },
-                    modifier = Modifier.weight(1f).height(44.dp),
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                     shape = RoundedCornerShape(999.dp),
                 ) { Text("保存", fontWeight = FontWeight.Bold) }
             }

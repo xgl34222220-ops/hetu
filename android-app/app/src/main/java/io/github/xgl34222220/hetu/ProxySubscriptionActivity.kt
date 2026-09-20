@@ -66,6 +66,7 @@ import io.github.rosemoe.sora.widget.CodeEditor
 import io.github.rosemoe.sora.widget.subscribeAlways
 import io.github.rosemoe.sora.widget.schemes.SchemeDarcula
 import io.github.rosemoe.sora.widget.schemes.SchemeGitHub
+import io.github.xgl34222220.hetu.ui.*
 import io.github.xgl34222220.hetu.ui.HetuTheme
 import io.github.xgl34222220.hetu.ui.LocalHetuTokens
 import kotlinx.coroutines.delay
@@ -257,7 +258,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
         ) {
         LazyColumn(
             Modifier.fillMaxSize().statusBarsPadding(),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 94.dp),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = hetuContentBottomPadding()),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             item("header") {
@@ -351,7 +352,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             FilledTonalButton(
                                 onClick = { importLauncher.launch(arrayOf("*/*")) },
-                                modifier = Modifier.weight(1f).height(46.dp),
+                                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                                 shape = CircleShape,
                                 colors = ButtonDefaults.filledTonalButtonColors(
                                     containerColor = if (dark) Color.White.copy(alpha = .07f) else Color(0xFFE2E8F0).copy(alpha = .62f),
@@ -370,7 +371,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                                     editorUrl = ""
                                     editorError = ""
                                 },
-                                modifier = Modifier.weight(1f).height(46.dp),
+                                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                                 shape = CircleShape,
                             ) {
                                 Icon(Icons.Rounded.Add, null, Modifier.size(18.dp))
@@ -776,7 +777,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                     FilledTonalButton(
                         onClick = { addingSubscription = false; editSubscription = null },
                         enabled = !savingSubscription,
-                        modifier = Modifier.weight(1f).height(46.dp),
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                         shape = CircleShape,
                     ) {
                         Text("取消", fontWeight = FontWeight.Bold)
@@ -797,7 +798,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                             }
                         },
                         enabled = !savingSubscription,
-                        modifier = Modifier.weight(1.35f).height(46.dp),
+                        modifier = Modifier.weight(1.35f).heightIn(min = 48.dp),
                         shape = CircleShape,
                     ) {
                         if (savingSubscription) {
@@ -870,7 +871,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
             }
 
             Surface(modifier = Modifier.fillMaxSize(), color = tokens.pageBackground) {
-                Column(Modifier.fillMaxSize()) {
+                Column(Modifier.fillMaxSize().imePadding()) {
                     Row(
                         Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 10.dp, vertical = 7.dp).height(48.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -880,7 +881,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                         }
                         Column(Modifier.weight(1f)) {
                             Text(configName, color = tokens.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
-                            Text("$yamlLineCount 行 · YAML 编辑 · 缩进参考线", color = tokens.textSecondary, fontSize = 10.sp)
+                            Text("$yamlLineCount 行 · 长行可横向滚动", color = tokens.textSecondary, fontSize = 12.sp)
                         }
                         IconButton(
                             onClick = {
@@ -908,6 +909,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                             AndroidView(
                                 factory = { viewContext ->
                                     CodeEditor(viewContext).apply {
+                                        setEditorLanguage(HetuYamlLanguage())
                                         setText(yamlText)
                                         typefaceText = Typeface.MONOSPACE
                                         setTextSize(13f)
@@ -921,7 +923,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                                             CodeEditor.FLAG_DRAW_WHITESPACE_LEADING or
                                                 CodeEditor.FLAG_DRAW_LINE_SEPARATOR or
                                                 CodeEditor.FLAG_DRAW_WHITESPACE_IN_SELECTION
-                                        colorScheme = if (dark) SchemeDarcula() else SchemeGitHub()
+                                        colorScheme = HetuYamlLanguage.colors(if (dark) SchemeDarcula() else SchemeGitHub(), dark)
                                         subscribeAlways<ContentChangeEvent> {
                                             yamlLineCount = text.lineCount
                                             yamlCanUndo = canUndo()
@@ -943,24 +945,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                                     editor.release()
                                 },
                             )
-                            Canvas(Modifier.matchParentSize()) {
-                                val firstGuide = 58.dp.toPx()
-                                val indentStep = 16.dp.toPx()
-                                val stroke = .5.dp.toPx()
-                                val dash = PathEffect.dashPathEffect(floatArrayOf(2.dp.toPx(), 3.dp.toPx()))
-                                val guideColor = if (dark) Color.White.copy(alpha = .075f) else Color(0xFF64748B).copy(alpha = .12f)
-                                var x = firstGuide
-                                while (x < size.width) {
-                                    drawLine(
-                                        color = guideColor,
-                                        start = Offset(x, 0f),
-                                        end = Offset(x, size.height),
-                                        strokeWidth = stroke,
-                                        pathEffect = dash,
-                                    )
-                                    x += indentStep
-                                }
-                            }
+
                         }
                     }
 
@@ -973,21 +958,9 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                             animationSpec = androidx.compose.animation.core.tween(140),
                         ) { it / 2 } + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(110)),
                     ) {
-                        Surface(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-                            shape = RoundedCornerShape(14.dp),
-                            color = scheme.errorContainer,
-                            tonalElevation = 0.dp,
-                        ) {
-                            Row(
-                                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(Icons.Rounded.ErrorOutline, null, tint = scheme.error, modifier = Modifier.size(17.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text(yamlError, color = scheme.onErrorContainer, fontSize = 11.sp, lineHeight = 15.sp, modifier = Modifier.weight(1f))
-                            }
-                        }
+                        HetuTaskFeedback(yamlError, error = true, busy = false,
+                            modifier = Modifier.padding(horizontal = 12.dp))
+
                     }
 
                     androidx.compose.animation.AnimatedVisibility(
@@ -1019,35 +992,16 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                         }
                     }
 
-                    androidx.compose.animation.AnimatedVisibility(
-                        visible = !imeVisible,
-                        enter = androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(180)) { it / 2 } +
-                            androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(160)),
-                        exit = androidx.compose.animation.slideOutVertically(androidx.compose.animation.core.tween(140)) { it / 2 } +
-                            androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(120)),
-                    ) {
-                        Row(
-                            Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            FilledTonalButton(
-                                onClick = { yamlOpen = false },
-                                enabled = !yamlSaving,
-                                modifier = Modifier.weight(1f).height(44.dp),
-                                shape = CircleShape,
-                            ) { Text("取消", fontWeight = FontWeight.Bold) }
-                            Button(
-                                onClick = ::saveYaml,
-                                enabled = !yamlSaving,
-                                modifier = Modifier.weight(1f).height(44.dp),
-                                shape = CircleShape,
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF002FA7), contentColor = Color.White),
-                            ) {
-                                if (yamlSaving) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
-                                else Text("保存", fontWeight = FontWeight.Bold)
-                            }
+                    if (!imeVisible) {
+                        Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Text("语法着色仅影响显示，不改写配置", color = tokens.textSecondary,
+                                fontSize = 12.sp, modifier = Modifier.weight(1f))
+                            TextButton(onClick = { yamlOpen = false }, enabled = !yamlSaving,
+                                modifier = Modifier.heightIn(min = 48.dp)) { Text("取消") }
                         }
                     }
+
                 }
             }
 
