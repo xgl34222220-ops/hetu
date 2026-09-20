@@ -109,7 +109,7 @@ class InstrumentRenderTest {
         assertEquals("到期日未上报",ticketExpireAt(0,zone))
     }
     @Test fun ruleBatchesKeepAllRulesInOriginalOrderAndBoundedGroups() {
-        val rows=(0 until 31).map{ProxyRuleUi("DOMAIN","host-$it.example","DIRECT")}
+        val rows=(0 until 31).map{ProxyRuleUi(it,"DOMAIN","host-$it.example","DIRECT")}
         val batches=instrumentRuleBatches(rows)
         assertEquals(listOf(15,15,1),batches.map{it.size})
         assertEquals(rows,batches.flatten())
