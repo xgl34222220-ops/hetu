@@ -181,7 +181,8 @@ internal fun LiquidGroupWell(group: ProxyGroupUi, selected: String, delays: Map<
         Row(Modifier.fillMaxWidth().heightIn(min = 40.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("切换落地节点", color = t.textSecondary, fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Bold,
-                    modifier = Modifier.testTag("well-title:${group.name}"))
+                    modifier = Modifier.fillMaxWidth().heightIn(min = with(LocalDensity.current) { 24.sp.toDp() })
+                        .testTag("well-title:${group.name}"))
                 Text("点击即生效", color = t.textMuted, fontSize = 10.sp, lineHeight = 13.sp)
             }
             LiquidPill("全测速", Icons.Rounded.Bolt, onTestAll,
