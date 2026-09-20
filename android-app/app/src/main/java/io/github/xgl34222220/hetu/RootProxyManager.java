@@ -99,13 +99,16 @@ final class RootProxyManager {
         int start=(int)(Math.abs(System.nanoTime())%span);
         for(int offset=0;offset<span;offset++)candidates.add(29090+((start+offset)%span));
         for(int port:candidates){
-            try(ServerSocket socket=new ServerSocket()){
+            try(ServerSocket socket=new ServerSocket();ServerSocket egress=new ServerSocket()){
                 socket.setReuseAddress(false);
-                socket.bind(new InetSocketAddress(InetAddress.getByName("127.0.0.1"),port));
+                egress.setReuseAddress(false);
+                InetAddress loopback=InetAddress.getByName("127.0.0.1");
+                socket.bind(new InetSocketAddress(loopback,port));
+                egress.bind(new InetSocketAddress(loopback,MihomoStartupConfig.egressProbePort(port)));
                 return port;
             }catch(IOException occupied){ }
         }
-        throw new IOException("河图控制接口动态端口 29090-29149 均被占用，请关闭冲突代理后重试");
+        throw new IOException("河图控制接口或出口探针动态端口已被占用，请关闭冲突代理后重试");
     }
 
     private Set<String> selectedTunPackages(){

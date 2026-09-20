@@ -10,6 +10,8 @@ final class MihomoStartupConfig {
     static final int REDIRECT_PORT=19797;
     static final int DNS_PORT=11053;
     static final int CONTROLLER_PORT=29090;
+    static final int EGRESS_PROBE_PORT_OFFSET=60;
+    static int egressProbePort(int controllerPort){return controllerPort+EGRESS_PROBE_PORT_OFFSET;}
     /** AOSP-reserved high fwmark bit used only by Mihomo outbound sockets. */
     static final int OUTBOUND_ROUTING_MARK=0x08000000;
     static final String CNIP_V4_URL="https://raw.githubusercontent.com/gaoyifan/china-operator-ip/ip-lists/china.txt";
@@ -151,8 +153,8 @@ final class MihomoStartupConfig {
         // Mihomo marks its own outbound sockets. Root netfilter returns this bit before interception,
         // so Root/system UID traffic no longer needs to be blanket-bypassed just to avoid a core loop.
         // The transparent listener must accept packets re-routed to loopback while retaining
-        // their original destination. No HTTP/SOCKS/Mixed listener is present in this private
-        // runtime, so enabling wildcard ingress does not expose the user's former 7890 proxy.
+        // their original destination. User HTTP/SOCKS/Mixed listeners are never inherited.
+        // Hetu adds only one loopback-only HTTP listener below for its own egress-IP probe.
         override.append("allow-lan: true\n");
         override.append("bind-address: '*'\n");
         // Android netd owns the socket fwmark/netId. Do not overwrite the full SO_MARK here;
@@ -160,6 +162,11 @@ final class MihomoStartupConfig {
         override.append("find-process-mode: strict\n");
         if(profile.adblockChain) override.append("log-level: info\n");
         override.append("external-controller: 127.0.0.1:").append(controllerPort).append('\n');
+        override.append("listeners:\n");
+        override.append("  - name: hetu-egress-probe\n");
+        override.append("    type: http\n");
+        override.append("    listen: 127.0.0.1\n");
+        override.append("    port: ").append(egressProbePort(controllerPort)).append('\n');
         override.append("secret: '").append(controllerSecret.replace("'","''")).append("'\n");
         override.append("# --- end Hetu runtime isolation ---\n");
         return new Result(yaml+override,tp,rp);

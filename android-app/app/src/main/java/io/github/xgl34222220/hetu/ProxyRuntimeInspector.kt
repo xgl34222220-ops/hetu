@@ -8,7 +8,9 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.Inet4Address
+import java.net.InetSocketAddress
 import java.net.NetworkInterface
+import java.net.Proxy
 import java.net.URL
 import java.util.concurrent.Executors
 
@@ -182,13 +184,20 @@ internal class ProxyRuntimeInspector(context: Context) {
         }.getOrNull()
         // Selected settings are not yet the running policy. Invalidate only
         // after application/restart, a real network change, or runtime stop.
+        val controllerPort = prefs.getInt("proxyControllerPort", MihomoStartupConfig.CONTROLLER_PORT)
+        val egressPort = MihomoStartupConfig.egressProbePort(controllerPort)
+        probeEgressPort = egressPort
+        val runtimeRunning = prefs.getBoolean("proxyRootRuntimeRunning", false)
         val key = listOf(
+            "mihomo-egress-v2",
             active?.networkHandle?.toString() ?: "offline",
+            controllerPort.toString(),
+            egressPort.toString(),
             prefs.getString("proxyRootAppliedSettings", "").orEmpty(),
-            prefs.getBoolean("proxyRootRuntimeRunning", false).toString(),
+            runtimeRunning.toString(),
             prefs.getLong("proxyRootLastStartupAt", 0L).toString(),
         ).joinToString("|")
-        return wanLookup.get(key, active != null)
+        return wanLookup.get(key, active != null && runtimeRunning)
     }
 
     private companion object {
@@ -197,6 +206,7 @@ internal class ProxyRuntimeInspector(context: Context) {
         val wanWorker = Executors.newSingleThreadExecutor { task ->
             Thread(task, "hetu-public-network").apply { isDaemon = true }
         }
+        @Volatile var probeEgressPort: Int = 0
         val wanLookup = ProxyAsyncValue<Triple<String, String, String>>(
             wanWorker,
             { SystemClock.elapsedRealtime() },
@@ -208,7 +218,10 @@ internal class ProxyRuntimeInspector(context: Context) {
 
         fun fetchPublicNetwork(): Triple<String, String, String> {
             val deadline = SystemClock.elapsedRealtime() + 6_000L
-            val connection = (URL("https://ipwho.is/?fields=success,ip,country_code,region").openConnection() as HttpURLConnection).apply {
+            val port = probeEgressPort
+            if (port !in 1024..65535) error("Mihomo egress probe is not ready")
+            val proxy = Proxy(Proxy.Type.HTTP, InetSocketAddress("127.0.0.1", port))
+            val connection = (URL("https://ipwho.is/?fields=success,ip,country_code,region").openConnection(proxy) as HttpURLConnection).apply {
                 connectTimeout = 3_000
                 readTimeout = 3_000
                 requestMethod = "GET"

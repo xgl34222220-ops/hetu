@@ -183,15 +183,16 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
             ),
         )
     }
+    val cachedWanViaCore = prefs.getBoolean("proxyUiLastWanViaCore", false)
     var runtime by remember { mutableStateOf(ProxyRuntimeSnapshot(
         running = prefs.getBoolean("proxyUiLastRunning", prefs.getBoolean("proxyRootWanted", false)),
         elapsedSeconds = prefs.getLong("proxyUiLastElapsed", 0L),
         rssBytes = prefs.getLong("proxyUiLastRss", 0L),
         lanAddress = prefs.getString("proxyUiLastLan", "—") ?: "—",
         lanInterface = prefs.getString("proxyUiLastLanIf", "—") ?: "—",
-        wanAddress = prefs.getString("proxyUiLastWan", "—") ?: "—",
-        wanCountryCode = prefs.getString("proxyUiLastWanCountry", "") ?: "",
-        wanRegion = prefs.getString("proxyUiLastWanRegion", "—") ?: "—",
+        wanAddress = if (cachedWanViaCore) prefs.getString("proxyUiLastWan", "—") ?: "—" else "—",
+        wanCountryCode = if (cachedWanViaCore) prefs.getString("proxyUiLastWanCountry", "") ?: "" else "",
+        wanRegion = if (cachedWanViaCore) prefs.getString("proxyUiLastWanRegion", "—") ?: "—" else "—",
     )) }
     var providers by remember { mutableStateOf<List<DashboardProviderUi>>(emptyList()) }
     var cachedSubscription by remember { mutableStateOf(RefSubscriptionCache(
@@ -289,6 +290,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                 .putString("proxyUiLastWan", sampled.wanAddress)
                 .putString("proxyUiLastWanCountry", sampled.wanCountryCode)
                 .putString("proxyUiLastWanRegion", sampled.wanRegion)
+                .putBoolean("proxyUiLastWanViaCore", true)
                 .putFloat("proxyUiLastCpu", cpuPercent)
                 .putLong("proxyUiLastUpRate", upRate)
                 .putLong("proxyUiLastDownRate", downRate)
@@ -1068,7 +1070,7 @@ private fun RefNetworkIdentityCard(
             Row(Modifier.fillMaxWidth().height(24.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.weight(1f).widthIn(min = 40.dp), contentAlignment = Alignment.CenterStart) {
                     Text(
-                        if (renderedLan) "LAN" else "WAN",
+                        if (renderedLan) "LAN" else "出口",
                         color = Color(0xFF64748B),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
@@ -1080,7 +1082,7 @@ private fun RefNetworkIdentityCard(
                         .border(.6.dp, Color(0xFF2563EB).copy(alpha = .12f), CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.Rounded.SwapHoriz, "切换 LAN/WAN", tint = Color(0xFF2563EB), modifier = Modifier.size(14.dp))
+                    Icon(Icons.Rounded.SwapHoriz, "切换 LAN/出口", tint = Color(0xFF2563EB), modifier = Modifier.size(14.dp))
                 }
             }
             Box(
