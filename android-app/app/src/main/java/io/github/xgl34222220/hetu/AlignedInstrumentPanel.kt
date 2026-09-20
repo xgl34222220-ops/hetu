@@ -13,6 +13,8 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
@@ -94,13 +96,22 @@ private fun AlignedInstrumentCell(reading: InstrumentReading, modifier: Modifier
                     Text(reading.badge, color = reading.accent, fontSize = 9.5.sp, lineHeight = 13.sp,
                         fontWeight = FontWeight.SemiBold, maxLines = 1)
                 }
+                Icon(when (reading.id) {
+                    "network" -> Icons.Rounded.Public
+                    "speed" -> Icons.Rounded.Speed
+                    "usage" -> Icons.Rounded.DataUsage
+                    else -> Icons.Rounded.Memory
+                }, null, Modifier.size(14.dp).testTag("instrument-${reading.id}-icon"), tint = reading.accent.copy(alpha = .7f))
             }) { measurable, constraints ->
             val badge = measurable[1].measure(constraints.copy(minWidth = 0, minHeight = 0))
+            val icon = measurable[2].measure(constraints.copy(minWidth = 0, minHeight = 0))
+            val titleStart = icon.width + 5.dp.roundToPx()
             val title = measurable[0].measure(constraints.copy(minWidth = 0, minHeight = 0,
-                maxWidth = (constraints.maxWidth - badge.width - 4.dp.roundToPx()).coerceAtLeast(0)))
+                maxWidth = (constraints.maxWidth - titleStart - badge.width - 4.dp.roundToPx()).coerceAtLeast(0)))
             val baseline = 16.sp.roundToPx()
             layout(constraints.maxWidth, constraints.maxHeight) {
-                title.placeRelative(0, (baseline - title[FirstBaseline]).coerceAtLeast(0))
+                icon.placeRelative(0, (baseline - 11.sp.roundToPx()).coerceAtLeast(0))
+                title.placeRelative(titleStart, (baseline - title[FirstBaseline]).coerceAtLeast(0))
                 badge.placeRelative(constraints.maxWidth - badge.width,
                     (baseline - badge[FirstBaseline]).coerceAtLeast(0))
             }
@@ -202,14 +213,14 @@ internal fun AlignedInstrumentPanel(runtime: ProxyRuntimeSnapshot, connections: 
         else -> if (runtime.running) "等待出口检测" else "代理已停止"
     }
     val readings = listOf(
-        InstrumentReading("network", if (lan) "局域网络" else "网络出口", "切换 ⇄", address,
+        InstrumentReading("network", if (lan) "局域网络" else "网络出口", "切换", address,
             networkSupporting, if (runtime.wanState == "failed" && !lan) t.danger else primary, "status",
             monospaced = lan || runtime.wanState in listOf("success", "stale")),
         InstrumentReading("speed", "实时速率", if (runtime.running) "实时" else "停止",
             if (runtime.running) "↓ ${refSpeed(down)}" else "—",
             if (runtime.running) "↑ 上行 ${refSpeed(up)}" else "代理已停止", t.success, "share",
             if (runtime.running) instrumentUploadShare(up, down) else null),
-        InstrumentReading("usage", "已用流量", ratio?.let { "${((1f - it) * 100f).toInt()}% 剩余" } ?: "未上报",
+        InstrumentReading("usage", "已用流量", ratio?.let { "${((1f - it) * 100f).toInt()}%" } ?: "未上报",
             if (ratio != null) refBytes(used) else "—",
             if (ratio != null) "总量 ${refBytes(total)}" else "$count 个订阅 · 未上报额度", primary, "quota", ratio),
         InstrumentReading("resource", "资源占用", if (runtime.running) "运行中" else "已停止",

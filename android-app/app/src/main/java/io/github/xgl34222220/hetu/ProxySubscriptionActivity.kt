@@ -62,6 +62,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.viewinterop.AndroidView
+import io.github.rosemoe.sora.event.SelectionChangeEvent
+import io.github.rosemoe.sora.event.PublishSearchResultEvent
 import io.github.rosemoe.sora.event.ContentChangeEvent
 import io.github.rosemoe.sora.widget.CodeEditor
 import io.github.rosemoe.sora.widget.subscribeAlways
@@ -662,18 +664,14 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
             var yamlCanUndo by remember { mutableStateOf(false) }
             var yamlCanRedo by remember { mutableStateOf(false) }
             var outlineOpen by remember { mutableStateOf(false) }
+            var yamlSearchOpen by remember { mutableStateOf(false) }
+            var yamlMatches by remember { mutableIntStateOf(0) }
+            var yamlCursorLine by remember { mutableIntStateOf(1) }
+            var yamlCursorColumn by remember { mutableIntStateOf(1) }
             var outlineItems by remember { mutableStateOf(yamlOutlineItems(yamlText)) }
             val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
 
             fun currentYamlText(): String = yamlEditor?.text?.toString() ?: yamlText
-
-            fun insertYamlText(snippet: String) {
-                yamlEditor?.let { editor ->
-                    editor.insertText(snippet, snippet.length)
-                    editor.requestFocus()
-                    editor.ensureSelectionVisible()
-                }
-            }
 
             fun jumpToYamlLine(line: Int) {
                 yamlEditor?.let { editor ->
@@ -722,19 +720,12 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                             Text(configName, color = tokens.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
                             Text("$yamlLineCount 行 · 长行可横向滚动", color = tokens.textSecondary, fontSize = 12.sp)
                         }
-                        IconButton(
-                            onClick = {
-                                outlineItems = yamlOutlineItems(currentYamlText())
-                                outlineOpen = true
-                            },
-                            enabled = !yamlSaving,
-                        ) {
-                            Icon(Icons.Rounded.FormatListBulleted, "语法大纲", tint = scheme.primary)
-                        }
-                        TextButton(onClick = ::saveYaml, enabled = !yamlSaving) {
-                            if (yamlSaving) CircularProgressIndicator(Modifier.size(17.dp), strokeWidth = 2.dp)
-                            else Text("保存", color = scheme.primary, fontWeight = FontWeight.Bold)
-                        }
+                    }
+                    YamlWorkbenchActions(yamlCanUndo, yamlCanRedo, yamlSaving,
+                        { yamlEditor?.undo() }, { yamlEditor?.redo() }, { yamlSearchOpen = !yamlSearchOpen },
+                        { outlineItems = yamlOutlineItems(currentYamlText()); outlineOpen = true }, ::saveYaml)
+                    if (yamlSearchOpen) YamlWorkbenchSearch(yamlEditor, yamlMatches) {
+                        yamlSearchOpen = false; yamlEditor?.requestFocus()
                     }
 
                     Surface(
@@ -763,6 +754,13 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                                                 CodeEditor.FLAG_DRAW_LINE_SEPARATOR or
                                                 CodeEditor.FLAG_DRAW_WHITESPACE_IN_SELECTION
                                         colorScheme = HetuYamlLanguage.colors(if (dark) SchemeDarcula() else SchemeGitHub(), dark)
+                                        subscribeAlways<SelectionChangeEvent> {
+                                            yamlCursorLine = cursor.rightLine + 1
+                                            yamlCursorColumn = cursor.rightColumn + 1
+                                        }
+                                        subscribeAlways<PublishSearchResultEvent> {
+                                            yamlMatches = if (searcher.hasQuery()) searcher.matchedPositionCount else 0
+                                        }
                                         subscribeAlways<ContentChangeEvent> {
                                             yamlLineCount = text.lineCount
                                             yamlCanUndo = canUndo()
@@ -802,44 +800,10 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
 
                     }
 
-                    androidx.compose.animation.AnimatedVisibility(
-                        visible = imeVisible,
-                        enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(130)) +
-                            androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(170)) { it / 2 },
-                        exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(100)),
-                    ) {
-                        Surface(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 5.dp),
-                            shape = RoundedCornerShape(18.dp),
-                            color = if (dark) tokens.elevatedCardBackground else Color(0xFFF1F5F9),
-                            border = BorderStroke(.7.dp, if (dark) tokens.outline.copy(alpha = .42f) else Color(0xFFE2E8F0)),
-                            tonalElevation = 0.dp,
-                        ) {
-                            Row(
-                                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 7.dp, vertical = 6.dp),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                YamlAccessoryKey("2空格") { insertYamlText("  ") }
-                                YamlAccessoryKey(":") { insertYamlText(": ") }
-                                YamlAccessoryKey("-") { insertYamlText("- ") }
-                                YamlAccessoryKey("#") { insertYamlText("# ") }
-                                YamlAccessoryKey("\"") { insertYamlText("\"") }
-                                YamlAccessoryKey("撤销", enabled = yamlCanUndo) { yamlEditor?.undo() }
-                                YamlAccessoryKey("重做", enabled = yamlCanRedo) { yamlEditor?.redo() }
-                            }
-                        }
+                    if (!yamlSearchOpen) YamlWorkbenchAccessory(!yamlSaving) { symbol ->
+                        yamlEditor?.let { applyYamlAccessory(it, symbol) }
                     }
-
-                    if (!imeVisible) {
-                        Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically) {
-                            Text("语法着色仅影响显示，不改写配置", color = tokens.textSecondary,
-                                fontSize = 12.sp, modifier = Modifier.weight(1f))
-                            TextButton(onClick = { yamlOpen = false }, enabled = !yamlSaving,
-                                modifier = Modifier.heightIn(min = 48.dp)) { Text("取消") }
-                        }
-                    }
+                    YamlCursorStatus(yamlCursorLine, yamlCursorColumn, yamlLineCount, Modifier.navigationBarsPadding())
 
                 }
             }
@@ -949,30 +913,6 @@ private fun yamlOutlineItems(text: String): List<YamlOutlineItem> {
         out += YamlOutlineItem(if (count > 0) "$base ($count)" else base, index)
     }
     return out.distinctBy { it.line }
-}
-
-@Composable
-private fun YamlAccessoryKey(label: String, enabled: Boolean = true, onClick: () -> Unit) {
-    val tokens = LocalHetuTokens.current
-    val shape = RoundedCornerShape(11.dp)
-    Box(
-        Modifier.height(34.dp).widthIn(min = 42.dp)
-            .clip(shape)
-            .background(if (enabled) tokens.cardBackground else tokens.cardBackground.copy(alpha = .42f), shape)
-            .border(.6.dp, tokens.outline.copy(alpha = if (enabled) .55f else .24f), shape)
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 10.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            label,
-            color = if (enabled) tokens.textPrimary else tokens.textMuted,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace,
-            maxLines = 1,
-        )
-    }
 }
 
 @Composable

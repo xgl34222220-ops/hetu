@@ -14,6 +14,7 @@ import java.util.regex.Pattern;
 public final class HetuYamlLanguage extends EmptyLanguage {
     public static final int YAML_KEY = 256, YAML_VALUE = 257, YAML_COMMENT = 258, YAML_LITERAL = 259;
     private final Analyzer analyzer = new Analyzer();
+    @Override public boolean useTab() { return false; }
     @Override public AnalyzeManager getAnalyzeManager() { return analyzer; }
     @Override public void destroy() { analyzer.destroy(); }
 

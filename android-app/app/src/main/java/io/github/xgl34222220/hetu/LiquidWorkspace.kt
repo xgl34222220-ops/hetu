@@ -85,7 +85,8 @@ internal fun LiquidStrategyCard(group: ProxyGroupUi, selected: String, expanded:
     Column(modifier.offset(y = sink).heightIn(min = 88.dp)
         .graphicsLayer { scaleX = scale; scaleY = scale }
         .crystalMaterial(shape, selection = expanded)
-        .testTag("strategy:${group.name}")) {
+        .testTag("strategy:${group.name}")
+        .clickable(interactionSource = interactions, indication = null, role = Role.Button, onClick = onExpand)) {
         Row(Modifier.fillMaxWidth().heightIn(min = 40.dp)
             .clickable(interactionSource = interactions, indication = null, role = Role.Button,
                 onClickLabel = if (expanded) "收起策略组" else "展开策略组", onClick = onExpand)
@@ -97,8 +98,6 @@ internal fun LiquidStrategyCard(group: ProxyGroupUi, selected: String, expanded:
                     lineHeight = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             LiquidBrandTray(group)
-            Icon(Icons.Rounded.KeyboardArrowDown, null, Modifier.padding(start = 3.dp).size(14.dp)
-                .graphicsLayer { rotationZ = angle }, tint = primary)
         }
         Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(start = 13.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Row(Modifier.weight(1f).heightIn(min = 48.dp).clickable(interactionSource = interactions, indication = null,
@@ -108,7 +107,10 @@ internal fun LiquidStrategyCard(group: ProxyGroupUi, selected: String, expanded:
                 Text(selected.ifBlank { "未选择" }, color = t.textSecondary, fontSize = 11.5.sp, lineHeight = 15.sp,
                     fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            LatencyChip(value, testing, onDelay, Modifier.testTag("strategy-delay:${group.name}"))
+            LatencyChip(value, testing, onDelay, Modifier.testTag("strategy-delay:${group.name}"), compact = true)
+            Box(Modifier.padding(start = 3.dp).size(20.dp).background(primary.copy(alpha = .075f), CircleShape), contentAlignment = Alignment.Center) {
+                Icon(Icons.Rounded.KeyboardArrowDown, null, Modifier.size(13.dp).graphicsLayer { rotationZ = angle }, tint = primary)
+            }
         }
     }
 }

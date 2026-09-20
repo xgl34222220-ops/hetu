@@ -786,7 +786,6 @@ internal fun RefHome(
                             }
                         }
                     }
-                    EngineThroughput(upRate, downRate)
                     RefHomeActions(state.running, busy, onToggle, onReload, onRestart)
                 }
             }
@@ -1012,6 +1011,7 @@ private fun RefPanel(
     var refreshing by remember { mutableStateOf(false) }
     var providers by remember { mutableStateOf<List<DashboardProviderUi>>(emptyList()) }
     var rules by remember { mutableStateOf<List<ProxyRuleUi>>(emptyList()) }
+    var overviewRuleCount by remember { mutableStateOf<Int?>(null) }
     var ruleSets by remember { mutableStateOf<List<DashboardRuleSetUi>>(emptyList()) }
     var selectedGroupName by rememberSaveable { mutableStateOf<String?>(null) }
     val selectedLocal = remember { mutableStateMapOf<String, String>() }
@@ -1118,6 +1118,7 @@ private fun RefPanel(
                 RefPanelTab.Subscriptions -> providers = repo.providers()
                 RefPanelTab.Rules -> rules = repo.rules()
                 RefPanelTab.RuleSets -> ruleSets = repo.ruleSets()
+                RefPanelTab.Overview -> { overviewRuleCount = null; rules = repo.rules(); overviewRuleCount = rules.size }
                 else -> Unit
             }
         } catch (cancel: CancellationException) {
@@ -1296,6 +1297,9 @@ private fun RefPanel(
                     }
                     RefPanelTab.Overview -> {
                         onRefreshState()
+                        overviewRuleCount = null
+                        rules = repo.rules()
+                        overviewRuleCount = rules.size
                         capsuleError = false
                         capsuleText = "流量状态已刷新"
                     }
@@ -1491,7 +1495,7 @@ private fun RefPanel(
                         }
                     }
                 }
-                RefPanelTab.Overview -> item(key = "${tab.name}-traffic-overview", contentType = "traffic-overview") { RefTrafficOverview(state) }
+                RefPanelTab.Overview -> item(key = "${tab.name}-traffic-overview", contentType = "traffic-overview") { RefTrafficOverview(state, overviewRuleCount) }
                 RefPanelTab.Subscriptions -> items(filteredProviders, key = { "${tab.name}-provider-${it.name}" }, contentType = { "subscription-provider" }) { item ->
                     RefProviderRow(
                         item = item,
@@ -2221,7 +2225,7 @@ private fun RefDelayBadge(value: Long?, testing: Boolean, onClick: (() -> Unit)?
 }
 
 @Composable
-private fun RefTrafficOverview(state: ProxyComposeState) {
+private fun RefTrafficOverview(state: ProxyComposeState, ruleCount: Int?) {
     val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val history = remember { mutableStateListOf<Triple<Long, Long, Long>>() }
@@ -2255,6 +2259,7 @@ private fun RefTrafficOverview(state: ProxyComposeState) {
 
     val peak = history.maxOfOrNull { maxOf(it.second, it.third) } ?: 0L
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        OverviewInstruments(state, ruleCount)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             RefRateCard("上行速度", upRate, Icons.Rounded.ArrowUpward, t.success, Modifier.weight(1f))
             RefRateCard("下行速度", downRate, Icons.Rounded.ArrowDownward, scheme.primary, Modifier.weight(1f))
@@ -2288,6 +2293,7 @@ private fun RefTrafficOverview(state: ProxyComposeState) {
                 Text(if (points.size < 2) "正在收集真实采样" else "仅绘制实际采样；无流量时保持平直", color = t.textSecondary, fontSize = 12.sp)
             }
         }
+        OverviewRouteRanking(state)
         Surface(shape = RoundedCornerShape(18.dp), color = t.cardBackground) {
             Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("会话累计", color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)

@@ -41,7 +41,7 @@ internal fun delayBand(value: Long?): String = when {
 
 /** Selection and latency are independent: selected 96ms remains green. */
 @Composable
-internal fun LatencyChip(value: Long?, testing: Boolean, onClick: (() -> Unit)? = null, modifier: Modifier = Modifier) {
+internal fun LatencyChip(value: Long?, testing: Boolean, onClick: (() -> Unit)? = null, modifier: Modifier = Modifier, compact: Boolean = false) {
     val t = LocalHetuTokens.current
     val band = delayBand(value)
     val foreground = when (band) { "good" -> t.success; "fair" -> t.warning; "failed", "slow" -> t.danger; else -> t.textSecondary }
@@ -50,17 +50,17 @@ internal fun LatencyChip(value: Long?, testing: Boolean, onClick: (() -> Unit)? 
     LaunchedEffect(testing) { if (testing) { delay(150); showBusy = true } else showBusy = false }
     val target = if (showBusy) "测速中" else when { value == null -> "— ms"; value <= 0L -> "超时"; else -> "$value ms" }
     val motion = LocalHetuMotionEnabled.current
-    Box(modifier.then(if (onClick != null) Modifier.sizeIn(minWidth = 72.dp, minHeight = 48.dp)
+    Box(modifier.then(if (onClick != null) Modifier.sizeIn(minWidth = if (compact) 56.dp else 72.dp, minHeight = 48.dp)
         .clickable(enabled = !testing, role = Role.Button, onClickLabel = "测速", onClick = onClick) else Modifier),
         contentAlignment = Alignment.Center) {
         Surface(shape = CircleShape, color = if (showBusy || value == null) Color.Transparent else background,
             modifier = Modifier.semantics { stateDescription = if (showBusy) "正在测速" else "$band $target" }) {
-            Row(Modifier.padding(horizontal = 9.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically,
+            Row(Modifier.padding(horizontal = if (compact) 6.dp else 9.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (showBusy) HetuBusyIndicator(Modifier.size(12.dp), t.textSecondary)
                 AnimatedContent(target, transitionSpec = { fadeIn(tween(if (motion) 150 else 0)).togetherWith(fadeOut(tween(if (motion) 90 else 0))) }, label = "latency") {
                     HetuNumber(it, monospaced = true, color = if (showBusy || value == null) t.textSecondary.copy(alpha = .65f) else foreground,
-                        style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.SemiBold))
+                        style = MaterialTheme.typography.labelMedium.copy(fontSize = if (compact) 10.5.sp else 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.SemiBold))
                 }
             }
         }

@@ -65,6 +65,8 @@ class HomeScreenRenderTest {
             compose.onNodeWithText("网络与广告过滤",true).assertDoesNotExist()
             compose.onNodeWithText("应用连接",true).assertDoesNotExist()
             compose.onNodeWithContentDescription("更多工具").assertExists()
+            compose.onNodeWithText("↑ 实时上行", true).assertDoesNotExist()
+            compose.onNodeWithText("↓ 实时下行", true).assertDoesNotExist()
             compose.runOnIdle { assertEquals(0,restarts);assertEquals(0,toggles);assertEquals(0,reloads) }
             capture("home-${w}-${scale}-${if(dark) "dark" else "light"}-top")
             compose.onNode(hasScrollToIndexAction()).performScrollToIndex(3)
