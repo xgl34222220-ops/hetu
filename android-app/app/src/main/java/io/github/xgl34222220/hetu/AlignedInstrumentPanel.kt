@@ -40,17 +40,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-/** Presentation only: three baseline slots and a shared rail, never space-between. */
-private data class InstrumentReading(
-    val id: String,
-    val title: String,
-    val value: String,
-    val supporting: String,
-    val fraction: Float? = null,
-    val progressAccent: Color? = null,
-    val monospaced: Boolean = false,
-)
-
+/** Home dashboard measured from the 156785 reference video. */
 internal fun instrumentFraction(value: Long, total: Long): Float? =
     if (total > 0L && value >= 0L) (value.toDouble() / total.toDouble()).toFloat().coerceIn(0f, 1f) else null
 
@@ -59,173 +49,86 @@ internal fun instrumentUploadShare(up: Long, down: Long): Float? {
     return (up.toDouble() / (up.toDouble() + down.toDouble())).toFloat().coerceIn(0f, 1f)
 }
 
-private object InstrumentSlots {
-    val header = 18.sp
-    val value = 22.sp
-    val support = 18.sp
-    val gap = 4.dp
-    val padding = 10.dp
-    val rail = 3.dp
-
-    @Composable
-    fun fontHeight(size: TextUnit): Dp {
-        val density = LocalDensity.current
-        return maxOf(with(density) { size.toDp() }, (size.value * density.fontScale).dp)
-    }
-
-    @Composable
-    fun height(): Dp =
-        fontHeight(header) + fontHeight(value) + fontHeight(support) + gap * 3 + padding * 2 + rail
-}
-
 @Composable
-private fun CleanInstrumentRail(reading: InstrumentReading) {
-    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val track = if (dark) Color.White.copy(alpha = .10f) else Color(0xFFF1F5F9)
-    val accent = reading.progressAccent ?: HetuMicroCrystal.KleinBlue
-    val progress = reading.fraction
-    val tag = when (reading.id) {
-        "usage" -> "home-usage-progress"
-        "resource" -> "home-cpu-progress"
-        else -> "instrument-${reading.id}-progress"
-    }
-    Canvas(
-        Modifier
-            .fillMaxWidth()
-            .height(InstrumentSlots.rail)
-            .clip(CircleShape)
-            .testTag(tag)
-            .semantics {
-                stateDescription = when (reading.id) {
-                    "usage" -> if (progress == null) "订阅额度未上报" else "已用流量占总额度"
-                    "resource" -> if (progress == null) "CPU 未采样" else "CPU 占用"
-                    else -> ""
-                }
-                if (progress != null) progressBarRangeInfo = ProgressBarRangeInfo(progress, 0f..1f)
-            },
-    ) {
-        drawRect(track)
-        if (progress != null && progress > 0f) {
-            drawRect(
-                Brush.horizontalGradient(
-                    if (reading.id == "resource") listOf(Color(0xFF10B981), Color(0xFF5AD6A8))
-                    else listOf(HetuMicroCrystal.KleinBlue, Color(0xFF38BDF8)),
-                ),
-                size = size.copy(width = size.width * progress.coerceIn(.01f, 1f)),
-            )
-        }
-    }
-}
-
-@Composable
-private fun AlignedInstrumentCell(
-    reading: InstrumentReading,
+private fun ReferenceDashboardCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
 ) {
     val t = LocalHetuTokens.current
-    val headerHeight = InstrumentSlots.fontHeight(InstrumentSlots.header)
-    val valueHeight = InstrumentSlots.fontHeight(InstrumentSlots.value)
-    val supportHeight = InstrumentSlots.fontHeight(InstrumentSlots.support)
-
+    val shape = RoundedCornerShape(20.dp)
     @OptIn(ExperimentalFoundationApi::class)
-    val action = if (onClick != null) {
+    val interaction = if (onClick != null || onLongClick != null) {
         Modifier.combinedClickable(
-            role = Role.Button,
-            onClick = onClick,
+            onClick = onClick ?: {},
             onLongClick = onLongClick,
-            onClickLabel = if (reading.id == "network") "切换局域网与网络出口" else "查看订阅",
-            onLongClickLabel = if (onLongClick != null) "查看完整网络详情" else null,
+            role = if (onClick != null) Role.Button else null,
         )
     } else Modifier
-
     Column(
         modifier
-            .then(action)
-            .testTag("instrument-${reading.id}")
-            .padding(InstrumentSlots.padding),
-        verticalArrangement = Arrangement.spacedBy(InstrumentSlots.gap),
+            .heightIn(min = 102.dp)
+            .clip(shape)
+            .background(t.cardBackground)
+            .then(interaction)
+            .padding(horizontal = 14.dp, vertical = 11.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        content = content,
+    )
+}
+
+@Composable
+private fun ReferenceProgress(
+    progress: Float?,
+    tag: String,
+    accent: Color,
+) {
+    val t = LocalHetuTokens.current
+    val p = progress?.takeIf { it.isFinite() }?.coerceIn(0f, 1f)
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(3.dp)
+            .clip(CircleShape)
+            .background(Color(0xFFD7E0F5))
+            .testTag(tag)
+            .semantics {
+                if (p != null) progressBarRangeInfo = ProgressBarRangeInfo(p, 0f..1f)
+            },
     ) {
-        InstrumentBaselineLine(
-            reading.title,
-            "instrument-${reading.id}-title",
-            headerHeight,
-            14.sp,
-            TextStyle(
-                fontSize = 11.sp,
-                lineHeight = 15.sp,
-                fontWeight = FontWeight.Bold,
-                color = t.textMuted,
-            ),
-        )
-        InstrumentBaselineLine(
-            reading.value,
-            "instrument-${reading.id}-value",
-            valueHeight,
-            17.sp,
-            TextStyle(
-                fontSize = 14.5.sp,
-                lineHeight = 20.sp,
-                fontWeight = FontWeight.ExtraBold,
-                fontFamily = if (reading.monospaced) FontFamily.Monospace else FontFamily.SansSerif,
-                fontFeatureSettings = "tnum",
-                color = t.textPrimary,
-            ),
-            autoSize = true,
-        )
-        InstrumentBaselineLine(
-            reading.supporting,
-            "instrument-${reading.id}-support",
-            supportHeight,
-            14.sp,
-            TextStyle(
-                fontSize = 11.sp,
-                lineHeight = 16.sp,
-                fontWeight = FontWeight.Medium,
-                fontFamily = if (reading.monospaced) FontFamily.Monospace else FontFamily.SansSerif,
-                fontFeatureSettings = "tnum",
-                color = t.textSecondary,
-            ),
-        )
-        if (reading.progressAccent != null) {
-            CleanInstrumentRail(reading)
-        } else {
-            Spacer(Modifier.fillMaxWidth().height(InstrumentSlots.rail).testTag("instrument-${reading.id}-rail-space"))
+        if (p != null && p > 0f) {
+            Box(
+                Modifier
+                    .fillMaxWidth(p.coerceAtLeast(.01f))
+                    .fillMaxHeight()
+                    .background(accent, CircleShape),
+            )
         }
     }
 }
 
 @Composable
-private fun InstrumentBaselineLine(
-    text: String,
-    tag: String,
-    height: Dp,
-    baseline: TextUnit,
-    style: TextStyle,
-    autoSize: Boolean = false,
-) {
-    Layout(
-        modifier = Modifier.fillMaxWidth().height(height).testTag("$tag-slot"),
-        content = {
-            BasicText(
-                text,
-                Modifier.fillMaxWidth().testTag(tag),
-                style = style,
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Ellipsis,
-                autoSize = if (autoSize) TextAutoSize.StepBased(
-                    minFontSize = 11.sp,
-                    maxFontSize = style.fontSize,
-                    stepSize = .5.sp,
-                ) else null,
-            )
-        },
-    ) { measurable, constraints ->
-        val child = measurable.single().measure(constraints.copy(minWidth = 0, minHeight = 0))
-        val y = (baseline.roundToPx() - child[FirstBaseline]).coerceAtLeast(0)
-        layout(constraints.maxWidth, constraints.maxHeight) { child.placeRelative(0, y) }
+private fun ReferenceMetricLine(label: String, value: String) {
+    val t = LocalHetuTokens.current
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            label,
+            color = t.textSecondary,
+            fontSize = 12.sp,
+            lineHeight = 17.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(Modifier.weight(1f))
+        Text(
+            value,
+            color = t.textPrimary,
+            fontSize = 13.5.sp,
+            lineHeight = 18.sp,
+            fontWeight = FontWeight.ExtraBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -246,14 +149,14 @@ internal fun AlignedInstrumentPanel(
     val view = LocalView.current
     var lan by rememberSaveable { mutableStateOf(false) }
     var details by rememberSaveable { mutableStateOf(false) }
-
     val usageRatio = instrumentFraction(used, total)
     val cpuRatio = if (runtime.running && cpu.isFinite() && cpu >= 0f) {
         (cpu / 100f).coerceIn(0f, 1f)
     } else null
 
     val checked = if (runtime.wanCheckedAt > 0L) {
-        DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault())
+        DateTimeFormatter.ofPattern("HH:mm")
+            .withZone(ZoneId.systemDefault())
             .format(Instant.ofEpochMilli(runtime.wanCheckedAt))
     } else ""
 
@@ -261,106 +164,124 @@ internal fun AlignedInstrumentPanel(
         lan -> "局域网"
         runtime.wanState == "success" -> "已检测"
         runtime.wanState == "stale" -> "上次结果"
-        runtime.wanState == "loading" -> "检测中"
+        runtime.wanState == "loading" -> "读取中"
         runtime.wanState == "failed" -> "失败"
         else -> "未检测"
     }
 
     val address = if (lan) runtime.lanAddress else when (runtime.wanState) {
         "success", "stale" -> runtime.wanAddress
-        "loading" -> "检测中…"
+        "loading" -> "读取中"
         "failed" -> "检测失败"
         else -> "未检测"
     }
 
-    val networkSupporting = if (lan) {
+    val region = if (lan) {
         "${runtime.lanInterface} · $connections 连接"
     } else when (runtime.wanState) {
-        "success" -> "${countryEmoji(runtime.wanCountryCode)} ${runtime.wanRegion}"
-        "stale" -> "上次 $checked · 未重新确认"
-        "loading" -> "按当前规则检测出口"
+        "success" -> "${countryEmoji(runtime.wanCountryCode)} ${runtime.wanRegion.substringBefore(" · ")}"
+        "stale" -> "上次 $checked"
+        "loading" -> "正在检测当前网络…"
         "failed" -> "长按查看失败详情"
         else -> if (runtime.running) "等待出口检测" else "代理已停止"
     }
 
-    val readings = listOf(
-        InstrumentReading(
-            id = "network",
-            title = if (lan) "局域网络" else "网络出口",
-            value = address,
-            supporting = networkSupporting,
-            monospaced = true,
-        ),
-        InstrumentReading(
-            id = "speed",
-            title = "实时速率",
-            value = if (runtime.running) "↓ ${refSpeed(down)}" else "—",
-            supporting = if (runtime.running) "↑ 上行 ${refSpeed(up)}" else "代理已停止",
-            monospaced = true,
-        ),
-        InstrumentReading(
-            id = "usage",
-            title = "已用流量",
-            value = usageRatio?.let { refBytes(used) } ?: "—",
-            supporting = if (usageRatio != null) "总量 ${refBytes(total)}" else "$count 个订阅 · 未上报额度",
-            fraction = usageRatio,
-            progressAccent = HetuMicroCrystal.KleinBlue,
-            monospaced = true,
-        ),
-        InstrumentReading(
-            id = "resource",
-            title = "系统负载",
-            value = if (runtime.running && memory >= 0L) refBytes(memory) else "—",
-            supporting = if (runtime.running && cpu.isFinite() && cpu >= 0f) {
-                String.format(Locale.US, "CPU %.1f %%", cpu)
-            } else "CPU 未采样",
-            fraction = cpuRatio,
-            progressAccent = Color(0xFF10B981),
-            monospaced = true,
-        ),
-    )
-
-    BoxWithConstraints(
-        Modifier
-            .fillMaxWidth()
-            .crystalMaterial(RoundedCornerShape(24.dp))
-            .testTag("workspace-bento"),
+    Column(
+        Modifier.fillMaxWidth().testTag("workspace-bento"),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        val single = maxWidth < 280.dp || LocalDensity.current.fontScale > 1.35f
-        val onNetwork = {
-            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-            lan = !lan
-        }
-
-        @Composable
-        fun Cell(reading: InstrumentReading, modifier: Modifier) {
-            AlignedInstrumentCell(
-                reading,
-                modifier,
-                onClick = when (reading.id) {
-                    "network" -> onNetwork
-                    "usage" -> onSubscription
-                    else -> null
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            ReferenceDashboardCard(
+                Modifier.weight(1f).testTag("instrument-network"),
+                onClick = {
+                    view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                    lan = !lan
                 },
-                onLongClick = if (reading.id == "network") ({ details = true }) else null,
-            )
-        }
-
-        Column(Modifier.fillMaxWidth()) {
-            if (single) {
-                readings.forEachIndexed { index, reading ->
-                    if (index > 0) PanelDivider()
-                    Cell(reading, Modifier.fillMaxWidth())
-                }
-            } else {
-                readings.chunked(2).forEachIndexed { rowIndex, pair ->
-                    if (rowIndex > 0) PanelDivider()
-                    Row(Modifier.fillMaxWidth().height(InstrumentSlots.height())) {
-                        Cell(pair[0], Modifier.weight(1f))
-                        Box(Modifier.width(1.dp).fillMaxHeight().background(Color(0xFFF1F5F9)))
-                        Cell(pair[1], Modifier.weight(1f))
+                onLongClick = { details = true },
+            ) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("WAN", color = t.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+                    Spacer(Modifier.weight(1f))
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color(0xFFE7ECFA))
+                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                    ) {
+                        Text("详情", color = HetuMicroCrystal.KleinBlue, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     }
                 }
+                Text(
+                    address,
+                    Modifier.fillMaxWidth().testTag("instrument-network-value"),
+                    color = t.textPrimary,
+                    fontSize = 15.sp,
+                    lineHeight = 20.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    "地区  $region",
+                    Modifier.fillMaxWidth().testTag("instrument-network-support"),
+                    color = t.textSecondary,
+                    fontSize = 11.5.sp,
+                    lineHeight = 17.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+
+            ReferenceDashboardCard(
+                Modifier.weight(1f).testTag("instrument-speed"),
+            ) {
+                Text("网速", color = t.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+                ReferenceMetricLine("上行", if (runtime.running) refSpeed(up) else "0 B/s")
+                ReferenceMetricLine("下行", if (runtime.running) refSpeed(down) else "0 B/s")
+            }
+        }
+
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            ReferenceDashboardCard(
+                Modifier.weight(1f).testTag("instrument-usage"),
+                onClick = onSubscription,
+            ) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("订阅", color = t.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        usageRatio?.let { "剩余 ${((1f - it) * 100f).toInt()}%" } ?: "未上报",
+                        color = t.textSecondary,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+                ReferenceMetricLine("已用", usageRatio?.let { refBytes(used) } ?: "—")
+                ReferenceMetricLine("总量", usageRatio?.let { refBytes(total) } ?: "—")
+                Spacer(Modifier.weight(1f))
+                ReferenceProgress(usageRatio, "home-usage-progress", HetuMicroCrystal.KleinBlue)
+            }
+
+            ReferenceDashboardCard(
+                Modifier.weight(1f).testTag("instrument-resource"),
+            ) {
+                Text("资源占用", color = t.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+                ReferenceMetricLine("内存", if (runtime.running && memory >= 0L) refBytes(memory) else "—")
+                ReferenceMetricLine(
+                    "CPU",
+                    if (runtime.running && cpu.isFinite() && cpu >= 0f) {
+                        String.format(Locale.US, "%.1f%%", cpu)
+                    } else "—",
+                )
+                Spacer(Modifier.weight(1f))
+                ReferenceProgress(cpuRatio, "home-cpu-progress", HetuMicroCrystal.KleinBlue)
             }
         }
     }
