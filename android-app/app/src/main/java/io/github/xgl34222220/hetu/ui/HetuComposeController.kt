@@ -45,8 +45,8 @@ internal data class AppItem(
     val label: String,
     val packageName: String,
     val system: Boolean,
-    val uid: Int = -1,
     val icon: Bitmap? = null,
+    val uid: Int = -1,
 )
 
 internal data class RuleSourceItem(
