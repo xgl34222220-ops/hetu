@@ -79,7 +79,13 @@ class WorkbenchRegressionTest {
             yamlWorkbenchSymbols.forEach { symbol ->
                 awaitEditable(editor)
                 applyYamlAccessory(editor, symbol)
-                expected += if (symbol == "Tab") "  " else symbol
+                expected += when (symbol) {
+                    "Tab" -> "  "
+                    ":" -> ": "
+                    "-" -> "- "
+                    "#" -> "# "
+                    else -> symbol
+                }
                 assertEquals(expected, editor.text.toString())
             }
             assertFalse(editor.text.toString().contains('\t'))
