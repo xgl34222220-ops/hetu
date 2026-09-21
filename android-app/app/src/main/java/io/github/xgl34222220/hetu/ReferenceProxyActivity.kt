@@ -1018,8 +1018,10 @@ private fun RefPanel(
     val testing = remember { mutableStateMapOf<String, Boolean>() }
     val providerRefreshing = remember { mutableStateMapOf<String, Boolean>() }
     val providerSucceeded = remember { mutableStateMapOf<String, Boolean>() }
+    val providerErrors = remember { mutableStateMapOf<String, String>() }
     val ruleSetRefreshing = remember { mutableStateMapOf<String, Boolean>() }
     val ruleSetSucceeded = remember { mutableStateMapOf<String, Boolean>() }
+    val ruleSetErrors = remember { mutableStateMapOf<String, String>() }
     var capsuleText by remember { mutableStateOf("") }
     var capsuleError by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
@@ -1197,6 +1199,7 @@ private fun RefPanel(
             return
         }
         providerSucceeded.clear()
+        providerErrors.clear()
         var completed = 0
         var failed = 0
         capsuleText = "订阅更新 0/${targets.size}"
@@ -1215,7 +1218,8 @@ private fun RefPanel(
                         }
                     } catch (cancel: CancellationException) {
                         throw cancel
-                    } catch (_: Exception) {
+                    } catch (failure: Exception) {
+                        providerErrors[item.name] = failure.message ?: "更新失败"
                         failed++
                     } finally {
                         providerRefreshing.remove(item.name)
@@ -1239,6 +1243,7 @@ private fun RefPanel(
             return
         }
         ruleSetSucceeded.clear()
+        ruleSetErrors.clear()
         var completed = 0
         var failed = 0
         capsuleText = "规则集更新 0/${targets.size}"
@@ -1259,7 +1264,8 @@ private fun RefPanel(
                             }
                         } catch (cancel: CancellationException) {
                             throw cancel
-                        } catch (_: Exception) {
+                        } catch (failure: Exception) {
+                            ruleSetErrors[item.name] = failure.message ?: "更新失败"
                             failed++
                         } finally {
                             ruleSetRefreshing.remove(item.name)
@@ -1414,25 +1420,7 @@ private fun RefPanel(
                                 }
                                 if (pair.size < groupColumns) Spacer(Modifier.weight(1f))
                             }
-                            androidx.compose.animation.AnimatedVisibility(
-                                visible = expandedGroup != null,
-                                enter = androidx.compose.animation.expandVertically(
-                                    expandFrom = Alignment.Top,
-                                    animationSpec = spring(dampingRatio = .78f, stiffness = 380f),
-                                    clip = false,
-                                ) + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(180)) +
-                                    androidx.compose.animation.slideInVertically(
-                                        animationSpec = spring(dampingRatio = .74f, stiffness = 420f),
-                                    ) { -it / 10 },
-                                exit = androidx.compose.animation.shrinkVertically(
-                                    shrinkTowards = Alignment.Top,
-                                    animationSpec = androidx.compose.animation.core.tween(
-                                        durationMillis = 220,
-                                        easing = androidx.compose.animation.core.CubicBezierEasing(.16f, 1f, .30f, 1f),
-                                    ),
-                                    clip = false,
-                                ) + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(140)),
-                            ) {
+                            WorkspaceAccordion(visible = expandedGroup != null) {
                                 (expandedGroup ?: closingGroup)?.let { group ->
                                     val selected = selectedLocal[group.name] ?: group.now
                                     RefInlineGroupExpansion(
@@ -1501,9 +1489,12 @@ private fun RefPanel(
                         item = item,
                         refreshing = providerRefreshing[item.name] == true,
                         success = providerSucceeded[item.name] == true,
+                        error = providerErrors[item.name].orEmpty(),
                         onRefresh = {
                             if (providerRefreshing[item.name] != true) scope.launch {
                                 providerRefreshing[item.name] = true
+                                providerSucceeded.remove(item.name)
+                                providerErrors.remove(item.name)
                                 try {
                                     val updated = repo.refreshProvider(item.name)
                                     if (updated != null) providers = providers.map { if (it.name == updated.name) updated else it }
@@ -1517,7 +1508,10 @@ private fun RefPanel(
                                     view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
                                     delay(70)
                                     view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                } catch (cancel: CancellationException) {
+                                    throw cancel
                                 } catch (e: Exception) {
+                                    providerErrors[item.name] = e.message ?: "更新失败"
                                     capsuleError = true
                                     capsuleText = "${item.name} 更新失败：${e.message.orEmpty()}"
                                 } finally {
@@ -1583,9 +1577,11 @@ private fun RefPanel(
                     RefRuleGroupCard(batch)
                 }
                 RefPanelTab.RuleSets -> items(filteredRuleSets, key = { "${tab.name}-ruleset-${it.name}" }, contentType = { "ruleset-row" }) { item ->
-                    RefRuleSetRow(item, refreshing = ruleSetRefreshing[item.name] == true, success = ruleSetSucceeded[item.name] == true) {
+                    RefRuleSetRow(item, refreshing = ruleSetRefreshing[item.name] == true, success = ruleSetSucceeded[item.name] == true, error = ruleSetErrors[item.name].orEmpty()) {
                         if (ruleSetRefreshing[item.name] != true) scope.launch {
                             ruleSetRefreshing[item.name] = true
+                            ruleSetSucceeded.remove(item.name)
+                            ruleSetErrors.remove(item.name)
                             try {
                                 val updated = repo.refreshRuleSet(item.name)
                                 if (updated != null) ruleSets = ruleSets.map { if (it.name == updated.name) updated else it }
@@ -1595,9 +1591,14 @@ private fun RefPanel(
                                 view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
                                 delay(70)
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                delay(1200)
-                                ruleSetSucceeded.remove(item.name)
+                                scope.launch {
+                                    delay(1400)
+                                    ruleSetSucceeded.remove(item.name)
+                                }
+                            } catch (cancel: CancellationException) {
+                                throw cancel
                             } catch (e: Exception) {
+                                ruleSetErrors[item.name] = e.message ?: "更新失败"
                                 capsuleError = true
                                 capsuleText = "${item.name} 更新失败：${e.message.orEmpty()}"
                             } finally {
@@ -2281,6 +2282,11 @@ private fun RefTrafficOverview(state: ProxyComposeState, ruleCount: Int?) {
                                 val y = size.height - (if (upload) point.second else point.third) / maxRate * (size.height - 4.dp.toPx())
                                 if (index == 0) path.moveTo(x,y) else path.lineTo(x,y)
                             }
+                            val firstX = ((points.first().first - (end - 60_000L)).coerceIn(0L, 60_000L) / 60_000f) * size.width
+                            val area = Path().apply {
+                                addPath(path); lineTo(size.width, size.height); lineTo(firstX, size.height); close()
+                            }
+                            drawPath(area, Brush.verticalGradient(listOf(color.copy(alpha = .18f), color.copy(alpha = .015f))))
                             drawPath(path, color, style = Stroke(2.dp.toPx()))
                         }
                         drawSeries(true, t.success); drawSeries(false, scheme.primary)
@@ -2328,8 +2334,8 @@ private fun RefRateCard(title: String, value: Long, icon: ImageVector, color: Co
 }
 
 @Composable
-internal fun RefProviderRow(item: DashboardProviderUi, refreshing: Boolean, success: Boolean, onRefresh: () -> Unit, onClick: () -> Unit) {
-    InstrumentSubscriptionTicket(item.name, item, refreshing = refreshing, success = success, onEdit = onClick, onRefresh = onRefresh)
+internal fun RefProviderRow(item: DashboardProviderUi, refreshing: Boolean, success: Boolean, onRefresh: () -> Unit, onClick: () -> Unit, error: String = "") {
+    InstrumentSubscriptionTicket(item.name, item, refreshing = refreshing, success = success, onEdit = onClick, onRefresh = onRefresh, error = error)
 }
 
 private fun refExpireDays(expire: Long): String {
@@ -2583,7 +2589,7 @@ internal fun RefRuleGroupCard(items: List<ProxyRuleUi>) {
                     expression.count { it == '(' } >= 2
                 var expanded by remember(item.type, item.payload, item.proxy) { mutableStateOf(false) }
                 Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 9.dp),
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 9.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -2649,7 +2655,7 @@ internal fun RefRuleGroupCard(items: List<ProxyRuleUi>) {
                 }
                 if (index != items.lastIndex) {
                     HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 14.dp),
+                        modifier = Modifier.padding(horizontal = 16.dp),
                         thickness = .5.dp,
                         color = if (dark) t.outline.copy(alpha = .28f) else t.pageBackground.copy(alpha = .84f),
                     )
@@ -2660,23 +2666,21 @@ internal fun RefRuleGroupCard(items: List<ProxyRuleUi>) {
 }
 
 @Composable
-internal fun RefRuleSetRow(item: DashboardRuleSetUi, refreshing: Boolean, success: Boolean, onRefresh: () -> Unit) {
+internal fun RefRuleSetRow(item: DashboardRuleSetUi, refreshing: Boolean, success: Boolean, error: String = "", onRefresh: () -> Unit) {
     val t = LocalHetuTokens.current
-    Surface(shape = RoundedCornerShape(18.dp), color = t.cardBackground) {
-        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+    Column(Modifier.fillMaxWidth().crystalMaterial(RoundedCornerShape(22.dp)).padding(16.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text(item.name, color = t.textPrimary, fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold)
                 HetuNumber("${java.text.NumberFormat.getIntegerInstance(java.util.Locale.US).format(item.ruleCount)} 条规则",
-                    style = MaterialTheme.typography.bodyMedium)
-                Text(listOf(item.behavior, item.format, item.vehicleType).filter { it.isNotBlank() }.joinToString(" / "), color = t.textSecondary, fontSize = 12.sp)
-                Text(if (refreshing) "正在更新" else if (success) "更新完成 · ${refUpdatedAt(item.updatedAt)}" else refUpdatedAt(item.updatedAt), color = if (success) t.success else t.textSecondary, fontSize = 12.sp)
+                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 20.sp))
+                Text(listOf(item.behavior, item.format, item.vehicleType).filter { it.isNotBlank() }.joinToString(" / "),
+                    color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+                Text(refUpdatedAt(item.updatedAt), color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
             }
-            IconButton(onClick = onRefresh, enabled = !refreshing, modifier = Modifier.size(48.dp)) {
-                if (refreshing) HetuBusyIndicator()
-                else Icon(if (success) Icons.Rounded.CheckCircle else Icons.Rounded.Refresh,
-                    "${item.name} 更新规则集", tint = if (success) t.success else MaterialTheme.colorScheme.primary)
-            }
+            WorkspaceRefreshAction(item.name, refreshing, success, error.isNotBlank(), actionLabel = "更新规则集", onClick = onRefresh)
         }
+        if (error.isNotBlank() && !refreshing) HetuTaskFeedback("${item.name} 更新失败：$error", error = true)
     }
 }
 
@@ -3195,153 +3199,47 @@ private fun RefSectionLabel(text: String) {
 private fun RefGradientIcon(icon: ImageVector, accent: Color) { HetuListIcon(icon) }
 
 @Composable
-private fun RefToolRow(
-    icon: ImageVector,
-    accent: Color,
-    title: String,
-    subtitle: String,
-    trailingText: String = "",
-    trailingBadge: Boolean = false,
-    trailingColor: Color = Color(0xFF2563EB),
-    onClick: () -> Unit,
-) {
-    val resolvedTrailing = if (trailingColor == Color(0xFF2563EB)) MaterialTheme.colorScheme.primary else trailingColor
+private fun RefToolRow(icon: ImageVector, accent: Color, title: String, subtitle: String,
+    trailingText: String = "", trailingBadge: Boolean = false, trailingColor: Color = Color(0xFF2563EB), onClick: () -> Unit) {
     val t = LocalHetuTokens.current
-    val source = remember(title) { MutableInteractionSource() }
-    val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .96f else 1f, spring(dampingRatio = .78f, stiffness = 560f), label = "tool$title")
-    Row(
-        Modifier.fillMaxWidth()
-            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .91f else 1f }
-            .background(if (pressed) t.controlBackground.copy(alpha = .42f) else Color.Transparent)
-            .clickable(interactionSource = source, indication = null, onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 13.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        RefGradientIcon(icon, accent)
-        Spacer(Modifier.width(13.dp))
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(title, color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            Text(subtitle, color = t.textSecondary, fontSize = 12.sp, lineHeight = 17.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        }
-        Spacer(Modifier.width(8.dp))
-        if (trailingText.isNotBlank()) {
-            if (trailingBadge) {
-                Surface(shape = CircleShape, color = resolvedTrailing.copy(alpha = .10f), tonalElevation = 0.dp) {
-                    Row(
-                        Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp),
-                    ) {
-                        Box(Modifier.size(6.dp).background(resolvedTrailing, CircleShape))
-                        Text(trailingText, color = resolvedTrailing, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-            } else {
-                Text(trailingText, color = t.textSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 88.dp))
-                Spacer(Modifier.width(4.dp))
-                Icon(Icons.Rounded.ChevronRight, null, tint = Color(0xFFCBD5E1), modifier = Modifier.size(15.dp))
-            }
-        } else {
-            Icon(Icons.Rounded.ChevronRight, null, tint = Color(0xFFCBD5E1), modifier = Modifier.size(17.dp))
+    val color = if (trailingColor == Color(0xFF2563EB)) MaterialTheme.colorScheme.primary else trailingColor
+    WorkspaceSettingRow(title, subtitle, icon, onClick = onClick) {
+        Row(Modifier.heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (trailingText.isNotBlank()) Text(trailingText, Modifier.widthIn(max = 72.dp), color = if (trailingBadge) color else t.textSecondary,
+                fontSize = 12.sp, lineHeight = 18.sp, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Icon(Icons.Rounded.ChevronRight, null, Modifier.size(16.dp), tint = t.textMuted)
         }
     }
 }
 
 @Composable
-private fun RefValueRow(
-    title: String,
-    value: String,
-    icon: ImageVector? = null,
-    accent: Color = Color(0xFF64748B),
-    highlightValue: Boolean = false,
-    onClick: (() -> Unit)? = null,
-) {
+private fun RefValueRow(title: String, value: String, icon: ImageVector? = null,
+    accent: Color = Color(0xFF64748B), highlightValue: Boolean = false, onClick: (() -> Unit)? = null) {
     val t = LocalHetuTokens.current
-    val source = remember(title) { MutableInteractionSource() }
-    val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed && onClick != null) .96f else 1f, spring(dampingRatio = .80f, stiffness = 560f), label = "value$title")
-    val modifier = if (onClick == null) Modifier.fillMaxWidth() else Modifier.fillMaxWidth()
-        .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .91f else 1f }
-        .background(if (pressed) t.controlBackground.copy(alpha = .42f) else Color.Transparent)
-        .clickable(interactionSource = source, indication = null, onClick = onClick)
-    Row(modifier.padding(horizontal = 14.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
-        if (icon != null) {
-            RefGradientIcon(icon, accent)
-            Spacer(Modifier.width(13.dp))
-        }
-        val stackedValue = value.length > 12
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(title, color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            if (stackedValue) Text(value, color = if (highlightValue) MaterialTheme.colorScheme.primary else t.textSecondary,
-                fontSize = 12.sp, lineHeight = 18.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        }
-        if (value.isNotBlank() && !stackedValue) {
-            Spacer(Modifier.width(12.dp))
-            Text(
-                value,
-                color = if (highlightValue) MaterialTheme.colorScheme.primary else t.textSecondary,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.widthIn(max = 138.dp),
-            )
-        }
-        if (onClick != null) {
-            Spacer(Modifier.width(5.dp))
-            Icon(Icons.Rounded.ChevronRight, null, tint = Color(0xFFCBD5E1), modifier = Modifier.size(16.dp))
+    val stacked = value.length > 12
+    WorkspaceSettingRow(title, if (stacked) value else "", icon, onClick = onClick) {
+        Row(Modifier.heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (!stacked) Text(value, Modifier.widthIn(max = 72.dp), color = if (highlightValue) MaterialTheme.colorScheme.primary else t.textSecondary,
+                fontSize = 13.sp, lineHeight = 18.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (onClick != null) Icon(Icons.Rounded.ChevronRight, null, Modifier.size(16.dp), tint = t.textMuted)
         }
     }
 }
 
 @Composable
-private fun RefSwitchRow(
-    icon: ImageVector,
-    accent: Color,
-    title: String,
-    subtitle: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    val t = LocalHetuTokens.current
+private fun RefSwitchRow(icon: ImageVector, accent: Color, title: String, subtitle: String,
+    checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
     val view = LocalView.current
-    Row(
-        Modifier.fillMaxWidth().toggleable(checked, role = Role.Switch) { value ->
-            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-            onCheckedChange(value)
-        }.padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        RefGradientIcon(icon, accent)
-        Spacer(Modifier.width(13.dp))
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(title, color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            Text(subtitle, color = t.textSecondary, fontSize = 12.sp, lineHeight = 17.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        }
-        Spacer(Modifier.width(10.dp))
-        Switch(
-            checked = checked,
-            onCheckedChange = null,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
-                checkedTrackColor = MaterialTheme.colorScheme.primary,
-                uncheckedThumbColor = Color.White,
-                uncheckedTrackColor = t.outline,
-                uncheckedBorderColor = Color.Transparent,
-            ),
-        )
+    WorkspaceSettingRow(title, subtitle, icon,
+        modifier = Modifier.toggleable(checked, role = Role.Switch) {
+            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK); onCheckedChange(it)
+        }) {
+        Switch(checked, onCheckedChange = null, modifier = Modifier.heightIn(min = 48.dp))
     }
 }
 
 @Composable
-private fun RefDivider() {
-    HorizontalDivider(
-        modifier = Modifier.padding(start = 58.dp, end = 14.dp),
-        thickness = 1.dp,
-        color = if (MaterialTheme.colorScheme.background.luminance() < .5f) LocalHetuTokens.current.outline else Color(0xFFF4F6F9),
-    )
-}
+private fun RefDivider() { WorkspaceInsetDivider() }
 
 @Composable
 private fun RefMetric(title: String, value: String, modifier: Modifier) {

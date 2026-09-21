@@ -223,7 +223,7 @@ private fun NetworkGroup(content: @Composable ColumnScope.() -> Unit) {
 }
 
 @Composable
-private fun NetworkDivider() = HorizontalDivider(Modifier.padding(start = 62.dp, end = 14.dp), color = if (MaterialTheme.colorScheme.background.luminance() < .5f) LocalHetuTokens.current.outline else MaterialTheme.colorScheme.background)
+private fun NetworkDivider() { WorkspaceInsetDivider() }
 
 @Composable
 private fun NetworkIcon(icon: ImageVector, accent: Color) {
@@ -232,26 +232,16 @@ private fun NetworkIcon(icon: ImageVector, accent: Color) {
 
 @Composable
 private fun NetworkValueRow(icon: ImageVector, accent: Color, title: String, value: String, onClick: () -> Unit) {
-    val t = LocalHetuTokens.current
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        NetworkIcon(icon, accent); Spacer(Modifier.width(12.dp))
-        Text(title, color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-        Text(value, color = t.textSecondary, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Spacer(Modifier.width(7.dp)); Icon(Icons.Rounded.ChevronRight, null, tint = Color(0xFFCBD5E1), modifier = Modifier.size(18.dp))
+    WorkspaceSettingRow(title, value, icon, onClick = onClick) {
+        Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.CenterEnd) {
+            Icon(Icons.Rounded.ChevronRight, null, Modifier.size(16.dp), tint = LocalHetuTokens.current.textMuted)
+        }
     }
 }
 
 @Composable
 private fun NetworkSwitchRow(icon: ImageVector, accent: Color, title: String, subtitle: String, checked: Boolean, onChecked: (Boolean) -> Unit) {
-    val t = LocalHetuTokens.current
-    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
-        NetworkIcon(icon, accent); Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(title, color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            Text(subtitle, color = t.textSecondary, fontSize = 12.sp)
-        }
-        Switch(checked = checked, onCheckedChange = onChecked)
-    }
+    WorkspaceSettingRow(title, subtitle, icon) { Switch(checked, onCheckedChange = onChecked, modifier = Modifier.heightIn(min = 48.dp)) }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

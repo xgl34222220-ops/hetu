@@ -49,9 +49,9 @@ internal val yamlWorkbenchSymbols = listOf("Tab", "<", ">", "{", "}", "[", "]", 
 internal fun YamlWorkbenchActions(canUndo: Boolean, canRedo: Boolean, saving: Boolean,
     undo: () -> Unit, redo: () -> Unit, search: () -> Unit, outline: () -> Unit, save: () -> Unit) {
     val t = LocalHetuTokens.current
-    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp).testTag("yaml-workbench-actions")
+    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp).testTag("yaml-workbench-actions")
         .crystalMaterial(RoundedCornerShape(14.dp), depth = CrystalDepth.InsetItem),
-        horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+        horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         @Composable fun Action(label: String, icon: ImageVector, enabled: Boolean = true, click: () -> Unit) {
             IconButton(onClick = click, enabled = enabled, modifier = Modifier.size(48.dp).testTag("yaml-action:$label")) {
                 if (label == "保存" && saving) HetuBusyIndicator(Modifier.size(18.dp))
@@ -92,7 +92,7 @@ internal fun YamlWorkbenchAccessory(enabled: Boolean, onSymbol: (String) -> Unit
 @Composable
 internal fun YamlCursorStatus(line: Int, column: Int, lines: Int, modifier: Modifier = Modifier) {
     val t = LocalHetuTokens.current
-    Row(modifier.fillMaxWidth().testTag("yaml-cursor-status").padding(horizontal = 14.dp, vertical = 5.dp),
+    Row(modifier.fillMaxWidth().testTag("yaml-cursor-status").padding(horizontal = 16.dp, vertical = 5.dp),
         horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         Text("Ln ${line.coerceAtLeast(1)}, Col ${column.coerceAtLeast(1)}", Modifier.testTag("yaml-cursor"),
             color = t.textSecondary, fontSize = 11.sp, lineHeight = 16.sp, fontFamily = FontFamily.Monospace)
@@ -117,7 +117,7 @@ internal fun YamlWorkbenchSearch(editor: CodeEditor?, matches: Int, onClose: () 
         }
     }
     DisposableEffect(editor) { onDispose { editor?.searcher?.stopSearch() } }
-    Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp).testTag("yaml-search")) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).testTag("yaml-search")) {
         OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth().focusRequester(focus).testTag("yaml-search-query"),
             singleLine = true, placeholder = { Text("搜索配置文本", fontSize = 13.sp) },
             textStyle = LocalTextStyle.current.copy(fontSize = 13.sp), shape = RoundedCornerShape(12.dp),

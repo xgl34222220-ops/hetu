@@ -73,6 +73,8 @@ import io.github.xgl34222220.hetu.ui.*
 import io.github.xgl34222220.hetu.ui.HetuTheme
 import io.github.xgl34222220.hetu.ui.LocalHetuTokens
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 
 class ProxySubscriptionActivity : ComponentActivity() {
@@ -157,6 +159,10 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
     var loading by remember { mutableStateOf(false) }
     var pullRefreshing by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("") }
+    val subscriptionRefreshing = remember { mutableStateMapOf<String, Boolean>() }
+    val subscriptionSucceeded = remember { mutableStateMapOf<String, Boolean>() }
+    val subscriptionErrors = remember { mutableStateMapOf<String, String>() }
+
 
     var editSubscription by remember { mutableStateOf<ProxySubscriptionUi?>(null) }
     var addingSubscription by remember { mutableStateOf(false) }
@@ -186,26 +192,51 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
         }
     }
 
+    suspend fun refreshLibraryProvider(name: String): Boolean {
+        if (subscriptionRefreshing[name] == true) return false
+        subscriptionRefreshing[name] = true
+        subscriptionSucceeded.remove(name)
+        subscriptionErrors.remove(name)
+        return try {
+            dashboardRepo.refreshProvider(name)?.let { liveProviders = liveProviders + (name to it) }
+            subscriptionSucceeded[name] = true
+            true
+        } catch (cancel: kotlinx.coroutines.CancellationException) {
+            throw cancel
+        } catch (error: Exception) {
+            subscriptionErrors[name] = error.message ?: "更新失败"
+            false
+        } finally { subscriptionRefreshing.remove(name) }
+    }
+
     fun pullRefreshAll() {
         if (pullRefreshing) return
         scope.launch {
             pullRefreshing = true
             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
             try {
-                val freshProviders = runCatching { dashboardRepo.refreshSubscriptions() }.getOrDefault(emptyList())
+                // Preserve the original remote-provider scope. Only feedback is per-item;
+                // failure must not be swallowed and labelled as a complete success.
+                val targets = dashboardRepo.providers()
+                var failed = 0
+                for (chunk in targets.chunked(3)) {
+                    val results = kotlinx.coroutines.coroutineScope {
+                        chunk.map { item -> async { refreshLibraryProvider(item.name) } }.awaitAll()
+                    }
+                    failed += results.count { !it }
+                }
                 val overview = controller.configOverview()
                 val library = controller.configLibrary()
                 configName = overview.first
                 subscriptions = overview.second
                 configLibrary = library
-                liveProviders = if (freshProviders.isNotEmpty()) freshProviders.associateBy { it.name }
-                    else runCatching { dashboardRepo.providers() }.getOrDefault(emptyList()).associateBy { it.name }
-                message = "订阅、用量与配置状态已刷新"
+                if (targets.isEmpty()) liveProviders = emptyMap()
+                message = if (failed == 0) "订阅、用量与配置状态已刷新" else "部分订阅更新失败：$failed 项，详情见对应卡片"
+            } catch (cancel: kotlinx.coroutines.CancellationException) {
+                throw cancel
             } catch (error: Exception) {
                 message = "刷新失败：" + (error.message ?: "未知错误")
-            } finally {
-                pullRefreshing = false
-            }
+            } finally { pullRefreshing = false }
         }
     }
 
@@ -444,9 +475,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
 
             if (message.isNotBlank()) {
                 item("message") {
-                    Surface(shape = RoundedCornerShape(20.dp), color = scheme.errorContainer) {
-                        Text(message, Modifier.fillMaxWidth().padding(16.dp), color = scheme.onErrorContainer, style = MaterialTheme.typography.bodySmall)
-                    }
+                    HetuTaskFeedback(message, error = message.contains("失败") || message.contains("未完成"))
                 }
             }
 
@@ -470,7 +499,12 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
 
             items(subscriptions, key = { "sub-${it.name}" }) { item ->
                 val provider = liveProviders[item.name] ?: liveProviders.entries.firstOrNull { it.key.equals(item.name, true) }?.value
-                InstrumentSubscriptionTicket(item.name, provider, subscriptionHost(item), item.placeholder, onEdit = {
+                InstrumentSubscriptionTicket(item.name, provider, subscriptionHost(item), item.placeholder,
+                    refreshing = subscriptionRefreshing[item.name] == true,
+                    success = subscriptionSucceeded[item.name] == true,
+                    error = subscriptionErrors[item.name].orEmpty(),
+                    onRefresh = if (provider != null) ({ scope.launch { refreshLibraryProvider(item.name) }; Unit }) else null,
+                    onEdit = {
                     addingSubscription = false
                     editSubscription = item
                     editorName = item.name
@@ -710,7 +744,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
             Surface(modifier = Modifier.fillMaxSize(), color = tokens.pageBackground) {
                 Column(Modifier.fillMaxSize().imePadding()) {
                     Row(
-                        Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 10.dp, vertical = 7.dp).height(48.dp),
+                        Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 4.dp, vertical = 7.dp).heightIn(min = 48.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         IconButton(onClick = { if (!yamlSaving) yamlOpen = false }, enabled = !yamlSaving) {
@@ -729,7 +763,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                     }
 
                     Surface(
-                        modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 12.dp, vertical = 7.dp),
+                        modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 16.dp, vertical = 8.dp),
                         shape = RoundedCornerShape(18.dp),
                         color = if (dark) Color(0xFF101722) else Color(0xFFF8FAFC),
                         border = BorderStroke(.8.dp, if (dark) tokens.outline.copy(alpha = .44f) else Color(0xFFE2E8F0)),
@@ -796,7 +830,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                         ) { it / 2 } + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(110)),
                     ) {
                         HetuTaskFeedback(yamlError, error = true, busy = false,
-                            modifier = Modifier.padding(horizontal = 12.dp))
+                            modifier = Modifier.padding(horizontal = 16.dp))
 
                     }
 

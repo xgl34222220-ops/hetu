@@ -76,6 +76,6 @@ internal fun ticketExpireAt(expire: Long, zone: ZoneId = ZoneId.systemDefault())
 @Composable
 internal fun InstrumentSubscriptionTicket(name: String, provider: DashboardProviderUi?, host: String = "",
     placeholder: Boolean = false, refreshing: Boolean = false, success: Boolean = false,
-    onEdit: () -> Unit, onRefresh: (() -> Unit)? = null) {
-    SubscriptionBoardingTicket(name, provider, host, placeholder, refreshing, success, onEdit, onRefresh)
+    onEdit: () -> Unit, onRefresh: (() -> Unit)? = null, error: String = "") {
+    SubscriptionBoardingTicket(name, provider, host, placeholder, refreshing, success, onEdit, onRefresh, error)
 }

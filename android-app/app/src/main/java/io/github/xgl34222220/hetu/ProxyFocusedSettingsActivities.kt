@@ -191,33 +191,38 @@ private fun FocusedSettingsScaffold(title: String, subtitle: String, onBack: () 
 
 @Composable private fun FocusedNotice(text: String) { Surface(color = if (MaterialTheme.colorScheme.background.luminance() < .5f) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .46f) else Color(0xFFEFF4FA), shape = RoundedCornerShape(18.dp), tonalElevation = 0.dp, shadowElevation = 0.dp) { Text(text, modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, lineHeight = 18.sp, fontWeight = FontWeight.Medium) } }
 @Composable private fun FocusedGroup(content: @Composable ColumnScope.() -> Unit) { Surface(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(18.dp), tonalElevation = 0.dp, shadowElevation = 1.dp) { Column(content = content) } }
-@Composable private fun FocusedDivider() { HorizontalDivider(modifier = Modifier.padding(start = 58.dp), thickness = .5.dp, color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .55f)) }
+@Composable private fun FocusedDivider() { WorkspaceInsetDivider() }
 @Composable private fun FocusedIcon(icon: ImageVector, accent: Color) { HetuListIcon(icon) }
 
 @Composable
 private fun FocusedChoiceRow(icon: ImageVector, accent: Color, title: String, subtitle: String, selected: Boolean, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        FocusedIcon(icon, accent); Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text(title, fontSize = 14.sp, fontWeight = FontWeight.Bold); Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, lineHeight = 17.sp) }
-        if (selected) Surface(color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = .45f), shape = CircleShape) { Icon(Icons.Rounded.Check, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(6.dp).size(16.dp)) } else Icon(Icons.Rounded.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .52f))
+    WorkspaceSettingRow(title, subtitle, icon, onClick = onClick) {
+        Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.CenterEnd) {
+            Icon(if (selected) Icons.Rounded.Check else Icons.Rounded.ChevronRight, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+        }
     }
 }
 
 @Composable
 private fun FocusedSwitchRow(icon: ImageVector, accent: Color, title: String, subtitle: String, checked: Boolean, onChecked: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) { FocusedIcon(icon, accent); Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text(title, fontSize = 14.sp, fontWeight = FontWeight.Bold); Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, lineHeight = 17.sp) }; Switch(checked = checked, onCheckedChange = onChecked) }
+    WorkspaceSettingRow(title, subtitle, icon) { Switch(checked, onCheckedChange = onChecked, modifier = Modifier.heightIn(min = 48.dp)) }
 }
 
 @Composable
 private fun FocusedActionRow(icon: ImageVector, accent: Color, title: String, subtitle: String, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) { FocusedIcon(icon, accent); Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text(title, fontSize = 14.sp, fontWeight = FontWeight.Bold); Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, lineHeight = 17.sp) }; Icon(Icons.Rounded.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .52f)) }
+    WorkspaceSettingRow(title, subtitle, icon, onClick = onClick) {
+        Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.CenterEnd) { Icon(Icons.Rounded.ChevronRight, null, Modifier.size(16.dp)) }
+    }
 }
 
 @Composable
 private fun FocusedInfoRow(icon: ImageVector, accent: Color, title: String, subtitle: String) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) { FocusedIcon(icon, accent); Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text(title, fontSize = 14.sp, fontWeight = FontWeight.Bold); Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, lineHeight = 17.sp) } }
+    WorkspaceSettingRow(title, subtitle, icon)
 }
 
 @Composable
 private fun FocusedValueRow(icon: ImageVector, accent: Color, title: String, subtitle: String, value: String, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) { FocusedIcon(icon, accent); Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text(title, fontSize = 14.sp, fontWeight = FontWeight.Bold); Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, lineHeight = 17.sp) }; Text(value, color = Color(0xFF64748B), fontSize = 12.sp, fontWeight = FontWeight.SemiBold); Spacer(Modifier.width(4.dp)); Icon(Icons.Rounded.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .52f)) }
+    WorkspaceSettingRow(title, listOf(subtitle, value).filter { it.isNotBlank() }.joinToString(" · "), icon, onClick = onClick) {
+        Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.CenterEnd) { Icon(Icons.Rounded.ChevronRight, null, Modifier.size(16.dp)) }
+    }
 }
