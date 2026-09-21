@@ -52,6 +52,7 @@ crystal = (src / "ui/CrystalMaterial.kt").read_text()
 liquid = (src / "LiquidWorkspace.kt").read_text()
 editor = (src / "EditorWorkbench.kt").read_text()
 monitoring = (src / "MonitoringWorkspace.kt").read_text()
+refhome = (src / "ReferenceProxyActivity.kt").read_text()
 assert "Color(0xFFF4F6F9)" in theme and "Color(0xFF0F172A)" in theme
 assert "RoundedCornerShape(24.dp)" in main and "LiquidStatusGlyph(state.running, busy)" in main
 assert ".size(48.dp)" in liquid and "shape = CircleShape" in liquid
@@ -64,7 +65,6 @@ assert "UTF-8 · YAML" in editor
 assert "ticket-badge:" in monitoring and "ticket-progress:" in monitoring
 nonhome = (src / "NonHomeWorkspace.kt").read_text()
 instrument = (src / "AlignedInstrumentPanel.kt").read_text()
-refhome = (src / "ReferenceProxyActivity.kt").read_text()
 assert "Color.White.copy(alpha = .95f)" in crystal
 assert "Color(0xFFFFFFFF)" in crystal and "Color(0xFFF8FAFC)" in crystal
 assert "topAlpha" not in crystal and "bottomAlpha" not in crystal
