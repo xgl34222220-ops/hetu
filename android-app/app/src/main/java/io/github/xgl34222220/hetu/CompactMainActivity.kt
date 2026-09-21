@@ -531,35 +531,95 @@ private fun CompactHomePage(
     }
 
     if (showModePicker) {
-        AlertDialog(
-            onDismissRequest = { showModePicker = false },
-            title = { Text("去广告保护方式") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    ProtectionModeOption(
-                        selected = !vpnMode,
-                        icon = Icons.Rounded.Extension,
-                        title = "模块保护",
-                        description = "不占 VPN · 全局 hosts 去广告 · 无法获得逐条命中次数",
-                    ) {
-                        controller.setProtectionMode("module")
-                        showModePicker = false
-                        refresh++
-                    }
-                    ProtectionModeOption(
-                        selected = vpnMode,
-                        icon = Icons.Rounded.QueryStats,
-                        title = "应用保护",
-                        description = "本地 DNS VPN · 精确累计请求/拦截 · 支持按应用放行",
-                    ) {
-                        controller.setProtectionMode("vpn")
-                        showModePicker = false
-                        refresh++
-                    }
-                }
+        CompactProtectionModeSheet(
+            vpnMode = vpnMode,
+            onDismiss = { showModePicker = false },
+            onSelect = { mode ->
+                controller.setProtectionMode(mode)
+                showModePicker = false
+                refresh++
             },
-            confirmButton = { TextButton(onClick = { showModePicker = false }) { Text("关闭") } },
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CompactProtectionModeSheet(
+    vpnMode: Boolean,
+    onDismiss: () -> Unit,
+    onSelect: (String) -> Unit,
+) {
+    val tokens = LocalHetuTokens.current
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
+        containerColor = tokens.elevatedCardBackground,
+        tonalElevation = 0.dp,
+        scrimColor = Color.Black.copy(alpha = .35f),
+    ) {
+        Column(
+            Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text("去广告保护方式", color = tokens.textPrimary, fontSize = 20.sp, lineHeight = 25.sp, fontWeight = FontWeight.Bold)
+            ProtectionModeOption(
+                selected = !vpnMode,
+                icon = Icons.Rounded.Extension,
+                title = "模块保护",
+                description = "不占 VPN · 全局 hosts 去广告 · 无法获得逐条命中次数",
+            ) { onSelect("module") }
+            ProtectionModeOption(
+                selected = vpnMode,
+                icon = Icons.Rounded.QueryStats,
+                title = "应用保护",
+                description = "本地 DNS VPN · 精确累计请求/拦截 · 支持按应用放行",
+            ) { onSelect("vpn") }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CompactDomainBottomSheet(
+    allow: Boolean,
+    value: String,
+    onValueChange: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onAdd: () -> Unit,
+) {
+    val tokens = LocalHetuTokens.current
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
+        containerColor = tokens.elevatedCardBackground,
+        tonalElevation = 0.dp,
+        scrimColor = Color.Black.copy(alpha = .35f),
+    ) {
+        Column(
+            Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(if (allow) "添加放行域名" else "添加拦截域名",
+                color = tokens.textPrimary, fontSize = 20.sp, lineHeight = 25.sp, fontWeight = FontWeight.Bold)
+            OutlinedTextField(
+                value = value,
+                onValueChange = onValueChange,
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("example.com") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                shape = RoundedCornerShape(16.dp),
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                TextButton(onClick = onDismiss, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("取消") }
+                Button(
+                    onClick = onAdd,
+                    enabled = value.trim().isNotEmpty(),
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                ) { Text("添加") }
+            }
+        }
     }
 }
 
@@ -897,17 +957,20 @@ private fun CompactRulesPage(controller: HetuComposeController) {
     }
 
     if (addMode != null) {
-        AlertDialog(
-            onDismissRequest = { addMode = null; input = "" },
-            title = { Text(if (addMode == true) "添加放行域名" else "添加拦截域名") },
-            text = { OutlinedTextField(input, { input = it }, placeholder = { Text("example.com") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    val allow = addMode == true
-                    scope.launch { runCatching { controller.changeDomain(input, allow, true) }; input = ""; addMode = null; reload++ }
-                }) { Text("添加") }
+        CompactDomainBottomSheet(
+            allow = addMode == true,
+            value = input,
+            onValueChange = { input = it },
+            onDismiss = { addMode = null; input = "" },
+            onAdd = {
+                val allow = addMode == true
+                scope.launch {
+                    runCatching { controller.changeDomain(input, allow, true) }
+                    input = ""
+                    addMode = null
+                    reload++
+                }
             },
-            dismissButton = { TextButton(onClick = { addMode = null; input = "" }) { Text("取消") } },
         )
     }
 }
