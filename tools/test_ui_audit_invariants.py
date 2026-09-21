@@ -21,8 +21,7 @@ assert "idleWave" not in main and "kotlin.math.sin" not in main, "No synthetic t
 assert "BoxProxy Design System" not in (src / "ThemeSettingsActivity.kt").read_text()
 assert "setEditorLanguage(HetuYamlLanguage())" in (src / "ProxySubscriptionActivity.kt").read_text()
 assert "RuleMetricSummary(" in (src / "ProxyAdblockChainActivity.kt").read_text()
-assert 'item(key = "home-shortcuts")' not in main, "Home must not reintroduce banner-like shortcut strips"
-assert "private fun RefHomeShortcut" not in main
+assert 'item(key = "home-shortcuts")' in main, "Reference home requires the two compact shortcut cards"
 assert 'Text("网络与广告过滤"' not in main
 assert "expandedGroup ?: closingGroup" in main
 assert "LiquidConfigIndicator(config.selected)" in (src / "ProxySubscriptionActivity.kt").read_text()
