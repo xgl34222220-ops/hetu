@@ -1238,6 +1238,6 @@ case "${1:-status}" in
   status) status;;
   network-health) health_json;;
   repair-network) [ "$#" = 2 ] || exit 1; root; health_repair "$2";;
-  watchdog) [ "$#" = 9 ] || exit 0; root; watchdog "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9";;
+  watchdog) { [ "$#" = 9 ] || [ "$#" = 10 ]; } || exit 0; root; watchdog "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10:-}";;
   *) fail "未知 Root 代理操作";;
 esac
