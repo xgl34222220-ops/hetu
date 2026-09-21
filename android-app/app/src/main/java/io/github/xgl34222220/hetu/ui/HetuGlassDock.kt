@@ -90,7 +90,7 @@ fun HetuGlassDock(
         prefs.registerOnSharedPreferenceChangeListener(listener)
         onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
-    val shape = if (floating) RoundedCornerShape(31.dp) else RoundedCornerShape(topStart = 31.dp, topEnd = 31.dp)
+    val shape = if (floating) RoundedCornerShape(32.dp) else RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
     // Never render a translucent glass shell without a real blur/backdrop behind it.
     // That fallback was the source of the opaque white slab when either appearance switch was disabled.
     val renderGlass = activeGlass && enableBlur
@@ -108,11 +108,11 @@ fun HetuGlassDock(
             listOf(Color.White.copy(alpha = .085f), Color(0xFF60A5FA).copy(alpha = .035f)),
         )
         renderGlass -> Brush.verticalGradient(
-            listOf(Color(0xFFF8FBFF).copy(alpha = .58f), Color(0xFFEAF2FF).copy(alpha = .34f)),
+            listOf(Color(0xFFF9F8FE).copy(alpha = .90f), Color(0xFFF1F1FA).copy(alpha = .78f)),
         )
         else -> Brush.verticalGradient(
             if (dark) listOf(Color(0xFF1A2230), Color(0xFF151C27))
-            else listOf(Color(0xFFF1F5F9), Color(0xFFE8EEF6)),
+            else listOf(Color(0xFFF9F8FE), Color(0xFFF1F1FA)),
         )
     }
     val shellTint = if (dark) scheme.surface.copy(alpha = .70f) else scheme.surface.copy(alpha = .72f)
@@ -177,9 +177,9 @@ fun HetuGlassDock(
     Box(
         modifier = modifier
             .background(Color.Transparent)
-            .then(if (floating) Modifier.padding(horizontal = 20.dp).padding(bottom = bottomInset + 12.dp) else Modifier)
+            .then(if (floating) Modifier.padding(horizontal = 25.dp).padding(bottom = bottomInset + 12.dp) else Modifier)
             .fillMaxWidth()
-            .height(72.dp + if (floating) 0.dp else bottomInset),
+            .height(64.dp + if (floating) 0.dp else bottomInset),
     ) {
         Box(
             modifier = Modifier
@@ -207,15 +207,15 @@ fun HetuGlassDock(
             items = items,
             selected = selected,
             onSelect = onSelect,
-            itemHeight = 60.dp,
+            itemHeight = 54.dp,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = 6.dp, top = 6.dp, end = 6.dp, bottom = if (floating) 6.dp else bottomInset + 6.dp),
-            indicatorColor = if (dark) scheme.primary.copy(alpha = .18f) else scheme.primary.copy(alpha = .08f),
-            indicatorBorderColor = if (dark) scheme.primary.copy(alpha = .22f) else scheme.primary.copy(alpha = .18f),
+                .padding(start = 5.dp, top = 5.dp, end = 5.dp, bottom = if (floating) 5.dp else bottomInset + 5.dp),
+            indicatorColor = if (dark) Color.White.copy(alpha = .10f) else Color(0xFFDEDEEA).copy(alpha = .92f),
+            indicatorBorderColor = if (dark) Color.White.copy(alpha = .08f) else Color.White.copy(alpha = .35f),
             indicatorShadow = 0.dp,
-            selectedColor = scheme.primary,
-            unselectedColor = scheme.onSurfaceVariant.copy(alpha = .90f),
+            selectedColor = HetuMicroCrystal.KleinBlue,
+            unselectedColor = if (dark) scheme.onSurfaceVariant.copy(alpha = .90f) else Color(0xFF191720),
             liquidGlass = renderGlass,
             indicatorBackdrop = dockSurfaceBackdrop.takeIf { runtimeLiquid },
             dark = dark,
@@ -242,7 +242,7 @@ private fun DockItems(
     BoxWithConstraints(modifier = modifier) {
         val itemWidth = maxWidth / items.size.toFloat()
         val targetIndex = selected.coerceIn(0, items.lastIndex)
-        val indicatorInset = 4.dp
+        val indicatorInset = 2.dp
         val liquidStretch = remember { Animatable(0f) }
         val indicatorPosition = remember { Animatable(targetIndex.toFloat()) }
         var travelDirection by remember { mutableFloatStateOf(0f) }
@@ -277,7 +277,7 @@ private fun DockItems(
         val indicatorX = itemWidth * indicatorPosition.value
         val liquidExtra = if (liquidGlass) 16.dp * liquidStretch.value else 0.dp
         val indicatorStart = indicatorX + indicatorInset - if (travelDirection < 0f) liquidExtra else 0.dp
-        val indicatorShape = RoundedCornerShape(23.dp)
+        val indicatorShape = RoundedCornerShape(27.dp)
         // The outer dock keeps the real blur/refraction. The active tab must NOT create
         // another refractive white lens on top of it; that was the remaining white-patch artifact.
         val activeLens = false
@@ -306,7 +306,7 @@ private fun DockItems(
                 .width(itemWidth - (indicatorInset * 2) + liquidExtra)
                 .height(itemHeight)
                 .shadow(indicatorShadow, indicatorShape, clip = false)
-                .squircleClip(23.dp)
+                .squircleClip(27.dp)
                 .then(movingLensModifier)
                 .border(1.dp, indicatorBorderColor, indicatorShape),
         )
@@ -339,7 +339,7 @@ private fun DockItems(
                             scaleX = itemScale
                             scaleY = itemScale
                         }
-                        .clip(RoundedCornerShape(23.dp))
+                        .clip(RoundedCornerShape(27.dp))
                         .selectable(
                             selected = active,
                             role = Role.Tab,
@@ -355,7 +355,7 @@ private fun DockItems(
                         contentDescription = item.label,
                         tint = itemColor,
                         modifier = Modifier
-                            .size(22.dp)
+                            .size(23.dp)
                             .graphicsLayer {
                                 scaleX = item.opticalScale
                                 scaleY = item.opticalScale
@@ -365,9 +365,9 @@ private fun DockItems(
                     Text(
                         item.label,
                         color = itemColor,
-                        fontSize = 12.sp,
+                        fontSize = 12.5.sp,
                         lineHeight = 17.sp,
-                        fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                        fontWeight = if (active) FontWeight.Bold else FontWeight.SemiBold,
                         maxLines = 1,
                     )
                 }
