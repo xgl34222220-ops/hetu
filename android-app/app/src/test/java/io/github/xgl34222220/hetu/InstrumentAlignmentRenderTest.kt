@@ -82,11 +82,17 @@ class InstrumentAlignmentRenderTest {
                         baseline("instrument-network-$slot") - top.top,
                         baseline("instrument-$id-$slot") - b.top, .6f)
                 }
-                val railTag = when(id) { "usage" -> "home-usage-progress"; "resource" -> "home-cpu-progress"; else -> "instrument-$id-rail" }
-                assertEquals("Rail bottom does not match", bounds("instrument-network-rail").top - top.top,
-                    bounds(railTag).top - b.top, .6f)
-                assertEquals(5f, bounds(railTag).height, .6f)
             }
+            assertEquals(
+                "Bottom progress rails must align",
+                bounds("home-usage-progress").top - bounds("instrument-usage").top,
+                bounds("home-cpu-progress").top - bounds("instrument-resource").top,
+                .6f,
+            )
+            assertEquals(3f, bounds("home-usage-progress").height, .6f)
+            assertEquals(3f, bounds("home-cpu-progress").height, .6f)
+            compose.onNodeWithTag("instrument-network-badge", true).assertDoesNotExist()
+            compose.onNodeWithTag("instrument-speed-badge", true).assertDoesNotExist()
             if (f == 1f) assertEquals("Central divider must remain 1px", 1f, bounds("instrument-speed").left - top.right, 1f)
             else assertTrue("Large font must not squeeze a two-column panel", bounds("instrument-speed").top > top.bottom)
         }
@@ -115,11 +121,11 @@ class InstrumentAlignmentRenderTest {
         compose.onNodeWithText("健康", true).assertDoesNotExist()
         compose.onNodeWithTag("home-usage-progress", true).assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.ProgressBarRangeInfo))
         compose.onNodeWithTag("home-cpu-progress", true).assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.ProgressBarRangeInfo))
-        compose.onNodeWithTag("instrument-speed-rail", true).assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.ProgressBarRangeInfo))
+        compose.onNodeWithTag("instrument-speed-badge", true).assertDoesNotExist()
         capture("aligned102-unknown")
         compose.runOnIdle { stopped = true }; compose.waitForIdle()
         compose.onNodeWithText("实时", substring = false).assertDoesNotExist()
-        compose.onNodeWithTag("instrument-speed-badge", true).onChild().assertTextEquals("停止")
+        compose.onNodeWithText("代理已停止", true).assertExists()
         capture("aligned102-stopped")
     }
 
@@ -138,8 +144,7 @@ class InstrumentAlignmentRenderTest {
         compose.onNodeWithText("关闭").performClick()
         compose.onNodeWithTag("instrument-usage", true).performClick()
         compose.runOnIdle { assertEquals(1, subscriptions) }
-        compose.onNodeWithTag("instrument-speed-rail", true).assert(SemanticsMatcher.expectValue(
-            SemanticsProperties.ProgressBarRangeInfo, ProgressBarRangeInfo(.25f, 0f..1f)))
+        compose.onNodeWithText("↑ 上行", substring = true, useUnmergedTree = true).assertExists()
     }
 
     @Test fun fractionsAreActualAndBoundedWithoutOverflow() {
