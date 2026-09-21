@@ -36,7 +36,7 @@ denied(){ echo 'Permission denied'; return 1; }
 [ -z "$(cleanup_snapshot_read absent nat)" ] || exit 1
 if cleanup_snapshot_read denied nat; then exit 1; fi
 ''');checks+=2
- common=prefix+'''root(){ :; }; has(){ return 0; }; probeowner(){ return 0; }; probecidrs(){ return 0; }
+ common=prefix+'''root(){ :; }; has(){ return 0; }; probeowner(){ return 0; }; probegid(){ return 0; }; probecidrs(){ return 0; }
 probe_ingress(){ printf '%s\\n' probe >> "$HETU_TEST_DIR/probes"; }
 '''
  locker=subprocess.Popen(['sh'],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=env,text=True)
@@ -47,6 +47,11 @@ probe_ingress(){ printf '%s\\n' probe >> "$HETU_TEST_DIR/probes"; }
  assert p.returncode==0,(p.stdout,p.stderr)
  assert time.monotonic()-started>=.25
  assert (d/'probes').read_text()=='probe\n';locker.wait(timeout=5);checks+=2
+ gid_ok=subprocess.run(['sh'],input=common+"preflight tproxy 19898 0 disable 1 1 redirect 0 11053 29090 core '' 0 0 '' '' '' 10123\n",env=env,text=True,capture_output=True,timeout=10)
+ assert gid_ok.returncode==0,(gid_ok.stdout,gid_ok.stderr);checks+=1
+ gid_bad=subprocess.run(['sh'],input=common+"preflight tproxy 19898 0 disable 1 1 redirect 0 11053 29090 core '' 0 0 '' '' '' 3003\n",env=env,text=True,capture_output=True,timeout=10)
+ assert gid_bad.returncode!=0 and 'DIRECT GID' in (gid_bad.stdout+gid_bad.stderr);checks+=1
+ assert '--gid-owner' in SCRIPT.read_text();checks+=1
  harness=d/'EpochTest.java'
  harness.write_text('''package io.github.xgl34222220.hetu;
 public class EpochTest {
