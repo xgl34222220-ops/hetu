@@ -81,16 +81,16 @@ fun Modifier.crystalMaterial(
     val primary = MaterialTheme.colorScheme.primary
     val dark = t.pageBackground.luminance() < .5f
     val radius = when (depth) { CrystalDepth.Popover -> 24.dp; CrystalDepth.InsetItem, CrystalDepth.Sunken -> 12.dp; else -> 20.dp }
-    val topAlpha = when (depth) { CrystalDepth.Popover -> .72f; CrystalDepth.InsetItem -> .68f; CrystalDepth.Sunken -> .72f; else -> .82f }
-    val bottomAlpha = when (depth) { CrystalDepth.Popover -> .60f; CrystalDepth.InsetItem -> .56f; CrystalDepth.Sunken -> .70f; else -> .68f }
+    val topAlpha = when (depth) { CrystalDepth.Popover -> .94f; CrystalDepth.InsetItem -> .92f; CrystalDepth.Sunken -> 1f; else -> .98f }
+    val bottomAlpha = when (depth) { CrystalDepth.Popover -> .84f; CrystalDepth.InsetItem -> .84f; CrystalDepth.Sunken -> 1f; else -> .88f }
     val accent = if (selection) primary else if (tint.isSpecified && tint.alpha > .05f) tint else Color.Unspecified
-    val upper = if (dark) Color(0xFF283543).copy(alpha = .82f) else (if (depth == CrystalDepth.Sunken) Color(0xFFEEF2F6) else Color(0xFFFBFDFF)).copy(alpha = topAlpha)
-    val lower = if (dark) Color(0xFF18232F).copy(alpha = .72f) else (if (depth == CrystalDepth.Sunken) Color(0xFFEEF2F6) else Color(0xFFF3F7FB)).copy(alpha = bottomAlpha)
+    val upper = if (dark) Color(0xFF283543).copy(alpha = .82f) else (if (depth == CrystalDepth.Sunken) Color(0xFFEEF2F6) else Color.White).copy(alpha = topAlpha)
+    val lower = if (dark) Color(0xFF18232F).copy(alpha = .72f) else (if (depth == CrystalDepth.Sunken) Color(0xFFEEF2F6) else Color(0xFFF8FAFC)).copy(alpha = bottomAlpha)
     val fill = Brush.verticalGradient(listOf(upper, lower))
     // Suppress Haze's default opaque tint; the translucent fill above is the only wash.
     val style = HazeStyle(backgroundColor = Color.Transparent, tints = emptyList(), blurRadius = radius,
         noiseFactor = .005f, fallbackTint = HazeTint(Color.Transparent))
-    val shadowSize = when(depth) { CrystalDepth.Popover -> 12.dp; CrystalDepth.InsetItem -> 1.dp; CrystalDepth.Sunken -> 0.dp; else -> 5.dp }
+    val shadowSize = when(depth) { CrystalDepth.Popover -> 18.dp; CrystalDepth.InsetItem -> 2.dp; CrystalDepth.Sunken -> 2.dp; else -> 8.dp }
     val blur = if (blurEnabled && backdrop != null) Modifier.hazeEffect(backdrop, style) {
         canDrawArea = { true }
     } else Modifier
@@ -98,15 +98,15 @@ fun Modifier.crystalMaterial(
         1.dp, shape, clip = false, ambientColor = Color(0xFF0F172A).copy(alpha = .03f),
         spotColor = Color(0xFF0F172A).copy(alpha = .03f))
     return then(contact).shadow(shadowSize, shape, clip = false,
-        ambientColor = Color(0xFF0F172A).copy(alpha = if (depth == CrystalDepth.Popover) .10f else .04f),
-        spotColor = Color(0xFF0F172A).copy(alpha = if (depth == CrystalDepth.Popover) .14f else .06f))
+        ambientColor = Color(0xFF0F172A).copy(alpha = if (depth == CrystalDepth.Popover) .10f else .03f),
+        spotColor = Color(0xFF0F172A).copy(alpha = if (depth == CrystalDepth.Popover) .14f else .05f))
         .clip(shape).then(blur).background(fill, shape)
         .drawWithCache {
             val outline = shape.createOutline(size, layoutDirection, this)
             val rim = Brush.verticalGradient(listOf(
-                Color.White.copy(alpha = if (dark) .22f else .96f),
-                Color.White.copy(alpha = if (dark) .08f else .56f),
-                if (dark) Color(0xFF61778C).copy(alpha = .25f) else Color(0xFFC4D3E2).copy(alpha = .65f)))
+                Color.White.copy(alpha = if (dark) .22f else .95f),
+                Color.White.copy(alpha = if (dark) .08f else .72f),
+                if (dark) Color(0xFF61778C).copy(alpha = .25f) else Color(0xFFE2E8F0).copy(alpha = .72f)))
             val ambient = Brush.radialGradient(listOf(
                 (if (accent.isSpecified) accent else if (dark) Color(0xFF2A6496) else Color(0xFF7BAFDE))
                     .copy(alpha = if (selection) .15f else .105f), Color.Transparent),
