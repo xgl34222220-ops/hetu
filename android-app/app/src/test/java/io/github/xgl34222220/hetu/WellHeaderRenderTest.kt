@@ -9,8 +9,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.SemanticsActions
-import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.*
@@ -31,42 +29,66 @@ import java.io.File
 class WellHeaderRenderTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
-    @Test fun compactMeasureActionNeverConsumesWeightedTitleWidth() {
+    @Test fun referenceNodeGridKeepsTwoColumnsUntilAccessibilityNeedsOne() {
         var width by mutableIntStateOf(360)
         var scale by mutableFloatStateOf(1f)
-        val group=ProxyGroupUi("AI 平台", "Selector", "日本节点", listOf(
-            ProxyNodeUi("美国节点", "URLTest"),ProxyNodeUi("日本节点", "URLTest")))
+        val group=ProxyGroupUi("AI 平台","Selector","日本节点",listOf(
+            ProxyNodeUi("美国节点", "Vless", true),
+            ProxyNodeUi("日本节点超级长名称用于自动缩放", "Trojan", false),
+            ProxyNodeUi("新加坡节点", "Vless", true),
+            ProxyNodeUi("香港节点", "Trojan", false),
+        ))
         compose.setContent { HetuTheme {
-            CompositionLocalProvider(LocalDensity provides Density(1f,scale),LocalHetuMotionEnabled provides false) {
-                Column(Modifier.width(width.dp).background(LocalHetuTokens.current.pageBackground).padding(16.dp).testTag("well-render-root")) {
-                    LiquidGroupWell(group,"日本节点",mapOf("美国节点" to 245L,"日本节点" to 87L),emptyMap(),{},{},{})
+            CompositionLocalProvider(
+                LocalDensity provides Density(1f,scale),
+                LocalHetuMotionEnabled provides false,
+            ) {
+                Column(
+                    Modifier.width(width.dp).background(LocalHetuTokens.current.pageBackground)
+                        .padding(16.dp).testTag("well-render-root"),
+                ) {
+                    LiquidGroupWell(
+                        group,"日本节点",
+                        mapOf("美国节点" to 245L,"日本节点超级长名称用于自动缩放" to 87L),
+                        emptyMap(),{},{},{},
+                    )
                 }
             }
         } }
-        for(w in listOf(320,360,412)) for(f in listOf(1f,1.3f,1.5f)) {
-            compose.runOnIdle { width=w; scale=f }
+
+        for(w in listOf(320,360,412)) {
+            compose.runOnIdle { width=w; scale=1f }
             compose.waitForIdle()
-            val title=compose.onNodeWithTag("well-title:AI 平台",true)
-            val layouts=mutableListOf<TextLayoutResult>()
-            title.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
-            assertEquals("Title unexpectedly wrapped at $w/$f",1,layouts.single().lineCount)
-            assertFalse("Title clipped at $w/$f",layouts.single().hasVisualOverflow)
-            val titleBounds=title.fetchSemanticsNode().boundsInRoot
-            val actionBounds=compose.onNodeWithTag("well-testall:AI 平台",true).fetchSemanticsNode().boundsInRoot
-            assertTrue("Accessory consumed header width at $w/$f",actionBounds.width < w*.5f)
-            assertTrue("Title/action overlap at $w/$f",titleBounds.right <= actionBounds.left+.5f)
-            if(w==360 && f==1f) {
-                val bounds=compose.onNodeWithTag("well-render-root",true).fetchSemanticsNode().boundsInWindow
-                val image=compose.runOnIdle {
-                    val decor=compose.activity.window.decorView
-                    val xy=IntArray(2).also { decor.getLocationInWindow(it) }
-                    Bitmap.createBitmap(kotlin.math.ceil(bounds.width).toInt(),kotlin.math.ceil(bounds.height).toInt(),Bitmap.Config.ARGB_8888).also {
-                        val canvas=Canvas(it); canvas.translate(xy[0]-bounds.left,xy[1]-bounds.top); decor.draw(canvas)
-                    }
-                }
-                val file=File("build/reports/ui-audit/liquid-header-360-verified.png").apply { parentFile.mkdirs() }
-                file.outputStream().use { image.compress(Bitmap.CompressFormat.PNG,100,it) }
+            val left=compose.onNodeWithTag("node:美国节点",true).fetchSemanticsNode().boundsInRoot
+            val right=compose.onNodeWithTag("node:日本节点超级长名称用于自动缩放",true).fetchSemanticsNode().boundsInRoot
+            assertEquals("Reference first row must align",left.top,right.top,.5f)
+            assertTrue("Reference node grid lost its right column",right.left>left.right)
+            compose.onNodeWithText("日本节点超级长名称用于自动缩放",true).assertExists()
+        }
+
+        compose.runOnIdle { width=360; scale=1.5f }
+        compose.waitForIdle()
+        val first=compose.onNodeWithTag("node:美国节点",true).fetchSemanticsNode().boundsInRoot
+        val second=compose.onNodeWithTag("node:日本节点超级长名称用于自动缩放",true).fetchSemanticsNode().boundsInRoot
+        assertTrue("Accessibility font scale should stack node cards",second.top>first.bottom)
+
+        compose.runOnIdle { width=360; scale=1f }
+        compose.waitForIdle()
+        val bounds=compose.onNodeWithTag("well-render-root",true).fetchSemanticsNode().boundsInWindow
+        val image=compose.runOnIdle {
+            val decor=compose.activity.window.decorView
+            val xy=IntArray(2).also { decor.getLocationInWindow(it) }
+            Bitmap.createBitmap(
+                kotlin.math.ceil(bounds.width).toInt(),
+                kotlin.math.ceil(bounds.height).toInt(),
+                Bitmap.Config.ARGB_8888,
+            ).also {
+                val canvas=Canvas(it)
+                canvas.translate(xy[0]-bounds.left,xy[1]-bounds.top)
+                decor.draw(canvas)
             }
         }
+        val file=File("build/reports/ui-audit/liquid-grid-156785.png").apply { parentFile?.mkdirs() }
+        file.outputStream().use { image.compress(Bitmap.CompressFormat.PNG,100,it) }
     }
 }
