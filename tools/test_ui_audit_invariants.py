@@ -56,7 +56,7 @@ refhome = (src / "ReferenceProxyActivity.kt").read_text()
 assert "Color(0xFFF4F6F9)" in theme and "Color(0xFF0F172A)" in theme
 assert "RoundedCornerShape(24.dp)" in main and "LiquidStatusGlyph(state.running, busy)" in main
 assert ".size(48.dp)" in liquid and "shape = CircleShape" in liquid
-assert ".height(112.dp)" in liquid and ".height(64.dp)" in liquid
+assert ".height(132.dp)" in liquid and ".height(64.dp)" in liquid
 assert '.size(48.dp).testTag("strategy-delay:' in liquid
 assert '.padding(end = 4.dp).size(48.dp)' in liquid and '.testTag("node-delay:' in liquid
 assert 'modifier = Modifier.testTag("home-run-state")' in refhome
@@ -74,7 +74,7 @@ assert ".border(" in crystal and "1.dp" in crystal
 assert "if (crystal) {" in crystal and "Box(modifier.crystalMaterial(shape))" in crystal
 assert "MaterialSurface(modifier = if (crystal)" not in crystal
 assert ".size(32.dp)" in liquid and "RoundedCornerShape(10.dp)" in liquid
-assert ".height(112.dp)" in liquid and ".height(64.dp)" in liquid
+assert ".height(132.dp)" in liquid and ".height(64.dp)" in liquid
 assert "animateContentSize" in liquid and "Spring.DampingRatioLowBouncy" in liquid and "Spring.StiffnessLow" in liquid
 assert "Spring.DampingRatioLowBouncy" in nonhome and "Spring.StiffnessLow" in nonhome
 assert ".height(InstrumentSlots.height())" in instrument
