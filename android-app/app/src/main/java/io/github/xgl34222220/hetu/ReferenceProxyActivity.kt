@@ -771,6 +771,7 @@ internal fun RefHome(
                                 )
                                 Text(
                                     if (busy) "正在处理" else if (state.running) "运行中" else "已停止",
+                                    modifier = Modifier.testTag("home-run-state"),
                                     color = t.textPrimary,
                                     fontSize = 19.sp,
                                     lineHeight = 24.sp,

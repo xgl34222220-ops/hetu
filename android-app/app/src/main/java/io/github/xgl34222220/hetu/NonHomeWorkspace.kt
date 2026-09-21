@@ -73,7 +73,10 @@ internal fun WorkspaceRefreshAction(label: String, refreshing: Boolean, success:
     val phase = when { refreshing -> "loading"; error -> "failed"; success -> "success"; else -> "idle" }
     val motion = LocalHetuMotionEnabled.current
     IconButton(onClick = onClick, enabled = !refreshing,
-        modifier = modifier.size(48.dp).testTag("refresh:$label").semantics { stateDescription = phase }) {
+        modifier = modifier.size(48.dp).testTag("refresh:$label").semantics {
+            contentDescription = "$label $actionLabel"
+            stateDescription = phase
+        }) {
         Box(Modifier.size(30.dp).background(MaterialTheme.colorScheme.primary.copy(alpha = .07f), CircleShape),
             contentAlignment = Alignment.Center) {
             AnimatedContent(phase, transitionSpec = {
@@ -81,7 +84,7 @@ internal fun WorkspaceRefreshAction(label: String, refreshing: Boolean, success:
             }, label = "refresh-phase") { state ->
                 if (state == "loading") HetuBusyIndicator(Modifier.size(18.dp))
                 else Icon(when(state) { "success" -> Icons.Rounded.Check; "failed" -> Icons.Rounded.ErrorOutline; else -> Icons.Rounded.Refresh },
-                    "$label ${if(state == "success") "更新完成" else actionLabel}", Modifier.size(18.dp),
+                    null, Modifier.size(18.dp),
                     tint = when(state) { "success" -> t.success; "failed" -> t.danger; else -> MaterialTheme.colorScheme.primary })
             }
         }
@@ -97,26 +100,28 @@ internal fun WorkspaceAccordion(visible: Boolean, content: @Composable AnimatedV
         stiffness = Spring.StiffnessLow,
     )
     val fadeDuration = if (motion) 150 else 0
-    AnimatedVisibility(
-        visible = visible,
-        enter = if (motion) {
-            expandVertically(
-                animationSpec = springSpec,
-                expandFrom = Alignment.Top,
-                clip = true,
-            ) + fadeIn(tween(fadeDuration))
-        } else {
-            expandVertically(tween(0), expandFrom = Alignment.Top, clip = true)
-        },
-        exit = if (motion) {
-            shrinkVertically(
-                animationSpec = springSpec,
-                shrinkTowards = Alignment.Top,
-                clip = true,
-            ) + fadeOut(tween(fadeDuration))
-        } else {
-            shrinkVertically(tween(0), shrinkTowards = Alignment.Top, clip = true)
-        },
-        content = content,
-    )
+    key(motion) {
+        AnimatedVisibility(
+            visible = visible,
+            enter = if (motion) {
+                expandVertically(
+                    animationSpec = springSpec,
+                    expandFrom = Alignment.Top,
+                    clip = true,
+                ) + fadeIn(tween(fadeDuration))
+            } else {
+                expandVertically(tween(0), expandFrom = Alignment.Top, clip = true)
+            },
+            exit = if (motion) {
+                shrinkVertically(
+                    animationSpec = springSpec,
+                    shrinkTowards = Alignment.Top,
+                    clip = true,
+                ) + fadeOut(tween(fadeDuration))
+            } else {
+                shrinkVertically(tween(0), shrinkTowards = Alignment.Top, clip = true)
+            },
+            content = content,
+        )
+    }
 }

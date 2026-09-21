@@ -132,7 +132,13 @@ internal fun LiquidStrategyCard(group: ProxyGroupUi, selected: String, expanded:
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            LatencyChip(value, testing, onDelay, Modifier.testTag("strategy-delay:${group.name}"), compact = true)
+            Box(
+                Modifier.size(48.dp).testTag("strategy-delay:${group.name}")
+                    .clickable(enabled = !testing, role = Role.Button, onClickLabel = "测速", onClick = onDelay),
+                contentAlignment = Alignment.Center,
+            ) {
+                LatencyChip(value, testing, compact = true)
+            }
             Spacer(Modifier.width(4.dp))
             Icon(
                 Icons.Rounded.KeyboardArrowDown,
@@ -207,13 +213,14 @@ internal fun LiquidNodeCard(node: ProxyNodeUi, active: Boolean, value: Long?, te
                 )
             }
         }
-        LatencyChip(
-            value,
-            testing,
-            onDelay,
-            Modifier.align(Alignment.CenterEnd).padding(end = 4.dp).testTag("node-delay:${node.name}"),
-            compact = true,
-        )
+        Box(
+            Modifier.align(Alignment.CenterEnd).padding(end = 4.dp).size(48.dp)
+                .testTag("node-delay:${node.name}")
+                .clickable(enabled = !testing, role = Role.Button, onClickLabel = "测速", onClick = onDelay),
+            contentAlignment = Alignment.Center,
+        ) {
+            LatencyChip(value, testing, compact = true)
+        }
         if (active) {
             Icon(
                 Icons.Rounded.CheckCircle,

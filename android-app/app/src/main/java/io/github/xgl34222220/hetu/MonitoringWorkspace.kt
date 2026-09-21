@@ -230,8 +230,11 @@ internal fun SubscriptionBoardingTicket(name: String, provider: DashboardProvide
                 lineHeight = 16.sp,
                 maxLines = 1,
             )
-            IconButton(onClick = onEdit, modifier = Modifier.size(36.dp)) {
-                Icon(Icons.Rounded.Edit, "编辑 $name", Modifier.size(16.dp), tint = t.textMuted)
+            IconButton(
+                onClick = onEdit,
+                modifier = Modifier.size(36.dp).semantics { contentDescription = "编辑 $name" },
+            ) {
+                Icon(Icons.Rounded.Edit, null, Modifier.size(16.dp), tint = t.textMuted)
             }
         }
         if (known && provider != null) {

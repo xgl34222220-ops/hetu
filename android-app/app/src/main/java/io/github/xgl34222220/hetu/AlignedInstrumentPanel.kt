@@ -56,9 +56,9 @@ internal fun instrumentUploadShare(up: Long, down: Long): Float? {
 
 /** One geometry source for both cell contents and their enclosing row. */
 private object InstrumentSlots {
-    val header = 16.sp
+    val header = 18.sp
     val value = 20.sp
-    val support = 16.sp
+    val support = 18.sp
     val gap = 3.dp
     val padding = 7.dp
     val rail = 3.dp
