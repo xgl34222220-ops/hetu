@@ -380,7 +380,7 @@ internal fun LiquidPill(text: String, icon: ImageVector, onClick: () -> Unit, mo
 
 @Composable
 internal fun LiquidHomeActions(running: Boolean, busy: Boolean, onToggle: () -> Unit, onReload: () -> Unit, onRestart: () -> Unit) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         LiquidPill(
             "重载",
             Icons.Rounded.Refresh,
@@ -413,9 +413,9 @@ internal fun LiquidStatusGlyph(running: Boolean, busy: Boolean) {
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     Box(
         Modifier
-            .size(48.dp)
+            .size(46.dp)
             .shadow(
-                elevation = if (running && !busy) 12.dp else 2.dp,
+                elevation = if (running && !busy) 10.dp else 2.dp,
                 shape = CircleShape,
                 ambientColor = kleinBlue.copy(alpha = .12f),
                 spotColor = kleinBlue.copy(alpha = .35f),
@@ -438,7 +438,7 @@ internal fun LiquidStatusGlyph(running: Boolean, busy: Boolean) {
             Icon(
                 if (running) Icons.Rounded.Check else Icons.Rounded.PowerSettingsNew,
                 null,
-                Modifier.size(if (running) 28.dp else 23.dp),
+                Modifier.size(if (running) 26.dp else 23.dp),
                 tint = if (running) Color.White else primary,
             )
         }
