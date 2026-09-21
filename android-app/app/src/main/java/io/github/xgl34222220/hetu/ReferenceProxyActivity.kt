@@ -729,10 +729,10 @@ internal fun RefHome(
     LazyColumn(
         Modifier.fillMaxSize().statusBarsPadding(),
         contentPadding = PaddingValues(
-            start = 16.dp, top = 8.dp, end = 16.dp,
+            start = 16.dp, top = 4.dp, end = 16.dp,
             bottom = hetuContentBottomPadding(),
         ),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item(key = "home-title") {
             Row(
@@ -740,8 +740,8 @@ internal fun RefHome(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text("河图", color = t.textPrimary, fontSize = 22.sp, lineHeight = 28.sp,
-                        fontWeight = FontWeight.Bold, letterSpacing = (-.7).sp)
+                    Text("河图", color = t.textPrimary, fontSize = 26.sp, lineHeight = 32.sp,
+                        fontWeight = FontWeight.ExtraBold, letterSpacing = (-.9).sp)
                 }
                 LiquidHomeMenu(onLog, onConnections, onDiagnostics, {
                     context.startActivity(Intent(context, ProxyAdblockChainActivity::class.java))
@@ -755,7 +755,7 @@ internal fun RefHome(
                 modifier = refHomeLiquidModifier(Modifier.fillMaxWidth(), hazeState, glassEnabled, shape),
                 shape = shape, color = Color.Transparent,
             ) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
+                Column(Modifier.padding(horizontal = 14.dp, vertical = 13.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                         LiquidStatusGlyph(state.running, busy)
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -770,29 +770,58 @@ internal fun RefHome(
                         }
                     }
                     Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 3.dp),
+                        Modifier.fillMaxWidth().heightIn(min = 34.dp).padding(horizontal = 1.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Icon(Icons.Rounded.Description, null, Modifier.size(18.dp), tint = t.textSecondary)
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text("当前配置", color = t.textSecondary, style = MaterialTheme.typography.labelMedium)
-                            Text(state.config, color = t.textPrimary, style = MaterialTheme.typography.bodyMedium,
-                                maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Box(
+                            Modifier.size(28.dp).background(t.controlBackground.copy(alpha = .52f), RoundedCornerShape(9.dp)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(Icons.Rounded.Description, null, Modifier.size(15.dp), tint = t.textSecondary)
                         }
+                        Text("配置", color = t.textMuted, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            state.config,
+                            Modifier.weight(1f),
+                            color = t.textPrimary,
+                            fontSize = 12.5.sp,
+                            lineHeight = 17.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
                     if (busy || message.isNotBlank()) {
                         HetuTaskFeedback(operation.ifBlank { message },
                             error = !busy && (message.contains("失败") || message.contains("异常") || message.contains("error", true)),
                             busy = busy)
                     }
-                    if (state.running && (state.runtimeSettingsPending || context.getSharedPreferences("hetu", 0).getBoolean("proxyRootRuntimeRefreshPending", false))) {
-                        Surface(onClick = onSettings, color = t.warning.copy(alpha = .10f), shape = RoundedCornerShape(12.dp)) {
-                            Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Icon(Icons.Rounded.Info, null, Modifier.size(18.dp), tint = t.warning)
-                                Text("运行组件或设置待应用，请手动重启", Modifier.weight(1f), color = t.textPrimary, style = MaterialTheme.typography.bodySmall)
-                                Icon(Icons.Rounded.ChevronRight, null, Modifier.size(18.dp), tint = t.textSecondary)
+                    if (state.running && state.runtimeSettingsPending) {
+                        val runtimeRefreshPending = context.getSharedPreferences("hetu", 0)
+                            .getBoolean("proxyRootRuntimeRefreshPending", false)
+                        Surface(
+                            onClick = onSettings,
+                            color = t.warning.copy(alpha = .075f),
+                            shape = RoundedCornerShape(14.dp),
+                            shadowElevation = 0.dp,
+                        ) {
+                            Row(
+                                Modifier.fillMaxWidth().heightIn(min = 40.dp).padding(horizontal = 11.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(7.dp),
+                            ) {
+                                Icon(Icons.Rounded.Info, null, Modifier.size(16.dp), tint = t.warning)
+                                Text(
+                                    if (runtimeRefreshPending) "运行组件已更新，重启后应用"
+                                    else "运行设置已修改，重启后生效",
+                                    Modifier.weight(1f),
+                                    color = t.textPrimary,
+                                    fontSize = 11.5.sp,
+                                    lineHeight = 16.sp,
+                                    fontWeight = FontWeight.Medium,
+                                )
+                                Icon(Icons.Rounded.ChevronRight, null, Modifier.size(16.dp), tint = t.textMuted)
                             }
                         }
                     }
@@ -860,7 +889,7 @@ private fun RefHomeShortcut(
     Surface(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.height(52.dp).crystalMaterial(shape, depth = CrystalDepth.InsetItem),
+        modifier = modifier.height(48.dp).crystalMaterial(shape, depth = CrystalDepth.InsetItem),
         shape = shape,
         color = Color.Transparent,
         shadowElevation = 0.dp,
@@ -871,25 +900,25 @@ private fun RefHomeShortcut(
             horizontalArrangement = Arrangement.spacedBy(9.dp),
         ) {
             Box(
-                Modifier.size(30.dp).background(primary.copy(alpha = .085f), RoundedCornerShape(10.dp)),
+                Modifier.size(28.dp).background(primary.copy(alpha = .075f), RoundedCornerShape(9.dp)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(icon, null, Modifier.size(18.dp), tint = primary)
+                Icon(icon, null, Modifier.size(16.dp), tint = primary)
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 Text(
                     title,
                     color = if (enabled) t.textPrimary else t.textMuted,
-                    fontSize = 13.sp,
-                    lineHeight = 17.sp,
+                    fontSize = 12.5.sp,
+                    lineHeight = 16.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                 )
                 Text(
                     subtitle,
                     color = t.textSecondary,
-                    fontSize = 10.5.sp,
-                    lineHeight = 14.sp,
+                    fontSize = 10.sp,
+                    lineHeight = 13.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -918,11 +947,11 @@ private fun RefLatencyPanel(
         shadowElevation = 0.dp,
     ) {
         Column(
-            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 13.dp),
-            verticalArrangement = Arrangement.spacedBy(9.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("网络延迟", color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                Text("网络延迟", color = t.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                 TextButton(onClick = onClick, enabled = !testing, modifier = Modifier.heightIn(min = 48.dp)) {
                     if (testing) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                     else Icon(Icons.Rounded.Speed, null, Modifier.size(18.dp))
@@ -941,7 +970,7 @@ private fun RefLatencyPanel(
 
 @Composable
 private fun RefLatencyColumn(label: String, value: Long?, testing: Boolean, modifier: Modifier) {
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) {
         Text(label, color = LocalHetuTokens.current.textSecondary, fontSize = 12.sp, lineHeight = 17.sp)
         LatencyChip(value, testing)
     }
@@ -3220,6 +3249,7 @@ private fun RefSettings(state: ProxyComposeState, operation: String, onApplySett
             onSelect = { index ->
                 val mode = choices[index]
                 prefs.edit().putString("proxyBaseMode", mode.id).apply()
+                ProxyRuntimeSettings.markDirty(prefs, "proxyBaseMode")
                 modePicker = false
                 android.widget.Toast.makeText(
                     context,
@@ -3246,6 +3276,7 @@ private fun RefSettings(state: ProxyComposeState, operation: String, onApplySett
             onSelect = { index ->
                 val value = values[index].first
                 prefs.edit().putString("proxyBaseIpv6", value.id).apply()
+                ProxyRuntimeSettings.markDirty(prefs, "proxyBaseIpv6")
                 ipv6Picker = false
                 android.widget.Toast.makeText(
                     context,
