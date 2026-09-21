@@ -640,7 +640,11 @@ final class RootProxyManager {
                 .putInt("proxyAdblockLastRuleCount",p.adblock==null?0:p.adblock.count)
                 .putString("proxyAdblockLastRevision",p.adblock==null?"":p.adblock.revision)
                 .putString("proxyRootTopologyFingerprint",topologyFingerprint(profile,policy))
-                .putString("proxyRootAppliedSettings",p.settingsSignature)
+                // A completed network transaction consumes the user's current settings snapshot.
+                // Runtime fallbacks (for example adblock-chain degradation) are reported through
+                // their own effective/error fields; they must not create an endless "restart again"
+                // loop by leaving the generic settings signature permanently different.
+                .putString("proxyRootAppliedSettings",ProxyRuntimeSettings.signature(prefs))
                 .putString("proxyRootEffectiveIpv6",profile.ipv6.id)
                 .putLong("proxyRootHealthProbeElapsed",0L)
                 .putString("proxyRootValidatedFingerprint",validationKey)
