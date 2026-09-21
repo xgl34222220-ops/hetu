@@ -118,6 +118,7 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
     fun proxyApps(): Set<String> = prefs.getStringSet("proxyAppPackages", emptySet()).orEmpty().toSet()
     fun saveProxyApps(next: Set<String>) {
         prefs.edit().putStringSet("proxyAppPackages", next.toSet()).apply()
+        ProxyRuntimeSettings.markDirty(prefs, "proxyAppPackages")
     }
     fun setProxyApp(packageName: String, enabled: Boolean) {
         val next = proxyApps().toMutableSet()
@@ -194,6 +195,7 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
                 onSelect = { next ->
                     appScopeId = next
                     prefs.edit().putString("proxyAppScope", next).apply()
+                    ProxyRuntimeSettings.markDirty(prefs, "proxyAppScope")
                 },
             )
         }
@@ -440,6 +442,7 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
                                 error = failure
                             } else {
                                 prefs.edit().putStringSet("proxyDirectGids", parsed).apply()
+                                ProxyRuntimeSettings.markDirty(prefs, "proxyDirectGids")
                                 gidRules = parsed
                                 showGidRules = false
                             }
