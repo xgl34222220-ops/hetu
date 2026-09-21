@@ -118,7 +118,7 @@ class NonHomeAlignmentTest {
             }
         } } }
         val original=bounds("refresh:${p.name}")
-        assertEquals(18.sp,layout("ticket-remaining:${p.name}").layoutInput.style.fontSize)
+        assertEquals(14.sp,layout("ticket-remaining:${p.name}").layoutInput.style.fontSize)
         for(phase in listOf("loading","success","failed","idle")) {
             compose.runOnIdle { busy=phase=="loading";ok=phase=="success";error=if(phase=="failed")"HTTP 503" else "" };compose.waitForIdle()
             assertEquals(original,bounds("refresh:${p.name}"))
