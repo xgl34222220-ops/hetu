@@ -194,7 +194,11 @@ class ProxyStatusNotificationService : Service() {
     }
 
     private fun ensureForeground(text: String) {
-        val notification = buildNotification("河图 · 代理状态", text, ProxyStatusBridge.rootProxyRunning(this))
+        val notification = buildNotification(
+            "河图 · 代理状态",
+            text,
+            prefs.getBoolean("proxyRootRuntimeRunning", false) && prefs.getBoolean("proxyRootWanted", false),
+        )
         if (Build.VERSION.SDK_INT >= 34) {
             startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         } else {
