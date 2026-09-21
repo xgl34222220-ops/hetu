@@ -307,6 +307,7 @@ internal class ProxyComposeController(context: Context) {
         val profile = ProxyRuntimeProfile.load(prefs)
         val result = root.replaceRunningManually(profile, onProgress)
         prefs.edit()
+            .putString("proxyRootAppliedSettings", ProxyRuntimeSettings.signature(prefs))
             .remove("proxyRootRuntimeRefreshPending")
             .remove("proxyRootUpgradeError")
             .apply()
