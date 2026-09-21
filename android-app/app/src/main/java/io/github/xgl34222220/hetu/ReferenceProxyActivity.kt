@@ -750,7 +750,7 @@ internal fun RefHome(
             }
         }
         item(key = "home-status") {
-            val shape = RoundedCornerShape(20.dp)
+            val shape = RoundedCornerShape(24.dp)
             Surface(
                 modifier = refHomeLiquidModifier(Modifier.fillMaxWidth(), hazeState, glassEnabled, shape),
                 shape = shape, color = Color.Transparent,
