@@ -26,10 +26,10 @@ import io.github.xgl34222220.hetu.ui.*
 /** Shared non-home geometry. Longer text grows downwards; it never recentres the title. */
 internal object WorkspaceMetrics {
     val gutter = 16.dp
-    val icon = 36.dp
-    val iconGap = 12.dp
+    val icon = 28.dp
+    val iconGap = 16.dp
     val textInset = gutter + icon + iconGap
-    val rowMinimum = 76.dp
+    val rowMinimum = 70.dp
     val tap = 48.dp
     val easing = CubicBezierEasing(.16f, 1f, .30f, 1f)
 }
@@ -40,20 +40,18 @@ internal fun WorkspaceSettingRow(title: String, supporting: String, icon: ImageV
     val t = LocalHetuTokens.current
     Row(modifier.fillMaxWidth().heightIn(min = WorkspaceMetrics.rowMinimum)
         .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
-        .padding(horizontal = WorkspaceMetrics.gutter, vertical = 14.dp),
-        verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(WorkspaceMetrics.iconGap)) {
+        .padding(horizontal = WorkspaceMetrics.gutter, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(WorkspaceMetrics.iconGap)) {
         Box(Modifier.size(WorkspaceMetrics.icon), contentAlignment = Alignment.Center) {
-            if (icon != null) Box(Modifier.fillMaxSize().background(
-                MaterialTheme.colorScheme.primary.copy(alpha = .065f),
-                androidx.compose.foundation.shape.RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
-                Icon(icon, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+            if (icon != null) {
+                Icon(icon, null, Modifier.size(24.dp), tint = t.textPrimary)
             }
         }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(title, Modifier.fillMaxWidth().testTag("setting-title:$title"), color = t.textPrimary,
-                fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold)
+                fontSize = 16.sp, lineHeight = 21.sp, fontWeight = FontWeight.Bold)
             if (supporting.isNotBlank()) Text(supporting, Modifier.fillMaxWidth().testTag("setting-support:$title"),
-                color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+                color = t.textSecondary, fontSize = 12.5.sp, lineHeight = 17.sp, fontWeight = FontWeight.SemiBold)
         }
         Box(Modifier.widthIn(max = 96.dp).heightIn(min = WorkspaceMetrics.tap), contentAlignment = Alignment.TopEnd) { trailing() }
     }
@@ -62,7 +60,7 @@ internal fun WorkspaceSettingRow(title: String, supporting: String, icon: ImageV
 @Composable
 internal fun WorkspaceInsetDivider() {
     HorizontalDivider(Modifier.padding(start = WorkspaceMetrics.textInset, end = WorkspaceMetrics.gutter),
-        thickness = .5.dp, color = LocalHetuTokens.current.textMuted.copy(alpha = .14f))
+        thickness = .5.dp, color = LocalHetuTokens.current.textMuted.copy(alpha = .08f))
 }
 
 /** One 48dp action slot for every refresh state; no success/failure popup or shifting label. */
