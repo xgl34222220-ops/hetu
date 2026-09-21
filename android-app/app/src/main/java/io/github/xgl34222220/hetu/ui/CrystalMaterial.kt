@@ -81,16 +81,16 @@ fun Modifier.crystalMaterial(
     val primary = MaterialTheme.colorScheme.primary
     val dark = t.pageBackground.luminance() < .5f
     val radius = when (depth) { CrystalDepth.Popover -> 24.dp; CrystalDepth.InsetItem, CrystalDepth.Sunken -> 12.dp; else -> 20.dp }
-    val topAlpha = when (depth) { CrystalDepth.Popover -> .75f; CrystalDepth.InsetItem -> .85f; CrystalDepth.Sunken -> .78f; else -> .96f }
-    val bottomAlpha = when (depth) { CrystalDepth.Popover -> .65f; CrystalDepth.InsetItem -> .74f; CrystalDepth.Sunken -> .78f; else -> .85f }
+    val topAlpha = when (depth) { CrystalDepth.Popover -> .72f; CrystalDepth.InsetItem -> .68f; CrystalDepth.Sunken -> .72f; else -> .82f }
+    val bottomAlpha = when (depth) { CrystalDepth.Popover -> .60f; CrystalDepth.InsetItem -> .56f; CrystalDepth.Sunken -> .70f; else -> .68f }
     val accent = if (selection) primary else if (tint.isSpecified && tint.alpha > .05f) tint else Color.Unspecified
-    val upper = if (dark) Color(0xFF283543).copy(alpha = .87f) else (if (depth == CrystalDepth.Sunken) Color(0xFFEEF2F6) else Color.White).copy(alpha = topAlpha)
-    val lower = if (dark) Color(0xFF18232F).copy(alpha = .78f) else (if (depth == CrystalDepth.Sunken) Color(0xFFEEF2F6) else Color(0xFFF8FAFE)).copy(alpha = bottomAlpha)
+    val upper = if (dark) Color(0xFF283543).copy(alpha = .82f) else (if (depth == CrystalDepth.Sunken) Color(0xFFEEF2F6) else Color(0xFFFBFDFF)).copy(alpha = topAlpha)
+    val lower = if (dark) Color(0xFF18232F).copy(alpha = .72f) else (if (depth == CrystalDepth.Sunken) Color(0xFFEEF2F6) else Color(0xFFF3F7FB)).copy(alpha = bottomAlpha)
     val fill = Brush.verticalGradient(listOf(upper, lower))
     // Suppress Haze's default opaque tint; the translucent fill above is the only wash.
     val style = HazeStyle(backgroundColor = Color.Transparent, tints = emptyList(), blurRadius = radius,
         noiseFactor = .005f, fallbackTint = HazeTint(Color.Transparent))
-    val shadowSize = when(depth) { CrystalDepth.Popover -> 14.dp; CrystalDepth.InsetItem -> 2.dp; CrystalDepth.Sunken -> 0.dp; else -> 7.dp }
+    val shadowSize = when(depth) { CrystalDepth.Popover -> 12.dp; CrystalDepth.InsetItem -> 1.dp; CrystalDepth.Sunken -> 0.dp; else -> 5.dp }
     val blur = if (blurEnabled && backdrop != null) Modifier.hazeEffect(backdrop, style) {
         canDrawArea = { true }
     } else Modifier
