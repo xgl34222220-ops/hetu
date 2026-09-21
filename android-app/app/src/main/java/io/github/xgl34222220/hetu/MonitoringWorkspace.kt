@@ -200,13 +200,22 @@ internal fun SubscriptionBoardingTicket(name: String, provider: DashboardProvide
     var details by rememberSaveable(name) { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().crystalMaterial(RoundedCornerShape(22.dp), tint = primary)
         .testTag("subscription-ticket:$name").padding(WorkspaceMetrics.gutter), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(name, Modifier.weight(1f).testTag("ticket-title:$name"), color = t.textPrimary,
-                fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.Bold)
-            if (known && provider != null) Box(Modifier.background(primary.copy(alpha = .09f), CircleShape)
-                .padding(horizontal = 8.dp, vertical = 4.dp).testTag("ticket-badge:$name")) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(name, Modifier.testTag("ticket-title:$name"), color = t.textPrimary,
+                fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
+            Box(Modifier.background(Color(0xFFEFF6FF), RoundedCornerShape(6.dp))
+                .padding(horizontal = 6.dp, vertical = 2.dp).testTag("ticket-nodes:$name")) {
+                Text(
+                    if (provider != null) "${provider.nodes.size} 节点" else if (placeholder) "待填写" else "订阅",
+                    color = if (placeholder) t.warning else primary, fontSize = 10.5.sp,
+                    lineHeight = 14.sp, fontWeight = FontWeight.Bold,
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            if (known && provider != null) Box(Modifier.background(Color(0xFFEFF6FF), CircleShape)
+                .padding(horizontal = 7.dp, vertical = 2.dp).testTag("ticket-badge:$name")) {
                 Text("剩余 ${((1f - provider.ratio) * 100f).toInt()}%", color = primary, fontSize = 11.sp,
-                    lineHeight = 16.sp, fontWeight = FontWeight.SemiBold)
+                    lineHeight = 15.sp, fontWeight = FontWeight.ExtraBold)
             }
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -227,7 +236,7 @@ internal fun SubscriptionBoardingTicket(name: String, provider: DashboardProvide
                 Text("剩余流量", Modifier.alignByBaseline(), color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
                 HetuNumber(refBytes(provider.remaining), Modifier.weight(1f).alignByBaseline().testTag("ticket-remaining:$name"),
                     style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp, lineHeight = 24.sp,
-                        fontWeight = FontWeight.Bold), color = primary)
+                        fontWeight = FontWeight.ExtraBold), color = t.textPrimary, monospaced = true)
             }
             InstrumentProgress(provider.ratio, Modifier.testTag("ticket-progress:$name"))
             HetuNumber("已用 ${refBytes(provider.used)} / ${refBytes(provider.total)}",
