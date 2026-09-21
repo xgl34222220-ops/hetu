@@ -184,8 +184,9 @@ final class RootProxyPolicy {
         if (values.size() > MAX_DIRECT_GID_RANGES)
             throw new IOException("GID 直连列表超过 " + MAX_DIRECT_GID_RANGES + " 项");
         TreeSet<String> out = new TreeSet<>((a, b) -> {
-            long aa = Long.parseLong(a.substringBefore("-"));
-            long bb = Long.parseLong(b.substringBefore("-"));
+            int ai = a.indexOf('-'), bi = b.indexOf('-');
+            long aa = Long.parseLong(ai < 0 ? a : a.substring(0, ai));
+            long bb = Long.parseLong(bi < 0 ? b : b.substring(0, bi));
             int cmp = Long.compare(aa, bb);
             return cmp != 0 ? cmp : a.compareTo(b);
         });
