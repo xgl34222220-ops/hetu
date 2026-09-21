@@ -88,6 +88,7 @@ private fun AppScopeSegmentedControl(selected: String, onSelect: (String) -> Uni
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ProxyAppSelectionPage(onBack: () -> Unit) {
     val context = LocalContext.current
@@ -313,6 +314,8 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
                 }
             }
         }
+    }
+
     if (showBatchActions) {
         ModalBottomSheet(
             onDismissRequest = { showBatchActions = false },
@@ -358,6 +361,5 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
                 }
             }
         }
-    }
     }
 }
