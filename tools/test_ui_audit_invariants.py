@@ -28,4 +28,12 @@ assert "expandedGroup ?: closingGroup" in main
 assert "LiquidConfigIndicator(config.selected)" in (src / "ProxySubscriptionActivity.kt").read_text()
 for modal_free in ("ReferenceProxyActivity.kt", "AlignedInstrumentPanel.kt", "ReferenceFileManagerActivity.kt", "CompactMainActivity.kt"):
     assert "AlertDialog(" not in (src / modal_free).read_text(), f"Legacy centered AlertDialog remains in {modal_free}"
+for kt in src.rglob("*.kt"):
+    text = kt.read_text()
+    assert "AlertDialog(" not in text, f"Legacy centered AlertDialog remains in {kt.name}"
+assert "proxyDirectGids" in (src / "ProxyRuntimeSettings.java").read_text()
+assert "GID 规则" in (src / "ProxyAppSelectionActivity.kt").read_text()
+root_shell = (root / "android-app/app/src/main/assets/hetu-root.sh").read_text()
+assert "--gid-owner" in root_shell and "DIRECT_GIDS" in root_shell
+assert 'icon = Icons.Rounded.Sort' in main
 print("UI audit source/runtime invariants passed")
