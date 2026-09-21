@@ -64,6 +64,8 @@ class HomeScreenRenderTest {
             compose.onNodeWithText("停止",true).assertExists()
             compose.onNodeWithText("网络与广告过滤",true).assertDoesNotExist()
             compose.onNodeWithText("应用连接",true).assertDoesNotExist()
+            compose.onNodeWithText("WebUI",true).assertDoesNotExist()
+            compose.onNodeWithText("运行日志",true).assertDoesNotExist()
             compose.onNodeWithContentDescription("更多工具").assertExists()
             compose.onNodeWithText("↑ 实时上行", true).assertDoesNotExist()
             compose.onNodeWithText("↓ 实时下行", true).assertDoesNotExist()
