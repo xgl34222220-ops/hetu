@@ -7,6 +7,30 @@ import java.util.*;
 
 /** Compares saved network settings with the snapshot of a completed transaction. */
 final class ProxyRuntimeSettings {
+    static final String DIRTY_KEY = "proxyRootSettingsDirty";
+    private static final Set<String> RESTART_KEYS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
+            "proxyBaseCore","proxyBaseMode","proxyBaseIpv6","proxyAppScope","proxyDnsHijack",
+            "proxyBaseAutoOverwrite","proxyTcp","proxyUdp","proxyQuicBlocked","proxyCnIpDirect",
+            "proxyAdblockChain","proxySharedNetwork","proxyKillSwitch","proxyAppPackages",
+            "proxyDirectGids","proxyBypassCidrs","proxyBypassInterfaces"
+    )));
+
+    static void markDirty(SharedPreferences prefs, String key) {
+        if (prefs != null && RESTART_KEYS.contains(key)) {
+            prefs.edit().putBoolean(DIRTY_KEY, true).apply();
+        }
+    }
+
+    static void clearDirty(SharedPreferences prefs) {
+        if (prefs != null) prefs.edit().remove(DIRTY_KEY).apply();
+    }
+
+    static boolean pending(boolean running, SharedPreferences prefs) {
+        if (!running || prefs == null) return false;
+        return prefs.getBoolean(DIRTY_KEY, false) ||
+                prefs.getBoolean("proxyRootRuntimeRefreshPending", false);
+    }
+
     static String signature(SharedPreferences prefs) {
         return signature(ProxyRuntimeProfile.load(prefs), prefs.getAll());
     }
