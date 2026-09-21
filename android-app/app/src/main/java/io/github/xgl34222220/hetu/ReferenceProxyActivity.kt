@@ -906,11 +906,11 @@ private fun RefHomeShortcut(
 ) {
     val t = LocalHetuTokens.current
     val primary = MaterialTheme.colorScheme.primary
-    val shape = RoundedCornerShape(17.dp)
+    val shape = RoundedCornerShape(18.dp)
     Surface(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.height(48.dp).crystalMaterial(shape, depth = CrystalDepth.InsetItem),
+        modifier = modifier.height(58.dp).crystalMaterial(shape, depth = CrystalDepth.Card),
         shape = shape,
         color = Color.Transparent,
         shadowElevation = 0.dp,
@@ -921,7 +921,7 @@ private fun RefHomeShortcut(
             horizontalArrangement = Arrangement.spacedBy(9.dp),
         ) {
             Box(
-                Modifier.size(28.dp).background(primary.copy(alpha = .075f), RoundedCornerShape(9.dp)),
+                Modifier.size(32.dp).background(Color(0xFFEFF6FF), RoundedCornerShape(9.dp)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(icon, null, Modifier.size(16.dp), tint = primary)
@@ -930,8 +930,8 @@ private fun RefHomeShortcut(
                 Text(
                     title,
                     color = if (enabled) t.textPrimary else t.textMuted,
-                    fontSize = 12.5.sp,
-                    lineHeight = 16.sp,
+                    fontSize = 13.sp,
+                    lineHeight = 17.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                 )
@@ -939,7 +939,7 @@ private fun RefHomeShortcut(
                     subtitle,
                     color = t.textSecondary,
                     fontSize = 10.sp,
-                    lineHeight = 13.sp,
+                    lineHeight = 14.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
