@@ -25,10 +25,14 @@ import io.github.xgl34222220.hetu.ui.*
 
 internal object UiFeedback {
     fun summary(text: String, error: Boolean): String {
+        val normalized = if (text.contains("/data/adb/hetu/") || text.contains("hetu-root.sh[")) {
+            if (error) "Root 运行状态暂时无法确认" else "运行状态正在同步"
+        } else text
         val code = Regex("(?:返回|HTTP|status[ =:]*)\\s*(\\d{3})", RegexOption.IGNORE_CASE)
-            .find(text)?.groupValues?.get(1)
-        val prefix = text.substringBefore("：").substringBefore(":").substringBefore('{')
+            .find(normalized)?.groupValues?.get(1)
+        val prefix = normalized.substringBefore("：").substringBefore(":").substringBefore('{')
         val safe = prefix.replace(Regex("https?://\\S+"), "远端地址")
+            .replace(Regex("""/data/adb/hetu/\S+"""), "Root 运行组件")
             .replace(Regex("[\\r\\n]+"), " ").trim()
         if (error) {
             val title = safe.takeIf { it.length in 1..32 && !it.contains("Mihomo 控制接口") }
