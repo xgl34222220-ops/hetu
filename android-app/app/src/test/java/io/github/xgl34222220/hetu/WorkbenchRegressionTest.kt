@@ -164,6 +164,18 @@ class WorkbenchRegressionTest {
         capture("overview-scene", "overview103-real-counts")
     }
 
+    @Test fun knownBrandsKeepDedicatedColorVectorFallbacks() {
+        assertEquals("openai", builtInBrandKey("OpenAI / ChatGPT"))
+        assertEquals("google", builtInBrandKey("Google"))
+        assertEquals("github", builtInBrandKey("GitHub"))
+        assertEquals("telegram", builtInBrandKey("Telegram"))
+        assertEquals("youtube", builtInBrandKey("YouTube"))
+        assertEquals("x", builtInBrandKey("Twitter"))
+        assertEquals("netflix", builtInBrandKey("Netflix"))
+        assertEquals("emby", builtInBrandKey("Emby"))
+        assertNull(builtInBrandKey("自定义节点组"))
+    }
+
     @Test fun configuredBrandAddressesRemainExactIncludingFlagsAndAnchors() {
         val source = "template: &b {type: select, icon: 'https://icons.example/google.svg'}\nproxy-groups:\n" +
             "  - {<<: *b, name: '🇺🇸 Google', proxies: [DIRECT]}\n" +
