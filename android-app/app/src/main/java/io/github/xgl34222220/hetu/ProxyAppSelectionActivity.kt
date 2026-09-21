@@ -400,7 +400,7 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
                 if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
                 Surface(shape = RoundedCornerShape(14.dp), color = t.controlBackground.copy(alpha = .48f)) {
                     Text(
-                        "GID 规则属于 Root OUTPUT 直连绕过，保存后需要重启代理才会应用。它不会改变黑名单/白名单中的 UID 选择。",
+                        "GID 规则属于 Root OUTPUT 直连绕过，保存后需要重启代理才会应用；仅支持 TPROXY / Redirect / Enhance。TUN / eBPF 不会假装生效，而会在预检时明确提示先清空 GID 规则。它不会改变黑名单/白名单中的 UID 选择。",
                         Modifier.fillMaxWidth().padding(12.dp),
                         color = t.textSecondary,
                         fontSize = 11.sp,
