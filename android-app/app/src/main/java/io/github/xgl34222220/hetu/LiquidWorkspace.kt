@@ -1,6 +1,7 @@
 package io.github.xgl34222220.hetu
 
 import android.view.HapticFeedbackConstants
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -55,7 +56,7 @@ internal fun LiquidBrandTray(group: ProxyGroupUi) {
         "telegram" in name || "twitter" in name -> Color(0xFF38A4D8)
         else -> primary
     }
-    val shape = RoundedCornerShape(11.dp)
+    val shape = RoundedCornerShape(10.dp)
     Box(Modifier.size(32.dp).testTag("brand-tray:${group.name}")
         .shadow(2.dp, shape, clip = false, ambientColor = accent.copy(alpha = .05f), spotColor = accent.copy(alpha = .09f))
         .background(Brush.verticalGradient(listOf(
@@ -229,9 +230,23 @@ internal fun LiquidGroupWell(group: ProxyGroupUi, selected: String, delays: Map<
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val shape = RoundedCornerShape(22.dp)
-    Column(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 16.dp).testTag("sunken-well:${group.name}")
-        .crystalMaterial(shape, depth = CrystalDepth.Sunken)
-        .padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    val motion = LocalHetuMotionEnabled.current
+    Column(
+        Modifier.fillMaxWidth()
+            .padding(top = 8.dp, bottom = 16.dp)
+            .testTag("sunken-well:${group.name}")
+            .then(
+                if (motion) Modifier.animateContentSize(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioLowBouncy,
+                        stiffness = Spring.StiffnessLow,
+                    ),
+                ) else Modifier
+            )
+            .crystalMaterial(shape, depth = CrystalDepth.Sunken)
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         Row(Modifier.fillMaxWidth().heightIn(min = 40.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("切换落地节点", color = t.textSecondary, fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Bold,
@@ -290,7 +305,11 @@ internal fun LiquidPill(text: String, icon: ImageVector, onClick: () -> Unit, mo
             )
             .padding(horizontal = if (compact) 9.dp else 10.dp, vertical = if (compact) 5.dp else 6.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-            Icon(icon, null, Modifier.size(if (compact) 13.dp else 16.dp), tint = color)
+            if (danger && text == "停止") {
+                Box(Modifier.size(6.dp).background(Color(0xFFE11D48), CircleShape))
+            } else {
+                Icon(icon, null, Modifier.size(if (compact) 13.dp else 16.dp), tint = color)
+            }
             Spacer(Modifier.width(5.dp))
             Text(text, color = color, fontSize = if (compact) 11.sp else 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
         }
