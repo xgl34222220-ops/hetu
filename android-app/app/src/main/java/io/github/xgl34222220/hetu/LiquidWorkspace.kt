@@ -324,57 +324,42 @@ internal fun LiquidHomeActions(running: Boolean, busy: Boolean, onToggle: () -> 
 }
 @Composable
 internal fun LiquidStatusGlyph(running: Boolean, busy: Boolean) {
-    val t = LocalHetuTokens.current
     val primary = MaterialTheme.colorScheme.primary
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val shape = RoundedCornerShape(16.dp)
     Box(
         Modifier
             .size(48.dp)
             .shadow(
-                elevation = if (running && !busy) 8.dp else 2.dp,
-                shape = shape,
-                ambientColor = primary.copy(alpha = .08f),
-                spotColor = primary.copy(alpha = .16f),
+                elevation = if (running && !busy) 10.dp else 2.dp,
+                shape = CircleShape,
+                ambientColor = primary.copy(alpha = .12f),
+                spotColor = primary.copy(alpha = .28f),
             )
             .background(
-                Brush.verticalGradient(
-                    if (running && !busy) {
-                        listOf(primary, primary.copy(alpha = .88f))
-                    } else {
-                        listOf(
-                            if (dark) Color.White.copy(alpha = .10f) else Color.White.copy(alpha = .92f),
-                            if (dark) Color.White.copy(alpha = .05f) else Color(0xFFF4F7FB),
-                        )
-                    },
-                ),
-                shape,
+                if (running && !busy) primary
+                else if (dark) Color.White.copy(alpha = .08f) else Color(0xFFF8FAFC),
+                CircleShape,
             )
             .border(
-                .7.dp,
-                if (running && !busy) Color.White.copy(alpha = .24f) else t.textMuted.copy(alpha = .14f),
-                shape,
+                1.dp,
+                if (running && !busy) Color.White.copy(alpha = .20f) else Color(0xFFE2E8F0),
+                CircleShape,
             ),
         contentAlignment = Alignment.Center,
     ) {
         if (busy) {
-            HetuBusyIndicator(Modifier.size(24.dp))
+            HetuBusyIndicator(Modifier.size(22.dp), if (running) Color.White else primary)
         } else {
             Icon(
                 if (running) Icons.Rounded.Check else Icons.Rounded.PowerSettingsNew,
                 null,
-                Modifier.size(if (running) 30.dp else 25.dp),
+                Modifier.size(if (running) 28.dp else 23.dp),
                 tint = if (running) Color.White else primary,
             )
         }
-        if (running && !busy) {
-            Canvas(Modifier.align(Alignment.BottomEnd).padding(3.dp).size(10.dp)) {
-                drawCircle(t.cardBackground)
-                drawCircle(t.success, radius = size.minDimension * .32f)
-            }
-        }
     }
 }
+
 @Composable
 internal fun LiquidHomeMenu(onLog: () -> Unit, onConnections: () -> Unit, onDiagnostics: () -> Unit,
     onAdblock: () -> Unit, diagnosticLoading: Boolean, hazeState: HazeState? = null, glassEnabled: Boolean = false) {
