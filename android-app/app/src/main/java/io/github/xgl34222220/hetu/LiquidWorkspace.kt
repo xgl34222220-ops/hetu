@@ -79,31 +79,66 @@ internal fun LiquidStrategyCard(group: ProxyGroupUi, selected: String, expanded:
     val pressed by interactions.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) .98f else 1f, tween(if (motion) 110 else 0), label = "groupPress")
     val angle by animateFloatAsState(if (expanded) 180f else 0f, tween(if (motion) 250 else 0), label = "groupArrow")
-    Column(modifier.heightIn(min = 96.dp).graphicsLayer { scaleX = scale; scaleY = scale }
-        .crystalMaterial(RoundedCornerShape(22.dp), selection = expanded).testTag("strategy:${group.name}")
-        .clickable(interactionSource = interactions, indication = null, role = Role.Button, onClick = onExpand)) {
-        Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(start = 12.dp, end = 10.dp, top = 8.dp),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            LiquidBrandTray(group)
+    Column(
+        modifier
+            .height(90.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .crystalMaterial(RoundedCornerShape(22.dp), selection = expanded)
+            .testTag("strategy:${group.name}")
+            .clickable(interactionSource = interactions, indication = null, role = Role.Button, onClick = onExpand)
+            .padding(13.dp),
+        verticalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(group.name, Modifier.fillMaxWidth().testTag("strategy-title:${group.name}"), color = t.textPrimary,
-                    fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("${liquidGroupType(group.type)} · ${group.nodes.size}", Modifier.fillMaxWidth().testTag("strategy-type:${group.name}"),
-                    color = t.textSecondary, fontSize = 11.sp, lineHeight = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    group.name,
+                    Modifier.fillMaxWidth().testTag("strategy-title:${group.name}"),
+                    color = t.textPrimary,
+                    fontSize = 15.sp,
+                    lineHeight = 20.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    "${liquidGroupType(group.type)} · ${group.nodes.size}",
+                    Modifier.fillMaxWidth().testTag("strategy-type:${group.name}"),
+                    color = t.textMuted,
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
+            Spacer(Modifier.width(8.dp))
+            LiquidBrandTray(group)
         }
-        Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(start = 12.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                val flag = refNodeFlag(selected)
-                if (flag.isNotBlank()) { Text(flag, fontSize = 12.sp); Spacer(Modifier.width(4.dp)) }
-                Text(selected.ifBlank { "未选择" }, Modifier.weight(1f).testTag("strategy-selection:${group.name}"),
-                    color = t.textPrimary, fontSize = 12.sp, lineHeight = 18.sp, fontWeight = FontWeight.Medium,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            val flag = refNodeFlag(selected)
+            if (flag.isNotBlank()) {
+                Text(flag, fontSize = 12.sp)
+                Spacer(Modifier.width(4.dp))
             }
+            Text(
+                selected.ifBlank { "未选择" },
+                Modifier.weight(1f).testTag("strategy-selection:${group.name}"),
+                color = Color(0xFF475569),
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
             LatencyChip(value, testing, onDelay, Modifier.testTag("strategy-delay:${group.name}"), compact = true)
-            Box(Modifier.size(18.dp).background(primary.copy(alpha = .075f), CircleShape), contentAlignment = Alignment.Center) {
-                Icon(Icons.Rounded.KeyboardArrowDown, null, Modifier.size(13.dp).graphicsLayer { rotationZ = angle }, tint = primary)
-            }
+            Spacer(Modifier.width(4.dp))
+            Icon(
+                Icons.Rounded.KeyboardArrowDown,
+                null,
+                Modifier.size(16.dp).graphicsLayer { rotationZ = angle },
+                tint = primary,
+            )
         }
     }
 }
@@ -126,7 +161,7 @@ internal fun LiquidNodeCard(node: ProxyNodeUi, active: Boolean, value: Long?, te
 
     Box(
         modifier
-            .heightIn(min = 68.dp)
+            .height(64.dp)
             .testTag("node:${node.name}")
             .graphicsLayer { this.alpha = alpha; scaleX = scale; scaleY = scale }
             .crystalMaterial(RoundedCornerShape(16.dp), depth = CrystalDepth.InsetItem, selection = active)
@@ -154,15 +189,22 @@ internal fun LiquidNodeCard(node: ProxyNodeUi, active: Boolean, value: Long?, te
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Text(
-                listOf(node.type.ifBlank { "节点" }, if (node.udp) "UDP" else "").filter { it.isNotBlank() }.joinToString(" · "),
-                Modifier.fillMaxWidth().testTag("node-protocol:${node.name}"),
-                color = t.textSecondary,
-                fontSize = 10.5.sp,
-                lineHeight = 15.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Box(
+                Modifier
+                    .background(t.controlBackground.copy(alpha = .78f), RoundedCornerShape(5.dp))
+                    .padding(horizontal = 5.dp, vertical = 1.dp)
+                    .testTag("node-protocol:${node.name}"),
+            ) {
+                Text(
+                    listOf(node.type.ifBlank { "节点" }, if (node.udp) "UDP" else "").filter { it.isNotBlank() }.joinToString(" · "),
+                    color = t.textSecondary,
+                    fontSize = 9.sp,
+                    lineHeight = 12.sp,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         LatencyChip(
             value,
