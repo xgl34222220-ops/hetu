@@ -1619,14 +1619,14 @@ private fun RefPanel(
     }
 
     BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding()) {
-        val autoGroupColumns = liquidColumns(maxWidth - 32.dp)
+        val autoGroupColumns = liquidColumns(maxWidth - 24.dp)
         val groupColumns = if (maxWidth < 292.dp) 1 else when (groupLayout) {
             1 -> 1
             2 -> 2
             else -> autoGroupColumns
         }
         Column(Modifier.fillMaxSize()) {
-            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     RefPanelGlassHeader(
                         selected = tab,
                         onSelect = onSelectedTabChange,
@@ -1670,9 +1670,9 @@ private fun RefPanel(
             LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
-                start = 16.dp,
+                start = 12.dp,
                 top = 8.dp,
-                end = 16.dp,
+                end = 12.dp,
                 bottom = hetuContentBottomPadding(),
             ),
             verticalArrangement = Arrangement.spacedBy(8.dp),
