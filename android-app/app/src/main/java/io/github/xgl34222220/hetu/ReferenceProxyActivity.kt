@@ -721,7 +721,6 @@ internal fun RefHome(
 ) {
     val context = LocalContext.current
     val t = LocalHetuTokens.current
-    val scheme = MaterialTheme.colorScheme
     val memory = runtime.rssBytes.takeIf { it > 0L } ?: state.memoryBytes
     val busy = operation.isNotBlank()
     val connections = if (state.panelReady) state.connections.size else cachedConnections
@@ -729,131 +728,81 @@ internal fun RefHome(
     LazyColumn(
         Modifier.fillMaxSize().statusBarsPadding(),
         contentPadding = PaddingValues(
-            start = 16.dp, top = 4.dp, end = 16.dp,
+            start = 12.dp,
+            top = 6.dp,
+            end = 12.dp,
             bottom = hetuContentBottomPadding(),
         ),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item(key = "home-title") {
-            Row(
-                Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
+            Box(
+                Modifier.fillMaxWidth().height(48.dp),
+                contentAlignment = Alignment.Center,
             ) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text("河图", color = t.textPrimary, fontSize = 26.sp, lineHeight = 32.sp,
-                        fontWeight = FontWeight.ExtraBold, letterSpacing = (-.9).sp)
-                }
-                LiquidHomeMenu(onLog, onConnections, onDiagnostics, {
-                    context.startActivity(Intent(context, ProxyAdblockChainActivity::class.java))
-                }, diagnosticLoading, hazeState, glassEnabled)
-                RefPanelHeaderAction(Icons.Rounded.Refresh, "刷新状态", onClick = onRefresh)
+                Text(
+                    "河图",
+                    color = t.textPrimary,
+                    fontSize = 22.sp,
+                    lineHeight = 28.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = (-.6).sp,
+                )
             }
         }
+
         item(key = "home-status") {
-            val shape = RoundedCornerShape(24.dp)
-            Surface(
-                modifier = refHomeLiquidModifier(Modifier.fillMaxWidth(), hazeState, glassEnabled, shape),
-                shape = shape, color = Color.Transparent,
+            RefReferenceHero(
+                state = state,
+                runtime = runtime,
+                busy = busy,
+            )
+        }
+
+        item(key = "home-actions") {
+            RefReferenceActionStrip(
+                running = state.running,
+                busy = busy,
+                onToggle = onToggle,
+                onReload = onReload,
+                onRestart = onRestart,
+            )
+        }
+
+        item(key = "home-shortcuts") {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.Top,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                                Box(
-                                    Modifier.size(8.dp).background(
-                                        if (state.running) HetuMicroCrystal.KleinBlue else t.textMuted,
-                                        CircleShape,
-                                    ),
-                                )
-                                Text(
-                                    if (busy) "正在处理" else if (state.running) "运行中" else "已停止",
-                                    modifier = Modifier.testTag("home-run-state"),
-                                    color = t.textPrimary,
-                                    fontSize = 19.sp,
-                                    lineHeight = 24.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    letterSpacing = (-.5).sp,
-                                )
-                                if (state.running) {
-                                    Box(
-                                        Modifier.background(Color(0xFFF1F5F9), CircleShape)
-                                            .padding(horizontal = 7.dp, vertical = 2.dp),
-                                    ) {
-                                        Text(
-                                            refDuration(runtime.elapsedSeconds),
-                                            color = t.textSecondary,
-                                            fontSize = 11.sp,
-                                            lineHeight = 15.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                        )
-                                    }
-                                }
-                            }
-                            Text(
-                                if (state.running) "${state.core}  •  ${state.mode}" else "Root / Mihomo",
-                                color = Color(0xFF475569),
-                                fontSize = 12.5.sp,
-                                lineHeight = 17.sp,
-                                fontWeight = FontWeight.Bold,
-                            )
-                            Text(
-                                state.config,
-                                color = t.textMuted,
-                                fontSize = 11.5.sp,
-                                lineHeight = 16.sp,
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        LiquidStatusGlyph(state.running, busy)
-                    }
-                    if (busy || message.isNotBlank()) {
-                        HetuTaskFeedback(
-                            operation.ifBlank { message },
-                            error = !busy && (message.contains("失败") || message.contains("异常") || message.contains("error", true)),
-                            busy = busy,
-                        )
-                    }
-                    if (state.running && state.runtimeSettingsPending) {
-                        val runtimeRefreshPending = context.getSharedPreferences("hetu", 0)
-                            .getBoolean("proxyRootRuntimeRefreshPending", false)
-                        Surface(
-                            onClick = onSettings,
-                            color = t.warning.copy(alpha = .065f),
-                            shape = RoundedCornerShape(12.dp),
-                            shadowElevation = 0.dp,
-                        ) {
-                            Row(
-                                Modifier.fillMaxWidth().heightIn(min = 38.dp).padding(horizontal = 10.dp, vertical = 7.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(7.dp),
-                            ) {
-                                Icon(Icons.Rounded.Info, null, Modifier.size(15.dp), tint = t.warning)
-                                Text(
-                                    if (runtimeRefreshPending) "运行组件已更新，重启后应用" else "运行设置已修改，重启后生效",
-                                    Modifier.weight(1f),
-                                    color = t.textPrimary,
-                                    fontSize = 11.sp,
-                                    lineHeight = 15.sp,
-                                    fontWeight = FontWeight.Medium,
-                                )
-                                Icon(Icons.Rounded.ChevronRight, null, Modifier.size(15.dp), tint = t.textMuted)
-                            }
-                        }
-                    }
-                    HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
-                    RefHomeActions(state.running, busy, onToggle, onReload, onRestart)
+                RefReferenceShortcut(
+                    title = "WebUI",
+                    subtitle = "Web 界面",
+                    modifier = Modifier.weight(1f),
+                    enabled = state.running,
+                ) {
+                    context.startActivity(Intent(context, ProxyLocalWebUiActivity::class.java))
                 }
+                RefReferenceShortcut(
+                    title = "日志",
+                    subtitle = "查看",
+                    modifier = Modifier.weight(1f),
+                    enabled = true,
+                    onClick = onLog,
+                )
             }
         }
+
         item(key = "home-latency") {
-            RefLatencyPanel(siteDelays["Baidu"], siteDelays["Cloudflare"], siteDelays["Google"], testing, hazeState, glassEnabled, onDelay)
+            RefLatencyPanel(
+                baidu = siteDelays["Baidu"],
+                cloudflare = siteDelays["Cloudflare"],
+                google = siteDelays["Google"],
+                testing = testing,
+                onTune = onSettings,
+                onClick = onDelay,
+            )
         }
+
         item(key = "home-bento") {
             RefHomeBentoMatrix(
                 runtime = runtime,
@@ -869,12 +818,236 @@ internal fun RefHome(
                 onSubscription = onSubscription,
             )
         }
+
+        if (busy || message.isNotBlank()) {
+            item(key = "home-feedback") {
+                HetuTaskFeedback(
+                    operation.ifBlank { message },
+                    error = !busy && (
+                        message.contains("失败") ||
+                            message.contains("异常") ||
+                            message.contains("error", true)
+                        ),
+                    busy = busy,
+                )
+            }
+        }
     }
 }
 
 @Composable
-private fun RefHomeActions(running: Boolean, busy: Boolean, onToggle: () -> Unit, onReload: () -> Unit, onRestart: () -> Unit) {
-    LiquidHomeActions(running, busy, onToggle, onReload, onRestart)
+private fun RefReferenceHero(
+    state: ProxyComposeState,
+    runtime: ProxyRuntimeSnapshot,
+    busy: Boolean,
+) {
+    val t = LocalHetuTokens.current
+    val shape = RoundedCornerShape(22.dp)
+    val status = if (busy) "正在处理" else if (state.running) "运行中" else "已停止"
+    val uptime = when {
+        !state.running -> "等待启动"
+        runtime.elapsedSeconds < 60L -> "少于 1 分钟"
+        else -> refDuration(runtime.elapsedSeconds)
+    }
+
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(120.dp)
+            .clip(shape)
+            .background(t.heroBackground)
+            .testTag("home-hero"),
+    ) {
+        Column(
+            Modifier
+                .align(Alignment.TopStart)
+                .padding(start = 18.dp, top = 16.dp, end = 118.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Box(
+                    Modifier
+                        .size(9.dp)
+                        .background(
+                            if (state.running) HetuMicroCrystal.KleinBlue else t.textMuted,
+                            CircleShape,
+                        ),
+                )
+                Text(
+                    status,
+                    Modifier.testTag("home-run-state"),
+                    color = if (state.running) HetuMicroCrystal.KleinBlue else t.textPrimary,
+                    fontSize = 20.sp,
+                    lineHeight = 25.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                )
+            }
+            Text(
+                uptime,
+                color = t.textPrimary,
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                if (state.running) "${state.core}  ·  ${state.mode}" else "Root  ·  Mihomo",
+                color = t.textPrimary,
+                fontSize = 12.5.sp,
+                lineHeight = 17.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                state.config,
+                color = t.textPrimary,
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+
+        Canvas(
+            Modifier
+                .align(Alignment.BottomEnd)
+                .offset(x = 34.dp, y = 28.dp)
+                .size(116.dp),
+        ) {
+            val stroke = 10.dp.toPx()
+            drawCircle(
+                color = HetuMicroCrystal.KleinBlue,
+                radius = size.minDimension / 2f - stroke / 2f,
+                style = Stroke(width = stroke),
+            )
+            if (state.running && !busy) {
+                val path = Path().apply {
+                    moveTo(size.width * .28f, size.height * .52f)
+                    lineTo(size.width * .43f, size.height * .67f)
+                    lineTo(size.width * .73f, size.height * .34f)
+                }
+                drawPath(
+                    path,
+                    HetuMicroCrystal.KleinBlue,
+                    style = Stroke(
+                        width = 9.dp.toPx(),
+                        cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                        join = androidx.compose.ui.graphics.StrokeJoin.Round,
+                    ),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RefReferenceActionStrip(
+    running: Boolean,
+    busy: Boolean,
+    onToggle: () -> Unit,
+    onReload: () -> Unit,
+    onRestart: () -> Unit,
+) {
+    val t = LocalHetuTokens.current
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = t.cardBackground,
+        shadowElevation = 0.dp,
+    ) {
+        Row(
+            Modifier.fillMaxWidth().height(52.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RefReferenceAction(
+                label = "重载",
+                color = HetuMicroCrystal.KleinBlue,
+                enabled = running && !busy,
+                modifier = Modifier.weight(1f),
+                onClick = onReload,
+            )
+            Box(Modifier.width(1.dp).height(24.dp).background(t.outline.copy(alpha = .72f)))
+            RefReferenceAction(
+                label = if (busy) "请稍候" else if (running) "停止" else "启动",
+                color = if (running) Color(0xFFB51F32) else HetuMicroCrystal.KleinBlue,
+                enabled = !busy,
+                modifier = Modifier.weight(1f),
+                onClick = onToggle,
+            )
+            Box(Modifier.width(1.dp).height(24.dp).background(t.outline.copy(alpha = .72f)))
+            RefReferenceAction(
+                label = "重启",
+                color = Color(0xFF8A651B),
+                enabled = running && !busy,
+                modifier = Modifier.weight(1f),
+                onClick = onRestart,
+            )
+        }
+    }
+}
+
+@Composable
+private fun RefReferenceAction(
+    label: String,
+    color: Color,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier
+            .fillMaxHeight()
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            color = color.copy(alpha = if (enabled) 1f else .35f),
+            fontSize = 14.sp,
+            lineHeight = 18.sp,
+            fontWeight = FontWeight.ExtraBold,
+        )
+    }
+}
+
+@Composable
+private fun RefReferenceShortcut(
+    title: String,
+    subtitle: String,
+    modifier: Modifier,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    val t = LocalHetuTokens.current
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.height(64.dp),
+        shape = RoundedCornerShape(20.dp),
+        color = t.cardBackground,
+        shadowElevation = 0.dp,
+    ) {
+        Column(
+            Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                title,
+                color = t.textPrimary.copy(alpha = if (enabled) 1f else .45f),
+                fontSize = 16.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.ExtraBold,
+            )
+            Text(
+                subtitle,
+                color = t.textSecondary.copy(alpha = if (enabled) 1f else .45f),
+                fontSize = 11.5.sp,
+                lineHeight = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+    }
 }
 
 @Composable
@@ -883,35 +1056,50 @@ private fun RefLatencyPanel(
     cloudflare: Long?,
     google: Long?,
     testing: Boolean,
-    hazeState: HazeState,
-    glassEnabled: Boolean,
+    onTune: () -> Unit,
     onClick: () -> Unit,
 ) {
     val t = LocalHetuTokens.current
-    val scheme = MaterialTheme.colorScheme
-    val shape = RoundedCornerShape(20.dp)
     Surface(
-        modifier = refHomeLiquidModifier(Modifier.fillMaxWidth(), hazeState, glassEnabled, shape),
-        shape = shape,
-        color = Color.Transparent,
+        shape = RoundedCornerShape(20.dp),
+        color = t.cardBackground,
         shadowElevation = 0.dp,
     ) {
         Column(
-            Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            Modifier.fillMaxWidth().height(88.dp).padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("网络延迟", color = t.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                TextButton(onClick = onClick, enabled = !testing, modifier = Modifier.heightIn(min = 48.dp)) {
-                    if (testing) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                    else Icon(Icons.Rounded.Speed, null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(if (testing) "测速中" else "测速")
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "延迟",
+                    Modifier.weight(1f),
+                    color = t.textPrimary,
+                    fontSize = 16.sp,
+                    lineHeight = 20.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                )
+                IconButton(onClick = onTune, modifier = Modifier.size(34.dp)) {
+                    Icon(Icons.Rounded.Tune, "延迟设置", Modifier.size(18.dp), tint = t.textSecondary)
+                }
+                IconButton(onClick = onClick, enabled = !testing, modifier = Modifier.size(34.dp)) {
+                    if (testing) {
+                        CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 1.8.dp)
+                    } else {
+                        Icon(Icons.Rounded.Refresh, "测速", Modifier.size(18.dp), tint = t.textSecondary)
+                    }
                 }
             }
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.fillMaxWidth().height(42.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 RefLatencyColumn("Baidu", baidu, testing, Modifier.weight(1f))
+                Box(Modifier.width(1.dp).height(34.dp).background(t.outline.copy(alpha = .70f)))
                 RefLatencyColumn("Cloudflare", cloudflare, testing, Modifier.weight(1f))
+                Box(Modifier.width(1.dp).height(34.dp).background(t.outline.copy(alpha = .70f)))
                 RefLatencyColumn("Google", google, testing, Modifier.weight(1f))
             }
         }
@@ -919,10 +1107,33 @@ private fun RefLatencyPanel(
 }
 
 @Composable
-private fun RefLatencyColumn(label: String, value: Long?, testing: Boolean, modifier: Modifier) {
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) {
-        Text(label, color = LocalHetuTokens.current.textSecondary, fontSize = 12.sp, lineHeight = 17.sp)
-        LatencyChip(value, testing)
+private fun RefLatencyColumn(
+    label: String,
+    value: Long?,
+    testing: Boolean,
+    modifier: Modifier,
+) {
+    val t = LocalHetuTokens.current
+    Column(
+        modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(1.dp),
+    ) {
+        Text(
+            label,
+            color = t.textSecondary,
+            fontSize = 10.5.sp,
+            lineHeight = 14.sp,
+            fontWeight = FontWeight.Medium,
+        )
+        Text(
+            if (testing) "..." else refDelay(value),
+            color = HetuMicroCrystal.KleinBlue,
+            fontSize = 16.sp,
+            lineHeight = 20.sp,
+            fontWeight = FontWeight.ExtraBold,
+            maxLines = 1,
+        )
     }
 }
 
