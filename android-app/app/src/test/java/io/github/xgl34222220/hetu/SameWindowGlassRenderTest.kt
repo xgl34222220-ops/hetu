@@ -116,6 +116,7 @@ class SameWindowGlassRenderTest {
         save("cached-brand-images","glass101-distinct-cached-images")
         compose.runOnIdle {url=""}
         compose.onNodeWithTag("configured-icon:Google",true).assertDoesNotExist()
-        compose.onNodeWithContentDescription("Google 未配置图标").assertExists()
+        compose.onNodeWithTag("brand-icon:Google", true).assertExists()
+        compose.onNodeWithContentDescription("Google 彩色品牌图标").assertExists()
     }
 }

@@ -60,7 +60,7 @@ class HomeScreenRenderTest {
         for(w in listOf(360,412)) for(scale in listOf(1f,1.5f)) for(dark in listOf(false,true)) {
             compose.runOnIdle { width=w;font=scale;night=dark }
             compose.waitForIdle()
-            compose.onNodeWithText("代理运行中",true).assertExists()
+            compose.onNodeWithTag("home-run-state", true).assertTextEquals("运行中")
             compose.onNodeWithText("停止",true).assertExists()
             compose.onNodeWithText("网络与广告过滤",true).assertDoesNotExist()
             compose.onNodeWithText("应用连接",true).assertDoesNotExist()

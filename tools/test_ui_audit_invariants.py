@@ -56,11 +56,15 @@ assert "Color(0xFFF4F6F9)" in theme and "Color(0xFF0F172A)" in theme
 assert "RoundedCornerShape(24.dp)" in main and "LiquidStatusGlyph(state.running, busy)" in main
 assert ".size(48.dp)" in liquid and "shape = CircleShape" in liquid
 assert ".height(90.dp)" in liquid and ".height(64.dp)" in liquid
+assert '.size(48.dp).testTag("strategy-delay:' in liquid
+assert '.padding(end = 4.dp).size(48.dp)' in liquid and '.testTag("node-delay:' in liquid
+assert 'modifier = Modifier.testTag("home-run-state")' in refhome
 assert ".height(42.dp).testTag(\"yaml-accessory\")" in editor
 assert "UTF-8 · YAML" in editor
 assert "ticket-badge:" in monitoring and "ticket-progress:" in monitoring
 nonhome = (src / "NonHomeWorkspace.kt").read_text()
 instrument = (src / "AlignedInstrumentPanel.kt").read_text()
+refhome = (src / "ReferenceProxyActivity.kt").read_text()
 assert "Color.White.copy(alpha = .95f)" in crystal
 assert "Color(0xFFFFFFFF)" in crystal and "Color(0xFFF8FAFC)" in crystal
 assert "topAlpha" not in crystal and "bottomAlpha" not in crystal
