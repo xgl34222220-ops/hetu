@@ -59,4 +59,18 @@ assert ".height(90.dp)" in liquid and ".height(64.dp)" in liquid
 assert ".height(42.dp).testTag(\"yaml-accessory\")" in editor
 assert "UTF-8 · YAML" in editor
 assert "ticket-badge:" in monitoring and "ticket-progress:" in monitoring
+nonhome = (src / "NonHomeWorkspace.kt").read_text()
+instrument = (src / "AlignedInstrumentPanel.kt").read_text()
+assert "Color.White.copy(alpha = .95f)" in crystal
+assert ".border(" in crystal and "1.dp" in crystal
+assert "if (crystal) {" in crystal and "Box(modifier.crystalMaterial(shape))" in crystal
+assert "MaterialSurface(modifier = if (crystal)" not in crystal
+assert ".size(32.dp)" in liquid and "RoundedCornerShape(10.dp)" in liquid
+assert ".height(90.dp)" in liquid and ".height(64.dp)" in liquid
+assert "animateContentSize" in liquid and "Spring.DampingRatioLowBouncy" in liquid and "Spring.StiffnessLow" in liquid
+assert "Spring.DampingRatioLowBouncy" in nonhome and "Spring.StiffnessLow" in nonhome
+assert ".height(InstrumentSlots.height())" in instrument
+assert "builtInBrandKey" in icon and "BuiltInBrandIcon" in icon
+for brand in ("openai","google","github","telegram","youtube"):
+    assert f'"{brand}"' in icon, f"Missing multicolor brand fallback: {brand}"
 print("UI audit source/runtime invariants passed")
