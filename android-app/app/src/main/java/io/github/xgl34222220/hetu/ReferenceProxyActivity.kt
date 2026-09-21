@@ -2971,7 +2971,9 @@ private fun RefSettings(state: ProxyComposeState, operation: String, onApplySett
     var ipv6Picker by remember { mutableStateOf(false) }
     var latencyPicker by remember { mutableStateOf(false) }
     var portsInfo by remember { mutableStateOf(false) }
+    var notificationSettings by remember { mutableStateOf(false) }
     var autoStart by remember { mutableStateOf(prefs.getBoolean("proxyRootAutoStart", false)) }
+    var statusNotificationEnabled by remember { mutableStateOf(prefs.getBoolean(ProxyStatusNotificationService.PREF_ENABLED, false)) }
     var blurEnabled by remember { mutableStateOf(prefs.getBoolean("enableBlur", true)) }
     var latencyInterval by remember { mutableIntStateOf(prefs.getInt("latencyAutoRefreshSeconds", 0).takeIf { it == 0 || it == 30 || it == 60 } ?: 0) }
 
@@ -3079,6 +3081,29 @@ private fun RefSettings(state: ProxyComposeState, operation: String, onApplySett
                 }
             }
         }
+        item { RefSectionLabel("状态通知") }
+        item {
+            RefGroup {
+                RefSwitchRow(
+                    icon = Icons.Rounded.NotificationsActive,
+                    accent = Color(0xFF2563EB),
+                    title = "代理状态通知",
+                    subtitle = "显示 Root/Mihomo 状态、实时速率与快捷控制",
+                    checked = statusNotificationEnabled,
+                ) { enabled ->
+                    statusNotificationEnabled = enabled
+                    ProxyStatusNotificationService.setEnabled(context, enabled)
+                }
+                RefDivider()
+                RefValueRow(
+                    "通知内容与按钮",
+                    "模板变量 · 快捷操作",
+                    Icons.Rounded.Tune,
+                    Color(0xFF0EA5E9),
+                    highlightValue = true,
+                ) { notificationSettings = true }
+            }
+        }
         item { RefSectionLabel("界面") }
         item {
             RefGroup {
@@ -3098,6 +3123,17 @@ private fun RefSettings(state: ProxyComposeState, operation: String, onApplySett
                 }
             }
         }
+    }
+
+    if (notificationSettings) {
+        RefNotificationSettingsBottomSheet(
+            prefs = prefs,
+            onDismiss = { notificationSettings = false },
+            onSaved = {
+                notificationSettings = false
+                ProxyStatusNotificationService.refresh(context)
+            },
+        )
     }
 
     if (modePicker) {
@@ -3164,6 +3200,118 @@ private fun RefSettings(state: ProxyComposeState, operation: String, onApplySett
 
     if (portsInfo) {
         RefPortsBottomSheet(controllerPort = state.controllerPort, onDismiss = { portsInfo = false })
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RefNotificationSettingsBottomSheet(
+    prefs: android.content.SharedPreferences,
+    onDismiss: () -> Unit,
+    onSaved: () -> Unit,
+) {
+    val t = LocalHetuTokens.current
+    var template by remember {
+        mutableStateOf(
+            prefs.getString(
+                ProxyStatusNotificationService.PREF_TEMPLATE,
+                ProxyStatusNotificationService.DEFAULT_TEMPLATE,
+            ).orEmpty().ifBlank { ProxyStatusNotificationService.DEFAULT_TEMPLATE },
+        )
+    }
+    var action1 by remember { mutableStateOf(prefs.getString(ProxyStatusNotificationService.PREF_ACTION_1, "reload").orEmpty()) }
+    var action2 by remember { mutableStateOf(prefs.getString(ProxyStatusNotificationService.PREF_ACTION_2, "restart").orEmpty()) }
+    val actions = listOf(
+        "reload" to "重载",
+        "restart" to "重启",
+        "stop" to "停止",
+        "hide" to "隐藏通知",
+        "none" to "无按钮",
+    )
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
+        containerColor = t.elevatedCardBackground,
+        contentColor = t.textPrimary,
+        tonalElevation = 0.dp,
+        scrimColor = Color.Black.copy(alpha = .35f),
+        dragHandle = { RefSheetDragHandle() },
+    ) {
+        Column(
+            Modifier.fillMaxWidth().navigationBarsPadding().imePadding()
+                .padding(start = 18.dp, end = 18.dp, bottom = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text("状态通知", color = t.textPrimary, fontSize = 20.sp, lineHeight = 25.sp, fontWeight = FontWeight.Bold)
+            Text(
+                "可用变量：{status} {uptime} {upload} {download} {cpu} {memory} {connections} {config} {core} {mode}",
+                color = t.textSecondary,
+                fontSize = 11.sp,
+                lineHeight = 17.sp,
+            )
+            OutlinedTextField(
+                value = template,
+                onValueChange = { template = it.take(320) },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 104.dp),
+                label = { Text("通知正文模板") },
+                minLines = 3,
+                maxLines = 5,
+                shape = RoundedCornerShape(16.dp),
+            )
+            Text("第一个快捷按钮", color = t.textSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                actions.forEach { (value, label) ->
+                    FilterChip(selected = action1 == value, onClick = { action1 = value }, label = { Text(label) })
+                }
+            }
+            Text("第二个快捷按钮", color = t.textSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                actions.forEach { (value, label) ->
+                    FilterChip(selected = action2 == value, onClick = { action2 = value }, label = { Text(label) })
+                }
+            }
+            Surface(shape = RoundedCornerShape(16.dp), color = t.controlBackground.copy(alpha = .48f)) {
+                Column(Modifier.fillMaxWidth().padding(13.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("示例", color = t.textMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        template
+                            .replace("{status}", "运行中")
+                            .replace("{uptime}", "11小时49分")
+                            .replace("{upload}", "1.3 KB/s")
+                            .replace("{download}", "2.1 KB/s")
+                            .replace("{cpu}", "5.7%")
+                            .replace("{memory}", "88.0 MB")
+                            .replace("{connections}", "16")
+                            .replace("{config}", "自用_tproxy.yaml")
+                            .replace("{core}", "Mihomo")
+                            .replace("{mode}", "TPROXY"),
+                        color = t.textPrimary,
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp,
+                    )
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                TextButton(onClick = {
+                    template = ProxyStatusNotificationService.DEFAULT_TEMPLATE
+                    action1 = "reload"
+                    action2 = "restart"
+                }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                    Text("恢复默认")
+                }
+                Button(
+                    onClick = {
+                        prefs.edit()
+                            .putString(ProxyStatusNotificationService.PREF_TEMPLATE, template.ifBlank { ProxyStatusNotificationService.DEFAULT_TEMPLATE })
+                            .putString(ProxyStatusNotificationService.PREF_ACTION_1, action1)
+                            .putString(ProxyStatusNotificationService.PREF_ACTION_2, action2)
+                            .apply()
+                        onSaved()
+                    },
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                ) { Text("保存") }
+            }
+        }
     }
 }
 
