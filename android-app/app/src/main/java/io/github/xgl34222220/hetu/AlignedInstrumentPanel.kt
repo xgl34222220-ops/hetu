@@ -257,17 +257,65 @@ internal fun AlignedInstrumentPanel(runtime: ProxyRuntimeSnapshot, connections: 
             }
         }
     }
-    if (details) AlertDialog(onDismissRequest = { details = false }, title = { Text("网络详情") },
-        text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("出口状态：$networkState")
-            Text("出口地址：${runtime.wanAddress}")
-            Text("地区：${runtime.wanRegion}")
-            Text("局域地址：${runtime.lanAddress}")
-            Text("接口：${runtime.lanInterface} · $connections 连接")
-            if (checked.isNotBlank()) Text("检测时间：$checked")
-            if (runtime.wanError.isNotBlank()) Text(runtime.wanError)
-            Text("点击仪表中的网络区域切换局域网与出口显示。", color = t.textSecondary)
-        } }, confirmButton = { TextButton(onClick = { details = false }) { Text("关闭") } })
+    if (details) InstrumentNetworkDetailSheet(
+        networkState = networkState,
+        runtime = runtime,
+        connections = connections,
+        checked = checked,
+        onDismiss = { details = false },
+    )
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun InstrumentNetworkDetailSheet(
+    networkState: String,
+    runtime: ProxyRuntimeSnapshot,
+    connections: Int,
+    checked: String,
+    onDismiss: () -> Unit,
+) {
+    val t = LocalHetuTokens.current
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
+        containerColor = t.elevatedCardBackground,
+        contentColor = t.textPrimary,
+        tonalElevation = 0.dp,
+        scrimColor = Color.Black.copy(alpha = .35f),
+        dragHandle = {
+            Box(
+                Modifier.padding(top = 10.dp, bottom = 6.dp).size(width = 36.dp, height = 4.dp)
+                    .background(t.textMuted.copy(alpha = .24f), CircleShape),
+            )
+        },
+    ) {
+        Column(
+            Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text("网络详情", color = t.textPrimary, fontSize = 20.sp, lineHeight = 25.sp, fontWeight = FontWeight.Bold)
+            Column(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
+                    .background(t.controlBackground.copy(alpha = .42f))
+                    .padding(14.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(9.dp),
+            ) {
+                Text("出口状态：$networkState")
+                Text("出口地址：${runtime.wanAddress}")
+                Text("地区：${runtime.wanRegion}")
+                Text("局域地址：${runtime.lanAddress}")
+                Text("接口：${runtime.lanInterface} · $connections 连接")
+                if (checked.isNotBlank()) Text("检测时间：$checked")
+                if (runtime.wanError.isNotBlank()) Text(runtime.wanError, color = t.danger)
+                Text("点击仪表中的网络区域切换局域网与出口显示。", color = t.textSecondary)
+            }
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.align(androidx.compose.ui.Alignment.End).heightIn(min = 48.dp),
+            ) { Text("关闭") }
+        }
+    }
 }
 
 @Composable
