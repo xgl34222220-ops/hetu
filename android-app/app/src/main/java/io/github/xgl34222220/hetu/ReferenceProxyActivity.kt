@@ -2630,13 +2630,13 @@ private fun RefTrafficOverview(state: ProxyComposeState, ruleCount: Int?) {
     var lastAt by remember { mutableLongStateOf(0L) }
     var upRate by remember { mutableLongStateOf(0L) }
     var downRate by remember { mutableLongStateOf(0L) }
+
     LaunchedEffect(state.uploadTotal, state.downloadTotal) {
         val now = SystemClock.elapsedRealtime()
         if (lastAt > 0L && now > lastAt && state.uploadTotal >= lastUpload && state.downloadTotal >= lastDownload) {
             val elapsed = now - lastAt
             upRate = ((state.uploadTotal - lastUpload) * 1000L / elapsed).coerceAtLeast(0L)
             downRate = ((state.downloadTotal - lastDownload) * 1000L / elapsed).coerceAtLeast(0L)
-            // The 1s ticker below owns chart sampling so the graph keeps moving even at 0 B/s.
         }
         lastAt = now
         lastUpload = state.uploadTotal
@@ -2648,38 +2648,152 @@ private fun RefTrafficOverview(state: ProxyComposeState, ruleCount: Int?) {
             delay(1000)
             val now = SystemClock.elapsedRealtime()
             history += Triple(now, upRate, downRate)
-            while (history.isNotEmpty() && history.first().first < now - 60_000L) history.removeAt(0)
+            while (history.isNotEmpty() && history.first().first < now - 60_000L) {
+                history.removeAt(0)
+            }
         }
     }
-
 
     val peak = history.maxOfOrNull { maxOf(it.second, it.third) } ?: 0L
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         OverviewInstruments(state, ruleCount)
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            RefRateCard("上行速度", upRate, Icons.Rounded.ArrowUpward, t.success, Modifier.weight(1f))
-            RefRateCard("下行速度", downRate, Icons.Rounded.ArrowDownward, scheme.primary, Modifier.weight(1f))
+
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = t.cardBackground,
+            shadowElevation = 0.dp,
+        ) {
+            Column(
+                Modifier.fillMaxWidth().padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    "订阅",
+                    color = t.textPrimary,
+                    fontSize = 18.sp,
+                    lineHeight = 23.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                )
+                Text(
+                    "刷新后显示数据",
+                    color = t.textSecondary,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
         }
-        Surface(shape = RoundedCornerShape(18.dp), color = t.cardBackground) {
-            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("近 60 秒网速", color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                Text("峰值 ${refSpeed(peak)} · 上行 / 下行", color = t.textSecondary, fontSize = 12.sp)
+
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            RefRateCard(
+                "上行速度",
+                upRate,
+                Icons.Rounded.ArrowUpward,
+                Color(0xFF20AF67),
+                Modifier.weight(1f),
+            )
+            RefRateCard(
+                "下行速度",
+                downRate,
+                Icons.Rounded.ArrowDownward,
+                HetuMicroCrystal.KleinBlue,
+                Modifier.weight(1f),
+            )
+        }
+
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = t.cardBackground,
+            shadowElevation = 0.dp,
+        ) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 15.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "总流量",
+                    color = t.textPrimary,
+                    fontSize = 17.sp,
+                    lineHeight = 22.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "上行 ${refBytes(state.uploadTotal)}",
+                    color = Color(0xFF20AF67),
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                )
+                Text(
+                    "  /  ",
+                    color = t.textSecondary,
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    "下行 ${refBytes(state.downloadTotal)}",
+                    color = HetuMicroCrystal.KleinBlue,
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                )
+            }
+        }
+
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = t.cardBackground,
+            shadowElevation = 0.dp,
+        ) {
+            Column(
+                Modifier.fillMaxWidth().padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "近期趋势",
+                            color = t.textPrimary,
+                            fontSize = 18.sp,
+                            lineHeight = 23.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                        )
+                        Text(
+                            "最近 60 秒",
+                            color = t.textSecondary,
+                            fontSize = 12.5.sp,
+                            lineHeight = 17.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    RefTrendLegend("上行", Color(0xFF20AF67))
+                    Spacer(Modifier.width(8.dp))
+                    RefTrendLegend("下行", HetuMicroCrystal.KleinBlue)
+                }
+
                 val points = history.toList()
                 val chartGrid = if (scheme.background.luminance() < .5f) {
                     Color.White.copy(alpha = .08f)
                 } else {
-                    Color(0xFFE6ECF4)
+                    Color(0xFFDCD9E8)
                 }
-                Canvas(Modifier.fillMaxWidth().height(116.dp)) {
+
+                Canvas(Modifier.fillMaxWidth().height(190.dp).testTag("overview-trend-chart")) {
                     val inset = 6.dp.toPx()
                     val chartHeight = size.height - inset * 2f
                     for (line in 0..2) {
                         val y = inset + chartHeight * line / 2f
-                        drawLine(chartGrid, Offset(0f, y), Offset(size.width, y), 1.dp.toPx())
+                        drawLine(
+                            chartGrid,
+                            Offset(0f, y),
+                            Offset(size.width, y),
+                            1.dp.toPx(),
+                        )
                     }
+
                     if (points.size >= 2) {
                         val maxRate = peak.coerceAtLeast(1L).toFloat()
                         val end = points.last().first
+
                         fun drawSeries(upload: Boolean, color: Color) {
                             val rates = points.indices.map { index ->
                                 val from = (index - 1).coerceAtLeast(0)
@@ -2692,18 +2806,27 @@ private fun RefTrafficOverview(state: ProxyComposeState, ruleCount: Int?) {
                                 }
                                 (total / count.coerceAtLeast(1)).toFloat()
                             }
+
                             val offsets = points.mapIndexed { index, point ->
-                                val x = ((point.first - (end - 60_000L)).coerceIn(0L, 60_000L) / 60_000f) * size.width
+                                val x = (
+                                    (point.first - (end - 60_000L)).coerceIn(0L, 60_000L) /
+                                        60_000f
+                                    ) * size.width
                                 val y = size.height - inset - rates[index] / maxRate * chartHeight
                                 Offset(x, y)
                             }
+
                             val path = Path().apply {
                                 moveTo(offsets.first().x, offsets.first().y)
                                 for (index in 1 until offsets.size) {
                                     val previous = offsets[index - 1]
                                     val current = offsets[index]
                                     val controlX = (previous.x + current.x) / 2f
-                                    cubicTo(controlX, previous.y, controlX, current.y, current.x, current.y)
+                                    cubicTo(
+                                        controlX, previous.y,
+                                        controlX, current.y,
+                                        current.x, current.y,
+                                    )
                                 }
                             }
                             val area = Path().apply {
@@ -2712,11 +2835,12 @@ private fun RefTrafficOverview(state: ProxyComposeState, ruleCount: Int?) {
                                 lineTo(offsets.first().x, size.height - inset)
                                 close()
                             }
+
                             drawPath(
                                 area,
                                 Brush.verticalGradient(
                                     colors = listOf(
-                                        color.copy(alpha = .20f),
+                                        color.copy(alpha = .22f),
                                         color.copy(alpha = .07f),
                                         color.copy(alpha = 0f),
                                     ),
@@ -2726,55 +2850,98 @@ private fun RefTrafficOverview(state: ProxyComposeState, ruleCount: Int?) {
                             )
                             drawPath(
                                 path,
-                                color.copy(alpha = .12f),
-                                style = Stroke(5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round),
-                            )
-                            drawPath(
-                                path,
                                 color,
-                                style = Stroke(2.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round),
+                                style = Stroke(
+                                    2.5.dp.toPx(),
+                                    cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                                ),
                             )
                         }
-                        drawSeries(true, t.success)
-                        drawSeries(false, scheme.primary)
+
+                        drawSeries(true, Color(0xFF20AF67))
+                        drawSeries(false, HetuMicroCrystal.KleinBlue)
                     }
                 }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("−60 秒", color = t.textSecondary, fontSize = 12.sp)
-                    Text("现在", color = t.textSecondary, fontSize = 12.sp)
-                }
-                Text(if (points.size < 2) "正在收集真实采样" else "仅绘制实际采样；无流量时保持平直", color = t.textSecondary, fontSize = 12.sp)
+
+                Text(
+                    if (points.size < 2) "正在收集真实采样" else "峰值 ${refSpeed(peak)}",
+                    color = t.textSecondary,
+                    fontSize = 11.5.sp,
+                    lineHeight = 16.sp,
+                )
             }
         }
+
         OverviewRouteRanking(state)
-        Surface(shape = RoundedCornerShape(18.dp), color = t.cardBackground) {
-            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("会话累计", color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                HetuNumber("↑ ${refBytes(state.uploadTotal)}   ↓ ${refBytes(state.downloadTotal)}")
-                val tcp = state.connections.count { it.network.contains("tcp", true) }
-                val udp = state.connections.count { it.network.contains("udp", true) }
-                Text("${state.connections.size} 个连接 · TCP $tcp · UDP $udp", color = t.textSecondary, fontSize = 12.sp)
-                Text("入站 ${state.connections.count { it.inbound.isNotBlank() }} · 分流命中 ${state.connections.count { it.rule.isNotBlank() || it.chain.isNotBlank() }}", color = t.textSecondary, fontSize = 12.sp)
-            }
+    }
+}
+
+@Composable
+private fun RefTrendLegend(label: String, color: Color) {
+    Box(
+        Modifier
+            .clip(CircleShape)
+            .background(color.copy(alpha = .10f))
+            .padding(horizontal = 11.dp, vertical = 5.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(7.dp).background(color, CircleShape))
+            Spacer(Modifier.width(6.dp))
+            Text(
+                label,
+                color = color,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.ExtraBold,
+            )
         }
     }
 }
 
 @Composable
-private fun RefRateCard(title: String, value: Long, icon: ImageVector, color: Color, modifier: Modifier) {
+private fun RefRateCard(
+    title: String,
+    value: Long,
+    icon: ImageVector,
+    color: Color,
+    modifier: Modifier,
+) {
     val t = LocalHetuTokens.current
-    Surface(modifier = modifier.crystalMaterial(RoundedCornerShape(22.dp), tint = color), shape = RoundedCornerShape(22.dp), color = Color.Transparent, shadowElevation = 0.dp) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(20.dp),
+        color = t.cardBackground,
+        shadowElevation = 0.dp,
+    ) {
         Row(
             Modifier.fillMaxWidth().padding(14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(Modifier.size(34.dp).background(color.copy(alpha = .10f), CircleShape), contentAlignment = Alignment.Center) {
-                Icon(icon, null, tint = color, modifier = Modifier.size(19.dp))
+            Box(
+                Modifier
+                    .size(40.dp)
+                    .background(color.copy(alpha = .10f), RoundedCornerShape(13.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, null, tint = color, modifier = Modifier.size(22.dp))
             }
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                Text(title, color = Color(0xFF94A3B8), fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                HetuNumber(refSpeed(value), color = t.textPrimary, style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold))
+                Text(
+                    title,
+                    color = t.textPrimary,
+                    fontSize = 12.5.sp,
+                    lineHeight = 17.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                )
+                HetuNumber(
+                    refSpeed(value),
+                    color = color,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontSize = 18.sp,
+                        lineHeight = 23.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                    ),
+                )
             }
         }
     }
