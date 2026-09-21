@@ -174,8 +174,10 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
     var yamlOpen by remember { mutableStateOf(false) }
     var yamlText by remember { mutableStateOf("") }
     var yamlError by remember { mutableStateOf("") }
+    var yamlNotice by remember { mutableStateOf("") }
     var yamlLoading by remember { mutableStateOf(false) }
     var yamlSaving by remember { mutableStateOf(false) }
+    var yamlValidating by remember { mutableStateOf(false) }
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -552,6 +554,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                         }
                         TextButton(onClick = {
                             yamlError = ""
+                            yamlNotice = ""
                             yamlLoading = true
                             scope.launch {
                                 runCatching { controller.configText() }
@@ -716,8 +719,51 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                 }
             }
 
+            fun formatYaml() {
+                if (yamlSaving || yamlValidating) return
+                val editor = yamlEditor ?: return
+                val currentText = currentYamlText()
+                val formatted = yamlSafeFormatText(currentText)
+                yamlError = ""
+                if (formatted == currentText) {
+                    yamlNotice = "当前 YAML 已符合安全格式化规则"
+                } else {
+                    editor.setText(formatted)
+                    editor.requestFocus()
+                    yamlNotice = "已安全格式化：规范缩进、行尾空格与 key: value 间距"
+                }
+            }
+
+            fun validateYaml() {
+                if (yamlSaving || yamlValidating) return
+                val currentText = currentYamlText()
+                yamlLocalLint(currentText)?.let { issue ->
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    yamlNotice = ""
+                    yamlError = "第 ${issue.line} 行：${issue.message}"
+                    jumpToYamlLine(issue.line - 1)
+                    return
+                }
+                yamlError = ""
+                yamlNotice = "正在执行 Mihomo 预编译校验…"
+                yamlValidating = true
+                scope.launch {
+                    val result = runCatching { controller.validateConfigText(currentText) }
+                    result.onSuccess {
+                        yamlError = ""
+                        yamlNotice = "Mihomo 预编译校验通过"
+                    }
+                    result.exceptionOrNull()?.let { error ->
+                        yamlNotice = ""
+                        yamlError = error.message ?: "配置校验失败"
+                        yamlErrorLine(yamlError)?.let { line -> jumpToYamlLine(line - 1) }
+                    }
+                    yamlValidating = false
+                }
+            }
+
             fun saveYaml() {
-                if (yamlSaving) return
+                if (yamlSaving || yamlValidating) return
                 val currentText = currentYamlText()
                 yamlLocalLint(currentText)?.let { issue ->
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -755,9 +801,19 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                             Text("$yamlLineCount 行 · 长行可横向滚动", color = tokens.textSecondary, fontSize = 12.sp)
                         }
                     }
-                    YamlWorkbenchActions(yamlCanUndo, yamlCanRedo, yamlSaving,
-                        { yamlEditor?.undo() }, { yamlEditor?.redo() }, { yamlSearchOpen = !yamlSearchOpen },
-                        { outlineItems = yamlOutlineItems(currentYamlText()); outlineOpen = true }, ::saveYaml)
+                    YamlWorkbenchActions(
+                        yamlCanUndo,
+                        yamlCanRedo,
+                        yamlSaving,
+                        yamlValidating,
+                        { yamlEditor?.undo() },
+                        { yamlEditor?.redo() },
+                        ::formatYaml,
+                        { yamlSearchOpen = !yamlSearchOpen },
+                        { outlineItems = yamlOutlineItems(currentYamlText()); outlineOpen = true },
+                        ::validateYaml,
+                        ::saveYaml,
+                    )
                     if (yamlSearchOpen) YamlWorkbenchSearch(yamlEditor, yamlMatches) {
                         yamlSearchOpen = false; yamlEditor?.requestFocus()
                     }
@@ -800,6 +856,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                                             yamlCanUndo = canUndo()
                                             yamlCanRedo = canRedo()
                                             if (yamlError.isNotBlank()) yamlError = ""
+                                            if (yamlNotice.isNotBlank()) yamlNotice = ""
                                         }
                                         yamlLineCount = text.lineCount
                                         yamlCanUndo = canUndo()
@@ -821,7 +878,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                     }
 
                     androidx.compose.animation.AnimatedVisibility(
-                        visible = yamlError.isNotBlank(),
+                        visible = yamlError.isNotBlank() || yamlNotice.isNotBlank(),
                         enter = androidx.compose.animation.slideInVertically(
                             animationSpec = androidx.compose.animation.core.tween(180),
                         ) { it / 2 } + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(140)),
@@ -829,8 +886,12 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                             animationSpec = androidx.compose.animation.core.tween(140),
                         ) { it / 2 } + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(110)),
                     ) {
-                        HetuTaskFeedback(yamlError, error = true, busy = false,
-                            modifier = Modifier.padding(horizontal = 16.dp))
+                        HetuTaskFeedback(
+                            yamlError.ifBlank { yamlNotice },
+                            error = yamlError.isNotBlank(),
+                            busy = yamlValidating,
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        )
 
                     }
 
@@ -990,6 +1051,28 @@ private fun SubscriptionMetric(
 }
 
 private data class YamlLintIssue(val line: Int, val message: String)
+
+private fun yamlSafeFormatText(text: String): String {
+    val compactMapping = Regex("""^(\s*(?:-\s+)?(?:["'][^"']+["']|[A-Za-z0-9_.-]+)):(\S.*)$""")
+    return text.lines().joinToString("\n") { raw ->
+        val withoutTrailing = raw.trimEnd()
+        val leading = withoutTrailing.takeWhile { it == ' ' || it == '\t' }
+        val normalizedLeading = buildString {
+            leading.forEach { ch -> if (ch == '\t') append("  ") else append(ch) }
+        }
+        var line = normalizedLeading + withoutTrailing.drop(leading.length)
+        val trimmed = line.trimStart()
+        val urlOnly = trimmed.startsWith("http://") || trimmed.startsWith("https://") ||
+            trimmed.startsWith("- http://") || trimmed.startsWith("- https://")
+        if (!urlOnly && !trimmed.startsWith("#")) {
+            compactMapping.find(line)?.let { match ->
+                line = match.groupValues[1] + ": " + match.groupValues[2]
+            }
+        }
+        line
+    }
+}
+
 
 private fun yamlMihomoStrictDomainIssue(text: String): YamlLintIssue? {
     var top = ""
