@@ -97,15 +97,15 @@ class NonHomeAlignmentTest {
                 LiquidGroupWell(g,g.now,emptyMap(),emptyMap(),{},{},{})
             }
         } } }
-        compose.onNodeWithTag("strategy:AI 平台",true).assertHeightIsAtLeast(90.dp)
-        compose.onNodeWithTag("brand-tray:AI 平台",true).assertWidthIsEqualTo(32.dp)
+        compose.onNodeWithTag("strategy:AI 平台",true).assertHeightIsAtLeast(80.dp)
+        compose.onNodeWithTag("brand-tray:AI 平台",true).assertWidthIsEqualTo(34.dp)
         assertTrue(bounds("strategy-title:AI 平台").left < bounds("brand-tray:AI 平台").left)
-        assertTrue(bounds("node:${nodes[1].name}").top > bounds("node:${nodes[0].name}").bottom)
-        compose.onNodeWithText("VLESS",true).assertExists()
-        compose.onNodeWithText("TROJAN",true).assertExists()
+        assertEquals(bounds("node:${nodes[0].name}").top,bounds("node:${nodes[1].name}").top,.5f)
+        compose.onNodeWithText("Vless",true).assertExists()
+        compose.onNodeWithText("Trojan",true).assertExists()
         assertEquals("UDP", liquidNodeProtocolLabel(ProxyNodeUi("自动测速容器", "URLTest", true)))
         assertEquals("策略组", liquidNodeProtocolLabel(ProxyNodeUi("手动组", "Selector", false)))
-        compose.onNodeWithTag("node:${nodes[0].name}",true).assertHeightIsAtLeast(64.dp)
+        compose.onNodeWithTag("node:${nodes[0].name}",true).assertHeightIsAtLeast(78.dp)
         capture("groups-scene","nonhome104-groups")
     }
     @Test fun refreshStatesKeep48dpSlotAndDetailsRemainInlineWithoutDialogs() {
