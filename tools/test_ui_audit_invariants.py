@@ -47,4 +47,16 @@ assert 'proxyRootSettingsDirty' in runtime_settings and 'markDirty' in runtime_s
 assert '.remove("proxyRootRuntimeRefreshPending")' in boot
 assert '.putBoolean("proxyRootRuntimeRefreshPending", true)' not in boot
 assert '运行设置已修改，重启后生效' in main
+theme = (src / "ui/HetuTheme.kt").read_text()
+crystal = (src / "ui/CrystalMaterial.kt").read_text()
+liquid = (src / "LiquidWorkspace.kt").read_text()
+editor = (src / "EditorWorkbench.kt").read_text()
+monitoring = (src / "MonitoringWorkspace.kt").read_text()
+assert "Color(0xFFF4F6F9)" in theme and "Color(0xFF0F172A)" in theme
+assert "RoundedCornerShape(24.dp)" in main and "LiquidStatusGlyph(state.running, busy)" in main
+assert ".size(48.dp)" in liquid and "shape = CircleShape" in liquid
+assert ".height(90.dp)" in liquid and ".height(64.dp)" in liquid
+assert ".height(42.dp).testTag(\"yaml-accessory\")" in editor
+assert "UTF-8 · YAML" in editor
+assert "ticket-badge:" in monitoring and "ticket-progress:" in monitoring
 print("UI audit source/runtime invariants passed")
