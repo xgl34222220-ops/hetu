@@ -86,22 +86,67 @@ internal fun YamlWorkbenchActions(
 }
 /** Fixed above the IME by the containing Column's imePadding; keys never steal editor focus. */
 @Composable
-internal fun YamlWorkbenchAccessory(enabled: Boolean, onSymbol: (String) -> Unit) {
-    val t = LocalHetuTokens.current
-    Row(Modifier.fillMaxWidth().testTag("yaml-accessory")
-        .horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 2.dp),
-        horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
-        yamlWorkbenchSymbols.forEach { symbol ->
-            Box(Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)
-                .testTag("yaml-symbol:$symbol").clip(RoundedCornerShape(12.dp))
-                .clickable(enabled = enabled, role = Role.Button,
-                    onClickLabel = if (symbol == "Tab") "缩进两个空格" else "输入 $symbol") { onSymbol(symbol) },
-                contentAlignment = Alignment.Center) {
-                Box(Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = .045f), RoundedCornerShape(9.dp))
-                    .padding(horizontal = 10.dp, vertical = 7.dp), contentAlignment = Alignment.Center) {
-                    Text(symbol, color = if (enabled) t.textPrimary else t.textMuted, fontSize = 13.sp,
-                        fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold)
-                }
+internal fun YamlWorkbenchAccessory(
+    enabled: Boolean,
+    canUndo: Boolean = false,
+    canRedo: Boolean = false,
+    onUndo: () -> Unit = {},
+    onRedo: () -> Unit = {},
+    onSymbol: (String) -> Unit,
+) {
+    val primary = MaterialTheme.colorScheme.primary
+    val keys = yamlWorkbenchSymbols
+    Row(
+        Modifier.fillMaxWidth().height(42.dp).testTag("yaml-accessory")
+            .background(Color(0xFF0F172A))
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 6.dp, vertical = 5.dp),
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        keys.forEach { symbol ->
+            val highlighted = symbol == "Tab"
+            Box(
+                Modifier.height(32.dp).widthIn(min = 34.dp)
+                    .testTag("yaml-symbol:$symbol")
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(if (highlighted) primary else Color(0xFF1E293B))
+                    .clickable(
+                        enabled = enabled,
+                        role = Role.Button,
+                        onClickLabel = if (symbol == "Tab") "缩进两个空格" else "输入 $symbol",
+                    ) { onSymbol(symbol) }
+                    .padding(horizontal = if (symbol.length > 4) 7.dp else 9.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    symbol,
+                    color = if (enabled) Color.White else Color(0xFF64748B),
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        }
+        Box(Modifier.width(1.dp).height(20.dp).background(Color(0xFF334155)))
+        listOf(
+            Triple("撤销", Icons.Rounded.Undo, canUndo),
+            Triple("重做", Icons.Rounded.Redo, canRedo),
+        ).forEach { (label, icon, available) ->
+            Box(
+                Modifier.size(32.dp).clip(RoundedCornerShape(6.dp))
+                    .clickable(enabled = enabled && available, role = Role.Button) {
+                        if (label == "撤销") onUndo() else onRedo()
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    icon,
+                    label,
+                    Modifier.size(16.dp),
+                    tint = if (enabled && available) Color(0xFF94A3B8) else Color(0xFF475569),
+                )
             }
         }
     }
@@ -112,9 +157,15 @@ internal fun YamlCursorStatus(line: Int, column: Int, lines: Int, modifier: Modi
     val t = LocalHetuTokens.current
     Row(modifier.fillMaxWidth().testTag("yaml-cursor-status").padding(horizontal = 16.dp, vertical = 5.dp),
         horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Text("Ln ${line.coerceAtLeast(1)}, Col ${column.coerceAtLeast(1)}", Modifier.testTag("yaml-cursor"),
-            color = t.textSecondary, fontSize = 11.sp, lineHeight = 16.sp, fontFamily = FontFamily.Monospace)
-        Text("${lines.coerceAtLeast(1)} 行 · 2 空格", color = t.textSecondary, fontSize = 11.sp, lineHeight = 16.sp)
+        Text(
+            "Ln ${line.coerceAtLeast(1)} · Col ${column.coerceAtLeast(1)} · UTF-8 · YAML",
+            Modifier.testTag("yaml-cursor"),
+            color = t.textSecondary,
+            fontSize = 10.5.sp,
+            lineHeight = 15.sp,
+            fontFamily = FontFamily.Monospace,
+        )
+        Text("${lines.coerceAtLeast(1)} 行", color = t.textMuted, fontSize = 10.5.sp, lineHeight = 15.sp)
     }
 }
 
