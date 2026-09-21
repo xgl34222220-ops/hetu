@@ -217,19 +217,22 @@ internal fun SubscriptionBoardingTicket(name: String, provider: DashboardProvide
                 Text("剩余 ${((1f - provider.ratio) * 100f).toInt()}%", color = primary, fontSize = 11.sp,
                     lineHeight = 15.sp, fontWeight = FontWeight.ExtraBold)
             }
+            if (onRefresh != null) {
+                WorkspaceRefreshAction(name, refreshing, success, error.isNotBlank(), onClick = onRefresh)
+            }
         }
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f).heightIn(min = 48.dp).clickable(role = Role.Button, onClick = onEdit),
-                verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(if (provider != null) "${provider.nodes.size} 节点" else if (placeholder) "待填写订阅地址" else "订阅信息",
-                    color = if (placeholder) t.warning else t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp,
-                    modifier = Modifier.testTag("ticket-nodes:$name"))
-                if (host.isNotBlank()) Text(host, color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+        Row(Modifier.fillMaxWidth().heightIn(min = 36.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                host.ifBlank { if (placeholder) "待填写订阅地址" else "订阅配置" },
+                Modifier.weight(1f).clickable(role = Role.Button, onClick = onEdit),
+                color = if (placeholder) t.warning else t.textMuted,
+                fontSize = 11.sp,
+                lineHeight = 16.sp,
+                maxLines = 1,
+            )
+            IconButton(onClick = onEdit, modifier = Modifier.size(36.dp)) {
+                Icon(Icons.Rounded.Edit, "编辑 $name", Modifier.size(16.dp), tint = t.textMuted)
             }
-            IconButton(onClick = onEdit, modifier = Modifier.size(48.dp)) {
-                Icon(Icons.Rounded.Edit, "编辑 $name", Modifier.size(18.dp), tint = t.textSecondary)
-            }
-            if (onRefresh != null) WorkspaceRefreshAction(name, refreshing, success, error.isNotBlank(), onClick = onRefresh)
         }
         if (known && provider != null) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
