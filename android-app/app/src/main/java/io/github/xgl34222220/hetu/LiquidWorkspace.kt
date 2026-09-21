@@ -117,34 +117,70 @@ internal fun LiquidNodeCard(node: ProxyNodeUi, active: Boolean, value: Long?, te
     val interaction = remember(node.name) { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     var reveal by remember(node.name, motion) { mutableStateOf(!motion) }
-    LaunchedEffect(node.name, motion) { if (motion) delay((index * 15L).coerceAtMost(90L)); reveal = true }
+    LaunchedEffect(node.name, motion) {
+        if (motion) delay((index * 15L).coerceAtMost(90L))
+        reveal = true
+    }
     val alpha by animateFloatAsState(if (reveal) 1f else .78f, tween(if (motion) 150 else 0), label = "nodeReveal")
     val scale by animateFloatAsState(if (pressed) .97f else 1f, tween(if (motion) 110 else 0), label = "nodePress")
-    Box(modifier.heightIn(min = 88.dp).testTag("node:${node.name}")
-        .graphicsLayer { this.alpha = alpha; scaleX = scale; scaleY = scale }
-        .crystalMaterial(RoundedCornerShape(16.dp), depth = CrystalDepth.InsetItem, selection = active)
-        .clickable(interactionSource = interaction, indication = null, role = Role.RadioButton, onClick = onSelect)
-        .semantics { selected = active }) {
-        Column {
-            Row(Modifier.fillMaxWidth().padding(start = 10.dp, end = 20.dp, top = 9.dp), verticalAlignment = Alignment.Top) {
+
+    Box(
+        modifier
+            .heightIn(min = 68.dp)
+            .testTag("node:${node.name}")
+            .graphicsLayer { this.alpha = alpha; scaleX = scale; scaleY = scale }
+            .crystalMaterial(RoundedCornerShape(16.dp), depth = CrystalDepth.InsetItem, selection = active)
+            .clickable(interactionSource = interaction, indication = null, role = Role.RadioButton, onClick = onSelect)
+            .semantics { selected = active },
+    ) {
+        Column(
+            Modifier.fillMaxWidth().align(Alignment.CenterStart).padding(start = 11.dp, top = 8.dp, end = 66.dp, bottom = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 val flag = refNodeFlag(node.name)
-                if (flag.isNotBlank()) { Text(flag, fontSize = 12.sp, lineHeight = 18.sp); Spacer(Modifier.width(4.dp)) }
-                // Reserving the same two text lines keeps the protocol/delay row aligned for long names.
-                Text(node.name, Modifier.weight(1f).testTag("node-label:${node.name}"), color = if (active) primary else t.textPrimary,
-                    fontSize = 12.5.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold,
-                    minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (flag.isNotBlank()) {
+                    Text(flag, fontSize = 12.sp, lineHeight = 18.sp)
+                    Spacer(Modifier.width(4.dp))
+                }
+                Text(
+                    node.name,
+                    Modifier.weight(1f).testTag("node-label:${node.name}"),
+                    color = if (active) primary else t.textPrimary,
+                    fontSize = 12.5.sp,
+                    lineHeight = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
-            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(start = 10.dp, end = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(listOf(node.type.ifBlank { "节点" }, if (node.udp) "UDP" else "").filter { it.isNotBlank() }.joinToString(" · "),
-                    Modifier.weight(1f).testTag("node-protocol:${node.name}"), color = t.textSecondary,
-                    fontSize = 11.sp, lineHeight = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                LatencyChip(value, testing, onDelay, Modifier.testTag("node-delay:${node.name}"), compact = true)
-            }
+            Text(
+                listOf(node.type.ifBlank { "节点" }, if (node.udp) "UDP" else "").filter { it.isNotBlank() }.joinToString(" · "),
+                Modifier.fillMaxWidth().testTag("node-protocol:${node.name}"),
+                color = t.textSecondary,
+                fontSize = 10.5.sp,
+                lineHeight = 15.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
-        if (active) Icon(Icons.Rounded.Check, "已选择", Modifier.align(Alignment.TopEnd).padding(top = 10.dp, end = 5.dp).size(13.dp), tint = primary)
+        LatencyChip(
+            value,
+            testing,
+            onDelay,
+            Modifier.align(Alignment.CenterEnd).padding(end = 4.dp).testTag("node-delay:${node.name}"),
+            compact = true,
+        )
+        if (active) {
+            Icon(
+                Icons.Rounded.CheckCircle,
+                "已选择",
+                Modifier.align(Alignment.TopEnd).padding(top = 5.dp, end = 4.dp).size(13.dp),
+                tint = primary,
+            )
+        }
     }
 }
-
 @Composable
 internal fun LiquidGroupWell(group: ProxyGroupUi, selected: String, delays: Map<String, Long>, testing: Map<String, Boolean>,
     onSelect: (String) -> Unit, onDelay: (String) -> Unit, onTestAll: () -> Unit) {
@@ -219,26 +255,84 @@ internal fun LiquidPill(text: String, icon: ImageVector, onClick: () -> Unit, mo
 @Composable
 internal fun LiquidHomeActions(running: Boolean, busy: Boolean, onToggle: () -> Unit, onReload: () -> Unit, onRestart: () -> Unit) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        LiquidPill(if (busy) "请稍候" else if (running) "停止" else "启动", if (running) Icons.Rounded.Stop else Icons.Rounded.PlayArrow,
-            onToggle, Modifier.weight(1f), enabled = !busy, danger = running, primary = !running)
-        LiquidPill("重载", Icons.Rounded.Refresh, onReload, Modifier.weight(1f), enabled = running && !busy)
-        LiquidPill("重启", Icons.Rounded.RestartAlt, onRestart, Modifier.weight(1f), enabled = running && !busy)
+        LiquidPill(
+            "重载",
+            Icons.Rounded.Refresh,
+            onReload,
+            Modifier.weight(1f),
+            enabled = running && !busy,
+        )
+        LiquidPill(
+            if (busy) "请稍候" else if (running) "停止" else "启动",
+            if (running) Icons.Rounded.Stop else Icons.Rounded.PlayArrow,
+            onToggle,
+            Modifier.weight(1f),
+            enabled = !busy,
+            danger = running,
+            primary = !running,
+        )
+        LiquidPill(
+            "重启",
+            Icons.Rounded.RestartAlt,
+            onRestart,
+            Modifier.weight(1f),
+            enabled = running && !busy,
+        )
     }
 }
-
 @Composable
 internal fun LiquidStatusGlyph(running: Boolean, busy: Boolean) {
     val t = LocalHetuTokens.current
     val primary = MaterialTheme.colorScheme.primary
-    Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) {
-        if (busy) HetuBusyIndicator(Modifier.size(22.dp))
-        else Icon(if (running) Icons.Rounded.CheckCircle else Icons.Rounded.PowerSettingsNew, null, Modifier.size(28.dp), tint = primary)
-        if (running && !busy) Canvas(Modifier.align(Alignment.BottomEnd).size(9.dp)) {
-            drawCircle(t.cardBackground); drawCircle(t.success, radius = size.minDimension * .32f)
+    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
+    val shape = RoundedCornerShape(16.dp)
+    Box(
+        Modifier
+            .size(48.dp)
+            .shadow(
+                elevation = if (running && !busy) 8.dp else 2.dp,
+                shape = shape,
+                ambientColor = primary.copy(alpha = .08f),
+                spotColor = primary.copy(alpha = .16f),
+            )
+            .background(
+                Brush.verticalGradient(
+                    if (running && !busy) {
+                        listOf(primary, primary.copy(alpha = .88f))
+                    } else {
+                        listOf(
+                            if (dark) Color.White.copy(alpha = .10f) else Color.White.copy(alpha = .92f),
+                            if (dark) Color.White.copy(alpha = .05f) else Color(0xFFF4F7FB),
+                        )
+                    },
+                ),
+                shape,
+            )
+            .border(
+                .7.dp,
+                if (running && !busy) Color.White.copy(alpha = .24f) else t.textMuted.copy(alpha = .14f),
+                shape,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (busy) {
+            HetuBusyIndicator(Modifier.size(24.dp))
+        } else {
+            Icon(
+                if (running) Icons.Rounded.Check else Icons.Rounded.PowerSettingsNew,
+                null,
+                Modifier.size(if (running) 30.dp else 25.dp),
+                tint = if (running) Color.White else primary,
+            )
+        }
+        if (running && !busy) {
+            Canvas(Modifier.align(Alignment.BottomEnd).padding(3.dp).size(10.dp)) {
+                drawCircle(t.cardBackground)
+                drawCircle(t.success, radius = size.minDimension * .32f)
+            }
         }
     }
 }
-
 @Composable
 internal fun LiquidHomeMenu(onLog: () -> Unit, onConnections: () -> Unit, onDiagnostics: () -> Unit,
     onAdblock: () -> Unit, diagnosticLoading: Boolean, hazeState: HazeState? = null, glassEnabled: Boolean = false) {
