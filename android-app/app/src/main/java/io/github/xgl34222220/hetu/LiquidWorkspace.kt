@@ -82,7 +82,7 @@ internal fun LiquidStrategyCard(group: ProxyGroupUi, selected: String, expanded:
     val angle by animateFloatAsState(if (expanded) 180f else 0f, tween(if (motion) 250 else 0), label = "groupArrow")
     Column(
         modifier
-            .height(90.dp)
+            .height(112.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .crystalMaterial(RoundedCornerShape(22.dp), selection = expanded)
             .testTag("strategy:${group.name}")

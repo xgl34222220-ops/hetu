@@ -161,6 +161,6 @@ class NonHomeAlignmentTest {
         assertTrue("Close hard-snapped: $closing",closing.any { it>1f && it<end })
         assertTrue("Accordion did not finish closing: $closing",closing.last()<=1f)
         compose.runOnIdle { motion=false;visible=true }
-        assertEquals(end,frames(4).last(),1f)
+        assertEquals("Reduced motion must snap to the real 120dp content height, not the spring overshoot", 120f, frames(4).last(), 1f)
     }
 }

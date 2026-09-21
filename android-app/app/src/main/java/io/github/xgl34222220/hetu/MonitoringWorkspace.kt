@@ -21,6 +21,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.xgl34222220.hetu.ui.*
@@ -203,8 +204,16 @@ internal fun SubscriptionBoardingTicket(name: String, provider: DashboardProvide
     Column(Modifier.fillMaxWidth().crystalMaterial(RoundedCornerShape(22.dp), tint = primary)
         .testTag("subscription-ticket:$name").padding(WorkspaceMetrics.gutter), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(name, Modifier.testTag("ticket-title:$name"), color = t.textPrimary,
-                fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
+            Text(
+                name,
+                Modifier.weight(1f).testTag("ticket-title:$name"),
+                color = t.textPrimary,
+                fontSize = 16.sp,
+                lineHeight = 22.sp,
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
             Box(Modifier.background(Color(0xFFEFF6FF), RoundedCornerShape(6.dp))
                 .padding(horizontal = 6.dp, vertical = 2.dp).testTag("ticket-nodes:$name")) {
                 Text(
@@ -213,7 +222,6 @@ internal fun SubscriptionBoardingTicket(name: String, provider: DashboardProvide
                     lineHeight = 14.sp, fontWeight = FontWeight.Bold,
                 )
             }
-            Spacer(Modifier.weight(1f))
             if (known && provider != null) Box(Modifier.background(Color(0xFFEFF6FF), CircleShape)
                 .padding(horizontal = 7.dp, vertical = 2.dp).testTag("ticket-badge:$name")) {
                 Text("剩余 ${((1f - provider.ratio) * 100f).toInt()}%", color = primary, fontSize = 11.sp,
