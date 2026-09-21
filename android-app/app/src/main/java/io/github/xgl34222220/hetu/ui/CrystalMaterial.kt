@@ -3,6 +3,8 @@ package io.github.xgl34222220.hetu.ui
 import android.content.SharedPreferences
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -101,6 +103,11 @@ fun Modifier.crystalMaterial(
         ambientColor = Color(0xFF0F172A).copy(alpha = if (depth == CrystalDepth.Popover) .10f else .03f),
         spotColor = Color(0xFF0F172A).copy(alpha = if (depth == CrystalDepth.Popover) .14f else .05f))
         .clip(shape).then(blur).background(fill, shape)
+        .border(
+            1.dp,
+            if (dark) Color.White.copy(alpha = .14f) else Color.White.copy(alpha = .95f),
+            shape,
+        )
         .drawWithCache {
             val outline = shape.createOutline(size, layoutDirection, this)
             val rim = Brush.verticalGradient(listOf(
@@ -149,10 +156,22 @@ fun CrystalSurface(
     content: @Composable () -> Unit,
 ) {
     val crystal = wantsCrystal(color, shape)
-    MaterialSurface(modifier = if (crystal) modifier.crystalMaterial(shape) else modifier,
-        shape = shape, color = if (crystal) Color.Transparent else color, contentColor = contentColor,
-        tonalElevation = if (crystal) 0.dp else tonalElevation, shadowElevation = if (crystal) 0.dp else shadowElevation,
-        border = border, content = content)
+    if (crystal) {
+        Box(modifier.crystalMaterial(shape)) {
+            CompositionLocalProvider(LocalContentColor provides contentColor, content = content)
+        }
+    } else {
+        MaterialSurface(
+            modifier = modifier,
+            shape = shape,
+            color = color,
+            contentColor = contentColor,
+            tonalElevation = tonalElevation,
+            shadowElevation = shadowElevation,
+            border = border,
+            content = content,
+        )
+    }
 }
 
 @Composable
@@ -170,8 +189,33 @@ fun CrystalSurface(
     content: @Composable () -> Unit,
 ) {
     val crystal = wantsCrystal(color, shape)
-    MaterialSurface(onClick = onClick, modifier = if (crystal) modifier.crystalMaterial(shape) else modifier,
-        enabled = enabled, shape = shape, color = if (crystal) Color.Transparent else color, contentColor = contentColor,
-        tonalElevation = if (crystal) 0.dp else tonalElevation, shadowElevation = if (crystal) 0.dp else shadowElevation,
-        border = border, interactionSource = interactionSource, content = content)
+    if (crystal) {
+        val source = interactionSource ?: remember { MutableInteractionSource() }
+        Box(
+            modifier
+                .crystalMaterial(shape)
+                .clickable(
+                    enabled = enabled,
+                    interactionSource = source,
+                    indication = null,
+                    onClick = onClick,
+                ),
+        ) {
+            CompositionLocalProvider(LocalContentColor provides contentColor, content = content)
+        }
+    } else {
+        MaterialSurface(
+            onClick = onClick,
+            modifier = modifier,
+            enabled = enabled,
+            shape = shape,
+            color = color,
+            contentColor = contentColor,
+            tonalElevation = tonalElevation,
+            shadowElevation = shadowElevation,
+            border = border,
+            interactionSource = interactionSource,
+            content = content,
+        )
+    }
 }
