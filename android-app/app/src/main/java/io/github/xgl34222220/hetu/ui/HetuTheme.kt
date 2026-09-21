@@ -49,13 +49,13 @@ data class HetuTokens(
 
 val LocalHetuTokens = staticCompositionLocalOf {
     HetuTokens(
-        pageBackground = Color(0xFFF4F5F7),
+        pageBackground = Color(0xFFF4F6F9),
         cardBackground = Color(0xFFFFFFFF),
         elevatedCardBackground = Color(0xFFF1F5F9),
         heroBackground = Color(0xFFEDF4FF),
-        textPrimary = Color(0xFF111827),
-        textSecondary = Color(0xFF71767F),
-        textMuted = Color(0xFF71767F),
+        textPrimary = Color(0xFF0F172A),
+        textSecondary = Color(0xFF64748B),
+        textMuted = Color(0xFF94A3B8),
         success = Color(0xFF18794E),
         warning = Color(0xFF946200),
         danger = Color(0xFFC52A34),
@@ -146,11 +146,11 @@ fun HetuTheme(content: @Composable () -> Unit) {
         primary = fixedPrimary,
         primaryContainer = Color(0xFFDBEAFE),
         secondary = fixedPrimary,
-        background = Color(0xFFF4F5F7),
+        background = Color(0xFFF4F6F9),
         surface = Color.White,
         error = Color(0xFFC52A34),
-        onBackground = Color(0xFF111827),
-        onSurface = Color(0xFF111827),
+        onBackground = Color(0xFF0F172A),
+        onSurface = Color(0xFF0F172A),
     )
     val baseDark = darkColorScheme(
         primary = fixedPrimary,
@@ -195,13 +195,13 @@ fun HetuTheme(content: @Composable () -> Unit) {
             )
         } else {
             HetuTokens(
-                pageBackground = Color(0xFFF4F5F7),
+                pageBackground = Color(0xFFF4F6F9),
                 cardBackground = Color(0xFFFFFFFF),
                 elevatedCardBackground = Color(0xFFF1F5F9),
                 heroBackground = Color(0xFFEDF4FF),
-                textPrimary = Color(0xFF111827),
-                textSecondary = Color(0xFF71767F),
-                textMuted = Color(0xFF71767F),
+                textPrimary = Color(0xFF0F172A),
+                textSecondary = Color(0xFF64748B),
+                textMuted = Color(0xFF94A3B8),
                 success = Color(0xFF18794E),
                 warning = Color(0xFF946200),
                 danger = Color(0xFFC52A34),
