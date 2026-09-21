@@ -46,7 +46,7 @@ class LiquidRestoreRenderTest {
         val file=File("build/reports/ui-audit/$name.png").apply { parentFile.mkdirs() }
         file.outputStream().use { image.compress(Bitmap.CompressFormat.PNG,100,it) }
     }
-    @Test fun compactWellKeepsTwoColumnsAndSelectionDoesNotShiftLabels() {
+    @Test fun compactWellUsesFullWidthRowsAndSelectionDoesNotShiftContent() {
         val nodes=listOf(ProxyNodeUi("美国节点", "URLTest"),ProxyNodeUi("日本节点", "URLTest"),
             ProxyNodeUi("香港节点", "URLTest"),ProxyNodeUi("台湾节点", "URLTest"))
         val group=ProxyGroupUi("AI 平台", "Selector", "日本节点", nodes)
@@ -63,8 +63,8 @@ class LiquidRestoreRenderTest {
         } } }
         val us=compose.onNodeWithTag("node-label:美国节点",true).fetchSemanticsNode().boundsInRoot
         val jp=compose.onNodeWithTag("node-label:日本节点",true).fetchSemanticsNode().boundsInRoot
-        assertEquals("Selected label baseline changed",us.top,jp.top,.5f)
-        assertTrue("Nodes collapsed to single column",jp.left>us.right)
+        assertEquals("Full-width node rows must share the same left edge",us.left,jp.left,.5f)
+        assertTrue("Phone node rows must stack vertically",jp.top>us.bottom)
         compose.onNodeWithText("AI 平台 · 可选节点",true).assertDoesNotExist()
         compose.onNodeWithTag("brand-tray:AI 平台",true).assertWidthIsEqualTo(32.dp)
         compose.onNodeWithTag("node-delay:日本节点",true).performClick()
