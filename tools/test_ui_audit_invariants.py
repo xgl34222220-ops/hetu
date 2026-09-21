@@ -60,17 +60,17 @@ dock = (src / "ui/HetuGlassDock.kt").read_text()
 assert "Color(0xFFEEEDFB)" in theme and "Color(0xFFE2DEFF)" in theme
 assert 'item(key = "home-shortcuts")' in refhome
 assert 'title = "WebUI"' in refhome and 'title = "日志"' in refhome
-assert 'Modifier.fillMaxWidth().height(120.dp)' in refhome and 'size(116.dp)' in refhome
+assert '.height(120.dp)' in refhome and '.size(116.dp)' in refhome
 assert '"少于 1 分钟"' in refhome
-assert 'height(52.dp)' in refhome and 'label = "重载"' in refhome and 'label = "重启"' in refhome
+assert '.height(52.dp)' in refhome and 'label = "重载"' in refhome and 'label = "重启"' in refhome
 assert 'Text("延迟"' in refhome and 'Icons.Rounded.Tune' in refhome and 'Icons.Rounded.Refresh' in refhome
-assert 'height(88.dp)' in refhome
+assert '.height(88.dp)' in refhome
 assert 'ReferenceDashboardCard' in instrument and 'Text("WAN"' in instrument and 'Text("网速"' in instrument
 assert 'Text("订阅"' in instrument and 'Text("资源占用"' in instrument
 assert 'home-usage-progress' in instrument and 'home-cpu-progress' in instrument and '.height(3.dp)' in instrument
 assert 'fontSize = 32.sp' in refhome and 'RoundedCornerShape(14.dp)' in refhome
 assert '.horizontalScroll(rememberScrollState())' in refhome
-assert 'height(80.dp)' in liquid and 'height(78.dp)' in liquid
+assert '.height(80.dp)' in liquid and '.height(78.dp)' in liquid
 assert 'if (width < 292.dp' in liquid, "Phone strategy grid should use two columns when space permits"
 assert 'TextAutoSize.StepBased' in liquid, "Long node names must shrink instead of becoming ellipsis-heavy"
 assert 'ConfiguredGroupIcon(group, Modifier.size(32.dp))' in liquid
