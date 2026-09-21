@@ -72,11 +72,11 @@ private fun RuntimeCoreSettingsPage(onBack: () -> Unit) {
         item {
             FocusedGroup {
                 FocusedChoiceRow(Icons.Rounded.Memory, Color(0xFF2563EB), "Mihomo", "标准 Mihomo 运行核心", profile.core == ProxyRuntimeProfile.Core.MIHOMO) {
-                    prefs.edit().putString("proxyBaseCore", "mihomo").apply(); revision++
+                    prefs.edit().putString("proxyBaseCore", "mihomo").apply(); ProxyRuntimeSettings.markDirty(prefs, "proxyBaseCore"); revision++
                 }
                 FocusedDivider()
                 FocusedChoiceRow(Icons.Rounded.AutoAwesome, Color(0xFF8B5CF6), "Mihomo Smart", "Smart 运行配置入口", profile.core == ProxyRuntimeProfile.Core.MIHOMO_SMART) {
-                    prefs.edit().putString("proxyBaseCore", "mihomo-smart").apply(); revision++
+                    prefs.edit().putString("proxyBaseCore", "mihomo-smart").apply(); ProxyRuntimeSettings.markDirty(prefs, "proxyBaseCore"); revision++
                 }
             }
         }
@@ -100,7 +100,7 @@ private fun SharedNetworkSettingsPage(onBack: () -> Unit) {
         item {
             FocusedGroup {
                 FocusedSwitchRow(Icons.Rounded.WifiTethering, Color(0xFF10B981), "接管共享网络", "将进入 PREROUTING 的共享流量纳入 Root 透明代理", enabled) {
-                    enabled = it; prefs.edit().putBoolean("proxySharedNetwork", it).apply()
+                    enabled = it; prefs.edit().putBoolean("proxySharedNetwork", it).apply(); ProxyRuntimeSettings.markDirty(prefs, "proxySharedNetwork")
                 }
                 FocusedDivider()
                 FocusedInfoRow(Icons.Rounded.Router, Color(0xFF0EA5E9), "当前接管方式", "只处理共享/转发流量；本机应用仍按应用范围和原 YAML 分流。")
@@ -119,7 +119,7 @@ private fun CnIpSettingsPage(onBack: () -> Unit) {
         item {
             FocusedGroup {
                 FocusedSwitchRow(Icons.Rounded.Public, Color(0xFFF59E0B), "中国 IP 自动直连", "命中国内 IPv4 / IPv6 网段时直接连接", enabled) {
-                    enabled = it; prefs.edit().putBoolean("proxyCnIpDirect", it).apply()
+                    enabled = it; prefs.edit().putBoolean("proxyCnIpDirect", it).apply(); ProxyRuntimeSettings.markDirty(prefs, "proxyCnIpDirect")
                 }
                 FocusedDivider()
                 FocusedInfoRow(Icons.Rounded.Inventory2, Color(0xFF0EA5E9), "数据源", "内置离线快照 + Mihomo provider 运行时更新")
@@ -166,7 +166,7 @@ private fun BypassRulesPage(onBack: () -> Unit) {
                     TextButton(onClick = { editor = null }, modifier = Modifier.weight(1f)) { Text("取消") }
                     Button(onClick = {
                         val values = text.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toSortedSet()
-                        prefs.edit().putStringSet(current.key, values).apply(); revision++; editor = null
+                        prefs.edit().putStringSet(current.key, values).apply(); ProxyRuntimeSettings.markDirty(prefs, current.key); revision++; editor = null
                     }, modifier = Modifier.weight(1f)) { Text("保存") }
                 }
                 Spacer(Modifier.height(4.dp))
