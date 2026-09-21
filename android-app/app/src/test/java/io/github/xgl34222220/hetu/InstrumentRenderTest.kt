@@ -67,6 +67,9 @@ class InstrumentRenderTest {
             val speed=compose.onNodeWithTag("instrument-speed",true).fetchSemanticsNode().boundsInRoot
             assertEquals("Single-panel divider unexpectedly became a gutter",.5f,speed.left-net.right,1f)
             compose.onNodeWithTag("home-usage-progress",true).assert(SemanticsMatcher.expectValue(SemanticsProperties.ProgressBarRangeInfo,ProgressBarRangeInfo(25f/128f,0f..1f)))
+            compose.onNodeWithTag("home-cpu-progress",true).assert(SemanticsMatcher.expectValue(SemanticsProperties.ProgressBarRangeInfo,ProgressBarRangeInfo(.063f,0f..1f)))
+            compose.onNodeWithTag("instrument-network-badge",true).assertDoesNotExist()
+            compose.onNodeWithTag("instrument-resource-badge",true).assertDoesNotExist()
             capture("instrument-scene","instruments-360-${if(dark)"dark" else "light"}")
         }
     }
@@ -85,6 +88,8 @@ class InstrumentRenderTest {
             val layouts=mutableListOf<TextLayoutResult>()
             compose.onNodeWithTag("ticket-usage:${item.name}",true).performSemanticsAction(SemanticsActions.GetTextLayoutResult){it(layouts)}
             assertTrue("Ticket number clipping",layouts.isNotEmpty() && layouts.none{it.hasVisualOverflow})
+            val rail=compose.onNodeWithTag("ticket-progress:${item.name}",true).fetchSemanticsNode().boundsInRoot
+            assertEquals("Ticket progress must remain 5dp",5f,rail.height,.6f)
             capture("ticket-scene","ticket-360-$f")
         }
         compose.onNodeWithContentDescription("编辑 ${item.name}").performClick()
