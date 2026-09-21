@@ -3,6 +3,8 @@ package io.github.xgl34222220.hetu
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.view.View
+import android.view.ViewGroup
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -48,11 +50,34 @@ class WorkbenchRegressionTest {
         File("build/reports/ui-audit/$name.png").apply { parentFile?.mkdirs() }.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
+    private fun attachEditor(editor: CodeEditor) {
+        compose.activity.setContentView(editor, ViewGroup.LayoutParams(360, 480))
+        editor.measure(View.MeasureSpec.makeMeasureSpec(360, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(480, View.MeasureSpec.EXACTLY))
+        editor.layout(0, 0, 360, 480)
+        awaitEditable(editor)
+    }
+
+    private fun awaitEditable(editor: CodeEditor) {
+        // Sora intentionally refuses editing until its asynchronous layout is ready.
+        // Do not force layoutBusy=false or bypass the production isEditable guard.
+        repeat(200) {
+            shadowOf(Looper.getMainLooper()).idle()
+            if (editor.isEditable) return
+            Thread.sleep(10)
+        }
+        fail("Native editor did not finish layout: editable=${editor.editable}")
+    }
+
     @Test fun nativeSymbolInsertionPreservesTextAndBatchIndentUndo() {
-        val editor = CodeEditor(compose.activity).apply { setEditorLanguage(HetuYamlLanguage()); setTabWidth(2); setText("") }
+        val editor = CodeEditor(compose.activity).apply {
+            setEditorLanguage(HetuYamlLanguage()); setWordwrap(false); setTabWidth(2); setText("")
+        }
         try {
+            attachEditor(editor)
             var expected = ""
             yamlWorkbenchSymbols.forEach { symbol ->
+                awaitEditable(editor)
                 applyYamlAccessory(editor, symbol)
                 expected += if (symbol == "Tab") "  " else symbol
                 assertEquals(expected, editor.text.toString())
@@ -60,6 +85,7 @@ class WorkbenchRegressionTest {
             assertFalse(editor.text.toString().contains('\t'))
             val source = "name: 中文\npath: '/a'"
             editor.setText(source)
+            awaitEditable(editor)
             editor.setSelectionRegion(0, 0, 1, 10)
             applyYamlAccessory(editor, "Tab")
             assertEquals("  name: 中文\n  path: '/a'", editor.text.toString())
@@ -73,8 +99,9 @@ class WorkbenchRegressionTest {
 
     @Test fun nativeLiteralSearchDoesNotModifyConfiguration() {
         val source = "proxy: DIRECT\n# proxy test\nserver: example.org"
-        val editor = CodeEditor(compose.activity).apply { setText(source) }
+        val editor = CodeEditor(compose.activity).apply { setWordwrap(false); setText(source) }
         try {
+            attachEditor(editor)
             editor.searcher.search("proxy", EditorSearcher.SearchOptions(true, false))
             repeat(100) { Thread.sleep(10); shadowOf(Looper.getMainLooper()).idle() }
             assertEquals(2, editor.searcher.matchedPositionCount)
