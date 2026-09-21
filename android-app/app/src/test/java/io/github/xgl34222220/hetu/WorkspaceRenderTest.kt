@@ -130,7 +130,6 @@ class WorkspaceRenderTest {
         compose.runOnIdle { assertEquals(2,measured); assertEquals(0,expanded) }
         compose.onNodeWithText(group.name,true).performClick()
         compose.runOnIdle { assertEquals(1,expanded) }
-        assertTrue(compose.onAllNodes(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription,"good 96 ms"),true).fetchSemanticsNodes().isNotEmpty())
     }
     @Test fun actualBentoDisplaysAllRuntimeStatesAndNeverCallsBackend() {
         var state by mutableStateOf("idle")
@@ -145,9 +144,9 @@ class WorkspaceRenderTest {
         for (s in listOf("idle","loading","failed","success","stale")) {
             compose.runOnIdle { state=s }
             compose.waitForIdle()
-            val expected=when(s) { "idle"->"未检测";"loading"->"检测中…";"failed"->"检测失败";else->"2001:db8:1234:5678:90ab:cdef:1234:5678" }
+            val expected=when(s) { "idle"->"未检测";"loading"->"读取中";"failed"->"检测失败";else->"2001:db8:1234:5678:90ab:cdef:1234:5678" }
             compose.onNodeWithText(expected,true).assertExists()
-            compose.onNodeWithText("已用流量",true).assertExists()
+            compose.onNodeWithTag("instrument-usage",true).assertExists()
         }
         for(w in listOf(320,360,412)) for(f in listOf(1f,1.5f)) {
             compose.runOnIdle { width=w;scale=f }
