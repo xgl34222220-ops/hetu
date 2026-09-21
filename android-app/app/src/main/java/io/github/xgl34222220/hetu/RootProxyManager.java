@@ -645,6 +645,7 @@ final class RootProxyManager {
                 // their own effective/error fields; they must not create an endless "restart again"
                 // loop by leaving the generic settings signature permanently different.
                 .putString("proxyRootAppliedSettings",ProxyRuntimeSettings.signature(prefs))
+                .remove(ProxyRuntimeSettings.DIRTY_KEY)
                 .putString("proxyRootEffectiveIpv6",profile.ipv6.id)
                 .putLong("proxyRootHealthProbeElapsed",0L)
                 .putString("proxyRootValidatedFingerprint",validationKey)
