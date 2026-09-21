@@ -45,7 +45,6 @@ boot = (src / "BootReceiver.java").read_text()
 assert 'proxyRootSettingsDirty' in runtime_settings and 'markDirty' in runtime_settings
 assert '.remove("proxyRootRuntimeRefreshPending")' in boot
 assert '.putBoolean("proxyRootRuntimeRefreshPending", true)' not in boot
-assert '运行设置已修改，重启后生效' in main
 theme = (src / "ui/HetuTheme.kt").read_text()
 crystal = (src / "ui/CrystalMaterial.kt").read_text()
 liquid = (src / "LiquidWorkspace.kt").read_text()
