@@ -3470,6 +3470,7 @@ private fun RefSettings(state: ProxyComposeState, operation: String, onApplySett
     var latencyPicker by remember { mutableStateOf(false) }
     var portsInfo by remember { mutableStateOf(false) }
     var notificationSettings by remember { mutableStateOf(false) }
+    var baseSettings by remember { mutableStateOf(false) }
     var autoStart by remember { mutableStateOf(prefs.getBoolean("proxyRootAutoStart", false)) }
     var statusNotificationEnabled by remember { mutableStateOf(prefs.getBoolean(ProxyStatusNotificationService.PREF_ENABLED, false)) }
     var blurEnabled by remember { mutableStateOf(prefs.getBoolean("enableBlur", true)) }
@@ -3477,148 +3478,195 @@ private fun RefSettings(state: ProxyComposeState, operation: String, onApplySett
 
     val pending = state.runtimeSettingsPending || prefs.getBoolean("proxyRootRuntimeRefreshPending", false)
     val t = LocalHetuTokens.current
-    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
+
     LazyColumn(
         Modifier.fillMaxSize().statusBarsPadding(),
         contentPadding = PaddingValues(
-            start = 16.dp,
+            start = 12.dp,
             top = 8.dp,
-            end = 16.dp,
+            end = 12.dp,
             bottom = hetuContentBottomPadding(),
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item { RefTitleBar("设置") }
-        if (state.running) {
-            item {
-                RefGroup {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Icon(if (pending) Icons.Rounded.Info else Icons.Rounded.CheckCircle,
-                                null, Modifier.size(20.dp), tint = if (pending) t.warning else t.success)
-                            Text(if (pending) "有设置等待应用" else "当前运行设置",
-                                color = t.textPrimary, style = MaterialTheme.typography.titleSmall)
-                        }
-                        Text("当前 IPv6：${ProxyRuntimeSettings.ipv6Label(state.effectiveIpv6)}",
-                            color = t.textSecondary, style = MaterialTheme.typography.bodyMedium)
-                        if (state.effectiveIpv6 == "disable" || state.effectiveIpv6 == "strict") {
-                            Text(
-                                buildString {
-                                    if (state.effectiveIpv6 == "disable") {
-                                        if (state.ipv6ProtectionActive) append("IPv6 保护规则已加载")
-                                        else append("IPv6 外联保护待确认")
-                                        append(if (state.ipv6Disabled) " · 系统协议栈已关闭" else " · 系统接口可能保留 IPv6 地址")
-                                    } else {
-                                        append(if (state.ipv6ProtectionActive) "IPv6 保护规则已加载" else "外联保护状态待确认")
-                                    }
-                                },
-                                color = if (state.ipv6ProtectionActive) t.success else t.warning,
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                        if (pending) {
-                            Text("下面显示已保存的选项。应用后会短暂重连。", color = t.textSecondary, style = MaterialTheme.typography.bodySmall)
-                            Button(onClick = onApplySettings, enabled = operation.isBlank(), modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = CircleShape) {
-                                if (operation.isNotBlank()) {
-                                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                                    Spacer(Modifier.width(8.dp))
-                                }
-                                Text(if (operation.isNotBlank()) "正在应用…" else "应用设置并重启")
-                            }
-                        }
-                    }
+
+        item {
+            RefGroup {
+                RefToolRow(
+                    Icons.Rounded.Tune,
+                    Color.Unspecified,
+                    "基础代理配置",
+                    "配置核心 模式 IPv6 和当前配置",
+                ) {
+                    baseSettings = true
+                }
+                RefDivider()
+                RefToolRow(
+                    Icons.Rounded.Dns,
+                    Color.Unspecified,
+                    "其他代理配置",
+                    "调整端口 DNS 劫持与资源限制",
+                ) {
+                    context.startActivity(Intent(context, ProxyAdvancedSettingsActivity::class.java))
                 }
             }
         }
-        item { RefSectionLabel("核心与运行") }
+
         item {
             RefGroup {
-                RefValueRow("运行核心", state.core, Icons.Rounded.Memory, Color(0xFF334155), highlightValue = true) {
-                    context.startActivity(Intent(context, ProxyRuntimeCoreSettingsActivity::class.java))
+                RefValueRow(
+                    "语言",
+                    "跟随系统",
+                    Icons.Rounded.Translate,
+                    Color.Unspecified,
+                    highlightValue = false,
+                )
+                RefDivider()
+                RefToolRow(
+                    Icons.Rounded.FormatPaint,
+                    Color.Unspecified,
+                    "主题设置",
+                    "调整主题 模糊 底栏和缩放",
+                ) {
+                    context.startActivity(Intent(context, ThemeSettingsActivity::class.java))
                 }
-                RefDivider()
-                RefValueRow("运行模式", state.mode, Icons.Rounded.Tune, Color(0xFF2563EB), highlightValue = true) { modePicker = true }
-                RefDivider()
-                RefValueRow("IPv6", ProxyRuntimeSettings.ipv6Label(state.ipv6) +
-                    if (state.running && state.effectiveIpv6.isNotBlank() && state.effectiveIpv6 != state.ipv6) " · 待应用" else "",
-                    Icons.Rounded.Public, Color(0xFF10B981), highlightValue = true) { ipv6Picker = true }
-                RefDivider()
+            }
+        }
+
+        item {
+            RefGroup {
                 RefSwitchRow(
-                    icon = Icons.Rounded.Bolt,
-                    accent = Color(0xFF2563EB),
+                    icon = Icons.Rounded.PowerSettingsNew,
+                    accent = Color.Unspecified,
                     title = "开机自启",
-                    subtitle = "重启后自动恢复上次启用的代理保护",
+                    subtitle = "重启后自动恢复上次启用的代理服务",
                     checked = autoStart,
                 ) { enabled ->
                     autoStart = enabled
                     prefs.edit().putBoolean("proxyRootAutoStart", enabled).apply()
                 }
-            }
-        }
-        item { RefSectionLabel("网络与配置") }
-        item {
-            RefGroup {
-                RefValueRow(
-                    "延迟自动刷新",
-                    if (latencyInterval <= 0) "关闭" else "${latencyInterval} 秒",
-                    Icons.Rounded.Speed,
-                    Color(0xFF2563EB),
-                    highlightValue = latencyInterval > 0,
-                ) { latencyPicker = true }
                 RefDivider()
-                RefValueRow(
-                    "端口细则",
-                    "${MihomoStartupConfig.TPROXY_PORT} / ${MihomoStartupConfig.REDIRECT_PORT}",
-                    Icons.Rounded.Hub,
-                    Color(0xFFF97316),
-                    highlightValue = true,
-                ) { portsInfo = true }
-                RefDivider()
-                RefValueRow("高级代理配置", "应用范围 · DNS · QUIC · CNIP · 共享 · 绕过", Icons.Rounded.Tune, Color(0xFF0EA5E9), highlightValue = true) {
-                    context.startActivity(Intent(context, ProxyAdvancedSettingsActivity::class.java))
-                }
-            }
-        }
-        item { RefSectionLabel("状态通知") }
-        item {
-            RefGroup {
                 RefSwitchRow(
-                    icon = Icons.Rounded.NotificationsActive,
-                    accent = Color(0xFF2563EB),
-                    title = "代理状态通知",
-                    subtitle = "显示 Root/Mihomo 状态、实时速率与快捷控制",
+                    icon = Icons.Rounded.Notifications,
+                    accent = Color.Unspecified,
+                    title = "通知",
+                    subtitle = "启用代理状态通知与快捷控制",
                     checked = statusNotificationEnabled,
                 ) { enabled ->
                     statusNotificationEnabled = enabled
                     ProxyStatusNotificationService.setEnabled(context, enabled)
                 }
                 RefDivider()
-                RefValueRow(
-                    "通知内容与按钮",
-                    "模板变量 · 快捷操作",
+                RefToolRow(
                     Icons.Rounded.Tune,
-                    Color(0xFF0EA5E9),
-                    highlightValue = true,
-                ) { notificationSettings = true }
+                    Color.Unspecified,
+                    "通知内容与按钮",
+                    "模板变量与快捷操作",
+                ) {
+                    notificationSettings = true
+                }
             }
         }
-        item { RefSectionLabel("界面") }
-        item {
-            RefGroup {
-                RefSwitchRow(
-                    icon = Icons.Rounded.BlurOn,
-                    accent = Color(0xFF8B5CF6),
-                    title = "模糊效果",
-                    subtitle = "控制应用内磨砂与背景模糊",
-                    checked = blurEnabled,
-                ) { enabled ->
-                    blurEnabled = enabled
-                    prefs.edit().putBoolean("enableBlur", enabled).apply()
+
+        if (pending) {
+            item {
+                RefGroup {
+                    Column(
+                        Modifier.fillMaxWidth().padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(9.dp),
+                    ) {
+                        Text(
+                            "有设置等待应用",
+                            color = t.textPrimary,
+                            fontSize = 15.sp,
+                            lineHeight = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            "应用后会短暂重连代理。",
+                            color = t.textSecondary,
+                            fontSize = 12.sp,
+                            lineHeight = 17.sp,
+                        )
+                        Button(
+                            onClick = onApplySettings,
+                            enabled = operation.isBlank(),
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                            shape = CircleShape,
+                        ) {
+                            if (operation.isNotBlank()) {
+                                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                                Spacer(Modifier.width(8.dp))
+                            }
+                            Text(if (operation.isNotBlank()) "正在应用…" else "应用设置并重启")
+                        }
+                    }
                 }
-                RefDivider()
-                RefValueRow("主题与界面", "主题、色彩与玻璃效果", Icons.Rounded.Palette, Color(0xFFEC4899)) {
-                    context.startActivity(Intent(context, ThemeSettingsActivity::class.java))
+            }
+        }
+    }
+
+    if (baseSettings) {
+        ModalBottomSheet(
+            onDismissRequest = { baseSettings = false },
+            containerColor = t.cardBackground,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        ) {
+            Column(
+                Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    "基础代理配置",
+                    color = t.textPrimary,
+                    fontSize = 22.sp,
+                    lineHeight = 28.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                )
+                WorkspaceSettingRow(
+                    "运行核心",
+                    state.core.ifBlank { "Mihomo" },
+                    Icons.Rounded.Memory,
+                    onClick = {
+                        baseSettings = false
+                        context.startActivity(Intent(context, ProxyRuntimeCoreSettingsActivity::class.java))
+                    },
+                ) {
+                    Icon(Icons.Rounded.ChevronRight, null, tint = t.textMuted)
                 }
+                WorkspaceInsetDivider()
+                WorkspaceSettingRow(
+                    "运行模式",
+                    state.mode,
+                    Icons.Rounded.Tune,
+                    onClick = {
+                        baseSettings = false
+                        modePicker = true
+                    },
+                ) {
+                    Icon(Icons.Rounded.ChevronRight, null, tint = t.textMuted)
+                }
+                WorkspaceInsetDivider()
+                WorkspaceSettingRow(
+                    "IPv6",
+                    ProxyRuntimeSettings.ipv6Label(state.ipv6),
+                    Icons.Rounded.Public,
+                    onClick = {
+                        baseSettings = false
+                        ipv6Picker = true
+                    },
+                ) {
+                    Icon(Icons.Rounded.ChevronRight, null, tint = t.textMuted)
+                }
+                WorkspaceInsetDivider()
+                WorkspaceSettingRow(
+                    "当前配置",
+                    state.config,
+                    Icons.Rounded.Description,
+                )
+                Spacer(Modifier.height(8.dp))
             }
         }
     }
