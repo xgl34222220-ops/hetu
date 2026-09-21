@@ -109,6 +109,8 @@ class PresentationTest {
         assertEquals("Google 更新失败（503）", UiFeedback.summary("Google 更新失败：Mihomo 控制接口返回 503 : {\"message\":\"Get https://s.example/?token=private\"}", true))
         assertEquals("good", delayBand(96)); assertEquals("fair", delayBand(193))
         assertEquals("slow", delayBand(900)); assertEquals("failed", delayBand(-1)); assertEquals("unknown", delayBand(null))
+        assertEquals("运行状态正在同步", UiFeedback.summary("/data/adb/hetu/hetu-root.sh[1243]", false))
+        assertEquals("Root 运行状态暂时无法确认", UiFeedback.summary("/data/adb/hetu/hetu-root.sh[1243]: failed", true))
     }
     @Test fun yamlHighlightingDoesNotRewriteCommentsStringsOrSource() {
         val source = "  key: 'https://a.example/#fragment' # note"
