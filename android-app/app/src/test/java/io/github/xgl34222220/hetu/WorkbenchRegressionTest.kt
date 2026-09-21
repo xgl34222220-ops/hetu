@@ -128,7 +128,7 @@ class WorkbenchRegressionTest {
         } }
         for (dark in listOf(false, true)) for (scale in listOf(1f, 1.5f)) {
             compose.runOnIdle { night = dark; font = scale }; compose.waitForIdle()
-            compose.onNodeWithText("Ln 21, Col 9").assertExists()
+            compose.onNodeWithText("Ln 21 · Col 9 · UTF-8 · YAML").assertExists()
             compose.onNodeWithTag("yaml-action:保存").assertWidthIsEqualTo(48.dp)
             compose.onNodeWithTag("yaml-action:格式化").assertExists()
             compose.onNodeWithTag("yaml-action:校验").assertExists()
