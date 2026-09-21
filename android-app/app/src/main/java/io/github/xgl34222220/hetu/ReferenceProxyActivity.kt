@@ -790,6 +790,25 @@ internal fun RefHome(
                 }
             }
         }
+        item(key = "home-shortcuts") {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                RefHomeShortcut(
+                    title = "WebUI",
+                    subtitle = if (state.running) "本机控制台" else "核心启动后可用",
+                    icon = Icons.Rounded.Language,
+                    modifier = Modifier.weight(1f),
+                    onClick = { context.startActivity(Intent(context, ProxyLocalWebUiActivity::class.java)) },
+                    enabled = state.running,
+                )
+                RefHomeShortcut(
+                    title = "运行日志",
+                    subtitle = "实时流查看",
+                    icon = Icons.Rounded.ReceiptLong,
+                    modifier = Modifier.weight(1f),
+                    onClick = onLog,
+                )
+            }
+        }
         item(key = "home-latency") {
             RefLatencyPanel(siteDelays["Baidu"], siteDelays["Cloudflare"], siteDelays["Google"], testing, hazeState, glassEnabled, onDelay)
         }
@@ -826,15 +845,49 @@ private fun RefHomeShortcut(
     enabled: Boolean = true,
 ) {
     val t = LocalHetuTokens.current
-    Surface(onClick = onClick, enabled = enabled, modifier = modifier, shape = RoundedCornerShape(18.dp), color = t.cardBackground) {
-        Column(Modifier.padding(horizontal = 12.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Icon(icon, null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
-            Text(title, color = t.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(subtitle, color = t.textSecondary, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    val primary = MaterialTheme.colorScheme.primary
+    val shape = RoundedCornerShape(17.dp)
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.height(52.dp).crystalMaterial(shape, depth = CrystalDepth.InsetItem),
+        shape = shape,
+        color = Color.Transparent,
+        shadowElevation = 0.dp,
+    ) {
+        Row(
+            Modifier.fillMaxSize().padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(9.dp),
+        ) {
+            Box(
+                Modifier.size(30.dp).background(primary.copy(alpha = .085f), RoundedCornerShape(10.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, null, Modifier.size(18.dp), tint = primary)
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(
+                    title,
+                    color = if (enabled) t.textPrimary else t.textMuted,
+                    fontSize = 13.sp,
+                    lineHeight = 17.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                )
+                Text(
+                    subtitle,
+                    color = t.textSecondary,
+                    fontSize = 10.5.sp,
+                    lineHeight = 14.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Icon(Icons.Rounded.ChevronRight, null, Modifier.size(16.dp), tint = t.textMuted)
         }
     }
 }
-
 @Composable
 private fun RefLatencyPanel(
     baidu: Long?,
@@ -1616,33 +1669,30 @@ private fun RefPanel(
 
 
     if (confirmCloseAll) {
-        AlertDialog(
-            onDismissRequest = { confirmCloseAll = false },
-            icon = { Icon(Icons.Rounded.LinkOff, null) },
-            title = { Text("终止所有连接？") },
-            text = { Text("所有应用的现有连接都会断开。消息、通话和下载可能需要重新连接。") },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmCloseAll = false
-                    if (!closingConnections) scope.launch {
-                        closingConnections = true
-                        try {
-                            repo.closeAll()
-                            onRefreshState()
-                            capsuleError = false
-                            capsuleText = "现有连接已关闭"
-                        } catch (cancel: CancellationException) {
-                            throw cancel
-                        } catch (error: Exception) {
-                            capsuleError = true
-                            capsuleText = error.message ?: "关闭失败，请稍后重试"
-                        } finally {
-                            closingConnections = false
-                        }
+        RefConfirmBottomSheet(
+            title = "终止所有连接？",
+            description = "所有应用的现有连接都会断开。消息、通话和下载可能需要重新连接。",
+            confirmLabel = "终止全部",
+            onDismiss = { confirmCloseAll = false },
+            onConfirm = {
+                confirmCloseAll = false
+                if (!closingConnections) scope.launch {
+                    closingConnections = true
+                    try {
+                        repo.closeAll()
+                        onRefreshState()
+                        capsuleError = false
+                        capsuleText = "现有连接已关闭"
+                    } catch (cancel: CancellationException) {
+                        throw cancel
+                    } catch (error: Exception) {
+                        capsuleError = true
+                        capsuleText = error.message ?: "关闭失败，请稍后重试"
+                    } finally {
+                        closingConnections = false
                     }
-                }) { Text("终止全部", color = t.danger) }
+                }
             },
-            dismissButton = { TextButton(onClick = { confirmCloseAll = false }) { Text("取消") } },
         )
     }
 }
@@ -3065,6 +3115,54 @@ private fun RefChoiceBottomSheet(
                     Text(option.first, color = t.textPrimary, fontSize = 15.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, modifier = Modifier.weight(1f))
                     if (selected) Icon(Icons.Rounded.Check, "已选择", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                 }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RefConfirmBottomSheet(
+    title: String,
+    description: String,
+    confirmLabel: String,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    val t = LocalHetuTokens.current
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
+        containerColor = t.elevatedCardBackground,
+        contentColor = t.textPrimary,
+        tonalElevation = 0.dp,
+        scrimColor = Color.Black.copy(alpha = .35f),
+        dragHandle = { RefSheetDragHandle() },
+    ) {
+        Column(
+            Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(
+                    Modifier.size(38.dp).background(t.danger.copy(alpha = .10f), RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Rounded.LinkOff, null, Modifier.size(20.dp), tint = t.danger)
+                }
+                Text(title, color = t.textPrimary, fontSize = 20.sp, lineHeight = 25.sp, fontWeight = FontWeight.Bold)
+            }
+            Text(description, color = t.textSecondary, fontSize = 13.sp, lineHeight = 20.sp)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                ) { Text("取消") }
+                Button(
+                    onClick = onConfirm,
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = t.danger),
+                ) { Text(confirmLabel) }
             }
         }
     }
