@@ -87,12 +87,35 @@ internal fun WorkspaceRefreshAction(label: String, refreshing: Boolean, success:
     }
 }
 
-/** Single height transition, clipped to its slot; retaining exit content is the caller's job. */
+/** Spring-driven expansion. The well never hard-cuts or collapses into a 48dp strip. */
 @Composable
 internal fun WorkspaceAccordion(visible: Boolean, content: @Composable AnimatedVisibilityScope.() -> Unit) {
-    val duration = if (LocalHetuMotionEnabled.current) 300 else 0
-    AnimatedVisibility(visible,
-        enter = expandVertically(tween(duration, easing = WorkspaceMetrics.easing), expandFrom = Alignment.Top, clip = true) + fadeIn(tween(duration / 2)),
-        exit = shrinkVertically(tween(duration, easing = WorkspaceMetrics.easing), shrinkTowards = Alignment.Top, clip = true) + fadeOut(tween(duration / 2)),
-        content = content)
+    val motion = LocalHetuMotionEnabled.current
+    val springSpec = spring<IntSize>(
+        dampingRatio = Spring.DampingRatioLowBouncy,
+        stiffness = Spring.StiffnessLow,
+    )
+    val fadeDuration = if (motion) 150 else 0
+    AnimatedVisibility(
+        visible = visible,
+        enter = if (motion) {
+            expandVertically(
+                animationSpec = springSpec,
+                expandFrom = Alignment.Top,
+                clip = true,
+            ) + fadeIn(tween(fadeDuration))
+        } else {
+            expandVertically(tween(0), expandFrom = Alignment.Top, clip = true)
+        },
+        exit = if (motion) {
+            shrinkVertically(
+                animationSpec = springSpec,
+                shrinkTowards = Alignment.Top,
+                clip = true,
+            ) + fadeOut(tween(fadeDuration))
+        } else {
+            shrinkVertically(tween(0), shrinkTowards = Alignment.Top, clip = true)
+        },
+        content = content,
+    )
 }
