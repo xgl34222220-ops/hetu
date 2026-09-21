@@ -74,7 +74,7 @@ assert ".border(" in crystal and "1.dp" in crystal
 assert "if (crystal) {" in crystal and "Box(modifier.crystalMaterial(shape))" in crystal
 assert "MaterialSurface(modifier = if (crystal)" not in crystal
 assert ".size(32.dp)" in liquid and "RoundedCornerShape(10.dp)" in liquid
-assert ".height(90.dp)" in liquid and ".height(64.dp)" in liquid
+assert ".height(112.dp)" in liquid and ".height(64.dp)" in liquid
 assert "animateContentSize" in liquid and "Spring.DampingRatioLowBouncy" in liquid and "Spring.StiffnessLow" in liquid
 assert "Spring.DampingRatioLowBouncy" in nonhome and "Spring.StiffnessLow" in nonhome
 assert ".height(InstrumentSlots.height())" in instrument
