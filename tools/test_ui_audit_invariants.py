@@ -36,4 +36,9 @@ assert "GID 规则" in (src / "ProxyAppSelectionActivity.kt").read_text()
 root_shell = (root / "android-app/app/src/main/assets/hetu-root.sh").read_text()
 assert "--gid-owner" in root_shell and "DIRECT_GIDS" in root_shell
 assert 'icon = Icons.Rounded.Sort' in main
+controller = (src / "ProxyComposeController.kt").read_text()
+root_manager = (src / "RootProxyManager.java").read_text()
+assert '.putString("proxyRootAppliedSettings", ProxyRuntimeSettings.signature(prefs))' in controller
+assert '.putString("proxyRootAppliedSettings",ProxyRuntimeSettings.signature(prefs))' in root_manager
+assert '.putString("proxyRootAppliedSettings",p.settingsSignature)' not in root_manager
 print("UI audit source/runtime invariants passed")
