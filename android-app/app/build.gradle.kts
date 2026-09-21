@@ -15,8 +15,8 @@ android {
         applicationId = "io.github.xgl34222220.hetu"
         minSdk = 26
         targetSdk = 35
-        versionCode = 522
-        versionName = "0.4.0-test.122"
+        versionCode = 523
+        versionName = "0.4.0-test.123"
     }
 
     testOptions {

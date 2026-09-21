@@ -72,7 +72,6 @@ internal fun LiquidBrandTray(group: ProxyGroupUi) {
 }
 
 @OptIn(ExperimentalHazeMaterialsApi::class)
-@OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
 internal fun LiquidStrategyCard(group: ProxyGroupUi, selected: String, expanded: Boolean, value: Long?, testing: Boolean,
     modifier: Modifier = Modifier, onExpand: () -> Unit, onDelay: () -> Unit,
