@@ -13,13 +13,17 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -194,16 +198,36 @@ internal fun OverviewRouteRanking(state: ProxyComposeState) {
 }
 /** One ticket layout shared by panel and subscription library; all values are reported data. */
 @Composable
-internal fun SubscriptionBoardingTicket(name: String, provider: DashboardProviderUi?, host: String = "",
-    placeholder: Boolean = false, refreshing: Boolean = false, success: Boolean = false,
-    onEdit: () -> Unit, onRefresh: (() -> Unit)? = null, error: String = "") {
+internal fun SubscriptionBoardingTicket(
+    name: String,
+    provider: DashboardProviderUi?,
+    host: String = "",
+    placeholder: Boolean = false,
+    refreshing: Boolean = false,
+    success: Boolean = false,
+    onEdit: () -> Unit,
+    onRefresh: (() -> Unit)? = null,
+    error: String = "",
+) {
     val t = LocalHetuTokens.current
-    val primary = MaterialTheme.colorScheme.primary
+    val primary = HetuMicroCrystal.KleinBlue
+    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val known = provider?.let { it.hasSubscriptionInfo && it.total > 0L } == true
     var details by rememberSaveable(name) { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().crystalMaterial(RoundedCornerShape(22.dp), tint = primary)
-        .testTag("subscription-ticket:$name").padding(WorkspaceMetrics.gutter), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .crystalMaterial(RoundedCornerShape(22.dp), tint = primary)
+            .testTag("subscription-ticket:$name")
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             Text(
                 name,
                 Modifier.weight(1f).testTag("ticket-title:$name"),
@@ -214,68 +238,173 @@ internal fun SubscriptionBoardingTicket(name: String, provider: DashboardProvide
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Box(Modifier.background(Color(0xFFEFF6FF), RoundedCornerShape(6.dp))
-                .padding(horizontal = 6.dp, vertical = 2.dp).testTag("ticket-nodes:$name")) {
+            Box(
+                Modifier
+                    .background(HetuMicroCrystal.LightBlueBackground, RoundedCornerShape(6.dp))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                    .testTag("ticket-nodes:$name"),
+            ) {
                 Text(
                     if (provider != null) "${provider.nodes.size} 节点" else if (placeholder) "待填写" else "订阅",
-                    color = if (placeholder) t.warning else primary, fontSize = 10.5.sp,
-                    lineHeight = 14.sp, fontWeight = FontWeight.Bold,
+                    color = if (placeholder) t.warning else primary,
+                    fontSize = 10.5.sp,
+                    lineHeight = 14.sp,
+                    fontWeight = FontWeight.Bold,
                 )
             }
-            if (known && provider != null) Box(Modifier.background(Color(0xFFEFF6FF), CircleShape)
-                .padding(horizontal = 7.dp, vertical = 2.dp).testTag("ticket-badge:$name")) {
-                Text("剩余 ${((1f - provider.ratio) * 100f).toInt()}%", color = primary, fontSize = 11.sp,
-                    lineHeight = 15.sp, fontWeight = FontWeight.ExtraBold)
+            if (known && provider != null) {
+                Box(
+                    Modifier
+                        .background(HetuMicroCrystal.LightBlueBackground, CircleShape)
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                        .testTag("ticket-badge:$name"),
+                ) {
+                    Text(
+                        "剩余 ${((1f - provider.ratio) * 100f).toInt()}%",
+                        color = primary,
+                        fontSize = 11.sp,
+                        lineHeight = 15.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontFamily = FontFamily.Monospace,
+                    )
+                }
             }
             if (onRefresh != null) {
                 WorkspaceRefreshAction(name, refreshing, success, error.isNotBlank(), onClick = onRefresh)
             }
         }
-        Row(Modifier.fillMaxWidth().heightIn(min = 36.dp), verticalAlignment = Alignment.CenterVertically) {
+
+        if (known && provider != null) {
             Text(
-                host.ifBlank { if (placeholder) "待填写订阅地址" else "订阅配置" },
-                Modifier.weight(1f).clickable(role = Role.Button, onClick = onEdit),
-                color = if (placeholder) t.warning else t.textMuted,
-                fontSize = 11.sp,
-                lineHeight = 16.sp,
-                maxLines = 1,
+                "剩余流量 ${refBytes(provider.remaining)}",
+                Modifier.fillMaxWidth().testTag("ticket-remaining:$name"),
+                color = primary,
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.ExtraBold,
+                fontFamily = FontFamily.Monospace,
             )
+
+            val progress = provider.ratio.coerceIn(0f, 1f)
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(5.dp)
+                    .clip(CircleShape)
+                    .background(if (dark) Color.White.copy(alpha = .11f) else Color(0xFFF1F5F9))
+                    .testTag("ticket-progress:$name")
+                    .semantics { progressBarRangeInfo = ProgressBarRangeInfo(progress, 0f..1f) },
+            ) {
+                if (progress > 0f) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth(progress.coerceAtLeast(.01f))
+                            .fillMaxHeight()
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(HetuMicroCrystal.KleinBlue, Color(0xFF38BDF8)),
+                                ),
+                                CircleShape,
+                            ),
+                    )
+                }
+            }
+
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    "已用 ${refBytes(provider.used)} / ${refBytes(provider.total)}",
+                    Modifier.weight(1f).testTag("ticket-usage:$name"),
+                    color = t.textSecondary,
+                    fontSize = 11.5.sp,
+                    lineHeight = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 1,
+                )
+                TextButton(
+                    onClick = { details = !details },
+                    modifier = Modifier.heightIn(min = 40.dp),
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                ) {
+                    Text(if (details) "收起详情" else "流量详情", color = primary, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                    Icon(
+                        if (details) Icons.Rounded.ExpandLess else Icons.Rounded.ChevronRight,
+                        null,
+                        Modifier.size(14.dp),
+                        tint = primary,
+                    )
+                }
+            }
+        } else {
+            Text(
+                "订阅未上报流量信息",
+                color = t.textSecondary,
+                fontSize = 12.sp,
+                lineHeight = 18.sp,
+            )
+        }
+
+        if (error.isNotBlank() && !refreshing) {
+            HetuTaskFeedback("$name 更新失败：$error", error = true)
+        }
+
+        HorizontalDivider(color = t.textMuted.copy(alpha = .12f), thickness = .5.dp)
+
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(
+                    host.ifBlank { if (placeholder) "待填写订阅地址" else "订阅配置" },
+                    color = if (placeholder) t.warning else t.textMuted,
+                    fontSize = 10.5.sp,
+                    lineHeight = 15.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    ticketExpireAt(provider?.expire ?: 0),
+                    color = t.textSecondary,
+                    fontSize = 11.5.sp,
+                    lineHeight = 17.sp,
+                )
+                Text(
+                    ticketUpdatedAt(provider?.updatedAt.orEmpty()),
+                    color = t.textSecondary,
+                    fontSize = 11.5.sp,
+                    lineHeight = 17.sp,
+                )
+            }
             IconButton(
                 onClick = onEdit,
-                modifier = Modifier.size(36.dp).semantics { contentDescription = "编辑 $name" },
+                modifier = Modifier.size(40.dp).semantics { contentDescription = "编辑 $name" },
             ) {
                 Icon(Icons.Rounded.Edit, null, Modifier.size(16.dp), tint = t.textMuted)
             }
         }
-        if (known && provider != null) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("剩余流量", Modifier.alignByBaseline(), color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
-                HetuNumber(refBytes(provider.remaining), Modifier.weight(1f).alignByBaseline().testTag("ticket-remaining:$name"),
-                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp, lineHeight = 24.sp,
-                        fontWeight = FontWeight.ExtraBold), color = t.textPrimary, monospaced = true)
-            }
-            InstrumentProgress(provider.ratio, Modifier.testTag("ticket-progress:$name"))
-            HetuNumber("已用 ${refBytes(provider.used)} / ${refBytes(provider.total)}",
-                Modifier.fillMaxWidth().heightIn(min = with(LocalDensity.current) { 24.sp.toDp() }).testTag("ticket-usage:$name"),
-                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium))
-        } else Text("订阅未上报流量信息", color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
-        if (error.isNotBlank() && !refreshing) HetuTaskFeedback("$name 更新失败：$error", error = true)
-        HorizontalDivider(color = t.textMuted.copy(alpha = .14f), thickness = .5.dp)
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(ticketExpireAt(provider?.expire ?: 0), color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
-                Text(ticketUpdatedAt(provider?.updatedAt.orEmpty()), color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
-            }
-            if (known) TextButton(onClick = { details = !details }, modifier = Modifier.heightIn(min = 48.dp)) {
-                Text(if (details) "收起详情" else "流量详情", fontSize = 12.sp)
-                Icon(if (details) Icons.Rounded.ExpandLess else Icons.Rounded.ChevronRight, null, Modifier.size(15.dp))
-            }
-        }
+
         WorkspaceAccordion(details && known && provider != null) {
-            if (provider != null) Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text("剩余 ${refBytes(provider.remaining)}", color = t.textPrimary, fontSize = 13.sp, lineHeight = 20.sp)
-                Text("上传 ${refBytes(provider.upload)} · 下载 ${refBytes(provider.download)}", color = t.textSecondary,
-                    fontSize = 12.sp, lineHeight = 18.sp)
+            if (provider != null) {
+                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text(
+                        "剩余 ${refBytes(provider.remaining)}",
+                        color = t.textPrimary,
+                        fontSize = 13.sp,
+                        lineHeight = 20.sp,
+                    )
+                    Text(
+                        "上传 ${refBytes(provider.upload)} · 下载 ${refBytes(provider.download)}",
+                        color = t.textSecondary,
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp,
+                    )
+                }
             }
         }
     }
