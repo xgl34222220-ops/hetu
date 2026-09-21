@@ -53,44 +53,41 @@ liquid = (src / "LiquidWorkspace.kt").read_text()
 editor = (src / "EditorWorkbench.kt").read_text()
 monitoring = (src / "MonitoringWorkspace.kt").read_text()
 refhome = (src / "ReferenceProxyActivity.kt").read_text()
-assert "Color(0xFFF4F6F9)" in theme and "Color(0xFF0F172A)" in theme
-assert "RoundedCornerShape(24.dp)" in main and "LiquidStatusGlyph(state.running, busy)" in main
-assert ".size(48.dp)" in liquid and "shape = CircleShape" in liquid
-assert ".height(90.dp)" in liquid and ".height(64.dp)" in liquid
-assert '.size(48.dp)' in liquid and '.testTag("strategy-delay:' in liquid
-assert '.offset(x = (-4).dp, y = (-2).dp)' in liquid and '.testTag("node-delay:' in liquid and '.size(48.dp)' in liquid
-assert 'padding(start = 11.dp, top = 8.dp, end = 66.dp' not in liquid, "Node metadata must not reserve a hard 66dp rail"
-assert 'softWrap = false' in liquid, "Protocol badge must remain one intact token row"
-assert "width < 600.dp" in liquid, "Phone node list must remain full-width"
-assert "liquidNodeProtocolLabel" in liquid and '"urltest"' in liquid, "Container types must not leak as node protocol labels"
-assert 'modifier = Modifier.testTag("home-run-state")' in refhome
-assert ".height(42.dp).testTag(\"yaml-accessory\")" in editor
-assert "UTF-8 · YAML" in editor
-assert "ticket-badge:" in monitoring and "ticket-progress:" in monitoring
-assert 'Modifier.weight(1f).testTag("ticket-title:' in monitoring
 nonhome = (src / "NonHomeWorkspace.kt").read_text()
 instrument = (src / "AlignedInstrumentPanel.kt").read_text()
-assert "Color.White.copy(alpha = .95f)" in crystal
-assert "Color(0xFFFFFFFF)" in crystal and "Color(0xFFF8FAFC)" in crystal
-micro = (src / "ui/HetuMicroCrystal.kt").read_text()
-assert "Color(0xFF2563EB)" in micro and "Color(0xFFEFF6FF)" in micro and "Color(0xFFDBEAFE)" in micro
-assert "Color(0x0A0F172A)" in crystal and "Color(0x0D0F172A)" in crystal
-assert ".width(150.dp)" in (src / "CrystalWorkspace.kt").read_text()
-assert "topAlpha" not in crystal and "bottomAlpha" not in crystal
-assert "HetuMicroCrystal.KleinBlue" in liquid
-assert ".border(" in crystal and "1.dp" in crystal
-assert "if (crystal) {" in crystal and "Box(modifier.crystalMaterial(shape))" in crystal
-assert "MaterialSurface(modifier = if (crystal)" not in crystal
-assert ".size(32.dp)" in liquid and "RoundedCornerShape(10.dp)" in liquid
-assert ".height(90.dp)" in liquid and ".height(64.dp)" in liquid
-assert "animateContentSize" in liquid and "Spring.DampingRatioLowBouncy" in liquid and "Spring.StiffnessLow" in liquid
-assert "Spring.DampingRatioLowBouncy" in nonhome and "Spring.StiffnessLow" in nonhome
-assert ".height(InstrumentSlots.height())" in instrument
-assert "instrument-${reading.id}-badge" not in instrument, "Homepage bento must not reintroduce status capsules"
-assert "val rail = 3.dp" in instrument and "CleanInstrumentRail" in instrument, "Clean bento rails must stay aligned"
-instrument_progress = (src / "InstrumentWorkspace.kt").read_text()
-assert ".height(5.dp)" in instrument_progress and "Color(0xFFE8EEF7)" in instrument_progress and "Color(0xFF38BDF8)" in instrument_progress
-assert "val inset = 6.dp.toPx()" in refhome and "Stroke(5.dp.toPx()" in refhome, "Traffic chart must retain baseline inset and area glow"
+icon = (src / "ConfiguredGroupIcon.kt").read_text()
+dock = (src / "ui/HetuGlassDock.kt").read_text()
+
+# 156785.mp4 visual contract.
+assert "Color(0xFFEEEDFB)" in theme and "Color(0xFFE2DEFF)" in theme
+assert 'item(key = "home-shortcuts")' in refhome
+assert 'title = "WebUI"' in refhome and 'title = "日志"' in refhome
+assert 'Modifier.fillMaxWidth().height(120.dp)' in refhome and 'size(116.dp)' in refhome
+assert '"少于 1 分钟"' in refhome
+assert 'height(52.dp)' in refhome and 'label = "重载"' in refhome and 'label = "重启"' in refhome
+assert 'Text("延迟"' in refhome and 'Icons.Rounded.Tune' in refhome and 'Icons.Rounded.Refresh' in refhome
+assert 'height(88.dp)' in refhome
+assert 'ReferenceDashboardCard' in instrument and 'Text("WAN"' in instrument and 'Text("网速"' in instrument
+assert 'Text("订阅"' in instrument and 'Text("资源占用"' in instrument
+assert 'home-usage-progress' in instrument and 'home-cpu-progress' in instrument and '.height(3.dp)' in instrument
+assert 'fontSize = 32.sp' in refhome and 'RoundedCornerShape(14.dp)' in refhome
+assert '.horizontalScroll(rememberScrollState())' in refhome
+assert 'height(80.dp)' in liquid and 'height(78.dp)' in liquid
+assert 'if (width < 292.dp' in liquid, "Phone strategy grid should use two columns when space permits"
+assert 'TextAutoSize.StepBased' in liquid, "Long node names must shrink instead of becoming ellipsis-heavy"
+assert 'ConfiguredGroupIcon(group, Modifier.size(32.dp))' in liquid
+assert 'ReferenceDelayPill' in liquid and 'Color(0xFFE2E8FA)' in liquid
+assert 'crystalMaterial(shape, depth = CrystalDepth.Sunken)' not in liquid, "Expanded nodes must sit directly on the page"
+assert 'Modifier.padding(horizontal = 25.dp)' in dock and '.height(64.dp' in dock
+assert 'Color(0xFFDEDEEA)' in dock, "Dock active lens must be neutral, not blue plastic"
+assert 'private fun RefSectionLabel' in refhome and 'Spacer(Modifier.height(2.dp))' in refhome
+assert 'fontSize = 32.sp' in refhome
+assert "Color(0xFFF9F8FE)" in theme and "Color(0xFFF5F3FD)" in theme
+assert "drawRect(t.pageBackground)" not in crystal and "return background(t.pageBackground)" in crystal
+assert "BoxProxy Design System" not in (src / "ThemeSettingsActivity.kt").read_text()
+assert ".height(42.dp).testTag(\"yaml-accessory\")" in editor
+assert "UTF-8 · YAML" in editor
+assert "ticket-progress:" in monitoring
 assert "builtInBrandKey" in icon and "BuiltInBrandIcon" in icon
 for brand in ("openai","google","github","telegram","youtube"):
     assert f'"{brand}"' in icon, f"Missing multicolor brand fallback: {brand}"
