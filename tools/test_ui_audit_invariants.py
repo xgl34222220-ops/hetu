@@ -41,4 +41,10 @@ root_manager = (src / "RootProxyManager.java").read_text()
 assert '.putString("proxyRootAppliedSettings", ProxyRuntimeSettings.signature(prefs))' in controller
 assert '.putString("proxyRootAppliedSettings",ProxyRuntimeSettings.signature(prefs))' in root_manager
 assert '.putString("proxyRootAppliedSettings",p.settingsSignature)' not in root_manager
+runtime_settings = (src / "ProxyRuntimeSettings.java").read_text()
+boot = (src / "BootReceiver.java").read_text()
+assert 'proxyRootSettingsDirty' in runtime_settings and 'markDirty' in runtime_settings
+assert '.remove("proxyRootRuntimeRefreshPending")' in boot
+assert '.putBoolean("proxyRootRuntimeRefreshPending", true)' not in boot
+assert '运行设置已修改，重启后生效' in main
 print("UI audit source/runtime invariants passed")
