@@ -50,7 +50,7 @@ internal fun LatencyChip(value: Long?, testing: Boolean, onClick: (() -> Unit)? 
     LaunchedEffect(testing) { if (testing) { delay(150); showBusy = true } else showBusy = false }
     val target = if (showBusy) "测速中" else when { value == null -> "— ms"; value <= 0L -> "超时"; else -> "$value ms" }
     val motion = LocalHetuMotionEnabled.current
-    Box(modifier.then(if (onClick != null) Modifier.sizeIn(minWidth = if (compact) 56.dp else 72.dp, minHeight = 48.dp)
+    Box(modifier.then(if (onClick != null) Modifier.sizeIn(minWidth = if (compact) 48.dp else 72.dp, minHeight = 48.dp)
         .clickable(enabled = !testing, role = Role.Button, onClickLabel = "测速", onClick = onClick) else Modifier),
         contentAlignment = Alignment.Center) {
         Surface(shape = CircleShape, color = if (showBusy || value == null) Color.Transparent else background,
