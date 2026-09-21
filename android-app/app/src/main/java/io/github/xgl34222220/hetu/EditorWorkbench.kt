@@ -37,7 +37,13 @@ internal fun applyYamlAccessory(editor: CodeEditor, symbol: String) {
         else editor.insertText("  ", 2)
     } else {
         require(symbol in yamlWorkbenchSymbols) { "Unknown YAML accessory" }
-        editor.insertText(symbol, symbol.length)
+        val inserted = when (symbol) {
+            ":" -> ": "
+            "-" -> "- "
+            "#" -> "# "
+            else -> symbol
+        }
+        editor.insertText(inserted, inserted.length)
     }
     editor.requestFocus()
     editor.ensureSelectionVisible()
