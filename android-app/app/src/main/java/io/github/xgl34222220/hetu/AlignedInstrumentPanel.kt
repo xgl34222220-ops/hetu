@@ -61,7 +61,7 @@ private object InstrumentSlots {
     val support = 18.sp
     val gap = 3.dp
     val padding = 7.dp
-    val rail = 3.dp
+    val rail = 5.dp
     @Composable fun fontHeight(size: TextUnit): Dp {
         val density = LocalDensity.current
         // Keep room for the full line even when platform text scaling and the
@@ -161,7 +161,7 @@ private fun InstrumentAlignedRail(reading: InstrumentReading) {
         }
         if (progress != null) progressBarRangeInfo = ProgressBarRangeInfo(progress, 0f..1f)
     }) {
-        drawRect(t.textMuted.copy(alpha = .12f))
+        drawRect(t.textMuted.copy(alpha = .20f))
         if (progress != null) {
             when (reading.rail) {
                 "share" -> {
@@ -169,7 +169,7 @@ private fun InstrumentAlignedRail(reading: InstrumentReading) {
                     if (progress < 1f) drawRect(primary.copy(alpha = .75f),
                         topLeft = Offset(size.width * progress, 0f), size = size.copy(width = size.width * (1f - progress)))
                 }
-                else -> if (progress > 0f) drawRect(Brush.horizontalGradient(listOf(reading.accent, Color(0xFF42C9CE))),
+                else -> if (progress > 0f) drawRect(Brush.horizontalGradient(listOf(reading.accent, Color(0xFF38BDF8))),
                     size = size.copy(width = size.width * progress))
             }
         } else if (reading.rail == "status") {
