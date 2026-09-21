@@ -3325,80 +3325,136 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
     val context = LocalContext.current
     val inspector = remember { ProxyRuntimeInspector(context) }
     val scope = rememberCoroutineScope()
-    val t = LocalHetuTokens.current
-    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-
 
     LazyColumn(
         Modifier.fillMaxSize().statusBarsPadding(),
         contentPadding = PaddingValues(
-            start = 16.dp,
+            start = 12.dp,
             top = 8.dp,
-            end = 16.dp,
+            end = 12.dp,
             bottom = hetuContentBottomPadding(),
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item { RefTitleBar("工具") }
-        item { RefSectionLabel("系统服务") }
+
         item {
             RefGroup {
                 RefToolRow(
-                    Icons.Rounded.Terminal,
-                    Color(0xFF2563EB),
-                    "运行文件",
-                    "启动配置与运行文件",
-                    trailingText = if (state.running) "运行中" else "待机",
-                    trailingBadge = true,
-                    trailingColor = if (state.running) Color(0xFF059669) else Color(0xFF64748B),
-                ) { context.startActivity(Intent(context, ReferenceFileManagerActivity::class.java)) }
-                RefDivider()
-                RefToolRow(Icons.Rounded.Article, Color(0xFF9333EA), "日志查看", "查看运行记录与排查问题") {
-                    scope.launch { onLog(runCatching { inspector.runtimeLog() }.getOrElse { it.message ?: "日志读取失败" }) }
+                    Icons.Rounded.FolderOpen,
+                    Color.Unspecified,
+                    "文件管理",
+                    "查看并管理运行文件",
+                ) {
+                    context.startActivity(Intent(context, ReferenceFileManagerActivity::class.java))
                 }
                 RefDivider()
-                RefToolRow(Icons.Rounded.Apps, Color(0xFFF97316), "应用名单", "选择需要代理的应用", trailingText = "管理", trailingColor = Color(0xFF2563EB)) {
+                RefToolRow(
+                    Icons.Rounded.Article,
+                    Color.Unspecified,
+                    "日志查看",
+                    "查看运行日志与排查问题",
+                ) {
+                    scope.launch {
+                        onLog(runCatching { inspector.runtimeLog() }.getOrElse { it.message ?: "日志读取失败" })
+                    }
+                }
+                RefDivider()
+                RefToolRow(
+                    Icons.Rounded.Apps,
+                    Color.Unspecified,
+                    "应用管理",
+                    "查看并管理应用相关规则",
+                ) {
                     context.startActivity(Intent(context, ProxyAppSelectionActivity::class.java))
                 }
             }
         }
-        item { RefSectionLabel("网络与共享") }
+
         item {
             RefGroup {
-                RefToolRow(Icons.Rounded.Wifi, Color(0xFF0EA5E9), "网络匹配", "Wi‑Fi / SSID / 移动网络自动启停", trailingText = "自动化", trailingColor = Color(0xFF2563EB)) {
+                RefToolRow(
+                    Icons.Rounded.Wifi,
+                    Color.Unspecified,
+                    "网络匹配",
+                    "设置网络匹配后要执行的操作",
+                ) {
                     context.startActivity(Intent(context, ProxyNetworkAutomationActivity::class.java))
                 }
                 RefDivider()
-                RefToolRow(Icons.Rounded.WifiTethering, Color(0xFF10B981), "共享网络", "让热点与局域网设备使用代理", trailingText = "设置", trailingColor = Color(0xFF2563EB)) {
+                RefToolRow(
+                    Icons.Rounded.WifiTethering,
+                    Color.Unspecified,
+                    "共享网络",
+                    "管理共享网络转发相关设置",
+                ) {
                     context.startActivity(Intent(context, ProxySharedNetworkSettingsActivity::class.java))
                 }
                 RefDivider()
-                RefToolRow(Icons.Rounded.AltRoute, Color(0xFFEF4444), "绕过规则", "排除指定网段与网络接口", trailingText = "设置", trailingColor = Color(0xFF2563EB)) {
+                RefToolRow(
+                    Icons.Rounded.AltRoute,
+                    Color.Unspecified,
+                    "绕过规则",
+                    "管理本地 CIDR 与接口规则",
+                ) {
                     context.startActivity(Intent(context, ProxyBypassRulesActivity::class.java))
                 }
             }
         }
-        item { RefSectionLabel("订阅与数据") }
+
         item {
             RefGroup {
-                RefToolRow(Icons.Rounded.CloudDownload, Color(0xFF2563EB), "订阅管理", "导入、更新与切换配置", trailingText = "管理", trailingColor = Color(0xFF2563EB)) {
+                RefToolRow(
+                    Icons.Rounded.Link,
+                    Color.Unspecified,
+                    "订阅管理",
+                    "配置订阅源并更新规则数据",
+                ) {
                     context.startActivity(Intent(context, ProxySubscriptionActivity::class.java))
                 }
                 RefDivider()
-                RefToolRow(Icons.Rounded.Shield, Color(0xFF2563EB), "广告过滤", "订阅规则、放行与拦截记录", trailingText = "管理", trailingColor = Color(0xFF2563EB)) {
-                    context.startActivity(Intent(context, ProxyAdblockChainActivity::class.java))
-                }
-                RefDivider()
-                RefToolRow(Icons.Rounded.Public, Color(0xFFF59E0B), "国内地址分流", "国内 IPv4/IPv6 自动直连", trailingText = "设置", trailingColor = Color(0xFF2563EB)) {
+                RefToolRow(
+                    Icons.Rounded.Place,
+                    Color.Unspecified,
+                    "CNIP 设置",
+                    "配置 CNIP 数据源并更新地理数据",
+                ) {
                     context.startActivity(Intent(context, ProxyCnIpSettingsActivity::class.java))
                 }
             }
         }
-        item { RefSectionLabel("核心与更新") }
+
         item {
             RefGroup {
-                RefToolRow(Icons.Rounded.Memory, Color(0xFF334155), "内核管理", "下载、更新与维护内核", trailingText = state.core.ifBlank { "Mihomo" }, trailingBadge = true, trailingColor = Color(0xFF2563EB)) {
+                RefToolRow(
+                    Icons.Rounded.Web,
+                    Color.Unspecified,
+                    "更新 WebUI",
+                    "检查并更新 WebUI 资源",
+                    trailingText = "更新",
+                    trailingColor = HetuMicroCrystal.KleinBlue,
+                ) {
+                    context.startActivity(Intent(context, ProxyLocalWebUiActivity::class.java))
+                }
+                RefDivider()
+                RefToolRow(
+                    Icons.Rounded.Download,
+                    Color.Unspecified,
+                    "更新核心",
+                    "下载并安装核心",
+                    trailingText = state.core.ifBlank { "Mihomo" },
+                    trailingColor = HetuMicroCrystal.KleinBlue,
+                ) {
                     context.startActivity(Intent(context, ProxyCoreActivity::class.java))
+                }
+                RefDivider()
+                RefToolRow(
+                    Icons.Rounded.Shield,
+                    Color.Unspecified,
+                    "广告过滤",
+                    "订阅规则、放行与拦截记录",
+                ) {
+                    context.startActivity(Intent(context, ProxyAdblockChainActivity::class.java))
                 }
             }
         }
