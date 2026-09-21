@@ -45,6 +45,7 @@ internal data class AppItem(
     val label: String,
     val packageName: String,
     val system: Boolean,
+    val uid: Int = -1,
     val icon: Bitmap? = null,
 )
 
@@ -186,6 +187,7 @@ internal class HetuComposeController(private val context: Context) {
                     label = pm.getApplicationLabel(info).toString(),
                     packageName = info.packageName,
                     system = (info.flags and ApplicationInfo.FLAG_SYSTEM) != 0,
+                    uid = info.uid,
                     icon = null,
                 )
             }.toMutableList()
