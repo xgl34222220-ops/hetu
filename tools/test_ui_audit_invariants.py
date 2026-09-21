@@ -21,8 +21,8 @@ assert "idleWave" not in main and "kotlin.math.sin" not in main, "No synthetic t
 assert "BoxProxy Design System" not in (src / "ThemeSettingsActivity.kt").read_text()
 assert "setEditorLanguage(HetuYamlLanguage())" in (src / "ProxySubscriptionActivity.kt").read_text()
 assert "RuleMetricSummary(" in (src / "ProxyAdblockChainActivity.kt").read_text()
-assert 'item(key = "home-shortcuts")' in main, "Home must expose the WebUI/log control shortcuts"
-assert "ProxyLocalWebUiActivity::class.java" in main and 'title = "运行日志"' in main
+assert 'item(key = "home-shortcuts")' not in main, "Home must not reintroduce banner-like shortcut strips"
+assert "private fun RefHomeShortcut" not in main
 assert 'Text("网络与广告过滤"' not in main
 assert "expandedGroup ?: closingGroup" in main
 assert "LiquidConfigIndicator(config.selected)" in (src / "ProxySubscriptionActivity.kt").read_text()
@@ -61,6 +61,8 @@ assert '.size(48.dp)' in liquid and '.testTag("strategy-delay:' in liquid
 assert '.offset(x = (-4).dp, y = (-2).dp)' in liquid and '.testTag("node-delay:' in liquid and '.size(48.dp)' in liquid
 assert 'padding(start = 11.dp, top = 8.dp, end = 66.dp' not in liquid, "Node metadata must not reserve a hard 66dp rail"
 assert 'softWrap = false' in liquid, "Protocol badge must remain one intact token row"
+assert "width < 600.dp" in liquid, "Phone node list must remain full-width"
+assert "liquidNodeProtocolLabel" in liquid and '"urltest"' in liquid, "Container types must not leak as node protocol labels"
 assert 'modifier = Modifier.testTag("home-run-state")' in refhome
 assert ".height(42.dp).testTag(\"yaml-accessory\")" in editor
 assert "UTF-8 · YAML" in editor
@@ -84,10 +86,11 @@ assert ".height(90.dp)" in liquid and ".height(64.dp)" in liquid
 assert "animateContentSize" in liquid and "Spring.DampingRatioLowBouncy" in liquid and "Spring.StiffnessLow" in liquid
 assert "Spring.DampingRatioLowBouncy" in nonhome and "Spring.StiffnessLow" in nonhome
 assert ".height(InstrumentSlots.height())" in instrument
-assert "val rail = 5.dp" in instrument and "alpha = .20f" in instrument, "Bento rails must stay visibly rendered"
+assert "instrument-${reading.id}-badge" not in instrument, "Homepage bento must not reintroduce status capsules"
+assert "val rail = 3.dp" in instrument and "CleanInstrumentRail" in instrument, "Clean bento rails must stay aligned"
 instrument_progress = (src / "InstrumentWorkspace.kt").read_text()
 assert ".height(5.dp)" in instrument_progress and "Color(0xFFE8EEF7)" in instrument_progress and "Color(0xFF38BDF8)" in instrument_progress
-assert "val inset = 4.dp.toPx()" in refhome and "color.copy(alpha = .22f)" in refhome, "Traffic chart must retain baseline inset and area glow"
+assert "val inset = 6.dp.toPx()" in refhome and "Stroke(5.dp.toPx()" in refhome, "Traffic chart must retain baseline inset and area glow"
 assert "builtInBrandKey" in icon and "BuiltInBrandIcon" in icon
 for brand in ("openai","google","github","telegram","youtube"):
     assert f'"{brand}"' in icon, f"Missing multicolor brand fallback: {brand}"
