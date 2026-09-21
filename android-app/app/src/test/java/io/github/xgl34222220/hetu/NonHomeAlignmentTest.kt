@@ -99,7 +99,7 @@ class NonHomeAlignmentTest {
         } } }
         compose.onNodeWithTag("strategy:AI 平台",true).assertHeightIsAtLeast(90.dp)
         compose.onNodeWithTag("brand-tray:AI 平台",true).assertWidthIsEqualTo(32.dp)
-        assertTrue(bounds("brand-tray:AI 平台").left < bounds("strategy-title:AI 平台").left)
+        assertTrue(bounds("strategy-title:AI 平台").left < bounds("brand-tray:AI 平台").left)
         assertEquals(bounds("node-protocol:${nodes[0].name}").top,bounds("node-protocol:${nodes[1].name}").top,.5f)
         compose.onNodeWithText("Vless · UDP",true).assertExists()
         compose.onNodeWithText("Trojan",true).assertExists()
