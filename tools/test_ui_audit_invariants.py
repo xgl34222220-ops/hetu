@@ -58,7 +58,7 @@ assert "RoundedCornerShape(24.dp)" in main and "LiquidStatusGlyph(state.running,
 assert ".size(48.dp)" in liquid and "shape = CircleShape" in liquid
 assert ".height(90.dp)" in liquid and ".height(64.dp)" in liquid
 assert '.size(48.dp)' in liquid and '.testTag("strategy-delay:' in liquid
-assert '.sizeIn(minWidth = 48.dp, minHeight = 28.dp)' in liquid and '.testTag("node-delay:' in liquid
+assert '.offset(x = (-4).dp, y = (-2).dp)' in liquid and '.testTag("node-delay:' in liquid and '.size(48.dp)' in liquid
 assert 'padding(start = 11.dp, top = 8.dp, end = 66.dp' not in liquid, "Node metadata must not reserve a hard 66dp rail"
 assert 'softWrap = false' in liquid, "Protocol badge must remain one intact token row"
 assert 'modifier = Modifier.testTag("home-run-state")' in refhome
