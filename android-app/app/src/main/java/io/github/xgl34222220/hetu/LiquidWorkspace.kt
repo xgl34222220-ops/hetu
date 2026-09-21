@@ -35,7 +35,7 @@ import kotlinx.coroutines.delay
 // Presentation only. All callbacks are provided by the existing controller.
 @Composable
 internal fun liquidColumns(width: Dp): Int =
-    if (width < 292.dp || LocalDensity.current.fontScale > 1.35f) 1 else 2
+    if (width < 600.dp || LocalDensity.current.fontScale > 1.20f) 1 else 2
 
 internal fun liquidGroupType(type: String): String = when (type.lowercase()) {
     "selector", "select" -> "手动选择"
@@ -45,32 +45,51 @@ internal fun liquidGroupType(type: String): String = when (type.lowercase()) {
     else -> type
 }
 
-@Composable
-internal fun LiquidBrandTray(group: ProxyGroupUi) {
-    val primary = MaterialTheme.colorScheme.primary
-    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val name = group.name.lowercase()
-    val accent = when {
-        "ai" in name || "chatgpt" in name || "emby" in name -> Color(0xFF10A37F)
-        "youtube" in name || "netflix" in name -> Color(0xFFE5484D)
-        "telegram" in name || "twitter" in name -> Color(0xFF38A4D8)
-        else -> primary
-    }
-    val shape = RoundedCornerShape(10.dp)
-    Box(Modifier.size(32.dp).testTag("brand-tray:${group.name}")
-        .shadow(2.dp, shape, clip = false, ambientColor = accent.copy(alpha = .04f), spotColor = accent.copy(alpha = .07f))
-        .background(
-            if (dark) Brush.verticalGradient(listOf(accent.copy(alpha = .16f), accent.copy(alpha = .08f)))
-            else Brush.verticalGradient(listOf(Color.White, Color(0xFFF8FAFC))),
-            shape,
-        )
-        .border(1.dp, if (dark) accent.copy(alpha = .12f) else Color(0xFFE2E8F0), shape)
-        .clip(shape), contentAlignment = Alignment.Center) {
-        // Never tint or substitute the configured bitmap with a guessed flag.
-        ConfiguredGroupIcon(group, Modifier.size(28.dp))
+internal fun liquidNodeProtocolLabel(node: ProxyNodeUi): String {
+    val raw = node.type.trim()
+    val container = raw.lowercase(java.util.Locale.ROOT) in setOf(
+        "urltest", "url-test", "selector", "select", "fallback",
+        "loadbalance", "load-balance", "relay", "compatible",
+    )
+    return when {
+        raw.isNotBlank() && !container -> raw.uppercase(java.util.Locale.ROOT)
+        node.udp -> "UDP"
+        else -> "策略组"
     }
 }
 
+@Composable
+internal fun LiquidBrandTray(group: ProxyGroupUi) {
+    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
+    val shape = RoundedCornerShape(10.dp)
+    val tray = if (dark) {
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = .10f), Color.White.copy(alpha = .055f)))
+    } else {
+        Brush.verticalGradient(listOf(Color(0xFFFAFCFF), Color(0xFFF0F5FC)))
+    }
+    Box(
+        Modifier
+            .size(32.dp)
+            .testTag("brand-tray:${group.name}")
+            .shadow(
+                elevation = 3.dp,
+                shape = shape,
+                clip = false,
+                ambientColor = Color.Black.copy(alpha = .035f),
+                spotColor = Color.Black.copy(alpha = .055f),
+            )
+            .background(tray, shape)
+            .border(
+                1.dp,
+                if (dark) Color.White.copy(alpha = .09f) else Color(0xFFE4EAF2),
+                shape,
+            )
+            .clip(shape),
+        contentAlignment = Alignment.Center,
+    ) {
+        ConfiguredGroupIcon(group, Modifier.size(24.dp))
+    }
+}
 @OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
 internal fun LiquidStrategyCard(group: ProxyGroupUi, selected: String, expanded: Boolean, value: Long?, testing: Boolean,
@@ -179,10 +198,7 @@ internal fun LiquidNodeCard(node: ProxyNodeUi, active: Boolean, value: Long?, te
     }
     val alpha by animateFloatAsState(if (reveal) 1f else .78f, tween(if (motion) 150 else 0), label = "nodeReveal")
     val scale by animateFloatAsState(if (pressed) .97f else 1f, tween(if (motion) 110 else 0), label = "nodePress")
-    val protocolLabel = buildString {
-        append(node.type.ifBlank { "节点" })
-        if (node.udp) append(" · UDP")
-    }
+    val protocolLabel = liquidNodeProtocolLabel(node)
 
     Box(
         modifier
