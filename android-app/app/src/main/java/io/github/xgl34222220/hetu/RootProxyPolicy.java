@@ -13,6 +13,7 @@ final class RootProxyPolicy {
     private static final int FIRST_APP_UID = 10000;
     private static final int MAX_UIDS = 512;
     private static final int MAX_DIRECT_UIDS = 256;
+    private static final int MAX_DIRECT_GID_RANGES = 64;
     private static final int MAX_CIDRS = 256;
     private static final int MAX_INTERFACES = 32;
     private static final Pattern CIDR_SAFE = Pattern.compile("[0-9A-Fa-f:.]+/[0-9]{1,3}");
@@ -22,6 +23,7 @@ final class RootProxyPolicy {
     final String appScope;
     final String uidRanges;
     final String directUidRanges;
+    final String directGidRanges;
     final boolean sharedNetwork;
     final boolean killSwitch;
     final String cidrs;
@@ -34,6 +36,7 @@ final class RootProxyPolicy {
             String appScope,
             String uidRanges,
             String directUidRanges,
+            String directGidRanges,
             boolean sharedNetwork,
             boolean killSwitch,
             String cidrs,
@@ -44,6 +47,7 @@ final class RootProxyPolicy {
         this.appScope = appScope;
         this.uidRanges = uidRanges;
         this.directUidRanges = directUidRanges;
+        this.directGidRanges = directGidRanges;
         this.sharedNetwork = sharedNetwork;
         this.killSwitch = killSwitch;
         this.cidrs = cidrs;
@@ -131,10 +135,12 @@ final class RootProxyPolicy {
 
         String cidrs = sanitizeCidrs(prefs.getStringSet("proxyBypassCidrs", Collections.emptySet()));
         String interfaces = sanitizeInterfaces(prefs.getStringSet("proxyBypassInterfaces", Collections.emptySet()));
+        String directGids = sanitizeDirectGids(prefs.getStringSet("proxyDirectGids", Collections.emptySet()));
         return new RootProxyPolicy(
                 scope,
                 compress(uids),
                 compress(directUids),
+                directGids,
                 prefs.getBoolean("proxySharedNetwork", false),
                 prefs.getBoolean("proxyKillSwitch", false),
                 cidrs,
@@ -149,6 +155,7 @@ final class RootProxyPolicy {
         if (!missingPackages.isEmpty()) parts.add("已忽略 " + missingPackages.size() + " 个已卸载应用");
         if (!skippedSystemPackages.isEmpty()) parts.add("为避免影响系统服务，已忽略 " + skippedSystemPackages.size() + " 个系统 UID 应用");
         if (!directPackages.isEmpty()) parts.add("已将 " + directPackages.size() + " 个应用下沉为 Root 直连（包含河图自身控制进程）");
+        if (!directGidRanges.isEmpty()) parts.add("已启用 GID 直连：" + directGidRanges);
         return String.join("；", parts);
     }
 
@@ -170,6 +177,37 @@ final class RootProxyPolicy {
         if (out.length() > 0) out.append(',');
         out.append(start);
         if (end != start) out.append('-').append(end);
+    }
+
+    private static String sanitizeDirectGids(Set<String> values) throws IOException {
+        if (values == null || values.isEmpty()) return "";
+        if (values.size() > MAX_DIRECT_GID_RANGES)
+            throw new IOException("GID 直连列表超过 " + MAX_DIRECT_GID_RANGES + " 项");
+        TreeSet<String> out = new TreeSet<>((a, b) -> {
+            long aa = Long.parseLong(a.substringBefore("-"));
+            long bb = Long.parseLong(b.substringBefore("-"));
+            int cmp = Long.compare(aa, bb);
+            return cmp != 0 ? cmp : a.compareTo(b);
+        });
+        for (String raw : values) {
+            String value = raw == null ? "" : raw.trim();
+            if (value.isEmpty()) continue;
+            if (!value.matches("[0-9]{1,10}(?:-[0-9]{1,10})?"))
+                throw new IOException("GID 格式无效：" + value);
+            String[] parts = value.split("-", -1);
+            long start;
+            long end;
+            try {
+                start = Long.parseLong(parts[0]);
+                end = parts.length == 2 ? Long.parseLong(parts[1]) : start;
+            } catch (NumberFormatException bad) {
+                throw new IOException("GID 数值无效：" + value);
+            }
+            if (start < FIRST_APP_UID || end < start || end > Integer.MAX_VALUE)
+                throw new IOException("GID 仅允许普通应用范围（>=10000）：" + value);
+            out.add(start == end ? Long.toString(start) : start + "-" + end);
+        }
+        return String.join(",", out);
     }
 
     private static String sanitizeCidrs(Set<String> values) throws IOException {
