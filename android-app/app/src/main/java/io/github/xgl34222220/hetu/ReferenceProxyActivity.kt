@@ -755,76 +755,97 @@ internal fun RefHome(
                 modifier = refHomeLiquidModifier(Modifier.fillMaxWidth(), hazeState, glassEnabled, shape),
                 shape = shape, color = Color.Transparent,
             ) {
-                Column(Modifier.padding(horizontal = 14.dp, vertical = 13.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        LiquidStatusGlyph(state.running, busy)
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(
-                                if (busy) "正在处理" else if (state.running) "代理运行中" else "代理已停止",
-                                color = t.textPrimary, fontSize = 18.sp, lineHeight = 23.sp, fontWeight = FontWeight.SemiBold,
-                            )
-                            Text(
-                                if (state.running) "已运行 ${refDuration(runtime.elapsedSeconds)} · ${state.mode}" else "准备好后，轻点启动",
-                                color = t.textSecondary, style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                    }
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(
-                        Modifier.fillMaxWidth().heightIn(min = 34.dp).padding(horizontal = 1.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.Top,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        Box(
-                            Modifier.size(28.dp).background(t.controlBackground.copy(alpha = .52f), RoundedCornerShape(9.dp)),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(Icons.Rounded.Description, null, Modifier.size(15.dp), tint = t.textSecondary)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                                Box(
+                                    Modifier.size(8.dp).background(
+                                        if (state.running) MaterialTheme.colorScheme.primary else t.textMuted,
+                                        CircleShape,
+                                    ),
+                                )
+                                Text(
+                                    if (busy) "正在处理" else if (state.running) "运行中" else "已停止",
+                                    color = t.textPrimary,
+                                    fontSize = 19.sp,
+                                    lineHeight = 24.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    letterSpacing = (-.5).sp,
+                                )
+                                if (state.running) {
+                                    Box(
+                                        Modifier.background(Color(0xFFF1F5F9), CircleShape)
+                                            .padding(horizontal = 7.dp, vertical = 2.dp),
+                                    ) {
+                                        Text(
+                                            refDuration(runtime.elapsedSeconds),
+                                            color = t.textSecondary,
+                                            fontSize = 11.sp,
+                                            lineHeight = 15.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                        )
+                                    }
+                                }
+                            }
+                            Text(
+                                if (state.running) "${state.core}  •  ${state.mode}" else "Root / Mihomo",
+                                color = Color(0xFF475569),
+                                fontSize = 12.5.sp,
+                                lineHeight = 17.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Text(
+                                state.config,
+                                color = t.textMuted,
+                                fontSize = 11.5.sp,
+                                lineHeight = 16.sp,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
-                        Text("配置", color = t.textMuted, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                        Text(
-                            state.config,
-                            Modifier.weight(1f),
-                            color = t.textPrimary,
-                            fontSize = 12.5.sp,
-                            lineHeight = 17.sp,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                        LiquidStatusGlyph(state.running, busy)
                     }
                     if (busy || message.isNotBlank()) {
-                        HetuTaskFeedback(operation.ifBlank { message },
+                        HetuTaskFeedback(
+                            operation.ifBlank { message },
                             error = !busy && (message.contains("失败") || message.contains("异常") || message.contains("error", true)),
-                            busy = busy)
+                            busy = busy,
+                        )
                     }
                     if (state.running && state.runtimeSettingsPending) {
                         val runtimeRefreshPending = context.getSharedPreferences("hetu", 0)
                             .getBoolean("proxyRootRuntimeRefreshPending", false)
                         Surface(
                             onClick = onSettings,
-                            color = t.warning.copy(alpha = .075f),
-                            shape = RoundedCornerShape(14.dp),
+                            color = t.warning.copy(alpha = .065f),
+                            shape = RoundedCornerShape(12.dp),
                             shadowElevation = 0.dp,
                         ) {
                             Row(
-                                Modifier.fillMaxWidth().heightIn(min = 40.dp).padding(horizontal = 11.dp, vertical = 8.dp),
+                                Modifier.fillMaxWidth().heightIn(min = 38.dp).padding(horizontal = 10.dp, vertical = 7.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(7.dp),
                             ) {
-                                Icon(Icons.Rounded.Info, null, Modifier.size(16.dp), tint = t.warning)
+                                Icon(Icons.Rounded.Info, null, Modifier.size(15.dp), tint = t.warning)
                                 Text(
-                                    if (runtimeRefreshPending) "运行组件已更新，重启后应用"
-                                    else "运行设置已修改，重启后生效",
+                                    if (runtimeRefreshPending) "运行组件已更新，重启后应用" else "运行设置已修改，重启后生效",
                                     Modifier.weight(1f),
                                     color = t.textPrimary,
-                                    fontSize = 11.5.sp,
-                                    lineHeight = 16.sp,
+                                    fontSize = 11.sp,
+                                    lineHeight = 15.sp,
                                     fontWeight = FontWeight.Medium,
                                 )
-                                Icon(Icons.Rounded.ChevronRight, null, Modifier.size(16.dp), tint = t.textMuted)
+                                Icon(Icons.Rounded.ChevronRight, null, Modifier.size(15.dp), tint = t.textMuted)
                             }
                         }
                     }
+                    HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 1.dp)
                     RefHomeActions(state.running, busy, onToggle, onReload, onRestart)
                 }
             }
