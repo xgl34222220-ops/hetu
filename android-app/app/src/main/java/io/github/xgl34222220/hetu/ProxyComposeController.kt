@@ -118,6 +118,17 @@ internal class ProxyComposeController(context: Context) {
     private val appIconCache = android.util.LruCache<String, Bitmap>(96)
     private val appIdentityCache = android.util.LruCache<String, AppIdentity>(192)
 
+    private fun userSafeRuntimeMessage(raw: String?): String {
+        val text = raw.orEmpty().trim()
+        if (text.isBlank()) return "运行状态暂时无法确认"
+        if (text.contains("/data/adb/hetu/") || text.contains("hetu-root.sh[")) {
+            return "Root 运行状态暂时无法确认，请稍后自动重试"
+        }
+        return DiagnosticReport.redact(text, prefs.getString("proxyControllerSecret", ""))
+            .replace(Regex("""/data/adb/hetu/\S+"""), "Root 运行组件")
+            .take(180)
+    }
+
     suspend fun state(): ProxyComposeState = withContext(Dispatchers.IO) {
         val profile = ProxyRuntimeProfile.load(prefs)
         val selected = configs.selected(profile.core)
@@ -127,8 +138,12 @@ internal class ProxyComposeController(context: Context) {
 
         val fastRunning = ProxyStatusBridge.rootProxyRunning(app)
         val nowElapsed = android.os.SystemClock.elapsedRealtime()
+        val lastStartupAt = prefs.getLong("proxyRootLastStartupAt", 0L)
+        val sinceStartup = System.currentTimeMillis() - lastStartupAt
+        val startupGrace = fastRunning && lastStartupAt > 0L && sinceStartup in 0..8_000L
         val lastHealth = prefs.getLong("proxyRootHealthProbeElapsed", 0L)
-        val shouldProbeHealth = !fastRunning || nowElapsed - lastHealth >= 10_000L
+        val probeInterval = if (startupGrace) 1_000L else 10_000L
+        val shouldProbeHealth = !fastRunning || nowElapsed - lastHealth >= probeInterval
         val status = if (shouldProbeHealth) {
             try {
                 root.status().also { live ->
@@ -152,7 +167,7 @@ internal class ProxyComposeController(context: Context) {
                 if (fastRunning) JSONObject()
                     .put("running", true)
                     .put("healthProbeFailed", true)
-                    .put("message", "运行状态暂时无法确认：${error.message ?: "请稍后重试"}")
+                    .put("message", userSafeRuntimeMessage(error.message))
                     .put("runtimeSchema", prefs.getInt("proxyRootRuntimeSchema", 0))
                     .put("ipv4Rules", prefs.getBoolean("proxyRootIpv4Rules", false))
                     .put("ipv6Rules", prefs.getBoolean("proxyRootIpv6Rules", false))
@@ -165,7 +180,7 @@ internal class ProxyComposeController(context: Context) {
                     .put("dnsListenerReady", prefs.getBoolean("proxyRootDnsListenerReady", false))
                     .put("watchdog", prefs.getBoolean("proxyRootWatchdog", false))
                     .put("dataPlaneHealthy", prefs.getBoolean("proxyRootDataPlaneHealthy", false))
-                else JSONObject().put("running", false).put("message", error.message ?: "状态读取失败")
+                else JSONObject().put("running", false).put("message", userSafeRuntimeMessage(error.message))
             }
         } else {
             JSONObject()
@@ -222,10 +237,11 @@ internal class ProxyComposeController(context: Context) {
             config = selected?.name ?: "尚未选择配置",
             message = when {
                 !running -> listOf(
-                    status.optString("message", ""),
+                    userSafeRuntimeMessage(status.optString("message", "")),
                     prefs.getString("proxyAutoRecoveryError", "").orEmpty(),
                 ).filter { it.isNotBlank() }.distinct().joinToString("；")
-                status.optBoolean("healthProbeFailed", false) -> status.optString("message", "运行状态暂时无法确认")
+                startupGrace && (status.optBoolean("healthProbeFailed", false) || !status.optBoolean("dataPlaneHealthy", false)) -> ""
+                status.optBoolean("healthProbeFailed", false) -> userSafeRuntimeMessage(status.optString("message", ""))
                 !status.optBoolean("dataPlaneHealthy", false) ->
                     "核心仍在运行，但透明代理/DNS 数据面健康检查未完整通过"
                 else -> ""
