@@ -228,11 +228,10 @@ internal fun LiquidGroupWell(group: ProxyGroupUi, selected: String, delays: Map<
     onSelect: (String) -> Unit, onDelay: (String) -> Unit, onTestAll: () -> Unit) {
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val shape = RoundedCornerShape(20.dp)
-    val well = if (dark) Color(0xFF18212E) else Color(0xFFEEF2F6)
-    Column(Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 16.dp).testTag("sunken-well:${group.name}")
+    val shape = RoundedCornerShape(22.dp)
+    Column(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 16.dp).testTag("sunken-well:${group.name}")
         .crystalMaterial(shape, depth = CrystalDepth.Sunken)
-        .padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        .padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth().heightIn(min = 40.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("切换落地节点", color = t.textSecondary, fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Bold,
@@ -245,9 +244,9 @@ internal fun LiquidGroupWell(group: ProxyGroupUi, selected: String, delays: Map<
         }
         BoxWithConstraints {
             val columns = liquidColumns(maxWidth)
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 group.nodes.withIndex().toList().chunked(columns).forEach { row ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         row.forEach { (index, node) ->
                             LiquidNodeCard(node, node.name == selected, delays[node.name] ?: node.lastDelay,
                                 testing[node.name] == true, Modifier.weight(1f), { onSelect(node.name) }, { onDelay(node.name) }, index)
