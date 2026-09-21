@@ -109,7 +109,7 @@ class NonHomeAlignmentTest {
     @Test fun refreshStatesKeep48dpSlotAndDetailsRemainInlineWithoutDialogs() {
         var busy by mutableStateOf(false);var ok by mutableStateOf(false);var error by mutableStateOf("")
         var clicks=0
-        val p=DashboardProviderUi("两年套餐","HTTP","","","2026-09-21T00:00:00Z",5,20,128,1820000000,setOf("a","b"),true)
+        val p=DashboardProviderUi("两年套餐","HTTP","","","2026-09-21T00:00:00Z",5_000_000_000L,20_000_000_000L,128_000_000_000L,1820000000,setOf("a","b"),true)
         compose.setContent { HetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f,1f),LocalHetuMotionEnabled provides false) {
             Column(Modifier.width(360.dp).crystalPageBackground().padding(16.dp).verticalScroll(rememberScrollState()).testTag("ticket-scene")) {
                 SubscriptionBoardingTicket(p.name,p,"example.invalid",refreshing=busy,success=ok,error=error,onEdit={},onRefresh={clicks++})
@@ -143,15 +143,24 @@ class NonHomeAlignmentTest {
                 WorkspaceAccordion(visible) { Box(Modifier.fillMaxWidth().height(120.dp)) }
             }
         } }
-        compose.runOnIdle { visible=true };compose.mainClock.advanceTimeBy(100);compose.waitForIdle()
-        val middle=bounds("accordion-host").height
-        compose.mainClock.advanceTimeBy(500);compose.waitForIdle()
-        val end=bounds("accordion-host").height
-        assertTrue("Open hard-snapped: $middle/$end",middle>1f && middle<end)
-        compose.runOnIdle { visible=false };compose.mainClock.advanceTimeBy(100);compose.waitForIdle()
-        assertTrue(bounds("accordion-host").height<end)
-        compose.mainClock.advanceTimeBy(500)
-        compose.runOnIdle { motion=false;visible=true };compose.mainClock.advanceTimeBy(32);compose.waitForIdle()
-        assertEquals(end,bounds("accordion-host").height,1f)
+        // Android measure/layout is not driven by the Compose clock. Flush each
+        // frame to observe the actual intermediate height, not the pre-layout 1dp.
+        fun frames(count: Int): List<Float> = (0 until count).map {
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+            bounds("accordion-host").height
+        }
+        compose.runOnIdle { visible=true }
+        val opening=frames(26)
+        val end=opening.last()
+        assertTrue("Accordion never reached full height: $opening",end>=119f)
+        assertTrue("Open hard-snapped: $opening",opening.any { it>1f && it<end })
+        assertTrue("Opening moved backwards: $opening",opening.zipWithNext().all { (a,b)-> b>=a })
+        compose.runOnIdle { visible=false }
+        val closing=frames(26)
+        assertTrue("Close hard-snapped: $closing",closing.any { it>1f && it<end })
+        assertTrue("Accordion did not finish closing: $closing",closing.last()<=1f)
+        compose.runOnIdle { motion=false;visible=true }
+        assertEquals(end,frames(4).last(),1f)
     }
 }

@@ -41,8 +41,12 @@ internal fun WorkspaceSettingRow(title: String, supporting: String, icon: ImageV
         .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
         .padding(horizontal = WorkspaceMetrics.gutter, vertical = 14.dp),
         verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(WorkspaceMetrics.iconGap)) {
-        Box(Modifier.size(WorkspaceMetrics.icon).padding(top = 2.dp)) {
-            if (icon != null) HetuListIcon(icon)
+        Box(Modifier.size(WorkspaceMetrics.icon), contentAlignment = Alignment.Center) {
+            if (icon != null) Box(Modifier.fillMaxSize().background(
+                MaterialTheme.colorScheme.primary.copy(alpha = .065f),
+                androidx.compose.foundation.shape.RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
+                Icon(icon, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+            }
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(title, Modifier.fillMaxWidth().testTag("setting-title:$title"), color = t.textPrimary,
