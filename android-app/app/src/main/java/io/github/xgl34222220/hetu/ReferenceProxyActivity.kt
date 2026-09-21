@@ -378,12 +378,20 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
             operation = "正在重启…"
             try {
                 controller.restart { operation = it }
+                prefs.edit().remove("proxyRootRuntimeRefreshPending").remove("proxyRootUpgradeError").apply()
+                state = state.copy(runtimeSettingsPending = false, message = "")
+                message = ""
                 operation = ""
-                launch { delay(120); refresh() }
+                launch {
+                    delay(350)
+                    refresh()
+                    delay(1_100)
+                    refresh()
+                }
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                message = error.message ?: "重启失败"
+                message = UiFeedback.summary(error.message ?: "重启失败", true)
             } finally {
                 operation = ""
             }
