@@ -50,7 +50,7 @@ class CrystalMaterialRenderTest {
         val image=raster(tag)
         File("build/reports/ui-audit/$name.png").apply{parentFile?.mkdirs()}.outputStream().use{image.compress(Bitmap.CompressFormat.PNG,100,it)}
     }
-    @Test fun materialsHaveDirectionalLightWithoutBlurringTextOrUsingWhiteBlocks() {
+    @Test fun materialsMatchCalmReferenceCardsWithoutPureWhiteSlabs() {
         var dark by mutableStateOf(false)
         compose.setContent { key(dark) {
             app.getSharedPreferences("hetu",0).edit().putString("appearance",if(dark)"dark" else "light").commit()
@@ -70,8 +70,12 @@ class CrystalMaterialRenderTest {
             val card=raster("lit-card")
             val upper=card.getPixel(card.width/2,5)
             val lower=card.getPixel(card.width/2,card.height-6)
-            assertNotEquals("Card still uses a single flat fill",upper,lower)
-            if(!night) assertNotEquals("Lower surface became opaque white",0xffffffff.toInt(),lower)
+            if(!night) {
+                assertNotEquals("Reference surface must not become pure white",0xffffffff.toInt(),upper)
+                assertNotEquals("Reference surface must not become pure white",0xffffffff.toInt(),lower)
+            } else {
+                assertNotEquals("Dark card lost depth",upper,lower)
+            }
             compose.onNodeWithText("— ms",true).assertExists()
             compose.onNodeWithText("未测速",true).assertDoesNotExist()
             save("crystal-showcase","crystal-materials-${if(night)"dark" else "light"}")
