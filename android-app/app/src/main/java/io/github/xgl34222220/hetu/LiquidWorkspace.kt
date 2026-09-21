@@ -168,7 +168,7 @@ internal fun LiquidStrategyCard(group: ProxyGroupUi, selected: String, expanded:
 internal fun LiquidNodeCard(node: ProxyNodeUi, active: Boolean, value: Long?, testing: Boolean,
     modifier: Modifier = Modifier, onSelect: () -> Unit, onDelay: () -> Unit, index: Int = 0) {
     val t = LocalHetuTokens.current
-    val primary = MaterialTheme.colorScheme.primary
+    val primary = HetuMicroCrystal.KleinBlue
     val motion = LocalHetuMotionEnabled.current
     val interaction = remember(node.name) { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -179,21 +179,28 @@ internal fun LiquidNodeCard(node: ProxyNodeUi, active: Boolean, value: Long?, te
     }
     val alpha by animateFloatAsState(if (reveal) 1f else .78f, tween(if (motion) 150 else 0), label = "nodeReveal")
     val scale by animateFloatAsState(if (pressed) .97f else 1f, tween(if (motion) 110 else 0), label = "nodePress")
+    val protocolLabel = buildString {
+        append(node.type.ifBlank { "节点" }.uppercase())
+        if (node.udp) append(" · UDP")
+    }
 
     Box(
         modifier
             .height(64.dp)
             .testTag("node:${node.name}")
             .graphicsLayer { this.alpha = alpha; scaleX = scale; scaleY = scale }
-            .crystalMaterial(RoundedCornerShape(16.dp), depth = CrystalDepth.InsetItem, selection = active)
+            .crystalMaterial(RoundedCornerShape(14.dp), depth = CrystalDepth.InsetItem, selection = active)
             .clickable(interactionSource = interaction, indication = null, role = Role.RadioButton, onClick = onSelect)
             .semantics { selected = active },
     ) {
         Column(
-            Modifier.fillMaxWidth().align(Alignment.CenterStart).padding(start = 11.dp, top = 8.dp, end = 66.dp, bottom = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 val flag = refNodeFlag(node.name)
                 if (flag.isNotBlank()) {
                     Text(flag, fontSize = 12.sp, lineHeight = 18.sp)
@@ -203,45 +210,56 @@ internal fun LiquidNodeCard(node: ProxyNodeUi, active: Boolean, value: Long?, te
                     node.name,
                     Modifier.weight(1f).testTag("node-label:${node.name}"),
                     color = if (active) primary else t.textPrimary,
-                    fontSize = 12.5.sp,
-                    lineHeight = 18.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp,
+                    fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (active) {
+                    Spacer(Modifier.width(4.dp))
+                    Icon(
+                        Icons.Rounded.CheckCircle,
+                        "已选择",
+                        Modifier.size(13.dp),
+                        tint = primary,
+                    )
+                }
             }
-            Box(
-                Modifier
-                    .background(t.controlBackground.copy(alpha = .78f), RoundedCornerShape(5.dp))
-                    .padding(horizontal = 5.dp, vertical = 1.dp)
-                    .testTag("node-protocol:${node.name}"),
+
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = 28.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    listOf(node.type.ifBlank { "节点" }, if (node.udp) "UDP" else "").filter { it.isNotBlank() }.joinToString(" · "),
-                    color = t.textSecondary,
-                    fontSize = 9.sp,
-                    lineHeight = 12.sp,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Box(
+                    Modifier
+                        .background(t.controlBackground.copy(alpha = .82f), RoundedCornerShape(5.dp))
+                        .padding(horizontal = 5.dp, vertical = 1.dp)
+                        .testTag("node-protocol:${node.name}"),
+                ) {
+                    Text(
+                        protocolLabel,
+                        color = t.textSecondary,
+                        fontSize = 9.sp,
+                        lineHeight = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                }
+
+                Box(
+                    Modifier
+                        .sizeIn(minWidth = 48.dp, minHeight = 28.dp)
+                        .testTag("node-delay:${node.name}")
+                        .clickable(enabled = !testing, role = Role.Button, onClickLabel = "测速", onClick = onDelay),
+                    contentAlignment = Alignment.CenterEnd,
+                ) {
+                    LatencyChip(value, testing, compact = true)
+                }
             }
-        }
-        Box(
-            Modifier.align(Alignment.CenterEnd).padding(end = 4.dp).size(48.dp)
-                .testTag("node-delay:${node.name}")
-                .clickable(enabled = !testing, role = Role.Button, onClickLabel = "测速", onClick = onDelay),
-            contentAlignment = Alignment.Center,
-        ) {
-            LatencyChip(value, testing, compact = true)
-        }
-        if (active) {
-            Icon(
-                Icons.Rounded.CheckCircle,
-                "已选择",
-                Modifier.align(Alignment.TopEnd).padding(top = 5.dp, end = 4.dp).size(13.dp),
-                tint = primary,
-            )
         }
     }
 }
