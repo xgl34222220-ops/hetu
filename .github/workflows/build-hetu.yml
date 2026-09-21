@@ -19,7 +19,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: hetu-android-build-${{ github.ref }}
+  group: hetu-android-build-v2-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
