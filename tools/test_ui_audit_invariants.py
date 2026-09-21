@@ -21,9 +21,11 @@ assert "idleWave" not in main and "kotlin.math.sin" not in main, "No synthetic t
 assert "BoxProxy Design System" not in (src / "ThemeSettingsActivity.kt").read_text()
 assert "setEditorLanguage(HetuYamlLanguage())" in (src / "ProxySubscriptionActivity.kt").read_text()
 assert "RuleMetricSummary(" in (src / "ProxyAdblockChainActivity.kt").read_text()
-print("UI audit source/runtime invariants passed")
-
-assert 'item(key = "home-shortcuts")' not in main
+assert 'item(key = "home-shortcuts")' in main, "Home must expose the WebUI/log control shortcuts"
+assert "ProxyLocalWebUiActivity::class.java" in main and 'title = "运行日志"' in main
 assert 'Text("网络与广告过滤"' not in main
 assert "expandedGroup ?: closingGroup" in main
 assert "LiquidConfigIndicator(config.selected)" in (src / "ProxySubscriptionActivity.kt").read_text()
+for modal_free in ("ReferenceProxyActivity.kt", "AlignedInstrumentPanel.kt", "ReferenceFileManagerActivity.kt", "CompactMainActivity.kt"):
+    assert "AlertDialog(" not in (src / modal_free).read_text(), f"Legacy centered AlertDialog remains in {modal_free}"
+print("UI audit source/runtime invariants passed")
