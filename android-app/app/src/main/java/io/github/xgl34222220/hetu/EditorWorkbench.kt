@@ -43,29 +43,47 @@ internal fun applyYamlAccessory(editor: CodeEditor, symbol: String) {
     editor.ensureSelectionVisible()
 }
 
-internal val yamlWorkbenchSymbols = listOf("Tab", "<", ">", "{", "}", "[", "]", ":", "-", "'", "\"", "#", "$")
+internal val yamlWorkbenchSymbols = listOf("Tab", ":", "-", "#", "\"", "'", "[", "]", "{", "}", "=", "true", "false", "|")
 
 @Composable
-internal fun YamlWorkbenchActions(canUndo: Boolean, canRedo: Boolean, saving: Boolean,
-    undo: () -> Unit, redo: () -> Unit, search: () -> Unit, outline: () -> Unit, save: () -> Unit) {
+internal fun YamlWorkbenchActions(
+    canUndo: Boolean,
+    canRedo: Boolean,
+    saving: Boolean,
+    validating: Boolean,
+    undo: () -> Unit,
+    redo: () -> Unit,
+    format: () -> Unit,
+    search: () -> Unit,
+    outline: () -> Unit,
+    validate: () -> Unit,
+    save: () -> Unit,
+) {
     val t = LocalHetuTokens.current
-    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp).testTag("yaml-workbench-actions")
-        .crystalMaterial(RoundedCornerShape(14.dp), depth = CrystalDepth.InsetItem),
-        horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        @Composable fun Action(label: String, icon: ImageVector, enabled: Boolean = true, click: () -> Unit) {
+    val working = saving || validating
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp).testTag("yaml-workbench-actions")
+            .crystalMaterial(RoundedCornerShape(14.dp), depth = CrystalDepth.InsetItem)
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(1.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        @Composable fun Action(label: String, icon: ImageVector, enabled: Boolean = true, busy: Boolean = false, click: () -> Unit) {
             IconButton(onClick = click, enabled = enabled, modifier = Modifier.size(48.dp).testTag("yaml-action:$label")) {
-                if (label == "保存" && saving) HetuBusyIndicator(Modifier.size(18.dp))
+                if (busy) HetuBusyIndicator(Modifier.size(18.dp))
                 else Icon(icon, label, Modifier.size(19.dp), tint = if (enabled) MaterialTheme.colorScheme.primary else t.textMuted.copy(alpha = .45f))
             }
         }
-        Action("撤销", Icons.Rounded.Undo, canUndo && !saving, undo)
-        Action("重做", Icons.Rounded.Redo, canRedo && !saving, redo)
-        Action("搜索", Icons.Rounded.Search, !saving, search)
-        Action("语法大纲", Icons.Rounded.FormatListBulleted, !saving, outline)
-        Action("保存", Icons.Rounded.Save, !saving, save)
+        Action("撤销", Icons.Rounded.Undo, canUndo && !working, click = undo)
+        Action("重做", Icons.Rounded.Redo, canRedo && !working, click = redo)
+        Action("格式化", Icons.Rounded.AutoFixHigh, !working, click = format)
+        Action("搜索", Icons.Rounded.Search, !working, click = search)
+        Action("语法大纲", Icons.Rounded.FormatListBulleted, !working, click = outline)
+        Action("校验", Icons.Rounded.FactCheck, !saving, busy = validating, click = validate)
+        Action("保存", Icons.Rounded.Save, !validating, busy = saving, click = save)
     }
 }
-
 /** Fixed above the IME by the containing Column's imePadding; keys never steal editor focus. */
 @Composable
 internal fun YamlWorkbenchAccessory(enabled: Boolean, onSymbol: (String) -> Unit) {
