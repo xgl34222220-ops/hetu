@@ -3537,7 +3537,7 @@ internal fun RefRuleSetRow(item: DashboardRuleSetUi, refreshing: Boolean, succes
 }
 
 @Composable
-private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
+internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
     val context = LocalContext.current
     val inspector = remember { ProxyRuntimeInspector(context) }
     val scope = rememberCoroutineScope()
@@ -3678,7 +3678,7 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
 }
 
 @Composable
-private fun RefSettings(state: ProxyComposeState, operation: String, onApplySettings: () -> Unit, onChanged: () -> Unit) {
+internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySettings: () -> Unit, onChanged: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("hetu", 0) }
     var modePicker by remember { mutableStateOf(false) }
