@@ -232,7 +232,7 @@ internal class ProxyComposeController(context: Context) {
             ipv6ProtectionActive = running && !status.optBoolean("healthProbeFailed", false) &&
                 if (status.optString("ipv6Mode", "") == "strict") status.optBoolean("ipv6Rules", false)
                 else status.optBoolean("ipv6DisableGuard", false),
-            runtimeSettingsPending = ProxyRuntimeSettings.pending(running, ProxyRuntimeSettings.signature(prefs), prefs.getString("proxyRootAppliedSettings", "")),
+            runtimeSettingsPending = ProxyRuntimeSettings.pending(running, prefs),
             autoOverwrite = profile.autoOverwrite,
             config = selected?.name ?: "尚未选择配置",
             message = when {
@@ -308,6 +308,7 @@ internal class ProxyComposeController(context: Context) {
         val result = root.replaceRunningManually(profile, onProgress)
         prefs.edit()
             .putString("proxyRootAppliedSettings", ProxyRuntimeSettings.signature(prefs))
+            .remove(ProxyRuntimeSettings.DIRTY_KEY)
             .remove("proxyRootRuntimeRefreshPending")
             .remove("proxyRootUpgradeError")
             .apply()
