@@ -45,11 +45,11 @@ class HomeScreenRenderTest {
                         Box(Modifier.width(width.dp).height(1100.dp).testTag("home-screen")) {
                             RefHome(
                                 state=ProxyComposeState(running=true,panelReady=true,config="原始配置 · 不修改内容",mode="TPROXY"),
-                                runtime=ProxyRuntimeSnapshot(running=true,elapsedSeconds=3600,rssBytes=78100000,
-                                    wanAddress="203.0.113.7",wanRegion="示例出口",wanCountryCode="JP",wanState="success",wanCheckedAt=1789870000000),
-                                providers=emptyList(),cachedSubscription=RefSubscriptionCache(163100000000,685500000000,3),cachedConnections=20,
-                                siteDelays=mapOf("Baidu" to 96L,"Cloudflare" to 193L,"Google" to 882L),
-                                upRate=123456,downRate=345678,cpuPercent=6.3f,operation="",message="",testing=false,
+                                runtime=ProxyRuntimeSnapshot(running=true,elapsedSeconds=30,rssBytes=92_274_688,
+                                    wanAddress="61.222.202.153",wanRegion="Taiwan",wanCountryCode="TW",wanState="success",wanCheckedAt=1789870000000),
+                                providers=emptyList(),cachedSubscription=RefSubscriptionCache(177_414_635_520,735_965_020_160,3),cachedConnections=20,
+                                siteDelays=mapOf("Baidu" to 44L,"Cloudflare" to 186L,"Google" to 162L),
+                                upRate=1331,downRate=2150,cpuPercent=5.7f,operation="",message="",testing=false,
                                 hazeState=remember { HazeState() },glassEnabled=false,onRefresh={},onToggle={toggles++},onReload={reloads++},
                                 onRestart={restarts++},onDelay={},onLog={},onSubscription={},diagnosticLoading=false,onConnections={},onSettings={},onDiagnostics={})
                         }
