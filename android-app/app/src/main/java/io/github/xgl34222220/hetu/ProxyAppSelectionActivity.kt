@@ -42,7 +42,7 @@ import io.github.xgl34222220.hetu.ui.HetuComposeController
 import io.github.xgl34222220.hetu.ui.HetuTheme
 import io.github.xgl34222220.hetu.ui.LocalHetuTokens
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 
 class ProxyAppSelectionActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -102,11 +102,14 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
         loadingApps = true
         loadError = ""
         value = try {
-            withTimeout(6_000L) { controller.loadApps(forceRefresh = reload > 0) }
+            withTimeoutOrNull(6_000L) { controller.loadApps(forceRefresh = reload > 0) } ?: run {
+                loadError = "应用列表读取超过 6 秒"
+                controller.cachedApps()
+            }
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (error: Exception) {
-            loadError = error.message ?: "应用列表读取超时"
+            loadError = error.message ?: "应用列表读取失败"
             controller.cachedApps()
         } finally {
             loadingApps = false
