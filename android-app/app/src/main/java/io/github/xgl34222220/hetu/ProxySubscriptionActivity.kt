@@ -895,8 +895,24 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
 
                     }
 
-                    if (!yamlSearchOpen) YamlWorkbenchAccessory(!yamlSaving) { symbol ->
-                        yamlEditor?.let { applyYamlAccessory(it, symbol) }
+                    if (!yamlSearchOpen) {
+                        YamlWorkbenchAccessory(
+                            enabled = !yamlSaving,
+                            canUndo = yamlCanUndo,
+                            canRedo = yamlCanRedo,
+                            onUndo = {
+                                yamlEditor?.takeIf { it.canUndo() }?.undo()
+                                yamlCanUndo = yamlEditor?.canUndo() == true
+                                yamlCanRedo = yamlEditor?.canRedo() == true
+                            },
+                            onRedo = {
+                                yamlEditor?.takeIf { it.canRedo() }?.redo()
+                                yamlCanUndo = yamlEditor?.canUndo() == true
+                                yamlCanRedo = yamlEditor?.canRedo() == true
+                            },
+                        ) { symbol ->
+                            yamlEditor?.let { applyYamlAccessory(it, symbol) }
+                        }
                     }
                     YamlCursorStatus(yamlCursorLine, yamlCursorColumn, yamlLineCount, Modifier.navigationBarsPadding())
 
