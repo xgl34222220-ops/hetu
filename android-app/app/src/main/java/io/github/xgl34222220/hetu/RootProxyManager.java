@@ -307,7 +307,7 @@ final class RootProxyManager {
                 +"|tcp="+bit(profile.tcp)+"|udp="+bit(profile.udp)+"|quic="+bit(profile.quicBlocked)
                 +"|scope="+policy.appScope+"|uids="+policy.uidRanges+"|share="+bit(policy.sharedNetwork)
                 +"|kill="+bit(policy.killSwitch)+"|cidrs="+policy.cidrs+"|ifaces="+policy.interfaces
-                +"|direct="+policy.directUidRanges;
+                +"|direct="+policy.directUidRanges+"|directGids="+policy.directGidRanges;
     }
 
     private void installHotReloadFiles(Prepared p)throws Exception{
@@ -408,7 +408,7 @@ final class RootProxyManager {
                 p.profile.mode.id,String.valueOf(p.tproxyPort),String.valueOf(p.redirectPort),p.profile.ipv6.id,
                 bit(p.profile.tcp),bit(p.profile.udp),p.profile.dnsHijack.id,bit(p.profile.quicBlocked),
                 String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(p.controllerPort),
-                policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges);
+                policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,policy.directGidRanges);
         }finally{CONTROL_LOCK.unlock();}
     }
 
@@ -569,7 +569,7 @@ final class RootProxyManager {
                 BIN,CONFIG,profile.mode.id,String.valueOf(p.tproxyPort),String.valueOf(p.redirectPort),profile.ipv6.id,
                 bit(profile.tcp),bit(profile.udp),profile.dnsHijack.id,bit(profile.quicBlocked),
                 String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(p.controllerPort),
-                policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,"1",bit(capabilityKnown));
+                policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,"1",bit(capabilityKnown),policy.directGidRanges);
             if(!result.optBoolean("ok"))throw new IOException(result.optString("message","Root 代理启动失败"));
         }catch(Exception startFailure){if(adblockCoordinatorEntered)ProxyAdblockCoordinator.exit(context);throw startFailure;}
 
@@ -618,6 +618,7 @@ final class RootProxyManager {
                 .put("appScope",policy.appScope)
                 .put("uidRanges",policy.uidRanges)
                 .put("directUidRanges",policy.directUidRanges)
+                .put("directGidRanges",policy.directGidRanges)
                 .put("directPackageCount",policy.directPackages.size())
                 .put("sharedNetwork",policy.sharedNetwork)
                 .put("killSwitch",policy.killSwitch)
