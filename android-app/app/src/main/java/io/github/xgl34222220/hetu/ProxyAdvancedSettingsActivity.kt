@@ -89,11 +89,19 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
     val pageBg = if (dark) t.pageBackground else MaterialTheme.colorScheme.background
     val running = runtimeStatus?.optBoolean("running", false) ?: prefs.getBoolean("proxyRootRuntimeRunning", false)
     val effectiveIpv6 = runtimeStatus?.optString("ipv6Mode", "").orEmpty()
-    val settingsPending = ProxyRuntimeSettings.pending(running, ProxyRuntimeSettings.signature(prefs), prefs.getString("proxyRootAppliedSettings", ""))
+    val settingsPending = ProxyRuntimeSettings.pending(running, prefs)
 
     fun refresh() { revision++ }
-    fun putBool(key: String, value: Boolean) { prefs.edit().putBoolean(key, value).apply(); refresh() }
-    fun putString(key: String, value: String) { prefs.edit().putString(key, value).apply(); refresh() }
+    fun putBool(key: String, value: Boolean) {
+        prefs.edit().putBoolean(key, value).apply()
+        ProxyRuntimeSettings.markDirty(prefs, key)
+        refresh()
+    }
+    fun putString(key: String, value: String) {
+        prefs.edit().putString(key, value).apply()
+        ProxyRuntimeSettings.markDirty(prefs, key)
+        refresh()
+    }
     fun setSummary(key: String): String {
         val values = prefs.getStringSet(key, emptySet()).orEmpty()
         return if (values.isEmpty()) "未设置" else "${values.size} 条"
@@ -414,6 +422,7 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
             onSave = { raw ->
                 val set = raw.split('\n', ',', ';').map { it.trim() }.filter { it.isNotEmpty() }.toSortedSet()
                 prefs.edit().putStringSet(state.key, set).apply()
+                ProxyRuntimeSettings.markDirty(prefs, state.key)
                 editor = null
                 refresh()
             },
