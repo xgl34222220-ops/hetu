@@ -347,6 +347,7 @@ internal fun LiquidHomeActions(running: Boolean, busy: Boolean, onToggle: () -> 
 @Composable
 internal fun LiquidStatusGlyph(running: Boolean, busy: Boolean) {
     val primary = MaterialTheme.colorScheme.primary
+    val kleinBlue = Color(0xFF002FA7)
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     Box(
         Modifier
@@ -354,11 +355,11 @@ internal fun LiquidStatusGlyph(running: Boolean, busy: Boolean) {
             .shadow(
                 elevation = if (running && !busy) 10.dp else 2.dp,
                 shape = CircleShape,
-                ambientColor = primary.copy(alpha = .12f),
-                spotColor = primary.copy(alpha = .28f),
+                ambientColor = kleinBlue.copy(alpha = .12f),
+                spotColor = kleinBlue.copy(alpha = .28f),
             )
             .background(
-                if (running && !busy) primary
+                if (running && !busy) kleinBlue
                 else if (dark) Color.White.copy(alpha = .08f) else Color(0xFFF8FAFC),
                 CircleShape,
             )

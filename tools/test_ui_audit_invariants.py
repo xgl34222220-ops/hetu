@@ -62,6 +62,9 @@ assert "ticket-badge:" in monitoring and "ticket-progress:" in monitoring
 nonhome = (src / "NonHomeWorkspace.kt").read_text()
 instrument = (src / "AlignedInstrumentPanel.kt").read_text()
 assert "Color.White.copy(alpha = .95f)" in crystal
+assert "Color(0xFFFFFFFF)" in crystal and "Color(0xFFF8FAFC)" in crystal
+assert "topAlpha" not in crystal and "bottomAlpha" not in crystal
+assert "Color(0xFF002FA7)" in liquid
 assert ".border(" in crystal and "1.dp" in crystal
 assert "if (crystal) {" in crystal and "Box(modifier.crystalMaterial(shape))" in crystal
 assert "MaterialSurface(modifier = if (crystal)" not in crystal

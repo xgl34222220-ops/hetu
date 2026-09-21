@@ -83,11 +83,9 @@ fun Modifier.crystalMaterial(
     val primary = MaterialTheme.colorScheme.primary
     val dark = t.pageBackground.luminance() < .5f
     val radius = when (depth) { CrystalDepth.Popover -> 24.dp; CrystalDepth.InsetItem, CrystalDepth.Sunken -> 12.dp; else -> 20.dp }
-    val topAlpha = when (depth) { CrystalDepth.Popover -> .94f; CrystalDepth.InsetItem -> .92f; CrystalDepth.Sunken -> 1f; else -> .98f }
-    val bottomAlpha = when (depth) { CrystalDepth.Popover -> .84f; CrystalDepth.InsetItem -> .84f; CrystalDepth.Sunken -> 1f; else -> .88f }
     val accent = if (selection) primary else if (tint.isSpecified && tint.alpha > .05f) tint else Color.Unspecified
-    val upper = if (dark) Color(0xFF283543).copy(alpha = .82f) else (if (depth == CrystalDepth.Sunken) Color(0xFFEEF2F6) else Color.White).copy(alpha = topAlpha)
-    val lower = if (dark) Color(0xFF18232F).copy(alpha = .72f) else (if (depth == CrystalDepth.Sunken) Color(0xFFEEF2F6) else Color(0xFFF8FAFC)).copy(alpha = bottomAlpha)
+    val upper = if (dark) Color(0xFF283543).copy(alpha = .82f) else if (depth == CrystalDepth.Sunken) Color(0xFFEEF2F6) else Color(0xFFFFFFFF)
+    val lower = if (dark) Color(0xFF18232F).copy(alpha = .72f) else if (depth == CrystalDepth.Sunken) Color(0xFFEEF2F6) else Color(0xFFF8FAFC)
     val fill = Brush.verticalGradient(listOf(upper, lower))
     // Suppress Haze's default opaque tint; the translucent fill above is the only wash.
     val style = HazeStyle(backgroundColor = Color.Transparent, tints = emptyList(), blurRadius = radius,
