@@ -52,6 +52,10 @@ probe_ingress(){ printf '%s\\n' probe >> "$HETU_TEST_DIR/probes"; }
  gid_bad=subprocess.run(['sh'],input=common+"preflight tproxy 19898 0 disable 1 1 redirect 0 11053 29090 core '' 0 0 '' '' '' 3003\n",env=env,text=True,capture_output=True,timeout=10)
  assert gid_bad.returncode!=0 and 'DIRECT GID' in (gid_bad.stdout+gid_bad.stderr);checks+=1
  assert '--gid-owner' in SCRIPT.read_text();checks+=1
+ shell_text=SCRIPT.read_text()
+ assert 'watchdog) { [ "$#" = 9 ] || [ "$#" = 10 ]; }' in shell_text
+ assert 'watchdog "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10:-}"' in shell_text
+ checks+=2
  harness=d/'EpochTest.java'
  harness.write_text('''package io.github.xgl34222220.hetu;
 public class EpochTest {
