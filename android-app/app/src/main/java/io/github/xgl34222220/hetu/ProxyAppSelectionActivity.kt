@@ -42,6 +42,7 @@ import io.github.xgl34222220.hetu.ui.HetuComposeController
 import io.github.xgl34222220.hetu.ui.HetuTheme
 import io.github.xgl34222220.hetu.ui.LocalHetuTokens
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withTimeout
 
 class ProxyAppSelectionActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -96,12 +97,20 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
     val controller = remember { HetuComposeController(context) }
     var reload by remember { mutableIntStateOf(0) }
     var loadingApps by remember { mutableStateOf(controller.cachedApps().isEmpty()) }
+    var loadError by remember { mutableStateOf("") }
     val apps by produceState(initialValue = controller.cachedApps(), reload) {
         loadingApps = true
-        value = try { controller.loadApps(forceRefresh = reload > 0) }
-        catch (cancel: CancellationException) { throw cancel }
-        catch (_: Exception) { controller.cachedApps() }
-        finally { loadingApps = false }
+        loadError = ""
+        value = try {
+            withTimeout(6_000L) { controller.loadApps(forceRefresh = reload > 0) }
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (error: Exception) {
+            loadError = error.message ?: "应用列表读取超时"
+            controller.cachedApps()
+        } finally {
+            loadingApps = false
+        }
     }
     fun proxyApps(): Set<String> = prefs.getStringSet("proxyAppPackages", emptySet()).orEmpty().toSet()
     fun saveProxyApps(next: Set<String>) {
@@ -118,6 +127,8 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
     var selected by remember { mutableStateOf(proxyApps()) }
     var appScopeId by rememberSaveable { mutableStateOf(prefs.getString("proxyAppScope", "blacklist") ?: "blacklist") }
     var showBatchActions by rememberSaveable { mutableStateOf(false) }
+    var showGidRules by rememberSaveable { mutableStateOf(false) }
+    var gidRules by remember { mutableStateOf(prefs.getStringSet("proxyDirectGids", emptySet()).orEmpty().toSet()) }
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val pageBg = if (dark) t.pageBackground else MaterialTheme.colorScheme.background
@@ -195,6 +206,18 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
                         Text(scopeTitle, color = t.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                         Text(scopeDescription, color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
                         Text("已选择 ${selected.size} 个应用 · 修改后下次启动/重启 Root 代理生效", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                if (gidRules.isEmpty()) "GID 直连未配置" else "GID 直连 ${gidRules.size} 项",
+                                color = t.textSecondary,
+                                fontSize = 11.sp,
+                                modifier = Modifier.weight(1f),
+                            )
+                            TextButton(onClick = { showGidRules = true }, contentPadding = PaddingValues(horizontal = 6.dp)) {
+                                Text("GID 规则", fontSize = 11.sp)
+                                Icon(Icons.Rounded.ChevronRight, null, Modifier.size(15.dp))
+                            }
+                        }
                     }
                 }
             }
@@ -256,6 +279,29 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
             }
         }
 
+        if (!loadingApps && apps.isEmpty()) {
+            item("apps-empty") {
+                Surface(shape = RoundedCornerShape(18.dp), color = t.elevatedCardBackground) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Icon(Icons.Rounded.Apps, null, tint = t.textMuted, modifier = Modifier.size(28.dp))
+                        Text(if (loadError.isBlank()) "未读取到应用" else "应用列表读取失败", color = t.textPrimary, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            loadError.ifBlank { "可以点击右上角刷新重新读取本机应用。" },
+                            color = t.textSecondary,
+                            fontSize = 12.sp,
+                            lineHeight = 18.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        )
+                        TextButton(onClick = { reload++ }) { Text("重新读取") }
+                    }
+                }
+            }
+        }
+
         itemsIndexed(visible, key = { _, app -> app.packageName }) { index, app ->
             val checked = app.packageName in selected
             val icon by produceState(initialValue = app.icon, app.packageName) { value = controller.appIcon(app.packageName) }
@@ -311,6 +357,92 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
                     Icon(Icons.Rounded.Info, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(19.dp))
                     Spacer(Modifier.width(9.dp))
                     Text("Root 数据面会把包名解析为 UID。为避免破坏系统网络，系统 UID 会被自动忽略；已卸载应用也会在启动时跳过。", color = t.textSecondary, fontSize = 12.sp, lineHeight = 17.sp)
+                }
+            }
+        }
+    }
+
+    if (showGidRules) {
+        var text by remember(showGidRules) { mutableStateOf(gidRules.sorted().joinToString("\n")) }
+        var error by remember(showGidRules) { mutableStateOf("") }
+        ModalBottomSheet(
+            onDismissRequest = { showGidRules = false },
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            containerColor = t.elevatedCardBackground,
+            contentColor = t.textPrimary,
+            tonalElevation = 0.dp,
+            scrimColor = Color.Black.copy(alpha = .35f),
+        ) {
+            Column(
+                Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(start = 18.dp, end = 18.dp, bottom = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text("GID 直连规则", fontSize = 20.sp, lineHeight = 25.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    "每行一个 GID 或范围，例如 10123 或 10123-10130。仅允许 >=10000 的普通应用 GID；系统权限组（如 3003）禁止加入，避免整机流量绕过代理。",
+                    color = t.textSecondary,
+                    fontSize = 12.sp,
+                    lineHeight = 18.sp,
+                )
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it; error = "" },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 150.dp),
+                    minLines = 5,
+                    maxLines = 9,
+                    label = { Text("GID / GID 范围") },
+                    shape = RoundedCornerShape(16.dp),
+                    textStyle = LocalTextStyle.current.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
+                )
+                if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                Surface(shape = RoundedCornerShape(14.dp), color = t.controlBackground.copy(alpha = .48f)) {
+                    Text(
+                        "GID 规则属于 Root OUTPUT 直连绕过，保存后需要重启代理才会应用。它不会改变黑名单/白名单中的 UID 选择。",
+                        Modifier.fillMaxWidth().padding(12.dp),
+                        color = t.textSecondary,
+                        fontSize = 11.sp,
+                        lineHeight = 17.sp,
+                    )
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    TextButton(
+                        onClick = {
+                            text = ""
+                            error = ""
+                        },
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                    ) { Text("清空") }
+                    Button(
+                        onClick = {
+                            val raw = text.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()
+                            val parsed = LinkedHashSet<String>()
+                            var failure = ""
+                            raw.forEach { value ->
+                                if (failure.isNotBlank()) return@forEach
+                                if (!value.matches(Regex("[0-9]{1,10}(?:-[0-9]{1,10})?"))) {
+                                    failure = "格式无效：$value"
+                                    return@forEach
+                                }
+                                val parts = value.split("-")
+                                val start = parts[0].toLongOrNull() ?: -1L
+                                val end = parts.getOrNull(1)?.toLongOrNull() ?: start
+                                if (start < 10000L || end < start || end > Int.MAX_VALUE.toLong()) {
+                                    failure = "只允许普通应用 GID（>=10000）：$value"
+                                    return@forEach
+                                }
+                                parsed += if (start == end) start.toString() else "$start-$end"
+                            }
+                            if (parsed.size > 64) failure = "最多允许 64 条 GID 规则"
+                            if (failure.isNotBlank()) {
+                                error = failure
+                            } else {
+                                prefs.edit().putStringSet("proxyDirectGids", parsed).apply()
+                                gidRules = parsed
+                                showGidRules = false
+                            }
+                        },
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                    ) { Text("保存") }
                 }
             }
         }
