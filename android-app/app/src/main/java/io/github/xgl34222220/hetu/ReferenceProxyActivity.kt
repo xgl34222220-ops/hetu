@@ -755,7 +755,7 @@ internal fun RefHome(
                 modifier = refHomeLiquidModifier(Modifier.fillMaxWidth(), hazeState, glassEnabled, shape),
                 shape = shape, color = Color.Transparent,
             ) {
-                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(
                         Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.Top,
@@ -851,25 +851,6 @@ internal fun RefHome(
                 }
             }
         }
-        item(key = "home-shortcuts") {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                RefHomeShortcut(
-                    title = "WebUI",
-                    subtitle = if (state.running) "本机控制台" else "核心启动后可用",
-                    icon = Icons.Rounded.Language,
-                    modifier = Modifier.weight(1f),
-                    onClick = { context.startActivity(Intent(context, ProxyLocalWebUiActivity::class.java)) },
-                    enabled = state.running,
-                )
-                RefHomeShortcut(
-                    title = "运行日志",
-                    subtitle = "实时流查看",
-                    icon = Icons.Rounded.ReceiptLong,
-                    modifier = Modifier.weight(1f),
-                    onClick = onLog,
-                )
-            }
-        }
         item(key = "home-latency") {
             RefLatencyPanel(siteDelays["Baidu"], siteDelays["Cloudflare"], siteDelays["Google"], testing, hazeState, glassEnabled, onDelay)
         }
@@ -894,59 +875,6 @@ internal fun RefHome(
 @Composable
 private fun RefHomeActions(running: Boolean, busy: Boolean, onToggle: () -> Unit, onReload: () -> Unit, onRestart: () -> Unit) {
     LiquidHomeActions(running, busy, onToggle, onReload, onRestart)
-}
-
-@Composable
-private fun RefHomeShortcut(
-    title: String,
-    subtitle: String,
-    icon: ImageVector,
-    modifier: Modifier,
-    onClick: () -> Unit,
-    enabled: Boolean = true,
-) {
-    val shape = RoundedCornerShape(18.dp)
-    Surface(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier.height(58.dp).crystalMaterial(shape, depth = CrystalDepth.Card),
-        shape = shape,
-        color = Color.Transparent,
-        shadowElevation = 0.dp,
-    ) {
-        Row(
-            Modifier.fillMaxSize().padding(horizontal = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                Modifier.size(32.dp).background(HetuMicroCrystal.LightBlueBackground, RoundedCornerShape(9.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(icon, null, Modifier.size(16.dp), tint = HetuMicroCrystal.KleinBlue)
-            }
-            Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                Text(
-                    title,
-                    color = if (enabled) HetuMicroCrystal.TextMain else HetuMicroCrystal.TextLight,
-                    fontSize = 13.sp,
-                    lineHeight = 17.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    maxLines = 1,
-                )
-                Text(
-                    subtitle,
-                    color = HetuMicroCrystal.TextLight,
-                    fontSize = 10.sp,
-                    lineHeight = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Icon(Icons.Rounded.ArrowForwardIos, null, Modifier.size(12.dp), tint = Color(0xFFCBD5E1))
-        }
-    }
 }
 
 @Composable
@@ -2535,17 +2463,36 @@ private fun RefTrafficOverview(state: ProxyComposeState, ruleCount: Int?) {
                 Text("近 60 秒网速", color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                 Text("峰值 ${refSpeed(peak)} · 上行 / 下行", color = t.textSecondary, fontSize = 12.sp)
                 val points = history.toList()
+                val chartGrid = if (scheme.background.luminance() < .5f) {
+                    Color.White.copy(alpha = .08f)
+                } else {
+                    Color(0xFFE6ECF4)
+                }
                 Canvas(Modifier.fillMaxWidth().height(116.dp)) {
-                    for (line in 0..2) drawLine(t.outline.copy(alpha = .45f), Offset(0f, size.height * line / 2f), Offset(size.width, size.height * line / 2f), 1.dp.toPx())
+                    val inset = 6.dp.toPx()
+                    val chartHeight = size.height - inset * 2f
+                    for (line in 0..2) {
+                        val y = inset + chartHeight * line / 2f
+                        drawLine(chartGrid, Offset(0f, y), Offset(size.width, y), 1.dp.toPx())
+                    }
                     if (points.size >= 2) {
                         val maxRate = peak.coerceAtLeast(1L).toFloat()
                         val end = points.last().first
                         fun drawSeries(upload: Boolean, color: Color) {
-                            val offsets = points.map { point ->
+                            val rates = points.indices.map { index ->
+                                val from = (index - 1).coerceAtLeast(0)
+                                val to = (index + 1).coerceAtMost(points.lastIndex)
+                                var total = 0.0
+                                var count = 0
+                                for (sample in from..to) {
+                                    total += if (upload) points[sample].second.toDouble() else points[sample].third.toDouble()
+                                    count++
+                                }
+                                (total / count.coerceAtLeast(1)).toFloat()
+                            }
+                            val offsets = points.mapIndexed { index, point ->
                                 val x = ((point.first - (end - 60_000L)).coerceIn(0L, 60_000L) / 60_000f) * size.width
-                                val rate = if (upload) point.second else point.third
-                                val inset = 4.dp.toPx()
-                                val y = size.height - inset - rate / maxRate * (size.height - inset * 2f)
+                                val y = size.height - inset - rates[index] / maxRate * chartHeight
                                 Offset(x, y)
                             }
                             val path = Path().apply {
@@ -2559,19 +2506,35 @@ private fun RefTrafficOverview(state: ProxyComposeState, ruleCount: Int?) {
                             }
                             val area = Path().apply {
                                 addPath(path)
-                                lineTo(offsets.last().x, size.height)
-                                lineTo(offsets.first().x, size.height)
+                                lineTo(offsets.last().x, size.height - inset)
+                                lineTo(offsets.first().x, size.height - inset)
                                 close()
                             }
                             drawPath(
                                 area,
                                 Brush.verticalGradient(
-                                    listOf(color.copy(alpha = .22f), color.copy(alpha = .07f), color.copy(alpha = 0f)),
+                                    colors = listOf(
+                                        color.copy(alpha = .20f),
+                                        color.copy(alpha = .07f),
+                                        color.copy(alpha = 0f),
+                                    ),
+                                    startY = inset,
+                                    endY = size.height - inset,
                                 ),
                             )
-                            drawPath(path, color, style = Stroke(2.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round))
+                            drawPath(
+                                path,
+                                color.copy(alpha = .12f),
+                                style = Stroke(5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round),
+                            )
+                            drawPath(
+                                path,
+                                color,
+                                style = Stroke(2.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round),
+                            )
                         }
-                        drawSeries(true, t.success); drawSeries(false, scheme.primary)
+                        drawSeries(true, t.success)
+                        drawSeries(false, scheme.primary)
                     }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
