@@ -120,7 +120,7 @@ class WorkbenchRegressionTest {
             app.getSharedPreferences("hetu", 0).edit().putString("appearance", if (night) "dark" else "light").commit()
             HetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f, font), LocalHetuMotionEnabled provides false) {
                 Column(Modifier.width(360.dp).crystalPageBackground().testTag("workbench-scene")) {
-                    YamlWorkbenchActions(true, false, false, {}, {}, { searches++ }, {}, { saves++ })
+                    YamlWorkbenchActions(true, false, false, false, {}, {}, {}, { searches++ }, {}, {}, { saves++ })
                     YamlWorkbenchAccessory(true) { symbol = it }
                     YamlCursorStatus(21, 9, 1200)
                 }
@@ -130,7 +130,9 @@ class WorkbenchRegressionTest {
             compose.runOnIdle { night = dark; font = scale }; compose.waitForIdle()
             compose.onNodeWithText("Ln 21, Col 9").assertExists()
             compose.onNodeWithTag("yaml-action:保存").assertWidthIsEqualTo(48.dp)
-            capture("workbench-scene", "workbench103-$dark-$scale")
+            compose.onNodeWithTag("yaml-action:格式化").assertExists()
+            compose.onNodeWithTag("yaml-action:校验").assertExists()
+            capture("workbench-scene", "workbench105-$dark-$scale")
         }
         compose.onNodeWithTag("yaml-action:保存").performClick()
         compose.onNodeWithTag("yaml-action:搜索").performClick()
