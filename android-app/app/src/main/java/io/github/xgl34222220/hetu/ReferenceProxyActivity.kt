@@ -6,9 +6,11 @@ import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.os.SystemClock
 import android.view.HapticFeedbackConstants
+import androidx.activity.BackEventCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -1778,7 +1780,20 @@ private fun RefGroupDetailPage(
     onDelay: (String) -> Unit,
     onTestAll: () -> Unit,
 ) {
-    BackHandler(onBack = onBack)
+    var predictiveBackProgress by remember(group.name) { mutableFloatStateOf(0f) }
+    var predictiveBackDirection by remember(group.name) { mutableFloatStateOf(1f) }
+    PredictiveBackHandler(enabled = true) { events ->
+        try {
+            events.collect { event ->
+                predictiveBackProgress = event.progress.coerceIn(0f, 1f)
+                predictiveBackDirection = if (event.swipeEdge == BackEventCompat.EDGE_LEFT) 1f else -1f
+            }
+            onBack()
+        } catch (cancel: CancellationException) {
+            predictiveBackProgress = 0f
+            throw cancel
+        }
+    }
     val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
@@ -1821,8 +1836,16 @@ private fun RefGroupDetailPage(
     val pageBackground = t.pageBackground
     val nodeColumns = hetuCompactColumns(androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp - 32.dp, 220.dp)
 
+    val predictiveDistancePx = with(LocalDensity.current) { 52.dp.toPx() }
     Column(
-        Modifier.fillMaxSize().offset(x = enterX).background(pageBackground).navigationBarsPadding(),
+        Modifier.fillMaxSize()
+            .offset(x = enterX)
+            .graphicsLayer {
+                translationX = predictiveBackDirection * predictiveBackProgress * predictiveDistancePx
+                alpha = 1f - predictiveBackProgress * .10f
+            }
+            .background(pageBackground)
+            .navigationBarsPadding(),
     ) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
