@@ -755,7 +755,7 @@ internal fun RefHome(
                 modifier = refHomeLiquidModifier(Modifier.fillMaxWidth(), hazeState, glassEnabled, shape),
                 shape = shape, color = Color.Transparent,
             ) {
-                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(
                         Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.Top,
@@ -2544,7 +2544,8 @@ private fun RefTrafficOverview(state: ProxyComposeState, ruleCount: Int?) {
                             val offsets = points.map { point ->
                                 val x = ((point.first - (end - 60_000L)).coerceIn(0L, 60_000L) / 60_000f) * size.width
                                 val rate = if (upload) point.second else point.third
-                                val y = size.height - rate / maxRate * (size.height - 4.dp.toPx())
+                                val inset = 4.dp.toPx()
+                                val y = size.height - inset - rate / maxRate * (size.height - inset * 2f)
                                 Offset(x, y)
                             }
                             val path = Path().apply {
@@ -2565,7 +2566,7 @@ private fun RefTrafficOverview(state: ProxyComposeState, ruleCount: Int?) {
                             drawPath(
                                 area,
                                 Brush.verticalGradient(
-                                    listOf(color.copy(alpha = .20f), color.copy(alpha = .055f), color.copy(alpha = 0f)),
+                                    listOf(color.copy(alpha = .22f), color.copy(alpha = .07f), color.copy(alpha = 0f)),
                                 ),
                             )
                             drawPath(path, color, style = Stroke(2.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round))
