@@ -194,17 +194,60 @@ private fun ReferenceFileManagerScreen(onClose: () -> Unit) {
             val item = items.firstOrNull { it.name == title }
             if (item != null) previewText = readTextFile(context, item.path)
         }
-        AlertDialog(
-            onDismissRequest = { previewTitle = null },
-            shape = RoundedCornerShape(18.dp),
-            title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-            text = {
-                Box(Modifier.fillMaxWidth().heightIn(max = 500.dp).verticalScroll(rememberScrollState())) {
-                    Text(previewText, style = MaterialTheme.typography.bodySmall)
-                }
-            },
-            confirmButton = { TextButton(onClick = { previewTitle = null }) { Text("关闭") } },
+        RefFilePreviewSheet(
+            title = title,
+            text = previewText,
+            onDismiss = { previewTitle = null },
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RefFilePreviewSheet(
+    title: String,
+    text: String,
+    onDismiss: () -> Unit,
+) {
+    val t = LocalHetuTokens.current
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
+        containerColor = t.elevatedCardBackground,
+        contentColor = t.textPrimary,
+        tonalElevation = 0.dp,
+        scrimColor = Color.Black.copy(alpha = .35f),
+    ) {
+        Column(
+            Modifier.fillMaxWidth().fillMaxHeight(.82f).navigationBarsPadding()
+                .padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    title,
+                    modifier = Modifier.weight(1f),
+                    color = t.textPrimary,
+                    fontSize = 19.sp,
+                    lineHeight = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Rounded.Close, "关闭", tint = t.textSecondary)
+                }
+            }
+            Box(
+                Modifier.fillMaxWidth().weight(1f)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(t.controlBackground.copy(alpha = .45f))
+                    .padding(14.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                Text(text, color = t.textPrimary, style = MaterialTheme.typography.bodySmall)
+            }
+        }
     }
 }
 
