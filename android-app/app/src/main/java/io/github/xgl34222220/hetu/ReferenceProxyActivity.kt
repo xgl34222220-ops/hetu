@@ -1083,6 +1083,8 @@ private fun RefPanel(
     var searchOpen by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     var groupLayout by rememberSaveable { mutableIntStateOf(0) } // 0 auto, 1 single, 2 double
+    var groupSortMode by rememberSaveable { mutableStateOf("config") }
+    var groupSortPicker by rememberSaveable { mutableStateOf(false) }
     var connectionView by rememberSaveable { mutableStateOf("active") }
     var connectionProtocol by rememberSaveable { mutableStateOf("all") }
     var connectionSort by rememberSaveable { mutableStateOf("count") }
@@ -1168,10 +1170,19 @@ private fun RefPanel(
         previousConnections = state.connections
     }
 
-    val filteredGroups = remember(state.groups, query) {
-        state.groups.filter { group ->
+    val filteredGroups = remember(state.groups, query, groupSortMode, delays.toMap(), selectedLocal.toMap()) {
+        val matched = state.groups.filter { group ->
             query.isBlank() || group.name.contains(query, true) || group.now.contains(query, true) ||
                 group.nodes.any { it.name.contains(query, true) }
+        }
+        when (groupSortMode) {
+            "name" -> matched.sortedBy { it.name.lowercase() }
+            "delay" -> matched.sortedWith(compareBy<ProxyGroupUi> { group ->
+                val selected = selectedLocal[group.name] ?: group.now
+                (delays[selected] ?: group.nodes.firstOrNull { it.name == selected }?.lastDelay)
+                    ?.takeIf { it > 0L } ?: Long.MAX_VALUE
+            }.thenBy { it.name.lowercase() })
+            else -> matched
         }
     }
     val filteredNodes = remember(state.groups, query) {
@@ -1427,6 +1438,8 @@ private fun RefPanel(
                             if (!searchOpen) query = ""
                         },
                         onRefreshGroups = ::refresh,
+                        groupSortMode = groupSortMode,
+                        onSortGroups = { groupSortPicker = true },
                         groupColumns = groupColumns,
                         onToggleGroupLayout = {
                             groupLayout = when (groupLayout) {
@@ -1737,6 +1750,24 @@ private fun RefPanel(
 
 
 
+    if (groupSortPicker) {
+        val sortValues = listOf(
+            "config" to "配置顺序",
+            "delay" to "当前节点延迟",
+            "name" to "名称 A–Z",
+        )
+        RefChoiceBottomSheet(
+            title = "策略组排序",
+            options = sortValues.map { (value, label) -> label to (groupSortMode == value) },
+            onDismiss = { groupSortPicker = false },
+            onSelect = { index ->
+                groupSortMode = sortValues[index].first
+                selectedGroupName = null
+                groupSortPicker = false
+            },
+        )
+    }
+
     if (confirmCloseAll) {
         RefConfirmBottomSheet(
             title = "终止所有连接？",
@@ -2044,6 +2075,8 @@ private fun RefPanelGlassHeader(
     onQueryChange: (String) -> Unit,
     onSearchToggle: () -> Unit,
     onRefreshGroups: () -> Unit,
+    groupSortMode: String,
+    onSortGroups: () -> Unit,
     groupColumns: Int,
     onToggleGroupLayout: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -2085,6 +2118,16 @@ private fun RefPanelGlassHeader(
                     icon = Icons.Rounded.Bolt,
                     contentDescription = "一键测速当前节点",
                     onClick = onRefreshGroups,
+                )
+                RefPanelHeaderAction(
+                    icon = Icons.Rounded.Sort,
+                    contentDescription = when (groupSortMode) {
+                        "name" -> "策略组排序：名称"
+                        "delay" -> "策略组排序：延迟"
+                        else -> "策略组排序：配置顺序"
+                    },
+                    active = groupSortMode != "config",
+                    onClick = onSortGroups,
                 )
                 RefPanelHeaderAction(
                     icon = if (groupColumns == 1) Icons.Rounded.GridView else Icons.Rounded.ViewAgenda,
