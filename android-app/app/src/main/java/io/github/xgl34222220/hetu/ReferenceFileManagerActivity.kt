@@ -9,6 +9,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
@@ -48,6 +49,22 @@ private data class RefFileItem(
     val size: Long,
 )
 
+private data class RefFileBadge(val label: String, val background: Color, val foreground: Color)
+
+private fun refFileBadge(name: String): RefFileBadge {
+    return when (name.substringAfterLast('.', "").lowercase()) {
+        "yaml", "yml" -> RefFileBadge("YAML", Color(0xFFEFF6FF), Color(0xFF2563EB))
+        "log" -> RefFileBadge("LOG", Color(0xFFF1F5F9), Color(0xFF64748B))
+        "pid" -> RefFileBadge("PID", Color(0xFFF5F3FF), Color(0xFF7C3AED))
+        "db", "sqlite", "sqlite3" -> RefFileBadge("DB", Color(0xFFECFDF5), Color(0xFF059669))
+        "sh" -> RefFileBadge("SH", Color(0xFFFFF7ED), Color(0xFFEA580C))
+        "json", "jsonc" -> RefFileBadge("JSON", Color(0xFFECFEFF), Color(0xFF0891B2))
+        "conf", "ini" -> RefFileBadge("CONF", Color(0xFFEEF2FF), Color(0xFF4F46E5))
+        else -> RefFileBadge("FILE", Color(0xFFF8FAFC), Color(0xFF64748B))
+    }
+}
+
+
 class ReferenceFileManagerActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,6 +74,43 @@ class ReferenceFileManagerActivity : ComponentActivity() {
 }
 
 private fun shellQuote(value: String): String = "'" + value.replace("'", "'\\''") + "'"
+
+@Composable
+private fun RefBreadcrumb(path: String, onNavigate: (String) -> Unit) {
+    val t = LocalHetuTokens.current
+    val relative = path.removePrefix(REF_FILE_ROOT).trim('/')
+    val parts = buildList {
+        add("hetu")
+        if (relative.isNotBlank()) addAll(relative.split('/').filter { it.isNotBlank() })
+    }
+    Surface(shape = RoundedCornerShape(14.dp), color = t.selectionBackground) {
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            parts.forEachIndexed { index, part ->
+                val target = if (index == 0) REF_FILE_ROOT else REF_FILE_ROOT + "/" + parts.drop(1).take(index).joinToString("/")
+                val current = index == parts.lastIndex
+                TextButton(
+                    onClick = { if (!current) onNavigate(target) },
+                    enabled = !current,
+                    contentPadding = PaddingValues(horizontal = 7.dp, vertical = 3.dp),
+                    modifier = Modifier.heightIn(min = 34.dp),
+                ) {
+                    Text(
+                        part,
+                        color = if (current) t.textPrimary else MaterialTheme.colorScheme.primary,
+                        fontSize = 12.sp,
+                        fontWeight = if (current) FontWeight.SemiBold else FontWeight.Medium,
+                        maxLines = 1,
+                    )
+                }
+                if (!current) Icon(Icons.Rounded.ChevronRight, null, Modifier.size(15.dp), tint = t.textMuted)
+            }
+        }
+    }
+}
+
 
 private suspend fun readDirectory(context: android.content.Context, path: String): List<RefFileItem> = withContext(Dispatchers.IO) {
     if (!path.startsWith(REF_FILE_ROOT)) return@withContext emptyList()
@@ -142,17 +196,7 @@ private fun ReferenceFileManagerScreen(onClose: () -> Unit) {
             }
         }
         item {
-            val relative = path.removePrefix(REF_FILE_ROOT).trim('/')
-            Surface(shape = RoundedCornerShape(12.dp), color = t.selectionBackground) {
-                Text(
-                    if (relative.isBlank()) "hetu" else "hetu  ›  ${relative.replace("/", " › ")}",
-                    Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    color = t.textSecondary,
-                    style = MaterialTheme.typography.labelMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+            RefBreadcrumb(path) { target -> path = target }
         }
         item {
             Surface(shape = RoundedCornerShape(16.dp), color = t.cardBackground) {
@@ -176,11 +220,37 @@ private fun ReferenceFileManagerScreen(onClose: () -> Unit) {
                                 }.padding(vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Icon(if (item.directory) Icons.Rounded.Folder else Icons.Rounded.Description, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                                val badge = if (item.directory) null else refFileBadge(item.name)
+                                Box(
+                                    Modifier.size(34.dp).background(
+                                        badge?.background ?: MaterialTheme.colorScheme.primary.copy(alpha = .08f),
+                                        RoundedCornerShape(11.dp),
+                                    ),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(
+                                        if (item.directory) Icons.Rounded.Folder else Icons.Rounded.Description,
+                                        null,
+                                        tint = badge?.foreground ?: MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(19.dp),
+                                    )
+                                }
                                 Spacer(Modifier.width(11.dp))
                                 Column(Modifier.weight(1f)) {
                                     Text(item.name, color = t.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     if (!item.directory) Text(refFileSize(item.size), color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+                                }
+                                if (badge != null) {
+                                    Surface(shape = CircleShape, color = badge.background) {
+                                        Text(
+                                            badge.label,
+                                            color = badge.foreground,
+                                            fontSize = 9.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp),
+                                        )
+                                    }
+                                    Spacer(Modifier.width(6.dp))
                                 }
                                 Icon(Icons.Rounded.ChevronRight, null, tint = t.textSecondary, modifier = Modifier.size(18.dp))
                             }
