@@ -40,7 +40,7 @@ controller = (src / "ProxyComposeController.kt").read_text()
 root_manager = (src / "RootProxyManager.java").read_text()
 assert '.putString("proxyRootAppliedSettings", ProxyRuntimeSettings.signature(prefs))' in controller
 assert '.putString("proxyRootAppliedSettings",ProxyRuntimeSettings.signature(prefs))' in root_manager
-assert '.putString("proxyRootAppliedSettings",p.settingsSignature)' not in root_manager
+assert root_manager.count('.putString("proxyRootAppliedSettings",p.settingsSignature)') == 1, "hot reload may record its validated prepared signature once"
 runtime_settings = (src / "ProxyRuntimeSettings.java").read_text()
 boot = (src / "BootReceiver.java").read_text()
 assert 'proxyRootSettingsDirty' in runtime_settings and 'markDirty' in runtime_settings
