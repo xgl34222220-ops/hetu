@@ -2365,18 +2365,34 @@ private fun RefTrafficOverview(state: ProxyComposeState, ruleCount: Int?) {
                         val maxRate = peak.coerceAtLeast(1L).toFloat()
                         val end = points.last().first
                         fun drawSeries(upload: Boolean, color: Color) {
-                            val path = Path()
-                            points.forEachIndexed { index, point ->
+                            val offsets = points.map { point ->
                                 val x = ((point.first - (end - 60_000L)).coerceIn(0L, 60_000L) / 60_000f) * size.width
-                                val y = size.height - (if (upload) point.second else point.third) / maxRate * (size.height - 4.dp.toPx())
-                                if (index == 0) path.moveTo(x,y) else path.lineTo(x,y)
+                                val rate = if (upload) point.second else point.third
+                                val y = size.height - rate / maxRate * (size.height - 4.dp.toPx())
+                                Offset(x, y)
                             }
-                            val firstX = ((points.first().first - (end - 60_000L)).coerceIn(0L, 60_000L) / 60_000f) * size.width
+                            val path = Path().apply {
+                                moveTo(offsets.first().x, offsets.first().y)
+                                for (index in 1 until offsets.size) {
+                                    val previous = offsets[index - 1]
+                                    val current = offsets[index]
+                                    val controlX = (previous.x + current.x) / 2f
+                                    cubicTo(controlX, previous.y, controlX, current.y, current.x, current.y)
+                                }
+                            }
                             val area = Path().apply {
-                                addPath(path); lineTo(size.width, size.height); lineTo(firstX, size.height); close()
+                                addPath(path)
+                                lineTo(offsets.last().x, size.height)
+                                lineTo(offsets.first().x, size.height)
+                                close()
                             }
-                            drawPath(area, Brush.verticalGradient(listOf(color.copy(alpha = .18f), color.copy(alpha = .015f))))
-                            drawPath(path, color, style = Stroke(2.dp.toPx()))
+                            drawPath(
+                                area,
+                                Brush.verticalGradient(
+                                    listOf(color.copy(alpha = .20f), color.copy(alpha = .055f), color.copy(alpha = 0f)),
+                                ),
+                            )
+                            drawPath(path, color, style = Stroke(2.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round))
                         }
                         drawSeries(true, t.success); drawSeries(false, scheme.primary)
                     }
