@@ -232,7 +232,7 @@ internal fun LiquidPill(text: String, icon: ImageVector, onClick: () -> Unit, mo
     val color = if (danger) t.danger else if (primary || compact) scheme.primary else t.textSecondary
     val fill = if (danger) t.dangerContainer.copy(alpha = .62f) else if (dark) Color.White.copy(alpha = .06f)
         else if (primary) Color(0xFFEFF6FF) else Color(0xFFF1F5F9).copy(alpha = .80f)
-    Box(modifier.heightIn(min = 48.dp).graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (enabled) 1f else .45f }
+    Box(modifier.heightIn(min = if (compact) 36.dp else 44.dp).graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (enabled) 1f else .45f }
         .clip(CircleShape).clickable(enabled = enabled, interactionSource = interaction, indication = null, role = Role.Button) {
             view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK); onClick()
         }, contentAlignment = Alignment.Center) {
@@ -240,10 +240,10 @@ internal fun LiquidPill(text: String, icon: ImageVector, onClick: () -> Unit, mo
         // header's whole width before the weighted title is measured, forcing it
         // into a vertical column. Full-width home actions still fill their slot.
         Row(Modifier.then(if (compact) Modifier else Modifier.fillMaxWidth())
-            .heightIn(min = if (compact) 30.dp else 38.dp)
+            .heightIn(min = if (compact) 28.dp else 36.dp)
             .background(Brush.verticalGradient(listOf(fill, fill.copy(alpha = fill.alpha * .75f))), CircleShape)
             .border(.6.dp, if (danger) t.danger.copy(alpha = .10f) else Color.White.copy(alpha = if (dark) .08f else .68f), CircleShape)
-            .padding(horizontal = if (compact) 9.dp else 10.dp, vertical = 7.dp),
+            .padding(horizontal = if (compact) 9.dp else 10.dp, vertical = if (compact) 5.dp else 6.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
             Icon(icon, null, Modifier.size(if (compact) 13.dp else 16.dp), tint = color)
             Spacer(Modifier.width(5.dp))
