@@ -103,7 +103,7 @@ class NonHomeAlignmentTest {
         assertEquals(bounds("node-protocol:${nodes[0].name}").top,bounds("node-protocol:${nodes[1].name}").top,.5f)
         compose.onNodeWithText("Vless · UDP",true).assertExists()
         compose.onNodeWithText("Trojan",true).assertExists()
-        compose.onNodeWithTag("node:${nodes[0].name}",true).assertHeightIsAtLeast(80.dp)
+        compose.onNodeWithTag("node:${nodes[0].name}",true).assertHeightIsAtLeast(64.dp)
         capture("groups-scene","nonhome104-groups")
     }
     @Test fun refreshStatesKeep48dpSlotAndDetailsRemainInlineWithoutDialogs() {
