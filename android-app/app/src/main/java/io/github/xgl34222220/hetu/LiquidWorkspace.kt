@@ -270,10 +270,10 @@ internal fun LiquidPill(text: String, icon: ImageVector, onClick: () -> Unit, mo
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) .96f else 1f, tween(if (motion) 100 else 0), label = "pillPress")
-    val color = if (danger) t.danger else if (primary || compact) scheme.primary else t.textSecondary
-    val fill = if (danger) t.dangerContainer.copy(alpha = .62f) else if (dark) Color.White.copy(alpha = .06f)
-        else if (primary) Color(0xFFEFF6FF) else Color(0xFFF1F5F9).copy(alpha = .80f)
-    Box(modifier.heightIn(min = if (compact) 36.dp else 44.dp).graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (enabled) 1f else .45f }
+    val color = if (danger) Color(0xFFE11D48) else if (primary || compact) scheme.primary else Color(0xFF475569)
+    val fill = if (danger) Color(0xFFFFF1F2) else if (dark) Color.White.copy(alpha = .06f)
+        else if (primary) Color(0xFFEFF6FF) else Color(0xFFF8FAFC)
+    Box(modifier.heightIn(min = if (compact) 36.dp else 48.dp).graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (enabled) 1f else .45f }
         .clip(CircleShape).clickable(enabled = enabled, interactionSource = interaction, indication = null, role = Role.Button) {
             view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK); onClick()
         }, contentAlignment = Alignment.Center) {
@@ -281,9 +281,13 @@ internal fun LiquidPill(text: String, icon: ImageVector, onClick: () -> Unit, mo
         // header's whole width before the weighted title is measured, forcing it
         // into a vertical column. Full-width home actions still fill their slot.
         Row(Modifier.then(if (compact) Modifier else Modifier.fillMaxWidth())
-            .heightIn(min = if (compact) 28.dp else 36.dp)
-            .background(Brush.verticalGradient(listOf(fill, fill.copy(alpha = fill.alpha * .75f))), CircleShape)
-            .border(.6.dp, if (danger) t.danger.copy(alpha = .10f) else Color.White.copy(alpha = if (dark) .08f else .68f), CircleShape)
+            .heightIn(min = if (compact) 28.dp else 38.dp)
+            .background(Brush.verticalGradient(listOf(fill, fill.copy(alpha = fill.alpha * .92f))), CircleShape)
+            .border(
+                1.dp,
+                if (danger) Color(0xFFFFE4E6) else if (dark) Color.White.copy(alpha = .08f) else Color(0xFFF1F5F9),
+                CircleShape,
+            )
             .padding(horizontal = if (compact) 9.dp else 10.dp, vertical = if (compact) 5.dp else 6.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
             Icon(icon, null, Modifier.size(if (compact) 13.dp else 16.dp), tint = color)
