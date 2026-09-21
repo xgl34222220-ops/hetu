@@ -641,6 +641,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                     backdrop = liquidBackdrop.takeIf { liquid },
                     glassEnabled = blurEnabled && liquidGlassEnabled,
                     onRefreshState = { refresh() },
+                    onBack = { page = RefProxyPage.Home },
                     onOpenSettings = { page = RefProxyPage.Settings },
                     onDetailVisibleChanged = { panelDetailVisible = it },
                 )
@@ -1252,6 +1253,7 @@ private fun RefPanel(
     backdrop: LayerBackdrop?,
     glassEnabled: Boolean,
     onRefreshState: suspend () -> Unit,
+    onBack: () -> Unit,
     onOpenSettings: () -> Unit,
     onDetailVisibleChanged: (Boolean) -> Unit,
 ) {
@@ -1647,6 +1649,7 @@ private fun RefPanel(
                             }
                             selectedGroupName = null
                         },
+                        onBack = onBack,
                         onOpenSettings = onOpenSettings,
                         hazeState = hazeState,
                         backdrop = backdrop,
@@ -2277,6 +2280,7 @@ private fun RefPanelGlassHeader(
     onSortGroups: () -> Unit,
     groupColumns: Int,
     onToggleGroupLayout: () -> Unit,
+    onBack: () -> Unit,
     onOpenSettings: () -> Unit,
     hazeState: HazeState,
     backdrop: LayerBackdrop?,
@@ -2292,55 +2296,100 @@ private fun RefPanelGlassHeader(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(
-            Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            Modifier.fillMaxWidth().height(48.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                "面板",
-                color = t.textPrimary,
-                fontSize = 32.sp,
-                lineHeight = 40.sp,
-                fontWeight = FontWeight.ExtraBold,
-                letterSpacing = (-.8).sp,
-                modifier = Modifier.weight(1f),
-            )
-            if (selected != RefPanelTab.Overview) {
-                RefPanelHeaderAction(
-                    icon = if (searchOpen) Icons.Rounded.Close else Icons.Rounded.Search,
-                    contentDescription = if (searchOpen) "关闭搜索" else "搜索",
-                    active = searchOpen,
-                    onClick = onSearchToggle,
-                )
-            }
-            if (selected == RefPanelTab.Groups) {
-                RefPanelHeaderAction(
-                    icon = Icons.Rounded.Bolt,
-                    contentDescription = "一键测速当前节点",
-                    onClick = onRefreshGroups,
-                )
-                RefPanelHeaderAction(
-                    icon = Icons.Rounded.Sort,
-                    contentDescription = when (groupSortMode) {
-                        "name" -> "策略组排序：名称"
-                        "delay" -> "策略组排序：延迟"
-                        else -> "策略组排序：配置顺序"
-                    },
-                    active = groupSortMode != "config",
-                    onClick = onSortGroups,
-                )
-                RefPanelHeaderAction(
-                    icon = if (groupColumns == 1) Icons.Rounded.GridView else Icons.Rounded.ViewAgenda,
-                    contentDescription = if (groupColumns == 1) "切换双列" else "切换单列",
-                    active = groupColumns == 2,
-                    onClick = onToggleGroupLayout,
-                )
-                RefPanelHeaderAction(
-                    icon = Icons.Rounded.Settings,
-                    contentDescription = "面板设置",
-                    onClick = onOpenSettings,
-                )
+            when (selected) {
+                RefPanelTab.Groups -> {
+                    RefPanelHeaderAction(
+                        icon = if (searchOpen) Icons.Rounded.Close else Icons.Rounded.Search,
+                        contentDescription = if (searchOpen) "关闭搜索" else "搜索",
+                        active = searchOpen,
+                        onClick = onSearchToggle,
+                    )
+                    RefPanelHeaderAction(
+                        icon = Icons.Rounded.FilterList,
+                        contentDescription = if (groupColumns == 2) "切换单列" else "切换双列",
+                        active = groupColumns == 1,
+                        onClick = onToggleGroupLayout,
+                    )
+                    Spacer(Modifier.weight(1f))
+                    RefPanelHeaderAction(
+                        icon = Icons.Rounded.Sort,
+                        contentDescription = when (groupSortMode) {
+                            "name" -> "策略组排序：名称"
+                            "delay" -> "策略组排序：延迟"
+                            else -> "策略组排序：配置顺序"
+                        },
+                        active = groupSortMode != "config",
+                        onClick = onSortGroups,
+                    )
+                    RefPanelHeaderAction(
+                        icon = Icons.Rounded.Settings,
+                        contentDescription = "面板设置",
+                        onClick = onOpenSettings,
+                    )
+                }
+                RefPanelTab.Overview -> {
+                    Spacer(Modifier.weight(1f))
+                    RefPanelHeaderAction(
+                        icon = Icons.Rounded.Settings,
+                        contentDescription = "面板设置",
+                        onClick = onOpenSettings,
+                    )
+                }
+                RefPanelTab.Subscriptions -> {
+                    RefPanelHeaderAction(
+                        icon = Icons.AutoMirrored.Rounded.ArrowBack,
+                        contentDescription = "返回首页",
+                        onClick = onBack,
+                    )
+                    Spacer(Modifier.weight(1f))
+                    RefPanelHeaderAction(
+                        icon = Icons.Rounded.Link,
+                        contentDescription = "刷新订阅",
+                        active = true,
+                        onClick = onRefreshGroups,
+                    )
+                    RefPanelHeaderAction(
+                        icon = Icons.Rounded.Settings,
+                        contentDescription = "面板设置",
+                        onClick = onOpenSettings,
+                    )
+                }
+                else -> {
+                    RefPanelHeaderAction(
+                        icon = Icons.AutoMirrored.Rounded.ArrowBack,
+                        contentDescription = "返回首页",
+                        onClick = onBack,
+                    )
+                    Spacer(Modifier.weight(1f))
+                    if (selected != RefPanelTab.Overview) {
+                        RefPanelHeaderAction(
+                            icon = if (searchOpen) Icons.Rounded.Close else Icons.Rounded.Search,
+                            contentDescription = if (searchOpen) "关闭搜索" else "搜索",
+                            active = searchOpen,
+                            onClick = onSearchToggle,
+                        )
+                    }
+                    RefPanelHeaderAction(
+                        icon = Icons.Rounded.Settings,
+                        contentDescription = "面板设置",
+                        onClick = onOpenSettings,
+                    )
+                }
             }
         }
+
+        Text(
+            "面板",
+            color = t.textPrimary,
+            fontSize = 32.sp,
+            lineHeight = 40.sp,
+            fontWeight = FontWeight.ExtraBold,
+            letterSpacing = (-.8).sp,
+            modifier = Modifier.fillMaxWidth(),
+        )
         RefPanelTabs(
             selected = selected,
             liquidGlass = true,
