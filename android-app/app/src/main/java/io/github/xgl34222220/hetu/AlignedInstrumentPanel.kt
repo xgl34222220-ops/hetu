@@ -56,11 +56,11 @@ internal fun instrumentUploadShare(up: Long, down: Long): Float? {
 
 /** One geometry source for both cell contents and their enclosing row. */
 private object InstrumentSlots {
-    val header = 22.sp
-    val value = 26.sp
-    val support = 20.sp
-    val gap = 6.dp
-    val padding = 12.dp
+    val header = 18.sp
+    val value = 24.sp
+    val support = 18.sp
+    val gap = 4.dp
+    val padding = 10.dp
     val rail = 2.dp
     @Composable fun fontHeight(size: TextUnit): Dp {
         val density = LocalDensity.current
@@ -108,7 +108,7 @@ private fun AlignedInstrumentCell(reading: InstrumentReading, modifier: Modifier
             val titleStart = icon.width + 5.dp.roundToPx()
             val title = measurable[0].measure(constraints.copy(minWidth = 0, minHeight = 0,
                 maxWidth = (constraints.maxWidth - titleStart - badge.width - 4.dp.roundToPx()).coerceAtLeast(0)))
-            val baseline = 16.sp.roundToPx()
+            val baseline = 14.sp.roundToPx()
             layout(constraints.maxWidth, constraints.maxHeight) {
                 icon.placeRelative(0, (baseline - 11.sp.roundToPx()).coerceAtLeast(0))
                 title.placeRelative(titleStart, (baseline - title[FirstBaseline]).coerceAtLeast(0))
@@ -116,11 +116,11 @@ private fun AlignedInstrumentCell(reading: InstrumentReading, modifier: Modifier
                     (baseline - badge[FirstBaseline]).coerceAtLeast(0))
             }
         }
-        InstrumentBaselineLine(reading.value, "instrument-${reading.id}-value", valueHeight, 20.sp,
+        InstrumentBaselineLine(reading.value, "instrument-${reading.id}-value", valueHeight, 18.sp,
             TextStyle(fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.Bold,
                 fontFamily = if (reading.monospaced) FontFamily.Monospace else FontFamily.SansSerif,
                 fontFeatureSettings = "tnum", color = t.textPrimary), autoSize = true)
-        InstrumentBaselineLine(reading.supporting, "instrument-${reading.id}-support", supportingHeight, 15.sp,
+        InstrumentBaselineLine(reading.supporting, "instrument-${reading.id}-support", supportingHeight, 14.sp,
             TextStyle(fontSize = 11.sp, lineHeight = 16.sp, fontFamily = FontFamily.SansSerif,
                 fontFeatureSettings = "tnum", color = t.textSecondary))
         InstrumentAlignedRail(reading)
