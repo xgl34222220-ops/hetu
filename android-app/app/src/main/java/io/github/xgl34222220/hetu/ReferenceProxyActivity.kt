@@ -1082,6 +1082,8 @@ private fun RefPanel(
     var query by rememberSaveable { mutableStateOf("") }
     var groupLayout by rememberSaveable { mutableIntStateOf(0) } // 0 auto, 1 single, 2 double
     var connectionView by rememberSaveable { mutableStateOf("active") }
+    var connectionProtocol by rememberSaveable { mutableStateOf("all") }
+    var connectionSort by rememberSaveable { mutableStateOf("count") }
     var confirmCloseAll by remember { mutableStateOf(false) }
     var closingConnections by remember { mutableStateOf(false) }
     val expandedConnectionApps = remember { mutableStateMapOf<String, Boolean>() }
@@ -1091,14 +1093,30 @@ private fun RefPanel(
     val closedConnectionSnapshot = closedConnections.toList()
     val closedConnectionGroups = remember(closedConnectionSnapshot) { refConnectionGroups(closedConnectionSnapshot) }
     val connectionGroups = if (connectionView == "active") activeConnectionGroups else closedConnectionGroups
-    val filteredConnectionGroups = remember(connectionGroups, query) {
+    val filteredConnectionGroups = remember(connectionGroups, query, connectionProtocol, connectionSort) {
         val needle = query.trim()
-        if (needle.isEmpty()) connectionGroups else connectionGroups.mapNotNull { group ->
-            if (group.title.contains(needle, true) || group.subtitle.contains(needle, true)) group
-            else group.connections.filter { item ->
-                item.host.contains(needle, true) || item.chain.contains(needle, true) ||
-                    item.rule.contains(needle, true) || item.network.contains(needle, true)
-            }.takeIf { it.isNotEmpty() }?.let { group.copy(connections = it) }
+        val protocolFiltered = connectionGroups.mapNotNull { group ->
+            val children = group.connections.filter { item ->
+                connectionProtocol == "all" || item.network.contains(connectionProtocol, true)
+            }
+            if (children.isEmpty()) null else group.copy(connections = children)
+        }
+        val searched = if (needle.isEmpty()) {
+            protocolFiltered
+        } else {
+            protocolFiltered.mapNotNull { group ->
+                if (group.title.contains(needle, true) || group.subtitle.contains(needle, true)) group
+                else group.connections.filter { item ->
+                    item.host.contains(needle, true) || item.chain.contains(needle, true) ||
+                        item.rule.contains(needle, true) || item.network.contains(needle, true) ||
+                        item.inbound.contains(needle, true)
+                }.takeIf { it.isNotEmpty() }?.let { group.copy(connections = it) }
+            }
+        }
+        when (connectionSort) {
+            "traffic" -> searched.sortedWith(compareByDescending<RefConnectionAppGroup> { it.upload + it.download }.thenBy { it.title.lowercase() })
+            "name" -> searched.sortedBy { it.title.lowercase() }
+            else -> searched.sortedWith(compareByDescending<RefConnectionAppGroup> { it.connections.size }.thenBy { it.title.lowercase() })
         }
     }
 
@@ -1594,17 +1612,50 @@ private fun RefPanel(
                 RefPanelTab.Connections -> {
                     item {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(
+                                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
                                 FilterChip(
                                     selected = connectionView == "active",
                                     onClick = { connectionView = "active" },
-                                    label = { Text("活动连接 ${state.connections.size}") },
+                                    label = { Text("活动 ${state.connections.size}") },
                                 )
                                 FilterChip(
                                     selected = connectionView == "closed",
                                     onClick = { connectionView = "closed" },
                                     label = { Text("已关闭 ${closedConnections.size}") },
                                 )
+                                FilterChip(
+                                    selected = connectionProtocol == "all",
+                                    onClick = { connectionProtocol = "all" },
+                                    label = { Text("全部协议") },
+                                )
+                                FilterChip(
+                                    selected = connectionProtocol == "tcp",
+                                    onClick = { connectionProtocol = "tcp" },
+                                    label = { Text("TCP") },
+                                )
+                                FilterChip(
+                                    selected = connectionProtocol == "udp",
+                                    onClick = { connectionProtocol = "udp" },
+                                    label = { Text("UDP") },
+                                )
+                            }
+                            Row(
+                                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(7.dp),
+                            ) {
+                                Text("排序", color = t.textMuted, fontSize = 11.sp)
+                                listOf("count" to "连接数", "traffic" to "流量", "name" to "名称").forEach { (value, label) ->
+                                    FilterChip(
+                                        selected = connectionSort == value,
+                                        onClick = { connectionSort = value },
+                                        label = { Text(label, fontSize = 11.sp) },
+                                    )
+                                }
                             }
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                 Text(
@@ -2574,8 +2625,26 @@ private fun RefConnectionAppCard(
                         }
                     }
                     if (group.subtitle != group.title) Text(group.subtitle, color = t.textSecondary, fontSize = 12.sp, maxLines = if (expanded) Int.MAX_VALUE else 1, overflow = TextOverflow.Ellipsis)
+                    val totalUpload = group.upload
+                    val totalDownload = group.download
+                    var previousUpload by remember(group.key) { mutableLongStateOf(totalUpload) }
+                    var previousDownload by remember(group.key) { mutableLongStateOf(totalDownload) }
+                    var previousAt by remember(group.key) { mutableLongStateOf(0L) }
+                    var uploadRate by remember(group.key) { mutableLongStateOf(0L) }
+                    var downloadRate by remember(group.key) { mutableLongStateOf(0L) }
+                    LaunchedEffect(totalUpload, totalDownload) {
+                        val now = SystemClock.elapsedRealtime()
+                        if (previousAt > 0L && now > previousAt && totalUpload >= previousUpload && totalDownload >= previousDownload) {
+                            val elapsed = now - previousAt
+                            uploadRate = ((totalUpload - previousUpload) * 1000L / elapsed).coerceAtLeast(0L)
+                            downloadRate = ((totalDownload - previousDownload) * 1000L / elapsed).coerceAtLeast(0L)
+                        }
+                        previousUpload = totalUpload
+                        previousDownload = totalDownload
+                        previousAt = now
+                    }
                     Text(
-                        "↑ ${refBytes(group.upload)}   ↓ ${refBytes(group.download)}",
+                        "↑ ${refSpeed(uploadRate)} · ${refBytes(totalUpload)}    ↓ ${refSpeed(downloadRate)} · ${refBytes(totalDownload)}",
                         color = t.textMuted,
                         style = MaterialTheme.typography.labelSmall,
                     )
@@ -2654,7 +2723,27 @@ private fun RefConnectionRow(item: ProxyConnectionUi, onClose: (() -> Unit)?) {
                 Text(item.host, color = t.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(listOf(item.network, item.inbound).filter { it.isNotBlank() }.joinToString(" · "), color = t.textSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1)
                 Text(item.chain.ifBlank { item.rule.ifBlank { "DIRECT" } }, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("↑ ${refBytes(item.upload)}   ↓ ${refBytes(item.download)}", color = t.textMuted, style = MaterialTheme.typography.labelSmall)
+                var previousUpload by remember(item.id) { mutableLongStateOf(item.upload) }
+                var previousDownload by remember(item.id) { mutableLongStateOf(item.download) }
+                var previousAt by remember(item.id) { mutableLongStateOf(0L) }
+                var uploadRate by remember(item.id) { mutableLongStateOf(0L) }
+                var downloadRate by remember(item.id) { mutableLongStateOf(0L) }
+                LaunchedEffect(item.upload, item.download) {
+                    val now = SystemClock.elapsedRealtime()
+                    if (previousAt > 0L && now > previousAt && item.upload >= previousUpload && item.download >= previousDownload) {
+                        val elapsed = now - previousAt
+                        uploadRate = ((item.upload - previousUpload) * 1000L / elapsed).coerceAtLeast(0L)
+                        downloadRate = ((item.download - previousDownload) * 1000L / elapsed).coerceAtLeast(0L)
+                    }
+                    previousUpload = item.upload
+                    previousDownload = item.download
+                    previousAt = now
+                }
+                Text(
+                    "↑ ${refSpeed(uploadRate)} · ${refBytes(item.upload)}    ↓ ${refSpeed(downloadRate)} · ${refBytes(item.download)}",
+                    color = t.textMuted,
+                    style = MaterialTheme.typography.labelSmall,
+                )
             }
             if (onClose != null) {
                 Spacer(Modifier.width(8.dp))
