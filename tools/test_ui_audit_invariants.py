@@ -58,7 +58,9 @@ assert "RoundedCornerShape(24.dp)" in main and "LiquidStatusGlyph(state.running,
 assert ".size(48.dp)" in liquid and "shape = CircleShape" in liquid
 assert ".height(90.dp)" in liquid and ".height(64.dp)" in liquid
 assert '.size(48.dp)' in liquid and '.testTag("strategy-delay:' in liquid
-assert '.padding(end = 4.dp).size(48.dp)' in liquid and '.testTag("node-delay:' in liquid
+assert '.sizeIn(minWidth = 48.dp, minHeight = 28.dp)' in liquid and '.testTag("node-delay:' in liquid
+assert 'padding(start = 11.dp, top = 8.dp, end = 66.dp' not in liquid, "Node metadata must not reserve a hard 66dp rail"
+assert 'softWrap = false' in liquid, "Protocol badge must remain one intact token row"
 assert 'modifier = Modifier.testTag("home-run-state")' in refhome
 assert ".height(42.dp).testTag(\"yaml-accessory\")" in editor
 assert "UTF-8 · YAML" in editor
@@ -82,6 +84,10 @@ assert ".height(90.dp)" in liquid and ".height(64.dp)" in liquid
 assert "animateContentSize" in liquid and "Spring.DampingRatioLowBouncy" in liquid and "Spring.StiffnessLow" in liquid
 assert "Spring.DampingRatioLowBouncy" in nonhome and "Spring.StiffnessLow" in nonhome
 assert ".height(InstrumentSlots.height())" in instrument
+assert "val rail = 5.dp" in instrument and "alpha = .20f" in instrument, "Bento rails must stay visibly rendered"
+instrument_progress = (src / "InstrumentWorkspace.kt").read_text()
+assert ".height(5.dp)" in instrument_progress and "Color(0xFFE8EEF7)" in instrument_progress and "Color(0xFF38BDF8)" in instrument_progress
+assert "val inset = 4.dp.toPx()" in refhome and "color.copy(alpha = .22f)" in refhome, "Traffic chart must retain baseline inset and area glow"
 assert "builtInBrandKey" in icon and "BuiltInBrandIcon" in icon
 for brand in ("openai","google","github","telegram","youtube"):
     assert f'"{brand}"' in icon, f"Missing multicolor brand fallback: {brand}"
