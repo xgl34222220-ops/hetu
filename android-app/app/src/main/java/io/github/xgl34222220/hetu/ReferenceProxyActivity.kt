@@ -2781,8 +2781,159 @@ private fun RefRateCard(title: String, value: Long, icon: ImageVector, color: Co
 }
 
 @Composable
-internal fun RefProviderRow(item: DashboardProviderUi, refreshing: Boolean, success: Boolean, onRefresh: () -> Unit, onClick: () -> Unit, error: String = "") {
-    InstrumentSubscriptionTicket(item.name, item, refreshing = refreshing, success = success, onEdit = onClick, onRefresh = onRefresh, error = error)
+internal fun RefProviderRow(
+    item: DashboardProviderUi,
+    refreshing: Boolean,
+    success: Boolean,
+    onRefresh: () -> Unit,
+    onClick: () -> Unit,
+    error: String = "",
+) {
+    val t = LocalHetuTokens.current
+    val primary = HetuMicroCrystal.KleinBlue
+    val known = item.hasSubscriptionInfo && item.total > 0L
+    val shape = RoundedCornerShape(20.dp)
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(t.cardBackground)
+            .clickable(onClick = onClick)
+            .padding(16.dp)
+            .testTag("subscription-provider:${item.name}"),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                item.name,
+                Modifier.weight(1f),
+                color = t.textPrimary,
+                fontSize = 18.sp,
+                lineHeight = 23.sp,
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (known) {
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(11.dp))
+                        .background(Color(0xFFE2E8FA))
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                ) {
+                    Text(
+                        "${((1f - item.ratio) * 100f).toInt()}%",
+                        color = primary,
+                        fontSize = 14.sp,
+                        lineHeight = 18.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                    )
+                }
+            }
+            Spacer(Modifier.width(4.dp))
+            WorkspaceRefreshAction(
+                item.name,
+                refreshing,
+                success,
+                error.isNotBlank(),
+                actionLabel = "更新订阅",
+                onClick = onRefresh,
+            )
+        }
+
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                ticketExpireAt(item.expire),
+                Modifier.weight(1f),
+                color = t.textSecondary,
+                fontSize = 12.5.sp,
+                lineHeight = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                refUpdatedAt(item.updatedAt),
+                color = t.textSecondary,
+                fontSize = 12.5.sp,
+                lineHeight = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+            )
+        }
+
+        if (known) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                RefProviderMetric("上传", refBytes(item.upload), Modifier.weight(1f))
+                RefProviderMetric("下载", refBytes(item.download), Modifier.weight(1f))
+                RefProviderMetric("剩余", refBytes(item.remaining), Modifier.weight(1f), primary)
+            }
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(4.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFD7E0F5)),
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxWidth(item.ratio.coerceIn(.01f, 1f))
+                        .fillMaxHeight()
+                        .background(primary, CircleShape),
+                )
+            }
+            Row(Modifier.fillMaxWidth()) {
+                Text(
+                    "已用 ${refBytes(item.used)}",
+                    Modifier.weight(1f),
+                    color = t.textSecondary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    "总计 ${refBytes(item.total)}",
+                    color = t.textSecondary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        } else {
+            Text(
+                "订阅未上报流量信息",
+                color = t.textSecondary,
+                fontSize = 12.sp,
+                lineHeight = 18.sp,
+            )
+        }
+
+        if (error.isNotBlank() && !refreshing) {
+            HetuTaskFeedback("${item.name} 更新失败：$error", error = true)
+        }
+    }
+}
+
+@Composable
+private fun RefProviderMetric(
+    label: String,
+    value: String,
+    modifier: Modifier,
+    valueColor: Color = LocalHetuTokens.current.textPrimary,
+) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            value,
+            color = valueColor,
+            fontSize = 18.sp,
+            lineHeight = 22.sp,
+            fontWeight = FontWeight.ExtraBold,
+            maxLines = 1,
+        )
+        Text(
+            label,
+            color = LocalHetuTokens.current.textSecondary,
+            fontSize = 11.5.sp,
+            lineHeight = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
 }
 
 private fun refExpireDays(expire: Long): String {
