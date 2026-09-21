@@ -85,7 +85,7 @@ class InstrumentAlignmentRenderTest {
                 val railTag = when(id) { "usage" -> "home-usage-progress"; "resource" -> "home-cpu-progress"; else -> "instrument-$id-rail" }
                 assertEquals("Rail bottom does not match", bounds("instrument-network-rail").top - top.top,
                     bounds(railTag).top - b.top, .6f)
-                assertEquals(3f, bounds(railTag).height, .6f)
+                assertEquals(5f, bounds(railTag).height, .6f)
             }
             if (f == 1f) assertEquals("Central divider must remain 1px", 1f, bounds("instrument-speed").left - top.right, 1f)
             else assertTrue("Large font must not squeeze a two-column panel", bounds("instrument-speed").top > top.bottom)
