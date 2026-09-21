@@ -180,7 +180,7 @@ internal fun LiquidNodeCard(node: ProxyNodeUi, active: Boolean, value: Long?, te
     val alpha by animateFloatAsState(if (reveal) 1f else .78f, tween(if (motion) 150 else 0), label = "nodeReveal")
     val scale by animateFloatAsState(if (pressed) .97f else 1f, tween(if (motion) 110 else 0), label = "nodePress")
     val protocolLabel = buildString {
-        append(node.type.ifBlank { "节点" }.uppercase())
+        append(node.type.ifBlank { "节点" })
         if (node.udp) append(" · UDP")
     }
 
@@ -250,16 +250,23 @@ internal fun LiquidNodeCard(node: ProxyNodeUi, active: Boolean, value: Long?, te
                     )
                 }
 
-                Box(
-                    Modifier
-                        .sizeIn(minWidth = 48.dp, minHeight = 28.dp)
-                        .testTag("node-delay:${node.name}")
-                        .clickable(enabled = !testing, role = Role.Button, onClickLabel = "测速", onClick = onDelay),
-                    contentAlignment = Alignment.CenterEnd,
-                ) {
-                    LatencyChip(value, testing, compact = true)
-                }
+                Spacer(Modifier.width(52.dp))
             }
+        }
+
+        // Keep the visual latency chip on the second row while preserving a full
+        // 48dp touch target. The hit target may overlap the row, but it never
+        // steals horizontal measurement from the protocol badge.
+        Box(
+            Modifier
+                .align(Alignment.BottomEnd)
+                .offset(x = (-4).dp, y = (-2).dp)
+                .size(48.dp)
+                .testTag("node-delay:${node.name}")
+                .clickable(enabled = !testing, role = Role.Button, onClickLabel = "测速", onClick = onDelay),
+            contentAlignment = Alignment.BottomEnd,
+        ) {
+            LatencyChip(value, testing, compact = true)
         }
     }
 }
