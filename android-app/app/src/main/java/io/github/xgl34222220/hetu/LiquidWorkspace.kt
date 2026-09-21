@@ -9,6 +9,8 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -24,6 +26,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.*
 import androidx.compose.ui.semantics.*
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.*
@@ -35,7 +38,7 @@ import kotlinx.coroutines.delay
 // Presentation only. All callbacks are provided by the existing controller.
 @Composable
 internal fun liquidColumns(width: Dp): Int =
-    if (width < 600.dp || LocalDensity.current.fontScale > 1.20f) 1 else 2
+    if (width < 292.dp || LocalDensity.current.fontScale > 1.35f) 1 else 2
 
 internal fun liquidGroupType(type: String): String = when (type.lowercase()) {
     "selector", "select" -> "手动选择"
@@ -60,134 +63,160 @@ internal fun liquidNodeProtocolLabel(node: ProxyNodeUi): String {
 
 @Composable
 internal fun LiquidBrandTray(group: ProxyGroupUi) {
-    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val shape = RoundedCornerShape(10.dp)
-    val tray = if (dark) {
-        Brush.verticalGradient(listOf(Color.White.copy(alpha = .10f), Color.White.copy(alpha = .055f)))
-    } else {
-        Brush.verticalGradient(listOf(Color(0xFFFAFCFF), Color(0xFFF0F5FC)))
-    }
     Box(
         Modifier
-            .size(32.dp)
-            .testTag("brand-tray:${group.name}")
-            .shadow(
-                elevation = 3.dp,
-                shape = shape,
-                clip = false,
-                ambientColor = Color.Black.copy(alpha = .035f),
-                spotColor = Color.Black.copy(alpha = .055f),
-            )
-            .background(tray, shape)
-            .border(
-                1.dp,
-                if (dark) Color.White.copy(alpha = .09f) else Color(0xFFE4EAF2),
-                shape,
-            )
-            .clip(shape),
+            .size(34.dp)
+            .testTag("brand-tray:${group.name}"),
         contentAlignment = Alignment.Center,
     ) {
-        ConfiguredGroupIcon(group, Modifier.size(24.dp))
+        ConfiguredGroupIcon(group, Modifier.size(32.dp))
     }
 }
-@OptIn(ExperimentalHazeMaterialsApi::class)
+
 @Composable
-internal fun LiquidStrategyCard(group: ProxyGroupUi, selected: String, expanded: Boolean, value: Long?, testing: Boolean,
-    modifier: Modifier = Modifier, onExpand: () -> Unit, onDelay: () -> Unit,
-    hazeState: HazeState? = null, glassEnabled: Boolean = false) {
-    val t = LocalHetuTokens.current
-    val primary = HetuMicroCrystal.KleinBlue
-    val motion = LocalHetuMotionEnabled.current
-    val density = LocalDensity.current
-    val fixedFontScale = density.fontScale.coerceAtLeast(1f)
-    fun fixedSp(value: Float) = (value / fixedFontScale).sp
-    val interactions = remember(group.name) { MutableInteractionSource() }
-    val pressed by interactions.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .98f else 1f, tween(if (motion) 110 else 0), label = "groupPress")
-    val angle by animateFloatAsState(if (expanded) 180f else 0f, tween(if (motion) 250 else 0), label = "groupArrow")
+private fun ReferenceDelayPill(value: Long?, testing: Boolean, modifier: Modifier = Modifier) {
+    val text = if (testing) "..." else refDelay(value)
     Box(
         modifier
-            .height(90.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color(0xFFE2E8FA))
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text,
+            color = HetuMicroCrystal.KleinBlue,
+            fontSize = 11.5.sp,
+            lineHeight = 15.sp,
+            fontWeight = FontWeight.ExtraBold,
+            maxLines = 1,
+        )
+    }
+}
+
+@OptIn(ExperimentalHazeMaterialsApi::class)
+@Composable
+internal fun LiquidStrategyCard(
+    group: ProxyGroupUi,
+    selected: String,
+    expanded: Boolean,
+    value: Long?,
+    testing: Boolean,
+    modifier: Modifier = Modifier,
+    onExpand: () -> Unit,
+    onDelay: () -> Unit,
+    hazeState: HazeState? = null,
+    glassEnabled: Boolean = false,
+) {
+    val t = LocalHetuTokens.current
+    val motion = LocalHetuMotionEnabled.current
+    val interactions = remember(group.name) { MutableInteractionSource() }
+    val pressed by interactions.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        if (pressed) .97f else 1f,
+        tween(if (motion) 100 else 0),
+        label = "groupPress",
+    )
+    val measured = group.nodes.count { (it.lastDelay ?: 0L) > 0L }
+    val typeText = buildString {
+        append(group.type.ifBlank { "Group" })
+        append(' ')
+        append(measured)
+        append('/')
+        append(group.nodes.size)
+    }
+
+    Box(
+        modifier
+            .height(80.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
-            .crystalMaterial(RoundedCornerShape(22.dp), selection = expanded)
+            .clip(RoundedCornerShape(18.dp))
+            .background(t.cardBackground)
             .testTag("strategy:${group.name}")
-            .clickable(interactionSource = interactions, indication = null, role = Role.Button, onClick = onExpand),
+            .clickable(
+                interactionSource = interactions,
+                indication = null,
+                role = Role.Button,
+                onClick = onExpand,
+            ),
     ) {
         Column(
-            Modifier.fillMaxSize().padding(13.dp),
+            Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                Column(Modifier.weight(1f)) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                     Text(
                         group.name,
                         Modifier.fillMaxWidth().testTag("strategy-title:${group.name}"),
-                        color = HetuMicroCrystal.TextMain,
-                        fontSize = fixedSp(15f),
-                        lineHeight = fixedSp(18f),
+                        color = t.textPrimary,
+                        fontSize = 15.5.sp,
+                        lineHeight = 19.sp,
                         fontWeight = FontWeight.ExtraBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        "${liquidGroupType(group.type)} · ${group.nodes.size}",
+                        typeText,
                         Modifier.fillMaxWidth().testTag("strategy-type:${group.name}"),
-                        color = HetuMicroCrystal.TextLight,
-                        fontSize = fixedSp(11f),
-                        lineHeight = fixedSp(14f),
+                        color = t.textSecondary,
+                        fontSize = 12.5.sp,
+                        lineHeight = 16.sp,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
                     )
                 }
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(6.dp))
                 LiquidBrandTray(group)
             }
+
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 val flag = refNodeFlag(selected)
                 if (flag.isNotBlank()) {
-                    Text(flag, fontSize = fixedSp(12f))
-                    Spacer(Modifier.width(4.dp))
+                    Text(flag, fontSize = 11.5.sp)
+                    Spacer(Modifier.width(3.dp))
                 }
                 Text(
                     selected.ifBlank { "未选择" },
                     Modifier.weight(1f).testTag("strategy-selection:${group.name}"),
-                    color = HetuMicroCrystal.TextMuted,
-                    fontSize = fixedSp(12f),
-                    lineHeight = fixedSp(16f),
-                    fontWeight = FontWeight.Bold,
+                    color = t.textPrimary,
+                    fontSize = 11.5.sp,
+                    lineHeight = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Box(Modifier.width(48.dp), contentAlignment = Alignment.Center) {
-                    LatencyChip(value, testing, compact = true)
-                }
-                Spacer(Modifier.width(4.dp))
-                Icon(
-                    Icons.Rounded.KeyboardArrowDown,
-                    null,
-                    Modifier.size(16.dp).graphicsLayer { rotationZ = angle },
-                    tint = primary,
-                )
+                ReferenceDelayPill(value, testing)
             }
         }
-        // 48dp touch target is measured independently from the 90dp visual skeleton,
-        // so large system fonts can never squeeze it into a smaller hit box.
+
         Box(
-            Modifier.align(Alignment.BottomEnd)
-                .offset(x = (-20).dp)
+            Modifier
+                .align(Alignment.BottomEnd)
                 .size(48.dp)
                 .testTag("strategy-delay:${group.name}")
-                .clickable(enabled = !testing, role = Role.Button, onClickLabel = "测速", onClick = onDelay),
+                .clickable(
+                    enabled = !testing,
+                    role = Role.Button,
+                    onClickLabel = "测速",
+                    onClick = onDelay,
+                ),
         )
     }
 }
 
 @Composable
-internal fun LiquidNodeCard(node: ProxyNodeUi, active: Boolean, value: Long?, testing: Boolean,
-    modifier: Modifier = Modifier, onSelect: () -> Unit, onDelay: () -> Unit, index: Int = 0) {
+internal fun LiquidNodeCard(
+    node: ProxyNodeUi,
+    active: Boolean,
+    value: Long?,
+    testing: Boolean,
+    modifier: Modifier = Modifier,
+    onSelect: () -> Unit,
+    onDelay: () -> Unit,
+    index: Int = 0,
+) {
     val t = LocalHetuTokens.current
-    val primary = HetuMicroCrystal.KleinBlue
     val motion = LocalHetuMotionEnabled.current
     val interaction = remember(node.name) { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -197,139 +226,134 @@ internal fun LiquidNodeCard(node: ProxyNodeUi, active: Boolean, value: Long?, te
         reveal = true
     }
     val alpha by animateFloatAsState(if (reveal) 1f else .78f, tween(if (motion) 150 else 0), label = "nodeReveal")
-    val scale by animateFloatAsState(if (pressed) .97f else 1f, tween(if (motion) 110 else 0), label = "nodePress")
-    val protocolLabel = liquidNodeProtocolLabel(node)
+    val scale by animateFloatAsState(if (pressed) .97f else 1f, tween(if (motion) 100 else 0), label = "nodePress")
+    val protocol = node.type.ifBlank { if (node.udp) "UDP" else "Node" }
 
     Box(
         modifier
-            .height(64.dp)
+            .height(78.dp)
             .testTag("node:${node.name}")
             .graphicsLayer { this.alpha = alpha; scaleX = scale; scaleY = scale }
-            .crystalMaterial(RoundedCornerShape(14.dp), depth = CrystalDepth.InsetItem, selection = active)
-            .clickable(interactionSource = interaction, indication = null, role = Role.RadioButton, onClick = onSelect)
+            .clip(RoundedCornerShape(15.dp))
+            .background(if (active) Color(0xFFE8E6F7) else HetuMicroCrystal.Sunken)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                role = Role.RadioButton,
+                onClick = onSelect,
+            )
             .semantics { selected = active },
     ) {
         Column(
             Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
+            verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
+            BasicText(
+                text = node.name,
+                modifier = Modifier.fillMaxWidth().testTag("node-label:${node.name}"),
+                style = TextStyle(
+                    color = t.textPrimary,
+                    fontSize = 14.sp,
+                    lineHeight = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                ),
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Clip,
+                autoSize = TextAutoSize.StepBased(
+                    minFontSize = 10.sp,
+                    maxFontSize = 14.sp,
+                    stepSize = .5.sp,
+                ),
+            )
+            Text(
+                if (node.udp) "UDP" else "TCP",
+                color = t.textSecondary,
+                fontSize = 10.5.sp,
+                lineHeight = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+            )
             Row(
                 Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                val flag = refNodeFlag(node.name)
-                if (flag.isNotBlank()) {
-                    Text(flag, fontSize = 12.sp, lineHeight = 18.sp)
-                    Spacer(Modifier.width(4.dp))
-                }
                 Text(
-                    node.name,
-                    Modifier.weight(1f).testTag("node-label:${node.name}"),
-                    color = if (active) primary else t.textPrimary,
-                    fontSize = 12.sp,
-                    lineHeight = 17.sp,
-                    fontWeight = FontWeight.Bold,
+                    protocol,
+                    Modifier.weight(1f).testTag("node-protocol:${node.name}"),
+                    color = t.textSecondary,
+                    fontSize = 10.5.sp,
+                    lineHeight = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    overflow = TextOverflow.Clip,
                 )
-                if (active) {
-                    Spacer(Modifier.width(4.dp))
-                    Icon(
-                        Icons.Rounded.CheckCircle,
-                        "已选择",
-                        Modifier.size(13.dp),
-                        tint = primary,
-                    )
-                }
-            }
-
-            Row(
-                Modifier.fillMaxWidth().heightIn(min = 28.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(
-                    Modifier
-                        .background(t.controlBackground.copy(alpha = .82f), RoundedCornerShape(5.dp))
-                        .padding(horizontal = 5.dp, vertical = 1.dp)
-                        .testTag("node-protocol:${node.name}"),
-                ) {
-                    Text(
-                        protocolLabel,
-                        color = t.textSecondary,
-                        fontSize = 9.sp,
-                        lineHeight = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                        maxLines = 1,
-                        softWrap = false,
-                    )
-                }
-
-                Spacer(Modifier.width(52.dp))
+                ReferenceDelayPill(value, testing)
             }
         }
 
-        // Keep the visual latency chip on the second row while preserving a full
-        // 48dp touch target. The hit target may overlap the row, but it never
-        // steals horizontal measurement from the protocol badge.
         Box(
             Modifier
                 .align(Alignment.BottomEnd)
-                .offset(x = (-4).dp, y = (-2).dp)
                 .size(48.dp)
                 .testTag("node-delay:${node.name}")
-                .clickable(enabled = !testing, role = Role.Button, onClickLabel = "测速", onClick = onDelay),
-            contentAlignment = Alignment.BottomEnd,
-        ) {
-            LatencyChip(value, testing, compact = true)
-        }
+                .clickable(
+                    enabled = !testing,
+                    role = Role.Button,
+                    onClickLabel = "测速",
+                    onClick = onDelay,
+                ),
+        )
     }
 }
+
 @Composable
-internal fun LiquidGroupWell(group: ProxyGroupUi, selected: String, delays: Map<String, Long>, testing: Map<String, Boolean>,
-    onSelect: (String) -> Unit, onDelay: (String) -> Unit, onTestAll: () -> Unit) {
-    val t = LocalHetuTokens.current
-    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val shape = RoundedCornerShape(22.dp)
+internal fun LiquidGroupWell(
+    group: ProxyGroupUi,
+    selected: String,
+    delays: Map<String, Long>,
+    testing: Map<String, Boolean>,
+    onSelect: (String) -> Unit,
+    onDelay: (String) -> Unit,
+    onTestAll: () -> Unit,
+) {
     val motion = LocalHetuMotionEnabled.current
-    Column(
-        Modifier.fillMaxWidth()
-            .padding(top = 8.dp, bottom = 16.dp)
+    BoxWithConstraints(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp, bottom = 8.dp)
             .testTag("sunken-well:${group.name}")
             .then(
-                if (motion) Modifier.animateContentSize(
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioLowBouncy,
-                        stiffness = Spring.StiffnessLow,
-                    ),
-                ) else Modifier
-            )
-            .crystalMaterial(shape, depth = CrystalDepth.Sunken)
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+                if (motion) {
+                    Modifier.animateContentSize(
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioLowBouncy,
+                            stiffness = Spring.StiffnessLow,
+                        ),
+                    )
+                } else Modifier
+            ),
     ) {
-        Row(Modifier.fillMaxWidth().heightIn(min = 40.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("切换落地节点", color = t.textSecondary, fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Bold,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = with(LocalDensity.current) { 24.sp.toDp() })
-                        .testTag("well-title:${group.name}"))
-                Text("点击即生效", color = t.textMuted, fontSize = 10.sp, lineHeight = 13.sp)
-            }
-            LiquidPill("全测速", Icons.Rounded.Bolt, onTestAll,
-                Modifier.widthIn(min = 76.dp).testTag("well-testall:${group.name}"), compact = true)
-        }
-        BoxWithConstraints {
-            val columns = liquidColumns(maxWidth)
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                group.nodes.withIndex().toList().chunked(columns).forEach { row ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        row.forEach { (index, node) ->
-                            LiquidNodeCard(node, node.name == selected, delays[node.name] ?: node.lastDelay,
-                                testing[node.name] == true, Modifier.weight(1f), { onSelect(node.name) }, { onDelay(node.name) }, index)
-                        }
-                        if (row.size < columns) Spacer(Modifier.weight(1f))
+        val columns = liquidColumns(maxWidth)
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            group.nodes.withIndex().toList().chunked(columns).forEach { row ->
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    row.forEach { (index, node) ->
+                        LiquidNodeCard(
+                            node = node,
+                            active = node.name == selected,
+                            value = delays[node.name] ?: node.lastDelay,
+                            testing = testing[node.name] == true,
+                            modifier = Modifier.weight(1f),
+                            onSelect = { onSelect(node.name) },
+                            onDelay = { onDelay(node.name) },
+                            index = index,
+                        )
                     }
+                    if (row.size < columns) Spacer(Modifier.weight(1f))
                 }
             }
         }
