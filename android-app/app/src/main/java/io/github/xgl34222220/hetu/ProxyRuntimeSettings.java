@@ -18,7 +18,7 @@ final class ProxyRuntimeSettings {
                 String.valueOf(p.cnIpDirect),String.valueOf(p.adblockChain)}) append(state,value);
         for(String key:new String[]{"proxySharedNetwork","proxyKillSwitch"})
             append(state,String.valueOf(Boolean.TRUE.equals(values.get(key))));
-        for(String key:new String[]{"proxyAppPackages","proxyBypassCidrs","proxyBypassInterfaces"}) {
+        for(String key:new String[]{"proxyAppPackages","proxyDirectGids","proxyBypassCidrs","proxyBypassInterfaces"}) {
             append(state,key);
             TreeSet<String> sorted=new TreeSet<>();
             Object raw=values.get(key);
