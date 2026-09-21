@@ -2087,9 +2087,10 @@ private fun RefPanelGlassHeader(
             Text(
                 "面板",
                 color = t.textPrimary,
-                fontSize = 22.sp,
-                lineHeight = 28.sp,
+                fontSize = 32.sp,
+                lineHeight = 40.sp,
                 fontWeight = FontWeight.ExtraBold,
+                letterSpacing = (-.8).sp,
                 modifier = Modifier.weight(1f),
             )
             if (selected != RefPanelTab.Overview) {
@@ -2218,72 +2219,62 @@ private fun RefPanelTabs(
     onSelect: (RefPanelTab) -> Unit,
 ) {
     val t = LocalHetuTokens.current
-    val scheme = MaterialTheme.colorScheme
-    val dark = scheme.background.luminance() < .5f
+    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val view = LocalView.current
-    val tabFontScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
-    val tabs = RefPanelTab.entries
-    val trackBrush = Brush.verticalGradient(
-        if (dark) listOf(Color.White.copy(alpha = .085f), Color.White.copy(alpha = .035f))
-        else listOf(Color(0xFFE2E8F0).copy(alpha = .58f), Color.White.copy(alpha = .46f)),
-    )
-    val trackBorder = if (dark) Color.White.copy(alpha = .08f) else Color.White.copy(alpha = .82f)
-    BoxWithConstraints(
-        Modifier.fillMaxWidth().height(48.dp * tabFontScale)
-            .background(trackBrush, CircleShape)
-            .border(.5.dp, trackBorder, CircleShape)
-            .padding(3.dp),
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(9.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        val itemWidth = maxWidth / tabs.size.toFloat()
-        val targetIndex = tabs.indexOf(selected).coerceAtLeast(0)
-        val indicatorX by animateDpAsState(
-            targetValue = itemWidth * targetIndex.toFloat(),
-            animationSpec = spring(dampingRatio = .74f, stiffness = 380f),
-            label = "panelTabIndicator",
-        )
-        val indicatorShape = RoundedCornerShape(18.dp)
-        val lensBrush = Brush.verticalGradient(
-            if (dark) listOf(Color.White.copy(alpha = .10f), scheme.primary.copy(alpha = .18f))
-            else listOf(Color.White.copy(alpha = .98f), Color(0xFFF8FAFC).copy(alpha = .94f)),
-        )
-        Box(
-            Modifier.offset(x = indicatorX)
-                .width(itemWidth)
-                .fillMaxHeight()
-                .shadow(if (liquidGlass) 3.dp else 1.dp, indicatorShape, clip = false)
-                .background(lensBrush, indicatorShape)
-                .border(.6.dp, Color.White.copy(alpha = if (dark) .14f else .96f), indicatorShape),
-        )
-        Row(Modifier.fillMaxSize()) {
-            tabs.forEach { tab ->
-                val active = tab == selected
-                val source = remember(tab) { MutableInteractionSource() }
-                val pressed by source.collectIsPressedAsState()
-                val scale by animateFloatAsState(
-                    if (pressed) .96f else 1f,
-                    spring(dampingRatio = .76f, stiffness = 560f),
-                    label = "tab${tab.name}",
-                )
-                Box(
-                    Modifier.width(itemWidth).fillMaxHeight()
-                        .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .88f else 1f }
-                        .clip(CircleShape)
-                        .clickable(interactionSource = source, indication = null) {
-                            if (!active) {
-                                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                onSelect(tab)
-                            }
-                        },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        tab.label,
-                        color = if (active) scheme.primary else if (dark) t.textSecondary else Color(0xFF64748B),
-                        fontSize = 12.sp,
-                        fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
-                        maxLines = 1,
+        RefPanelTab.entries.forEach { tab ->
+            val active = tab == selected
+            val shape = RoundedCornerShape(14.dp)
+            val source = remember(tab) { MutableInteractionSource() }
+            val pressed by source.collectIsPressedAsState()
+            val scale by animateFloatAsState(
+                if (pressed) .96f else 1f,
+                spring(dampingRatio = .78f, stiffness = 520f),
+                label = "reference-tab-${tab.name}",
+            )
+            Box(
+                Modifier
+                    .height(38.dp)
+                    .graphicsLayer { scaleX = scale; scaleY = scale }
+                    .clip(shape)
+                    .background(
+                        if (active) {
+                            if (dark) Color.White.copy(alpha = .10f) else Color(0xFFF9F8FE)
+                        } else Color.Transparent,
+                        shape,
                     )
-                }
+                    .border(
+                        if (active) .7.dp else 1.dp,
+                        if (active) {
+                            if (dark) Color.White.copy(alpha = .08f) else Color.White.copy(alpha = .24f)
+                        } else {
+                            if (dark) Color.White.copy(alpha = .42f) else Color(0xFF6D6975)
+                        },
+                        shape,
+                    )
+                    .clickable(interactionSource = source, indication = null) {
+                        if (!active) {
+                            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                            onSelect(tab)
+                        }
+                    }
+                    .padding(horizontal = 14.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    tab.label,
+                    color = if (dark) t.textPrimary else Color(0xFF37333F),
+                    fontSize = 15.5.sp,
+                    lineHeight = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                )
             }
         }
     }
