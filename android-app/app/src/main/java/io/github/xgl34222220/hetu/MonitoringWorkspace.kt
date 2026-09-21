@@ -317,15 +317,16 @@ internal fun SubscriptionBoardingTicket(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(
+                HetuNumber(
                     "已用 ${refBytes(provider.used)} / ${refBytes(provider.total)}",
                     Modifier.weight(1f).testTag("ticket-usage:$name"),
                     color = t.textSecondary,
-                    fontSize = 11.5.sp,
-                    lineHeight = 18.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    fontFamily = FontFamily.Monospace,
-                    maxLines = 1,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontSize = 11.5.sp,
+                        lineHeight = 18.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    ),
+                    monospaced = true,
                 )
                 TextButton(
                     onClick = { details = !details },
