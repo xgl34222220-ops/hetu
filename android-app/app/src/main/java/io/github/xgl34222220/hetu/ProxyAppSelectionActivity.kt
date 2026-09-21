@@ -53,6 +53,42 @@ class ProxyAppSelectionActivity : ComponentActivity() {
 }
 
 @Composable
+private fun AppScopeSegmentedControl(selected: String, onSelect: (String) -> Unit) {
+    val t = LocalHetuTokens.current
+    val options = listOf(
+        "blacklist" to "黑名单",
+        "whitelist" to "白名单",
+        "core" to "核心",
+    )
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+            .background(t.controlBackground.copy(alpha = .56f))
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        options.forEach { (value, label) ->
+            val active = selected == value
+            Surface(
+                onClick = { onSelect(value) },
+                modifier = Modifier.weight(1f).heightIn(min = 42.dp),
+                shape = RoundedCornerShape(13.dp),
+                color = if (active) t.selectionBackground else Color.Transparent,
+                tonalElevation = 0.dp,
+            ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        label,
+                        color = if (active) MaterialTheme.colorScheme.primary else t.textSecondary,
+                        fontSize = 12.5.sp,
+                        fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun ProxyAppSelectionPage(onBack: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("hetu", 0) }
@@ -67,16 +103,20 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
         finally { loadingApps = false }
     }
     fun proxyApps(): Set<String> = prefs.getStringSet("proxyAppPackages", emptySet()).orEmpty().toSet()
+    fun saveProxyApps(next: Set<String>) {
+        prefs.edit().putStringSet("proxyAppPackages", next.toSet()).apply()
+    }
     fun setProxyApp(packageName: String, enabled: Boolean) {
         val next = proxyApps().toMutableSet()
         if (enabled) next.add(packageName) else next.remove(packageName)
-        prefs.edit().putStringSet("proxyAppPackages", next).apply()
+        saveProxyApps(next)
     }
     var query by rememberSaveable { mutableStateOf("") }
     var showSystem by rememberSaveable { mutableStateOf(false) }
     var selectedOnly by rememberSaveable { mutableStateOf(false) }
     var selected by remember { mutableStateOf(proxyApps()) }
-    val profile = remember(selected, reload) { ProxyRuntimeProfile.load(prefs) }
+    var appScopeId by rememberSaveable { mutableStateOf(prefs.getString("proxyAppScope", "blacklist") ?: "blacklist") }
+    var showBatchActions by rememberSaveable { mutableStateOf(false) }
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val pageBg = if (dark) t.pageBackground else MaterialTheme.colorScheme.background
@@ -94,15 +134,15 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
     )
     val revealOffsetPx = with(LocalDensity.current) { 8.dp.toPx() }
 
-    val scopeTitle = when (profile.appScope) {
-        ProxyRuntimeProfile.AppScope.BLACKLIST -> "所选应用直连"
-        ProxyRuntimeProfile.AppScope.WHITELIST -> "仅所选应用代理"
-        ProxyRuntimeProfile.AppScope.CORE -> "核心配置"
+    val scopeTitle = when (appScopeId) {
+        "whitelist" -> "仅所选应用代理"
+        "core" -> "核心配置"
+        else -> "所选应用直连"
     }
-    val scopeDescription = when (profile.appScope) {
-        ProxyRuntimeProfile.AppScope.BLACKLIST -> "勾选的应用绕过 Root 透明代理，其余应用进入代理。"
-        ProxyRuntimeProfile.AppScope.WHITELIST -> "只有勾选的应用进入 Root 透明代理，其余应用直连。"
-        ProxyRuntimeProfile.AppScope.CORE -> "当前不按 Android UID 过滤；名单已保存，但不会参与 Root 规则。"
+    val scopeDescription = when (appScopeId) {
+        "whitelist" -> "只有勾选的应用进入 Root 透明代理，其余应用直连。"
+        "core" -> "当前不按 Android UID 过滤；名单保留，但不会参与 Root 规则。"
+        else -> "勾选的应用绕过 Root 透明代理，其余应用进入代理。"
     }
     val visible = remember(apps, query, showSystem, selectedOnly, selected) {
         apps.filter { app ->
@@ -131,6 +171,16 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
                     Icon(Icons.Rounded.Refresh, "刷新应用", tint = MaterialTheme.colorScheme.primary)
                 }
             }
+        }
+
+        item("scope-segments") {
+            AppScopeSegmentedControl(
+                selected = appScopeId,
+                onSelect = { next ->
+                    appScopeId = next
+                    prefs.edit().putString("proxyAppScope", next).apply()
+                },
+            )
         }
 
         item("scope") {
@@ -167,6 +217,11 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
                 FilterChip(selected = selectedOnly, onClick = { selectedOnly = !selectedOnly }, label = { Text("已选择") })
                 Spacer(Modifier.weight(1f))
                 Text("${visible.size}/${apps.size}", color = t.textSecondary, fontSize = 12.sp)
+                TextButton(onClick = { showBatchActions = true }, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                    Icon(Icons.Rounded.Checklist, null, Modifier.size(17.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("批量", fontSize = 12.sp)
+                }
             }
         }
 
@@ -225,7 +280,19 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(app.label, color = t.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(app.packageName, color = t.textSecondary, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(app.packageName, color = t.textSecondary, fontSize = 11.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary.copy(alpha = .08f)) {
+                                Text(
+                                    if (app.uid >= 0) "#${app.uid}" else "UID —",
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontSize = 9.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                )
+                            }
+                            Text(if (app.system) "系统应用" else "用户应用", color = t.textMuted, fontSize = 9.5.sp)
+                        }
                     }
                     val checkScale by animateFloatAsState(if (checked) 1f else .78f, spring(dampingRatio = .50f, stiffness = 620f), label = "appCheck${app.packageName}")
                     Checkbox(
@@ -246,5 +313,51 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
                 }
             }
         }
+    if (showBatchActions) {
+        ModalBottomSheet(
+            onDismissRequest = { showBatchActions = false },
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            containerColor = t.elevatedCardBackground,
+            contentColor = t.textPrimary,
+            tonalElevation = 0.dp,
+            scrimColor = Color.Black.copy(alpha = .35f),
+        ) {
+            Column(
+                Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text("批量选择", fontSize = 20.sp, lineHeight = 25.sp, fontWeight = FontWeight.Bold)
+                Text("只对当前筛选结果执行，全选/反选不会修改应用范围模式。", color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+                listOf(
+                    Triple("全选当前结果", Icons.Rounded.DoneAll, "select"),
+                    Triple("反选当前结果", Icons.Rounded.SwapVert, "invert"),
+                    Triple("清空名单", Icons.Rounded.DeleteSweep, "clear"),
+                ).forEach { (label, icon, action) ->
+                    Surface(
+                        onClick = {
+                            val next = selected.toMutableSet()
+                            when (action) {
+                                "select" -> visible.forEach { next.add(it.packageName) }
+                                "invert" -> visible.forEach { app -> if (!next.add(app.packageName)) next.remove(app.packageName) }
+                                "clear" -> next.clear()
+                            }
+                            saveProxyApps(next)
+                            selected = next
+                            showBatchActions = false
+                        },
+                        shape = RoundedCornerShape(16.dp),
+                        color = t.controlBackground.copy(alpha = .52f),
+                    ) {
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(icon, null, Modifier.size(19.dp), tint = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.width(10.dp))
+                            Text(label, Modifier.weight(1f), color = t.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                            Icon(Icons.Rounded.ChevronRight, null, Modifier.size(18.dp), tint = t.textMuted)
+                        }
+                    }
+                }
+            }
+        }
+    }
     }
 }
