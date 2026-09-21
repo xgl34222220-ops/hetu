@@ -136,6 +136,12 @@ final class RootProxyPolicy {
         String cidrs = sanitizeCidrs(prefs.getStringSet("proxyBypassCidrs", Collections.emptySet()));
         String interfaces = sanitizeInterfaces(prefs.getStringSet("proxyBypassInterfaces", Collections.emptySet()));
         String directGids = sanitizeDirectGids(prefs.getStringSet("proxyDirectGids", Collections.emptySet()));
+        if (!directGids.isEmpty() &&
+                profile.mode != ProxyRuntimeProfile.Mode.TPROXY &&
+                profile.mode != ProxyRuntimeProfile.Mode.REDIRECT &&
+                profile.mode != ProxyRuntimeProfile.Mode.ENHANCE) {
+            throw new IOException("GID 直连仅支持 TPROXY / Redirect / Enhance；当前 " + profile.mode.label + " 不会假装应用 GID 规则");
+        }
         return new RootProxyPolicy(
                 scope,
                 compress(uids),
