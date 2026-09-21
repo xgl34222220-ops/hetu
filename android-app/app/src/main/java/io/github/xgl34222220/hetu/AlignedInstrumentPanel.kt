@@ -264,6 +264,7 @@ internal fun AlignedInstrumentPanel(runtime: ProxyRuntimeSnapshot, connections: 
         checked = checked,
         onDismiss = { details = false },
     )
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
