@@ -12,7 +12,7 @@
   "native/root/keepalive/hetu_policy_default.go": "b4decd3e49abb0685a698a4e4c73189097d8ae484f7121122c98742887930ffa",
   "native/root/keepalive/hetu_policy_root.go": "e7995e4f1e44c5b8f5d258489d853da0e194f655e6eddd5ef0e6d9a8fba7d8e6",
   "native/root/keepalive/hetu_socket_test.go": "f7c819c6d6ad238478c2afc951277705f5a787e8ec1c530418a6b51751e18fa8",
-  "android-app/app/src/main/assets/hetu-root.sh": "2e9e34e703428e7cd11ffbc0f729aa2dba637386a2ddfd8237d2f1aae7aea058",
+  "android-app/app/src/main/assets/hetu-root.sh": "7d712d03f6e2cb7e85a69c6c25a308ea18f07479beb4845fce12e130eaa8404d",
   "android-app/app/src/main/assets/MIHOMO-LICENSE": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
   "android-app/app/src/main/assets/ADGUARD-LICENSE": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
   "android-app/app/src/main/assets/hetu-route.sh": "6505fa375b96621d75fa8adb577bb6c733989c0d50f5d60146dd2b99d4fab851",
