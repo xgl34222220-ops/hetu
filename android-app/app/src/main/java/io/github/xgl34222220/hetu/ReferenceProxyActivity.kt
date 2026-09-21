@@ -765,7 +765,7 @@ internal fun RefHome(
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                                 Box(
                                     Modifier.size(8.dp).background(
-                                        if (state.running) MaterialTheme.colorScheme.primary else t.textMuted,
+                                        if (state.running) HetuMicroCrystal.KleinBlue else t.textMuted,
                                         CircleShape,
                                     ),
                                 )
@@ -852,7 +852,7 @@ internal fun RefHome(
             }
         }
         item(key = "home-shortcuts") {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 RefHomeShortcut(
                     title = "WebUI",
                     subtitle = if (state.running) "本机控制台" else "核心启动后可用",
@@ -905,8 +905,6 @@ private fun RefHomeShortcut(
     onClick: () -> Unit,
     enabled: Boolean = true,
 ) {
-    val t = LocalHetuTokens.current
-    val primary = MaterialTheme.colorScheme.primary
     val shape = RoundedCornerShape(18.dp)
     Surface(
         onClick = onClick,
@@ -917,38 +915,40 @@ private fun RefHomeShortcut(
         shadowElevation = 0.dp,
     ) {
         Row(
-            Modifier.fillMaxSize().padding(horizontal = 12.dp),
+            Modifier.fillMaxSize().padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(9.dp),
         ) {
             Box(
-                Modifier.size(32.dp).background(Color(0xFFEFF6FF), RoundedCornerShape(9.dp)),
+                Modifier.size(32.dp).background(HetuMicroCrystal.LightBlueBackground, RoundedCornerShape(9.dp)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(icon, null, Modifier.size(16.dp), tint = primary)
+                Icon(icon, null, Modifier.size(16.dp), tint = HetuMicroCrystal.KleinBlue)
             }
+            Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 Text(
                     title,
-                    color = if (enabled) t.textPrimary else t.textMuted,
+                    color = if (enabled) HetuMicroCrystal.TextMain else HetuMicroCrystal.TextLight,
                     fontSize = 13.sp,
                     lineHeight = 17.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = FontWeight.ExtraBold,
                     maxLines = 1,
                 )
                 Text(
                     subtitle,
-                    color = t.textSecondary,
+                    color = HetuMicroCrystal.TextLight,
                     fontSize = 10.sp,
                     lineHeight = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Icon(Icons.Rounded.ChevronRight, null, Modifier.size(16.dp), tint = t.textMuted)
+            Icon(Icons.Rounded.ArrowForwardIos, null, Modifier.size(12.dp), tint = Color(0xFFCBD5E1))
         }
     }
 }
+
 @Composable
 private fun RefLatencyPanel(
     baidu: Long?,

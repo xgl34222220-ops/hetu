@@ -58,95 +58,110 @@ internal fun LiquidBrandTray(group: ProxyGroupUi) {
     }
     val shape = RoundedCornerShape(10.dp)
     Box(Modifier.size(32.dp).testTag("brand-tray:${group.name}")
-        .shadow(2.dp, shape, clip = false, ambientColor = accent.copy(alpha = .05f), spotColor = accent.copy(alpha = .09f))
-        .background(Brush.verticalGradient(listOf(
-            if (dark) accent.copy(alpha = .19f) else androidx.compose.ui.graphics.lerp(Color.White, accent, .045f),
-            if (dark) accent.copy(alpha = .09f) else androidx.compose.ui.graphics.lerp(Color.White, accent, .095f))), shape)
-        .border(.6.dp, accent.copy(alpha = .13f), shape).clip(shape), contentAlignment = Alignment.Center) {
+        .shadow(2.dp, shape, clip = false, ambientColor = accent.copy(alpha = .04f), spotColor = accent.copy(alpha = .07f))
+        .background(
+            if (dark) Brush.verticalGradient(listOf(accent.copy(alpha = .16f), accent.copy(alpha = .08f)))
+            else Brush.verticalGradient(listOf(Color.White, Color(0xFFF8FAFC))),
+            shape,
+        )
+        .border(1.dp, if (dark) accent.copy(alpha = .12f) else Color(0xFFE2E8F0), shape)
+        .clip(shape), contentAlignment = Alignment.Center) {
         // Never tint or substitute the configured bitmap with a guessed flag.
         ConfiguredGroupIcon(group, Modifier.size(28.dp))
     }
 }
 
 @OptIn(ExperimentalHazeMaterialsApi::class)
+@OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
 internal fun LiquidStrategyCard(group: ProxyGroupUi, selected: String, expanded: Boolean, value: Long?, testing: Boolean,
     modifier: Modifier = Modifier, onExpand: () -> Unit, onDelay: () -> Unit,
     hazeState: HazeState? = null, glassEnabled: Boolean = false) {
     val t = LocalHetuTokens.current
-    val primary = MaterialTheme.colorScheme.primary
+    val primary = HetuMicroCrystal.KleinBlue
     val motion = LocalHetuMotionEnabled.current
+    val density = LocalDensity.current
+    val fixedFontScale = density.fontScale.coerceAtLeast(1f)
+    fun fixedSp(value: Float) = (value / fixedFontScale).sp
     val interactions = remember(group.name) { MutableInteractionSource() }
     val pressed by interactions.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) .98f else 1f, tween(if (motion) 110 else 0), label = "groupPress")
     val angle by animateFloatAsState(if (expanded) 180f else 0f, tween(if (motion) 250 else 0), label = "groupArrow")
-    Column(
+    Box(
         modifier
-            .height(132.dp)
+            .height(90.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .crystalMaterial(RoundedCornerShape(22.dp), selection = expanded)
             .testTag("strategy:${group.name}")
-            .clickable(interactionSource = interactions, indication = null, role = Role.Button, onClick = onExpand)
-            .padding(13.dp),
-        verticalArrangement = Arrangement.SpaceBetween,
+            .clickable(interactionSource = interactions, indication = null, role = Role.Button, onClick = onExpand),
     ) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    group.name,
-                    Modifier.fillMaxWidth().testTag("strategy-title:${group.name}"),
-                    color = t.textPrimary,
-                    fontSize = 15.sp,
-                    lineHeight = 20.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    "${liquidGroupType(group.type)} · ${group.nodes.size}",
-                    Modifier.fillMaxWidth().testTag("strategy-type:${group.name}"),
-                    color = t.textMuted,
-                    fontSize = 11.sp,
-                    lineHeight = 15.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+        Column(
+            Modifier.fillMaxSize().padding(13.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        group.name,
+                        Modifier.fillMaxWidth().testTag("strategy-title:${group.name}"),
+                        color = HetuMicroCrystal.TextMain,
+                        fontSize = fixedSp(15f),
+                        lineHeight = fixedSp(18f),
+                        fontWeight = FontWeight.ExtraBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        "${liquidGroupType(group.type)} · ${group.nodes.size}",
+                        Modifier.fillMaxWidth().testTag("strategy-type:${group.name}"),
+                        color = HetuMicroCrystal.TextLight,
+                        fontSize = fixedSp(11f),
+                        lineHeight = fixedSp(14f),
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                LiquidBrandTray(group)
             }
-            Spacer(Modifier.width(8.dp))
-            LiquidBrandTray(group)
-        }
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            val flag = refNodeFlag(selected)
-            if (flag.isNotBlank()) {
-                Text(flag, fontSize = 12.sp)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                val flag = refNodeFlag(selected)
+                if (flag.isNotBlank()) {
+                    Text(flag, fontSize = fixedSp(12f))
+                    Spacer(Modifier.width(4.dp))
+                }
+                Text(
+                    selected.ifBlank { "未选择" },
+                    Modifier.weight(1f).testTag("strategy-selection:${group.name}"),
+                    color = HetuMicroCrystal.TextMuted,
+                    fontSize = fixedSp(12f),
+                    lineHeight = fixedSp(16f),
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Box(Modifier.width(48.dp), contentAlignment = Alignment.Center) {
+                    LatencyChip(value, testing, compact = true)
+                }
                 Spacer(Modifier.width(4.dp))
+                Icon(
+                    Icons.Rounded.KeyboardArrowDown,
+                    null,
+                    Modifier.size(16.dp).graphicsLayer { rotationZ = angle },
+                    tint = primary,
+                )
             }
-            Text(
-                selected.ifBlank { "未选择" },
-                Modifier.weight(1f).testTag("strategy-selection:${group.name}"),
-                color = Color(0xFF475569),
-                fontSize = 12.sp,
-                lineHeight = 17.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Box(
-                Modifier.size(48.dp).testTag("strategy-delay:${group.name}")
-                    .clickable(enabled = !testing, role = Role.Button, onClickLabel = "测速", onClick = onDelay),
-                contentAlignment = Alignment.Center,
-            ) {
-                LatencyChip(value, testing, compact = true)
-            }
-            Spacer(Modifier.width(4.dp))
-            Icon(
-                Icons.Rounded.KeyboardArrowDown,
-                null,
-                Modifier.size(16.dp).graphicsLayer { rotationZ = angle },
-                tint = primary,
-            )
         }
+        // 48dp touch target is measured independently from the 90dp visual skeleton,
+        // so large system fonts can never squeeze it into a smaller hit box.
+        Box(
+            Modifier.align(Alignment.BottomEnd)
+                .offset(x = (-20).dp)
+                .size(48.dp)
+                .testTag("strategy-delay:${group.name}")
+                .clickable(enabled = !testing, role = Role.Button, onClickLabel = "测速", onClick = onDelay),
+        )
     }
 }
 
@@ -268,7 +283,7 @@ internal fun LiquidGroupWell(group: ProxyGroupUi, selected: String, delays: Map<
             val columns = liquidColumns(maxWidth)
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 group.nodes.withIndex().toList().chunked(columns).forEach { row ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         row.forEach { (index, node) ->
                             LiquidNodeCard(node, node.name == selected, delays[node.name] ?: node.lastDelay,
                                 testing[node.name] == true, Modifier.weight(1f), { onSelect(node.name) }, { onDelay(node.name) }, index)
@@ -337,7 +352,7 @@ internal fun LiquidHomeActions(running: Boolean, busy: Boolean, onToggle: () -> 
             if (busy) "请稍候" else if (running) "停止" else "启动",
             if (running) Icons.Rounded.Stop else Icons.Rounded.PlayArrow,
             onToggle,
-            Modifier.weight(1f),
+            Modifier.weight(1.1f),
             enabled = !busy,
             danger = running,
             primary = !running,
@@ -354,16 +369,16 @@ internal fun LiquidHomeActions(running: Boolean, busy: Boolean, onToggle: () -> 
 @Composable
 internal fun LiquidStatusGlyph(running: Boolean, busy: Boolean) {
     val primary = MaterialTheme.colorScheme.primary
-    val kleinBlue = Color(0xFF002FA7)
+    val kleinBlue = HetuMicroCrystal.KleinBlue
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     Box(
         Modifier
             .size(48.dp)
             .shadow(
-                elevation = if (running && !busy) 10.dp else 2.dp,
+                elevation = if (running && !busy) 12.dp else 2.dp,
                 shape = CircleShape,
                 ambientColor = kleinBlue.copy(alpha = .12f),
-                spotColor = kleinBlue.copy(alpha = .28f),
+                spotColor = kleinBlue.copy(alpha = .35f),
             )
             .background(
                 if (running && !busy) kleinBlue
@@ -372,7 +387,7 @@ internal fun LiquidStatusGlyph(running: Boolean, busy: Boolean) {
             )
             .border(
                 1.dp,
-                if (running && !busy) Color.White.copy(alpha = .20f) else Color(0xFFE2E8F0),
+                if (running && !busy) Color.Transparent else Color(0xFFE2E8F0),
                 CircleShape,
             ),
         contentAlignment = Alignment.Center,

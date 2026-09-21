@@ -56,8 +56,8 @@ refhome = (src / "ReferenceProxyActivity.kt").read_text()
 assert "Color(0xFFF4F6F9)" in theme and "Color(0xFF0F172A)" in theme
 assert "RoundedCornerShape(24.dp)" in main and "LiquidStatusGlyph(state.running, busy)" in main
 assert ".size(48.dp)" in liquid and "shape = CircleShape" in liquid
-assert ".height(132.dp)" in liquid and ".height(64.dp)" in liquid
-assert '.size(48.dp).testTag("strategy-delay:' in liquid
+assert ".height(90.dp)" in liquid and ".height(64.dp)" in liquid
+assert '.size(48.dp)' in liquid and '.testTag("strategy-delay:' in liquid
 assert '.padding(end = 4.dp).size(48.dp)' in liquid and '.testTag("node-delay:' in liquid
 assert 'modifier = Modifier.testTag("home-run-state")' in refhome
 assert ".height(42.dp).testTag(\"yaml-accessory\")" in editor
@@ -68,13 +68,17 @@ nonhome = (src / "NonHomeWorkspace.kt").read_text()
 instrument = (src / "AlignedInstrumentPanel.kt").read_text()
 assert "Color.White.copy(alpha = .95f)" in crystal
 assert "Color(0xFFFFFFFF)" in crystal and "Color(0xFFF8FAFC)" in crystal
+micro = (src / "ui/HetuMicroCrystal.kt").read_text()
+assert "Color(0xFF2563EB)" in micro and "Color(0xFFEFF6FF)" in micro and "Color(0xFFDBEAFE)" in micro
+assert "Color(0x0A0F172A)" in crystal and "Color(0x0D0F172A)" in crystal
+assert ".width(150.dp)" in (src / "CrystalWorkspace.kt").read_text()
 assert "topAlpha" not in crystal and "bottomAlpha" not in crystal
-assert "Color(0xFF002FA7)" in liquid
+assert "HetuMicroCrystal.KleinBlue" in liquid
 assert ".border(" in crystal and "1.dp" in crystal
 assert "if (crystal) {" in crystal and "Box(modifier.crystalMaterial(shape))" in crystal
 assert "MaterialSurface(modifier = if (crystal)" not in crystal
 assert ".size(32.dp)" in liquid and "RoundedCornerShape(10.dp)" in liquid
-assert ".height(132.dp)" in liquid and ".height(64.dp)" in liquid
+assert ".height(90.dp)" in liquid and ".height(64.dp)" in liquid
 assert "animateContentSize" in liquid and "Spring.DampingRatioLowBouncy" in liquid and "Spring.StiffnessLow" in liquid
 assert "Spring.DampingRatioLowBouncy" in nonhome and "Spring.StiffnessLow" in nonhome
 assert ".height(InstrumentSlots.height())" in instrument

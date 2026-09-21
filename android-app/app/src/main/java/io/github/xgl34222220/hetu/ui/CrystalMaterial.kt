@@ -85,22 +85,39 @@ fun Modifier.crystalMaterial(
     val dark = t.pageBackground.luminance() < .5f
     val radius = when (depth) { CrystalDepth.Popover -> 24.dp; CrystalDepth.InsetItem, CrystalDepth.Sunken -> 12.dp; else -> 20.dp }
     val accent = if (selection) primary else if (tint.isSpecified && tint.alpha > .05f) tint else Color.Unspecified
-    val upper = if (dark) Color(0xFF283543).copy(alpha = .82f) else if (depth == CrystalDepth.Sunken) Color(0xFFEEF2F6) else Color(0xFFFFFFFF)
-    val lower = if (dark) Color(0xFF18232F).copy(alpha = .72f) else if (depth == CrystalDepth.Sunken) Color(0xFFEEF2F6) else Color(0xFFF8FAFC)
+    val upper = if (dark) Color(0xFF283543).copy(alpha = .82f) else when (depth) {
+        CrystalDepth.Sunken -> HetuMicroCrystal.Sunken
+        CrystalDepth.Popover -> Color(0xE6FFFFFF)
+        else -> Color(0xFFFFFFFF)
+    }
+    val lower = if (dark) Color(0xFF18232F).copy(alpha = .72f) else when (depth) {
+        CrystalDepth.Sunken -> HetuMicroCrystal.Sunken
+        CrystalDepth.Popover -> Color(0xE6FFFFFF)
+        else -> Color(0xFFF8FAFC)
+    }
     val fill = Brush.verticalGradient(listOf(upper, lower))
     // Suppress Haze's default opaque tint; the translucent fill above is the only wash.
     val style = HazeStyle(backgroundColor = Color.Transparent, tints = emptyList(), blurRadius = radius,
         noiseFactor = .005f, fallbackTint = HazeTint(Color.Transparent))
-    val shadowSize = when(depth) { CrystalDepth.Popover -> 18.dp; CrystalDepth.InsetItem -> 2.dp; CrystalDepth.Sunken -> 2.dp; else -> 8.dp }
+    val shadowSize = when(depth) { CrystalDepth.Popover -> 12.dp; CrystalDepth.InsetItem -> 1.dp; CrystalDepth.Sunken -> 0.dp; else -> 6.dp }
     val blur = if (blurEnabled && backdrop != null) Modifier.hazeEffect(backdrop, style) {
         canDrawArea = { true }
     } else Modifier
+    if (!dark && depth == CrystalDepth.Sunken) {
+        return then(
+            Modifier.clip(shape)
+                .background(HetuMicroCrystal.Sunken, shape)
+                .border(1.dp, HetuMicroCrystal.SunkenBorder.copy(alpha = .60f), shape)
+        )
+    }
     val contact = if (depth == CrystalDepth.Sunken) Modifier else Modifier.shadow(
         1.dp, shape, clip = false, ambientColor = Color(0xFF0F172A).copy(alpha = .03f),
         spotColor = Color(0xFF0F172A).copy(alpha = .03f))
     return then(contact).shadow(shadowSize, shape, clip = false,
-        ambientColor = Color(0xFF0F172A).copy(alpha = if (depth == CrystalDepth.Popover) .10f else .03f),
-        spotColor = Color(0xFF0F172A).copy(alpha = if (depth == CrystalDepth.Popover) .14f else .05f))
+        ambientColor = if (dark) Color(0xFF0F172A).copy(alpha = if (depth == CrystalDepth.Popover) .10f else .03f)
+            else if (depth == CrystalDepth.Popover) Color(0x140F172A) else Color(0x0A0F172A),
+        spotColor = if (dark) Color(0xFF0F172A).copy(alpha = if (depth == CrystalDepth.Popover) .14f else .05f)
+            else if (depth == CrystalDepth.Popover) Color(0x1A0F172A) else Color(0x0D0F172A))
         .clip(shape).then(blur).background(fill, shape)
         .border(
             1.dp,
@@ -120,7 +137,10 @@ fun Modifier.crystalMaterial(
             val mint = Brush.radialGradient(listOf(Color(0xFF5AB8AD).copy(alpha = if (dark) .04f else .065f), Color.Transparent),
                 center = Offset(0f, size.height*.38f), radius = maxOf(size.width*.75f, 1f))
             onDrawWithContent {
-                drawRect(ambient); drawRect(mint)
+                if (dark) {
+                    drawRect(ambient)
+                    drawRect(mint)
+                }
                 if (depth == CrystalDepth.Sunken) drawRect(Brush.verticalGradient(
                     listOf(Color(0xFF0F172A).copy(alpha = .04f), Color.Transparent), endY = 5.dp.toPx()))
                 drawContent()

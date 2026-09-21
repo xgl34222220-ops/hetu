@@ -35,7 +35,7 @@ internal fun overviewRouteCounts(items: List<ProxyConnectionUi>): List<Pair<Stri
 @Composable
 internal fun OverviewInstruments(state: ProxyComposeState, ruleCount: Int?) {
     val t = LocalHetuTokens.current
-    val primary = MaterialTheme.colorScheme.primary
+    val primary = HetuMicroCrystal.KleinBlue
     val ready = state.running && state.panelReady
     Column(Modifier.fillMaxWidth().crystalMaterial(RoundedCornerShape(22.dp)).padding(16.dp).testTag("overview-instruments"),
         verticalArrangement = Arrangement.spacedBy(14.dp)) {
