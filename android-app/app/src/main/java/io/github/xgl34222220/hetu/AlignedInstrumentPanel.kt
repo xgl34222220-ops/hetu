@@ -56,12 +56,12 @@ internal fun instrumentUploadShare(up: Long, down: Long): Float? {
 
 /** One geometry source for both cell contents and their enclosing row. */
 private object InstrumentSlots {
-    val header = 18.sp
-    val value = 24.sp
-    val support = 18.sp
-    val gap = 4.dp
-    val padding = 10.dp
-    val rail = 2.dp
+    val header = 16.sp
+    val value = 20.sp
+    val support = 16.sp
+    val gap = 3.dp
+    val padding = 7.dp
+    val rail = 3.dp
     @Composable fun fontHeight(size: TextUnit): Dp {
         val density = LocalDensity.current
         // Keep room for the full line even when platform text scaling and the
@@ -116,8 +116,8 @@ private fun AlignedInstrumentCell(reading: InstrumentReading, modifier: Modifier
                     (baseline - badge[FirstBaseline]).coerceAtLeast(0))
             }
         }
-        InstrumentBaselineLine(reading.value, "instrument-${reading.id}-value", valueHeight, 18.sp,
-            TextStyle(fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.Bold,
+        InstrumentBaselineLine(reading.value, "instrument-${reading.id}-value", valueHeight, 16.sp,
+            TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.ExtraBold,
                 fontFamily = if (reading.monospaced) FontFamily.Monospace else FontFamily.SansSerif,
                 fontFeatureSettings = "tnum", color = t.textPrimary), autoSize = true)
         InstrumentBaselineLine(reading.supporting, "instrument-${reading.id}-support", supportingHeight, 14.sp,
@@ -134,7 +134,7 @@ private fun InstrumentBaselineLine(text: String, tag: String, height: Dp, baseli
     Layout(modifier = Modifier.fillMaxWidth().height(height).testTag("$tag-slot"), content = {
         BasicText(text, Modifier.fillMaxWidth().testTag(tag), style = style, maxLines = 1, softWrap = false,
             overflow = TextOverflow.Ellipsis,
-            autoSize = if (autoSize) TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = 16.sp, stepSize = .5.sp) else null)
+            autoSize = if (autoSize) TextAutoSize.StepBased(minFontSize = 11.sp, maxFontSize = 14.sp, stepSize = .5.sp) else null)
     }) { measurable, constraints ->
         val child = measurable.single().measure(constraints.copy(minWidth = 0, minHeight = 0))
         val y = (baseline.roundToPx() - child[FirstBaseline]).coerceAtLeast(0)
@@ -250,7 +250,7 @@ internal fun AlignedInstrumentPanel(runtime: ProxyRuntimeSnapshot, connections: 
                     if (index > 0) PanelDivider()
                     Row(Modifier.fillMaxWidth().height(InstrumentSlots.height())) {
                         Cell(pair[0], Modifier.weight(1f))
-                        Box(Modifier.width(.5.dp).fillMaxHeight().background(t.textMuted.copy(alpha = .14f)))
+                        Box(Modifier.width(1.dp).fillMaxHeight().background(Color(0xFFF1F5F9)))
                         Cell(pair[1], Modifier.weight(1f))
                     }
                 }
@@ -321,5 +321,5 @@ private fun InstrumentNetworkDetailSheet(
 
 @Composable
 private fun PanelDivider() {
-    Box(Modifier.fillMaxWidth().height(.5.dp).background(LocalHetuTokens.current.textMuted.copy(alpha = .14f)))
+    Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFF1F5F9)))
 }
