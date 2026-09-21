@@ -1080,6 +1080,7 @@ private fun RefPanel(
     var error by remember { mutableStateOf("") }
     var searchOpen by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
+    var groupLayout by rememberSaveable { mutableIntStateOf(0) } // 0 auto, 1 single, 2 double
     var connectionView by rememberSaveable { mutableStateOf("active") }
     var confirmCloseAll by remember { mutableStateOf(false) }
     var closingConnections by remember { mutableStateOf(false) }
@@ -1387,7 +1388,12 @@ private fun RefPanel(
     }
 
     BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding()) {
-        val groupColumns = liquidColumns(maxWidth - 32.dp)
+        val autoGroupColumns = liquidColumns(maxWidth - 32.dp)
+        val groupColumns = if (maxWidth < 292.dp) 1 else when (groupLayout) {
+            1 -> 1
+            2 -> 2
+            else -> autoGroupColumns
+        }
         Column(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     RefPanelGlassHeader(
@@ -1399,6 +1405,16 @@ private fun RefPanel(
                         onSearchToggle = {
                             searchOpen = !searchOpen
                             if (!searchOpen) query = ""
+                        },
+                        onRefreshGroups = ::refresh,
+                        groupColumns = groupColumns,
+                        onToggleGroupLayout = {
+                            groupLayout = when (groupLayout) {
+                                0 -> if (autoGroupColumns == 1) 2 else 1
+                                1 -> 2
+                                else -> 1
+                            }
+                            selectedGroupName = null
                         },
                         onOpenSettings = onOpenSettings,
                         hazeState = hazeState,
@@ -1953,6 +1969,9 @@ private fun RefPanelGlassHeader(
     query: String,
     onQueryChange: (String) -> Unit,
     onSearchToggle: () -> Unit,
+    onRefreshGroups: () -> Unit,
+    groupColumns: Int,
+    onToggleGroupLayout: () -> Unit,
     onOpenSettings: () -> Unit,
     hazeState: HazeState,
     backdrop: LayerBackdrop?,
@@ -1979,12 +1998,32 @@ private fun RefPanelGlassHeader(
                 fontWeight = FontWeight.ExtraBold,
                 modifier = Modifier.weight(1f),
             )
-            if (selected != RefPanelTab.Overview) RefPanelHeaderAction(
-                icon = if (searchOpen) Icons.Rounded.Close else Icons.Rounded.Search,
-                contentDescription = if (searchOpen) "关闭搜索" else "搜索",
-                active = searchOpen,
-                onClick = onSearchToggle,
-            )
+            if (selected != RefPanelTab.Overview) {
+                RefPanelHeaderAction(
+                    icon = if (searchOpen) Icons.Rounded.Close else Icons.Rounded.Search,
+                    contentDescription = if (searchOpen) "关闭搜索" else "搜索",
+                    active = searchOpen,
+                    onClick = onSearchToggle,
+                )
+            }
+            if (selected == RefPanelTab.Groups) {
+                RefPanelHeaderAction(
+                    icon = Icons.Rounded.Bolt,
+                    contentDescription = "一键测速当前节点",
+                    onClick = onRefreshGroups,
+                )
+                RefPanelHeaderAction(
+                    icon = if (groupColumns == 1) Icons.Rounded.GridView else Icons.Rounded.ViewAgenda,
+                    contentDescription = if (groupColumns == 1) "切换双列" else "切换单列",
+                    active = groupColumns == 2,
+                    onClick = onToggleGroupLayout,
+                )
+                RefPanelHeaderAction(
+                    icon = Icons.Rounded.Settings,
+                    contentDescription = "面板设置",
+                    onClick = onOpenSettings,
+                )
+            }
         }
         RefPanelTabs(
             selected = selected,
