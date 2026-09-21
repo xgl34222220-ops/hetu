@@ -3660,20 +3660,13 @@ private fun RefSheetDragHandle() {
 
 @Composable
 private fun RefGroup(content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxWidth().crystalMaterial(RoundedCornerShape(22.dp)), content = content)
+    Column(Modifier.fillMaxWidth().crystalMaterial(RoundedCornerShape(20.dp)), content = content)
 }
 
 @Composable
 private fun RefSectionLabel(text: String) {
-    Text(
-        text,
-        color = LocalHetuTokens.current.textSecondary,
-        fontSize = 13.sp,
-        lineHeight = 18.sp,
-        fontWeight = FontWeight.SemiBold,
-        letterSpacing = .3.sp,
-        modifier = Modifier.padding(start = 4.dp, top = 6.dp, bottom = 2.dp),
-    )
+    // The 156785 reference groups related rows by card spacing, not visible section captions.
+    Spacer(Modifier.height(2.dp))
 }
 
 @Composable
@@ -3772,10 +3765,11 @@ private fun RefTitleBar(title: String) {
     Text(
         title,
         color = LocalHetuTokens.current.textPrimary,
-        fontSize = 22.sp,
-        lineHeight = 28.sp,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp),
+        fontSize = 32.sp,
+        lineHeight = 40.sp,
+        fontWeight = FontWeight.ExtraBold,
+        letterSpacing = (-.8).sp,
+        modifier = Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 12.dp),
     )
 }
 
