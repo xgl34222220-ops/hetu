@@ -9,9 +9,11 @@ import android.view.HapticFeedbackConstants
 import androidx.activity.BackEventCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -176,8 +178,18 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
         prefs.getString("proxySelectedConfig.${startupProfile.core.id}", "").orEmpty().ifBlank { "尚未选择配置" }
     }
 
-    var page by rememberSaveable { mutableStateOf(RefProxyPage.Home) }
-    var panelTab by rememberSaveable { mutableStateOf(RefPanelTab.Groups) }
+    val initialPanelTab = remember {
+        runCatching {
+            RefPanelTab.valueOf(prefs.getString("defaultPanelTab", RefPanelTab.Groups.name).orEmpty())
+        }.getOrDefault(RefPanelTab.Groups)
+    }
+    var page by rememberSaveable {
+        mutableStateOf(
+            if (showPanelTab && prefs.getBoolean("startOnPanel", false)) RefProxyPage.Panel
+            else RefProxyPage.Home,
+        )
+    }
+    var panelTab by rememberSaveable { mutableStateOf(initialPanelTab) }
     var panelSearchRequest by rememberSaveable { mutableIntStateOf(0) }
     var panelDetailVisible by rememberSaveable { mutableStateOf(false) }
     val pageStateHolder = rememberSaveableStateHolder()
