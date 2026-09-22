@@ -143,7 +143,10 @@ internal class ProxyComposeController(context: Context) {
         val startupGrace = fastRunning && lastStartupAt > 0L && sinceStartup in 0..8_000L
         val lastHealth = prefs.getLong("proxyRootHealthProbeElapsed", 0L)
         val probeInterval = if (startupGrace) 1_000L else 10_000L
-        val shouldProbeHealth = !fastRunning || nowElapsed - lastHealth >= probeInterval
+        // elapsedRealtime resets on reboot; a persisted timestamp from the previous
+        // boot must never suppress the first real status verification.
+        val shouldProbeHealth = !fastRunning || lastHealth <= 0L || nowElapsed < lastHealth ||
+            nowElapsed - lastHealth >= probeInterval
         val status = if (shouldProbeHealth) {
             try {
                 root.status().also { live ->
