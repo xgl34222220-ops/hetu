@@ -41,8 +41,8 @@ internal fun WorkspaceSettingRow(title: String, supporting: String, icon: ImageV
     Row(modifier.fillMaxWidth().heightIn(min = WorkspaceMetrics.rowMinimum)
         .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
         .padding(horizontal = WorkspaceMetrics.gutter, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(WorkspaceMetrics.iconGap)) {
-        Box(Modifier.size(WorkspaceMetrics.icon), contentAlignment = Alignment.Center) {
+        verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(WorkspaceMetrics.iconGap)) {
+        Box(Modifier.size(WorkspaceMetrics.icon).padding(top = 2.dp), contentAlignment = Alignment.TopCenter) {
             if (icon != null) {
                 Icon(icon, null, Modifier.size(24.dp), tint = t.textPrimary)
             }
