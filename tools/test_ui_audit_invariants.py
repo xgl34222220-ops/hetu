@@ -34,6 +34,10 @@ assert "proxyDirectGids" in (src / "ProxyRuntimeSettings.java").read_text()
 assert "GID 规则" in (src / "ProxyAppSelectionActivity.kt").read_text()
 root_shell = (root / "android-app/app/src/main/assets/hetu-root.sh").read_text()
 assert "--gid-owner" in root_shell and "DIRECT_GIDS" in root_shell
+assert "shared_mac_returns" in root_shell and "--mac-source" in root_shell
+assert 'SHARED_BYPASS_MACS=%s' in root_shell
+shared_ui = (src / "ProxyFocusedSettingsActivities.kt").read_text()
+assert 'proxySharedBypassMacs' in shared_ui and '"下游设备 / MAC"' in shared_ui and '"接口管理"' in shared_ui
 assert 'icon = Icons.Rounded.Sort' in main
 controller = (src / "ProxyComposeController.kt").read_text()
 root_manager = (src / "RootProxyManager.java").read_text()
