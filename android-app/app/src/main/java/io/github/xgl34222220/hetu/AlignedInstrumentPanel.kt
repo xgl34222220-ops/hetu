@@ -266,7 +266,7 @@ internal fun AlignedInstrumentPanel(
                 }
                 ReferenceMetricLine("已用", usageRatio?.let { refBytes(used) } ?: "—")
                 ReferenceMetricLine("总量", usageRatio?.let { refBytes(total) } ?: "—")
-                Spacer(Modifier.weight(1f))
+                Spacer(Modifier.height(2.dp))
                 ReferenceProgress(usageRatio, "home-usage-progress", HetuMicroCrystal.KleinBlue)
             }
 
@@ -281,7 +281,7 @@ internal fun AlignedInstrumentPanel(
                         String.format(Locale.US, "%.1f%%", cpu)
                     } else "—",
                 )
-                Spacer(Modifier.weight(1f))
+                Spacer(Modifier.height(2.dp))
                 ReferenceProgress(cpuRatio, "home-cpu-progress", HetuMicroCrystal.KleinBlue)
             }
         }
