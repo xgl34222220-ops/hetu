@@ -42,6 +42,11 @@ internal class ProxyRuntimeInspector(context: Context) {
     private val app = context.applicationContext
     private val api = MihomoControllerClient(app)
     private val prefs = app.getSharedPreferences("hetu", Context.MODE_PRIVATE)
+    private val processSampleLock = Any()
+    @Volatile private var processSampleAt = 0L
+    @Volatile private var processSampleStartupAt = Long.MIN_VALUE
+    @Volatile private var processSampleJson: JSONObject? = null
+    private val processSampleTtlMs = 8_000L
 
     suspend fun sample(): ProxyRuntimeSnapshot = withContext(Dispatchers.IO) {
         val command = """
@@ -65,8 +70,30 @@ internal class ProxyRuntimeInspector(context: Context) {
               printf '%s\n' '{"running":false,"pid":0,"elapsed":0,"processTicks":0,"systemTicks":0,"rssBytes":0}'
             fi
         """.trimIndent()
-        val result = RootBridge.rootShell(app, command, 8_000L)
-        val json = if (result.ok()) runCatching { JSONObject(result.output.trim()) }.getOrNull() else null
+        val wanted = prefs.getBoolean("proxyRootWanted", false)
+        val startupAt = prefs.getLong("proxyRootLastStartupAt", 0L)
+        val sampleNow = SystemClock.elapsedRealtime()
+        val json = if (!wanted) {
+            JSONObject().put("running", false).put("pid", 0).put("elapsed", 0)
+                .put("processTicks", 0).put("systemTicks", 0).put("rssBytes", 0)
+        } else synchronized(processSampleLock) {
+            val age = sampleNow - processSampleAt
+            val cached = processSampleJson
+            if (cached != null && processSampleStartupAt == startupAt && age in 0..processSampleTtlMs) {
+                cached
+            } else {
+                val result = RootBridge.rootShell(app, command, 8_000L)
+                val fresh = if (result.ok()) runCatching { JSONObject(result.output.trim()) }.getOrNull() else null
+                if (fresh != null) {
+                    processSampleJson = fresh
+                    processSampleAt = sampleNow
+                    processSampleStartupAt = startupAt
+                    fresh
+                } else {
+                    cached
+                }
+            }
+        }
         val local = localNetwork()
         val wan = publicNetwork()
         val lookup = wanLookup.view()
