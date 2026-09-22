@@ -15,10 +15,9 @@ internal object ProxyApiHistoryStore {
         if (last != null && now - last.first < 900L) return
         points += Triple(now, upload.coerceAtLeast(0L), download.coerceAtLeast(0L))
         val cutoff = now - MAX_AGE_MS
-        val kept = points.asSequence()
+        val kept = points
             .filter { it.first >= cutoff }
             .takeLast(MAX_POINTS)
-            .toList()
         prefs.edit().putString(KEY, encode(kept)).apply()
     }
 
