@@ -21,15 +21,54 @@ final class MihomoControllerClient {
     private final Context context;
     MihomoControllerClient(Context c){context=c.getApplicationContext();}
 
+    private android.content.SharedPreferences prefs(){
+        return context.getSharedPreferences("hetu",0);
+    }
+
+    private boolean customApi(){
+        return prefs().getBoolean("proxyCustomApiEnabled",false);
+    }
+
+    private String host()throws IOException{
+        if(!customApi())return "127.0.0.1";
+        String value=prefs().getString("proxyCustomApiHost","127.0.0.1");
+        value=value==null?"":value.trim();
+        if(value.isEmpty()||value.length()>253||!value.matches("[A-Za-z0-9.-]+"))
+            throw new IOException("自定义 Clash API 地址无效");
+        return value;
+    }
+
     private String secret()throws IOException{
-        String value=context.getSharedPreferences("hetu",0).getString("proxyControllerSecret","");
-        if(value==null||value.isEmpty())throw new IOException("策略控制接口尚未初始化");
+        String key=customApi()?"proxyCustomApiSecret":"proxyControllerSecret";
+        String value=prefs().getString(key,"");
+        value=value==null?"":value;
+        if(value.indexOf('\r')>=0||value.indexOf('\n')>=0)throw new IOException("Clash API Secret 包含非法换行");
+        if(!customApi()&&value.isEmpty())throw new IOException("策略控制接口尚未初始化");
         return value;
     }
 
     private int port(){
-        int value=context.getSharedPreferences("hetu",0).getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT);
-        return value>=1024&&value<=65535?value:MihomoStartupConfig.CONTROLLER_PORT;
+        int key=customApi()?prefs().getInt("proxyCustomApiPort",9090):prefs().getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT);
+        return key>=1024&&key<=65535?key:(customApi()?9090:MihomoStartupConfig.CONTROLLER_PORT);
+    }
+
+    private String customDelayUrl(){
+        if(!prefs().getBoolean("proxyCustomDelayUrlEnabled",false))return "";
+        String value=prefs().getString("proxyCustomDelayUrl","");
+        value=value==null?"":value.trim();
+        if(value.length()>2048||!(value.startsWith("https://")||value.startsWith("http://")))return "";
+        return value;
+    }
+
+    private void addDelayUrls(ArrayList<String> urls,String preferredUrl){
+        String custom=customDelayUrl();
+        if(!custom.isEmpty())urls.add(custom);
+        if(preferredUrl!=null&&!preferredUrl.trim().isEmpty()){
+            String preferred=preferredUrl.trim();
+            if(!urls.contains(preferred))urls.add(preferred);
+        }else{
+            for(String item:DEFAULT_DELAY_URLS)if(!urls.contains(item))urls.add(item);
+        }
     }
 
     JSONObject proxies()throws Exception{
@@ -81,13 +120,8 @@ final class MihomoControllerClient {
         try{
             Exception last=null;
             ArrayList<String> urls=new ArrayList<>();
-            // When Mihomo/provider supplies a test URL, respect it exactly. Dashboard fallbacks are
-            // only for nodes whose running config has no test URL at all.
-            if(preferredUrl!=null&&!preferredUrl.trim().isEmpty()){
-                urls.add(preferredUrl.trim());
-            }else{
-                Collections.addAll(urls,DEFAULT_DELAY_URLS);
-            }
+            // An explicit user custom URL is tested first, followed by provider/native fallbacks.
+            addDelayUrls(urls,preferredUrl);
             String expectedRange=(expected==null||expected.trim().isEmpty())?"200-399":expected.trim();
             for(String rawUrl:urls){
                 try{
@@ -118,11 +152,7 @@ final class MihomoControllerClient {
     JSONObject groupDelay(String group,String preferredUrl,String expected)throws Exception{
         Exception last=null;
         ArrayList<String> urls=new ArrayList<>();
-        if(preferredUrl!=null&&!preferredUrl.trim().isEmpty()){
-            urls.add(preferredUrl.trim());
-        }else{
-            Collections.addAll(urls,DEFAULT_DELAY_URLS);
-        }
+        addDelayUrls(urls,preferredUrl);
         String expectedRange=(expected==null||expected.trim().isEmpty())?"200-399":expected.trim();
         for(String rawUrl:urls){
             try{
@@ -154,16 +184,18 @@ final class MihomoControllerClient {
     private JSONObject request(String method,String path,JSONObject body,int socketTimeoutMs)throws Exception{
         byte[] payload=body==null?new byte[0]:body.toString().getBytes(StandardCharsets.UTF_8);
         int port=port();
+        String host=host();
+        String secret=secret();
         Socket socket=new Socket();
         try{
-            socket.connect(new InetSocketAddress(InetAddress.getByName("127.0.0.1"),port),2200);
+            socket.connect(new InetSocketAddress(InetAddress.getByName(host),port),2200);
             socket.setSoTimeout(socketTimeoutMs);
             OutputStream raw=socket.getOutputStream();
             StringBuilder head=new StringBuilder();
             head.append(method).append(' ').append(path).append(" HTTP/1.1\r\n")
-                .append("Host: 127.0.0.1:").append(port).append("\r\n")
-                .append("Authorization: Bearer ").append(secret()).append("\r\n")
-                .append("Accept: application/json\r\n")
+                .append("Host: ").append(host).append(':').append(port).append("\r\n");
+            if(!secret.isEmpty())head.append("Authorization: Bearer ").append(secret).append("\r\n");
+            head.append("Accept: application/json\r\n")
                 .append("Connection: close\r\n");
             if(payload.length>0)head.append("Content-Type: application/json; charset=utf-8\r\nContent-Length: ").append(payload.length).append("\r\n");
             head.append("\r\n");
