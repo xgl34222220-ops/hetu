@@ -91,7 +91,7 @@ class ReferenceVideoScreenRenderTest {
 
         compose.runOnIdle { page="settings" }
         compose.waitForIdle()
-        compose.onNodeWithText("设置",true).assertExists()
+        compose.onNodeWithText("设置",substring=false).assertExists()
         compose.onNodeWithText("基础代理配置",true).assertExists()
         compose.onNodeWithText("其他代理配置",true).assertExists()
         compose.onNodeWithText("语言",true).assertExists()
