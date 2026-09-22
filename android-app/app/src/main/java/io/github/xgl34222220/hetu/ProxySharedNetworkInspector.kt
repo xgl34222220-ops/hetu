@@ -30,7 +30,7 @@ internal object ProxySharedNetworkInspector {
     suspend fun inspect(context: Context): SharedNetworkSnapshot = withContext(Dispatchers.IO) {
         val command = """
             for p in /sys/class/net/*; do
-              [ -d "$p" ] || continue
+              [ -d "${'p" ] || continue
               n=${p##*/}
               [ "$n" = lo ] && continue
               s=unknown
@@ -44,6 +44,149 @@ internal object ProxySharedNetworkInspector {
                   for(i=2;i<=NF;i++){
                     if($i=="dev" && i<NF)dev=$(i+1);
                     if($i=="lladdr" && i<NF)mac=$(i+1);
+                  }
+                  if(dev!="" && mac!="")printf "C\t%s\t%s\t%s\t%s\n",ip,mac,dev,st;
+                }'
+            fi
+        """.trimIndent()}p" ] || continue
+              n=${'{p##*/}
+              [ "$n" = lo ] && continue
+              s=unknown
+              [ ! -r "$p/operstate" ] || read -r s < "$p/operstate"
+              printf 'I\t%s\t%s\n' "$n" "$s"
+            done
+            if command -v ip >/dev/null 2>&1; then
+              ip neigh show 2>/dev/null | awk '
+                NF >= 4 {
+                  ip=$1; dev=""; mac=""; st=$NF;
+                  for(i=2;i<=NF;i++){
+                    if($i=="dev" && i<NF)dev=$(i+1);
+                    if($i=="lladdr" && i<NF)mac=$(i+1);
+                  }
+                  if(dev!="" && mac!="")printf "C\t%s\t%s\t%s\t%s\n",ip,mac,dev,st;
+                }'
+            fi
+        """.trimIndent()}{p##*/}
+              [ "${'n" = lo ] && continue
+              s=unknown
+              [ ! -r "$p/operstate" ] || read -r s < "$p/operstate"
+              printf 'I\t%s\t%s\n' "$n" "$s"
+            done
+            if command -v ip >/dev/null 2>&1; then
+              ip neigh show 2>/dev/null | awk '
+                NF >= 4 {
+                  ip=$1; dev=""; mac=""; st=$NF;
+                  for(i=2;i<=NF;i++){
+                    if($i=="dev" && i<NF)dev=$(i+1);
+                    if($i=="lladdr" && i<NF)mac=$(i+1);
+                  }
+                  if(dev!="" && mac!="")printf "C\t%s\t%s\t%s\t%s\n",ip,mac,dev,st;
+                }'
+            fi
+        """.trimIndent()}n" = lo ] && continue
+              s=unknown
+              [ ! -r "${'p/operstate" ] || read -r s < "$p/operstate"
+              printf 'I\t%s\t%s\n' "$n" "$s"
+            done
+            if command -v ip >/dev/null 2>&1; then
+              ip neigh show 2>/dev/null | awk '
+                NF >= 4 {
+                  ip=$1; dev=""; mac=""; st=$NF;
+                  for(i=2;i<=NF;i++){
+                    if($i=="dev" && i<NF)dev=$(i+1);
+                    if($i=="lladdr" && i<NF)mac=$(i+1);
+                  }
+                  if(dev!="" && mac!="")printf "C\t%s\t%s\t%s\t%s\n",ip,mac,dev,st;
+                }'
+            fi
+        """.trimIndent()}p/operstate" ] || read -r s < "${'p/operstate"
+              printf 'I\t%s\t%s\n' "$n" "$s"
+            done
+            if command -v ip >/dev/null 2>&1; then
+              ip neigh show 2>/dev/null | awk '
+                NF >= 4 {
+                  ip=$1; dev=""; mac=""; st=$NF;
+                  for(i=2;i<=NF;i++){
+                    if($i=="dev" && i<NF)dev=$(i+1);
+                    if($i=="lladdr" && i<NF)mac=$(i+1);
+                  }
+                  if(dev!="" && mac!="")printf "C\t%s\t%s\t%s\t%s\n",ip,mac,dev,st;
+                }'
+            fi
+        """.trimIndent()}p/operstate"
+              printf 'I\t%s\t%s\n' "${'n" "$s"
+            done
+            if command -v ip >/dev/null 2>&1; then
+              ip neigh show 2>/dev/null | awk '
+                NF >= 4 {
+                  ip=$1; dev=""; mac=""; st=$NF;
+                  for(i=2;i<=NF;i++){
+                    if($i=="dev" && i<NF)dev=$(i+1);
+                    if($i=="lladdr" && i<NF)mac=$(i+1);
+                  }
+                  if(dev!="" && mac!="")printf "C\t%s\t%s\t%s\t%s\n",ip,mac,dev,st;
+                }'
+            fi
+        """.trimIndent()}n" "${'s"
+            done
+            if command -v ip >/dev/null 2>&1; then
+              ip neigh show 2>/dev/null | awk '
+                NF >= 4 {
+                  ip=$1; dev=""; mac=""; st=$NF;
+                  for(i=2;i<=NF;i++){
+                    if($i=="dev" && i<NF)dev=$(i+1);
+                    if($i=="lladdr" && i<NF)mac=$(i+1);
+                  }
+                  if(dev!="" && mac!="")printf "C\t%s\t%s\t%s\t%s\n",ip,mac,dev,st;
+                }'
+            fi
+        """.trimIndent()}s"
+            done
+            if command -v ip >/dev/null 2>&1; then
+              ip neigh show 2>/dev/null | awk '
+                NF >= 4 {
+                  ip=${'1; dev=""; mac=""; st=$NF;
+                  for(i=2;i<=NF;i++){
+                    if($i=="dev" && i<NF)dev=$(i+1);
+                    if($i=="lladdr" && i<NF)mac=$(i+1);
+                  }
+                  if(dev!="" && mac!="")printf "C\t%s\t%s\t%s\t%s\n",ip,mac,dev,st;
+                }'
+            fi
+        """.trimIndent()}1; dev=""; mac=""; st=${'NF;
+                  for(i=2;i<=NF;i++){
+                    if($i=="dev" && i<NF)dev=$(i+1);
+                    if($i=="lladdr" && i<NF)mac=$(i+1);
+                  }
+                  if(dev!="" && mac!="")printf "C\t%s\t%s\t%s\t%s\n",ip,mac,dev,st;
+                }'
+            fi
+        """.trimIndent()}NF;
+                  for(i=2;i<=NF;i++){
+                    if(${'i=="dev" && i<NF)dev=$(i+1);
+                    if($i=="lladdr" && i<NF)mac=$(i+1);
+                  }
+                  if(dev!="" && mac!="")printf "C\t%s\t%s\t%s\t%s\n",ip,mac,dev,st;
+                }'
+            fi
+        """.trimIndent()}i=="dev" && i<NF)dev=${'(i+1);
+                    if($i=="lladdr" && i<NF)mac=$(i+1);
+                  }
+                  if(dev!="" && mac!="")printf "C\t%s\t%s\t%s\t%s\n",ip,mac,dev,st;
+                }'
+            fi
+        """.trimIndent()}(i+1);
+                    if(${'i=="lladdr" && i<NF)mac=$(i+1);
+                  }
+                  if(dev!="" && mac!="")printf "C\t%s\t%s\t%s\t%s\n",ip,mac,dev,st;
+                }'
+            fi
+        """.trimIndent()}i=="lladdr" && i<NF)mac=${'(i+1);
+                  }
+                  if(dev!="" && mac!="")printf "C\t%s\t%s\t%s\t%s\n",ip,mac,dev,st;
+                }'
+            fi
+        """.trimIndent()}(i+1);
                   }
                   if(dev!="" && mac!="")printf "C\t%s\t%s\t%s\t%s\n",ip,mac,dev,st;
                 }'
