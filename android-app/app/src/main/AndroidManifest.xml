@@ -21,6 +21,7 @@
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity>
         <activity android:name=".ReferenceFileManagerActivity" android:label="文件管理" android:exported="false"  android:launchMode="singleTop" />\n        <activity android:name=".ProxyLogViewerActivity" android:label="日志查看" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name=".ProxyScriptsActivity" android:label="脚本" android:exported="false" android:launchMode="singleTop" />
         <activity android:name=".ProxyLocalWebUiActivity" android:label="河图 WebUI" android:exported="false" android:launchMode="singleTop" />
         <activity android:name=".ProxyCoreActivity" android:label="内核管理" android:exported="false"  android:launchMode="singleTop" />
         <activity android:name=".ProxySubscriptionActivity" android:label="订阅与配置" android:exported="false" android:windowSoftInputMode="adjustResize"  android:launchMode="singleTop" />
