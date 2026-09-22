@@ -90,20 +90,270 @@ private fun RuntimeCoreSettingsPage(onBack: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SharedNetworkSettingsPage(onBack: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("hetu", 0) }
     var enabled by remember { mutableStateOf(prefs.getBoolean("proxySharedNetwork", false)) }
+    var revision by remember { mutableIntStateOf(0) }
+    var snapshot by remember { mutableStateOf(SharedNetworkSnapshot()) }
+    var loading by remember { mutableStateOf(true) }
+    var interfaceSheet by remember { mutableStateOf(false) }
+    var macSheet by remember { mutableStateOf(false) }
+    var interfaceBypass by remember {
+        mutableStateOf(TreeSet(prefs.getStringSet("proxyBypassInterfaces", emptySet()).orEmpty()))
+    }
+    var macBypass by remember {
+        mutableStateOf(TreeSet(prefs.getStringSet("proxySharedBypassMacs", emptySet()).orEmpty()))
+    }
+    var macEditor by remember { mutableStateOf("") }
+    var macError by remember { mutableStateOf("") }
+
+    LaunchedEffect(revision) {
+        loading = true
+        snapshot = ProxySharedNetworkInspector.inspect(context)
+        loading = false
+    }
+
+    fun saveInterfaces(next: Set<String>) {
+        val sorted = TreeSet(next)
+        interfaceBypass = sorted
+        prefs.edit().putStringSet("proxyBypassInterfaces", sorted).apply()
+        ProxyRuntimeSettings.markDirty(prefs, "proxyBypassInterfaces")
+    }
+
+    fun saveMacs(next: Set<String>) {
+        val sorted = TreeSet(next.map { it.lowercase() })
+        macBypass = sorted
+        prefs.edit().putStringSet("proxySharedBypassMacs", sorted).apply()
+        ProxyRuntimeSettings.markDirty(prefs, "proxySharedBypassMacs")
+    }
+
     FocusedSettingsScaffold("共享网络", "热点、USB 与局域网转发流量", onBack) {
-        item { FocusedNotice("仅在确实需要让热点/USB 下游设备经过河图时开启。修改后重启代理生效。") }
+        item {
+            FocusedNotice(
+                "开启后，河图接管共享/转发流量。接口绕过和 MAC 直连规则都会在 Root PREROUTING/FORWARD 层生效；修改后重启代理应用。"
+            )
+        }
         item {
             FocusedGroup {
-                FocusedSwitchRow(Icons.Rounded.WifiTethering, Color(0xFF10B981), "接管共享网络", "将进入 PREROUTING 的共享流量纳入 Root 透明代理", enabled) {
-                    enabled = it; prefs.edit().putBoolean("proxySharedNetwork", it).apply(); ProxyRuntimeSettings.markDirty(prefs, "proxySharedNetwork")
+                FocusedSwitchRow(
+                    Icons.Rounded.WifiTethering,
+                    Color(0xFF10B981),
+                    "接管共享网络",
+                    "将进入 PREROUTING 的共享流量纳入 Root 透明代理",
+                    enabled,
+                ) {
+                    enabled = it
+                    prefs.edit().putBoolean("proxySharedNetwork", it).apply()
+                    ProxyRuntimeSettings.markDirty(prefs, "proxySharedNetwork")
                 }
                 FocusedDivider()
-                FocusedInfoRow(Icons.Rounded.Router, Color(0xFF0EA5E9), "当前接管方式", "只处理共享/转发流量；本机应用仍按应用范围和原 YAML 分流。")
+                FocusedValueRow(
+                    Icons.Rounded.Cable,
+                    Color(0xFF0EA5E9),
+                    "接口管理",
+                    if (loading) "正在读取接口" else "选择不由河图接管的共享/转发接口",
+                    if (interfaceBypass.isEmpty()) "全部接管" else "${interfaceBypass.size} 个直连接口",
+                ) {
+                    interfaceSheet = true
+                }
+                FocusedDivider()
+                FocusedValueRow(
+                    Icons.Rounded.Devices,
+                    Color(0xFF8B5CF6),
+                    "下游设备 / MAC",
+                    if (loading) "正在读取邻居表" else "指定设备绕过透明代理直接联网",
+                    if (macBypass.isEmpty()) "未设置" else "${macBypass.size} 个直连设备",
+                ) {
+                    macEditor = macBypass.joinToString("\n")
+                    macError = ""
+                    macSheet = true
+                }
+                FocusedDivider()
+                FocusedActionRow(
+                    Icons.Rounded.Refresh,
+                    Color(0xFF64748B),
+                    "刷新共享网络状态",
+                    when {
+                        loading -> "读取中…"
+                        snapshot.error.isNotBlank() -> snapshot.error
+                        else -> "${snapshot.interfaces.size} 个接口 · ${snapshot.clients.size} 个可识别下游设备"
+                    },
+                ) {
+                    revision++
+                }
+            }
+        }
+
+        item {
+            FocusedGroup {
+                FocusedInfoRow(
+                    Icons.Rounded.Router,
+                    Color(0xFF0EA5E9),
+                    "当前接管方式",
+                    "本机应用仍按应用范围与 YAML 分流；共享设备先经过接口/MAC/CIDR 绕过，再进入透明代理。",
+                )
+            }
+        }
+    }
+
+    if (interfaceSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { interfaceSheet = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            dragHandle = { BottomSheetDefaults.DragHandle() },
+        ) {
+            Column(
+                Modifier.fillMaxWidth().fillMaxHeight(.72f).navigationBarsPadding()
+                    .padding(horizontal = 18.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text("接口管理", fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
+                Text(
+                    "打开“直连”后，该接口进入河图 Root 链时会立即 RETURN，不再送入 Mihomo。不要绕过当前实际需要代理的下游接口。",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp,
+                )
+                if (snapshot.interfaces.isEmpty()) {
+                    Text(
+                        if (loading) "正在读取接口…" else snapshot.error.ifBlank { "没有读取到活动接口" },
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 13.sp,
+                    )
+                } else {
+                    snapshot.interfaces.forEach { item ->
+                        val checked = item.name in interfaceBypass
+                        WorkspaceSettingRow(
+                            item.name,
+                            "状态：${item.state}",
+                            Icons.Rounded.Cable,
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    if (checked) "直连" else "接管",
+                                    color = if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Switch(
+                                    checked = checked,
+                                    onCheckedChange = { value ->
+                                        val next = TreeSet(interfaceBypass)
+                                        if (value) next.add(item.name) else next.remove(item.name)
+                                        saveInterfaces(next)
+                                    },
+                                )
+                            }
+                        }
+                        WorkspaceInsetDivider()
+                    }
+                }
+                TextButton(
+                    onClick = {
+                        interfaceSheet = false
+                        context.startActivity(Intent(context, ProxyBypassRulesActivity::class.java))
+                    },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                ) {
+                    Text("打开完整 CIDR / 接口绕过规则")
+                }
+            }
+        }
+    }
+
+    if (macSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { macSheet = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            dragHandle = { BottomSheetDefaults.DragHandle() },
+        ) {
+            Column(
+                Modifier.fillMaxWidth().fillMaxHeight(.84f).navigationBarsPadding().imePadding()
+                    .padding(horizontal = 18.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text("下游设备 / MAC", fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
+                Text(
+                    "勾选设备后，它在共享网络的 TPROXY、Redirect、DNS、UDP 防泄漏、QUIC 与 Kill Switch 链中都会优先 RETURN 直连。",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp,
+                )
+
+                if (snapshot.clients.isNotEmpty()) {
+                    Text("已检测设备", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    snapshot.clients.forEach { client ->
+                        val checked = client.mac in macBypass
+                        WorkspaceSettingRow(
+                            client.ip,
+                            "${client.mac} · ${client.iface} · ${client.state}",
+                            Icons.Rounded.Devices,
+                        ) {
+                            Switch(
+                                checked = checked,
+                                onCheckedChange = { value ->
+                                    val next = TreeSet(macBypass)
+                                    if (value) next.add(client.mac) else next.remove(client.mac)
+                                    saveMacs(next)
+                                    macEditor = next.joinToString("\n")
+                                },
+                            )
+                        }
+                        WorkspaceInsetDivider()
+                    }
+                } else {
+                    Text(
+                        if (loading) "正在读取下游设备…" else snapshot.error.ifBlank { "当前邻居表没有可识别的下游 MAC，可在下面手动填写。" },
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp,
+                        lineHeight = 17.sp,
+                    )
+                }
+
+                Text("手动 MAC 列表", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                OutlinedTextField(
+                    value = macEditor,
+                    onValueChange = {
+                        macEditor = it.take(4096)
+                        macError = ""
+                    },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 130.dp, max = 240.dp),
+                    textStyle = LocalTextStyle.current.copy(fontSize = 13.sp, lineHeight = 19.sp),
+                    placeholder = { Text("每行一个，例如 aa:bb:cc:dd:ee:ff") },
+                )
+                if (macError.isNotBlank()) {
+                    Text(macError, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                }
+                Button(
+                    onClick = {
+                        val values = macEditor.lineSequence()
+                            .map { it.trim().lowercase() }
+                            .filter { it.isNotBlank() }
+                            .toSortedSet()
+                        val bad = values.firstOrNull {
+                            !it.matches(Regex("(?i)^[0-9a-f]{2}(?::[0-9a-f]{2}){5}$")) ||
+                                it == "00:00:00:00:00:00" || it == "ff:ff:ff:ff:ff:ff"
+                        }
+                        if (values.size > 64) {
+                            macError = "最多 64 个 MAC"
+                        } else if (bad != null) {
+                            macError = "MAC 格式无效：$bad"
+                        } else {
+                            saveMacs(values)
+                            macSheet = false
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                ) {
+                    Text("保存 MAC 直连规则")
+                }
+                Spacer(Modifier.height(4.dp))
             }
         }
     }
