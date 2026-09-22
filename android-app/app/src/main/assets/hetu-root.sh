@@ -502,7 +502,7 @@ select_dns6_policy(){
 }
 install_disabled_dns6(){
   case "$START_DNS6" in
-    redirect) install_dns_redirect6 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" "$START_SHARED_MACS";;
+    redirect) install_dns_redirect6 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" "${START_SHARED_MACS:-}";;
     blocked-no-nat|blocked-no-redirect)
       # Verify the actual fail-closed guard; do not treat optional NAT failure as
       # permission to send system/app IPv6 DNS directly to an external resolver.
