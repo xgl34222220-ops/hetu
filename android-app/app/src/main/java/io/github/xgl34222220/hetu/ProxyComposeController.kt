@@ -295,6 +295,8 @@ internal class ProxyComposeController(context: Context) {
         if (!configs.hasConfiguredSubscription(selected)) {
             error("当前是河图内置占位配置，尚未填写真实订阅。请打开「面板 → 订阅」添加订阅，或导入一份完整可运行的 YAML 配置。")
         }
+        onProgress("执行服务启动前脚本…")
+        ProxyScriptHooks.run(app, "pre-start", profile.mode.id, selected.name)
         root.startManual(profile) { onProgress(it) }
     }
 
@@ -305,6 +307,9 @@ internal class ProxyComposeController(context: Context) {
     suspend fun restart(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
         LegacyAppMigrator.migrateIfNeeded(app)
         val profile = ProxyRuntimeProfile.load(prefs)
+        val selected = configs.selected(profile.core)
+        onProgress("执行服务启动前脚本…")
+        ProxyScriptHooks.run(app, "pre-start", profile.mode.id, selected?.name ?: "")
         val result = root.replaceRunningManually(profile, onProgress)
         prefs.edit()
             .putString("proxyRootAppliedSettings", ProxyRuntimeSettings.signature(prefs))
@@ -316,7 +321,11 @@ internal class ProxyComposeController(context: Context) {
     }
 
     suspend fun stop(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
+        val profile = ProxyRuntimeProfile.load(prefs)
+        val selected = configs.selected(profile.core)
         val result = root.stop { onProgress(it) }
+        onProgress("执行服务停止后脚本…")
+        ProxyScriptHooks.run(app, "post-stop", profile.mode.id, selected?.name ?: "")
         result
     }
     suspend fun select(group: String, node: String) = withContext(Dispatchers.IO) { api.select(group, node) }
