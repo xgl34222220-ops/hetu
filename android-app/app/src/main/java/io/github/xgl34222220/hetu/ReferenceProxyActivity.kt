@@ -3930,6 +3930,57 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
     var statusNotificationEnabled by remember { mutableStateOf(prefs.getBoolean(ProxyStatusNotificationService.PREF_ENABLED, false)) }
     var blurEnabled by remember { mutableStateOf(prefs.getBoolean("enableBlur", true)) }
     var latencyInterval by remember { mutableIntStateOf(prefs.getInt("latencyAutoRefreshSeconds", 0).takeIf { it == 0 || it == 30 || it == 60 } ?: 0) }
+    var backupSheet by remember { mutableStateOf(false) }
+    var mirrorSheet by remember { mutableStateOf(false) }
+    var aboutSheet by remember { mutableStateOf(false) }
+    var defaultPanelPicker by remember { mutableStateOf(false) }
+    var backupBusy by remember { mutableStateOf(false) }
+    var backupMessage by remember { mutableStateOf("") }
+    var mirrorEnabled by remember { mutableStateOf(prefs.getBoolean("downloadMirrorEnabled", false)) }
+    var mirrorPrefix by remember { mutableStateOf(prefs.getString("downloadMirrorPrefix", "").orEmpty()) }
+    var showPanelEntry by remember { mutableStateOf(prefs.getBoolean("showPanelTab", true)) }
+    var startOnPanel by remember { mutableStateOf(prefs.getBoolean("startOnPanel", false)) }
+    var defaultPanel by remember {
+        mutableStateOf(
+            runCatching {
+                RefPanelTab.valueOf(prefs.getString("defaultPanelTab", RefPanelTab.Groups.name).orEmpty())
+            }.getOrDefault(RefPanelTab.Groups),
+        )
+    }
+    val scope = rememberCoroutineScope()
+    val backupExporter = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri ->
+        if (uri != null) scope.launch {
+            backupBusy = true
+            backupMessage = ""
+            try {
+                val count = HetuSettingsBackup.export(context, uri)
+                backupMessage = "备份完成 · $count 个配置"
+            } catch (failure: Exception) {
+                backupMessage = failure.message ?: "备份失败"
+            } finally {
+                backupBusy = false
+            }
+        }
+    }
+    val backupImporter = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) scope.launch {
+            backupBusy = true
+            backupMessage = ""
+            try {
+                val count = HetuSettingsBackup.restore(context, uri)
+                backupMessage = "恢复完成 · $count 个配置；部分运行设置重启后生效"
+                onChanged()
+            } catch (failure: Exception) {
+                backupMessage = failure.message ?: "恢复失败"
+            } finally {
+                backupBusy = false
+            }
+        }
+    }
 
     val pending = state.runtimeSettingsPending || prefs.getBoolean("proxyRootRuntimeRefreshPending", false)
     val t = LocalHetuTokens.current
