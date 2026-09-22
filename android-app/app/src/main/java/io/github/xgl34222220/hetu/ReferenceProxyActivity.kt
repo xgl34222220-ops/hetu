@@ -600,10 +600,9 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                     onRestart = ::restart,
                     onDelay = ::measureSites,
                     diagnosticLoading = diagnosticLoading,
-                    onLog = { scope.launch {
-                        logTitle = "运行日志"
-                        logText = runCatching { inspector.runtimeLog() }.getOrElse { it.message ?: "日志读取失败" }
-                    } },
+                    onLog = {
+                        context.startActivity(Intent(context, ProxyLogViewerActivity::class.java))
+                    },
                     onConnections = {
                         panelTab = RefPanelTab.Connections
                         page = RefProxyPage.Panel
@@ -645,7 +644,9 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                     onOpenSettings = { page = RefProxyPage.Settings },
                     onDetailVisibleChanged = { panelDetailVisible = it },
                 )
-                RefProxyPage.Tools -> RefTools(state) { logTitle = "运行日志"; logText = it }
+                RefProxyPage.Tools -> RefTools(state) {
+                    context.startActivity(Intent(context, ProxyLogViewerActivity::class.java))
+                }
                 RefProxyPage.Settings -> RefSettings(state, operation, ::restart) { scope.launch { refresh() } }
             }
                 }
