@@ -574,15 +574,13 @@ final class RootProxyManager {
             if(!result.optBoolean("ok"))throw new IOException(result.optString("message","Root 代理启动失败"));
         }catch(Exception startFailure){if(adblockCoordinatorEntered)ProxyAdblockCoordinator.exit(context);throw startFailure;}
 
-        trace.next("finalProcessCheck");
-        stage(progress,"确认核心进程、策略控制接口与守护状态…");
-        if(!coreAliveFast()){
-            if(adblockCoordinatorEntered)ProxyAdblockCoordinator.exit(context);
-            RootBridge.Result failure=RootBridge.rootShell(context,"tail -c 1800 "+RootBridge.quote(ROOT+"/run/core.log")+" 2>/dev/null || true",3000L);
-            String detail=DiagnosticReport.redact(failure.output,prefs.getString("proxyControllerSecret",""));
-            throw new IOException("启动命令已返回，但未检测到河图私有核心进程"+(detail.isEmpty()?"":"："+detail));
-        }
+        // hetu-root.sh does not return success until the private core is alive,
+        // every required listener is present, network rules are installed, a
+        // health manifest is recorded and the watchdog has started. Re-spawning
+        // su here only to probe the same PID again adds visible start latency on
+        // Magisk/KernelSU devices without closing a meaningful race.
         trace.next("publishRuntime");
+        stage(progress,"核心监听与网络接管已就绪，守护将持续复核运行状态…");
         if(!prefs.getBoolean("hetuLegacyRetired",false))retireLegacyInstallation(progress);
         // Publish only the port of a successfully running core.
         prefs.edit().putInt("proxyControllerPort",p.controllerPort).commit();
