@@ -31,6 +31,6 @@
   "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java": "ca65faa90f2896463ee26ebb937d5d8c0629f4005c37334b5b7ad33d390607b5",
   "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java": "925d79cf7508d62e3844fa8d7db5812836352e09e2c8a880d975589bf6c436a1",
   "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt": "dd2ac29cf2d73ac1ed153a0018c1311951bedeb719c0ec8ad5547a9b87c309d3",
-  "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java": "72acd22f9d7116849118542964b42a26ed717d8f4f60eb938f87e6e53a796561",
+  "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java": "86412df01b7dc3449f11548a63e03ee03610371d22a64a4e0664c0272f918367",
   "android-app/app/src/main/java/io/github/xgl34222220/hetu/BootReceiver.java": "85b3853bbe1d05bb625a3c7044895c70c1fcdeba80a9b63fc4b1d0de16758580"
 }
