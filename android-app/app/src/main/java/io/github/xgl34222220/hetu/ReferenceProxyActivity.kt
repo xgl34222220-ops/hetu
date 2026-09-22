@@ -4033,9 +4033,18 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
                     Icons.Rounded.FormatPaint,
                     Color.Unspecified,
                     "主题设置",
-                    "调整主题 模糊 底栏和缩放",
+                    "调整主题、模糊、洛书同款液态底栏和缩放",
                 ) {
                     context.startActivity(Intent(context, ThemeSettingsActivity::class.java))
+                }
+                RefDivider()
+                RefToolRow(
+                    Icons.Rounded.Backup,
+                    Color.Unspecified,
+                    "备份与恢复",
+                    "导出或恢复河图设置与配置库",
+                ) {
+                    backupSheet = true
                 }
             }
         }
@@ -4053,6 +4062,17 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
                     prefs.edit().putBoolean("proxyRootAutoStart", enabled).apply()
                 }
                 RefDivider()
+                RefToolRow(
+                    Icons.Rounded.Download,
+                    Color.Unspecified,
+                    "加速下载",
+                    if (mirrorEnabled) "已开启 · ${mirrorPrefix.ifBlank { "未填写镜像地址" }}" else "关闭 · 核心 release 直连 GitHub",
+                    trailingText = if (mirrorEnabled) "开启" else "关闭",
+                    trailingColor = if (mirrorEnabled) HetuMicroCrystal.KleinBlue else t.textSecondary,
+                ) {
+                    mirrorSheet = true
+                }
+                RefDivider()
                 RefSwitchRow(
                     icon = Icons.Rounded.Notifications,
                     accent = Color.Unspecified,
@@ -4067,10 +4087,59 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
                 RefToolRow(
                     Icons.Rounded.Tune,
                     Color.Unspecified,
-                    "通知内容与按钮",
-                    "模板变量与快捷操作",
+                    "通知详细设置",
+                    "通知正文模板、变量与两个快捷按钮",
                 ) {
                     notificationSettings = true
+                }
+            }
+        }
+
+        item {
+            RefGroup {
+                RefSwitchRow(
+                    icon = Icons.Rounded.SpaceDashboard,
+                    accent = Color.Unspecified,
+                    title = "显示连接面板入口",
+                    subtitle = "在洛书同款底栏中显示“面板”入口",
+                    checked = showPanelEntry,
+                ) { enabled ->
+                    showPanelEntry = enabled
+                    prefs.edit().putBoolean("showPanelTab", enabled).apply()
+                }
+                RefDivider()
+                RefValueRow(
+                    "默认面板页面",
+                    defaultPanel.label,
+                    Icons.Rounded.Dashboard,
+                    Color.Unspecified,
+                    highlightValue = true,
+                ) {
+                    defaultPanelPicker = true
+                }
+                RefDivider()
+                RefSwitchRow(
+                    icon = Icons.Rounded.Launch,
+                    accent = Color.Unspecified,
+                    title = "启动时打开面板",
+                    subtitle = if (showPanelEntry) "下次打开河图直接进入默认面板页" else "需要先开启面板入口",
+                    checked = startOnPanel,
+                ) { enabled ->
+                    startOnPanel = enabled
+                    prefs.edit().putBoolean("startOnPanel", enabled).apply()
+                }
+            }
+        }
+
+        item {
+            RefGroup {
+                RefToolRow(
+                    Icons.Rounded.Info,
+                    Color.Unspecified,
+                    "关于",
+                    "版本、构建与运行环境信息",
+                ) {
+                    aboutSheet = true
                 }
             }
         }
