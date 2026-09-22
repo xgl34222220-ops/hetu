@@ -83,5 +83,10 @@ public class EpochTest {
  assert 'controller.closeConnection(' not in service
  assert 'default-changed-connections-preserved' in service
  assert service.count('RootProxyManager.publishObservation(')>=5
- assert 'CONTROL_LOCK.tryLock()' in (JAVA/'RootProxyManager.java').read_text();checks+=4
+ manager=(JAVA/'RootProxyManager.java').read_text()
+ assert 'CONTROL_LOCK.tryLock()' in manager
+ start_body=manager.split('private JSONObject startInternal',1)[1].split('JSONObject stop()',1)[0]
+ assert 'runJsonWithTimeout(125000L,"start"' in start_body
+ assert 'trace.next("finalProcessCheck")' not in start_body
+ checks+=6
 print(f'Startup/lifecycle regression checks passed: {checks}')
