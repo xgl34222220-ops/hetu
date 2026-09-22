@@ -16,8 +16,10 @@ final class RootProxyPolicy {
     private static final int MAX_DIRECT_GID_RANGES = 64;
     private static final int MAX_CIDRS = 256;
     private static final int MAX_INTERFACES = 32;
+    private static final int MAX_SHARED_MACS = 64;
     private static final Pattern CIDR_SAFE = Pattern.compile("[0-9A-Fa-f:.]+/[0-9]{1,3}");
     private static final Pattern IFACE_SAFE = Pattern.compile("[A-Za-z0-9_.:@-]+\\+?");
+    private static final Pattern MAC_SAFE = Pattern.compile("(?i)[0-9a-f]{2}(?::[0-9a-f]{2}){5}");
     private static final Pattern PKG_SAFE = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)+(?:\\*)?");
 
     final String appScope;
@@ -28,6 +30,7 @@ final class RootProxyPolicy {
     final boolean killSwitch;
     final String cidrs;
     final String interfaces;
+    final String sharedBypassMacs;
     final Set<String> missingPackages;
     final Set<String> skippedSystemPackages;
     final Set<String> directPackages;
@@ -41,6 +44,7 @@ final class RootProxyPolicy {
             boolean killSwitch,
             String cidrs,
             String interfaces,
+            String sharedBypassMacs,
             Set<String> missingPackages,
             Set<String> skippedSystemPackages,
             Set<String> directPackages) {
@@ -52,6 +56,7 @@ final class RootProxyPolicy {
         this.killSwitch = killSwitch;
         this.cidrs = cidrs;
         this.interfaces = interfaces;
+        this.sharedBypassMacs = sharedBypassMacs;
         this.missingPackages = Collections.unmodifiableSet(new TreeSet<>(missingPackages));
         this.skippedSystemPackages = Collections.unmodifiableSet(new TreeSet<>(skippedSystemPackages));
         this.directPackages = Collections.unmodifiableSet(new TreeSet<>(directPackages));
@@ -135,6 +140,7 @@ final class RootProxyPolicy {
 
         String cidrs = sanitizeCidrs(prefs.getStringSet("proxyBypassCidrs", Collections.emptySet()));
         String interfaces = sanitizeInterfaces(prefs.getStringSet("proxyBypassInterfaces", Collections.emptySet()));
+        String sharedBypassMacs = sanitizeMacs(prefs.getStringSet("proxySharedBypassMacs", Collections.emptySet()));
         String directGids = sanitizeDirectGids(prefs.getStringSet("proxyDirectGids", Collections.emptySet()));
         if (!directGids.isEmpty() &&
                 profile.mode != ProxyRuntimeProfile.Mode.TPROXY &&
@@ -151,6 +157,7 @@ final class RootProxyPolicy {
                 prefs.getBoolean("proxyKillSwitch", false),
                 cidrs,
                 interfaces,
+                sharedBypassMacs,
                 missing,
                 skipped,
                 resolvedDirectPackages);
@@ -162,6 +169,7 @@ final class RootProxyPolicy {
         if (!skippedSystemPackages.isEmpty()) parts.add("为避免影响系统服务，已忽略 " + skippedSystemPackages.size() + " 个系统 UID 应用");
         if (!directPackages.isEmpty()) parts.add("已将 " + directPackages.size() + " 个应用下沉为 Root 直连（包含河图自身控制进程）");
         if (!directGidRanges.isEmpty()) parts.add("已启用 GID 直连：" + directGidRanges);
+        if (!sharedBypassMacs.isEmpty()) parts.add("共享网络已有 " + sharedBypassMacs.split(",").length + " 个 MAC 直连设备");
         return String.join("；", parts);
     }
 
@@ -231,6 +239,22 @@ final class RootProxyPolicy {
             catch (NumberFormatException bad) { throw new IOException("CIDR 前缀无效：" + value); }
             boolean ipv6 = value.indexOf(':') >= 0;
             if ((!ipv6 && prefix > 32) || (ipv6 && prefix > 128)) throw new IOException("CIDR 前缀越界：" + value);
+            out.add(value);
+        }
+        return String.join(",", out);
+    }
+
+    private static String sanitizeMacs(Set<String> values) throws IOException {
+        if (values == null || values.isEmpty()) return "";
+        if (values.size() > MAX_SHARED_MACS)
+            throw new IOException("共享网络 MAC 直连列表超过 " + MAX_SHARED_MACS + " 项");
+        TreeSet<String> out = new TreeSet<>();
+        for (String raw : values) {
+            String value = raw == null ? "" : raw.trim().toLowerCase(Locale.ROOT);
+            if (value.isEmpty()) continue;
+            if (!MAC_SAFE.matcher(value).matches()) throw new IOException("MAC 地址无效：" + value);
+            if (value.equals("00:00:00:00:00:00") || value.equals("ff:ff:ff:ff:ff:ff"))
+                throw new IOException("不能使用全零或广播 MAC：" + value);
             out.add(value);
         }
         return String.join(",", out);
