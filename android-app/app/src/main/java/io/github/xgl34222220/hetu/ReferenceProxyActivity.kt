@@ -65,6 +65,9 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
@@ -162,7 +165,8 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
     var uiPrefsRevision by remember { mutableIntStateOf(0) }
     DisposableEffect(prefs) {
         val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key == "enableBlur" || key == "liquidGlass" || key == "showPanelTab" || key == "latencyAutoRefreshSeconds") uiPrefsRevision++
+            if (key == "enableBlur" || key == "liquidGlass" || key == "floatingBottomBar" ||
+                key == "showPanelTab" || key == "latencyAutoRefreshSeconds") uiPrefsRevision++
         }
         prefs.registerOnSharedPreferenceChangeListener(listener)
         onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
@@ -172,6 +176,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
     val liquidGlassEnabled = prefs.getBoolean("liquidGlass", true)
     val siteProbeInterval = prefs.getInt("latencyAutoRefreshSeconds", 0).takeIf { it == 30 || it == 60 } ?: 0
     val liquid = blurEnabled && liquidGlassEnabled && isRuntimeShaderSupported()
+    val floatingBottomBar = prefs.getBoolean("floatingBottomBar", true)
     val showPanelTab = prefs.getBoolean("showPanelTab", true)
     val startupProfile = remember { ProxyRuntimeProfile.load(prefs) }
     val startupConfig = remember(startupProfile.core) {
@@ -193,6 +198,39 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
     var panelSearchRequest by rememberSaveable { mutableIntStateOf(0) }
     var panelDetailVisible by rememberSaveable { mutableStateOf(false) }
     val pageStateHolder = rememberSaveableStateHolder()
+    var dockHiddenByScroll by remember { mutableStateOf(false) }
+    var dockScrollAccumulator by remember { mutableFloatStateOf(0f) }
+    val quickDockReturn = floatingBottomBar && page != RefProxyPage.Home
+    val dockDensity = LocalDensity.current
+    val dockScrollConnection = remember(quickDockReturn, dockDensity) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(
+                available: Offset,
+                source: NestedScrollSource,
+            ): Offset {
+                if (!quickDockReturn || source != NestedScrollSource.UserInput) return Offset.Zero
+                val dy = available.y
+                if (dy == 0f) return Offset.Zero
+                val sameDirection = dockScrollAccumulator == 0f ||
+                    (dockScrollAccumulator > 0f) == (dy > 0f)
+                dockScrollAccumulator = if (sameDirection) dockScrollAccumulator + dy else dy
+                val hideThreshold = with(dockDensity) { 34.dp.toPx() }
+                val showThreshold = with(dockDensity) { 20.dp.toPx() }
+                if (!dockHiddenByScroll && dockScrollAccumulator < -hideThreshold) {
+                    dockHiddenByScroll = true
+                    dockScrollAccumulator = 0f
+                } else if (dockHiddenByScroll && dockScrollAccumulator > showThreshold) {
+                    dockHiddenByScroll = false
+                    dockScrollAccumulator = 0f
+                }
+                return Offset.Zero
+            }
+        }
+    }
+    LaunchedEffect(page, floatingBottomBar) {
+        dockHiddenByScroll = false
+        dockScrollAccumulator = 0f
+    }
     BackHandler(enabled = page != RefProxyPage.Home && !panelDetailVisible) { page = RefProxyPage.Home }
     var state by remember {
         mutableStateOf(
@@ -549,6 +587,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
     Box(Modifier.fillMaxSize().background(shellBackground)) {
         Box(
             Modifier.fillMaxSize()
+                .nestedScroll(dockScrollConnection)
                 .then(if (blurEnabled) Modifier.hazeSource(haze) else Modifier)
                 .then(if (liquid) Modifier.layerBackdrop(liquidBackdrop) else Modifier),
         ) {
@@ -668,14 +707,27 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                 }
             }
         }
-        if (!panelDetailVisible) {
+        androidx.compose.animation.AnimatedVisibility(
+            visible = !panelDetailVisible && !dockHiddenByScroll,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            enter = androidx.compose.animation.fadeIn(
+                androidx.compose.animation.core.tween(180),
+            ) + androidx.compose.animation.slideInVertically(
+                androidx.compose.animation.core.tween(210),
+            ) { it / 2 },
+            exit = androidx.compose.animation.fadeOut(
+                androidx.compose.animation.core.tween(150),
+            ) + androidx.compose.animation.slideOutVertically(
+                androidx.compose.animation.core.tween(190),
+            ) { it },
+        ) {
             HetuGlassDock(
                 items = dock,
                 selected = dockPages.indexOf(page).coerceAtLeast(0),
                 onSelect = { page = dockPages[it] },
                 hazeState = haze,
                 backdrop = liquidBackdrop.takeIf { liquid },
-                modifier = Modifier.align(Alignment.BottomCenter).onSizeChanged {
+                modifier = Modifier.onSizeChanged {
                     measuredDockHeight = with(layoutDensity) { it.height.toDp() }
                 },
             )
