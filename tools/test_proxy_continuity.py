@@ -31,6 +31,11 @@ def main():
         names = ('ProxyContinuity', 'MessagingFilterPolicy', 'MihomoStartupConfig', 'ProxyRuntimeProfile', 'ProxyRestoreScheduler', 'DiagnosticReport', 'RootStartupProbe', 'ProxyNetworkHandover', 'ProxyTaskCoalescer', 'ProxyLogLines', 'ProxyAdblockSession', 'ProxyRuntimeSettings', 'ProxyAsyncValue')
         sources = [str(PACKAGE / (name + '.java')) for name in names]
         tests = ('ProxyContinuityTest', 'ProxyRestoreSchedulerTest', 'DiagnosticReportTest', 'ProxyCoreProbeTest', 'RootStartupProbeTest', 'ProxyNetworkEventsTest', 'ProxyLogLinesTest', 'ProxyRuntimeSettingsTest', 'MihomoIpv6PolicyTest', 'ProxyAsyncValueTest')
+        service_source = (PACKAGE / 'ProxyNetworkMatchService.java').read_text()
+        if 'repairLiveNetworkIntegrity();' not in service_source or 'hetu-root.sh repair-network' not in service_source:
+            raise RuntimeError('Default-network handover must trigger bounded in-place Hetu network repair')
+        if '.closeAll()' in service_source:
+            raise RuntimeError('Network handover must not flush all live proxy connections')
         sources += [str(stub)] + [str(ROOT / 'tests' / (name + '.java')) for name in tests]
         # Android's java.* stubs conflict with JVM modules in ECJ. Only the Android
         # API types are needed here; use the host JDK implementation of java.*.
