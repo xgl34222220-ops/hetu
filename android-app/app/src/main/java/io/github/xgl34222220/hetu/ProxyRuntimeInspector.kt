@@ -79,7 +79,7 @@ internal class ProxyRuntimeInspector(context: Context) {
         } else synchronized(processSampleLock) {
             val age = sampleNow - processSampleAt
             val cached = processSampleJson
-            if (cached != null && processSampleStartupAt == startupAt && age in 0..processSampleTtlMs) {
+            if (cached != null && processSampleStartupAt == startupAt && age >= 0L && age <= processSampleTtlMs) {
                 cached
             } else {
                 val result = RootBridge.rootShell(app, command, 8_000L)
