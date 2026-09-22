@@ -31,6 +31,14 @@ class ReferenceDockRenderTest {
     @get:Rule val compose=createAndroidComposeRule<ComponentActivity>()
 
     @Test fun floatingDockMatches156785Geometry() {
+        // Robolectric cannot execute MIUIX's device RuntimeShader bytecode in this
+        // JVM. Disable runtime glass only for this screenshot; geometry, colors,
+        // spacing and active-lens layout remain production code.
+        compose.activity.getSharedPreferences("hetu",0).edit()
+            .putBoolean("floatingBottomBar",true)
+            .putBoolean("enableBlur",false)
+            .putBoolean("liquidGlass",false)
+            .commit()
         compose.setContent {
             HetuTheme {
                 val haze=remember { HazeState() }
