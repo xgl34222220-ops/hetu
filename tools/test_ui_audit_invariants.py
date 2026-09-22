@@ -76,8 +76,8 @@ assert 'TextAutoSize.StepBased' in liquid, "Long node names must shrink instead 
 assert 'ConfiguredGroupIcon(group, Modifier.size(32.dp))' in liquid
 assert 'ReferenceDelayPill' in liquid and 'Color(0xFFE2E8FA)' in liquid
 assert 'crystalMaterial(shape, depth = CrystalDepth.Sunken)' not in liquid, "Expanded nodes must sit directly on the page"
-assert 'Modifier.padding(horizontal = 25.dp)' in dock and '.height(64.dp' in dock
-assert 'Color(0xFFDEDEEA)' in dock, "Dock active lens must be neutral, not blue plastic"
+assert 'Modifier.padding(horizontal = 20.dp)' in dock and '.height(72.dp' in dock and 'itemHeight = 60.dp' in dock
+assert 'refractionHeight = 17.dp.toPx()' in dock and 'chromaticAberration = .045f' in dock, "Dock shell must retain LuoShu liquid-glass optics"
 assert 'private fun RefSectionLabel' in refhome and 'Spacer(Modifier.height(2.dp))' in refhome
 assert 'fontSize = 32.sp' in refhome
 assert "Color(0xFFF9F8FE)" in theme and "Color(0xFFF5F3FD)" in theme
