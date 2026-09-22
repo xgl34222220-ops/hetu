@@ -3540,9 +3540,6 @@ internal fun RefRuleSetRow(item: DashboardRuleSetUi, refreshing: Boolean, succes
 @Composable
 internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
     val context = LocalContext.current
-    val inspector = remember { ProxyRuntimeInspector(context) }
-    val scope = rememberCoroutineScope()
-
     LazyColumn(
         Modifier.fillMaxSize().statusBarsPadding(),
         contentPadding = PaddingValues(
@@ -3558,30 +3555,28 @@ internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
         item {
             RefGroup {
                 RefToolRow(
-                    Icons.Rounded.FolderOpen,
+                    Icons.Rounded.Code,
                     Color.Unspecified,
-                    "文件管理",
-                    "查看并管理运行文件",
+                    "脚本",
+                    "服务启动前、停止后脚本与环境变量",
                 ) {
-                    context.startActivity(Intent(context, ReferenceFileManagerActivity::class.java))
+                    context.startActivity(Intent(context, ProxyScriptsActivity::class.java))
                 }
                 RefDivider()
                 RefToolRow(
                     Icons.Rounded.Article,
                     Color.Unspecified,
                     "日志查看",
-                    "查看运行日志与排查问题",
+                    "切换、刷新与清理 Root / Mihomo 日志",
                 ) {
-                    scope.launch {
-                        onLog(runCatching { inspector.runtimeLog() }.getOrElse { it.message ?: "日志读取失败" })
-                    }
+                    onLog("")
                 }
                 RefDivider()
                 RefToolRow(
                     Icons.Rounded.Apps,
                     Color.Unspecified,
                     "应用管理",
-                    "查看并管理应用相关规则",
+                    "黑名单、白名单、核心范围与批量选择",
                 ) {
                     context.startActivity(Intent(context, ProxyAppSelectionActivity::class.java))
                 }
@@ -3637,6 +3632,15 @@ internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
                     "配置 CNIP 数据源并更新地理数据",
                 ) {
                     context.startActivity(Intent(context, ProxyCnIpSettingsActivity::class.java))
+                }
+                RefDivider()
+                RefToolRow(
+                    Icons.Rounded.FolderOpen,
+                    Color.Unspecified,
+                    "文件管理",
+                    "浏览 /data/adb/hetu 运行文件",
+                ) {
+                    context.startActivity(Intent(context, ReferenceFileManagerActivity::class.java))
                 }
             }
         }
