@@ -4182,6 +4182,154 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
         }
     }
 
+    if (backupSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { if (!backupBusy) backupSheet = false },
+            containerColor = t.cardBackground,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            dragHandle = { RefSheetDragHandle() },
+        ) {
+            Column(
+                Modifier.fillMaxWidth().navigationBarsPadding().padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text("备份与恢复", color = t.textPrimary, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
+                Text(
+                    "备份包含河图设置、应用/绕过选择和配置库。运行时临时状态与 Clash API Secret 不会导出。",
+                    color = t.textSecondary,
+                    fontSize = 12.sp,
+                    lineHeight = 18.sp,
+                )
+                if (backupMessage.isNotBlank()) {
+                    HetuTaskFeedback(
+                        backupMessage,
+                        error = backupMessage.contains("失败") || backupMessage.contains("错误") || backupMessage.contains("不支持"),
+                        busy = backupBusy,
+                    )
+                }
+                Button(
+                    onClick = {
+                        backupExporter.launch("Hetu-backup-${System.currentTimeMillis()}.json")
+                    },
+                    enabled = !backupBusy,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                ) {
+                    Icon(Icons.Rounded.UploadFile, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(7.dp))
+                    Text("导出备份")
+                }
+                OutlinedButton(
+                    onClick = { backupImporter.launch(arrayOf("application/json", "text/plain")) },
+                    enabled = !backupBusy,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                ) {
+                    Icon(Icons.Rounded.Restore, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(7.dp))
+                    Text("从备份恢复")
+                }
+            }
+        }
+    }
+
+    if (mirrorSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { mirrorSheet = false },
+            containerColor = t.cardBackground,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            dragHandle = { RefSheetDragHandle() },
+        ) {
+            Column(
+                Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text("加速下载", color = t.textPrimary, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("启用下载镜像", color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                        Text("只改写 GitHub release 资产；版本 API 仍直接访问 GitHub", color = t.textSecondary, fontSize = 11.5.sp)
+                    }
+                    Switch(mirrorEnabled, onCheckedChange = { mirrorEnabled = it })
+                }
+                OutlinedTextField(
+                    value = mirrorPrefix,
+                    onValueChange = { mirrorPrefix = it.take(512) },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = mirrorEnabled,
+                    singleLine = true,
+                    label = { Text("HTTPS 镜像前缀") },
+                    placeholder = { Text("https://mirror.example/") },
+                    supportingText = { Text("支持直接前缀，也支持包含 {url} 的模板") },
+                )
+                Button(
+                    onClick = {
+                        val value = mirrorPrefix.trim()
+                        if (mirrorEnabled && !value.startsWith("https://")) {
+                            backupMessage = "下载镜像必须使用 HTTPS"
+                        } else {
+                            mirrorPrefix = value
+                            prefs.edit()
+                                .putBoolean("downloadMirrorEnabled", mirrorEnabled)
+                                .putString("downloadMirrorPrefix", value)
+                                .apply()
+                            mirrorSheet = false
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                ) {
+                    Text("保存")
+                }
+            }
+        }
+    }
+
+    if (defaultPanelPicker) {
+        val values = listOf(
+            RefPanelTab.Overview,
+            RefPanelTab.Groups,
+            RefPanelTab.Subscriptions,
+            RefPanelTab.Connections,
+            RefPanelTab.Rules,
+            RefPanelTab.RuleSets,
+        )
+        RefChoiceBottomSheet(
+            title = "默认面板页面",
+            options = values.map { it.label to (it == defaultPanel) },
+            onDismiss = { defaultPanelPicker = false },
+            onSelect = { index ->
+                defaultPanel = values[index]
+                prefs.edit().putString("defaultPanelTab", defaultPanel.name).apply()
+                defaultPanelPicker = false
+            },
+        )
+    }
+
+    if (aboutSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { aboutSheet = false },
+            containerColor = t.cardBackground,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            dragHandle = { RefSheetDragHandle() },
+        ) {
+            Column(
+                Modifier.fillMaxWidth().navigationBarsPadding().padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text("关于河图", color = t.textPrimary, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+                RefAboutLine("版本", BuildConfig.VERSION_NAME)
+                RefAboutLine("核心", state.core.ifBlank { "—" })
+                RefAboutLine("模式", state.mode.ifBlank { "—" })
+                RefAboutLine("Android", android.os.Build.VERSION.SDK_INT.toString())
+                RefAboutLine("运行目录", "/data/adb/hetu")
+                Text(
+                    "河图负责 Root 透明代理、配置、面板、订阅、规则与运行维护。",
+                    color = t.textSecondary,
+                    fontSize = 12.sp,
+                    lineHeight = 18.sp,
+                )
+            }
+        }
+    }
+
     if (baseSettings) {
         ModalBottomSheet(
             onDismissRequest = { baseSettings = false },
@@ -4746,6 +4894,16 @@ private fun RefSwitchRow(icon: ImageVector, accent: Color, title: String, subtit
 
 @Composable
 private fun RefDivider() { WorkspaceInsetDivider() }
+
+@Composable
+private fun RefAboutLine(label: String, value: String) {
+    val t = LocalHetuTokens.current
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, color = t.textSecondary, fontSize = 12.5.sp)
+        Spacer(Modifier.weight(1f))
+        Text(value, color = t.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+    }
+}
 
 @Composable
 private fun RefMetric(title: String, value: String, modifier: Modifier) {
