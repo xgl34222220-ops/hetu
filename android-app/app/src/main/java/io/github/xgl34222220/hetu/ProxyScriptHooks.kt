@@ -75,6 +75,32 @@ internal object ProxyScriptHooks {
         }
         ensure(context)
 
+        val dollar = '
+
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（" + result.code + "），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+
         val command = buildString {
             append("if [ ! -s ").append(q(path)).append(" ]; then exit 0; fi; ")
             append("export HETU_HOOK=").append(q(stage)).append("; ")
@@ -83,12 +109,13 @@ internal object ProxyScriptHooks {
             append("export HETU_BASE=/data/adb/hetu; ")
             append("export HETU_RUN_DIR=/data/adb/hetu/run; ")
             append("export HETU_SCRIPT_DIR=").append(q(ROOT)).append("; ")
-            append("{ printf '\\n[%s] hook=%s mode=%s config=%s\\n' ")
-            append("\"\\$(date '+%Y-%m-%d %H:%M:%S')\" ")
+            append("{ printf '\\n[%s] hook=%s mode=%s config=%s\\n' \"")
+            append(dollar).append("(date '+%Y-%m-%d %H:%M:%S')\" ")
             append(q(stage)).append(" ").append(q(mode)).append(" ").append(q(config)).append("; ")
             append("if command -v timeout >/dev/null 2>&1; then timeout 12 sh ")
             append(q(path)).append("; else sh ").append(q(path)).append("; fi; ")
-            append("RC=\\$?; printf '[hook-exit] %s\\n' \"\\$RC\"; exit \"\\$RC\"; ")
+            append("RC=").append(dollar).append("?; printf '[hook-exit] %s\\n' \"")
+            append(dollar).append("RC\"; exit \"").append(dollar).append("RC\"; ")
             append("} >> ").append(q(LOG)).append(" 2>&1")
         }
 
