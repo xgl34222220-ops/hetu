@@ -1286,6 +1286,7 @@ private fun RefPanel(
     var groupLayout by rememberSaveable { mutableIntStateOf(0) } // 0 auto, 1 single, 2 double
     var groupSortMode by rememberSaveable { mutableStateOf("config") }
     var groupSortPicker by rememberSaveable { mutableStateOf(false) }
+    var apiSettings by rememberSaveable { mutableStateOf(false) }
     var connectionView by rememberSaveable { mutableStateOf("active") }
     var connectionProtocol by rememberSaveable { mutableStateOf("all") }
     var connectionSort by rememberSaveable { mutableStateOf("count") }
@@ -1651,7 +1652,7 @@ private fun RefPanel(
                             selectedGroupName = null
                         },
                         onBack = onBack,
-                        onOpenSettings = onOpenSettings,
+                        onOpenSettings = { apiSettings = true },
                         hazeState = hazeState,
                         backdrop = backdrop,
                     )
@@ -1970,6 +1971,17 @@ private fun RefPanel(
         )
     }
 
+    if (apiSettings) {
+        RefPanelApiSettingsSheet(
+            mode = state.mode,
+            onDismiss = { apiSettings = false },
+            onOpenAppSettings = {
+                apiSettings = false
+                onOpenSettings()
+            },
+        )
+    }
+
     if (confirmCloseAll) {
         RefConfirmBottomSheet(
             title = "终止所有连接？",
@@ -1999,6 +2011,207 @@ private fun RefPanel(
     }
 }
 
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RefPanelApiSettingsSheet(
+    mode: String,
+    onDismiss: () -> Unit,
+    onOpenAppSettings: () -> Unit,
+) {
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("hetu", 0) }
+    val t = LocalHetuTokens.current
+    val scope = rememberCoroutineScope()
+    var customApi by remember { mutableStateOf(prefs.getBoolean("proxyCustomApiEnabled", false)) }
+    var host by remember { mutableStateOf(prefs.getString("proxyCustomApiHost", "127.0.0.1").orEmpty().ifBlank { "127.0.0.1" }) }
+    var port by remember { mutableStateOf(prefs.getInt("proxyCustomApiPort", 9090).toString()) }
+    var secret by remember { mutableStateOf(prefs.getString("proxyCustomApiSecret", "").orEmpty()) }
+    var customDelay by remember { mutableStateOf(prefs.getBoolean("proxyCustomDelayUrlEnabled", false)) }
+    var delayUrl by remember {
+        mutableStateOf(
+            prefs.getString(
+                "proxyCustomDelayUrl",
+                "https://connectivitycheck.platform.hicloud.com/generate_204",
+            ).orEmpty().ifBlank { "https://connectivitycheck.platform.hicloud.com/generate_204" },
+        )
+    }
+    var history by remember { mutableStateOf(prefs.getBoolean("proxyApiHistoryEnabled", false)) }
+    var busy by remember { mutableStateOf(false) }
+    var feedback by remember { mutableStateOf("") }
+    var feedbackError by remember { mutableStateOf(false) }
+
+    fun save(): Boolean {
+        val cleanHost = host.trim()
+        val cleanPort = port.toIntOrNull()
+        val cleanDelay = delayUrl.trim()
+        when {
+            customApi && (cleanHost.isBlank() || cleanHost.length > 253 || !cleanHost.matches(Regex("[A-Za-z0-9.-]+"))) -> {
+                feedback = "Clash API 地址无效"
+                feedbackError = true
+                return false
+            }
+            customApi && (cleanPort == null || cleanPort !in 1024..65535) -> {
+                feedback = "Clash API 端口必须在 1024–65535"
+                feedbackError = true
+                return false
+            }
+            secret.contains('\n') || secret.contains('\r') -> {
+                feedback = "Secret 不能包含换行"
+                feedbackError = true
+                return false
+            }
+            customDelay && !(cleanDelay.startsWith("https://") || cleanDelay.startsWith("http://")) -> {
+                feedback = "自定义测速地址必须是 http/https URL"
+                feedbackError = true
+                return false
+            }
+        }
+        prefs.edit()
+            .putBoolean("proxyCustomApiEnabled", customApi)
+            .putString("proxyCustomApiHost", cleanHost)
+            .putInt("proxyCustomApiPort", cleanPort ?: 9090)
+            .putString("proxyCustomApiSecret", secret)
+            .putBoolean("proxyCustomDelayUrlEnabled", customDelay)
+            .putString("proxyCustomDelayUrl", cleanDelay)
+            .putBoolean("proxyApiHistoryEnabled", history)
+            .apply()
+        feedback = "面板 API 设置已保存"
+        feedbackError = false
+        return true
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = t.cardBackground,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        dragHandle = { RefSheetDragHandle() },
+    ) {
+        Column(
+            Modifier.fillMaxWidth().fillMaxHeight(.86f).navigationBarsPadding().imePadding()
+                .verticalScroll(rememberScrollState())
+                .padding(start = 16.dp, end = 16.dp, bottom = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text("API 配置", color = t.textPrimary, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+            Text(
+                "当前模式：$mode",
+                color = t.textSecondary,
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
+            )
+
+            Surface(shape = RoundedCornerShape(18.dp), color = t.controlBackground.copy(alpha = .55f)) {
+                Column(Modifier.fillMaxWidth()) {
+                    WorkspaceSettingRow(
+                        "自定义 Clash API",
+                        if (customApi) "使用下面填写的地址连接面板" else "使用河图内部 localhost API",
+                        Icons.Rounded.Api,
+                    ) {
+                        Switch(customApi, onCheckedChange = { customApi = it })
+                    }
+                    WorkspaceInsetDivider()
+                    WorkspaceSettingRow(
+                        "Clash API 历史收集",
+                        "保存真实流量采样供概览趋势恢复",
+                        Icons.Rounded.History,
+                    ) {
+                        Switch(history, onCheckedChange = { history = it })
+                    }
+                }
+            }
+
+            if (customApi) {
+                OutlinedTextField(
+                    value = host,
+                    onValueChange = { host = it.take(253) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("地址") },
+                    placeholder = { Text("127.0.0.1") },
+                )
+                OutlinedTextField(
+                    value = port,
+                    onValueChange = { port = it.filter(Char::isDigit).take(5) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("端口") },
+                    placeholder = { Text("9090") },
+                )
+                OutlinedTextField(
+                    value = secret,
+                    onValueChange = { secret = it.take(256) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("Secret") },
+                )
+            }
+
+            Surface(shape = RoundedCornerShape(18.dp), color = t.controlBackground.copy(alpha = .55f)) {
+                WorkspaceSettingRow(
+                    "自定义延迟测试地址",
+                    if (customDelay) "优先使用自定义 URL，再回退 provider 地址" else "使用 provider / 河图默认测速地址",
+                    Icons.Rounded.Speed,
+                ) {
+                    Switch(customDelay, onCheckedChange = { customDelay = it })
+                }
+            }
+            if (customDelay) {
+                OutlinedTextField(
+                    value = delayUrl,
+                    onValueChange = { delayUrl = it.take(2048) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("测速 URL") },
+                )
+            }
+
+            if (feedback.isNotBlank()) {
+                HetuTaskFeedback(feedback, error = feedbackError, busy = busy)
+            }
+
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(
+                    onClick = {
+                        if (!save()) return@OutlinedButton
+                        busy = true
+                        scope.launch {
+                            try {
+                                val info = withContext(Dispatchers.IO) { MihomoControllerClient(context).version() }
+                                feedback = "连接成功 · " + info.optString("version", "API 可用")
+                                feedbackError = false
+                            } catch (failure: Exception) {
+                                feedback = failure.message ?: "API 连接失败"
+                                feedbackError = true
+                            } finally {
+                                busy = false
+                            }
+                        }
+                    },
+                    enabled = !busy,
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                ) {
+                    if (busy) CircularProgressIndicator(Modifier.size(17.dp), strokeWidth = 2.dp)
+                    else Text("测试连接")
+                }
+                Button(
+                    onClick = {
+                        if (save()) onDismiss()
+                    },
+                    enabled = !busy,
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                ) { Text("保存") }
+            }
+
+            TextButton(
+                onClick = onOpenAppSettings,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            ) {
+                Text("打开河图完整设置")
+            }
+        }
+    }
+}
 
 @Composable
 private fun RefGroupDetailPage(
