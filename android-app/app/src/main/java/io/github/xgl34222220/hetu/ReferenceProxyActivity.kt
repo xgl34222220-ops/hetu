@@ -535,8 +535,9 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                 catch (cancel: CancellationException) { throw cancel }
                 catch (_: Exception) { }
             }
-            // Paint the persisted snapshot before issuing Root/controller queries.
-            delay(320)
+            // The persisted snapshot is already painted synchronously above.
+            // Start live reconciliation immediately so returning to Hetu never sits on
+            // a stale "waiting/stopped" card until the first polling interval.
             while (true) {
                 if (operation.isBlank()) refresh()
                 delay(3000)
