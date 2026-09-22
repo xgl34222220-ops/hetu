@@ -319,6 +319,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                 lastAt = now
                 lastUp = next.uploadTotal
                 lastDown = next.downloadTotal
+                ProxyApiHistoryStore.record(context, upRate, downRate)
             }
         } catch (cancel: CancellationException) {
             throw cancel
@@ -2889,7 +2890,12 @@ private fun RefDelayBadge(value: Long?, testing: Boolean, onClick: (() -> Unit)?
 private fun RefTrafficOverview(state: ProxyComposeState, ruleCount: Int?) {
     val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
-    val history = remember { mutableStateListOf<Triple<Long, Long, Long>>() }
+    val context = LocalContext.current
+    val history = remember {
+        mutableStateListOf<Triple<Long, Long, Long>>().apply {
+            addAll(ProxyApiHistoryStore.recent(context))
+        }
+    }
     var lastUpload by remember { mutableLongStateOf(state.uploadTotal) }
     var lastDownload by remember { mutableLongStateOf(state.downloadTotal) }
     var lastAt by remember { mutableLongStateOf(0L) }
@@ -2911,7 +2917,7 @@ private fun RefTrafficOverview(state: ProxyComposeState, ruleCount: Int?) {
     LaunchedEffect(Unit) {
         while (true) {
             delay(1000)
-            val now = SystemClock.elapsedRealtime()
+            val now = System.currentTimeMillis()
             history += Triple(now, upRate, downRate)
             while (history.isNotEmpty() && history.first().first < now - 60_000L) {
                 history.removeAt(0)
