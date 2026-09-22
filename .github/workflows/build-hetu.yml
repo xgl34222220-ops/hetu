@@ -89,7 +89,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
       - name: Verify message filtering and connection continuity
         run: |
           python3 tools/test_proxy_continuity.py --android-jar "$ANDROID_HOME/platforms/android-37.0/android.jar" --fixture "$RUNNER_TEMP/hetu-continuity.yaml"
