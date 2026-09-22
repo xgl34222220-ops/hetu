@@ -61,8 +61,12 @@ class WellHeaderRenderTest {
             compose.waitForIdle()
             val left=compose.onNodeWithTag("node:美国节点",true).fetchSemanticsNode().boundsInRoot
             val right=compose.onNodeWithTag("node:日本节点超级长名称用于自动缩放",true).fetchSemanticsNode().boundsInRoot
-            assertEquals("Reference first row must align",left.top,right.top,.5f)
-            assertTrue("Reference node grid lost its right column",right.left>left.right)
+            if (w < 360) {
+                assertTrue("Narrow phone width should stack node cards",right.top>left.bottom)
+            } else {
+                assertEquals("Reference first row must align",left.top,right.top,.5f)
+                assertTrue("Reference node grid lost its right column",right.left>left.right)
+            }
             compose.onNodeWithText("日本节点超级长名称用于自动缩放",true).assertExists()
         }
 
