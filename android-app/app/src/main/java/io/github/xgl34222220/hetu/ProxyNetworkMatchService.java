@@ -138,7 +138,24 @@ public final class ProxyNetworkMatchService extends Service {
                     .putString("proxyLastNetworkObservationReason","default-changed-connections-preserved")
                     .putBoolean("proxyRootEgressPending",true).apply());
             lastPolicyProbeAt=-90000L;
+            // Android/netd may rebuild policy-routing or firewall state during a
+            // Wi-Fi/cellular handover. Waiting for the 12s watchdog window leaves
+            // a visible "connected but no Internet" gap. Repair only Hetu-owned
+            // state in place; never restart Mihomo or flush its live connections.
+            repairLiveNetworkIntegrity();
         },2500L);
+    }
+
+    private void repairLiveNetworkIntegrity(){
+        if(destroyed||!prefs.getBoolean("proxyRootWanted",false))return;
+        try{
+            RootBridge.rootShell(getApplicationContext(),
+                    "P=$(cat /data/adb/hetu/run/core.pid 2>/dev/null || true); "
+                            +"case \"$P\" in ''|*[!0-9]*) exit 0;; esac; "
+                            +"/data/adb/hetu/hetu-root.sh repair-network \"$P\" >/dev/null 2>&1 || true",
+                    6000L);
+        }catch(Exception ignored){}
+        checkLiveNetworkIntegrity();
     }
 
     private void scheduleWorker(Runnable task,long delayMs){
