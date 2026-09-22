@@ -88,5 +88,9 @@ public class EpochTest {
  start_body=manager.split('private JSONObject startInternal',1)[1].split('JSONObject stop()',1)[0]
  assert 'runJsonWithTimeout(125000L,"start"' in start_body
  assert 'trace.next("finalProcessCheck")' not in start_body
- checks+=6
+ status_bridge=(JAVA/'ProxyStatusBridge.kt').read_text()
+ assert 'RootBridge.rootShell' not in status_bridge
+ compose=(JAVA/'ProxyComposeController.kt').read_text()
+ assert 'nowElapsed < lastHealth' in compose
+ checks+=8
 print(f'Startup/lifecycle regression checks passed: {checks}')
