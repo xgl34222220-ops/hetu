@@ -92,5 +92,8 @@ public class EpochTest {
  assert 'RootBridge.rootShell' not in status_bridge
  compose=(JAVA/'ProxyComposeController.kt').read_text()
  assert 'nowElapsed < lastHealth' in compose
- checks+=8
+ inspector=(JAVA/'ProxyRuntimeInspector.kt').read_text()
+ assert 'processSampleTtlMs = 8_000L' in inspector
+ assert 'processSampleStartupAt == startupAt' in inspector
+ checks+=10
 print(f'Startup/lifecycle regression checks passed: {checks}')
