@@ -73,6 +73,7 @@ class WorkbenchRegressionTest {
         val editor = CodeEditor(compose.activity).apply {
             setEditorLanguage(HetuYamlLanguage()); setWordwrap(false); setTabWidth(2); setText("")
         }
+        var batchEditor: CodeEditor? = null
         try {
             attachEditor(editor)
             var expected = ""
@@ -89,18 +90,27 @@ class WorkbenchRegressionTest {
                 assertEquals(expected, editor.text.toString())
             }
             assertFalse(editor.text.toString().contains('\t'))
+
+            // Batch-indent behavior does not depend on syntax highlighting. Use a
+            // plain editor here so Sora's asynchronous mapped-span refresh cannot
+            // race the multi-line selection in Robolectric.
             val source = "name: 中文\npath: '/a'"
-            editor.setText(source)
-            awaitEditable(editor)
-            editor.setSelectionRegion(0, 0, 1, 10)
-            applyYamlAccessory(editor, "Tab")
-            assertEquals("  name: 中文\n  path: '/a'", editor.text.toString())
-            assertTrue(editor.canUndo())
-            editor.undo()
-            assertEquals(source, editor.text.toString())
-            editor.redo()
-            assertEquals("  name: 中文\n  path: '/a'", editor.text.toString())
-        } finally { editor.release() }
+            batchEditor = CodeEditor(compose.activity).apply {
+                setWordwrap(false); setTabWidth(2); setText(source)
+            }
+            attachEditor(batchEditor)
+            batchEditor.setSelectionRegion(0, 0, 1, 10)
+            applyYamlAccessory(batchEditor, "Tab")
+            assertEquals("  name: 中文\n  path: '/a'", batchEditor.text.toString())
+            assertTrue(batchEditor.canUndo())
+            batchEditor.undo()
+            assertEquals(source, batchEditor.text.toString())
+            batchEditor.redo()
+            assertEquals("  name: 中文\n  path: '/a'", batchEditor.text.toString())
+        } finally {
+            batchEditor?.release()
+            editor.release()
+        }
     }
 
     @Test fun nativeLiteralSearchDoesNotModifyConfiguration() {
