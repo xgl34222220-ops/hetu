@@ -40,6 +40,7 @@ internal data class ProxyCoreRemoteStatus(
 internal class ProxyCoreDownloadManager(context: Context) {
     private val app = context.applicationContext
     private val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private val uiPrefs = app.getSharedPreferences("hetu", Context.MODE_PRIVATE)
     private val store = ProxyCoreStore(app)
 
     private data class Source(
@@ -351,7 +352,7 @@ internal class ProxyCoreDownloadManager(context: Context) {
     private fun download(asset: Asset, progress: (Long, Long) -> Unit): File {
         if (asset.size > MAX_DOWNLOAD) throw IOException("核心文件过大")
         val target = File(app.cacheDir, "proxy-core-${asset.source.core.id}-${System.nanoTime()}.pkg")
-        val connection = open(asset.url)
+        val connection = open(assetDownloadUrl(asset.url))
         try {
             connection.connectTimeout = 10_000
             connection.readTimeout = 45_000
@@ -537,6 +538,19 @@ internal class ProxyCoreDownloadManager(context: Context) {
             if (n < 0) throw IOException("压缩包提前结束")
             remaining -= n
         }
+    }
+
+    private fun assetDownloadUrl(url: String): String {
+        if (!uiPrefs.getBoolean("downloadMirrorEnabled", false)) return url
+        if (!url.startsWith("https://github.com/")) return url
+        val prefix = uiPrefs.getString("downloadMirrorPrefix", "").orEmpty().trim()
+        if (!prefix.startsWith("https://") || prefix.length > 512) return url
+        val candidate = if ("{url}" in prefix) {
+            prefix.replace("{url}", url)
+        } else {
+            prefix.trimEnd('/') + "/" + url
+        }
+        return candidate.takeIf { it.startsWith("https://") && it.length <= 4096 } ?: url
     }
 
     private fun open(url: String): HttpsURLConnection {
