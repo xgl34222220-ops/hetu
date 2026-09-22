@@ -74,7 +74,9591 @@ internal object ProxyScriptHooks {
         ensure(context)
         val command = """
             FILE=${q(path)}
-            [ -s "$FILE" ] || exit 0
+            [ -s "${'
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "${'
+              else
+                sh "${'
+              fi
+              RC=${'
+              printf '[hook-exit] %s\n' "${'
+              exit "${'
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_HOOK" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_MODE" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_HOOK" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_MODE" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_HOOK" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_MODE" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_HOOK" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_MODE" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_HOOK" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_MODE" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_HOOK" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_MODE" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_HOOK" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_MODE" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_HOOK" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_MODE" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_HOOK" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_MODE" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_HOOK" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_MODE" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_HOOK" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_MODE" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_HOOK" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_MODE" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_HOOK" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_MODE" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_HOOK" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_MODE" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_HOOK" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_MODE" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_HOOK" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_MODE" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_HOOK" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_MODE" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_HOOK" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_MODE" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_HOOK" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_MODE" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_HOOK" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_MODE" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_HOOK" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_MODE" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_HOOK" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_MODE" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_HOOK" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_MODE" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_HOOK" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_MODE" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_HOOK" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_MODE" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_HOOK" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_MODE" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_HOOK" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_MODE" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_HOOK" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_MODE" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_HOOK" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_MODE" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_HOOK" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_MODE" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_HOOK" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_MODE" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_HOOK" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_MODE" "${'
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
+            export HETU_HOOK=${q(stage)}
+            export HETU_MODE=${q(mode)}
+            export HETU_CONFIG=${q(config)}
+            export HETU_BASE=/data/adb/hetu
+            export HETU_RUN_DIR=/data/adb/hetu/run
+            export HETU_SCRIPT_DIR=${q(ROOT)}
+            {
+              printf '\n[%s] hook=%s mode=%s config=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$HETU_HOOK" "$HETU_MODE" "$HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}HETU_CONFIG"
+              if command -v timeout >/dev/null 2>&1; then
+                timeout 12 sh "$FILE"
+              else
+                sh "$FILE"
+              fi
+              RC=$?
+              printf '[hook-exit] %s\n' "$RC"
+              exit "$RC"
+            } >> ${q(LOG)} 2>&1
+        """.trimIndent()
+        val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+        if (!result.ok()) {
+            throw IllegalStateException(
+                if (result.code == 124) "脚本执行超时，已停止本次操作"
+                else "脚本执行失败（${result.code}），请查看 scripts.log",
+            )
+        }
+        "脚本执行完成"
+    }
+
+    fun environmentText(): String = """
+        HETU_HOOK       pre-start / post-stop
+        HETU_MODE       当前运行模式
+        HETU_CONFIG     当前配置名称
+        HETU_BASE       /data/adb/hetu
+        HETU_RUN_DIR    /data/adb/hetu/run
+        HETU_SCRIPT_DIR /data/adb/hetu/scripts
+
+        脚本使用 /system/bin/sh 执行，最长 12 秒。
+        非 0 退出码会阻止对应的手动启动/停止操作，并写入：
+        /data/adb/hetu/run/scripts.log
+    """.trimIndent()
+}
+}FILE" ] || exit 0
             export HETU_HOOK=${q(stage)}
             export HETU_MODE=${q(mode)}
             export HETU_CONFIG=${q(config)}
