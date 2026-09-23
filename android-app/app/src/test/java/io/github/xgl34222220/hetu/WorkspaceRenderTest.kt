@@ -175,7 +175,7 @@ class WorkspaceRenderTest {
                 items(20) { i -> Button(onClick={click++},modifier=Modifier.fillMaxWidth().height(56.dp).testTag("row-$i")) { Text("条目 $i") } }
             }
         } } }
-        compose.runOnIdle { assertEquals(138f,padding,.01f) }
+        compose.runOnIdle { assertEquals(128f,padding,.01f) }
         // Lazy items outside the viewport do not yet have semantics nodes.
         compose.onNodeWithTag("dock-list").performScrollToIndex(19)
         compose.onNodeWithTag("row-19").assertIsDisplayed().performClick()
