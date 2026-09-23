@@ -131,7 +131,7 @@ phase2_pages = {
     "files": (src / "ReferenceFileManagerActivity.kt").read_text(),
 }
 for name, text in phase2_pages.items():
-    assert not re.search(r"\\bSwitch\\(", text), f"Legacy Material Switch remains in {name}"
+    assert not re.search(r"\bSwitch\(", text), f"Legacy Material Switch remains in {name}"
     assert "OutlinedTextField(" not in text, f"Legacy outlined input remains in {name}"
     assert ".background(t.pageBackground)" not in text and ".background(pageBg)" not in text, f"Flat page field remains in {name}"
 
