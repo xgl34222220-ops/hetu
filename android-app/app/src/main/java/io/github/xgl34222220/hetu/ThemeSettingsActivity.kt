@@ -235,7 +235,7 @@ private fun ThemeSettingsScreen(onBack: () -> Unit, onThemeChanged: () -> Unit) 
                 Text(title, color = t.textPrimary, fontSize = 21.sp, lineHeight = 27.sp, fontWeight = FontWeight.ExtraBold)
                 Text("选择后立即生效", color = t.textSecondary, style = MaterialTheme.typography.bodySmall)
                 pickerOptions.forEach { option ->
-                    val selected = selected
+                    val selected = option.value == pickerSelected
                     Box(
                         Modifier
                             .fillMaxWidth()
