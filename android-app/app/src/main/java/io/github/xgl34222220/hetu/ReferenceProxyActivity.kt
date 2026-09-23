@@ -126,22 +126,44 @@ import kotlinx.coroutines.withContext
 @OptIn(ExperimentalMaterial3Api::class)
 class ReferenceProxyActivity : ComponentActivity() {
     private var resumeRevision by mutableIntStateOf(0)
+    private var startPageRequest by mutableStateOf<String?>(null)
+    private var startPageRevision by mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        startPageRequest = intent?.getStringExtra(EXTRA_START_PAGE)
         enableEdgeToEdge()
         setContent {
             // Re-read theme preferences on resume without destroying the Compose tree.
             // The previous forced wrapper recreated RefProxyShell and briefly exposed
             // default/empty runtime state before the async refresh completed.
             val revision = resumeRevision
-            HetuTheme { HetuOnboardingGate { RefProxyShell(resumeRevision = revision) { finish() } } }
+            HetuTheme {
+                HetuOnboardingGate {
+                    RefProxyShell(
+                        resumeRevision = revision,
+                        requestedStartPage = startPageRequest,
+                        startPageRevision = startPageRevision,
+                    ) { finish() }
+                }
+            }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        startPageRequest = intent.getStringExtra(EXTRA_START_PAGE)
+        startPageRevision++
     }
 
     override fun onResume() {
         super.onResume()
         resumeRevision++
+    }
+
+    companion object {
+        const val EXTRA_START_PAGE = "io.github.xgl34222220.hetu.START_PAGE"
     }
 }
 
@@ -152,7 +174,12 @@ private enum class RefPanelTab(val label: String) {
 }
 
 @Composable
-private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
+private fun RefProxyShell(
+    resumeRevision: Int,
+    requestedStartPage: String?,
+    startPageRevision: Int,
+    onBack: () -> Unit,
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val motionEnabled = LocalHetuMotionEnabled.current
@@ -189,11 +216,19 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
             RefPanelTab.valueOf(prefs.getString("defaultPanelTab", RefPanelTab.Groups.name).orEmpty())
         }.getOrDefault(RefPanelTab.Groups)
     }
-    var page by rememberSaveable {
-        mutableStateOf(
-            if (showPanelTab && prefs.getBoolean("startOnPanel", false)) RefProxyPage.Panel
-            else RefProxyPage.Home,
-        )
+    fun requestedPage(): RefProxyPage {
+        return when (requestedStartPage?.trim()?.lowercase()) {
+            "panel" -> if (showPanelTab) RefProxyPage.Panel else RefProxyPage.Home
+            "strategy" -> RefProxyPage.Strategy
+            "tools" -> RefProxyPage.Tools
+            "settings" -> RefProxyPage.Settings
+            "home" -> RefProxyPage.Home
+            else -> if (showPanelTab && prefs.getBoolean("startOnPanel", false)) RefProxyPage.Panel else RefProxyPage.Home
+        }
+    }
+    var page by rememberSaveable { mutableStateOf(requestedPage()) }
+    LaunchedEffect(startPageRevision, showPanelTab) {
+        if (!requestedStartPage.isNullOrBlank()) page = requestedPage()
     }
     var panelTab by rememberSaveable {
         mutableStateOf(if (initialPanelTab == RefPanelTab.Groups) RefPanelTab.Overview else initialPanelTab)
