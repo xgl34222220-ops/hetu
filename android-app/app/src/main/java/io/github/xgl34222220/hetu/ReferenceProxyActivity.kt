@@ -826,6 +826,7 @@ internal fun RefHome(
                 state = state,
                 runtime = runtime,
                 busy = busy,
+                onToggle = onToggle,
             )
         }
 
@@ -910,106 +911,25 @@ private fun RefReferenceHero(
     state: ProxyComposeState,
     runtime: ProxyRuntimeSnapshot,
     busy: Boolean,
+    onToggle: () -> Unit,
 ) {
-    val t = LocalHetuTokens.current
-    val shape = RoundedCornerShape(22.dp)
     val status = if (busy) "正在处理" else if (state.running) "运行中" else "已停止"
     val uptime = when {
         !state.running -> "等待启动"
         runtime.elapsedSeconds < 60L -> "少于 1 分钟"
         else -> refDuration(runtime.elapsedSeconds)
     }
-
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .height(120.dp)
-            .clip(shape)
-            .background(t.heroBackground)
-            .testTag("home-hero"),
-    ) {
-        Column(
-            Modifier
-                .align(Alignment.TopStart)
-                .padding(start = 18.dp, top = 16.dp, end = 118.dp),
-            verticalArrangement = Arrangement.spacedBy(3.dp),
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Box(
-                    Modifier
-                        .size(9.dp)
-                        .background(
-                            if (state.running) HetuMicroCrystal.KleinBlue else t.textMuted,
-                            CircleShape,
-                        ),
-                )
-                Text(
-                    status,
-                    Modifier.testTag("home-run-state"),
-                    color = if (state.running) HetuMicroCrystal.KleinBlue else t.textPrimary,
-                    fontSize = 20.sp,
-                    lineHeight = 25.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                )
-            }
-            Text(
-                uptime,
-                color = t.textPrimary,
-                fontSize = 13.sp,
-                lineHeight = 18.sp,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                if (state.running) "${state.core}  ·  ${state.mode}" else "Root  ·  Mihomo",
-                color = t.textPrimary,
-                fontSize = 12.5.sp,
-                lineHeight = 17.sp,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                state.config,
-                color = t.textPrimary,
-                fontSize = 12.sp,
-                lineHeight = 17.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-
-        Canvas(
-            Modifier
-                .align(Alignment.BottomEnd)
-                .offset(x = 34.dp, y = 28.dp)
-                .size(116.dp),
-        ) {
-            val stroke = 10.dp.toPx()
-            drawCircle(
-                color = HetuMicroCrystal.KleinBlue,
-                radius = size.minDimension / 2f - stroke / 2f,
-                style = Stroke(width = stroke),
-            )
-            if (state.running && !busy) {
-                val path = Path().apply {
-                    moveTo(size.width * .28f, size.height * .52f)
-                    lineTo(size.width * .43f, size.height * .67f)
-                    lineTo(size.width * .73f, size.height * .34f)
-                }
-                drawPath(
-                    path,
-                    HetuMicroCrystal.KleinBlue,
-                    style = Stroke(
-                        width = 9.dp.toPx(),
-                        cap = androidx.compose.ui.graphics.StrokeCap.Round,
-                        join = androidx.compose.ui.graphics.StrokeJoin.Round,
-                    ),
-                )
-            }
-        }
-    }
+    LiquidStatusCapsule(
+        running = state.running,
+        busy = busy,
+        status = status,
+        core = state.core,
+        mode = state.mode,
+        config = state.config,
+        uptime = uptime,
+        onToggle = onToggle,
+        modifier = Modifier.testTag("home-hero"),
+    )
 }
 
 @Composable
@@ -1020,41 +940,13 @@ private fun RefReferenceActionStrip(
     onReload: () -> Unit,
     onRestart: () -> Unit,
 ) {
-    val t = LocalHetuTokens.current
-    Surface(
-        shape = RoundedCornerShape(20.dp),
-        color = t.cardBackground,
-        shadowElevation = 0.dp,
-    ) {
-        Row(
-            Modifier.fillMaxWidth().height(52.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            RefReferenceAction(
-                label = "重载",
-                color = HetuMicroCrystal.KleinBlue,
-                enabled = running && !busy,
-                modifier = Modifier.weight(1f),
-                onClick = onReload,
-            )
-            Box(Modifier.width(1.dp).height(24.dp).background(t.outline.copy(alpha = .72f)))
-            RefReferenceAction(
-                label = if (busy) "请稍候" else if (running) "停止" else "启动",
-                color = if (running) Color(0xFFB51F32) else HetuMicroCrystal.KleinBlue,
-                enabled = !busy,
-                modifier = Modifier.weight(1f),
-                onClick = onToggle,
-            )
-            Box(Modifier.width(1.dp).height(24.dp).background(t.outline.copy(alpha = .72f)))
-            RefReferenceAction(
-                label = "重启",
-                color = Color(0xFF8A651B),
-                enabled = running && !busy,
-                modifier = Modifier.weight(1f),
-                onClick = onRestart,
-            )
-        }
-    }
+    SegmentedLiquidActionPill(
+        running = running,
+        busy = busy,
+        onReload = onReload,
+        onToggle = onToggle,
+        onRestart = onRestart,
+    )
 }
 
 @Composable
@@ -1196,13 +1088,10 @@ private fun RefLatencyColumn(
             lineHeight = 14.sp,
             fontWeight = FontWeight.Medium,
         )
-        Text(
-            if (testing) "..." else refDelay(value),
-            color = HetuMicroCrystal.KleinBlue,
-            fontSize = 16.sp,
-            lineHeight = 20.sp,
-            fontWeight = FontWeight.ExtraBold,
-            maxLines = 1,
+        LatencyChip(
+            value = value,
+            testing = testing,
+            compact = true,
         )
     }
 }
