@@ -177,7 +177,12 @@ fun HetuGlassDock(
 
     Box(
         modifier = modifier
-            .then(if (floating) Modifier.padding(horizontal = 20.dp).padding(bottom = bottomInset + 12.dp) else Modifier)
+            .then(
+                if (floating) Modifier
+                    .padding(horizontal = HetuBottomBarMetrics.FloatingHorizontal)
+                    .padding(bottom = bottomInset + HetuBottomBarMetrics.FloatingBottom)
+                else Modifier
+            )
             .fillMaxWidth()
             .height(72.dp + if (floating) 0.dp else bottomInset),
     ) {
