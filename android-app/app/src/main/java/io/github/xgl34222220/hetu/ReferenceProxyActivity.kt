@@ -4124,12 +4124,12 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
     if (backupSheet) {
         ModalBottomSheet(
             onDismissRequest = { if (!backupBusy) backupSheet = false },
-            containerColor = t.cardBackground,
-            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            containerColor = Color.Transparent,
+            shape = RoundedCornerShape(topStart = HetuGlassRadius.Sheet, topEnd = HetuGlassRadius.Sheet),
             dragHandle = { RefSheetDragHandle() },
         ) {
             Column(
-                Modifier.fillMaxWidth().navigationBarsPadding().padding(18.dp),
+                Modifier.fillMaxWidth().liquidSheetMaterial().navigationBarsPadding().padding(18.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text("备份与恢复", color = t.textPrimary, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
@@ -4173,12 +4173,12 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
     if (mirrorSheet) {
         ModalBottomSheet(
             onDismissRequest = { mirrorSheet = false },
-            containerColor = t.cardBackground,
-            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            containerColor = Color.Transparent,
+            shape = RoundedCornerShape(topStart = HetuGlassRadius.Sheet, topEnd = HetuGlassRadius.Sheet),
             dragHandle = { RefSheetDragHandle() },
         ) {
             Column(
-                Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(18.dp),
+                Modifier.fillMaxWidth().liquidSheetMaterial().navigationBarsPadding().imePadding().padding(18.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text("加速下载", color = t.textPrimary, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
@@ -4244,12 +4244,12 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
     if (aboutSheet) {
         ModalBottomSheet(
             onDismissRequest = { aboutSheet = false },
-            containerColor = t.cardBackground,
-            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            containerColor = Color.Transparent,
+            shape = RoundedCornerShape(topStart = HetuGlassRadius.Sheet, topEnd = HetuGlassRadius.Sheet),
             dragHandle = { RefSheetDragHandle() },
         ) {
             Column(
-                Modifier.fillMaxWidth().navigationBarsPadding().padding(18.dp),
+                Modifier.fillMaxWidth().liquidSheetMaterial().navigationBarsPadding().padding(18.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text("关于河图", color = t.textPrimary, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
@@ -4271,11 +4271,11 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
     if (baseSettings) {
         ModalBottomSheet(
             onDismissRequest = { baseSettings = false },
-            containerColor = t.cardBackground,
-            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            containerColor = Color.Transparent,
+            shape = RoundedCornerShape(topStart = HetuGlassRadius.Sheet, topEnd = HetuGlassRadius.Sheet),
         ) {
             Column(
-                Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp),
+                Modifier.fillMaxWidth().liquidSheetMaterial().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(
