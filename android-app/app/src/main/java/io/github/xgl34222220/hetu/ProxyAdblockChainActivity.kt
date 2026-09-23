@@ -481,7 +481,8 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                     }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                         listOf("lite" to "轻量", "balanced" to "均衡", "enhanced" to "加强").forEach { (id, label) ->
-                            FilterChip(
+                            LiquidChoicePill(
+                                label = label,
                                 selected = snapshot.rules.profile == label,
                                 onClick = {
                                     if (!busy) scope.launch {
@@ -495,7 +496,6 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                                         busy = false
                                     }
                                 },
-                                label = { Text(label) },
                                 modifier = Modifier.weight(1f),
                                 enabled = !busy,
                             )
