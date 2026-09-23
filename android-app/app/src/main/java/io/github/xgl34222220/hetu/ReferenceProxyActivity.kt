@@ -1801,31 +1801,19 @@ private fun RefPanel(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
-                                FilterChip(
+                                LiquidChoicePill(
+                                    label = "活动 ${state.connections.size}",
                                     selected = connectionView == "active",
                                     onClick = { connectionView = "active" },
-                                    label = { Text("活动 ${state.connections.size}") },
                                 )
-                                FilterChip(
+                                LiquidChoicePill(
+                                    label = "已关闭 ${closedConnections.size}",
                                     selected = connectionView == "closed",
                                     onClick = { connectionView = "closed" },
-                                    label = { Text("已关闭 ${closedConnections.size}") },
                                 )
-                                FilterChip(
-                                    selected = connectionProtocol == "all",
-                                    onClick = { connectionProtocol = "all" },
-                                    label = { Text("全部协议") },
-                                )
-                                FilterChip(
-                                    selected = connectionProtocol == "tcp",
-                                    onClick = { connectionProtocol = "tcp" },
-                                    label = { Text("TCP") },
-                                )
-                                FilterChip(
-                                    selected = connectionProtocol == "udp",
-                                    onClick = { connectionProtocol = "udp" },
-                                    label = { Text("UDP") },
-                                )
+                                LiquidChoicePill("全部协议", connectionProtocol == "all", { connectionProtocol = "all" })
+                                LiquidChoicePill("TCP", connectionProtocol == "tcp", { connectionProtocol = "tcp" })
+                                LiquidChoicePill("UDP", connectionProtocol == "udp", { connectionProtocol = "udp" })
                             }
                             Row(
                                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -1834,10 +1822,10 @@ private fun RefPanel(
                             ) {
                                 Text("排序", color = t.textMuted, fontSize = 11.sp)
                                 listOf("count" to "连接数", "traffic" to "流量", "name" to "名称").forEach { (value, label) ->
-                                    FilterChip(
+                                    LiquidChoicePill(
+                                        label = label,
                                         selected = connectionSort == value,
                                         onClick = { connectionSort = value },
-                                        label = { Text(label, fontSize = 11.sp) },
                                     )
                                 }
                             }
@@ -2344,14 +2332,13 @@ private fun RefGroupDetailPage(
                     }
 
                     if (searchOpen) {
-                        OutlinedTextField(
+                        LiquidGlassTextField(
                             value = query,
                             onValueChange = { query = it },
                             modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            placeholder = { Text("搜索节点或协议") },
-                            leadingIcon = { Icon(Icons.Rounded.Search, null, modifier = Modifier.size(17.dp)) },
-                            shape = RoundedCornerShape(14.dp),
+                            label = "搜索",
+                            placeholder = "搜索节点或协议",
+                            leadingIcon = Icons.Rounded.Search,
                         )
                     }
 
@@ -4476,16 +4463,23 @@ private fun RefNotificationSettingsBottomSheet(
             Text("第一个快捷按钮", color = t.textSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 actions.forEach { (value, label) ->
-                    FilterChip(selected = action1 == value, onClick = { action1 = value }, label = { Text(label) })
+                    LiquidChoicePill(label, action1 == value, { action1 = value })
                 }
             }
             Text("第二个快捷按钮", color = t.textSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 actions.forEach { (value, label) ->
-                    FilterChip(selected = action2 == value, onClick = { action2 = value }, label = { Text(label) })
+                    LiquidChoicePill(label, action2 == value, { action2 = value })
                 }
             }
-            Surface(shape = RoundedCornerShape(16.dp), color = t.controlBackground.copy(alpha = .48f)) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .crystalMaterial(
+                        RoundedCornerShape(HetuGlassRadius.Tile),
+                        depth = CrystalDepth.InsetItem,
+                    )
+            ) {
                 Column(Modifier.fillMaxWidth().padding(13.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("示例", color = t.textMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     Text(
