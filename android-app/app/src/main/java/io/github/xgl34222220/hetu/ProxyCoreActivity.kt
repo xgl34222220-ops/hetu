@@ -6,7 +6,9 @@ import io.github.xgl34222220.hetu.ui.*
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -38,6 +40,7 @@ import androidx.compose.material.icons.rounded.Downloading
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.material3.*
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -87,6 +90,31 @@ private fun CoreManagerScreen(onBack: () -> Unit) {
     var progress by remember { mutableStateOf("") }
     var notice by remember { mutableStateOf("") }
     var explanationOpen by remember { mutableStateOf(false) }
+    var importCoreId by remember { mutableStateOf("") }
+    val coreImporter = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val core = ProxyRuntimeProfile.Core.values().firstOrNull { it.id == importCoreId }
+        if (uri == null || core == null || busyCore.isNotBlank()) {
+            importCoreId = ""
+            return@rememberLauncherForActivityResult
+        }
+        busyCore = core.id
+        progress = "正在校验并导入 ${core.label}…"
+        scope.launch {
+            try {
+                manager.importFromUri(core, uri, uri.lastPathSegment ?: "本地核心")
+                notice = "${core.label} 已从文件导入"
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) {
+                notice = error.message ?: "${core.label} 导入失败"
+            } finally {
+                busyCore = ""
+                progress = ""
+                importCoreId = ""
+                revision++
+            }
+        }
+    }
 
     LaunchedEffect(revision) {
         loading = true
@@ -173,6 +201,11 @@ private fun CoreManagerScreen(onBack: () -> Unit) {
                         }
                     }
                 },
+                onImport = {
+                    if (busyCore.isNotBlank()) return@CoreStatusCard
+                    importCoreId = item.id
+                    coreImporter.launch(arrayOf("application/octet-stream", "application/zip", "application/gzip", "*/*"))
+                },
                 onRemove = {
                     if (busyCore.isNotBlank()) return@CoreStatusCard
                     val core = ProxyRuntimeProfile.Core.values().firstOrNull { it.id == item.id } ?: return@CoreStatusCard
@@ -200,6 +233,7 @@ private fun CoreStatusCard(
     busy: Boolean,
     enabled: Boolean,
     onInstall: () -> Unit,
+    onImport: () -> Unit,
     onRemove: () -> Unit,
 ) {
     val tokens = LocalHetuTokens.current
@@ -275,17 +309,26 @@ private fun CoreStatusCard(
                     Spacer(Modifier.width(6.dp))
                     Text(if (busy) "处理中" else installText)
                 }
-                if (item.downloaded) {
-                    OutlinedButton(
-                        onClick = onRemove,
-                        enabled = enabled,
-                        modifier = Modifier.heightIn(min = 48.dp),
-                        shape = RoundedCornerShape(17.dp),
-                    ) {
-                        Icon(Icons.Rounded.DeleteOutline, null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(5.dp))
-                        Text(if (item.bundled) "恢复内置" else "删除")
-                    }
+                OutlinedButton(
+                    onClick = onImport,
+                    enabled = enabled,
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                    shape = RoundedCornerShape(17.dp),
+                ) {
+                    Icon(Icons.Rounded.UploadFile, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(5.dp))
+                    Text("从文件导入")
+                }
+            }
+            if (item.downloaded) {
+                TextButton(
+                    onClick = onRemove,
+                    enabled = enabled,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp),
+                ) {
+                    Icon(Icons.Rounded.DeleteOutline, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(5.dp))
+                    Text(if (item.bundled) "删除下载版并恢复内置核心" else "删除已导入 / 下载核心")
                 }
             }
         }
