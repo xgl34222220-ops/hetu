@@ -190,8 +190,10 @@ assert ".background(tokens.pageBackground)" not in core_ui
 assert "selection = selected" in theme_ui and "HetuGlassRadius.Input" in theme_ui
 assert "--bg:#f5f7fb" in web_ui and "--bg:#0e1014" in web_ui
 assert "backdrop-filter:blur(20px)" in web_ui and "border-radius:24px" in web_ui
-assert manifest.count('android.intent.action.MAIN') == 1, "Only the reference Liquid Glass shell may be launcher"
-assert '.ReferenceProxyActivity' in manifest and 'android.intent.action.MAIN' in manifest
+assert manifest.count('android.intent.action.MAIN') == 2, "Two switchable launcher aliases are expected"
+assert 'android:name=".LauncherOfficial"' in manifest and 'android:name=".LauncherClassic"' in manifest
+assert manifest.count('android:targetActivity=".ReferenceProxyActivity"') == 2
+assert 'android:enabled="true"' in manifest and 'android:enabled="false"' in manifest
 assert "CompactMainActivity::class" not in refhome and "HetuMainActivity::class" not in refhome
 
 # Existing productivity/accessibility contracts remain.
