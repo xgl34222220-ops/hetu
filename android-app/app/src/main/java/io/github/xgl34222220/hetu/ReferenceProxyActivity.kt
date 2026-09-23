@@ -155,6 +155,7 @@ private enum class RefPanelTab(val label: String) {
 private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val motionEnabled = LocalHetuMotionEnabled.current
     val controller = remember { ProxyComposeController(context) }
     val repo = remember { ProxyDashboardRepository(context) }
     val inspector = remember { ProxyRuntimeInspector(context) }
@@ -599,11 +600,18 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
             key(page) {
                 pageStateHolder.SaveableStateProvider(page.name) {
                 val pageEnter = remember { Animatable(0f) }
-                LaunchedEffect(Unit) {
-                    pageEnter.animateTo(
-                        targetValue = 1f,
-                        animationSpec = spring(dampingRatio = .86f, stiffness = 430f),
-                    )
+                LaunchedEffect(motionEnabled) {
+                    if (motionEnabled) {
+                        pageEnter.animateTo(
+                            targetValue = 1f,
+                            animationSpec = spring(
+                                dampingRatio = HetuMotionSpec.SelectionDamping,
+                                stiffness = 430f,
+                            ),
+                        )
+                    } else {
+                        pageEnter.snapTo(1f)
+                    }
                 }
                 Box(
                     Modifier
@@ -712,15 +720,15 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
             visible = !panelDetailVisible && !dockHiddenByScroll,
             modifier = Modifier.align(Alignment.BottomCenter),
             enter = androidx.compose.animation.fadeIn(
-                androidx.compose.animation.core.tween(180),
+                androidx.compose.animation.core.tween(if (motionEnabled) 180 else 0),
             ) + androidx.compose.animation.slideInVertically(
-                androidx.compose.animation.core.tween(210),
-            ) { it / 2 },
+                androidx.compose.animation.core.tween(if (motionEnabled) 210 else 0),
+            ) { if (motionEnabled) it / 2 else 0 },
             exit = androidx.compose.animation.fadeOut(
-                androidx.compose.animation.core.tween(150),
+                androidx.compose.animation.core.tween(if (motionEnabled) 150 else 0),
             ) + androidx.compose.animation.slideOutVertically(
-                androidx.compose.animation.core.tween(190),
-            ) { it },
+                androidx.compose.animation.core.tween(if (motionEnabled) 190 else 0),
+            ) { if (motionEnabled) it else 0 },
         ) {
             HetuGlassDock(
                 items = dock,
