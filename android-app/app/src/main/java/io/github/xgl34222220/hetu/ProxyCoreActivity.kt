@@ -103,7 +103,7 @@ private fun CoreManagerScreen(onBack: () -> Unit) {
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().background(tokens.pageBackground),
+        modifier = Modifier.fillMaxSize().crystalPageBackground(),
         contentPadding = PaddingValues(
             start = 16.dp,
             end = 16.dp,
@@ -121,8 +121,8 @@ private fun CoreManagerScreen(onBack: () -> Unit) {
             }
         }
         item("intro") {
-            Surface(shape = RoundedCornerShape(18.dp), color = tokens.cardBackground, shadowElevation = 1.dp) {
-                Column(Modifier.fillMaxWidth().padding(17.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            GroupedInsetSection {
+                Column(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Rounded.Memory, null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(9.dp))
@@ -203,13 +203,30 @@ private fun CoreStatusCard(
     onRemove: () -> Unit,
 ) {
     val tokens = LocalHetuTokens.current
-    Surface(shape = RoundedCornerShape(18.dp), color = tokens.cardBackground, shadowElevation = 1.dp) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .crystalMaterial(
+                RoundedCornerShape(HetuGlassRadius.Card),
+                depth = CrystalDepth.Card,
+            )
+    ) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(shape = RoundedCornerShape(14.dp), color = tokens.elevatedCardBackground, modifier = Modifier.size(44.dp)) {
-                    androidx.compose.foundation.layout.Box(contentAlignment = Alignment.Center) {
-                        Icon(if (item.downloaded || item.bundled) Icons.Rounded.CheckCircle else Icons.Rounded.CloudDownload, null, tint = MaterialTheme.colorScheme.primary)
-                    }
+                Box(
+                    Modifier
+                        .size(44.dp)
+                        .crystalMaterial(
+                            RoundedCornerShape(HetuGlassRadius.Input),
+                            depth = CrystalDepth.InsetItem,
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        if (item.downloaded || item.bundled) Icons.Rounded.CheckCircle else Icons.Rounded.CloudDownload,
+                        null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
                 }
                 Spacer(Modifier.width(11.dp))
                 Column(Modifier.weight(1f)) {
@@ -217,8 +234,16 @@ private fun CoreStatusCard(
                         Text(item.label, color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                         if (item.bundled) {
                             Spacer(Modifier.width(7.dp))
-                            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = .55f)) {
-                                Text("内置", Modifier.padding(horizontal = 7.dp, vertical = 2.dp), color = MaterialTheme.colorScheme.primary, fontSize = 12.sp)
+                            Box(
+                                Modifier
+                                    .crystalMaterial(
+                                        RoundedCornerShape(HetuGlassRadius.Pill),
+                                        depth = CrystalDepth.InsetItem,
+                                        selection = true,
+                                    )
+                                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                            ) {
+                                Text("内置", color = MaterialTheme.colorScheme.primary, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
