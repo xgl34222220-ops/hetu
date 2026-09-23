@@ -576,10 +576,10 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
         val existing = editSubscription
         ModalBottomSheet(
             onDismissRequest = { if (!savingSubscription) { addingSubscription = false; editSubscription = null } },
-            containerColor = tokens.elevatedCardBackground,
+            containerColor = Color.Transparent,
             contentColor = tokens.textPrimary,
             tonalElevation = 0.dp,
-            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            shape = RoundedCornerShape(topStart = HetuGlassRadius.Sheet, topEnd = HetuGlassRadius.Sheet),
             dragHandle = {
                 Box(
                     Modifier.padding(top = 10.dp, bottom = 7.dp)
@@ -589,7 +589,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
             },
         ) {
             Column(
-                Modifier.fillMaxWidth().navigationBarsPadding().imePadding()
+                Modifier.fillMaxWidth().liquidSheetMaterial().navigationBarsPadding().imePadding()
                     .padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -605,25 +605,21 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                     color = tokens.textSecondary,
                     fontSize = 11.sp,
                 )
-                OutlinedTextField(
+                LiquidGlassTextField(
                     value = editorName,
                     onValueChange = { if (existing == null) editorName = it },
                     enabled = existing == null && !savingSubscription,
-                    label = { Text("订阅名称") },
-                    placeholder = { Text("例如：机场一") },
-                    singleLine = true,
+                    label = "订阅名称",
+                    placeholder = "例如：机场一",
                     modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-                    shape = RoundedCornerShape(16.dp),
                 )
-                OutlinedTextField(
+                LiquidGlassTextField(
                     value = editorUrl,
                     onValueChange = { editorUrl = it; editorError = "" },
                     enabled = !savingSubscription,
-                    label = { Text("订阅链接") },
-                    placeholder = { Text("https://…") },
-                    singleLine = true,
+                    label = "订阅链接",
+                    placeholder = "https://…",
                     modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-                    shape = RoundedCornerShape(16.dp),
                 )
                 if (editorError.isNotBlank()) {
                     Text(editorError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
@@ -922,10 +918,10 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
             if (outlineOpen) {
                 ModalBottomSheet(
                     onDismissRequest = { outlineOpen = false },
-                    containerColor = tokens.elevatedCardBackground,
+                    containerColor = Color.Transparent,
                     contentColor = tokens.textPrimary,
                     tonalElevation = 0.dp,
-                    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                    shape = RoundedCornerShape(topStart = HetuGlassRadius.Sheet, topEnd = HetuGlassRadius.Sheet),
                     dragHandle = {
                         Box(
                             Modifier.padding(top = 10.dp, bottom = 6.dp)
@@ -935,7 +931,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                     },
                 ) {
                     Column(
-                        Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 16.dp),
+                        Modifier.fillMaxWidth().liquidSheetMaterial().navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text("YAML 语法大纲", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
@@ -945,13 +941,17 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
                             outlineItems.forEach { item ->
-                                Surface(
-                                    onClick = {
-                                        jumpToYamlLine(item.line)
-                                        outlineOpen = false
-                                    },
-                                    shape = RoundedCornerShape(15.dp),
-                                    color = tokens.controlBackground.copy(alpha = .58f),
+                                Box(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .crystalMaterial(
+                                            RoundedCornerShape(HetuGlassRadius.Input),
+                                            depth = CrystalDepth.InsetItem,
+                                        )
+                                        .clickable {
+                                            jumpToYamlLine(item.line)
+                                            outlineOpen = false
+                                        },
                                 ) {
                                     Row(
                                         Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 11.dp),
@@ -1035,34 +1035,27 @@ private fun SubscriptionMetric(
 ) {
     val tokens = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
-    val dark = scheme.background.luminance() < .5f
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(15.dp),
-        color = if (accent) scheme.primary.copy(alpha = if (dark) .13f else .08f)
-        else if (dark) Color.White.copy(alpha = .055f) else Color(0xFFF8FAFC).copy(alpha = .86f),
-        border = BorderStroke(
-            .7.dp,
-            if (accent) scheme.primary.copy(alpha = .20f)
-            else if (dark) Color.White.copy(alpha = .07f) else Color.White.copy(alpha = .92f),
-        ),
-        tonalElevation = 0.dp,
+    Column(
+        modifier
+            .crystalMaterial(
+                RoundedCornerShape(HetuGlassRadius.Input),
+                depth = CrystalDepth.InsetItem,
+                selection = accent,
+            )
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(1.dp),
     ) {
-        Column(
-            Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(1.dp),
-        ) {
-            Text(label, color = tokens.textMuted, fontSize = 9.5.sp, lineHeight = 12.sp, fontWeight = FontWeight.SemiBold)
-            Text(
-                value,
-                color = if (accent) scheme.primary else tokens.textPrimary,
+        Text(label, color = tokens.textMuted, fontSize = 9.5.sp, lineHeight = 12.sp, fontWeight = FontWeight.SemiBold)
+        HetuNumber(
+            text = value,
+            color = if (accent) scheme.primary else tokens.textPrimary,
+            monospaced = true,
+            style = MaterialTheme.typography.labelLarge.copy(
                 fontSize = 13.sp,
                 lineHeight = 17.sp,
                 fontWeight = FontWeight.ExtraBold,
-                fontFamily = FontFamily.Monospace,
-                maxLines = 1,
-            )
-        }
+            ),
+        )
     }
 }
 
