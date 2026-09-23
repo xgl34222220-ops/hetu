@@ -156,6 +156,27 @@ assert "LiquidChoicePill(" in refhome
 assert "FilterChip(" not in adblock, "Material FilterChip remains in adblock UI"
 assert "LiquidChoicePill(" in adblock
 
+# Phase 3 auxiliary tool pages use the same Liquid Glass controls.
+phase3_pages = {
+    "apps": (src / "ProxyAppSelectionActivity.kt").read_text(),
+    "focused": (src / "ProxyFocusedSettingsActivities.kt").read_text(),
+    "logs": (src / "ProxyLogViewerActivity.kt").read_text(),
+    "scripts": (src / "ProxyScriptsActivity.kt").read_text(),
+}
+for name, text in phase3_pages.items():
+    assert not re.search(r"\bSwitch\(", text), f"Legacy Material Switch remains in Phase 3 {name}"
+    assert "OutlinedTextField(" not in text, f"Legacy outlined input remains in Phase 3 {name}"
+    assert "FilterChip(" not in text, f"Legacy Material filter remains in Phase 3 {name}"
+    assert ".background(t.pageBackground)" not in text and ".background(pageBg)" not in text, f"Flat page field remains in Phase 3 {name}"
+
+assert "LiquidChoicePill" in phase3_pages["apps"]
+assert "LiquidGlassTextField" in phase3_pages["apps"]
+assert "LiquidSwitch" in phase3_pages["focused"]
+assert "LiquidGlassTextField" in phase3_pages["focused"]
+assert "crystalPageBackground()" in phase3_pages["logs"]
+assert "LiquidGlassTextField" in phase3_pages["scripts"]
+assert "liquidSheetMaterial()" in phase3_pages["scripts"]
+
 # Existing productivity/accessibility contracts remain.
 assert 'private fun RefSectionLabel' in refhome and 'Spacer(Modifier.height(2.dp))' in refhome
 assert ".height(42.dp).testTag(\"yaml-accessory\")" in editor
