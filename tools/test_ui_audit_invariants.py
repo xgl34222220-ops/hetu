@@ -60,33 +60,64 @@ instrument = (src / "AlignedInstrumentPanel.kt").read_text()
 icon = (src / "ConfiguredGroupIcon.kt").read_text()
 dock = (src / "ui/HetuGlassDock.kt").read_text()
 
-# 156785.mp4 visual contract.
-assert "Color(0xFFEEEDFB)" in theme and "Color(0xFFE2DEFF)" in theme
+# Liquid Glass visual contract (design.md is the source of truth).
+design = (root / "design.md").read_text()
+liquid_system = (src / "ui/HetuLiquidGlassSystem.kt").read_text()
+ui_kit = (src / "ui/HetuUiKit.kt").read_text()
+
+assert "iOS / VisionOS 极简液态浮岛" in design
+assert "HetuGlassRadius" in liquid_system and "HetuMotionSpec" in liquid_system
+assert "LiquidStatusCapsule" in liquid_system and "SegmentedLiquidActionPill" in liquid_system
+assert "LiquidGlassTextField" in liquid_system and "glassInputWell" in liquid_system
+
+# Cold-air canvas + translucent islands replace the previous lavender flat field.
+assert "Color(0xFFF5F7FB)" in theme
+assert "Color(0xA6FFFFFF)" in theme
+assert "Color(0xFF0E1014)" in theme
+assert "Brush.radialGradient" in crystal
+assert "Color(0xFF82DCFF)" in crystal and "Color(0xFFB4A0FF)" in crystal
+assert "HazeStyle(" in crystal and "hazeEffect" in crystal
+
+# Home must use the dock-derived Liquid Glass language, not the old giant hero.
 assert 'item(key = "home-shortcuts")' in refhome
 assert 'title = "WebUI"' in refhome and 'title = "日志"' in refhome
-assert '.height(120.dp)' in refhome and '.size(116.dp)' in refhome
+assert "LiquidStatusCapsule(" in refhome
+assert "SegmentedLiquidActionPill(" in refhome
+assert 'Modifier.testTag("home-liquid-actions")' in refhome
+assert '.height(120.dp)' not in refhome and '.size(116.dp)' not in refhome
 assert '"少于 1 分钟"' in refhome
-assert '.height(52.dp)' in refhome and 'label = "重载"' in refhome and 'label = "重启"' in refhome
 assert '"延迟"' in refhome and 'Icons.Rounded.Tune' in refhome and 'Icons.Rounded.Refresh' in refhome
-assert '.height(88.dp)' in refhome
+assert "LatencyChip(" in refhome
+
+# Four dashboard tiles share glass material and stable tabular number rendering.
 assert 'ReferenceDashboardCard' in instrument and '"WAN"' in instrument and '"网速"' in instrument
 assert '"订阅"' in instrument and '"资源占用"' in instrument
-assert 'home-usage-progress' in instrument and 'home-cpu-progress' in instrument and '.height(3.dp)' in instrument
-assert 'fontSize = 32.sp' in refhome and 'RoundedCornerShape(14.dp)' in refhome
-assert '.horizontalScroll(rememberScrollState())' in refhome
+assert 'crystalMaterial(shape, depth = CrystalDepth.Card)' in instrument
+assert 'HetuNumber(' in instrument and 'monospaced = true' in instrument
+assert 'home-usage-progress' in instrument and 'home-cpu-progress' in instrument
+
+# Strategy/node selections use the same glass selection language as the floating dock.
 assert '.height(80.dp)' in liquid and '.height(78.dp)' in liquid
 assert 'if (width < 292.dp' in liquid, "Phone strategy grid should use two columns when space permits"
 assert 'TextAutoSize.StepBased' in liquid, "Long node names must shrink instead of becoming ellipsis-heavy"
 assert 'ConfiguredGroupIcon(group, Modifier.size(32.dp))' in liquid
-assert 'ReferenceDelayPill' in liquid and 'Color(0xFFE2E8FA)' in liquid
-assert 'crystalMaterial(shape, depth = CrystalDepth.Sunken)' not in liquid, "Expanded nodes must sit directly on the page"
-assert 'Modifier.padding(horizontal = 20.dp)' in dock and '.height(72.dp' in dock and 'itemHeight = 60.dp' in dock
+assert 'LatencyChip(' in liquid
+assert 'selection = expanded' in liquid and 'selection = active' in liquid
+assert 'Color(0xFFE8E6F7)' not in liquid
+
+# Floating dock geometry and content clearance are shared tokens, not duplicated literals.
+assert 'HetuBottomBarMetrics.FloatingHorizontal' in dock
+assert 'HetuBottomBarMetrics.FloatingBottom' in dock
+assert '.height(72.dp' in dock and 'itemHeight = 60.dp' in dock
 assert 'refractionHeight = 17.dp.toPx()' in dock and 'chromaticAberration = .045f' in dock, "Dock shell must retain LuoShu liquid-glass optics"
+assert 'HetuBottomBarMetrics.ContentGap' in ui_kit
+
+# API/config inputs must use inset glass wells.
+assert refhome.count("LiquidGlassTextField(") >= 4
+assert 'label = "Secret"' in refhome and 'label = "测速 URL"' in refhome
+
+# Existing productivity/accessibility contracts remain.
 assert 'private fun RefSectionLabel' in refhome and 'Spacer(Modifier.height(2.dp))' in refhome
-assert 'fontSize = 32.sp' in refhome
-assert "Color(0xFFF9F8FE)" in theme and "Color(0xFFF5F3FD)" in theme
-assert "drawRect(t.pageBackground)" not in crystal and "return background(t.pageBackground)" in crystal
-assert "BoxProxy Design System" not in (src / "ThemeSettingsActivity.kt").read_text()
 assert ".height(42.dp).testTag(\"yaml-accessory\")" in editor
 assert "UTF-8 · YAML" in editor
 assert "ticket-progress:" in monitoring
