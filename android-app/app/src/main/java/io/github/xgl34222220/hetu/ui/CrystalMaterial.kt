@@ -174,8 +174,8 @@ fun Modifier.crystalMaterial(
         else -> 20.dp
     }
     val accent = if (selection) primary else if (tint.isSpecified && tint.alpha > .05f) tint else Color.Unspecified
-    val upper = Color(0xFF283543).copy(alpha = .82f)
-    val lower = Color(0xFF18232F).copy(alpha = .72f)
+    val upper = Color(0xFF24262C).copy(alpha = .78f)
+    val lower = Color(0xFF1A1C21).copy(alpha = .70f)
     val fill = Brush.verticalGradient(listOf(upper, lower))
     val style = HazeStyle(
         backgroundColor = Color.Transparent,
@@ -214,7 +214,7 @@ fun Modifier.crystalMaterial(
                 val outline = shape.createOutline(size, layoutDirection, this)
                 val ambient = Brush.radialGradient(
                     listOf(
-                        (if (accent.isSpecified) accent else Color(0xFF2A6496)).copy(alpha = if (selection) .15f else .08f),
+                        (if (accent.isSpecified) accent else Color(0xFF6EA8FF)).copy(alpha = if (selection) .14f else .055f),
                         Color.Transparent,
                     ),
                     center = Offset(size.width * .94f, size.height * .88f),
