@@ -4638,7 +4638,7 @@ private fun RefConfirmBottomSheet(
         dragHandle = { RefSheetDragHandle() },
     ) {
         Column(
-            Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 20.dp),
+            Modifier.fillMaxWidth().liquidSheetMaterial().navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -4717,7 +4717,12 @@ private fun RefInfoBottomSheet(
         },
     ) {
         Column(
-            Modifier.fillMaxWidth().fillMaxHeight(.80f).navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
+            Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(.80f)
+                .then(if (terminal) Modifier else Modifier.liquidSheetMaterial())
+                .navigationBarsPadding()
+                .padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -4775,7 +4780,7 @@ private fun RefSheetDragHandle() {
 
 @Composable
 private fun RefGroup(content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxWidth().crystalMaterial(RoundedCornerShape(20.dp)), content = content)
+    GroupedInsetSection(content = content)
 }
 
 @Composable
