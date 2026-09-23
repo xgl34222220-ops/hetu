@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -402,6 +403,7 @@ fun LiquidGlassTextField(
     supportingText: String = "",
     singleLine: Boolean = true,
     enabled: Boolean = true,
+    leadingIcon: ImageVector? = null,
 ) {
     val t = LocalHetuTokens.current
     OutlinedTextField(
@@ -413,6 +415,9 @@ fun LiquidGlassTextField(
         label = { Text(label) },
         placeholder = { if (placeholder.isNotBlank()) Text(placeholder) },
         supportingText = { if (supportingText.isNotBlank()) Text(supportingText) },
+        leadingIcon = if (leadingIcon == null) null else {
+            { Icon(leadingIcon, null, modifier = Modifier.size(18.dp)) }
+        },
         shape = RoundedCornerShape(HetuGlassRadius.Input),
         colors = OutlinedTextFieldDefaults.colors(
             focusedContainerColor = Color.Transparent,
@@ -524,3 +529,57 @@ fun Modifier.liquidSheetMaterial(): Modifier =
         ),
         depth = CrystalDepth.Popover,
     )
+
+
+/** Small liquid choice used for filters, modes and compact segmented decisions. */
+@Composable
+fun LiquidChoicePill(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    val t = LocalHetuTokens.current
+    val motion = LocalHetuMotionEnabled.current
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) HetuMotionSpec.PressedScale else 1f,
+        animationSpec = tween(if (motion) HetuMotionSpec.PressDurationMs else 0),
+        label = "choicePress",
+    )
+    val shape = RoundedCornerShape(HetuGlassRadius.Pill)
+    Box(
+        modifier
+            .heightIn(min = 44.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .crystalMaterial(
+                shape = shape,
+                depth = CrystalDepth.InsetItem,
+                selection = selected,
+            )
+            .clickable(
+                enabled = enabled,
+                interactionSource = interaction,
+                indication = null,
+                role = Role.RadioButton,
+                onClick = onClick,
+            )
+            .padding(horizontal = 13.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            color = when {
+                !enabled -> t.textMuted.copy(alpha = .48f)
+                selected -> MaterialTheme.colorScheme.primary
+                else -> t.textPrimary
+            },
+            fontSize = 12.sp,
+            lineHeight = 16.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
+            maxLines = 1,
+        )
+    }
+}
