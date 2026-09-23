@@ -387,7 +387,15 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
         }
 
         if (busy) item {
-            Surface(shape = RoundedCornerShape(16.dp), color = t.selectionBackground) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .crystalMaterial(
+                        RoundedCornerShape(HetuGlassRadius.Tile),
+                        depth = CrystalDepth.InsetItem,
+                        selection = true,
+                    )
+            ) {
                 Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                     CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                     Spacer(Modifier.width(10.dp))
@@ -450,9 +458,9 @@ private fun AdvancedPreflightSheet(passed: Boolean, text: String, onDismiss: () 
     val accent = if (passed) Color(0xFF10B981) else Color(0xFFF59E0B)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = t.elevatedCardBackground,
+        containerColor = Color.Transparent,
         tonalElevation = 0.dp,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        shape = RoundedCornerShape(topStart = HetuGlassRadius.Sheet, topEnd = HetuGlassRadius.Sheet),
         dragHandle = {
             Box(
                 Modifier.padding(top = 10.dp, bottom = 5.dp).size(width = 36.dp, height = 4.dp)
@@ -461,7 +469,7 @@ private fun AdvancedPreflightSheet(passed: Boolean, text: String, onDismiss: () 
         },
     ) {
         Column(
-            Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 20.dp, end = 20.dp, bottom = 22.dp),
+            Modifier.fillMaxWidth().liquidSheetMaterial().navigationBarsPadding().padding(start = 20.dp, end = 20.dp, bottom = 22.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -484,7 +492,14 @@ private fun AdvancedPreflightSheet(passed: Boolean, text: String, onDismiss: () 
                 lineHeight = 25.sp,
                 fontWeight = FontWeight.ExtraBold,
             )
-            Surface(shape = RoundedCornerShape(18.dp), color = t.controlBackground.copy(alpha = .52f)) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .crystalMaterial(
+                        RoundedCornerShape(HetuGlassRadius.Tile),
+                        depth = CrystalDepth.InsetItem,
+                    )
+            ) {
                 Text(
                     text,
                     Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
@@ -505,11 +520,7 @@ private fun AdvancedSectionLabel(text: String) {
 
 @Composable
 private fun AdvancedGroup(content: @Composable ColumnScope.() -> Unit) {
-    val t = LocalHetuTokens.current
-    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    Surface(shape = RoundedCornerShape(18.dp), color = if (dark) t.elevatedCardBackground else Color.White, shadowElevation = if (dark) 0.dp else 1.dp) {
-        Column(Modifier.fillMaxWidth(), content = content)
-    }
+    GroupedInsetSection(content = content)
 }
 
 @Composable
@@ -529,7 +540,11 @@ private fun AdvancedValueRow(icon: ImageVector, accent: Color, title: String, va
 
 @Composable
 private fun AdvancedSwitchRow(icon: ImageVector, accent: Color, title: String, subtitle: String, checked: Boolean, onChecked: (Boolean) -> Unit) {
-    WorkspaceSettingRow(title, subtitle, icon) { Switch(checked, onCheckedChange = onChecked, modifier = Modifier.heightIn(min = 48.dp)) }
+    WorkspaceSettingRow(title, subtitle, icon) {
+        Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.CenterEnd) {
+            LiquidSwitch(checked = checked, onCheckedChange = onChecked)
+        }
+    }
 }
 
 @Composable
@@ -544,12 +559,31 @@ private fun AdvancedActionRow(icon: ImageVector, accent: Color, title: String, s
 @Composable
 private fun AdvancedChoiceSheet(title: String, values: List<AdvancedChoice>, current: String, onDismiss: () -> Unit, onSelect: (String) -> Unit) {
     val t = LocalHetuTokens.current
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = t.elevatedCardBackground, tonalElevation = 0.dp, shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = Color.Transparent,
+        tonalElevation = 0.dp,
+        shape = RoundedCornerShape(topStart = HetuGlassRadius.Sheet, topEnd = HetuGlassRadius.Sheet),
+    ) {
+        Column(
+            Modifier.fillMaxWidth().liquidSheetMaterial().navigationBarsPadding().padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             Text(title, color = t.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             values.forEach { item ->
                 val selected = item.value == current
-                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(15.dp)).background(if (selected) t.selectionBackground else t.controlBackground.copy(alpha = .35f)).clickable { onSelect(item.value) }.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .crystalMaterial(
+                            RoundedCornerShape(HetuGlassRadius.Input),
+                            depth = CrystalDepth.InsetItem,
+                            selection = selected,
+                        )
+                        .clickable { onSelect(item.value) }
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Text(item.label, color = t.textPrimary, fontSize = 14.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, modifier = Modifier.weight(1f))
                     if (selected) Icon(Icons.Rounded.Check, null, tint = MaterialTheme.colorScheme.primary)
                 }
@@ -565,9 +599,9 @@ private fun SetEditorDialog(state: SetEditorState, onDismiss: () -> Unit, onSave
     val t = LocalHetuTokens.current
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = t.elevatedCardBackground,
+        containerColor = Color.Transparent,
         tonalElevation = 0.dp,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        shape = RoundedCornerShape(topStart = HetuGlassRadius.Sheet, topEnd = HetuGlassRadius.Sheet),
         dragHandle = {
             Box(
                 Modifier.padding(top = 10.dp, bottom = 6.dp).size(width = 36.dp, height = 4.dp)
@@ -576,17 +610,18 @@ private fun SetEditorDialog(state: SetEditorState, onDismiss: () -> Unit, onSave
         },
     ) {
         Column(
-            Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
+            Modifier.fillMaxWidth().liquidSheetMaterial().navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(state.title, color = t.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
             Text(state.hint, color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
-            OutlinedTextField(
+            LiquidGlassTextField(
                 value = text,
                 onValueChange = { text = it },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 190.dp, max = 360.dp),
-                minLines = 7,
-                shape = RoundedCornerShape(18.dp),
+                label = "规则",
+                placeholder = "每行一项",
+                singleLine = false,
             )
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 FilledTonalButton(onClick = onDismiss, modifier = Modifier.weight(1f).heightIn(min = 48.dp), shape = CircleShape) {
@@ -668,10 +703,10 @@ private fun AdvancedInfoSheet(title: String, text: String, onDismiss: () -> Unit
     val highlighted = remember(text, codePreview) { if (codePreview) advancedYamlPreview(text) else null }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = if (codePreview) Color(0xFF0B1220) else t.elevatedCardBackground,
+        containerColor = if (codePreview) Color(0xFF0B1220) else Color.Transparent,
         contentColor = if (codePreview) Color(0xFFE2E8F0) else t.textPrimary,
         tonalElevation = 0.dp,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        shape = RoundedCornerShape(topStart = HetuGlassRadius.Sheet, topEnd = HetuGlassRadius.Sheet),
         dragHandle = {
             Box(
                 Modifier.padding(top = 10.dp, bottom = 6.dp).size(width = 36.dp, height = 4.dp)
@@ -680,8 +715,12 @@ private fun AdvancedInfoSheet(title: String, text: String, onDismiss: () -> Unit
         },
     ) {
         Column(
-            Modifier.fillMaxWidth().fillMaxHeight(if (codePreview) .82f else .62f)
-                .navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
+            Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(if (codePreview) .82f else .62f)
+                .then(if (codePreview) Modifier else Modifier.liquidSheetMaterial())
+                .navigationBarsPadding()
+                .padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -726,7 +765,14 @@ private fun AdvancedInfoSheet(title: String, text: String, onDismiss: () -> Unit
                     }
                 }
             } else {
-                Surface(Modifier.weight(1f), shape = RoundedCornerShape(16.dp), color = t.controlBackground.copy(alpha = .55f)) {
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .crystalMaterial(
+                            RoundedCornerShape(HetuGlassRadius.Tile),
+                            depth = CrystalDepth.InsetItem,
+                        )
+                ) {
                     Text(
                         text,
                         Modifier.fillMaxWidth().padding(14.dp)
