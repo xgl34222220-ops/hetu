@@ -68,7 +68,10 @@ ui_kit = (src / "ui/HetuUiKit.kt").read_text()
 assert "iOS / VisionOS 极简液态浮岛" in design
 assert "HetuGlassRadius" in liquid_system and "HetuMotionSpec" in liquid_system
 assert "LiquidStatusCapsule" in liquid_system and "SegmentedLiquidActionPill" in liquid_system
+assert "LiquidSelectionIndicator" in liquid_system
 assert "LiquidGlassTextField" in liquid_system and "glassInputWell" in liquid_system
+assert "LocalOverscrollFactory provides if (motionEnabled)" in theme
+assert "pageEnter.snapTo(1f)" in refhome
 
 # Cold-air canvas + translucent islands replace the previous lavender flat field.
 assert "Color(0xFFF5F7FB)" in theme
@@ -102,7 +105,10 @@ assert 'if (width < 292.dp' in liquid, "Phone strategy grid should use two colum
 assert 'TextAutoSize.StepBased' in liquid, "Long node names must shrink instead of becoming ellipsis-heavy"
 assert 'ConfiguredGroupIcon(group, Modifier.size(32.dp))' in liquid
 assert 'LatencyChip(' in liquid
-assert 'selection = expanded' in liquid and 'selection = active' in liquid
+assert 'selection = expanded' in liquid
+assert 'LiquidSelectionIndicator(' in liquid and 'node-selection-indicator:' in liquid
+assert 'animateDpAsState(' in liquid and 'nodeSelectionX' in liquid and 'nodeSelectionY' in liquid
+assert 'selection = active' not in liquid
 assert 'Color(0xFFE8E6F7)' not in liquid
 
 # Floating dock geometry and content clearance are shared tokens, not duplicated literals.
