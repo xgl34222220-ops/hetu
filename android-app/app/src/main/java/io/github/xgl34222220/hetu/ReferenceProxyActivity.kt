@@ -4109,9 +4109,34 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
                     Icons.Rounded.Tune,
                     Color.Unspecified,
                     "通知详细设置",
-                    "通知正文模板、变量与两个快捷按钮",
+                    "通知正文模板、变量与三个快捷按钮",
                 ) {
                     notificationSettings = true
+                }
+                RefDivider()
+                RefToolRow(
+                    Icons.Rounded.ToggleOn,
+                    Color.Unspecified,
+                    "快捷设置磁贴",
+                    "把“河图代理”加入控制中心，下拉即可启停代理",
+                ) {
+                    if (android.os.Build.VERSION.SDK_INT >= 33) {
+                        val statusBar = context.getSystemService(android.app.StatusBarManager::class.java)
+                        statusBar.requestAddTileService(
+                            android.content.ComponentName(context, HetuProxyTileService::class.java),
+                            "河图代理",
+                            android.graphics.drawable.Icon.createWithResource(context, R.drawable.ic_qs_hetu),
+                            context.mainExecutor,
+                        ) {
+                            android.widget.Toast.makeText(context, "已提交快捷设置磁贴添加请求", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    } else {
+                        android.widget.Toast.makeText(
+                            context,
+                            "请下拉控制中心 → 编辑快捷设置 → 添加“河图代理”",
+                            android.widget.Toast.LENGTH_LONG,
+                        ).show()
+                    }
                 }
             }
         }
@@ -4511,6 +4536,7 @@ private fun RefNotificationSettingsBottomSheet(
     }
     var action1 by remember { mutableStateOf(prefs.getString(ProxyStatusNotificationService.PREF_ACTION_1, "reload").orEmpty()) }
     var action2 by remember { mutableStateOf(prefs.getString(ProxyStatusNotificationService.PREF_ACTION_2, "restart").orEmpty()) }
+    var action3 by remember { mutableStateOf(prefs.getString(ProxyStatusNotificationService.PREF_ACTION_3, "stop").orEmpty()) }
     val actions = listOf(
         "reload" to "重载",
         "restart" to "重启",
@@ -4558,6 +4584,12 @@ private fun RefNotificationSettingsBottomSheet(
                     LiquidChoicePill(label, action2 == value, { action2 = value })
                 }
             }
+            Text("第三个快捷按钮", color = t.textSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                actions.forEach { (value, label) ->
+                    LiquidChoicePill(label, action3 == value, { action3 = value })
+                }
+            }
             Box(
                 Modifier
                     .fillMaxWidth()
@@ -4591,6 +4623,7 @@ private fun RefNotificationSettingsBottomSheet(
                     template = ProxyStatusNotificationService.DEFAULT_TEMPLATE
                     action1 = "reload"
                     action2 = "restart"
+                    action3 = "stop"
                 }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
                     Text("恢复默认")
                 }
@@ -4600,6 +4633,7 @@ private fun RefNotificationSettingsBottomSheet(
                             .putString(ProxyStatusNotificationService.PREF_TEMPLATE, template.ifBlank { ProxyStatusNotificationService.DEFAULT_TEMPLATE })
                             .putString(ProxyStatusNotificationService.PREF_ACTION_1, action1)
                             .putString(ProxyStatusNotificationService.PREF_ACTION_2, action2)
+                            .putString(ProxyStatusNotificationService.PREF_ACTION_3, action3)
                             .apply()
                         onSaved()
                     },
