@@ -19,6 +19,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -363,3 +365,36 @@ fun Modifier.glassInputWell(): Modifier =
         RoundedCornerShape(HetuGlassRadius.Input),
         depth = CrystalDepth.Sunken,
     )
+
+
+/** Material text input with the outline/container stripped back to an inset glass well. */
+@Composable
+fun LiquidGlassTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier,
+    placeholder: String = "",
+    singleLine: Boolean = true,
+) {
+    val t = LocalHetuTokens.current
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier.glassInputWell(),
+        singleLine = singleLine,
+        label = { Text(label) },
+        placeholder = if (placeholder.isBlank()) null else { { Text(placeholder) } },
+        shape = RoundedCornerShape(HetuGlassRadius.Input),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = Color.Transparent,
+            unfocusedContainerColor = Color.Transparent,
+            disabledContainerColor = Color.Transparent,
+            errorContainerColor = Color.Transparent,
+            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = .34f),
+            unfocusedBorderColor = Color.Transparent,
+            disabledBorderColor = Color.Transparent,
+            errorBorderColor = t.danger.copy(alpha = .55f),
+        ),
+    )
+}
