@@ -2059,7 +2059,7 @@ private fun RefPanelApiSettingsSheet(
                 lineHeight = 17.sp,
             )
 
-            Surface(shape = RoundedCornerShape(18.dp), color = t.controlBackground.copy(alpha = .55f)) {
+            Surface(shape = RoundedCornerShape(HetuGlassRadius.Card), color = t.cardBackground) {
                 Column(Modifier.fillMaxWidth()) {
                     WorkspaceSettingRow(
                         "自定义 Clash API",
@@ -2102,7 +2102,7 @@ private fun RefPanelApiSettingsSheet(
                 )
             }
 
-            Surface(shape = RoundedCornerShape(HetuGlassRadius.Input), color = t.controlBackground.copy(alpha = .38f)) {
+            Surface(shape = RoundedCornerShape(HetuGlassRadius.Card), color = t.cardBackground) {
                 WorkspaceSettingRow(
                     "自定义延迟测试地址",
                     if (customDelay) "优先使用自定义 URL，再回退 provider 地址" else "使用 provider / 河图默认测速地址",
