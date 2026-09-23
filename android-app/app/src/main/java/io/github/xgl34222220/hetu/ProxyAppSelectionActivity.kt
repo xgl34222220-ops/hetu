@@ -169,7 +169,7 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().background(pageBg),
+        modifier = Modifier.fillMaxSize().crystalPageBackground(),
         contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = hetuContentBottomPadding()),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -229,21 +229,20 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
         }
 
         item("search") {
-            OutlinedTextField(
+            LiquidGlassTextField(
                 value = query,
                 onValueChange = { query = it },
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                placeholder = { Text("搜索应用名称或包名") },
-                leadingIcon = { Icon(Icons.Rounded.Search, null) },
-                shape = RoundedCornerShape(17.dp),
+                label = "搜索",
+                placeholder = "搜索应用名称或包名",
+                leadingIcon = Icons.Rounded.Search,
             )
         }
 
         item("filters") {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                FilterChip(selected = showSystem, onClick = { showSystem = !showSystem }, label = { Text("系统应用") })
-                FilterChip(selected = selectedOnly, onClick = { selectedOnly = !selectedOnly }, label = { Text("已选择") })
+                LiquidChoicePill("系统应用", showSystem, { showSystem = !showSystem })
+                LiquidChoicePill("已选择", selectedOnly, { selectedOnly = !selectedOnly })
                 Spacer(Modifier.weight(1f))
                 Text("${visible.size}/${apps.size}", color = t.textSecondary, fontSize = 12.sp)
                 TextButton(onClick = { showBatchActions = true }, contentPadding = PaddingValues(horizontal = 8.dp)) {
@@ -372,14 +371,14 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
         var error by remember(showGidRules) { mutableStateOf("") }
         ModalBottomSheet(
             onDismissRequest = { showGidRules = false },
-            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-            containerColor = t.elevatedCardBackground,
+            shape = RoundedCornerShape(topStart = HetuGlassRadius.Sheet, topEnd = HetuGlassRadius.Sheet),
+            containerColor = Color.Transparent,
             contentColor = t.textPrimary,
             tonalElevation = 0.dp,
             scrimColor = Color.Black.copy(alpha = .35f),
         ) {
             Column(
-                Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(start = 18.dp, end = 18.dp, bottom = 20.dp),
+                Modifier.fillMaxWidth().liquidSheetMaterial().navigationBarsPadding().imePadding().padding(start = 18.dp, end = 18.dp, bottom = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text("GID 直连规则", fontSize = 20.sp, lineHeight = 25.sp, fontWeight = FontWeight.Bold)
@@ -389,18 +388,24 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
                     fontSize = 12.sp,
                     lineHeight = 18.sp,
                 )
-                OutlinedTextField(
+                LiquidGlassTextField(
                     value = text,
                     onValueChange = { text = it; error = "" },
                     modifier = Modifier.fillMaxWidth().heightIn(min = 150.dp),
-                    minLines = 5,
-                    maxLines = 9,
-                    label = { Text("GID / GID 范围") },
-                    shape = RoundedCornerShape(16.dp),
+                    label = "GID / GID 范围",
+                    placeholder = "10123\n10123-10130",
+                    singleLine = false,
                     textStyle = LocalTextStyle.current.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
                 )
                 if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
-                Surface(shape = RoundedCornerShape(14.dp), color = t.controlBackground.copy(alpha = .48f)) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .crystalMaterial(
+                            RoundedCornerShape(HetuGlassRadius.Input),
+                            depth = CrystalDepth.InsetItem,
+                        )
+                ) {
                     Text(
                         "GID 规则属于 Root OUTPUT 直连绕过，保存后需要重启代理才会应用；仅支持 TPROXY / Redirect / Enhance。TUN / eBPF 不会假装生效，而会在预检时明确提示先清空 GID 规则。它不会改变黑名单/白名单中的 UID 选择。",
                         Modifier.fillMaxWidth().padding(12.dp),
