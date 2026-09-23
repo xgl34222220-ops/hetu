@@ -2244,13 +2244,18 @@ private fun RefGroupDetailPage(
     onDelay: (String) -> Unit,
     onTestAll: () -> Unit,
 ) {
+    val detailContext = LocalContext.current
+    val detailPrefs = remember(detailContext) { detailContext.getSharedPreferences("hetu", 0) }
+    val predictiveBackEnabled = detailPrefs.getBoolean("predictiveBackAnimation", true)
+    val predictiveBackFollowEdge = detailPrefs.getBoolean("predictiveBackFollowEdge", true)
     var predictiveBackProgress by remember(group.name) { mutableFloatStateOf(0f) }
     var predictiveBackDirection by remember(group.name) { mutableFloatStateOf(1f) }
-    PredictiveBackHandler(enabled = true) { events ->
+    BackHandler(enabled = !predictiveBackEnabled) { onBack() }
+    PredictiveBackHandler(enabled = predictiveBackEnabled) { events ->
         try {
             events.collect { event ->
                 predictiveBackProgress = event.progress.coerceIn(0f, 1f)
-                predictiveBackDirection = if (event.swipeEdge == BackEventCompat.EDGE_LEFT) 1f else -1f
+                predictiveBackDirection = if (predictiveBackFollowEdge && event.swipeEdge != BackEventCompat.EDGE_LEFT) -1f else 1f
             }
             onBack()
         } catch (cancel: CancellationException) {
@@ -2740,20 +2745,25 @@ private fun RefPanelTabs(
                     .height(38.dp)
                     .graphicsLayer { scaleX = scale; scaleY = scale }
                     .clip(shape)
-                    .background(
+                    .then(
                         if (active) {
-                            if (dark) Color.White.copy(alpha = .10f) else Color(0xFFF9F8FE)
-                        } else Color.Transparent,
-                        shape,
-                    )
-                    .border(
-                        if (active) .7.dp else 1.dp,
-                        if (active) {
-                            if (dark) Color.White.copy(alpha = .08f) else Color.White.copy(alpha = .24f)
+                            Modifier
+                                .shadow(
+                                    elevation = 2.dp,
+                                    shape = shape,
+                                    clip = false,
+                                    ambientColor = scheme.primary.copy(alpha = .08f),
+                                    spotColor = Color.Black.copy(alpha = .05f),
+                                )
+                                .background(t.selectionBackground, shape)
+                                .border(
+                                    .55.dp,
+                                    if (dark) Color.White.copy(alpha = .12f) else Color.White.copy(alpha = .52f),
+                                    shape,
+                                )
                         } else {
-                            if (dark) Color.White.copy(alpha = .42f) else Color(0xFF6D6975)
-                        },
-                        shape,
+                            Modifier.background(Color.Transparent, shape)
+                        }
                     )
                     .clickable(interactionSource = source, indication = null) {
                         if (!active) {
@@ -2766,10 +2776,10 @@ private fun RefPanelTabs(
             ) {
                 Text(
                     tab.label,
-                    color = if (dark) t.textPrimary else Color(0xFF37333F),
-                    fontSize = 15.5.sp,
-                    lineHeight = 20.sp,
-                    fontWeight = FontWeight.Bold,
+                    color = if (active) scheme.primary else t.textSecondary,
+                    fontSize = 14.5.sp,
+                    lineHeight = 19.sp,
+                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
                     maxLines = 1,
                 )
             }
@@ -3951,8 +3961,10 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
     var defaultPanel by remember {
         mutableStateOf(
             runCatching {
-                RefPanelTab.valueOf(prefs.getString("defaultPanelTab", RefPanelTab.Groups.name).orEmpty())
-            }.getOrDefault(RefPanelTab.Groups),
+                RefPanelTab.valueOf(prefs.getString("defaultPanelTab", RefPanelTab.Overview.name).orEmpty())
+            }.getOrDefault(RefPanelTab.Overview).let {
+                if (it == RefPanelTab.Groups) RefPanelTab.Overview else it
+            },
         )
     }
     val scope = rememberCoroutineScope()
@@ -4109,7 +4121,7 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
                     icon = Icons.Rounded.SpaceDashboard,
                     accent = Color.Unspecified,
                     title = "显示连接面板入口",
-                    subtitle = "在洛书同款底栏中显示“面板”入口",
+                    subtitle = "底栏独立显示概览、订阅、连接与规则入口",
                     checked = showPanelEntry,
                 ) { enabled ->
                     showPanelEntry = enabled
@@ -4292,7 +4304,6 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
     if (defaultPanelPicker) {
         val values = listOf(
             RefPanelTab.Overview,
-            RefPanelTab.Groups,
             RefPanelTab.Subscriptions,
             RefPanelTab.Connections,
             RefPanelTab.Rules,
