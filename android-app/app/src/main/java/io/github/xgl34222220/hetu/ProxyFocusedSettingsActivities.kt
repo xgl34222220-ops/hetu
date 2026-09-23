@@ -202,12 +202,12 @@ private fun SharedNetworkSettingsPage(onBack: () -> Unit) {
     if (interfaceSheet) {
         ModalBottomSheet(
             onDismissRequest = { interfaceSheet = false },
-            containerColor = MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            containerColor = Color.Transparent,
+            shape = RoundedCornerShape(topStart = HetuGlassRadius.Sheet, topEnd = HetuGlassRadius.Sheet),
             dragHandle = { BottomSheetDefaults.DragHandle() },
         ) {
             Column(
-                Modifier.fillMaxWidth().fillMaxHeight(.72f).navigationBarsPadding()
+                Modifier.fillMaxWidth().fillMaxHeight(.72f).liquidSheetMaterial().navigationBarsPadding()
                     .padding(horizontal = 18.dp, vertical = 6.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
@@ -240,7 +240,7 @@ private fun SharedNetworkSettingsPage(onBack: () -> Unit) {
                                     fontWeight = FontWeight.Bold,
                                 )
                                 Spacer(Modifier.width(6.dp))
-                                Switch(
+                                LiquidSwitch(
                                     checked = checked,
                                     onCheckedChange = { value ->
                                         val next = TreeSet(interfaceBypass)
@@ -269,12 +269,12 @@ private fun SharedNetworkSettingsPage(onBack: () -> Unit) {
     if (macSheet) {
         ModalBottomSheet(
             onDismissRequest = { macSheet = false },
-            containerColor = MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            containerColor = Color.Transparent,
+            shape = RoundedCornerShape(topStart = HetuGlassRadius.Sheet, topEnd = HetuGlassRadius.Sheet),
             dragHandle = { BottomSheetDefaults.DragHandle() },
         ) {
             Column(
-                Modifier.fillMaxWidth().fillMaxHeight(.84f).navigationBarsPadding().imePadding()
+                Modifier.fillMaxWidth().fillMaxHeight(.84f).liquidSheetMaterial().navigationBarsPadding().imePadding()
                     .padding(horizontal = 18.dp, vertical = 6.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
@@ -295,7 +295,7 @@ private fun SharedNetworkSettingsPage(onBack: () -> Unit) {
                             "${client.mac} · ${client.iface} · ${client.state}",
                             Icons.Rounded.Devices,
                         ) {
-                            Switch(
+                            LiquidSwitch(
                                 checked = checked,
                                 onCheckedChange = { value ->
                                     val next = TreeSet(macBypass)
@@ -317,15 +317,21 @@ private fun SharedNetworkSettingsPage(onBack: () -> Unit) {
                 }
 
                 Text("手动 MAC 列表", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                OutlinedTextField(
+                LiquidGlassTextField(
                     value = macEditor,
                     onValueChange = {
                         macEditor = it.take(4096)
                         macError = ""
                     },
                     modifier = Modifier.fillMaxWidth().heightIn(min = 130.dp, max = 240.dp),
-                    textStyle = LocalTextStyle.current.copy(fontSize = 13.sp, lineHeight = 19.sp),
-                    placeholder = { Text("每行一个，例如 aa:bb:cc:dd:ee:ff") },
+                    label = "MAC 列表",
+                    placeholder = "每行一个，例如 aa:bb:cc:dd:ee:ff",
+                    singleLine = false,
+                    textStyle = LocalTextStyle.current.copy(
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        fontSize = 13.sp,
+                        lineHeight = 19.sp,
+                    ),
                 )
                 if (macError.isNotBlank()) {
                     Text(macError, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
