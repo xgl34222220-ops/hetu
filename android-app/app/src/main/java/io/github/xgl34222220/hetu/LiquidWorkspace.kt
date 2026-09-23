@@ -75,23 +75,12 @@ internal fun LiquidBrandTray(group: ProxyGroupUi) {
 
 @Composable
 private fun ReferenceDelayPill(value: Long?, testing: Boolean, modifier: Modifier = Modifier) {
-    val text = if (testing) "..." else refDelay(value)
-    Box(
-        modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(Color(0xFFE2E8FA))
-            .padding(horizontal = 8.dp, vertical = 3.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text,
-            color = HetuMicroCrystal.KleinBlue,
-            fontSize = 11.5.sp,
-            lineHeight = 15.sp,
-            fontWeight = FontWeight.ExtraBold,
-            maxLines = 1,
-        )
-    }
+    LatencyChip(
+        value = value,
+        testing = testing,
+        modifier = modifier,
+        compact = true,
+    )
 }
 
 @OptIn(ExperimentalHazeMaterialsApi::class)
@@ -130,8 +119,11 @@ internal fun LiquidStrategyCard(
         modifier
             .height(80.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
-            .clip(RoundedCornerShape(18.dp))
-            .background(t.cardBackground)
+            .crystalMaterial(
+                RoundedCornerShape(HetuGlassRadius.Tile),
+                depth = CrystalDepth.Card,
+                selection = expanded,
+            )
             .testTag("strategy:${group.name}")
             .clickable(
                 interactionSource = interactions,
@@ -226,7 +218,15 @@ internal fun LiquidNodeCard(
         reveal = true
     }
     val alpha by animateFloatAsState(if (reveal) 1f else .78f, tween(if (motion) 150 else 0), label = "nodeReveal")
-    val scale by animateFloatAsState(if (pressed) .97f else 1f, tween(if (motion) 100 else 0), label = "nodePress")
+    val targetScale = if (pressed) HetuMotionSpec.PressedScale else if (active) 1.012f else 1f
+    val scale by animateFloatAsState(
+        targetValue = targetScale,
+        animationSpec = if (motion) spring(
+            dampingRatio = HetuMotionSpec.SelectionDamping,
+            stiffness = HetuMotionSpec.SelectionStiffness,
+        ) else tween(0),
+        label = "nodeLiquidSelection",
+    )
     val protocol = node.type.ifBlank { if (node.udp) "UDP" else "Node" }
 
     Box(
@@ -234,8 +234,11 @@ internal fun LiquidNodeCard(
             .height(78.dp)
             .testTag("node:${node.name}")
             .graphicsLayer { this.alpha = alpha; scaleX = scale; scaleY = scale }
-            .clip(RoundedCornerShape(15.dp))
-            .background(if (active) Color(0xFFE8E6F7) else HetuMicroCrystal.Sunken)
+            .crystalMaterial(
+                RoundedCornerShape(HetuGlassRadius.Tile),
+                depth = CrystalDepth.InsetItem,
+                selection = active,
+            )
             .clickable(
                 interactionSource = interaction,
                 indication = null,
