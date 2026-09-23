@@ -89,7 +89,7 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
     }
 
     LazyColumn(
-        Modifier.fillMaxSize().background(t.pageBackground),
+        Modifier.fillMaxSize().crystalPageBackground(),
         contentPadding = PaddingValues(
             start = 12.dp,
             top = 8.dp,
@@ -175,11 +175,11 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
     editor?.let { entry ->
         ModalBottomSheet(
             onDismissRequest = { if (!busy) editor = null },
-            containerColor = t.cardBackground,
-            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            containerColor = Color.Transparent,
+            shape = RoundedCornerShape(topStart = HetuGlassRadius.Sheet, topEnd = HetuGlassRadius.Sheet),
         ) {
             Column(
-                Modifier.fillMaxWidth().navigationBarsPadding().imePadding()
+                Modifier.fillMaxWidth().liquidSheetMaterial().navigationBarsPadding().imePadding()
                     .padding(start = 16.dp, end = 16.dp, bottom = 18.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -195,17 +195,18 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
                     fontSize = 12.sp,
                     lineHeight = 17.sp,
                 )
-                OutlinedTextField(
+                LiquidGlassTextField(
                     value = text,
                     onValueChange = { if (it.length <= 64 * 1024) text = it },
                     modifier = Modifier.fillMaxWidth().heightIn(min = 260.dp, max = 480.dp),
+                    label = "脚本内容",
+                    placeholder = "#!/system/bin/sh\n# 在这里输入脚本",
+                    singleLine = false,
                     textStyle = LocalTextStyle.current.copy(
                         fontFamily = FontFamily.Monospace,
                         fontSize = 12.sp,
                         lineHeight = 18.sp,
                     ),
-                    placeholder = { Text("#!/system/bin/sh\n# 在这里输入脚本") },
-                    minLines = 12,
                 )
                 Row(
                     Modifier.fillMaxWidth(),
