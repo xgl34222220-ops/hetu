@@ -407,11 +407,33 @@ private fun BypassRulesPage(onBack: () -> Unit) {
 
     editor?.let { current ->
         var text by remember(current) { mutableStateOf(current.value) }
-        ModalBottomSheet(onDismissRequest = { editor = null }, containerColor = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp), dragHandle = { BottomSheetDefaults.DragHandle() }) {
-            Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 18.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        ModalBottomSheet(
+            onDismissRequest = { editor = null },
+            containerColor = Color.Transparent,
+            shape = RoundedCornerShape(topStart = HetuGlassRadius.Sheet, topEnd = HetuGlassRadius.Sheet),
+            dragHandle = { BottomSheetDefaults.DragHandle() },
+        ) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .crystalMaterial(
+                        RoundedCornerShape(topStart = HetuGlassRadius.Sheet, topEnd = HetuGlassRadius.Sheet),
+                        depth = CrystalDepth.Popover,
+                    )
+                    .navigationBarsPadding()
+                    .padding(horizontal = 18.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 Text(current.title, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
                 Text(current.hint, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, lineHeight = 17.sp)
-                OutlinedTextField(value = text, onValueChange = { text = it }, modifier = Modifier.fillMaxWidth().heightIn(min = 180.dp, max = 360.dp), textStyle = LocalTextStyle.current.copy(fontSize = 13.sp, lineHeight = 20.sp), placeholder = { Text("每行一项") })
+                LiquidGlassTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 180.dp, max = 360.dp),
+                    label = "规则",
+                    placeholder = "每行一项",
+                    singleLine = false,
+                )
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     TextButton(onClick = { editor = null }, modifier = Modifier.weight(1f)) { Text("取消") }
                     Button(onClick = {
@@ -430,7 +452,7 @@ private fun FocusedSettingsScaffold(title: String, subtitle: String, onBack: () 
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val bg = if (dark) t.pageBackground else MaterialTheme.colorScheme.background
-    androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.fillMaxSize().background(bg), contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = hetuContentBottomPadding()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.fillMaxSize().crystalPageBackground(), contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = hetuContentBottomPadding()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             Column(Modifier.statusBarsPadding()) { HetuPageHeader(title, onBack, subtitle) }
         }
@@ -439,8 +461,30 @@ private fun FocusedSettingsScaffold(title: String, subtitle: String, onBack: () 
     }
 }
 
-@Composable private fun FocusedNotice(text: String) { Surface(color = if (MaterialTheme.colorScheme.background.luminance() < .5f) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .46f) else Color(0xFFEFF4FA), shape = RoundedCornerShape(18.dp), tonalElevation = 0.dp, shadowElevation = 0.dp) { Text(text, modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, lineHeight = 18.sp, fontWeight = FontWeight.Medium) } }
-@Composable private fun FocusedGroup(content: @Composable ColumnScope.() -> Unit) { Surface(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(18.dp), tonalElevation = 0.dp, shadowElevation = 1.dp) { Column(content = content) } }
+@Composable
+private fun FocusedNotice(text: String) {
+    val t = LocalHetuTokens.current
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .crystalMaterial(
+                RoundedCornerShape(HetuGlassRadius.Tile),
+                depth = CrystalDepth.InsetItem,
+            )
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+    ) {
+        Text(
+            text,
+            color = t.textSecondary,
+            fontSize = 12.sp,
+            lineHeight = 18.sp,
+            fontWeight = FontWeight.Medium,
+        )
+    }
+}
+@Composable private fun FocusedGroup(content: @Composable ColumnScope.() -> Unit) {
+    GroupedInsetSection(content = content)
+}
 @Composable private fun FocusedDivider() { WorkspaceInsetDivider() }
 @Composable private fun FocusedIcon(icon: ImageVector, accent: Color) { HetuListIcon(icon) }
 
@@ -455,7 +499,11 @@ private fun FocusedChoiceRow(icon: ImageVector, accent: Color, title: String, su
 
 @Composable
 private fun FocusedSwitchRow(icon: ImageVector, accent: Color, title: String, subtitle: String, checked: Boolean, onChecked: (Boolean) -> Unit) {
-    WorkspaceSettingRow(title, subtitle, icon) { Switch(checked, onCheckedChange = onChecked, modifier = Modifier.heightIn(min = 48.dp)) }
+    WorkspaceSettingRow(title, subtitle, icon) {
+        Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.CenterEnd) {
+            LiquidSwitch(checked = checked, onCheckedChange = onChecked)
+        }
+    }
 }
 
 @Composable
