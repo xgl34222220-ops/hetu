@@ -342,6 +342,9 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                     memoryBytes = if (state.memoryBytes > 0L) state.memoryBytes else next.memoryBytes,
                 )
             } else next
+            // A previous/transient start exception must not keep an error sheet alive
+            // after the authoritative runtime state has already converged to running.
+            if (next.running) startupError = null
             prefs.edit()
                 .putBoolean("proxyUiLastRunning", next.running)
                 .putString("proxyUiLastCore", next.core)
@@ -379,6 +382,20 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
         }
     }
 
+    suspend fun settleStartFailure(): ProxyComposeState? {
+        // A concurrent boot/network recovery can win immediately after a manual start
+        // attempt reports an exception. Do not flash a stale failure sheet while the
+        // same runtime is still converging. Confirm the authoritative Root state at
+        // points that span the normal ~2-3s shell startup transaction.
+        val waits = longArrayOf(350L, 1_050L, 1_800L)
+        for (waitMs in waits) {
+            delay(waitMs)
+            val confirmed = runCatching { controller.state() }.getOrNull()
+            if (confirmed?.running == true) return confirmed
+        }
+        return null
+    }
+
     fun toggle() {
         if (operation.isNotBlank()) return
         scope.launch {
@@ -391,14 +408,32 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                 throw cancel
             } catch (error: Exception) {
                 val reason = error.message ?: "操作失败"
-                message = reason
-                if (!state.running) {
-                    val diagnostics = runCatching { controller.diagnostics() }.getOrDefault("").trim()
-                    startupError = buildString {
-                        append(reason)
-                        if (diagnostics.isNotBlank()) {
-                            append("\n\n--- Root / Mihomo 诊断 ---\n")
-                            append(diagnostics)
+                val whitelistSelectionError =
+                    reason.contains("仅所选应用代理") &&
+                        reason.contains("普通应用 UID")
+                operation = "确认最终运行状态…"
+                val recovered = settleStartFailure()
+                if (recovered != null) {
+                    state = recovered
+                    message = recovered.message
+                    startupError = null
+                } else {
+                    message = reason
+                    if (!state.running) {
+                        if (whitelistSelectionError) {
+                            startupError =
+                                "当前使用“仅所选应用代理”，但没有可用的已选应用。\n\n" +
+                                    "请打开「工具 → 应用管理」，至少勾选一个已安装的普通应用；" +
+                                    "或者把应用范围改为“核心配置 / 所选应用直连”后再启动。"
+                        } else {
+                            val diagnostics = runCatching { controller.diagnostics() }.getOrDefault("").trim()
+                            startupError = buildString {
+                                append(reason)
+                                if (diagnostics.isNotBlank()) {
+                                    append("\n\n--- Root / Mihomo 诊断 ---\n")
+                                    append(diagnostics)
+                                }
+                            }
                         }
                     }
                 }
