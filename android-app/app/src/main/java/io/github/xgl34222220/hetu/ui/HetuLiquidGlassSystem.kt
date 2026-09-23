@@ -256,7 +256,7 @@ fun SegmentedLiquidActionPill(
             .height(54.dp)
             .crystalMaterial(shape, depth = CrystalDepth.Sunken),
     ) {
-        val segmentWidth = maxWidth / 3
+        val segmentWidth = maxWidth / 3f
         val targetX = segmentWidth * selected.toFloat()
         val indicatorX by animateDpAsState(
             targetValue = targetX,
