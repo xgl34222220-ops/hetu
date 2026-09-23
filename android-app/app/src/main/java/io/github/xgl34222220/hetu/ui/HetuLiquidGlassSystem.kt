@@ -10,6 +10,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -397,4 +398,90 @@ fun LiquidGlassTextField(
             errorBorderColor = t.danger.copy(alpha = .55f),
         ),
     )
+}
+
+
+/** Shared iOS-style grouped inset shell for all settings surfaces. */
+@Composable
+fun GroupedInsetSection(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column(
+        modifier
+            .fillMaxWidth()
+            .crystalMaterial(
+                RoundedCornerShape(HetuGlassRadius.Card),
+                depth = CrystalDepth.Card,
+            )
+            .padding(horizontal = 14.dp),
+        content = content,
+    )
+}
+
+/** Compact liquid switch used instead of the default Material tonal switch. */
+@Composable
+fun LiquidSwitch(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    val t = LocalHetuTokens.current
+    val motion = LocalHetuMotionEnabled.current
+    val shape = RoundedCornerShape(HetuGlassRadius.Pill)
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) HetuMotionSpec.PressedScale else 1f,
+        animationSpec = tween(if (motion) HetuMotionSpec.PressDurationMs else 0),
+        label = "liquidSwitchPress",
+    )
+
+    BoxWithConstraints(
+        modifier
+            .width(52.dp)
+            .height(32.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .crystalMaterial(shape, depth = CrystalDepth.Sunken, selection = checked)
+            .toggleable(
+                value = checked,
+                enabled = enabled,
+                role = Role.Switch,
+                interactionSource = interaction,
+                indication = null,
+                onValueChange = onCheckedChange,
+            ),
+    ) {
+        val thumb = 26.dp
+        val targetX = if (checked) maxWidth - thumb - 3.dp else 3.dp
+        val x by animateDpAsState(
+            targetValue = targetX,
+            animationSpec = spring(
+                dampingRatio = if (motion) .72f else 1f,
+                stiffness = if (motion) 480f else 10_000f,
+            ),
+            label = "liquidSwitchThumb",
+        )
+        Box(
+            Modifier
+                .offset(x = x)
+                .align(Alignment.CenterStart)
+                .size(thumb)
+                .crystalMaterial(
+                    RoundedCornerShape(13.dp),
+                    depth = CrystalDepth.Popover,
+                    selection = checked,
+                ),
+        )
+        if (checked) {
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .padding(3.dp)
+                    .clip(shape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = .08f)),
+            )
+        }
+    }
 }
