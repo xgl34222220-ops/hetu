@@ -195,7 +195,7 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
 
     LazyColumn(
         state = listState,
-        modifier = Modifier.fillMaxSize().background(pageBg),
+        modifier = Modifier.fillMaxSize().crystalPageBackground(),
         contentPadding = PaddingValues(
             start = 16.dp,
             top = 8.dp,
