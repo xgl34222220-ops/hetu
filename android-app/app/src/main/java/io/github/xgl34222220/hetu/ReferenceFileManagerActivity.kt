@@ -84,7 +84,14 @@ private fun RefBreadcrumb(path: String, onNavigate: (String) -> Unit) {
         add("hetu")
         if (relative.isNotBlank()) addAll(relative.split('/').filter { it.isNotBlank() })
     }
-    Surface(shape = RoundedCornerShape(14.dp), color = t.selectionBackground) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .crystalMaterial(
+                RoundedCornerShape(HetuGlassRadius.Input),
+                depth = CrystalDepth.InsetItem,
+            )
+    ) {
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -182,7 +189,7 @@ private fun ReferenceFileManagerScreen(onClose: () -> Unit) {
     }
 
     LazyColumn(
-        Modifier.fillMaxSize().background(t.pageBackground),
+        Modifier.fillMaxSize().crystalPageBackground(),
         contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = hetuContentBottomPadding()),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -200,8 +207,8 @@ private fun ReferenceFileManagerScreen(onClose: () -> Unit) {
             RefBreadcrumb(path) { target -> path = target }
         }
         item {
-            Surface(shape = RoundedCornerShape(16.dp), color = t.cardBackground) {
-                Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp)) {
+            GroupedInsetSection {
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(0.dp)) {
                     if (items.isEmpty()) {
                         Text(
                             loadError.ifBlank { "此目录暂无运行文件" },
@@ -286,14 +293,18 @@ private fun RefFilePreviewSheet(
     val t = LocalHetuTokens.current
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
-        containerColor = t.elevatedCardBackground,
+        shape = RoundedCornerShape(topStart = HetuGlassRadius.Sheet, topEnd = HetuGlassRadius.Sheet),
+        containerColor = Color.Transparent,
         contentColor = t.textPrimary,
         tonalElevation = 0.dp,
         scrimColor = Color.Black.copy(alpha = .35f),
     ) {
         Column(
-            Modifier.fillMaxWidth().fillMaxHeight(.82f).navigationBarsPadding()
+            Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(.82f)
+                .liquidSheetMaterial()
+                .navigationBarsPadding()
                 .padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -313,9 +324,13 @@ private fun RefFilePreviewSheet(
                 }
             }
             Box(
-                Modifier.fillMaxWidth().weight(1f)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(t.controlBackground.copy(alpha = .45f))
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .crystalMaterial(
+                        RoundedCornerShape(HetuGlassRadius.Tile),
+                        depth = CrystalDepth.InsetItem,
+                    )
                     .padding(14.dp)
                     .verticalScroll(rememberScrollState()),
             ) {
