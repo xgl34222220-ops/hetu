@@ -946,6 +946,7 @@ private fun RefReferenceActionStrip(
         onReload = onReload,
         onToggle = onToggle,
         onRestart = onRestart,
+        modifier = Modifier.testTag("home-liquid-actions"),
     )
 }
 
