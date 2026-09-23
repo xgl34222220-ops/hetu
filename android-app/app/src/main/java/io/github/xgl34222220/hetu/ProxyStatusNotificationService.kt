@@ -77,7 +77,8 @@ class ProxyStatusNotificationService : Service() {
             loopJob = scope.launch {
                 while (isActive && prefs.getBoolean(PREF_ENABLED, false)) {
                     updateNotification()
-                    delay(3_000L)
+                    val refreshSeconds = prefs.getInt(PREF_REFRESH_SECONDS, 3).coerceIn(2, 60)
+                    delay(refreshSeconds * 1_000L)
                 }
             }
         }
@@ -153,7 +154,10 @@ class ProxyStatusNotificationService : Service() {
     }
 
     private fun buildNotification(title: String, body: String, running: Boolean): Notification {
-        val launch = packageManager.getLaunchIntentForPackage(packageName)
+        val clickTarget = prefs.getString(PREF_CLICK_TARGET, "Home").orEmpty().ifBlank { "Home" }
+        val launch = Intent(this, ReferenceProxyActivity::class.java)
+            .putExtra(ReferenceProxyActivity.EXTRA_START_PAGE, clickTarget)
+            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         val builder = Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_lock)
             .setContentTitle(title)
@@ -164,22 +168,23 @@ class ProxyStatusNotificationService : Service() {
             .setShowWhen(false)
             .setCategory(Notification.CATEGORY_SERVICE)
 
-        if (launch != null) {
-            builder.setContentIntent(
-                PendingIntent.getActivity(this, 0, launch, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE),
-            )
-        }
-        val first = prefs.getString(PREF_ACTION_1, "reload").orEmpty()
-        val second = prefs.getString(PREF_ACTION_2, "restart").orEmpty()
-        val third = prefs.getString(PREF_ACTION_3, "stop").orEmpty()
-        listOf(first, second, third).distinct().filter { it != "none" }.forEachIndexed { index, action ->
-            actionSpec(action, running)?.let { (label, intentAction) ->
+        builder.setContentIntent(
+            PendingIntent.getActivity(this, 0, launch, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE),
+        )
+        val actions = listOf(
+            prefs.getString(PREF_ACTION_1, "reload").orEmpty() to prefs.getString(PREF_ACTION_LABEL_1, "").orEmpty(),
+            prefs.getString(PREF_ACTION_2, "restart").orEmpty() to prefs.getString(PREF_ACTION_LABEL_2, "").orEmpty(),
+            prefs.getString(PREF_ACTION_3, "stop").orEmpty() to prefs.getString(PREF_ACTION_LABEL_3, "").orEmpty(),
+        )
+        actions.filter { it.first != "none" }.forEachIndexed { index, (action, customLabel) ->
+            actionSpec(action, running)?.let { (defaultLabel, intentAction) ->
                 val pending = PendingIntent.getService(
                     this,
                     40 + index,
                     Intent(this, ProxyStatusNotificationService::class.java).setAction(intentAction),
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                 )
+                val label = customLabel.trim().take(12).ifBlank { defaultLabel }
                 builder.addAction(Notification.Action.Builder(null, label, pending).build())
             }
         }
@@ -221,6 +226,11 @@ class ProxyStatusNotificationService : Service() {
         const val PREF_ACTION_1 = "proxyStatusNotificationAction1"
         const val PREF_ACTION_2 = "proxyStatusNotificationAction2"
         const val PREF_ACTION_3 = "proxyStatusNotificationAction3"
+        const val PREF_ACTION_LABEL_1 = "proxyStatusNotificationActionLabel1"
+        const val PREF_ACTION_LABEL_2 = "proxyStatusNotificationActionLabel2"
+        const val PREF_ACTION_LABEL_3 = "proxyStatusNotificationActionLabel3"
+        const val PREF_REFRESH_SECONDS = "proxyStatusNotificationRefreshSeconds"
+        const val PREF_CLICK_TARGET = "proxyStatusNotificationClickTarget"
         const val DEFAULT_TEMPLATE = "{status} · {uptime}\n↓ {download}  ↑ {upload} · CPU {cpu}"
         private const val CHANNEL_ID = "proxy_status"
         private const val NOTIFICATION_ID = 2026
