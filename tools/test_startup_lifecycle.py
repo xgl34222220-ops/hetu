@@ -95,5 +95,15 @@ public class EpochTest {
  inspector=(JAVA/'ProxyRuntimeInspector.kt').read_text()
  assert 'processSampleTtlMs = 8_000L' in inspector
  assert 'processSampleStartupAt == startupAt' in inspector
- checks+=10
+ activity=(JAVA/'ReferenceProxyActivity.kt').read_text()
+ assert 'suspend fun settleStartFailure()' in activity
+ assert 'if (next.running) startupError = null' in activity
+ assert 'operation = "确认最终运行状态…"' in activity
+ app_selection=(JAVA/'ProxyAppSelectionActivity.kt').read_text()
+ assert 'next == "whitelist" && selected.isEmpty()' in app_selection
+ assert '请先选择至少一个应用' in app_selection
+ policy=(JAVA/'RootProxyPolicy.java').read_text()
+ assert '尚未选择任何应用' in policy
+ assert '所选应用已卸载或当前用户不可见' in policy
+ checks+=17
 print(f'Startup/lifecycle regression checks passed: {checks}')
