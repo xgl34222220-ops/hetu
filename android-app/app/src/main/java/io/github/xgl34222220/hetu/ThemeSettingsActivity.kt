@@ -92,7 +92,7 @@ private fun ThemeSettingsScreen(onBack: () -> Unit, onThemeChanged: () -> Unit) 
     }
 
     LazyColumn(
-        Modifier.fillMaxSize().background(t.pageBackground),
+        Modifier.fillMaxSize().crystalPageBackground(),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = hetuContentBottomPadding()),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -209,10 +209,10 @@ private fun ThemeSettingsScreen(onBack: () -> Unit, onThemeChanged: () -> Unit) 
     pickerTitle?.let { title ->
         ModalBottomSheet(
             onDismissRequest = { pickerTitle = null },
-            containerColor = t.elevatedCardBackground,
+            containerColor = Color.Transparent,
             contentColor = t.textPrimary,
             tonalElevation = 0.dp,
-            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            shape = RoundedCornerShape(topStart = HetuGlassRadius.Sheet, topEnd = HetuGlassRadius.Sheet),
             dragHandle = {
                 Box(
                     Modifier.padding(top = 10.dp, bottom = 7.dp)
@@ -222,7 +222,13 @@ private fun ThemeSettingsScreen(onBack: () -> Unit, onThemeChanged: () -> Unit) 
             },
         ) {
             Column(
-                Modifier.fillMaxWidth().navigationBarsPadding()
+                Modifier
+                    .fillMaxWidth()
+                    .crystalMaterial(
+                        RoundedCornerShape(topStart = HetuGlassRadius.Sheet, topEnd = HetuGlassRadius.Sheet),
+                        depth = CrystalDepth.Popover,
+                    )
+                    .navigationBarsPadding()
                     .padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
@@ -271,9 +277,7 @@ private fun ThemeSection(title: String, content: @Composable ColumnScope.() -> U
     val t = LocalHetuTokens.current
     Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
         Text(title, color = t.textSecondary, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 4.dp))
-        Surface(shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
-            Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp), content = content)
-        }
+        GroupedInsetSection(content = content)
     }
 }
 
@@ -300,7 +304,7 @@ private fun ThemeSwitchRow(icon: androidx.compose.ui.graphics.vector.ImageVector
             Text(title, color = t.textPrimary, style = MaterialTheme.typography.bodyMedium)
             Text(subtitle, color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
         }
-        Switch(checked = checked, onCheckedChange = onChecked)
+        LiquidSwitch(checked = checked, onCheckedChange = onChecked)
     }
 }
 
