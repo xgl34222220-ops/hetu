@@ -56,11 +56,43 @@ fun CrystalEnvironment(content: @Composable () -> Unit) {
     }
 }
 
-/** Reference-video page field: calm lavender, no synthetic colored blobs. */
+/** Cold-air canvas with restrained ambient light for glass refraction. */
 @Composable
 fun Modifier.crystalPageBackground(): Modifier {
     val t = LocalHetuTokens.current
-    return background(t.pageBackground)
+    val dark = t.pageBackground.luminance() < .5f
+    return drawWithCache {
+        val cyan = Brush.radialGradient(
+            colors = listOf(
+                Color(0xFF82DCFF).copy(alpha = if (dark) .055f else .15f),
+                Color.Transparent,
+            ),
+            center = Offset(size.width * .10f, size.height * .06f),
+            radius = maxOf(size.width * .78f, 1f),
+        )
+        val violet = Brush.radialGradient(
+            colors = listOf(
+                Color(0xFFB4A0FF).copy(alpha = if (dark) .045f else .12f),
+                Color.Transparent,
+            ),
+            center = Offset(size.width * .92f, size.height * .18f),
+            radius = maxOf(size.width * .72f, 1f),
+        )
+        val blue = Brush.radialGradient(
+            colors = listOf(
+                Color(0xFFA0D2FF).copy(alpha = if (dark) .025f else .07f),
+                Color.Transparent,
+            ),
+            center = Offset(size.width * .06f, size.height * .92f),
+            radius = maxOf(size.width * .82f, 1f),
+        )
+        onDrawBehind {
+            drawRect(t.pageBackground)
+            drawRect(cyan)
+            drawRect(violet)
+            drawRect(blue)
+        }
+    }
 }
 
 /** Shared material, not a foreground blur. The original composable's semantics are untouched. */
@@ -79,32 +111,60 @@ fun Modifier.crystalMaterial(
 
     if (!dark) {
         val fill = when (depth) {
-            CrystalDepth.Sunken, CrystalDepth.InsetItem -> HetuMicroCrystal.Sunken
-            CrystalDepth.Popover -> Color(0xF2F9F8FE)
+            CrystalDepth.Sunken, CrystalDepth.InsetItem -> Color.White.copy(alpha = .42f)
+            CrystalDepth.Popover -> Color.White.copy(alpha = .82f)
             CrystalDepth.Card -> t.cardBackground
         }
+        val blurRadius = when (depth) {
+            CrystalDepth.Popover -> 24.dp
+            CrystalDepth.Sunken, CrystalDepth.InsetItem -> 16.dp
+            CrystalDepth.Card -> 20.dp
+        }
+        val hazeStyle = HazeStyle(
+            backgroundColor = Color.Transparent,
+            tints = emptyList(),
+            blurRadius = blurRadius,
+            noiseFactor = .008f,
+            fallbackTint = HazeTint(fill),
+        )
         val elevation = when (depth) {
-            CrystalDepth.Popover -> 10.dp
-            CrystalDepth.Card -> 1.5.dp
-            else -> 0.dp
+            CrystalDepth.Popover -> 12.dp
+            CrystalDepth.Card -> 6.dp
+            CrystalDepth.InsetItem -> 1.dp
+            CrystalDepth.Sunken -> 0.dp
         }
         val outline = when {
-            selection -> primary.copy(alpha = .42f)
-            depth == CrystalDepth.Popover -> Color.White.copy(alpha = .78f)
-            else -> Color.White.copy(alpha = .32f)
+            selection -> primary.copy(alpha = .34f)
+            depth == CrystalDepth.Popover -> Color.White.copy(alpha = .76f)
+            else -> Color.White.copy(alpha = .60f)
         }
+        val blur = if (blurEnabled && backdrop != null) {
+            Modifier.hazeEffect(backdrop, hazeStyle) { canDrawArea = { true } }
+        } else Modifier
         return then(
             Modifier
                 .shadow(
                     elevation = elevation,
                     shape = shape,
                     clip = false,
-                    ambientColor = Color.Black.copy(alpha = if (depth == CrystalDepth.Popover) .08f else .018f),
-                    spotColor = Color.Black.copy(alpha = if (depth == CrystalDepth.Popover) .10f else .026f),
+                    ambientColor = Color(0xFF1F2687).copy(alpha = if (depth == CrystalDepth.Popover) .08f else .035f),
+                    spotColor = Color.Black.copy(alpha = if (depth == CrystalDepth.Popover) .08f else .028f),
                 )
                 .clip(shape)
+                .then(blur)
                 .background(fill, shape)
-                .border(if (selection) 1.2.dp else .6.dp, outline, shape)
+                .border(if (selection) 1.dp else .75.dp, outline, shape)
+                .drawWithCache {
+                    val outlineShape = shape.createOutline(size, layoutDirection, this)
+                    onDrawWithContent {
+                        drawContent()
+                        drawOutline(
+                            outlineShape,
+                            Color.White.copy(alpha = if (depth == CrystalDepth.Sunken) .34f else .58f),
+                            style = Stroke(.8.dp.toPx()),
+                        )
+                    }
+                }
         )
     }
 
