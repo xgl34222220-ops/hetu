@@ -489,3 +489,15 @@ fun LiquidSwitch(
         }
     }
 }
+
+
+/** Shared material wrapper for top-rounded modal/bottom-sheet content. */
+@Composable
+fun Modifier.liquidSheetMaterial(): Modifier =
+    crystalMaterial(
+        RoundedCornerShape(
+            topStart = HetuGlassRadius.Sheet,
+            topEnd = HetuGlassRadius.Sheet,
+        ),
+        depth = CrystalDepth.Popover,
+    )
