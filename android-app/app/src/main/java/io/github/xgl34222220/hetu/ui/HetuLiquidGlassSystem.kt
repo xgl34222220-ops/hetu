@@ -9,6 +9,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -322,6 +323,28 @@ fun SegmentedLiquidActionPill(
             }
         }
     }
+}
+
+/**
+ * Shared moving selection lens. Parent layouts animate its offset so the same
+ * highlight appears to flow between destinations instead of blinking per-card.
+ */
+@Composable
+fun LiquidSelectionIndicator(
+    modifier: Modifier = Modifier,
+) {
+    val primary = MaterialTheme.colorScheme.primary
+    val shape = RoundedCornerShape(HetuGlassRadius.Tile)
+    Box(
+        modifier
+            .graphicsLayer { alpha = .62f }
+            .crystalMaterial(
+                shape = shape,
+                depth = CrystalDepth.Card,
+                selection = true,
+            )
+            .border(1.dp, primary.copy(alpha = .22f), shape),
+    )
 }
 
 /** Shared micro-crystal tile used by WAN, speed, subscription and resource metrics. */
