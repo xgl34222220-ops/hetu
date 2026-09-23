@@ -17,10 +17,33 @@
         <activity android:name=".CompactMainActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".ThemeSettingsActivity" android:label="主题与界面" android:exported="false"  android:launchMode="singleTop" />
         <activity android:name=".HetuMainActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
-        <activity android:name=".ReferenceProxyActivity" android:label="河图" android:exported="true">
-            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
-        </activity>
-        <activity android:name=".ReferenceFileManagerActivity" android:label="文件管理" android:exported="false"  android:launchMode="singleTop" />\n        <activity android:name=".ProxyLogViewerActivity" android:label="日志查看" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name=".ReferenceProxyActivity" android:label="河图" android:exported="true" android:launchMode="singleTop" />
+        <activity-alias
+            android:name=".LauncherOfficial"
+            android:targetActivity=".ReferenceProxyActivity"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@drawable/ic_hetu_official"
+            android:label="河图">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".LauncherClassic"
+            android:targetActivity=".ReferenceProxyActivity"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_hetu"
+            android:label="河图">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity android:name=".ReferenceFileManagerActivity" android:label="文件管理" android:exported="false"  android:launchMode="singleTop" />
+        <activity android:name=".ProxyLogViewerActivity" android:label="日志查看" android:exported="false" android:launchMode="singleTop" />
         <activity android:name=".ProxyScriptsActivity" android:label="脚本" android:exported="false" android:launchMode="singleTop" />
         <activity android:name=".ProxyLocalWebUiActivity" android:label="河图 WebUI" android:exported="false" android:launchMode="singleTop" />
         <activity android:name=".ProxyCoreActivity" android:label="内核管理" android:exported="false"  android:launchMode="singleTop" />
@@ -29,6 +52,24 @@
         <activity android:name=".ProxySubStoreActivity" android:label="Sub-Store" android:exported="false" android:launchMode="singleTop" />
         <activity android:name=".ProxySubStoreWebActivity" android:label="Sub-Store 面板" android:exported="false" android:launchMode="singleTop" />
         <activity android:name=".ProxyPolicyIconsActivity" android:label="策略图标" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name=".ProxySelectorPreferencesActivity" android:label="策略显示" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name=".ProxyWebPanelsActivity" android:label="Web 面板" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name=".ProxyWebPanelViewerActivity" android:label="Web 面板" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name=".ProxyStartupConfigActivity" android:label="启动配置" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name=".ProxyNotificationSettingsActivity" android:label="通知设置" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name=".RuntimeFileEditorActivity" android:label="运行文件编辑" android:exported="false" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".ProxyAboutActivity" android:label="关于河图" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name=".ProxyAboutLibrariesActivity" android:label="开源库" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name=".ProxyAboutLibraryDetailActivity" android:label="开源库详情" android:exported="false" />
+        <activity android:name=".ProxyAboutSponsorshipActivity" android:label="赞助与支持" android:exported="false" />
+        <activity android:name=".ProxyCoreImportActivity" android:label="导入核心" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" android:mimeType="application/octet-stream" />
+                <data android:scheme="content" android:mimeType="application/x-executable" />
+            </intent-filter>
+        </activity>
         <activity android:name=".ProxyRuntimeCoreSettingsActivity" android:label="运行核心" android:exported="false"  android:launchMode="singleTop" />
         <activity android:name=".ProxySharedNetworkSettingsActivity" android:label="共享网络" android:exported="false"  android:launchMode="singleTop" />
         <activity android:name=".ProxyCnIpSettingsActivity" android:label="CNIP 设置" android:exported="false"  android:launchMode="singleTop" />

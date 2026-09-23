@@ -943,7 +943,7 @@ internal fun RefHome(
                     modifier = Modifier.weight(1f),
                     enabled = state.running,
                 ) {
-                    context.startActivity(Intent(context, ProxyLocalWebUiActivity::class.java))
+                    HetuWebPanels.openSelected(context)
                 }
                 RefReferenceShortcut(
                     title = "日志",
@@ -1314,6 +1314,16 @@ private fun RefPanel(
     val t = LocalHetuTokens.current
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
+    val selectorPrefs = remember(context) { context.getSharedPreferences("hetu", 0) }
+    var selectorPrefsRevision by remember { mutableIntStateOf(0) }
+    DisposableEffect(selectorPrefs) {
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key?.startsWith("proxySelector") == true) selectorPrefsRevision++
+        }
+        selectorPrefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { selectorPrefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+    selectorPrefsRevision
     val tab = if (strategyOnly) RefPanelTab.Groups else selectedTab
     var refreshing by remember { mutableStateOf(false) }
     var providers by remember { mutableStateOf<List<DashboardProviderUi>>(emptyList()) }
@@ -1334,8 +1344,12 @@ private fun RefPanel(
     var error by remember { mutableStateOf("") }
     var searchOpen by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
-    var groupLayout by rememberSaveable { mutableIntStateOf(0) } // 0 auto, 1 single, 2 double
-    var groupSortMode by rememberSaveable { mutableStateOf("config") }
+    var groupLayout by rememberSaveable { mutableIntStateOf(selectorPrefs.getInt("proxySelectorGroupColumns", 0).coerceIn(0, 2)) }
+    var groupSortMode by rememberSaveable { mutableStateOf(selectorPrefs.getString("proxySelectorGroupSort", "config").orEmpty().ifBlank { "config" }) }
+    LaunchedEffect(selectorPrefsRevision) {
+        groupLayout = selectorPrefs.getInt("proxySelectorGroupColumns", 0).coerceIn(0, 2)
+        groupSortMode = selectorPrefs.getString("proxySelectorGroupSort", "config").orEmpty().ifBlank { "config" }
+    }
     var groupSortPicker by rememberSaveable { mutableStateOf(false) }
     var apiSettings by rememberSaveable { mutableStateOf(false) }
     var connectionView by rememberSaveable { mutableStateOf("active") }
@@ -1706,6 +1720,7 @@ private fun RefPanel(
                                 1 -> 2
                                 else -> 1
                             }
+                            selectorPrefs.edit().putInt("proxySelectorGroupColumns", groupLayout).apply()
                             selectedGroupName = null
                         },
                         onBack = onBack,
@@ -1785,8 +1800,18 @@ private fun RefPanel(
                             WorkspaceAccordion(visible = expandedGroup != null) {
                                 (expandedGroup ?: closingGroup)?.let { group ->
                                     val selected = selectedLocal[group.name] ?: group.now
+                                    val nodeSort = selectorPrefs.getString("proxySelectorNodeSort", "config").orEmpty()
+                                    val descending = selectorPrefs.getBoolean("proxySelectorSortDescending", false)
+                                    val orderedNodes = when (nodeSort) {
+                                        "name" -> group.nodes.sortedBy { it.name.lowercase() }
+                                        "latency" -> group.nodes.sortedWith(compareBy<ProxyNodeUi> {
+                                            (delays[it.name] ?: it.lastDelay)?.takeIf { value -> value > 0L } ?: Long.MAX_VALUE
+                                        }.thenBy { it.name.lowercase() })
+                                        else -> group.nodes
+                                    }.let { values -> if (descending) values.reversed() else values }
+                                    val visibleGroup = group.copy(nodes = orderedNodes)
                                     RefInlineGroupExpansion(
-                                        group = group,
+                                        group = visibleGroup,
                                         selected = selected,
                                         delays = delays,
                                         testing = testing,
@@ -1796,7 +1821,13 @@ private fun RefPanel(
                                             view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                                             scope.launch {
                                                 try {
+                                                    val previousConnections = if (selectorPrefs.getBoolean("proxySelectorDisconnectOnSelect", false)) {
+                                                        state.connections.map { it.id }
+                                                    } else emptyList()
                                                     repo.select(group.name, node)
+                                                    if (previousConnections.isNotEmpty()) {
+                                                        previousConnections.forEach { id -> runCatching { repo.closeConnection(id) } }
+                                                    }
                                                     onRefreshState()
                                                 } catch (_: Exception) {
                                                     if (previous.isBlank()) selectedLocal.remove(group.name) else selectedLocal[group.name] = previous
@@ -2010,6 +2041,7 @@ private fun RefPanel(
             onDismiss = { groupSortPicker = false },
             onSelect = { index ->
                 groupSortMode = sortValues[index].first
+                selectorPrefs.edit().putString("proxySelectorGroupSort", groupSortMode).apply()
                 selectedGroupName = null
                 groupSortPicker = false
             },
@@ -3922,9 +3954,18 @@ internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
                     Icons.Rounded.FolderOpen,
                     Color.Unspecified,
                     "文件管理",
-                    "浏览 /data/adb/hetu 运行文件",
+                    "浏览和编辑 /data/adb/hetu 运行文件",
                 ) {
                     context.startActivity(Intent(context, ReferenceFileManagerActivity::class.java))
+                }
+                RefDivider()
+                RefToolRow(
+                    Icons.Rounded.Description,
+                    Color.Unspecified,
+                    "启动配置",
+                    "查看、复制、导出或重新生成最终运行配置",
+                ) {
+                    context.startActivity(Intent(context, ProxyStartupConfigActivity::class.java))
                 }
             }
         }
@@ -3934,12 +3975,12 @@ internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
                 RefToolRow(
                     Icons.Rounded.Web,
                     Color.Unspecified,
-                    "更新 WebUI",
-                    "检查并更新 WebUI 资源",
-                    trailingText = "更新",
+                    "Web 面板",
+                    "本地面板、自定义 HTTPS 面板、切换与缓存管理",
+                    trailingText = "管理",
                     trailingColor = HetuMicroCrystal.KleinBlue,
                 ) {
-                    context.startActivity(Intent(context, ProxyLocalWebUiActivity::class.java))
+                    context.startActivity(Intent(context, ProxyWebPanelsActivity::class.java))
                 }
                 RefDivider()
                 RefToolRow(
@@ -4101,6 +4142,15 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
                 }
                 RefDivider()
                 RefToolRow(
+                    Icons.Rounded.ViewModule,
+                    Color.Unspecified,
+                    "策略显示",
+                    "列数、密度、名称显示、节点排序与切换行为",
+                ) {
+                    context.startActivity(Intent(context, ProxySelectorPreferencesActivity::class.java))
+                }
+                RefDivider()
+                RefToolRow(
                     Icons.Rounded.FormatPaint,
                     Color.Unspecified,
                     "主题设置",
@@ -4159,9 +4209,9 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
                     Icons.Rounded.Tune,
                     Color.Unspecified,
                     "通知详细设置",
-                    "通知正文模板、变量与三个快捷按钮",
+                    "通知正文模板、刷新频率、点击目标与三个快捷按钮",
                 ) {
-                    notificationSettings = true
+                    context.startActivity(Intent(context, ProxyNotificationSettingsActivity::class.java))
                 }
                 RefDivider()
                 RefToolRow(
@@ -4233,9 +4283,9 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
                     Icons.Rounded.Info,
                     Color.Unspecified,
                     "关于",
-                    "版本、构建与运行环境信息",
+                    "版本、开源库、项目与赞助支持",
                 ) {
-                    aboutSheet = true
+                    context.startActivity(Intent(context, ProxyAboutActivity::class.java))
                 }
             }
         }

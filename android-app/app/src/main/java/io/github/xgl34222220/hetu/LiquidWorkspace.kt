@@ -99,6 +99,13 @@ internal fun LiquidStrategyCard(
 ) {
     val t = LocalHetuTokens.current
     val motion = LocalHetuMotionEnabled.current
+    val context = LocalContext.current
+    val selectorPrefs = remember(context) { context.getSharedPreferences("hetu", 0) }
+    val compactSelector = selectorPrefs.getString("proxySelectorDensity", "standard") == "compact"
+    val nameOverflow = selectorPrefs.getString("proxySelectorNameOverflow", "clip").orEmpty()
+    val strategyHeight = if (compactSelector) 68.dp else 80.dp
+    val titleModifier = Modifier.fillMaxWidth().testTag("strategy-title:" + group.name)
+        .then(if (nameOverflow == "scroll") Modifier.basicMarquee() else Modifier)
     val interactions = remember(group.name) { MutableInteractionSource() }
     val pressed by interactions.collectIsPressedAsState()
     val scale by animateFloatAsState(
@@ -120,7 +127,7 @@ internal fun LiquidStrategyCard(
 
     Box(
         modifier
-            .height(80.dp)
+            .height(strategyHeight)
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .crystalMaterial(
                 RoundedCornerShape(HetuGlassRadius.Tile),
@@ -143,13 +150,14 @@ internal fun LiquidStrategyCard(
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                     Text(
                         group.name,
-                        Modifier.fillMaxWidth().testTag("strategy-title:${group.name}"),
+                        titleModifier,
                         color = t.textPrimary,
-                        fontSize = 15.5.sp,
-                        lineHeight = 19.sp,
+                        fontSize = if (compactSelector) 14.sp else 15.5.sp,
+                        lineHeight = if (compactSelector) 17.sp else 19.sp,
                         fontWeight = FontWeight.ExtraBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        maxLines = if (nameOverflow == "wrap") 2 else 1,
+                        softWrap = nameOverflow == "wrap",
+                        overflow = if (nameOverflow == "clip" || nameOverflow == "scroll" || nameOverflow == "wrap") TextOverflow.Clip else TextOverflow.Ellipsis,
                     )
                     Text(
                         typeText,
@@ -173,13 +181,15 @@ internal fun LiquidStrategyCard(
                 }
                 Text(
                     selected.ifBlank { "未选择" },
-                    Modifier.weight(1f).testTag("strategy-selection:${group.name}"),
+                    Modifier.weight(1f).testTag("strategy-selection:" + group.name)
+                        .then(if (nameOverflow == "scroll") Modifier.basicMarquee() else Modifier),
                     color = t.textPrimary,
-                    fontSize = 11.5.sp,
+                    fontSize = if (compactSelector) 10.5.sp else 11.5.sp,
                     lineHeight = 15.sp,
                     fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    maxLines = if (nameOverflow == "wrap") 2 else 1,
+                    softWrap = nameOverflow == "wrap",
+                    overflow = if (nameOverflow == "clip" || nameOverflow == "scroll" || nameOverflow == "wrap") TextOverflow.Clip else TextOverflow.Ellipsis,
                 )
                 ReferenceDelayPill(value, testing)
             }
@@ -213,6 +223,13 @@ internal fun LiquidNodeCard(
 ) {
     val t = LocalHetuTokens.current
     val motion = LocalHetuMotionEnabled.current
+    val context = LocalContext.current
+    val selectorPrefs = remember(context) { context.getSharedPreferences("hetu", 0) }
+    val compactSelector = selectorPrefs.getString("proxySelectorDensity", "standard") == "compact"
+    val nameOverflow = selectorPrefs.getString("proxySelectorNameOverflow", "clip").orEmpty()
+    val nodeHeight = if (compactSelector) 66.dp else 78.dp
+    val nameModifier = Modifier.fillMaxWidth().testTag("node-label:" + node.name)
+        .then(if (nameOverflow == "scroll") Modifier.basicMarquee() else Modifier)
     val interaction = remember(node.name) { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     var reveal by remember(node.name, motion) { mutableStateOf(!motion) }
@@ -234,8 +251,8 @@ internal fun LiquidNodeCard(
 
     Box(
         modifier
-            .height(78.dp)
-            .testTag("node:${node.name}")
+            .height(nodeHeight)
+            .testTag("node:" + node.name)
             .graphicsLayer { this.alpha = alpha; scaleX = scale; scaleY = scale }
             .crystalMaterial(
                 RoundedCornerShape(HetuGlassRadius.Tile),
@@ -256,19 +273,19 @@ internal fun LiquidNodeCard(
         ) {
             BasicText(
                 text = node.name,
-                modifier = Modifier.fillMaxWidth().testTag("node-label:${node.name}"),
+                modifier = nameModifier,
                 style = TextStyle(
                     color = t.textPrimary,
-                    fontSize = 14.sp,
-                    lineHeight = 18.sp,
+                    fontSize = if (compactSelector) 12.5.sp else 14.sp,
+                    lineHeight = if (compactSelector) 16.sp else 18.sp,
                     fontWeight = FontWeight.Bold,
                 ),
-                maxLines = 1,
-                softWrap = false,
+                maxLines = if (nameOverflow == "wrap") 2 else 1,
+                softWrap = nameOverflow == "wrap",
                 overflow = TextOverflow.Clip,
-                autoSize = TextAutoSize.StepBased(
+                autoSize = if (nameOverflow == "wrap") null else TextAutoSize.StepBased(
                     minFontSize = 10.sp,
-                    maxFontSize = 14.sp,
+                    maxFontSize = if (compactSelector) 12.5.sp else 14.sp,
                     stepSize = .5.sp,
                 ),
             )
@@ -324,6 +341,11 @@ internal fun LiquidGroupWell(
     onTestAll: () -> Unit,
 ) {
     val motion = LocalHetuMotionEnabled.current
+    val context = LocalContext.current
+    val selectorPrefs = remember(context) { context.getSharedPreferences("hetu", 0) }
+    val configuredNodeColumns = selectorPrefs.getInt("proxySelectorNodeColumns", 0).coerceIn(0, 3)
+    val compactSelector = selectorPrefs.getString("proxySelectorDensity", "standard") == "compact"
+    val nodeHeight = if (compactSelector) 66.dp else 78.dp
     BoxWithConstraints(
         Modifier
             .fillMaxWidth()
@@ -340,7 +362,7 @@ internal fun LiquidGroupWell(
                 } else Modifier
             ),
     ) {
-        val columns = liquidColumns(maxWidth)
+        val columns = if (configuredNodeColumns == 0) liquidColumns(maxWidth) else configuredNodeColumns
         val horizontalGap = 10.dp
         val verticalGap = 8.dp
         val cellWidth = (maxWidth - horizontalGap * (columns - 1).toFloat()) / columns.toFloat()
@@ -349,7 +371,7 @@ internal fun LiquidGroupWell(
             val column = selectedIndex % columns
             val row = selectedIndex / columns
             val targetX = (cellWidth + horizontalGap) * column.toFloat()
-            val targetY = (78.dp + verticalGap) * row.toFloat()
+            val targetY = (nodeHeight + verticalGap) * row.toFloat()
             val indicatorX by animateDpAsState(
                 targetValue = targetX,
                 animationSpec = if (motion) spring(
@@ -370,8 +392,8 @@ internal fun LiquidGroupWell(
                 Modifier
                     .offset(x = indicatorX, y = indicatorY)
                     .width(cellWidth)
-                    .height(78.dp)
-                    .testTag("node-selection-indicator:${group.name}"),
+                    .height(nodeHeight)
+                    .testTag("node-selection-indicator:" + group.name),
             )
         }
         Column(verticalArrangement = Arrangement.spacedBy(verticalGap)) {

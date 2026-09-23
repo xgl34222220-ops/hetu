@@ -57,6 +57,7 @@ private fun ThemeSettingsScreen(onBack: () -> Unit, onThemeChanged: () -> Unit) 
     val t = LocalHetuTokens.current
 
     var uiStyle by remember { mutableStateOf(prefs.getString("uiStyle", "Miuix") ?: "Miuix") }
+    var launcherIcon by remember { mutableStateOf(prefs.getString("launcherIcon", "official") ?: "official") }
     var appearance by remember { mutableStateOf(prefs.getString("appearance", "system") ?: "system") }
     var pureBlack by remember { mutableStateOf(prefs.getBoolean("pureBlackDark", false)) }
     var monet by remember { mutableStateOf(prefs.getBoolean("enableMonet", false)) }
@@ -106,6 +107,17 @@ private fun ThemeSettingsScreen(onBack: () -> Unit, onThemeChanged: () -> Unit) 
             ThemeValueRow(Icons.Rounded.DashboardCustomize, "界面风格", uiStyle) {
                 openPicker("界面风格", uiStyle, listOf(PickerOption("Miuix", "Miuix"), PickerOption("Material", "Material"))) {
                     uiStyle = it; persistString("uiStyle", it)
+                }
+            }
+            ThemeDivider()
+            ThemeValueRow(Icons.Rounded.Apps, "启动图标", if (launcherIcon == "classic") "经典河图" else "官方河图") {
+                openPicker(
+                    "启动图标",
+                    launcherIcon,
+                    listOf(PickerOption("official", "官方河图"), PickerOption("classic", "经典河图")),
+                ) {
+                    launcherIcon = it
+                    HetuLauncherIcons.apply(context, it)
                 }
             }
             ThemeDivider()

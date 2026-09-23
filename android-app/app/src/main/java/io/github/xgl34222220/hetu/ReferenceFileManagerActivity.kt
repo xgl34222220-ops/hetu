@@ -163,6 +163,7 @@ private fun ReferenceFileManagerScreen(onClose: () -> Unit) {
     var path by rememberSaveable { mutableStateOf(REF_FILE_ROOT) }
     var refresh by remember { mutableIntStateOf(0) }
     var previewTitle by remember { mutableStateOf<String?>(null) }
+    var previewPath by remember { mutableStateOf("") }
     var previewText by remember { mutableStateOf("") }
     var loadError by remember { mutableStateOf("") }
     val items by produceState(initialValue = emptyList(), path, refresh) {
@@ -223,6 +224,7 @@ private fun ReferenceFileManagerScreen(onClose: () -> Unit) {
                                     if (item.directory) path = item.path
                                     else {
                                         previewTitle = item.name
+                                        previewPath = item.path
                                         previewText = "正在读取…"
                                     }
                                 }.padding(vertical = 12.dp),
@@ -278,6 +280,15 @@ private fun ReferenceFileManagerScreen(onClose: () -> Unit) {
         RefFilePreviewSheet(
             title = title,
             text = previewText,
+            onEdit = {
+                if (previewPath.isNotBlank()) {
+                    context.startActivity(
+                        android.content.Intent(context, RuntimeFileEditorActivity::class.java)
+                            .putExtra(EXTRA_RUNTIME_PATH, previewPath),
+                    )
+                    previewTitle = null
+                }
+            },
             onDismiss = { previewTitle = null },
         )
     }
@@ -288,6 +299,7 @@ private fun ReferenceFileManagerScreen(onClose: () -> Unit) {
 private fun RefFilePreviewSheet(
     title: String,
     text: String,
+    onEdit: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val t = LocalHetuTokens.current
@@ -319,6 +331,11 @@ private fun RefFilePreviewSheet(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                TextButton(onClick = onEdit) {
+                    Icon(Icons.Rounded.Edit, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("编辑")
+                }
                 IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) {
                     Icon(Icons.Rounded.Close, "关闭", tint = t.textSecondary)
                 }
