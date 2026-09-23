@@ -300,35 +300,53 @@ private fun ProxyPolicyIconsScreen(onBack: () -> Unit) {
     }
 
     editingName?.let { name ->
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { editingName = null },
-            title = { Text("“" + name + "”图标") },
-            text = {
+            containerColor = tokens.cardBackground,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        ) {
+            Column(
+                Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text("“" + name + "”图标", color = tokens.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    "使用 HTTPS 图片地址；也可以关闭此面板后使用策略卡上的“相册 / 文件”。",
+                    color = tokens.textSecondary,
+                    fontSize = 12.sp,
+                    lineHeight = 18.sp,
+                )
                 OutlinedTextField(
                     value = remoteUrl,
                     onValueChange = { remoteUrl = it.take(500) },
+                    modifier = Modifier.fillMaxWidth(),
                     label = { Text("HTTPS 图标链接") },
                     placeholder = { Text("https://…") },
                     singleLine = true,
                     shape = RoundedCornerShape(16.dp),
                 )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    val url = remoteUrl.trim()
-                    if (!url.startsWith("https://")) {
-                        message = "策略图标链接只接受 HTTPS"
-                    } else {
-                        ProxyPolicyIconOverrides.put(prefs, ProxyPolicyIconOverrides.Entry(name = name, url = url))
-                        revision++
-                        message = "已保存“" + name + "”的远程图标"
-                        editingName = null
-                    }
-                }) { Text("保存") }
-            },
-            dismissButton = {
-                TextButton(onClick = { editingName = null }) { Text("取消") }
-            },
-        )
-    }
-}
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(
+                        onClick = { editingName = null },
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                        shape = RoundedCornerShape(16.dp),
+                    ) { Text("取消") }
+                    Button(
+                        onClick = {
+                            val url = remoteUrl.trim()
+                            if (!url.startsWith("https://")) {
+                                message = "策略图标链接只接受 HTTPS"
+                            } else {
+                                ProxyPolicyIconOverrides.put(prefs, ProxyPolicyIconOverrides.Entry(name = name, url = url))
+                                revision++
+                                message = "已保存“" + name + "”的远程图标"
+                                editingName = null
+                            }
+                        },
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                        shape = RoundedCornerShape(16.dp),
+                    ) { Text("保存") }
+                }
+            }
+        }
+    }}
