@@ -61,7 +61,15 @@ class HomeScreenRenderTest {
             compose.runOnIdle { width=w;font=scale;night=dark }
             compose.waitForIdle()
             compose.onNodeWithTag("home-run-state", true).assertTextEquals("运行中")
+            compose.onNodeWithTag("home-liquid-actions", true).assertExists()
             compose.onNodeWithText("停止",true).assertExists()
+            compose.onNodeWithText("44 ms", true).assertExists()
+            val heroBounds = compose.onNodeWithTag("home-hero", true).fetchSemanticsNode().boundsInRoot
+            val actionBounds = compose.onNodeWithTag("home-liquid-actions", true).fetchSemanticsNode().boundsInRoot
+            compose.runOnIdle {
+                assertTrue("Liquid status capsule regressed into a giant hero: $heroBounds", heroBounds.height <= 96f)
+                assertTrue("Liquid action rail lost its 48dp touch height: $actionBounds", actionBounds.height >= 48f)
+            }
             compose.onNodeWithText("网络与广告过滤",true).assertDoesNotExist()
             compose.onNodeWithText("应用连接",true).assertDoesNotExist()
             compose.onNodeWithText("WebUI",true).assertExists()
