@@ -235,27 +235,27 @@ private fun ThemeSettingsScreen(onBack: () -> Unit, onThemeChanged: () -> Unit) 
                 Text(title, color = t.textPrimary, fontSize = 21.sp, lineHeight = 27.sp, fontWeight = FontWeight.ExtraBold)
                 Text("选择后立即生效", color = t.textSecondary, style = MaterialTheme.typography.bodySmall)
                 pickerOptions.forEach { option ->
-                    Surface(
-                        onClick = {
-                            pickerSelected = option.value
-                            pickerApply(option.value)
-                            pickerTitle = null
-                        },
-                        shape = RoundedCornerShape(18.dp),
-                        color = if (option.value == pickerSelected) MaterialTheme.colorScheme.primary.copy(alpha = .10f) else t.cardBackground,
-                        border = BorderStroke(
-                            .7.dp,
-                            if (option.value == pickerSelected) MaterialTheme.colorScheme.primary.copy(alpha = .24f)
-                            else t.outline.copy(alpha = .34f),
-                        ),
-                        tonalElevation = 0.dp,
+                    val selected = selected
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .crystalMaterial(
+                                RoundedCornerShape(HetuGlassRadius.Input),
+                                depth = CrystalDepth.InsetItem,
+                                selection = selected,
+                            )
+                            .clickable {
+                                pickerSelected = option.value
+                                pickerApply(option.value)
+                                pickerTitle = null
+                            },
                     ) {
                         Row(
                             Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 13.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(option.label, Modifier.weight(1f), color = t.textPrimary, fontWeight = FontWeight.SemiBold)
-                            if (option.value == pickerSelected) {
+                            if (selected) {
                                 Box(
                                     Modifier.size(28.dp).background(MaterialTheme.colorScheme.primary.copy(alpha = .11f), CircleShape),
                                     contentAlignment = Alignment.Center,
