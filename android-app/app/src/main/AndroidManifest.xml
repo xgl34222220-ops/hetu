@@ -26,6 +26,9 @@
         <activity android:name=".ProxyCoreActivity" android:label="内核管理" android:exported="false"  android:launchMode="singleTop" />
         <activity android:name=".ProxySubscriptionActivity" android:label="订阅与配置" android:exported="false" android:windowSoftInputMode="adjustResize"  android:launchMode="singleTop" />
         <activity android:name=".ProxyLatencyTargetsActivity" android:label="延迟目标" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name=".ProxySubStoreActivity" android:label="Sub-Store" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name=".ProxySubStoreWebActivity" android:label="Sub-Store 面板" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name=".ProxyPolicyIconsActivity" android:label="策略图标" android:exported="false" android:launchMode="singleTop" />
         <activity android:name=".ProxyRuntimeCoreSettingsActivity" android:label="运行核心" android:exported="false"  android:launchMode="singleTop" />
         <activity android:name=".ProxySharedNetworkSettingsActivity" android:label="共享网络" android:exported="false"  android:launchMode="singleTop" />
         <activity android:name=".ProxyCnIpSettingsActivity" android:label="CNIP 设置" android:exported="false"  android:launchMode="singleTop" />
