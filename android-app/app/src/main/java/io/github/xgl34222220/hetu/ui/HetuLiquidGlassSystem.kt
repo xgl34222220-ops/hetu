@@ -12,6 +12,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.PowerSettingsNew
@@ -96,30 +97,23 @@ fun LiquidStatusCapsule(
     ) {
         Box(
             Modifier
-                .size(10.dp)
+                .size(16.dp)
                 .graphicsLayer {
                     alpha = pulse
                     scaleX = if (running) 1.08f else 1f
                     scaleY = if (running) 1.08f else 1f
                 }
-                .clip(RoundedCornerShape(5.dp))
-                .then(
-                    Modifier.graphicsLayer {
-                        shadowElevation = if (running) 8.dp.toPx() else 0f
-                        ambientShadowColor = t.success.copy(alpha = .28f)
-                        spotShadowColor = t.success.copy(alpha = .32f)
-                    }
-                )
-                .then(
-                    Modifier.clip(RoundedCornerShape(5.dp))
-                )
-                .then(
-                    Modifier
+                .background(
+                    if (running) t.success.copy(alpha = .16f) else Color.Transparent,
+                    CircleShape,
                 ),
+            contentAlignment = Alignment.Center,
         ) {
-            androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
-                drawCircle(if (running) t.success else t.textMuted)
-            }
+            Box(
+                Modifier
+                    .size(8.dp)
+                    .background(if (running) t.success else t.textMuted, CircleShape),
+            )
         }
 
         Spacer(Modifier.width(10.dp))
