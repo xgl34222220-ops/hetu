@@ -145,7 +145,7 @@ class ReferenceProxyActivity : ComponentActivity() {
     }
 }
 
-private enum class RefProxyPage { Home, Panel, Tools, Settings }
+private enum class RefProxyPage { Home, Panel, Strategy, Tools, Settings }
 internal data class RefSubscriptionCache(val used: Long = 0L, val total: Long = 0L, val count: Int = 0)
 private enum class RefPanelTab(val label: String) {
     Groups("节点"), Overview("概览"), Subscriptions("订阅"), Connections("连接"), Rules("规则"), RuleSets("规则集")
@@ -195,7 +195,9 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
             else RefProxyPage.Home,
         )
     }
-    var panelTab by rememberSaveable { mutableStateOf(initialPanelTab) }
+    var panelTab by rememberSaveable {
+        mutableStateOf(if (initialPanelTab == RefPanelTab.Groups) RefPanelTab.Overview else initialPanelTab)
+    }
     var panelSearchRequest by rememberSaveable { mutableIntStateOf(0) }
     var panelDetailVisible by rememberSaveable { mutableStateOf(false) }
     val pageStateHolder = rememberSaveableStateHolder()
@@ -599,8 +601,11 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
     }
 
     val dockPages = remember(showPanelTab) {
-        if (showPanelTab) listOf(RefProxyPage.Home, RefProxyPage.Panel, RefProxyPage.Tools, RefProxyPage.Settings)
-        else listOf(RefProxyPage.Home, RefProxyPage.Tools, RefProxyPage.Settings)
+        if (showPanelTab) {
+            listOf(RefProxyPage.Home, RefProxyPage.Panel, RefProxyPage.Strategy, RefProxyPage.Tools, RefProxyPage.Settings)
+        } else {
+            listOf(RefProxyPage.Home, RefProxyPage.Strategy, RefProxyPage.Tools, RefProxyPage.Settings)
+        }
     }
     LaunchedEffect(showPanelTab) { if (!showPanelTab && page == RefProxyPage.Panel) page = RefProxyPage.Home }
     val dock = remember(showPanelTab) {
@@ -608,6 +613,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
             when (destination) {
                 RefProxyPage.Home -> DockItem("首页", Icons.Rounded.Home, .94f)
                 RefProxyPage.Panel -> DockItem("面板", Icons.Rounded.Link, .96f)
+                RefProxyPage.Strategy -> DockItem("策略", Icons.Rounded.Tune, .96f)
                 RefProxyPage.Tools -> DockItem("工具", Icons.Rounded.GridView, .96f)
                 RefProxyPage.Settings -> DockItem("设置", Icons.Rounded.Settings, .94f)
             }
@@ -740,6 +746,22 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                     onOpenSettings = { page = RefProxyPage.Settings },
                     onDetailVisibleChanged = { panelDetailVisible = it },
                 )
+                RefProxyPage.Strategy -> RefPanel(
+                    state = state,
+                    repo = repo,
+                    delays = delays,
+                    selectedTab = RefPanelTab.Groups,
+                    onSelectedTabChange = {},
+                    searchRequest = panelSearchRequest,
+                    hazeState = haze,
+                    backdrop = liquidBackdrop.takeIf { liquid },
+                    glassEnabled = blurEnabled && liquidGlassEnabled,
+                    strategyOnly = true,
+                    onRefreshState = { refresh() },
+                    onBack = { page = RefProxyPage.Home },
+                    onOpenSettings = { page = RefProxyPage.Settings },
+                    onDetailVisibleChanged = { panelDetailVisible = it },
+                )
                 RefProxyPage.Tools -> RefTools(state) {
                     context.startActivity(Intent(context, ProxyLogViewerActivity::class.java))
                 }
@@ -766,7 +788,13 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
             HetuGlassDock(
                 items = dock,
                 selected = dockPages.indexOf(page).coerceAtLeast(0),
-                onSelect = { page = dockPages[it] },
+                onSelect = {
+                    val destination = dockPages[it]
+                    if (destination == RefProxyPage.Panel && panelTab == RefPanelTab.Groups) {
+                        panelTab = RefPanelTab.Overview
+                    }
+                    page = destination
+                },
                 hazeState = haze,
                 backdrop = liquidBackdrop.takeIf { liquid },
                 modifier = Modifier.onSizeChanged {
@@ -1252,6 +1280,7 @@ private fun RefPanel(
     hazeState: HazeState,
     backdrop: LayerBackdrop?,
     glassEnabled: Boolean,
+    strategyOnly: Boolean = false,
     onRefreshState: suspend () -> Unit,
     onBack: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -1262,7 +1291,7 @@ private fun RefPanel(
     val t = LocalHetuTokens.current
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
-    val tab = selectedTab
+    val tab = if (strategyOnly) RefPanelTab.Groups else selectedTab
     var refreshing by remember { mutableStateOf(false) }
     var providers by remember { mutableStateOf<List<DashboardProviderUi>>(emptyList()) }
     var rules by remember { mutableStateOf<List<ProxyRuleUi>>(emptyList()) }
@@ -1629,6 +1658,12 @@ private fun RefPanel(
         Column(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     RefPanelGlassHeader(
+                        title = if (strategyOnly) "策略" else "面板",
+                        tabs = if (strategyOnly) {
+                            listOf(RefPanelTab.Groups)
+                        } else {
+                            RefPanelTab.entries.filter { it != RefPanelTab.Groups }
+                        },
                         selected = tab,
                         onSelect = onSelectedTabChange,
                         searchOpen = searchOpen,
@@ -2465,6 +2500,8 @@ private fun refNodeFilterTags(nodes: List<ProxyNodeUi>): List<String> {
 @OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
 private fun RefPanelGlassHeader(
+    title: String,
+    tabs: List<RefPanelTab>,
     selected: RefPanelTab,
     onSelect: (RefPanelTab) -> Unit,
     searchOpen: Boolean,
@@ -2578,7 +2615,7 @@ private fun RefPanelGlassHeader(
         }
 
         Text(
-            "面板",
+            title,
             color = t.textPrimary,
             fontSize = 32.sp,
             lineHeight = 40.sp,
@@ -2586,11 +2623,14 @@ private fun RefPanelGlassHeader(
             letterSpacing = (-.8).sp,
             modifier = Modifier.fillMaxWidth(),
         )
-        RefPanelTabs(
-            selected = selected,
-            liquidGlass = true,
-            onSelect = onSelect,
-        )
+        if (tabs.size > 1) {
+            RefPanelTabs(
+                tabs = tabs,
+                selected = selected,
+                liquidGlass = true,
+                onSelect = onSelect,
+            )
+        }
         androidx.compose.animation.AnimatedVisibility(
             visible = searchOpen && selected != RefPanelTab.Overview,
             enter = androidx.compose.animation.expandVertically(
@@ -2670,6 +2710,7 @@ private fun RefPanelHeaderAction(
 
 @Composable
 private fun RefPanelTabs(
+    tabs: List<RefPanelTab> = RefPanelTab.entries,
     selected: RefPanelTab,
     liquidGlass: Boolean = false,
     onSelect: (RefPanelTab) -> Unit,
@@ -2684,7 +2725,7 @@ private fun RefPanelTabs(
         horizontalArrangement = Arrangement.spacedBy(9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        RefPanelTab.entries.forEach { tab ->
+        tabs.forEach { tab ->
             val active = tab == selected
             val shape = RoundedCornerShape(14.dp)
             val source = remember(tab) { MutableInteractionSource() }
