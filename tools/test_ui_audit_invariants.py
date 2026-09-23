@@ -177,6 +177,23 @@ assert "crystalPageBackground()" in phase3_pages["logs"]
 assert "LiquidGlassTextField" in phase3_pages["scripts"]
 assert "liquidSheetMaterial()" in phase3_pages["scripts"]
 
+# Phase 4 final reachable surfaces and launcher boundary.
+core_ui = (src / "ProxyCoreActivity.kt").read_text()
+theme_ui = (src / "ThemeSettingsActivity.kt").read_text()
+web_ui = (src / "ProxyLocalWebUiActivity.kt").read_text()
+manifest = (root / "android-app/app/src/main/AndroidManifest.xml").read_text()
+
+assert "crystalPageBackground()" in core_ui
+assert "GroupedInsetSection" in core_ui
+assert "HetuGlassRadius.Card" in core_ui and "CrystalDepth.InsetItem" in core_ui
+assert ".background(tokens.pageBackground)" not in core_ui
+assert "selection = selected" in theme_ui and "HetuGlassRadius.Input" in theme_ui
+assert "--bg:#f5f7fb" in web_ui and "--bg:#0e1014" in web_ui
+assert "backdrop-filter:blur(20px)" in web_ui and "border-radius:24px" in web_ui
+assert manifest.count('android.intent.action.MAIN') == 1, "Only the reference Liquid Glass shell may be launcher"
+assert '.ReferenceProxyActivity' in manifest and 'android.intent.action.MAIN' in manifest
+assert "CompactMainActivity::class" not in refhome and "HetuMainActivity::class" not in refhome
+
 # Existing productivity/accessibility contracts remain.
 assert 'private fun RefSectionLabel' in refhome and 'Spacer(Modifier.height(2.dp))' in refhome
 assert ".height(42.dp).testTag(\"yaml-accessory\")" in editor
