@@ -376,7 +376,9 @@ fun LiquidGlassTextField(
     label: String,
     modifier: Modifier = Modifier,
     placeholder: String = "",
+    supportingText: String = "",
     singleLine: Boolean = true,
+    enabled: Boolean = true,
 ) {
     val t = LocalHetuTokens.current
     OutlinedTextField(
@@ -384,8 +386,10 @@ fun LiquidGlassTextField(
         onValueChange = onValueChange,
         modifier = modifier.glassInputWell(),
         singleLine = singleLine,
+        enabled = enabled,
         label = { Text(label) },
         placeholder = { if (placeholder.isNotBlank()) Text(placeholder) },
+        supportingText = { if (supportingText.isNotBlank()) Text(supportingText) },
         shape = RoundedCornerShape(HetuGlassRadius.Input),
         colors = OutlinedTextFieldDefaults.colors(
             focusedContainerColor = Color.Transparent,
