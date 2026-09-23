@@ -384,7 +384,7 @@ fun LiquidGlassTextField(
         modifier = modifier.glassInputWell(),
         singleLine = singleLine,
         label = { Text(label) },
-        placeholder = if (placeholder.isBlank()) null else { { Text(placeholder) } },
+        placeholder = { if (placeholder.isNotBlank()) Text(placeholder) },
         shape = RoundedCornerShape(HetuGlassRadius.Input),
         colors = OutlinedTextFieldDefaults.colors(
             focusedContainerColor = Color.Transparent,
