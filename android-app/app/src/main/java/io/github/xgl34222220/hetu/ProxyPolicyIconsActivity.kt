@@ -88,7 +88,10 @@ internal object ProxyPolicyIconOverrides {
         } ?: throw IllegalArgumentException("无法读取所选图标")
         if (bytes.isEmpty()) throw IllegalArgumentException("图标文件为空")
         val directory = File(context.filesDir, "policy-icons").apply { mkdirs() }
-        val target = File(directory, Integer.toHexString(name.hashCode()) + ".img")
+        val target = File(
+            directory,
+            Integer.toHexString(name.hashCode()) + "-" + System.currentTimeMillis().toString(16) + ".img",
+        )
         val temp = File(directory, target.name + ".new")
         temp.writeBytes(bytes)
         if (!temp.renameTo(target)) temp.copyTo(target, overwrite = true)
