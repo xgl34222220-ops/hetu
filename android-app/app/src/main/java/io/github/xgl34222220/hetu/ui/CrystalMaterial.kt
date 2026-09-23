@@ -128,15 +128,16 @@ fun Modifier.crystalMaterial(
             fallbackTint = HazeTint(fill),
         )
         val elevation = when (depth) {
-            CrystalDepth.Popover -> 12.dp
-            CrystalDepth.Card -> 6.dp
+            CrystalDepth.Popover -> 10.dp
+            CrystalDepth.Card -> 4.dp
             CrystalDepth.InsetItem -> 1.dp
             CrystalDepth.Sunken -> 0.dp
         }
         val outline = when {
-            selection -> primary.copy(alpha = .34f)
-            depth == CrystalDepth.Popover -> Color.White.copy(alpha = .76f)
-            else -> Color.White.copy(alpha = .60f)
+            selection -> primary.copy(alpha = .32f)
+            depth == CrystalDepth.Popover -> Color.White.copy(alpha = .52f)
+            depth == CrystalDepth.Sunken -> Color.White.copy(alpha = .18f)
+            else -> Color.White.copy(alpha = .30f)
         }
         val blur = if (blurEnabled && backdrop != null) {
             Modifier.hazeEffect(backdrop, hazeStyle) { canDrawArea = { true } }
@@ -147,21 +148,30 @@ fun Modifier.crystalMaterial(
                     elevation = elevation,
                     shape = shape,
                     clip = false,
-                    ambientColor = Color(0xFF1F2687).copy(alpha = if (depth == CrystalDepth.Popover) .08f else .035f),
-                    spotColor = Color.Black.copy(alpha = if (depth == CrystalDepth.Popover) .08f else .028f),
+                    ambientColor = Color(0xFF1F2687).copy(alpha = if (depth == CrystalDepth.Popover) .065f else .025f),
+                    spotColor = Color.Black.copy(alpha = if (depth == CrystalDepth.Popover) .075f else .040f),
                 )
                 .clip(shape)
                 .then(blur)
                 .background(fill, shape)
-                .border(if (selection) 1.dp else .75.dp, outline, shape)
+                .border(if (selection) .9.dp else .55.dp, outline, shape)
                 .drawWithCache {
                     val outlineShape = shape.createOutline(size, layoutDirection, this)
+                    val highlight = Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = if (depth == CrystalDepth.Popover) .30f else .20f),
+                            Color.Transparent,
+                            Color.White.copy(alpha = .06f),
+                        ),
+                        start = Offset.Zero,
+                        end = Offset(size.width, size.height),
+                    )
                     onDrawWithContent {
                         drawContent()
                         drawOutline(
                             outlineShape,
-                            Color.White.copy(alpha = if (depth == CrystalDepth.Sunken) .34f else .58f),
-                            style = Stroke(.8.dp.toPx()),
+                            highlight,
+                            style = Stroke(.45.dp.toPx()),
                         )
                     }
                 }
