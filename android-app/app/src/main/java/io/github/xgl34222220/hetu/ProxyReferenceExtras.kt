@@ -753,7 +753,7 @@ private fun validRuntimePath(path: String): Boolean =
 private suspend fun readRuntimeFile(context: Context, path: String): String = withContext(Dispatchers.IO) {
     if (!validRuntimePath(path)) throw IllegalArgumentException("不允许编辑此路径")
     val quoted = RootBridge.quote(path)
-    val command = "set -e; test -f " + quoted + "; size=$(wc -c < " + quoted + "); [ \"\\$size\" -le 2097152 ]; cat " + quoted
+    val command = "set -e; test -f " + quoted + "; size=$(wc -c < " + quoted + "); [ \"${'$'}size\" -le 2097152 ]; cat " + quoted
     val result = RootBridge.rootShell(context, command, 10_000L)
     if (!result.ok()) throw IllegalStateException(result.output.ifBlank { "无法读取运行文件" })
     if (result.output.indexOf('\u0000') >= 0) throw IllegalArgumentException("该文件包含二进制数据，不能使用文本编辑器")
