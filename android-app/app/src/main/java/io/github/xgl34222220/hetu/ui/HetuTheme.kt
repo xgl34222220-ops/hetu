@@ -49,19 +49,19 @@ data class HetuTokens(
 
 val LocalHetuTokens = staticCompositionLocalOf {
     HetuTokens(
-        pageBackground = Color(0xFFEEEDFB),
-        cardBackground = Color(0xFFF9F8FE),
-        elevatedCardBackground = Color(0xFFF5F3FD),
-        heroBackground = Color(0xFFE2DEFF),
+        pageBackground = Color(0xFFF5F7FB),
+        cardBackground = Color(0xA6FFFFFF),
+        elevatedCardBackground = Color(0xC2FFFFFF),
+        heroBackground = Color(0xA6FFFFFF),
         textPrimary = Color(0xFF191720),
         textSecondary = Color(0xFF5E5A67),
         textMuted = Color(0xFF8A8794),
         success = Color(0xFF18794E),
         warning = Color(0xFF946200),
         danger = Color(0xFFC52A34),
-        outline = Color(0xFFD9D6E4),
-        controlBackground = Color(0xFFF2F0FA),
-        selectionBackground = Color(0xFFDEDEEA),
+        outline = Color(0x99FFFFFF),
+        controlBackground = Color(0x73FFFFFF),
+        selectionBackground = Color(0x66DDEBFF),
     )
 }
 
@@ -146,8 +146,8 @@ fun HetuTheme(content: @Composable () -> Unit) {
         primary = fixedPrimary,
         primaryContainer = Color(0xFFDEDEEA),
         secondary = fixedPrimary,
-        background = Color(0xFFEEEDFB),
-        surface = Color(0xFFF9F8FE),
+        background = Color(0xFFF5F7FB),
+        surface = Color(0xE6FFFFFF),
         error = Color(0xFFC52A34),
         onBackground = Color(0xFF191720),
         onSurface = Color(0xFF191720),
@@ -156,8 +156,8 @@ fun HetuTheme(content: @Composable () -> Unit) {
         primary = fixedPrimary,
         primaryContainer = Color(0xFF1E3A8A),
         secondary = fixedPrimary,
-        background = if (pureBlack) Color.Black else Color(0xFF121212),
-        surface = Color(0xFF1E1E1E),
+        background = if (pureBlack) Color.Black else Color(0xFF0E1014),
+        surface = Color(0xB31E1E23),
         error = Color(0xFFF87171),
         onBackground = Color(0xFFF8FAFC),
         onSurface = Color(0xFFF8FAFC),
@@ -175,19 +175,19 @@ fun HetuTheme(content: @Composable () -> Unit) {
         val scheme = MaterialTheme.colorScheme
         val tokens = if (dark) {
             HetuTokens(
-                pageBackground = if (pureBlack) Color.Black else Color(0xFF121212),
-                cardBackground = Color(0xFF1E1E1E),
-                elevatedCardBackground = Color(0xFF242424),
-                heroBackground = Color(0xFF172338),
+                pageBackground = if (pureBlack) Color.Black else Color(0xFF0E1014),
+                cardBackground = Color(0xB31E1E23),
+                elevatedCardBackground = Color(0xC226272D),
+                heroBackground = Color(0xB31E1E23),
                 textPrimary = Color(0xFFF8FAFC),
                 textSecondary = Color(0xFFB4BDCA),
                 textMuted = Color(0xFFADB7C4),
                 success = Color(0xFF89DCAE),
                 warning = Color(0xFFFBBF24),
                 danger = Color(0xFFF87171),
-                outline = Color(0xFF30343B),
-                controlBackground = Color(0xFF24272D),
-                selectionBackground = scheme.primaryContainer.copy(alpha = .55f),
+                outline = Color.White.copy(alpha = .10f),
+                controlBackground = Color.White.copy(alpha = .07f),
+                selectionBackground = scheme.primary.copy(alpha = .20f),
                 textOnPage = Color(0xFFB4BDCA),
                 successContainer = Color(0xFF17382B),
                 warningContainer = Color(0xFF3C311E),
@@ -195,19 +195,19 @@ fun HetuTheme(content: @Composable () -> Unit) {
             )
         } else {
             HetuTokens(
-                pageBackground = Color(0xFFEEEDFB),
-                cardBackground = Color(0xFFF9F8FE),
-                elevatedCardBackground = Color(0xFFF5F3FD),
-                heroBackground = Color(0xFFE2DEFF),
+                pageBackground = Color(0xFFF5F7FB),
+                cardBackground = Color(0xA6FFFFFF),
+                elevatedCardBackground = Color(0xC2FFFFFF),
+                heroBackground = Color(0xA6FFFFFF),
                 textPrimary = Color(0xFF191720),
                 textSecondary = Color(0xFF5E5A67),
                 textMuted = Color(0xFF8A8794),
                 success = Color(0xFF18794E),
                 warning = Color(0xFF946200),
                 danger = Color(0xFFC52A34),
-                outline = Color(0xFFD9D6E4),
-                controlBackground = Color(0xFFF2F0FA),
-                selectionBackground = scheme.primaryContainer.copy(alpha = .72f),
+                outline = Color.White.copy(alpha = .60f),
+                controlBackground = Color.White.copy(alpha = .45f),
+                selectionBackground = scheme.primary.copy(alpha = .14f),
             )
         }
         CompositionLocalProvider(
