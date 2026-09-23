@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Runtime fences and view lifecycle invariants; pixels/interactions are tested with Compose."""
 from pathlib import Path
-import hashlib, json
+import hashlib, json, re
 root = Path(__file__).resolve().parents[1]
 src = root / "android-app/app/src/main/java/io/github/xgl34222220/hetu"
 for name, expected in json.loads((root / "tests/ui-runtime-baseline.json").read_text()).items():
@@ -121,6 +121,31 @@ assert 'HetuBottomBarMetrics.ContentGap' in ui_kit
 # API/config inputs must use inset glass wells.
 assert refhome.count("LiquidGlassTextField(") >= 4
 assert 'label = "Secret"' in refhome and 'label = "测速 URL"' in refhome
+
+# Phase 2 full-app Liquid Glass settings/tool surfaces.
+phase2_pages = {
+    "advanced": (src / "ProxyAdvancedSettingsActivity.kt").read_text(),
+    "network": (src / "ProxyNetworkAutomationActivity.kt").read_text(),
+    "subscriptions": (src / "ProxySubscriptionActivity.kt").read_text(),
+    "adblock": (src / "ProxyAdblockChainActivity.kt").read_text(),
+    "files": (src / "ReferenceFileManagerActivity.kt").read_text(),
+}
+for name, text in phase2_pages.items():
+    assert not re.search(r"\\bSwitch\\(", text), f"Legacy Material Switch remains in {name}"
+    assert "OutlinedTextField(" not in text, f"Legacy outlined input remains in {name}"
+    assert ".background(t.pageBackground)" not in text and ".background(pageBg)" not in text, f"Flat page field remains in {name}"
+
+assert "GroupedInsetSection" in phase2_pages["advanced"]
+assert "GroupedInsetSection" in phase2_pages["network"]
+assert "GroupedInsetSection" in phase2_pages["files"]
+assert "LiquidSwitch" in phase2_pages["advanced"] and "LiquidSwitch" in phase2_pages["network"] and "LiquidSwitch" in phase2_pages["adblock"]
+assert "LiquidGlassTextField" in phase2_pages["advanced"]
+assert "LiquidGlassTextField" in phase2_pages["network"]
+assert "LiquidGlassTextField" in phase2_pages["subscriptions"]
+assert "liquidSheetMaterial()" in phase2_pages["advanced"]
+assert "liquidSheetMaterial()" in phase2_pages["network"]
+assert "liquidSheetMaterial()" in phase2_pages["subscriptions"]
+assert "liquidSheetMaterial()" in phase2_pages["files"]
 
 # Existing productivity/accessibility contracts remain.
 assert 'private fun RefSectionLabel' in refhome and 'Spacer(Modifier.height(2.dp))' in refhome
