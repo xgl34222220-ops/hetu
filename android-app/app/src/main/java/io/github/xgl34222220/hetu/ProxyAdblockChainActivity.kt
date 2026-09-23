@@ -322,7 +322,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().background(pageBg),
+        modifier = Modifier.fillMaxSize().crystalPageBackground(),
         contentPadding = PaddingValues(
             start = 16.dp,
             top = 8.dp,
@@ -364,7 +364,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                                 fontSize = 12.sp,
                             )
                         }
-                        Switch(
+                        LiquidSwitch(
                             checked = chainEnabled,
                             onCheckedChange = {
                                 chainEnabled = it
@@ -445,7 +445,14 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                         )
                     }
                     if (displayedRecentDomains.isNotEmpty()) {
-                        Surface(shape = RoundedCornerShape(12.dp), color = if (dark) Color.White.copy(alpha = .04f) else Color(0xFFF8FAFC)) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .crystalMaterial(
+                                    RoundedCornerShape(HetuGlassRadius.Input),
+                                    depth = CrystalDepth.InsetItem,
+                                )
+                        ) {
                             Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text("最近拦截", color = t.textPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 displayedRecentDomains.take(6).forEach { domain ->
@@ -500,7 +507,14 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
         }
 
         item("flow") {
-            Surface(shape = RoundedCornerShape(18.dp), color = t.selectionBackground) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .crystalMaterial(
+                        RoundedCornerShape(HetuGlassRadius.Tile),
+                        depth = CrystalDepth.InsetItem,
+                    )
+            ) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Text("执行顺序", color = t.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     Text("应用流量 → Root DIRECT 应用 / 明确域名白名单 → 广告后缀 RULE-SET → 普通地区/规则集分流 → 最终兜底", color = t.textSecondary, fontSize = 12.sp, lineHeight = 17.sp)
@@ -527,7 +541,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                             }
                             Text(fallbackState, color = t.textSecondary, fontSize = 12.sp)
                         }
-                        Switch(checked = fallbackEnabled, onCheckedChange = { applyFallback(it) }, enabled = !busy)
+                        LiquidSwitch(checked = fallbackEnabled, onCheckedChange = { applyFallback(it) }, enabled = !busy)
                     }
                     Text("类似 AdGuard Home 的 DNS 层过滤思路：域名后缀规则 + 白名单优先；Root 代理运行时由 Mihomo 规则链接管，代理停止后由本地 DNS 过滤继续。", color = t.textSecondary, fontSize = 12.sp, lineHeight = 15.sp)
                 }
@@ -548,7 +562,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                         Text("CNAME 别名链保护", color = t.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                         Text("独立 DNS 模式会继续检查别名最终目标，防止广告/跟踪域名通过 CNAME 绕过。", color = t.textSecondary, fontSize = 12.sp, lineHeight = 17.sp)
                     }
-                    Switch(
+                    LiquidSwitch(
                         checked = cnameProtection,
                         onCheckedChange = {
                             cnameProtection = it
@@ -590,7 +604,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                                 )
                             }
                         }
-                        Switch(checked = source.enabled, onCheckedChange = { toggleSource(source) }, enabled = !busy)
+                        LiquidSwitch(checked = source.enabled, onCheckedChange = { toggleSource(source) }, enabled = !busy)
                     }
                 }
             }
