@@ -4439,15 +4439,15 @@ private fun RefNotificationSettingsBottomSheet(
     )
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
-        containerColor = t.elevatedCardBackground,
+        shape = RoundedCornerShape(topStart = HetuGlassRadius.Sheet, topEnd = HetuGlassRadius.Sheet),
+        containerColor = Color.Transparent,
         contentColor = t.textPrimary,
         tonalElevation = 0.dp,
         scrimColor = Color.Black.copy(alpha = .35f),
         dragHandle = { RefSheetDragHandle() },
     ) {
         Column(
-            Modifier.fillMaxWidth().navigationBarsPadding().imePadding()
+            Modifier.fillMaxWidth().liquidSheetMaterial().navigationBarsPadding().imePadding()
                 .padding(start = 18.dp, end = 18.dp, bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -4458,14 +4458,12 @@ private fun RefNotificationSettingsBottomSheet(
                 fontSize = 11.sp,
                 lineHeight = 17.sp,
             )
-            OutlinedTextField(
+            LiquidGlassTextField(
                 value = template,
                 onValueChange = { template = it.take(320) },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 104.dp),
-                label = { Text("通知正文模板") },
-                minLines = 3,
-                maxLines = 5,
-                shape = RoundedCornerShape(16.dp),
+                label = "通知正文模板",
+                singleLine = false,
             )
             Text("第一个快捷按钮", color = t.textSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -4530,15 +4528,15 @@ private fun RefPortsBottomSheet(controllerPort: Int, onDismiss: () -> Unit) {
     val t = LocalHetuTokens.current
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
-        containerColor = t.elevatedCardBackground,
+        shape = RoundedCornerShape(topStart = HetuGlassRadius.Sheet, topEnd = HetuGlassRadius.Sheet),
+        containerColor = Color.Transparent,
         contentColor = t.textPrimary,
         tonalElevation = 0.dp,
         scrimColor = Color.Black.copy(alpha = .32f),
         dragHandle = { RefSheetDragHandle() },
     ) {
         Column(
-            Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 20.dp),
+            Modifier.fillMaxWidth().liquidSheetMaterial().navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text("端口与控制器细则", color = t.textPrimary, fontSize = 20.sp, lineHeight = 25.sp, fontWeight = FontWeight.Black)
@@ -4590,15 +4588,15 @@ private fun RefChoiceBottomSheet(
     val t = LocalHetuTokens.current
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
-        containerColor = t.elevatedCardBackground,
+        shape = RoundedCornerShape(topStart = HetuGlassRadius.Sheet, topEnd = HetuGlassRadius.Sheet),
+        containerColor = Color.Transparent,
         contentColor = t.textPrimary,
         tonalElevation = 0.dp,
         scrimColor = Color.Black.copy(alpha = .35f),
         dragHandle = { RefSheetDragHandle() },
     ) {
         Column(
-            Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
+            Modifier.fillMaxWidth().liquidSheetMaterial().navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(title, color = t.textPrimary, fontSize = 20.sp, lineHeight = 25.sp, fontWeight = FontWeight.Bold)
@@ -4607,8 +4605,7 @@ private fun RefChoiceBottomSheet(
                 val shape = RoundedCornerShape(15.dp)
                 Row(
                     Modifier.fillMaxWidth()
-                        .clip(shape)
-                        .background(if (selected) t.selectionBackground else t.controlBackground.copy(alpha = .42f), shape)
+                        .crystalMaterial(shape, depth = CrystalDepth.InsetItem, selection = selected)
                         .clickable { onSelect(index) }
                         .padding(horizontal = 14.dp, vertical = 13.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -4633,8 +4630,8 @@ private fun RefConfirmBottomSheet(
     val t = LocalHetuTokens.current
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
-        containerColor = t.elevatedCardBackground,
+        shape = RoundedCornerShape(topStart = HetuGlassRadius.Sheet, topEnd = HetuGlassRadius.Sheet),
+        containerColor = Color.Transparent,
         contentColor = t.textPrimary,
         tonalElevation = 0.dp,
         scrimColor = Color.Black.copy(alpha = .35f),
@@ -4707,8 +4704,8 @@ private fun RefInfoBottomSheet(
     }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
-        containerColor = if (terminal) Color(0xFF0B1220) else t.elevatedCardBackground,
+        shape = RoundedCornerShape(topStart = HetuGlassRadius.Sheet, topEnd = HetuGlassRadius.Sheet),
+        containerColor = if (terminal) Color(0xFF0B1220) else Color.Transparent,
         contentColor = if (terminal) Color(0xFFE2E8F0) else t.textPrimary,
         tonalElevation = 0.dp,
         scrimColor = Color.Black.copy(alpha = if (terminal) .48f else .35f),
