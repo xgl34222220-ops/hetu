@@ -151,9 +151,9 @@ internal fun ConfiguredGroupIcon(group: ProxyGroupUi, modifier: Modifier = Modif
     val prefs = remember(context) { context.getSharedPreferences("hetu", 0) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var epoch by remember { mutableIntStateOf(0) }
-    val override = remember(group.name, epoch) { ProxyPolicyIconOverrides.get(prefs, group.name) }
-    val effectiveUrl = override?.url.orEmpty().ifBlank { group.iconUrl }
-    val effectivePath = override?.path.orEmpty().ifBlank { group.iconPath }
+    val customIcon = remember(group.name, epoch) { ProxyPolicyIconOverrides.get(prefs, group.name) }
+    val effectiveUrl = customIcon?.url.orEmpty().ifBlank { group.iconUrl }
+    val effectivePath = customIcon?.path.orEmpty().ifBlank { group.iconPath }
     val configured = effectiveUrl.isNotBlank() || effectivePath.isNotBlank()
     val builtInBrand = remember(group.name) { builtInBrandKey(group.name) }
     val key = effectiveUrl.ifBlank {
