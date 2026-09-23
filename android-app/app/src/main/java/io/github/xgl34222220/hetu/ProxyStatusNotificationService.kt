@@ -171,7 +171,8 @@ class ProxyStatusNotificationService : Service() {
         }
         val first = prefs.getString(PREF_ACTION_1, "reload").orEmpty()
         val second = prefs.getString(PREF_ACTION_2, "restart").orEmpty()
-        listOf(first, second).distinct().filter { it != "none" }.forEachIndexed { index, action ->
+        val third = prefs.getString(PREF_ACTION_3, "stop").orEmpty()
+        listOf(first, second, third).distinct().filter { it != "none" }.forEachIndexed { index, action ->
             actionSpec(action, running)?.let { (label, intentAction) ->
                 val pending = PendingIntent.getService(
                     this,
@@ -219,6 +220,7 @@ class ProxyStatusNotificationService : Service() {
         const val PREF_TEMPLATE = "proxyStatusNotificationTemplate"
         const val PREF_ACTION_1 = "proxyStatusNotificationAction1"
         const val PREF_ACTION_2 = "proxyStatusNotificationAction2"
+        const val PREF_ACTION_3 = "proxyStatusNotificationAction3"
         const val DEFAULT_TEMPLATE = "{status} · {uptime}\n↓ {download}  ↑ {upload} · CPU {cpu}"
         private const val CHANNEL_ID = "proxy_status"
         private const val NOTIFICATION_ID = 2026
