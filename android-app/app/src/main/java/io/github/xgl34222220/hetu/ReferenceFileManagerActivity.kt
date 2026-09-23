@@ -332,7 +332,7 @@ private fun RefFilePreviewSheet(
                     overflow = TextOverflow.Ellipsis,
                 )
                 TextButton(onClick = onEdit) {
-                    Icon(Icons.Rounded.Edit, null, Modifier.size(18.dp))
+                    Icon(Icons.Rounded.Description, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(4.dp))
                     Text("编辑")
                 }
