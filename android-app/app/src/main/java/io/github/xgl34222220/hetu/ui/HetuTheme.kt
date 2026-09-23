@@ -1,6 +1,7 @@
 package io.github.xgl34222220.hetu.ui
 
 import android.os.Build
+import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -164,6 +165,7 @@ fun HetuTheme(content: @Composable () -> Unit) {
     )
 
     val motionEnabled = rememberHetuMotionEnabled()
+    val platformOverscrollFactory = LocalOverscrollFactory.current
     val density = LocalDensity.current
     // Density already scales dp and sp. Multiplying fontScale too applied the app
     // size twice to text and caused clipping at larger sizes. Preserve the user's
@@ -213,6 +215,7 @@ fun HetuTheme(content: @Composable () -> Unit) {
         CompositionLocalProvider(
             LocalHetuTokens provides tokens,
             LocalHetuMotionEnabled provides motionEnabled,
+            LocalOverscrollFactory provides if (motionEnabled) platformOverscrollFactory else null,
             LocalDensity provides scaledDensity,
             content = { CrystalEnvironment(content = inner) },
         )
