@@ -156,7 +156,7 @@ private fun ProxyLogViewerScreen(onBack: () -> Unit) {
     Column(
         Modifier
             .fillMaxSize()
-            .background(t.pageBackground),
+            .crystalPageBackground(),
     ) {
         Row(
             Modifier
