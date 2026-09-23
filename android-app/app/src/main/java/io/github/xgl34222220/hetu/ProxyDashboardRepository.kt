@@ -241,13 +241,11 @@ suspend fun delay(node: String): Long = withContext(Dispatchers.IO) {
     }
 
     suspend fun siteLatencies(): Map<String, Long> = withContext(Dispatchers.IO) {
-        val sites = listOf(
-            "Baidu" to "https://www.baidu.com/",
-            "Cloudflare" to "https://cp.cloudflare.com/generate_204",
-            "Google" to "https://www.gstatic.com/generate_204",
-        )
+        val sites = ProxyLatencyTargets.load(app)
         coroutineScope {
-            sites.map { (name, url) -> async { name to measureSiteLatency(url) } }.awaitAll().toMap()
+            sites.map { target ->
+                async { target.name to measureSiteLatency(target.url) }
+            }.awaitAll().toMap()
         }
     }
 
