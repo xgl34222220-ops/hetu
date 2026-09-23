@@ -148,13 +148,18 @@ internal fun BuiltInBrandIcon(brand: String, modifier: Modifier = Modifier) {
 internal fun ConfiguredGroupIcon(group: ProxyGroupUi, modifier: Modifier = Modifier.size(32.dp)) {
     val context = LocalContext.current
     val repository = remember(context) { ProxyGroupIconRepository.get(context) }
-    val configured = group.iconUrl.isNotBlank() || group.iconPath.isNotBlank()
-    val builtInBrand = remember(group.name) { builtInBrandKey(group.name) }
-    val key = group.iconUrl.ifBlank { group.iconPath }
-    val cached = remember(key) { repository.peek(key) }
     val prefs = remember(context) { context.getSharedPreferences("hetu", 0) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var epoch by remember { mutableIntStateOf(0) }
+    val override = remember(group.name, epoch) { ProxyPolicyIconOverrides.get(prefs, group.name) }
+    val effectiveUrl = override?.url.orEmpty().ifBlank { group.iconUrl }
+    val effectivePath = override?.path.orEmpty().ifBlank { group.iconPath }
+    val configured = effectiveUrl.isNotBlank() || effectivePath.isNotBlank()
+    val builtInBrand = remember(group.name) { builtInBrandKey(group.name) }
+    val key = effectiveUrl.ifBlank {
+        if (effectivePath.isBlank()) "" else "local-policy:" + group.name + ":" + effectivePath.hashCode()
+    }
+    val cached = remember(key) { repository.peek(key) }
     var visible by remember(lifecycle) { mutableStateOf(lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) }
     DisposableEffect(prefs, lifecycle) {
         val observer = LifecycleEventObserver { _, event ->
@@ -162,14 +167,15 @@ internal fun ConfiguredGroupIcon(group: ProxyGroupUi, modifier: Modifier = Modif
             if (event == Lifecycle.Event.ON_RESUME) epoch++
         }
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, changed ->
-            if (changed == "proxyRootRuntimeRunning" || changed == "proxyControllerPort") epoch++
+            if (changed == "proxyRootRuntimeRunning" || changed == "proxyControllerPort" ||
+                changed == ProxyPolicyIconOverrides.PREF_KEY) epoch++
         }
         lifecycle.addObserver(observer)
         prefs.registerOnSharedPreferenceChangeListener(listener)
         onDispose { lifecycle.removeObserver(observer); prefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
     val loaded by produceState<GroupIconLoad>(cached?.let { GroupIconLoad.Ready(it, true) } ?: GroupIconLoad.Loading,
-        key, group.iconPath, epoch, visible) {
+        key, effectivePath, epoch, visible) {
         // produceState keeps its previous value when the URL key changes. Reset
         // before early returns so a removed/changed icon cannot reuse another image.
         value = repository.peek(key)?.let { GroupIconLoad.Ready(it, true) } ?: GroupIconLoad.Loading
@@ -177,7 +183,7 @@ internal fun ConfiguredGroupIcon(group: ProxyGroupUi, modifier: Modifier = Modif
         // A failed first attempt must not remain stuck until the entire process dies.
         // Only visible composed cards retry; cache, per-URL single flight and bounds remain.
         repeat(3) { attempt ->
-            value = repository.load(key, group.iconPath, retry = epoch > 0 || attempt > 0)
+            value = repository.load(key, effectivePath, retry = epoch > 0 || attempt > 0)
             if (value is GroupIconLoad.Ready) return@produceState
             if (attempt < 2) delay(60_000L)
         }
