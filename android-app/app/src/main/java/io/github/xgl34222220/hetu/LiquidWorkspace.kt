@@ -102,8 +102,11 @@ internal fun LiquidStrategyCard(
     val interactions = remember(group.name) { MutableInteractionSource() }
     val pressed by interactions.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        if (pressed) .97f else 1f,
-        tween(if (motion) 100 else 0),
+        targetValue = if (pressed) HetuMotionSpec.PressedScale else 1f,
+        animationSpec = if (motion) spring(
+            dampingRatio = HetuMotionSpec.SelectionDamping,
+            stiffness = HetuMotionSpec.SelectionStiffness,
+        ) else tween(0),
         label = "groupPress",
     )
     val measured = group.nodes.count { (it.lastDelay ?: 0L) > 0L }
@@ -237,7 +240,7 @@ internal fun LiquidNodeCard(
             .crystalMaterial(
                 RoundedCornerShape(HetuGlassRadius.Tile),
                 depth = CrystalDepth.InsetItem,
-                selection = active,
+                selection = false,
             )
             .clickable(
                 interactionSource = interaction,
@@ -338,7 +341,40 @@ internal fun LiquidGroupWell(
             ),
     ) {
         val columns = liquidColumns(maxWidth)
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        val horizontalGap = 10.dp
+        val verticalGap = 8.dp
+        val cellWidth = (maxWidth - horizontalGap * (columns - 1).toFloat()) / columns.toFloat()
+        val selectedIndex = group.nodes.indexOfFirst { it.name == selected }
+        if (selectedIndex >= 0) {
+            val column = selectedIndex % columns
+            val row = selectedIndex / columns
+            val targetX = (cellWidth + horizontalGap) * column.toFloat()
+            val targetY = (78.dp + verticalGap) * row.toFloat()
+            val indicatorX by animateDpAsState(
+                targetValue = targetX,
+                animationSpec = if (motion) spring(
+                    dampingRatio = HetuMotionSpec.SelectionDamping,
+                    stiffness = HetuMotionSpec.SelectionStiffness,
+                ) else tween(0),
+                label = "nodeSelectionX",
+            )
+            val indicatorY by animateDpAsState(
+                targetValue = targetY,
+                animationSpec = if (motion) spring(
+                    dampingRatio = HetuMotionSpec.SelectionDamping,
+                    stiffness = HetuMotionSpec.SelectionStiffness,
+                ) else tween(0),
+                label = "nodeSelectionY",
+            )
+            LiquidSelectionIndicator(
+                Modifier
+                    .offset(x = indicatorX, y = indicatorY)
+                    .width(cellWidth)
+                    .height(78.dp)
+                    .testTag("node-selection-indicator:${group.name}"),
+            )
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(verticalGap)) {
             group.nodes.withIndex().toList().chunked(columns).forEach { row ->
                 Row(
                     Modifier.fillMaxWidth(),
@@ -373,7 +409,14 @@ internal fun LiquidPill(text: String, icon: ImageVector, onClick: () -> Unit, mo
     val motion = LocalHetuMotionEnabled.current
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .96f else 1f, tween(if (motion) 100 else 0), label = "pillPress")
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) HetuMotionSpec.PressedScale else 1f,
+        animationSpec = if (motion) spring(
+            dampingRatio = HetuMotionSpec.SelectionDamping,
+            stiffness = HetuMotionSpec.SelectionStiffness,
+        ) else tween(0),
+        label = "pillPress",
+    )
     val color = if (danger) Color(0xFFE11D48) else if (primary || compact) scheme.primary else Color(0xFF475569)
     val fill = if (danger) Color(0xFFFFF1F2) else if (dark) Color.White.copy(alpha = .06f)
         else if (primary) Color(0xFFEFF6FF) else Color(0xFFF8FAFC)
