@@ -193,9 +193,17 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
             AppScopeSegmentedControl(
                 selected = appScopeId,
                 onSelect = { next ->
-                    appScopeId = next
-                    prefs.edit().putString("proxyAppScope", next).apply()
-                    ProxyRuntimeSettings.markDirty(prefs, "proxyAppScope")
+                    if (next == "whitelist" && selected.isEmpty()) {
+                        android.widget.Toast.makeText(
+                            context,
+                            "请先选择至少一个应用，再启用“仅所选应用代理”",
+                            android.widget.Toast.LENGTH_SHORT,
+                        ).show()
+                    } else {
+                        appScopeId = next
+                        prefs.edit().putString("proxyAppScope", next).apply()
+                        ProxyRuntimeSettings.markDirty(prefs, "proxyAppScope")
+                    }
                 },
             )
         }
