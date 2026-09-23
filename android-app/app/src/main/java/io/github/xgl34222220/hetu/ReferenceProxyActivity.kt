@@ -135,7 +135,7 @@ class ReferenceProxyActivity : ComponentActivity() {
             // The previous forced wrapper recreated RefProxyShell and briefly exposed
             // default/empty runtime state before the async refresh completed.
             val revision = resumeRevision
-            HetuTheme { RefProxyShell(resumeRevision = revision) { finish() } }
+            HetuTheme { HetuOnboardingGate { RefProxyShell(resumeRevision = revision) { finish() } } }
         }
     }
 
@@ -269,11 +269,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
     var cachedConnectionCount by remember { mutableIntStateOf(prefs.getInt("proxyUiLastConnectionCount", 0)) }
     var lastProviderRefreshAt by remember { mutableLongStateOf(0L) }
     val coldStartAt = remember { SystemClock.elapsedRealtime() }
-    var siteDelays by remember { mutableStateOf(mapOf(
-        "Baidu" to prefs.getLong("proxyUiLastDelayBaidu", -2L),
-        "Cloudflare" to prefs.getLong("proxyUiLastDelayCloudflare", -2L),
-        "Google" to prefs.getLong("proxyUiLastDelayGoogle", -2L),
-    ).filterValues { it != -2L }) }
+    var siteDelays by remember { mutableStateOf(ProxyLatencyTargets.lastResults(prefs)) }
     val delays = remember { mutableStateMapOf<String, Long>() }
     var cpuPercent by remember { mutableFloatStateOf(prefs.getFloat("proxyUiLastCpu", 0f)) }
     var lastProcessTicks by remember { mutableLongStateOf(0L) }
@@ -494,11 +490,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
             val measured = repo.siteLatencies()
             if (measured.isNotEmpty()) {
                 siteDelays = measured
-                prefs.edit()
-                    .putLong("proxyUiLastDelayBaidu", measured["Baidu"] ?: -2L)
-                    .putLong("proxyUiLastDelayCloudflare", measured["Cloudflare"] ?: -2L)
-                    .putLong("proxyUiLastDelayGoogle", measured["Google"] ?: -2L)
-                    .apply()
+                ProxyLatencyTargets.persistLast(prefs, measured)
             }
             if (reportError && measured.values.none { it > 0L }) {
                 message = "关键站点测速失败，请检查当前网络"
@@ -541,11 +533,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
             val sites = siteTask.await()
             if (sites.isNotEmpty()) {
                 siteDelays = sites
-                prefs.edit()
-                    .putLong("proxyUiLastDelayBaidu", sites["Baidu"] ?: -2L)
-                    .putLong("proxyUiLastDelayCloudflare", sites["Cloudflare"] ?: -2L)
-                    .putLong("proxyUiLastDelayGoogle", sites["Google"] ?: -2L)
-                    .apply()
+                ProxyLatencyTargets.persistLast(prefs, sites)
             }
             val freshProviders = providerTask.await()
             if (freshProviders.isNotEmpty()) {
@@ -3878,6 +3866,15 @@ internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
                 }
                 RefDivider()
                 RefToolRow(
+                    Icons.Rounded.Cloud,
+                    Color.Unspecified,
+                    "Sub-Store",
+                    "连接本机 Sub-Store 后端并打开官方管理面板",
+                ) {
+                    context.startActivity(Intent(context, ProxySubStoreActivity::class.java))
+                }
+                RefDivider()
+                RefToolRow(
                     Icons.Rounded.Place,
                     Color.Unspecified,
                     "CNIP 设置",
@@ -4049,6 +4046,24 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
                     Color.Unspecified,
                     highlightValue = false,
                 )
+                RefDivider()
+                RefToolRow(
+                    Icons.Rounded.Speed,
+                    Color.Unspecified,
+                    "延迟目标",
+                    "自定义首页测速使用的三个名称与 HTTP(S) 地址",
+                ) {
+                    context.startActivity(Intent(context, ProxyLatencyTargetsActivity::class.java))
+                }
+                RefDivider()
+                RefToolRow(
+                    Icons.Rounded.Image,
+                    Color.Unspecified,
+                    "策略图标",
+                    "为策略组设置本地图标或 HTTPS 图标，不修改 YAML",
+                ) {
+                    context.startActivity(Intent(context, ProxyPolicyIconsActivity::class.java))
+                }
                 RefDivider()
                 RefToolRow(
                     Icons.Rounded.FormatPaint,
