@@ -67,6 +67,8 @@ private fun ThemeSettingsScreen(onBack: () -> Unit, onThemeChanged: () -> Unit) 
     var floating by remember { mutableStateOf(prefs.getBoolean("floatingBottomBar", true)) }
     var liquid by remember { mutableStateOf(prefs.getBoolean("liquidGlass", true)) }
     var panelTab by remember { mutableStateOf(prefs.getBoolean("showPanelTab", true)) }
+    var predictiveBack by remember { mutableStateOf(prefs.getBoolean("predictiveBackAnimation", true)) }
+    var predictiveBackFollowEdge by remember { mutableStateOf(prefs.getBoolean("predictiveBackFollowEdge", true)) }
     var scale by remember { mutableFloatStateOf(prefs.getFloat("uiScale", 1f).coerceIn(.8f, 1.2f)) }
 
     var pickerTitle by remember { mutableStateOf<String?>(null) }
@@ -171,12 +173,22 @@ private fun ThemeSettingsScreen(onBack: () -> Unit, onThemeChanged: () -> Unit) 
                 liquid = it; persistBoolean("liquidGlass", it)
             }
             ThemeDivider()
-            ThemeSwitchRow(Icons.Rounded.Link, "显示面板 Tab", "隐藏后底栏保留首页 / 工具 / 设置", panelTab) {
+            ThemeSwitchRow(Icons.Rounded.Link, "显示面板入口", "关闭后底栏保留首页 / 策略 / 工具 / 设置", panelTab) {
                 panelTab = it; persistBoolean("showPanelTab", it, false)
             }
         } }
 
         item { ThemeSection("交互") {
+            ThemeSwitchRow(Icons.AutoMirrored.Rounded.ArrowBack, "预测式返回动画", "节点详情随系统返回手势平滑退出", predictiveBack) {
+                predictiveBack = it
+                persistBoolean("predictiveBackAnimation", it, false)
+            }
+            ThemeDivider()
+            ThemeSwitchRow(Icons.Rounded.Swipe, "跟随手势边缘", "从右侧返回时动画方向同步反转", predictiveBackFollowEdge) {
+                predictiveBackFollowEdge = it
+                persistBoolean("predictiveBackFollowEdge", it, false)
+            }
+            ThemeDivider()
             Column(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Rounded.ZoomIn, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
