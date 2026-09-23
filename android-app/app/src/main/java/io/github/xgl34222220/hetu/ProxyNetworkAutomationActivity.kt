@@ -106,7 +106,7 @@ private fun ProxyNetworkAutomationPage(onBack: () -> Unit) {
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().background(pageBg),
+        modifier = Modifier.fillMaxSize().crystalPageBackground(),
         contentPadding = PaddingValues(
             start = 16.dp,
             top = 8.dp,
@@ -128,7 +128,14 @@ private fun ProxyNetworkAutomationPage(onBack: () -> Unit) {
         }
 
         item {
-            Surface(shape = RoundedCornerShape(18.dp), color = if (dark) t.elevatedCardBackground else Color.White, shadowElevation = if (dark) 0.dp else 1.dp) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .crystalMaterial(
+                        RoundedCornerShape(HetuGlassRadius.Card),
+                        depth = CrystalDepth.Card,
+                    )
+            ) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(42.dp).background(MaterialTheme.colorScheme.primary.copy(alpha = .10f), RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
@@ -146,7 +153,7 @@ private fun ProxyNetworkAutomationPage(onBack: () -> Unit) {
                             Text("自动网络匹配", color = t.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                             Text(if (enabled) "监听服务正在运行" else "关闭后不会自动启停代理", color = t.textSecondary, fontSize = 12.sp)
                         }
-                        Switch(checked = enabled, onCheckedChange = { value ->
+                        LiquidSwitch(checked = enabled, onCheckedChange = { value ->
                             if (value) {
                                 prefs.edit().putBoolean("networkMatchEnabled", true).apply(); refresh(); requestWifiPermissions()
                             } else setEnabled(false)
@@ -179,7 +186,14 @@ private fun ProxyNetworkAutomationPage(onBack: () -> Unit) {
         }
 
         item {
-            Surface(shape = RoundedCornerShape(18.dp), color = t.selectionBackground) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .crystalMaterial(
+                        RoundedCornerShape(HetuGlassRadius.Tile),
+                        depth = CrystalDepth.InsetItem,
+                    )
+            ) {
                 Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.Top) {
                     Icon(Icons.Rounded.Info, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(10.dp))
@@ -217,9 +231,7 @@ private fun NetworkSectionLabel(text: String) = Text(text, color = Color(0xFF94A
 
 @Composable
 private fun NetworkGroup(content: @Composable ColumnScope.() -> Unit) {
-    val t = LocalHetuTokens.current
-    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    Surface(shape = RoundedCornerShape(20.dp), color = if (dark) t.elevatedCardBackground else Color.White, shadowElevation = if (dark) 0.dp else 1.dp) { Column(Modifier.fillMaxWidth(), content = content) }
+    GroupedInsetSection(content = content)
 }
 
 @Composable
@@ -241,19 +253,42 @@ private fun NetworkValueRow(icon: ImageVector, accent: Color, title: String, val
 
 @Composable
 private fun NetworkSwitchRow(icon: ImageVector, accent: Color, title: String, subtitle: String, checked: Boolean, onChecked: (Boolean) -> Unit) {
-    WorkspaceSettingRow(title, subtitle, icon) { Switch(checked, onCheckedChange = onChecked, modifier = Modifier.heightIn(min = 48.dp)) }
+    WorkspaceSettingRow(title, subtitle, icon) {
+        Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.CenterEnd) {
+            LiquidSwitch(checked = checked, onCheckedChange = onChecked)
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NetworkChoiceSheet(title: String, values: List<NetworkChoice>, current: String, onDismiss: () -> Unit, onSelect: (String) -> Unit) {
     val t = LocalHetuTokens.current
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = t.elevatedCardBackground, tonalElevation = 0.dp, shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = Color.Transparent,
+        tonalElevation = 0.dp,
+        shape = RoundedCornerShape(topStart = HetuGlassRadius.Sheet, topEnd = HetuGlassRadius.Sheet),
+    ) {
+        Column(
+            Modifier.fillMaxWidth().liquidSheetMaterial().navigationBarsPadding().padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             Text(title, color = t.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             values.forEach { item ->
                 val selected = item.value == current
-                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(15.dp)).background(if (selected) t.selectionBackground else t.controlBackground.copy(alpha = .35f)).clickable { onSelect(item.value) }.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .crystalMaterial(
+                            RoundedCornerShape(HetuGlassRadius.Input),
+                            depth = CrystalDepth.InsetItem,
+                            selection = selected,
+                        )
+                        .clickable { onSelect(item.value) }
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Text(item.label, color = t.textPrimary, fontSize = 14.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, modifier = Modifier.weight(1f))
                     if (selected) Icon(Icons.Rounded.Check, null, tint = MaterialTheme.colorScheme.primary)
                 }
@@ -269,9 +304,9 @@ private fun NetworkSetEditor(state: NetworkEditor, onDismiss: () -> Unit, onSave
     val t = LocalHetuTokens.current
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = t.elevatedCardBackground,
+        containerColor = Color.Transparent,
         tonalElevation = 0.dp,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        shape = RoundedCornerShape(topStart = HetuGlassRadius.Sheet, topEnd = HetuGlassRadius.Sheet),
         dragHandle = {
             Box(
                 Modifier.padding(top = 10.dp, bottom = 6.dp).size(width = 36.dp, height = 4.dp)
@@ -280,17 +315,18 @@ private fun NetworkSetEditor(state: NetworkEditor, onDismiss: () -> Unit, onSave
         },
     ) {
         Column(
-            Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
+            Modifier.fillMaxWidth().liquidSheetMaterial().navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(state.title, color = t.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
             Text(state.hint, color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
-            OutlinedTextField(
+            LiquidGlassTextField(
                 value = text,
                 onValueChange = { text = it },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 190.dp, max = 360.dp),
-                minLines = 7,
-                shape = RoundedCornerShape(18.dp),
+                label = "匹配项",
+                placeholder = "每行一项",
+                singleLine = false,
             )
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 FilledTonalButton(
