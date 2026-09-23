@@ -2080,32 +2080,29 @@ private fun RefPanelApiSettingsSheet(
             }
 
             if (customApi) {
-                OutlinedTextField(
+                LiquidGlassTextField(
                     value = host,
                     onValueChange = { host = it.take(253) },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    label = { Text("地址") },
-                    placeholder = { Text("127.0.0.1") },
+                    label = "地址",
+                    placeholder = "127.0.0.1",
                 )
-                OutlinedTextField(
+                LiquidGlassTextField(
                     value = port,
                     onValueChange = { port = it.filter(Char::isDigit).take(5) },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    label = { Text("端口") },
-                    placeholder = { Text("9090") },
+                    label = "端口",
+                    placeholder = "9090",
                 )
-                OutlinedTextField(
+                LiquidGlassTextField(
                     value = secret,
                     onValueChange = { secret = it.take(256) },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    label = { Text("Secret") },
+                    label = "Secret",
                 )
             }
 
-            Surface(shape = RoundedCornerShape(18.dp), color = t.controlBackground.copy(alpha = .55f)) {
+            Surface(shape = RoundedCornerShape(HetuGlassRadius.Input), color = t.controlBackground.copy(alpha = .38f)) {
                 WorkspaceSettingRow(
                     "自定义延迟测试地址",
                     if (customDelay) "优先使用自定义 URL，再回退 provider 地址" else "使用 provider / 河图默认测速地址",
@@ -2115,12 +2112,11 @@ private fun RefPanelApiSettingsSheet(
                 }
             }
             if (customDelay) {
-                OutlinedTextField(
+                LiquidGlassTextField(
                     value = delayUrl,
                     onValueChange = { delayUrl = it.take(2048) },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    label = { Text("测速 URL") },
+                    label = "测速 URL",
                 )
             }
 
