@@ -2066,7 +2066,7 @@ private fun RefPanelApiSettingsSheet(
                         if (customApi) "使用下面填写的地址连接面板" else "使用河图内部 localhost API",
                         Icons.Rounded.Api,
                     ) {
-                        Switch(customApi, onCheckedChange = { customApi = it })
+                        LiquidSwitch(checked = customApi, onCheckedChange = { customApi = it })
                     }
                     WorkspaceInsetDivider()
                     WorkspaceSettingRow(
@@ -2074,7 +2074,7 @@ private fun RefPanelApiSettingsSheet(
                         "保存真实流量采样供概览趋势恢复",
                         Icons.Rounded.History,
                     ) {
-                        Switch(history, onCheckedChange = { history = it })
+                        LiquidSwitch(checked = history, onCheckedChange = { history = it })
                     }
                 }
             }
@@ -2108,7 +2108,7 @@ private fun RefPanelApiSettingsSheet(
                     if (customDelay) "优先使用自定义 URL，再回退 provider 地址" else "使用 provider / 河图默认测速地址",
                     Icons.Rounded.Speed,
                 ) {
-                    Switch(customDelay, onCheckedChange = { customDelay = it })
+                    LiquidSwitch(checked = customDelay, onCheckedChange = { customDelay = it })
                 }
             }
             if (customDelay) {
@@ -4187,17 +4187,16 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
                         Text("启用下载镜像", color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                         Text("只改写 GitHub release 资产；版本 API 仍直接访问 GitHub", color = t.textSecondary, fontSize = 11.5.sp)
                     }
-                    Switch(mirrorEnabled, onCheckedChange = { mirrorEnabled = it })
+                    LiquidSwitch(checked = mirrorEnabled, onCheckedChange = { mirrorEnabled = it })
                 }
-                OutlinedTextField(
+                LiquidGlassTextField(
                     value = mirrorPrefix,
                     onValueChange = { mirrorPrefix = it.take(512) },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = mirrorEnabled,
-                    singleLine = true,
-                    label = { Text("HTTPS 镜像前缀") },
-                    placeholder = { Text("https://mirror.example/") },
-                    supportingText = { Text("支持直接前缀，也支持包含 {url} 的模板") },
+                    label = "HTTPS 镜像前缀",
+                    placeholder = "https://mirror.example/",
+                    supportingText = "支持直接前缀，也支持包含 {url} 的模板",
                 )
                 Button(
                     onClick = {
@@ -4827,7 +4826,13 @@ private fun RefSwitchRow(icon: ImageVector, accent: Color, title: String, subtit
         modifier = Modifier.toggleable(checked, role = Role.Switch) {
             view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK); onCheckedChange(it)
         }) {
-        Switch(checked, onCheckedChange = null, modifier = Modifier.heightIn(min = 48.dp))
+        Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.CenterEnd) {
+            LiquidSwitch(
+                checked = checked,
+                onCheckedChange = {},
+                enabled = false,
+            )
+        }
     }
 }
 
