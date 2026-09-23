@@ -102,8 +102,15 @@ final class RootProxyPolicy {
             }
             if (uids.size() > MAX_UIDS)
                 throw new IOException("Root 分应用名单超过 " + MAX_UIDS + " 个 UID，请缩小选择范围");
-            if (profile.appScope == ProxyRuntimeProfile.AppScope.WHITELIST && uids.isEmpty())
-                throw new IOException("当前是“仅所选应用代理”，但应用名单没有可用的普通应用 UID");
+            if (profile.appScope == ProxyRuntimeProfile.AppScope.WHITELIST && uids.isEmpty()) {
+                if (selected.isEmpty())
+                    throw new IOException("当前是“仅所选应用代理”，但尚未选择任何应用");
+                if (!missing.isEmpty() && skipped.isEmpty())
+                    throw new IOException("当前是“仅所选应用代理”，但所选应用已卸载或当前用户不可见");
+                if (!skipped.isEmpty() && missing.isEmpty())
+                    throw new IOException("当前是“仅所选应用代理”，但所选项只有系统 UID，不能用于 Root 分应用代理");
+                throw new IOException("当前是“仅所选应用代理”，但所选应用没有可用的普通应用 UID");
+            }
         }
 
         if (directPatterns != null && !directPatterns.isEmpty()) {
