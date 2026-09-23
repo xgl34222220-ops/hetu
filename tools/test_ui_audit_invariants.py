@@ -100,7 +100,7 @@ assert 'HetuNumber(' in instrument and 'monospaced = true' in instrument
 assert 'home-usage-progress' in instrument and 'home-cpu-progress' in instrument
 
 # Strategy/node selections use the same glass selection language as the floating dock.
-assert '.height(80.dp)' in liquid and '.height(78.dp)' in liquid
+assert 'strategyHeight' in liquid and 'nodeHeight' in liquid and '80.dp' in liquid and '78.dp' in liquid
 assert 'if (width < 292.dp' in liquid, "Phone strategy grid should use two columns when space permits"
 assert 'TextAutoSize.StepBased' in liquid, "Long node names must shrink instead of becoming ellipsis-heavy"
 assert 'ConfiguredGroupIcon(group, Modifier.size(32.dp))' in liquid
