@@ -408,9 +408,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                 throw cancel
             } catch (error: Exception) {
                 val reason = error.message ?: "操作失败"
-                val whitelistSelectionError =
-                    reason.contains("仅所选应用代理") &&
-                        reason.contains("普通应用 UID")
+                val whitelistSelectionError = reason.contains("仅所选应用代理")
                 operation = "确认最终运行状态…"
                 val recovered = settleStartFailure()
                 if (recovered != null) {
