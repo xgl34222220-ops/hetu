@@ -71,8 +71,9 @@ fun rememberHetuMotionEnabled(): Boolean {
 fun hetuContentBottomPadding(): Dp {
     val dock = LocalHetuDockHeight.current
     val system = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    // Dock is measured including inset. Do not add navigationBars for a second time.
-    return if (dock > 0.dp) dock + 30.dp else system + 16.dp
+    // Dock is measured including its navigation inset and floating bottom gap.
+    // Only add the design-system content gap; never count navigationBars twice.
+    return if (dock > 0.dp) dock + HetuBottomBarMetrics.ContentGap else system + HetuBottomBarMetrics.ContentGap
 }
 
 @Composable
