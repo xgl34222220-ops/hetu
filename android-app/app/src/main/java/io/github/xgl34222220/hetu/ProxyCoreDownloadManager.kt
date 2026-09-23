@@ -1,6 +1,7 @@
 package io.github.xgl34222220.hetu
 
 import android.content.Context
+import android.net.Uri
 import android.os.Build
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -196,6 +197,29 @@ internal class ProxyCoreDownloadManager(context: Context) {
             source = asset.source.repo,
             message = if (runtimeReady(core)) "已就绪" else "核心已下载；当前运行后端尚未接入",
         )
+    }
+
+    suspend fun importFromUri(
+        core: ProxyRuntimeProfile.Core,
+        uri: Uri,
+        displayName: String,
+    ): ProxyCoreRemoteStatus = withContext(Dispatchers.IO) {
+        val temp = File(app.cacheDir, "proxy-core-import-${core.id}-${System.nanoTime()}.bin")
+        try {
+            val input = app.contentResolver.openInputStream(uri) ?: throw IOException("无法读取核心文件")
+            input.use { writeLimited(it, temp) }
+            verifyElf(temp)
+            FileInputStream(temp).use { store.importCore(core, it) }
+            prefs.edit()
+                .putString("version_${core.id}", "本地导入")
+                .putString("source_${core.id}", "local")
+                .putString("asset_${core.id}", displayName.ifBlank { uri.lastPathSegment ?: "本地文件" })
+                .putLong("updated_${core.id}", System.currentTimeMillis())
+                .apply()
+            localStatus(core, "已从文件导入")
+        } finally {
+            temp.delete()
+        }
     }
 
     suspend fun removeDownloaded(core: ProxyRuntimeProfile.Core): ProxyCoreRemoteStatus = withContext(Dispatchers.IO) {
