@@ -70,8 +70,7 @@ private fun ReferenceDashboardCard(
     Column(
         modifier
             .heightIn(min = 102.dp)
-            .clip(shape)
-            .background(t.cardBackground)
+            .crystalMaterial(shape, depth = CrystalDepth.Card)
             .then(interaction)
             .padding(horizontal = 14.dp, vertical = 11.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -121,14 +120,15 @@ private fun ReferenceMetricLine(label: String, value: String) {
             fontWeight = FontWeight.SemiBold,
         )
         Spacer(Modifier.weight(1f))
-        Text(
-            value,
+        HetuNumber(
+            text = value,
             color = t.textPrimary,
-            fontSize = 13.5.sp,
-            lineHeight = 18.sp,
-            fontWeight = FontWeight.ExtraBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            monospaced = true,
+            style = MaterialTheme.typography.labelLarge.copy(
+                fontSize = 13.5.sp,
+                lineHeight = 18.sp,
+                fontWeight = FontWeight.ExtraBold,
+            ),
         )
     }
 }
@@ -215,15 +215,16 @@ internal fun AlignedInstrumentPanel(
                         Text("详情", color = HetuMicroCrystal.KleinBlue, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     }
                 }
-                Text(
-                    address,
-                    Modifier.fillMaxWidth().testTag("instrument-network-value"),
+                HetuNumber(
+                    text = address,
+                    modifier = Modifier.fillMaxWidth().testTag("instrument-network-value"),
                     color = t.textPrimary,
-                    fontSize = 15.sp,
-                    lineHeight = 20.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    monospaced = true,
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontSize = 15.sp,
+                        lineHeight = 20.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                    ),
                 )
                 Text(
                     "地区  $region",
