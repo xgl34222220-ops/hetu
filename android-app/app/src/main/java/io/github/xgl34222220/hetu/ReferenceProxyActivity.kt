@@ -2721,7 +2721,8 @@ private fun RefPanelTabs(
     onSelect: (RefPanelTab) -> Unit,
 ) {
     val t = LocalHetuTokens.current
-    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
+    val scheme = MaterialTheme.colorScheme
+    val dark = scheme.background.luminance() < .5f
     val view = LocalView.current
     Row(
         Modifier
