@@ -222,7 +222,7 @@ private fun ProxyPolicyIconsScreen(onBack: () -> Unit) {
             }
 
             items(names, key = { it }) { name ->
-                val override = overrides[name]
+                val customIcon = overrides[name]
                 ElevatedCard(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
@@ -234,18 +234,18 @@ private fun ProxyPolicyIconsScreen(onBack: () -> Unit) {
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
-                                if (override == null) Icons.Rounded.Image else if (override.path.isNotBlank()) Icons.Rounded.AddPhotoAlternate else Icons.Rounded.Link,
+                                if (customIcon == null) Icons.Rounded.Image else if (customIcon.path.isNotBlank()) Icons.Rounded.AddPhotoAlternate else Icons.Rounded.Link,
                                 contentDescription = null,
-                                tint = if (override == null) tokens.textSecondary else MaterialTheme.colorScheme.primary,
+                                tint = if (customIcon == null) tokens.textSecondary else MaterialTheme.colorScheme.primary,
                             )
                             Spacer(Modifier.width(10.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(name, color = tokens.textPrimary, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Text(
                                     when {
-                                        override == null -> "使用 YAML / 内置图标"
-                                        override.path.isNotBlank() -> "本地图标"
-                                        else -> override.url
+                                        customIcon == null -> "使用 YAML / 内置图标"
+                                        customIcon.path.isNotBlank() -> "本地图标"
+                                        else -> customIcon.url
                                     },
                                     color = tokens.textSecondary,
                                     fontSize = 11.sp,
@@ -266,14 +266,14 @@ private fun ProxyPolicyIconsScreen(onBack: () -> Unit) {
                             OutlinedButton(
                                 onClick = {
                                     editingName = name
-                                    remoteUrl = override?.url.orEmpty()
+                                    remoteUrl = customIcon?.url.orEmpty()
                                 },
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(16.dp),
                             ) { Text("HTTPS 链接") }
-                            if (override != null) {
+                            if (customIcon != null) {
                                 IconButton(onClick = {
-                                    override.path.takeIf { it.isNotBlank() }?.let { runCatching { File(it).delete() } }
+                                    customIcon.path.takeIf { it.isNotBlank() }?.let { runCatching { File(it).delete() } }
                                     ProxyPolicyIconOverrides.remove(prefs, name)
                                     revision++
                                     message = "“" + name + "”已恢复原图标"
