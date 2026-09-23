@@ -147,6 +147,15 @@ assert "liquidSheetMaterial()" in phase2_pages["network"]
 assert "liquidSheetMaterial()" in phase2_pages["subscriptions"]
 assert "liquidSheetMaterial()" in phase2_pages["files"]
 
+# Compact filters and mode choices must also use the liquid component family.
+adblock = (src / "ProxyAdblockChainActivity.kt").read_text()
+assert "LiquidChoicePill" in liquid_system
+assert "FilterChip(" not in refhome, "Material FilterChip remains in main proxy UI"
+assert "OutlinedTextField(" not in refhome, "Legacy outlined field remains in main proxy UI"
+assert "LiquidChoicePill(" in refhome
+assert "FilterChip(" not in adblock, "Material FilterChip remains in adblock UI"
+assert "LiquidChoicePill(" in adblock
+
 # Existing productivity/accessibility contracts remain.
 assert 'private fun RefSectionLabel' in refhome and 'Spacer(Modifier.height(2.dp))' in refhome
 assert ".height(42.dp).testTag(\"yaml-accessory\")" in editor
