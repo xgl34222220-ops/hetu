@@ -80,17 +80,21 @@ class ProxyLocalWebUiActivity : ComponentActivity() {
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>河图 WebUI</title>
 <style>
-:root{color-scheme:light dark;--bg:#f3f6fa;--surface:rgba(255,255,255,.86);--text:#142033;--muted:#748197;--line:rgba(20,32,51,.08);--blue:#2563eb;--green:#0f9f75;--red:#dc5a68}
-@media(prefers-color-scheme:dark){:root{--bg:#0f141c;--surface:rgba(28,35,46,.88);--text:#edf3fb;--muted:#9aa7b9;--line:rgba(255,255,255,.08);--blue:#6e9cff;--green:#47c89d;--red:#ff8791}}
-*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 85% -10%,rgba(37,99,235,.12),transparent 34%),var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text)}
+:root{color-scheme:light dark;--bg:#f5f7fb;--surface:rgba(255,255,255,.65);--surface-strong:rgba(255,255,255,.78);--text:#171a20;--muted:#697586;--line:rgba(255,255,255,.60);--blue:#2e70de;--green:#059669;--red:#dc5a68}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1014;--surface:rgba(30,30,35,.70);--surface-strong:rgba(38,39,45,.82);--text:#f4f7fb;--muted:#a8b2c0;--line:rgba(255,255,255,.10);--blue:#6e9cff;--green:#47c89d;--red:#ff8791}}
+*{box-sizing:border-box}body{margin:0;background:
+radial-gradient(circle at 8% 5%,rgba(130,220,255,.16),transparent 34%),
+radial-gradient(circle at 92% 16%,rgba(180,160,255,.14),transparent 34%),
+radial-gradient(circle at 8% 92%,rgba(160,210,255,.08),transparent 38%),
+var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text)}
 main{max-width:900px;margin:auto;padding:max(18px,env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom))}
 header{display:flex;align-items:center;gap:12px;margin:6px 0 16px}h1{font-size:24px;margin:0;letter-spacing:-.6px}header small{color:var(--muted)}
-.status{margin-left:auto;width:48px;height:48px;border-radius:16px;background:linear-gradient(180deg,#3275f2,#1d59d8);display:grid;place-items:center;color:white;font-size:27px;box-shadow:0 8px 22px rgba(37,99,235,.22)}
-.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}.tabs button,.action{border:0;border-radius:999px;padding:11px 12px;background:var(--surface);color:var(--text);font-weight:650}.tabs button.active{background:var(--blue);color:white}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:20px;margin:10px 0;overflow:hidden;box-shadow:0 8px 26px rgba(18,34,58,.05);backdrop-filter:blur(18px)}
+.status{margin-left:auto;width:48px;height:40px;border-radius:999px;background:var(--surface-strong);border:1px solid var(--line);display:grid;place-items:center;color:var(--green);font-size:22px;box-shadow:0 8px 24px rgba(31,38,135,.08);backdrop-filter:blur(20px)}
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;padding:5px;border-radius:999px;background:var(--surface);border:1px solid var(--line);backdrop-filter:blur(20px)}.tabs button,.action{border:0;border-radius:999px;padding:10px 12px;background:transparent;color:var(--text);font-weight:650}.tabs button.active{background:var(--surface-strong);color:var(--blue);box-shadow:0 4px 14px rgba(31,38,135,.07)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:24px;margin:10px 0;overflow:hidden;box-shadow:0 10px 30px rgba(31,38,135,.08),0 2px 8px rgba(0,0,0,.03);backdrop-filter:blur(20px)}
 .row{padding:13px 14px;border-top:1px solid var(--line)}.row:first-child{border-top:0}.title{font-size:14px;font-weight:700}.sub{font-size:12px;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.metric{padding:14px}.metric b{display:block;font-size:18px;margin-top:5px}.pill{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;background:rgba(37,99,235,.10);color:var(--blue);font-size:11px;font-weight:700}
-.node{display:flex;align-items:center;gap:8px;margin-top:9px}.node select{min-width:0;flex:1;border:1px solid var(--line);border-radius:12px;padding:9px;background:transparent;color:var(--text)}
+.node{display:flex;align-items:center;gap:8px;margin-top:9px}.node select{min-width:0;flex:1;border:1px solid var(--line);border-radius:16px;padding:9px 11px;background:var(--surface-strong);color:var(--text);backdrop-filter:blur(16px)}
 .empty{padding:30px 18px;text-align:center;color:var(--muted)}.error{color:var(--red)}.ok{color:var(--green)}
 @media(max-width:520px){.grid{grid-template-columns:1fr}}
 </style>
