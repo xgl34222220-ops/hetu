@@ -9,6 +9,15 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -100,6 +109,24 @@ private fun ProxyQuickPanelSheet(
     }
     var loading by remember { mutableStateOf(true) }
     var loadError by remember { mutableStateOf("") }
+    var sheetVisible by remember { mutableStateOf(false) }
+    var closing by remember { mutableStateOf(false) }
+    val scrimAlpha by animateFloatAsState(
+        targetValue = if (sheetVisible) 0.12f else 0f,
+        animationSpec = tween(160),
+        label = "quickSheetScrim",
+    )
+
+    fun requestClose() {
+        if (closing) return
+        closing = true
+        sheetVisible = false
+        scope.launch {
+            delay(180)
+            onClose()
+        }
+    }
+
 
     suspend fun refreshState() {
         try {
@@ -119,6 +146,7 @@ private fun ProxyQuickPanelSheet(
     }
 
     LaunchedEffect(Unit) {
+        sheetVisible = true
         runCatching { repo.ensureIcons() }
         while (true) {
             refreshState()
@@ -126,7 +154,7 @@ private fun ProxyQuickPanelSheet(
         }
     }
 
-    BackHandler(onBack = onClose)
+    BackHandler(onBack = ::requestClose)
 
     val dismissSource = remember { MutableInteractionSource() }
     val sheetSource = remember { MutableInteractionSource() }
@@ -135,16 +163,30 @@ private fun ProxyQuickPanelSheet(
     Box(
         Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.12f))
+            .background(Color.Black.copy(alpha = scrimAlpha))
             .clickable(
                 interactionSource = dismissSource,
                 indication = null,
-                onClick = onClose,
+                onClick = ::requestClose,
             ),
     ) {
-        Box(
+        AnimatedVisibility(
+            visible = sheetVisible,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            enter = slideInVertically(
+                initialOffsetY = { it },
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessMediumLow,
+                ),
+            ) + fadeIn(animationSpec = tween(150)),
+            exit = slideOutVertically(
+                targetOffsetY = { it / 3 },
+                animationSpec = tween(160),
+            ) + fadeOut(animationSpec = tween(120)),
+        ) {
+            Box(
             Modifier
-                .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .fillMaxHeight(if (strategyOnly) 0.88f else 0.94f)
                 .clip(sheetShape)
@@ -179,17 +221,18 @@ private fun ProxyQuickPanelSheet(
                         glassEnabled = true,
                         strategyOnly = strategyOnly,
                         onRefreshState = { refreshState() },
-                        onBack = onClose,
+                        onBack = ::requestClose,
                         onOpenSettings = {
                             context.startActivity(
                                 Intent(context, ReferenceProxyActivity::class.java)
                                     .putExtra(ReferenceProxyActivity.EXTRA_START_PAGE, "settings"),
                             )
-                            onClose()
+                            requestClose()
                         },
                         onDetailVisibleChanged = {},
                     )
                 }
+            }
             }
         }
     }
