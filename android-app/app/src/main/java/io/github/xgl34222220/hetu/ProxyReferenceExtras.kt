@@ -428,6 +428,7 @@ private fun ProxySelectorPreferencesScreen(onBack: () -> Unit) {
     var desc by remember { mutableStateOf(prefs.getBoolean("proxySelectorSortDescending", false)) }
     var groupByProvider by remember { mutableStateOf(prefs.getBoolean("proxySelectorGroupByProvider", false)) }
     var collapsePrevious by remember { mutableStateOf(prefs.getBoolean("proxySelectorCollapsePrevious", true)) }
+    var expandSelectedInSheet by remember { mutableStateOf(prefs.getBoolean("proxySelectorExpandSelectedInSheet", false)) }
     var disconnect by remember { mutableStateOf(prefs.getBoolean("proxySelectorDisconnectOnSelect", false)) }
     var hidden by remember { mutableStateOf(prefs.getBoolean("proxySelectorShowHidden", false)) }
     var detectIpv6 by remember { mutableStateOf(prefs.getBoolean("proxySelectorDetectIpv6", true)) }
@@ -462,6 +463,7 @@ private fun ProxySelectorPreferencesScreen(onBack: () -> Unit) {
                     ExtraSwitchRow("倒序", "对当前节点排序结果反向显示", desc) { desc = it; putBool("proxySelectorSortDescending", it) }
                     ExtraSwitchRow("按 Provider 分组", "有 Provider 信息时按来源组织节点", groupByProvider) { groupByProvider = it; putBool("proxySelectorGroupByProvider", it) }
                     ExtraSwitchRow("折叠上一个策略", "打开新策略组时收起之前的策略", collapsePrevious) { collapsePrevious = it; putBool("proxySelectorCollapsePrevious", it) }
+                    ExtraSwitchRow("底部弹窗展开策略", "点击策略组后从底部弹出节点列表", expandSelectedInSheet) { expandSelectedInSheet = it; putBool("proxySelectorExpandSelectedInSheet", it) }
                 }
             }
             item {
