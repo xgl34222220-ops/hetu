@@ -1324,14 +1324,16 @@ internal fun RefPanel(
         onDispose { selectorPrefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
     selectorPrefsRevision
-    val expandSelectedInSheet = selectorPrefs.getBoolean("proxySelectorExpandSelectedInSheet", false)\n    val tab = if (strategyOnly) RefPanelTab.Groups else selectedTab
+    val expandSelectedInSheet = selectorPrefs.getBoolean("proxySelectorExpandSelectedInSheet", false)
+    val tab = if (strategyOnly) RefPanelTab.Groups else selectedTab
     var refreshing by remember { mutableStateOf(false) }
     var providers by remember { mutableStateOf<List<DashboardProviderUi>>(emptyList()) }
     var rules by remember { mutableStateOf<List<ProxyRuleUi>>(emptyList()) }
     var overviewRuleCount by remember { mutableStateOf<Int?>(null) }
     var ruleSets by remember { mutableStateOf<List<DashboardRuleSetUi>>(emptyList()) }
     var selectedGroupName by rememberSaveable { mutableStateOf<String?>(null) }
-    var selectedGroupSheetName by rememberSaveable { mutableStateOf<String?>(null) }\n    val selectedLocal = remember { mutableStateMapOf<String, String>() }
+    var selectedGroupSheetName by rememberSaveable { mutableStateOf<String?>(null) }
+    val selectedLocal = remember { mutableStateMapOf<String, String>() }
     val testing = remember { mutableStateMapOf<String, Boolean>() }
     val providerRefreshing = remember { mutableStateMapOf<String, Boolean>() }
     val providerSucceeded = remember { mutableStateMapOf<String, Boolean>() }
