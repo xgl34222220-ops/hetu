@@ -18,6 +18,24 @@
         <activity android:name=".ThemeSettingsActivity" android:label="主题与界面" android:exported="false"  android:launchMode="singleTop" />
         <activity android:name=".HetuMainActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".ReferenceProxyActivity" android:label="河图" android:exported="true" android:launchMode="singleTop" />
+        <activity
+            android:name=".ProxySelectorSheetActivity"
+            android:label="河图策略"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:resizeableActivity="true"
+            android:theme="@style/HetuTranslucentPopupTheme"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
+            android:name=".PanelSheetActivity"
+            android:label="河图面板"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:resizeableActivity="true"
+            android:theme="@style/HetuTranslucentPopupTheme"
+            android:windowSoftInputMode="adjustResize" />
         <activity-alias
             android:name=".LauncherOfficial"
             android:targetActivity=".ReferenceProxyActivity"
