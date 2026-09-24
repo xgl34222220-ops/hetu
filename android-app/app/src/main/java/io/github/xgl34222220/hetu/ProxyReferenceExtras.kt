@@ -1063,11 +1063,15 @@ private fun ProxyAboutSponsorshipScreen(onBack: () -> Unit) {
 internal object HetuLauncherIcons {
     private const val OFFICIAL = "io.github.xgl34222220.hetu.LauncherOfficial"
     private const val CLASSIC = "io.github.xgl34222220.hetu.LauncherClassic"
+    private const val TILE_OFFICIAL = "io.github.xgl34222220.hetu.TilePreferencesOfficial"
+    private const val TILE_CLASSIC = "io.github.xgl34222220.hetu.TilePreferencesClassic"
 
     fun apply(context: Context, value: String) {
         val pm = context.packageManager
         val official = ComponentName(context, OFFICIAL)
         val classic = ComponentName(context, CLASSIC)
+        val tileOfficial = ComponentName(context, TILE_OFFICIAL)
+        val tileClassic = ComponentName(context, TILE_CLASSIC)
         val useClassic = value == "classic"
         pm.setComponentEnabledSetting(
             official,
@@ -1076,6 +1080,16 @@ internal object HetuLauncherIcons {
         )
         pm.setComponentEnabledSetting(
             classic,
+            if (useClassic) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+            PackageManager.DONT_KILL_APP,
+        )
+        pm.setComponentEnabledSetting(
+            tileOfficial,
+            if (useClassic) PackageManager.COMPONENT_ENABLED_STATE_DISABLED else PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+            PackageManager.DONT_KILL_APP,
+        )
+        pm.setComponentEnabledSetting(
+            tileClassic,
             if (useClassic) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
             PackageManager.DONT_KILL_APP,
         )
