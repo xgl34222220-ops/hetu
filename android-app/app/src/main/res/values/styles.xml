@@ -27,4 +27,15 @@
         <item name="android:activityCloseEnterAnimation">@anim/hetu_route_close_enter</item>
         <item name="android:activityCloseExitAnimation">@anim/hetu_route_close_exit</item>
     </style>
+    <style name="HetuTranslucentPopupTheme" parent="@style/AppTheme">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:windowDimAmount">0.30</item>
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowAnimationStyle">@style/HetuSharedAxisWindowAnimation</item>
+    </style>
 </resources>
