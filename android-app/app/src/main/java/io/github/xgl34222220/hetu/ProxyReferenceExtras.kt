@@ -679,7 +679,21 @@ private fun ProxyNotificationSettingsScreen(onBack: () -> Unit) {
                     )
                     ExtraRow(Icons.Rounded.Refresh, "刷新频率", "通知状态读取间隔", refresh.toString() + " 秒") { picker = "refresh" to -1 }
                     HorizontalDivider(color = t.outline)
-                    ExtraRow(Icons.Rounded.TouchApp, "点击通知打开", "首页 / 面板 / 策略 / 工具 / 设置", clickTarget) { picker = "target" to -1 }
+                    ExtraRow(
+                        Icons.Rounded.TouchApp,
+                        "点击通知打开",
+                        "主界面页面或独立半透明浮窗",
+                        when (clickTarget) {
+                            "PanelSheet" -> "面板浮窗"
+                            "StrategySheet" -> "策略浮窗"
+                            "Home" -> "首页"
+                            "Panel" -> "面板"
+                            "Strategy" -> "策略"
+                            "Tools" -> "工具"
+                            "Settings" -> "设置"
+                            else -> clickTarget
+                        },
+                    ) { picker = "target" to -1 }
                 }
             }
             items(3) { index ->
@@ -723,7 +737,7 @@ private fun ProxyNotificationSettingsScreen(onBack: () -> Unit) {
     picker?.let { current ->
         val options: List<Pair<String, String>> = when (current.first) {
             "refresh" -> listOf("2" to "2 秒", "3" to "3 秒", "5" to "5 秒", "10" to "10 秒", "30" to "30 秒", "60" to "60 秒")
-            "target" -> listOf("Home" to "首页", "Panel" to "面板", "Strategy" to "策略", "Tools" to "工具", "Settings" to "设置")
+            "target" -> listOf("Home" to "首页", "Panel" to "面板", "Strategy" to "策略", "PanelSheet" to "面板浮窗", "StrategySheet" to "策略浮窗", "Tools" to "工具", "Settings" to "设置")
             else -> listOf("reload" to "重载", "restart" to "重启", "stop" to "停止", "hide" to "隐藏通知", "none" to "无")
         }
         ModalBottomSheet(
