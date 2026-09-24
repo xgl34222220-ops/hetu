@@ -169,7 +169,7 @@ class ReferenceProxyActivity : ComponentActivity() {
 
 private enum class RefProxyPage { Home, Panel, Strategy, Tools, Settings }
 internal data class RefSubscriptionCache(val used: Long = 0L, val total: Long = 0L, val count: Int = 0)
-private enum class RefPanelTab(val label: String) {
+internal enum class RefPanelTab(val label: String) {
     Groups("节点"), Overview("概览"), Subscriptions("订阅"), Connections("连接"), Rules("规则"), RuleSets("规则集")
 }
 
@@ -1293,7 +1293,7 @@ private fun RefSubscriptionCard(items: List<DashboardProviderUi>) {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalHazeMaterialsApi::class)
 @Composable
-private fun RefPanel(
+internal fun RefPanel(
     state: ProxyComposeState,
     repo: ProxyDashboardRepository,
     delays: MutableMap<String, Long>,
