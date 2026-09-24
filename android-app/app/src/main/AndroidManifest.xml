@@ -60,6 +60,32 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity-alias>
+        <activity-alias
+            android:name=".TilePreferencesOfficial"
+            android:targetActivity=".ReferenceProxyActivity"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@drawable/ic_hetu_official"
+            android:label="河图代理"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE_PREFERENCES" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".TilePreferencesClassic"
+            android:targetActivity=".ReferenceProxyActivity"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_hetu"
+            android:label="河图代理"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE_PREFERENCES" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity-alias>
         <activity android:name=".ReferenceFileManagerActivity" android:label="文件管理" android:exported="false"  android:launchMode="singleTop" />
         <activity android:name=".ProxyLogViewerActivity" android:label="日志查看" android:exported="false" android:launchMode="singleTop" />
         <activity android:name=".ProxyScriptsActivity" android:label="脚本" android:exported="false" android:launchMode="singleTop" />
