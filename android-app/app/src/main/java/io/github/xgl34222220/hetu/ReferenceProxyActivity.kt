@@ -1324,14 +1324,14 @@ internal fun RefPanel(
         onDispose { selectorPrefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
     selectorPrefsRevision
-    val tab = if (strategyOnly) RefPanelTab.Groups else selectedTab
+    val expandSelectedInSheet = selectorPrefs.getBoolean("proxySelectorExpandSelectedInSheet", false)\n    val tab = if (strategyOnly) RefPanelTab.Groups else selectedTab
     var refreshing by remember { mutableStateOf(false) }
     var providers by remember { mutableStateOf<List<DashboardProviderUi>>(emptyList()) }
     var rules by remember { mutableStateOf<List<ProxyRuleUi>>(emptyList()) }
     var overviewRuleCount by remember { mutableStateOf<Int?>(null) }
     var ruleSets by remember { mutableStateOf<List<DashboardRuleSetUi>>(emptyList()) }
     var selectedGroupName by rememberSaveable { mutableStateOf<String?>(null) }
-    val selectedLocal = remember { mutableStateMapOf<String, String>() }
+    var selectedGroupSheetName by rememberSaveable { mutableStateOf<String?>(null) }\n    val selectedLocal = remember { mutableStateMapOf<String, String>() }
     val testing = remember { mutableStateMapOf<String, Boolean>() }
     val providerRefreshing = remember { mutableStateMapOf<String, Boolean>() }
     val providerSucceeded = remember { mutableStateMapOf<String, Boolean>() }
@@ -1681,7 +1681,10 @@ internal fun RefPanel(
     LaunchedEffect(searchRequest) { if (searchRequest > 0) searchOpen = true }
 
     LaunchedEffect(tab) {
-        if (tab != RefPanelTab.Groups) selectedGroupName = null
+        if (tab != RefPanelTab.Groups) {
+            selectedGroupName = null
+            selectedGroupSheetName = null
+        }
         onDetailVisibleChanged(false)
     }
 
@@ -1777,7 +1780,13 @@ internal fun RefPanel(
                                         modifier = Modifier.weight(1f),
                                         onClick = {
                                             view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                                            selectedGroupName = if (selectedGroupName == group.name) null else group.name
+                                            if (expandSelectedInSheet) {
+                                                selectedGroupName = null
+                                                selectedGroupSheetName = group.name
+                                            } else {
+                                                selectedGroupSheetName = null
+                                                selectedGroupName = if (selectedGroupName == group.name) null else group.name
+                                            }
                                         },
                                         onDelay = {
                                             if (selected.isNotBlank() && testing[selected] != true) scope.launch {
@@ -2028,6 +2037,138 @@ internal fun RefPanel(
     } // measured content width
 
 
+
+    selectedGroupSheetName?.let { sheetGroupName ->
+        state.groups.firstOrNull { it.name == sheetGroupName }?.let { group ->
+            val selected = selectedLocal[group.name] ?: group.now
+            val nodeSort = selectorPrefs.getString("proxySelectorNodeSort", "config").orEmpty()
+            val descending = selectorPrefs.getBoolean("proxySelectorSortDescending", false)
+            val orderedNodes = when (nodeSort) {
+                "name" -> group.nodes.sortedBy { it.name.lowercase() }
+                "latency" -> group.nodes.sortedWith(compareBy<ProxyNodeUi> {
+                    (delays[it.name] ?: it.lastDelay)?.takeIf { value -> value > 0L } ?: Long.MAX_VALUE
+                }.thenBy { it.name.lowercase() })
+                else -> group.nodes
+            }.let { values -> if (descending) values.reversed() else values }
+            val visibleGroup = group.copy(nodes = orderedNodes)
+
+            ModalBottomSheet(
+                onDismissRequest = { selectedGroupSheetName = null },
+                containerColor = Color.Transparent,
+                shape = RoundedCornerShape(topStart = HetuGlassRadius.Sheet, topEnd = HetuGlassRadius.Sheet),
+                dragHandle = { RefSheetDragHandle() },
+            ) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight(.82f)
+                        .liquidSheetMaterial()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 14.dp, vertical = 6.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "策略节点",
+                                color = t.textSecondary,
+                                fontSize = 11.sp,
+                                lineHeight = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Text(
+                                group.name,
+                                color = t.textPrimary,
+                                fontSize = 21.sp,
+                                lineHeight = 27.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        TextButton(
+                            onClick = {
+                                val pending = group.nodes.filter { testing[it.name] != true }
+                                if (pending.isNotEmpty()) scope.launch {
+                                    try {
+                                        val wave = pending.mapIndexed { index, node ->
+                                            async {
+                                                delay(index * 30L)
+                                                testing[node.name] = true
+                                                try { repo.delay(node.name) }
+                                                catch (_: Exception) { -1L }
+                                            }
+                                        }
+                                        pending.forEachIndexed { index, node ->
+                                            val measured = wave[index].await()
+                                            if (measured > 0L) delays[node.name] = measured
+                                            else if ((delays[node.name] ?: 1L) <= 0L) delays.remove(node.name)
+                                            delay(32L)
+                                            testing.remove(node.name)
+                                        }
+                                        view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                                    } finally {
+                                        pending.forEach { testing.remove(it.name) }
+                                    }
+                                }
+                            },
+                        ) { Text("全部测速") }
+                    }
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState()),
+                    ) {
+                        RefInlineGroupExpansion(
+                            group = visibleGroup,
+                            selected = selected,
+                            delays = delays,
+                            testing = testing,
+                            onSelect = { node ->
+                                val previous = selectedLocal[group.name] ?: group.now
+                                selectedLocal[group.name] = node
+                                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                scope.launch {
+                                    try {
+                                        val previousConnections =
+                                            if (selectorPrefs.getBoolean("proxySelectorDisconnectOnSelect", false)) {
+                                                state.connections.map { it.id }
+                                            } else emptyList()
+                                        repo.select(group.name, node)
+                                        if (previousConnections.isNotEmpty()) {
+                                            previousConnections.forEach { id -> runCatching { repo.closeConnection(id) } }
+                                        }
+                                        onRefreshState()
+                                    } catch (_: Exception) {
+                                        if (previous.isBlank()) selectedLocal.remove(group.name)
+                                        else selectedLocal[group.name] = previous
+                                    }
+                                }
+                            },
+                            onDelay = { node ->
+                                if (testing[node] != true) scope.launch {
+                                    testing[node] = true
+                                    try {
+                                        val measured = repo.delay(node)
+                                        if (measured > 0L) delays[node] = measured
+                                    } catch (_: Exception) {
+                                        if ((delays[node] ?: 1L) <= 0L) delays.remove(node)
+                                    } finally {
+                                        testing.remove(node)
+                                    }
+                                }
+                            },
+                            onTestAll = {},
+                        )
+                    }
+                }
+            }
+        }
+    }
 
     if (groupSortPicker) {
         val sortValues = listOf(
