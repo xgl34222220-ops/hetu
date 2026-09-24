@@ -453,7 +453,9 @@ private fun RefProxyShell(
                     if (!state.running) {
                         if (whitelistSelectionError) {
                             startupError =
-                                "当前使用“仅所选应用代理”，但没有可用的已选应用。\n\n" +
+                                "当前使用“仅所选应用代理”，但没有可用的已选应用。
+
+" +
                                     "请打开「工具 → 应用管理」，至少勾选一个已安装的普通应用；" +
                                     "或者把应用范围改为“核心配置 / 所选应用直连”后再启动。"
                         } else {
@@ -461,7 +463,10 @@ private fun RefProxyShell(
                             startupError = buildString {
                                 append(reason)
                                 if (diagnostics.isNotBlank()) {
-                                    append("\n\n--- Root / Mihomo 诊断 ---\n")
+                                    append("
+
+--- Root / Mihomo 诊断 ---
+")
                                     append(diagnostics)
                                 }
                             }
@@ -1324,14 +1329,16 @@ internal fun RefPanel(
         onDispose { selectorPrefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
     selectorPrefsRevision
-    val expandSelectedInSheet = selectorPrefs.getBoolean("proxySelectorExpandSelectedInSheet", false)\n    val tab = if (strategyOnly) RefPanelTab.Groups else selectedTab
+    val expandSelectedInSheet = selectorPrefs.getBoolean("proxySelectorExpandSelectedInSheet", false)
+    val tab = if (strategyOnly) RefPanelTab.Groups else selectedTab
     var refreshing by remember { mutableStateOf(false) }
     var providers by remember { mutableStateOf<List<DashboardProviderUi>>(emptyList()) }
     var rules by remember { mutableStateOf<List<ProxyRuleUi>>(emptyList()) }
     var overviewRuleCount by remember { mutableStateOf<Int?>(null) }
     var ruleSets by remember { mutableStateOf<List<DashboardRuleSetUi>>(emptyList()) }
     var selectedGroupName by rememberSaveable { mutableStateOf<String?>(null) }
-    var selectedGroupSheetName by rememberSaveable { mutableStateOf<String?>(null) }\n    val selectedLocal = remember { mutableStateMapOf<String, String>() }
+    var selectedGroupSheetName by rememberSaveable { mutableStateOf<String?>(null) }
+    val selectedLocal = remember { mutableStateMapOf<String, String>() }
     val testing = remember { mutableStateMapOf<String, Boolean>() }
     val providerRefreshing = remember { mutableStateMapOf<String, Boolean>() }
     val providerSucceeded = remember { mutableStateMapOf<String, Boolean>() }
@@ -2274,7 +2281,8 @@ private fun RefPanelApiSettingsSheet(
                 feedbackError = true
                 return false
             }
-            secret.contains('\n') || secret.contains('\r') -> {
+            secret.contains('
+') || secret.contains('\r') -> {
                 feedback = "Secret 不能包含换行"
                 feedbackError = true
                 return false
@@ -5060,7 +5068,8 @@ private fun RefInfoBottomSheet(
                     pushStyle(androidx.compose.ui.text.SpanStyle(color = color))
                     append(line)
                     pop()
-                    if (index != lines.lastIndex) append('\n')
+                    if (index != lines.lastIndex) append('
+')
                 }
             }
         }
