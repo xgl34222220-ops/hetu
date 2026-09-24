@@ -155,9 +155,12 @@ class ProxyStatusNotificationService : Service() {
 
     private fun buildNotification(title: String, body: String, running: Boolean): Notification {
         val clickTarget = prefs.getString(PREF_CLICK_TARGET, "Home").orEmpty().ifBlank { "Home" }
-        val launch = Intent(this, ReferenceProxyActivity::class.java)
-            .putExtra(ReferenceProxyActivity.EXTRA_START_PAGE, clickTarget)
-            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        val launch = when (clickTarget) {
+            "PanelSheet" -> Intent(this, PanelSheetActivity::class.java)
+            "StrategySheet" -> Intent(this, ProxySelectorSheetActivity::class.java)
+            else -> Intent(this, ReferenceProxyActivity::class.java)
+                .putExtra(ReferenceProxyActivity.EXTRA_START_PAGE, clickTarget)
+        }.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         val builder = Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_lock)
             .setContentTitle(title)
