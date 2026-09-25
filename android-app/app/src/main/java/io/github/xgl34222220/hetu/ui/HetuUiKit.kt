@@ -37,6 +37,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -141,9 +144,51 @@ fun HetuListIcon(icon: ImageVector, modifier: Modifier = Modifier) {
 }
 
 @Composable
+internal fun Modifier.hetuTopBarBackdrop(): Modifier {
+    val context = LocalContext.current
+    val prefs = context.getSharedPreferences("hetu", 0)
+    val enabled = prefs.getBoolean("enableBlur", true)
+    if (!enabled) return this
+
+    val style = prefs.getString("topBarBlurStyle", "progressive").orEmpty().ifBlank { "progressive" }
+    val tokens = LocalHetuTokens.current
+    val shape = RoundedCornerShape(22.dp)
+    val base = crystalMaterial(
+        shape = shape,
+        depth = if (style == "gaussian") CrystalDepth.Popover else CrystalDepth.InsetItem,
+    )
+    if (style == "gaussian") return this.then(base)
+
+    return this.then(base).drawWithCache {
+        val radius = 22.dp.toPx()
+        val fade = Brush.verticalGradient(
+            colors = listOf(
+                tokens.elevatedCardBackground.copy(alpha = .18f),
+                tokens.cardBackground.copy(alpha = .08f),
+                Color.Transparent,
+            ),
+        )
+        onDrawWithContent {
+            drawContent()
+            drawRoundRect(
+                brush = fade,
+                cornerRadius = CornerRadius(radius, radius),
+            )
+        }
+    }
+}
+
+@Composable
 fun HetuPageHeader(title: String, onBack: () -> Unit, subtitle: String = "", actions: @Composable RowScope.() -> Unit = {}) {
     val t = LocalHetuTokens.current
-    Row(Modifier.fillMaxWidth().heightIn(min = 64.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .hetuTopBarBackdrop()
+            .padding(horizontal = 4.dp)
+            .heightIn(min = 64.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         IconButton(onBack, Modifier.size(48.dp)) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回", tint = t.textPrimary) }
         Column(Modifier.weight(1f).padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(title, color = t.textPrimary, fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold)
