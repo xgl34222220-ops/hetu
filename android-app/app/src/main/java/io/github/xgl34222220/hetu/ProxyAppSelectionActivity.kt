@@ -126,7 +126,7 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
         saveProxyApps(next)
     }
     var query by rememberSaveable { mutableStateOf("") }
-    var showSystem by rememberSaveable { mutableStateOf(false) }
+    var appTypeFilter by rememberSaveable { mutableStateOf("user") }
     var selectedOnly by rememberSaveable { mutableStateOf(false) }
     var selected by remember { mutableStateOf(proxyApps()) }
     var appScopeId by rememberSaveable { mutableStateOf(prefs.getString("proxyAppScope", "blacklist") ?: "blacklist") }
@@ -160,10 +160,15 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
         "core" -> "当前不按 Android UID 过滤；名单保留，但不会参与 Root 规则。"
         else -> "勾选的应用绕过 Root 透明代理，其余应用进入代理。"
     }
-    val visible = remember(apps, query, showSystem, selectedOnly, selected) {
+    val visible = remember(apps, query, appTypeFilter, selectedOnly, selected) {
         apps.filter { app ->
+            val typeMatch = when (appTypeFilter) {
+                "system" -> app.system
+                "all" -> true
+                else -> !app.system
+            }
             (!selectedOnly || app.packageName in selected) &&
-                (showSystem || !app.system || app.packageName in selected) &&
+                typeMatch &&
                 (query.isBlank() || app.label.contains(query, true) || app.packageName.contains(query, true))
         }
     }
@@ -248,15 +253,21 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
         }
 
         item("filters") {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                LiquidChoicePill("系统应用", showSystem, { showSystem = !showSystem })
-                LiquidChoicePill("已选择", selectedOnly, { selectedOnly = !selectedOnly })
-                Spacer(Modifier.weight(1f))
-                Text("${visible.size}/${apps.size}", color = t.textSecondary, fontSize = 12.sp)
-                TextButton(onClick = { showBatchActions = true }, contentPadding = PaddingValues(horizontal = 8.dp)) {
-                    Icon(Icons.Rounded.Checklist, null, Modifier.size(17.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("批量", fontSize = 12.sp)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    LiquidChoicePill("全部", appTypeFilter == "all", { appTypeFilter = "all" })
+                    LiquidChoicePill("用户应用", appTypeFilter == "user", { appTypeFilter = "user" })
+                    LiquidChoicePill("系统应用", appTypeFilter == "system", { appTypeFilter = "system" })
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    LiquidChoicePill("已选择", selectedOnly, { selectedOnly = !selectedOnly })
+                    Spacer(Modifier.weight(1f))
+                    Text("${visible.size}/${apps.size}", color = t.textSecondary, fontSize = 12.sp)
+                    TextButton(onClick = { showBatchActions = true }, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                        Icon(Icons.Rounded.Checklist, null, Modifier.size(17.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("批量", fontSize = 12.sp)
+                    }
                 }
             }
         }
@@ -350,7 +361,15 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                 )
                             }
-                            Text(if (app.system) "系统应用" else "用户应用", color = t.textMuted, fontSize = 9.5.sp)
+                            val androidUserId = if (app.uid >= 0) app.uid / 100000 else 0
+                            Text(
+                                buildString {
+                                    if (androidUserId > 0) append("用户 ").append(androidUserId).append(" · ")
+                                    append(if (app.system) "系统应用" else "用户应用")
+                                },
+                                color = t.textMuted,
+                                fontSize = 9.5.sp,
+                            )
                         }
                     }
                     val checkScale by animateFloatAsState(if (checked) 1f else .78f, spring(dampingRatio = .50f, stiffness = 620f), label = "appCheck${app.packageName}")
