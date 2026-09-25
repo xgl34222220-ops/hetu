@@ -82,9 +82,16 @@ internal object ProxyScriptHooks {
 
     suspend fun listManaged(context: Context): List<ManagedScript> = withContext(Dispatchers.IO) {
         ensure(context)
-        val command = """
-            for f in ${ROOT}/*.sh; do
-              [ -f "${'        val result = RootBridge.rootShell(context.applicationContext, command, 6_000L)
+        val command =
+            "for f in " + q(ROOT) + "/*.sh; do " +
+            "[ -f \"\$f\" ] || continue; " +
+            "n=\$(basename \"\$f\"); " +
+            "[ \"\$n\" = \"pre-start.sh\" ] && continue; " +
+            "[ \"\$n\" = \"post-stop.sh\" ] && continue; " +
+            "s=\$(wc -c < \"\$f\" 2>/dev/null || echo 0); " +
+            "printf '%s\\t%s\\n' \"\$n\" \"\$s\"; " +
+            "done"
+        val result = RootBridge.rootShell(context.applicationContext, command, 6_000L)
         if (!result.ok()) throw IllegalStateException(result.output.ifBlank { "脚本列表读取失败" })
         result.output.lineSequence().mapNotNull { line ->
             val parts = line.split('\t')
