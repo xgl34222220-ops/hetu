@@ -65,6 +65,7 @@ private fun ThemeSettingsScreen(onBack: () -> Unit, onThemeChanged: () -> Unit) 
     var standard by remember { mutableStateOf(prefs.getString("colorStandard", "Material3_2021") ?: "Material3_2021") }
     var accent by remember { mutableStateOf(prefs.getString("accentHex", "#2563EB") ?: "#2563EB") }
     var blur by remember { mutableStateOf(prefs.getBoolean("enableBlur", true)) }
+    var topBarBlurStyle by remember { mutableStateOf(prefs.getString("topBarBlurStyle", "progressive").orEmpty().ifBlank { "progressive" }) }
     var floating by remember { mutableStateOf(prefs.getBoolean("floatingBottomBar", true)) }
     var liquid by remember { mutableStateOf(prefs.getBoolean("liquidGlass", true)) }
     var panelTab by remember { mutableStateOf(prefs.getBoolean("showPanelTab", true)) }
@@ -175,6 +176,24 @@ private fun ThemeSettingsScreen(onBack: () -> Unit, onThemeChanged: () -> Unit) 
         item { ThemeSection("玻璃与导航") {
             ThemeSwitchRow(Icons.Rounded.BlurOn, "模糊效果总开关", "控制应用内磨砂与背景模糊", blur) {
                 blur = it; persistBoolean("enableBlur", it)
+            }
+            ThemeDivider()
+            ThemeValueRow(
+                Icons.Rounded.Gradient,
+                "顶栏模糊样式",
+                if (topBarBlurStyle == "gaussian") "高斯模糊" else "渐进式模糊",
+            ) {
+                openPicker(
+                    "顶栏模糊样式",
+                    topBarBlurStyle,
+                    listOf(
+                        PickerOption("gaussian", "高斯模糊"),
+                        PickerOption("progressive", "渐进式模糊"),
+                    ),
+                ) {
+                    topBarBlurStyle = it
+                    persistString("topBarBlurStyle", it)
+                }
             }
             ThemeDivider()
             ThemeSwitchRow(Icons.Rounded.SpaceBar, "悬浮底栏", "关闭后吸附到屏幕底部", floating) {
