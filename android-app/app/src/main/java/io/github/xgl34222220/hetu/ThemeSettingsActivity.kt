@@ -179,7 +179,7 @@ private fun ThemeSettingsScreen(onBack: () -> Unit, onThemeChanged: () -> Unit) 
             }
             ThemeDivider()
             ThemeValueRow(
-                Icons.Rounded.Gradient,
+                Icons.Rounded.BlurOn,
                 "顶栏模糊样式",
                 if (topBarBlurStyle == "gaussian") "高斯模糊" else "渐进式模糊",
             ) {
