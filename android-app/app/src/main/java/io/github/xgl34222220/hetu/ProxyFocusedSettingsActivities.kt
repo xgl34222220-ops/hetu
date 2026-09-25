@@ -370,15 +370,55 @@ private fun CnIpSettingsPage(onBack: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("hetu", 0) }
     var enabled by remember { mutableStateOf(prefs.getBoolean("proxyCnIpDirect", false)) }
+    val runtimeMode = ProxyRuntimeProfile.load(prefs).mode
     FocusedSettingsScaffold("CNIP 设置", "中国大陆 IPv4 / IPv6 自动直连", onBack) {
-        item { FocusedNotice("CNIP 只补充 IP 级直连，不替代 YAML 中已有的域名规则。修改后重启代理生效。") }
+        item {
+            FocusedNotice(
+                "CNIP 只补充 IP 级直连，不替代 YAML 中已有的域名规则。河图会把内置 IPv4 / IPv6 网段写入当前 Mihomo / Root 运行配置；修改后重启代理生效。"
+            )
+        }
         item {
             FocusedGroup {
-                FocusedSwitchRow(Icons.Rounded.Public, Color(0xFFF59E0B), "中国 IP 自动直连", "命中国内 IPv4 / IPv6 网段时直接连接", enabled) {
-                    enabled = it; prefs.edit().putBoolean("proxyCnIpDirect", it).apply(); ProxyRuntimeSettings.markDirty(prefs, "proxyCnIpDirect")
+                FocusedSwitchRow(
+                    Icons.Rounded.Public,
+                    Color(0xFFF59E0B),
+                    "中国 IP 自动直连",
+                    "命中国大陆 IPv4 / IPv6 网段时直接连接",
+                    enabled,
+                ) {
+                    enabled = it
+                    prefs.edit().putBoolean("proxyCnIpDirect", it).apply()
+                    ProxyRuntimeSettings.markDirty(prefs, "proxyCnIpDirect")
                 }
                 FocusedDivider()
-                FocusedInfoRow(Icons.Rounded.Inventory2, Color(0xFF0EA5E9), "数据源", "内置离线快照 + Mihomo provider 运行时更新")
+                FocusedInfoRow(
+                    Icons.Rounded.Inventory2,
+                    Color(0xFF0EA5E9),
+                    "数据源",
+                    "内置离线 IPv4 / IPv6 快照 · 随河图版本更新",
+                )
+                FocusedDivider()
+                FocusedActionRow(
+                    Icons.Rounded.Memory,
+                    Color(0xFF8B5CF6),
+                    "CNIP 运行模式",
+                    if (runtimeMode == ProxyRuntimeProfile.Mode.EBPF) {
+                        "当前 eBPF · CNIP 与 hetu0 数据面协同"
+                    } else {
+                        "当前 ${runtimeMode.label} · 可切换 eBPF / TUN / TPROXY 等模式"
+                    },
+                ) {
+                    context.startActivity(Intent(context, ProxyRuntimeCoreSettingsActivity::class.java))
+                }
+                FocusedDivider()
+                FocusedActionRow(
+                    Icons.Rounded.Apps,
+                    Color(0xFF10B981),
+                    "例外与强制代理应用",
+                    "使用应用名单控制哪些 UID 直连、代理或交给核心配置",
+                ) {
+                    context.startActivity(Intent(context, ProxyAppSelectionActivity::class.java))
+                }
             }
         }
     }
