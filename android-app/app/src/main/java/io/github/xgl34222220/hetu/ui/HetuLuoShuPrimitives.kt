@@ -135,7 +135,13 @@ fun HetuLuoShuTopBar(
 ) {
     val tokens = LocalHetuTokens.current
     Row(
-        modifier = modifier.fillMaxWidth().statusBarsPadding().heightIn(min = 64.dp).padding(vertical = 8.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .hetuTopBarBackdrop()
+            .padding(horizontal = 8.dp)
+            .heightIn(min = 64.dp)
+            .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
