@@ -26,7 +26,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35], qualifiers = "w480dp-h2400dp-mdpi")
+@Config(sdk = [35], qualifiers = "zh-rCN-w480dp-h2400dp-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class InstrumentAlignmentRenderTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()

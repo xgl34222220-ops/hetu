@@ -30,7 +30,7 @@ import java.net.Proxy
 import java.net.InetSocketAddress
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk=[35], qualifiers="w480dp-h1600dp-mdpi")
+@Config(sdk=[35], qualifiers = "zh-rCN-w480dp-h1600dp-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class CrystalMaterialRenderTest {
     @get:Rule val compose=createAndroidComposeRule<ComponentActivity>()

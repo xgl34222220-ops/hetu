@@ -48,7 +48,7 @@ internal fun WorkspaceSettingRow(title: String, supporting: String, icon: ImageV
             }
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(title, Modifier.fillMaxWidth().testTag("setting-title:$title"), color = t.textPrimary,
+            Text(ht(title), Modifier.fillMaxWidth().testTag("setting-title:$title"), color = t.textPrimary,
                 fontSize = 16.sp, lineHeight = 21.sp, fontWeight = FontWeight.Bold)
             if (supporting.isNotBlank()) Text(supporting, Modifier.fillMaxWidth().testTag("setting-support:$title"),
                 color = t.textSecondary, fontSize = 12.5.sp, lineHeight = 17.sp, fontWeight = FontWeight.SemiBold)

@@ -35,13 +35,11 @@ class ThemeSettingsActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             var revision by remember { mutableIntStateOf(0) }
-            key(revision) {
-                HetuTheme {
+            HetuTheme {
                     ThemeSettingsScreen(
                         onBack = { finish() },
                         onThemeChanged = { revision++ },
                     )
-                }
             }
         }
     }
@@ -275,7 +273,7 @@ private fun ThemeSettingsScreen(onBack: () -> Unit, onThemeChanged: () -> Unit) 
                     .padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Text(title, color = t.textPrimary, fontSize = 21.sp, lineHeight = 27.sp, fontWeight = FontWeight.ExtraBold)
+                Text(ht(title), color = t.textPrimary, fontSize = 21.sp, lineHeight = 27.sp, fontWeight = FontWeight.ExtraBold)
                 Text("选择后立即生效", color = t.textSecondary, style = MaterialTheme.typography.bodySmall)
                 pickerOptions.forEach { option ->
                     val selected = option.value == pickerSelected
@@ -319,7 +317,7 @@ private fun ThemeSettingsScreen(onBack: () -> Unit, onThemeChanged: () -> Unit) 
 private fun ThemeSection(title: String, content: @Composable ColumnScope.() -> Unit) {
     val t = LocalHetuTokens.current
     Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-        Text(title, color = t.textSecondary, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 4.dp))
+        Text(ht(title), color = t.textSecondary, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 4.dp))
         GroupedInsetSection(content = content)
     }
 }
@@ -330,7 +328,7 @@ private fun ThemeValueRow(icon: androidx.compose.ui.graphics.vector.ImageVector,
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
         HetuListIcon(icon)
         Spacer(Modifier.width(12.dp))
-        Text(title, color = t.textPrimary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        Text(ht(title), color = t.textPrimary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
         Text(value, color = t.textSecondary, style = MaterialTheme.typography.bodySmall)
         Spacer(Modifier.width(6.dp))
         Icon(Icons.Rounded.ChevronRight, null, tint = t.textMuted, modifier = Modifier.size(18.dp))
@@ -344,8 +342,8 @@ private fun ThemeSwitchRow(icon: androidx.compose.ui.graphics.vector.ImageVector
         HetuListIcon(icon)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(title, color = t.textPrimary, style = MaterialTheme.typography.bodyMedium)
-            Text(subtitle, color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+            Text(ht(title), color = t.textPrimary, style = MaterialTheme.typography.bodyMedium)
+            Text(ht(subtitle), color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
         }
         LiquidSwitch(checked = checked, onCheckedChange = onChecked)
     }

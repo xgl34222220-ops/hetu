@@ -1,5 +1,13 @@
 package io.github.xgl34222220.hetu
 
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.horizontalScroll
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.delay
+
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -10,6 +18,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.DeleteOutline
@@ -126,6 +135,20 @@ private fun ProxyLogViewerScreen(onBack: () -> Unit) {
     var error by remember { mutableStateOf("") }
     var menuOpen by remember { mutableStateOf(false) }
     var clearConfirm by remember { mutableStateOf(false) }
+    val prefs = remember { context.getSharedPreferences("hetu", 0) }
+    var autoRefresh by rememberSaveable { mutableStateOf(prefs.getBoolean("logAutoRefresh", false)) }
+    var cards by rememberSaveable { mutableStateOf(prefs.getBoolean("logCardView", false)) }
+    var query by rememberSaveable { mutableStateOf("") }
+    var level by rememberSaveable { mutableStateOf("all") }
+    val lifecycle = LocalLifecycleOwner.current
+    LaunchedEffect(autoRefresh, lifecycle) {
+        if (autoRefresh) lifecycle.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (true) { delay(2000); if (!loading) revision++ }
+        }
+    }
+    val visibleLines = remember(content, query, level) {
+        content.lines().filter { line -> line.contains(query, true) && (level == "all" || line.contains(level, true)) }
+    }
 
     LaunchedEffect(revision, selectedPath) {
         loading = true
@@ -245,21 +268,22 @@ private fun ProxyLogViewerScreen(onBack: () -> Unit) {
             }
         }
 
-        Box(
-            Modifier
-                .fillMaxSize()
-                .padding(start = 12.dp, end = 12.dp, bottom = 12.dp)
-                .background(t.cardBackground, RoundedCornerShape(18.dp))
-                .padding(12.dp)
-                .verticalScroll(rememberScrollState()),
-        ) {
-            Text(
-                content,
-                color = if (error.isBlank()) t.textPrimary else MaterialTheme.colorScheme.error,
-                fontSize = 11.5.sp,
-                lineHeight = 16.sp,
-                fontFamily = FontFamily.Monospace,
-            )
+        LiquidGlassTextField(query, { query = it }, "搜索日志", Modifier.fillMaxWidth().padding(horizontal = 12.dp), leadingIcon = Icons.Rounded.Search)
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LiquidChoicePill(if (autoRefresh) "自动刷新中" else "自动刷新", autoRefresh, { autoRefresh = !autoRefresh; prefs.edit().putBoolean("logAutoRefresh", autoRefresh).apply() })
+            LiquidChoicePill("逐条卡片", cards, { cards = !cards; prefs.edit().putBoolean("logCardView", cards).apply() })
+            listOf("all" to "全部", "error" to "错误", "warn" to "警告", "info" to "信息", "debug" to "调试").forEach { (key,label) -> LiquidChoicePill(label, level == key, { level = key }) }
+        }
+        if (error.isNotBlank()) HetuTaskFeedback(error, true, modifier = Modifier.padding(horizontal = 12.dp))
+        LazyColumn(Modifier.fillMaxWidth().weight(1f), contentPadding = PaddingValues(12.dp, 4.dp, 12.dp, hetuContentBottomPadding()), verticalArrangement = Arrangement.spacedBy(if (cards) 6.dp else 0.dp)) {
+            if (visibleLines.isEmpty()) item { Text("没有匹配的日志", color = t.textSecondary, modifier = Modifier.padding(12.dp)) }
+            itemsIndexed(visibleLines, key = { index, _ -> index }) { _, line ->
+                androidx.compose.foundation.text.selection.SelectionContainer {
+                    Text(line, modifier = Modifier.fillMaxWidth().then(if (cards) Modifier.crystalMaterial(RoundedCornerShape(12.dp)).padding(12.dp) else Modifier.padding(horizontal = 8.dp, vertical = 2.dp)),
+                        color = when { line.contains("error", true) -> t.danger; line.contains("warn", true) -> t.warning; else -> t.textPrimary },
+                        fontFamily = FontFamily.Monospace, fontSize = 11.5.sp, lineHeight = 17.sp)
+                }
+            }
         }
     }
 

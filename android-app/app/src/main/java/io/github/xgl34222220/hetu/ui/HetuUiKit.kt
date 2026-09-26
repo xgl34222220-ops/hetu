@@ -191,8 +191,8 @@ fun HetuPageHeader(title: String, onBack: () -> Unit, subtitle: String = "", act
     ) {
         IconButton(onBack, Modifier.size(48.dp)) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回", tint = t.textPrimary) }
         Column(Modifier.weight(1f).padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(title, color = t.textPrimary, fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold)
-            if (subtitle.isNotBlank()) Text(subtitle, color = t.textOnPage, fontSize = 12.sp, lineHeight = 17.sp)
+            Text(ht(title), color = t.textPrimary, fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold)
+            if (subtitle.isNotBlank()) Text(ht(subtitle), color = t.textOnPage, fontSize = 12.sp, lineHeight = 17.sp)
         }
         actions()
     }

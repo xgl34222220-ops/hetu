@@ -8,6 +8,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -102,8 +104,8 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
         loadingApps = true
         loadError = ""
         value = try {
-            withTimeoutOrNull(6_000L) { controller.loadApps(forceRefresh = reload > 0) } ?: run {
-                loadError = "应用列表读取超过 6 秒"
+            withTimeoutOrNull(20_000L) { ProxyUserAppsRepository.load(context, controller, reload > 0) } ?: run {
+                loadError = "应用列表读取超时"
                 controller.cachedApps()
             }
         } catch (cancel: CancellationException) {
@@ -127,6 +129,7 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
     }
     var query by rememberSaveable { mutableStateOf("") }
     var appTypeFilter by rememberSaveable { mutableStateOf("user") }
+    var userFilter by rememberSaveable { mutableIntStateOf(-1) }
     var selectedOnly by rememberSaveable { mutableStateOf(false) }
     var selected by remember { mutableStateOf(proxyApps()) }
     var appScopeId by rememberSaveable { mutableStateOf(prefs.getString("proxyAppScope", "blacklist") ?: "blacklist") }
@@ -160,14 +163,14 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
         "core" -> "当前不按 Android UID 过滤；名单保留，但不会参与 Root 规则。"
         else -> "勾选的应用绕过 Root 透明代理，其余应用进入代理。"
     }
-    val visible = remember(apps, query, appTypeFilter, selectedOnly, selected) {
+    val visible = remember(apps, query, appTypeFilter, userFilter, selectedOnly, selected) {
         apps.filter { app ->
             val typeMatch = when (appTypeFilter) {
                 "system" -> app.system
                 "all" -> true
                 else -> !app.system
             }
-            (!selectedOnly || app.packageName in selected) &&
+            (!selectedOnly || app.selectionKey in selected) && (userFilter < 0 || app.userId == userFilter) &&
                 typeMatch &&
                 (query.isBlank() || app.label.contains(query, true) || app.packageName.contains(query, true))
         }
@@ -259,6 +262,10 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
                     LiquidChoicePill("用户应用", appTypeFilter == "user", { appTypeFilter = "user" })
                     LiquidChoicePill("系统应用", appTypeFilter == "system", { appTypeFilter = "system" })
                 }
+                if (apps.map { it.userId }.distinct().size > 1) Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LiquidChoicePill("全部用户", userFilter == -1, { userFilter = -1 })
+                    apps.map { it.userId }.distinct().sorted().forEach { user -> LiquidChoicePill(if (user == 0) "主用户" else "用户 $user", userFilter == user, { userFilter = user }) }
+                }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     LiquidChoicePill("已选择", selectedOnly, { selectedOnly = !selectedOnly })
                     Spacer(Modifier.weight(1f))
@@ -325,8 +332,8 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
             }
         }
 
-        itemsIndexed(visible, key = { _, app -> app.packageName }) { index, app ->
-            val checked = app.packageName in selected
+        itemsIndexed(visible, key = { _, app -> app.selectionKey }) { index, app ->
+            val checked = app.selectionKey in selected
             val icon by produceState(initialValue = app.icon, app.packageName) { value = controller.appIcon(app.packageName) }
             Surface(
                 modifier = Modifier.fillMaxWidth()
@@ -335,7 +342,7 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
                         translationY = (1f - listReveal) * revealOffsetPx * (1f + (index.coerceAtMost(6) * .03f))
                     }
                     .clip(RoundedCornerShape(18.dp)).clickable {
-                    setProxyApp(app.packageName, !checked)
+                    setProxyApp(app.selectionKey, !checked)
                     selected = proxyApps()
                 },
                 shape = RoundedCornerShape(18.dp),
@@ -375,7 +382,7 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
                     val checkScale by animateFloatAsState(if (checked) 1f else .78f, spring(dampingRatio = .50f, stiffness = 620f), label = "appCheck${app.packageName}")
                     Checkbox(
                         checked = checked,
-                        onCheckedChange = { value -> setProxyApp(app.packageName, value); selected = proxyApps() },
+                        onCheckedChange = { value -> setProxyApp(app.selectionKey, value); selected = proxyApps() },
                         modifier = Modifier.graphicsLayer { scaleX = checkScale; scaleY = checkScale },
                     )
                 }
@@ -510,8 +517,8 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
                         onClick = {
                             val next = selected.toMutableSet()
                             when (action) {
-                                "select" -> visible.forEach { next.add(it.packageName) }
-                                "invert" -> visible.forEach { app -> if (!next.add(app.packageName)) next.remove(app.packageName) }
+                                "select" -> visible.forEach { next.add(it.selectionKey) }
+                                "invert" -> visible.forEach { app -> if (!next.add(app.selectionKey)) next.remove(app.selectionKey) }
                                 "clear" -> next.clear()
                             }
                             saveProxyApps(next)

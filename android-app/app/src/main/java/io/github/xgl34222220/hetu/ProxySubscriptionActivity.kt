@@ -164,6 +164,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
     val subscriptionErrors = remember { mutableStateMapOf<String, String>() }
 
 
+    var healthSettings by remember { mutableStateOf(false) }
     var editSubscription by remember { mutableStateOf<ProxySubscriptionUi?>(null) }
     var addingSubscription by remember { mutableStateOf(false) }
     var editorName by remember { mutableStateOf("") }
@@ -385,6 +386,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                         } else {
                             Text("运行中的 Mihomo 暂未上报订阅流量；配置管理功能仍可正常使用。", color = tokens.textSecondary, fontSize = 11.sp, lineHeight = 16.sp)
                         }
+                        TextButton(onClick = { healthSettings = true }, modifier = Modifier.fillMaxWidth()) { Text(ht("健康检查")) }
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             LiquidPill("导入配置", Icons.Rounded.FileOpen,
                                 { importLauncher.launch(arrayOf("*/*")) }, Modifier.weight(1f))
@@ -571,6 +573,8 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
         }
         }
     }
+
+    if (healthSettings) SubscriptionHealthSheet({ healthSettings = false }) { revision++; message = "健康检查已保存；重载或重启代理后生效" }
 
     if (addingSubscription || editSubscription != null) {
         val existing = editSubscription

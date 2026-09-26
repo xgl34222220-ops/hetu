@@ -30,7 +30,7 @@ import java.time.Instant
 import java.time.ZoneId
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk=[35],qualifiers="w480dp-h2400dp-mdpi")
+@Config(sdk=[35],qualifiers = "zh-rCN-w480dp-h2400dp-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class InstrumentRenderTest {
     @get:Rule val compose=createAndroidComposeRule<ComponentActivity>()

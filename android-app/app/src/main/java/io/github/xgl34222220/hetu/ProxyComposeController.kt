@@ -27,6 +27,7 @@ internal data class ProxyNodeUi(
     val type: String = "",
     val udp: Boolean = false,
     val lastDelay: Long? = null,
+    val provider: String = "",
 )
 
 internal data class ProxyGroupUi(
@@ -36,6 +37,7 @@ internal data class ProxyGroupUi(
     val nodes: List<ProxyNodeUi>,
     val iconUrl: String = "",
     val iconPath: String = "",
+    val hidden: Boolean = false,
 )
 
 internal data class ProxyConnectionUi(
@@ -106,6 +108,7 @@ internal data class ProxyComposeState(
     val dnsListenerReady: Boolean = false,
     val watchdog: Boolean = false,
     val dataPlaneHealthy: Boolean = false,
+    val trafficMode: String = "",
 )
 
 internal class ProxyComposeController(context: Context) {
@@ -209,8 +212,10 @@ internal class ProxyComposeController(context: Context) {
         var down = 0L
         var up = 0L
         var memory = 0L
+        var trafficMode = ""
 
         if (running) {
+            try { trafficMode = api.configs().optString("mode", "") } catch (_: Exception) { }
             try {
                 groups = parseGroups(api.proxies(), iconMap)
                 panelReady = true
@@ -269,6 +274,7 @@ internal class ProxyComposeController(context: Context) {
             dnsListenerReady = status.optBoolean("dnsListenerReady", false),
             watchdog = status.optBoolean("watchdog", false),
             dataPlaneHealthy = !status.optBoolean("healthProbeFailed", false) && status.optBoolean("dataPlaneHealthy", false),
+            trafficMode = trafficMode,
         )
     }
 
@@ -357,7 +363,6 @@ internal class ProxyComposeController(context: Context) {
         val iterator = raw.keys()
         while (iterator.hasNext()) {
             val name = iterator.next()
-            if (name == "GLOBAL") continue
             val item = raw.optJSONObject(name) ?: continue
             if (item.optJSONArray("all") != null) continue
             val type = item.optString("type", "").lowercase(Locale.ROOT)
@@ -585,9 +590,13 @@ internal class ProxyComposeController(context: Context) {
                 nodes = nodes,
                 iconUrl = iconUrl,
                 iconPath = icons.diskPath(iconUrl),
+                hidden = group.optBoolean("hidden", false),
             )
         }
-        return result.sortedBy { it.name.lowercase(Locale.ROOT) }
+        // GLOBAL.all carries configuration order; JSON object key order does not.
+        val order = root.optJSONObject("GLOBAL")?.optJSONArray("all")
+        val positions = (0 until (order?.length() ?: 0)).associate { order!!.optString(it) to it }
+        return result.sortedBy { positions[it.name] ?: Int.MAX_VALUE }
     }
 
     private fun parseConnections(root: JSONObject, socketUids: Map<String, Int> = emptyMap()): List<ProxyConnectionUi> {

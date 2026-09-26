@@ -35,7 +35,7 @@ import java.io.File
 
 /** Real Compose rasterization and interactions, no Root/backend/network mocking as UI success. */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35], qualifiers = "w480dp-h2400dp-mdpi")
+@Config(sdk = [35], qualifiers = "zh-rCN-w480dp-h2400dp-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class WorkspaceRenderTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()

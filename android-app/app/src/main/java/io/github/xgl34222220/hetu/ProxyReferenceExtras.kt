@@ -63,6 +63,10 @@ internal const val EXTRA_RUNTIME_PATH = "runtime_path"
 internal data class HetuWebPanel(val id: String, val name: String, val url: String)
 
 internal object HetuWebPanels {
+    fun validUrl(value: String): Boolean = runCatching {
+        val uri = java.net.URI(value)
+        uri.scheme == "https" && !uri.host.isNullOrBlank() && uri.rawUserInfo == null && value.none { it.code < 32 }
+    }.getOrDefault(false)
     private const val KEY = "proxyWebPanelsJson"
     private const val SELECTED = "proxyWebPanelSelected"
 
@@ -76,7 +80,7 @@ internal object HetuWebPanels {
             val id = item.optString("id").trim()
             val name = item.optString("name").trim()
             val url = item.optString("url").trim()
-            if (id.isNotBlank() && name.isNotBlank() && url.startsWith("https://")) {
+            if (id.isNotBlank() && name.isNotBlank() && validUrl(url)) {
                 out += HetuWebPanel(id, name, url)
             }
         }
@@ -122,16 +126,7 @@ private fun ExtraPage(
 ) {
     val t = LocalHetuTokens.current
     Column(Modifier.fillMaxSize().crystalPageBackground()) {
-        Row(
-            Modifier.fillMaxWidth().statusBarsPadding().heightIn(min = 58.dp).padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回") }
-            Column(Modifier.weight(1f)) {
-                Text(title, color = t.textPrimary, fontSize = 22.sp, lineHeight = 27.sp, fontWeight = FontWeight.ExtraBold)
-                if (subtitle.isNotBlank()) Text(subtitle, color = t.textSecondary, fontSize = 11.5.sp, lineHeight = 16.sp)
-            }
-        }
+        Column(Modifier.statusBarsPadding()) { HetuPageHeader(title, onBack, subtitle) }
         Column(
             Modifier.fillMaxWidth().weight(1f).padding(horizontal = 16.dp).navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -168,8 +163,8 @@ private fun ExtraRow(
         ) { Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp)) }
         Spacer(Modifier.width(11.dp))
         Column(Modifier.weight(1f)) {
-            Text(title, color = t.textPrimary, fontSize = 14.5.sp, lineHeight = 19.sp, fontWeight = FontWeight.SemiBold)
-            Text(subtitle, color = t.textSecondary, fontSize = 11.5.sp, lineHeight = 16.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(ht(title), color = t.textPrimary, fontSize = 14.5.sp, lineHeight = 19.sp, fontWeight = FontWeight.SemiBold)
+            Text(ht(subtitle), color = t.textSecondary, fontSize = 11.5.sp, lineHeight = 16.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
         if (value.isNotBlank()) {
             Text(value, color = t.textSecondary, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -202,6 +197,11 @@ private fun ProxyWebPanelsScreen(onBack: () -> Unit) {
     var error by remember { mutableStateOf("") }
     var localMode by remember { mutableStateOf(prefs.getString("proxyWebPanelLocalMode", "auto").orEmpty().ifBlank { "auto" }) }
     var modePicker by remember { mutableStateOf(false) }
+    var editingPanel by remember { mutableStateOf<HetuWebPanel?>(null) }
+    var deletingPanel by remember { mutableStateOf<HetuWebPanel?>(null) }
+    var feedback by remember { mutableStateOf("") }
+    var panelUpdating by remember { mutableStateOf(false) }
+    val panelScope = rememberCoroutineScope()
 
     ExtraPage("Web 面板", "本地控制台与自定义 HTTPS 面板", onBack) {
         LazyColumn(
@@ -222,14 +222,14 @@ private fun ProxyWebPanelsScreen(onBack: () -> Unit) {
                         context.startActivity(Intent(context, ProxyLocalWebUiActivity::class.java))
                     }
                     HorizontalDivider(color = t.outline)
-                    ExtraRow(Icons.Rounded.Tune, "本地面板模式", "自动 / Clash / sing-box", localMode) { modePicker = true }
+                    ExtraRow(Icons.Rounded.Tune, "本地面板模式", "自动 / 河图内置 / 本地 Zashboard", localMode) { modePicker = true }
                 }
             }
 
             item {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text("自定义面板", color = t.textPrimary, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                    TextButton(onClick = { adding = true; error = ""; panelName = ""; panelUrl = "" }) {
+                    TextButton(onClick = { editingPanel = null; adding = true; error = ""; panelName = ""; panelUrl = "" }) {
                         Icon(Icons.Rounded.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("添加")
                     }
                 }
@@ -274,11 +274,10 @@ private fun ProxyWebPanelsScreen(onBack: () -> Unit) {
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(16.dp),
                         ) { Text("打开") }
+                        IconButton(onClick = { editingPanel = panel; panelName = panel.name; panelUrl = panel.url; adding = true; error = "" }) { Icon(Icons.Rounded.Edit, "编辑") }
                         OutlinedButton(
                             onClick = {
-                                HetuWebPanels.save(context, panels.filterNot { it.id == panel.id })
-                                if (selected == panel.id) HetuWebPanels.select(context, "local")
-                                revision++
+                                deletingPanel = panel
                             },
                             shape = RoundedCornerShape(16.dp),
                         ) { Icon(Icons.Rounded.DeleteOutline, "删除") }
@@ -286,6 +285,22 @@ private fun ProxyWebPanelsScreen(onBack: () -> Unit) {
                 }
             }
 
+            item {
+                ExtraCard {
+                    ExtraRow(Icons.Rounded.CloudDownload, if (panelUpdating) "正在更新 Zashboard…" else "安装 / 更新本地 Zashboard", "从官方 GitHub 获取，资源保存在本机；失败时保留原版本") {
+                        if (!panelUpdating) {
+                            panelUpdating = true
+                            panelScope.launch {
+                                try { WebPanelAssets.update(context); feedback = "Zashboard 已更新，重新打开本地面板即可使用" }
+                                catch (cancel: CancellationException) { throw cancel }
+                                catch (failure: Exception) { feedback = failure.message ?: "面板更新失败" }
+                                finally { panelUpdating = false }
+                            }
+                        }
+                    }
+                }
+            }
+            if (feedback.isNotBlank()) item { HetuTaskFeedback(feedback) }
             item {
                 ExtraCard {
                     ExtraRow(Icons.Rounded.CleaningServices, "清除 Web 缓存", "清理 WebView 缓存、Cookie 与本地 WebStorage") {
@@ -298,13 +313,25 @@ private fun ProxyWebPanelsScreen(onBack: () -> Unit) {
                             CookieManager.getInstance().removeAllCookies(null)
                             CookieManager.getInstance().flush()
                             WebStorage.getInstance().deleteAllData()
-                        }
+                        }.onSuccess { feedback = "Web 缓存已清除" }.onFailure { feedback = it.message ?: "清理失败" }
                     }
                 }
             }
         }
     }
 
+    if (deletingPanel != null) ModalBottomSheet(onDismissRequest = { deletingPanel = null }, containerColor = Color.Transparent) {
+        val panel = deletingPanel!!
+        Column(Modifier.fillMaxWidth().liquidSheetMaterial().navigationBarsPadding().padding(20.dp)) {
+            Text("删除面板 ${panel.name}？", style = MaterialTheme.typography.titleLarge)
+            Text("仅移除面板入口，远端服务不受影响。")
+            Button(onClick = {
+                HetuWebPanels.save(context, panels.filterNot { it.id == panel.id })
+                if (selected == panel.id) HetuWebPanels.select(context, "local")
+                deletingPanel = null; revision++
+            }) { Text("删除") }
+        }
+    }
     if (adding) {
         ModalBottomSheet(
             onDismissRequest = { adding = false },
@@ -315,9 +342,9 @@ private fun ProxyWebPanelsScreen(onBack: () -> Unit) {
                 Modifier.fillMaxWidth().liquidSheetMaterial().navigationBarsPadding().imePadding().padding(18.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text("添加 Web 面板", color = t.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                OutlinedTextField(panelName, { panelName = it.take(40); error = "" }, Modifier.fillMaxWidth(), label = { Text("名称") }, singleLine = true)
-                OutlinedTextField(panelUrl, { panelUrl = it.take(500); error = "" }, Modifier.fillMaxWidth(), label = { Text("HTTPS 地址") }, singleLine = true)
+                Text(if (editingPanel == null) "添加 Web 面板" else "编辑 Web 面板", color = t.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                LiquidGlassTextField(panelName, { panelName = it.take(40); error = "" }, "名称", Modifier.fillMaxWidth())
+                LiquidGlassTextField(panelUrl, { panelUrl = it.take(500); error = "" }, "HTTPS 地址", Modifier.fillMaxWidth())
                 if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
                 Button(
                     onClick = {
@@ -325,10 +352,10 @@ private fun ProxyWebPanelsScreen(onBack: () -> Unit) {
                         val url = panelUrl.trim()
                         when {
                             name.isBlank() -> error = "请输入面板名称"
-                            !url.startsWith("https://") -> error = "自定义面板只接受 HTTPS 地址"
+                            !HetuWebPanels.validUrl(url) -> error = "请输入有效的 HTTPS 面板地址"
                             else -> {
-                                val id = "custom-" + System.currentTimeMillis().toString(16)
-                                HetuWebPanels.save(context, panels + HetuWebPanel(id, name, url))
+                                val id = editingPanel?.id ?: ("custom-" + System.currentTimeMillis().toString(16))
+                                HetuWebPanels.save(context, panels.filterNot { it.id == id } + HetuWebPanel(id, name, url))
                                 revision++
                                 adding = false
                             }
@@ -349,8 +376,8 @@ private fun ProxyWebPanelsScreen(onBack: () -> Unit) {
         ) {
             Column(Modifier.fillMaxWidth().liquidSheetMaterial().navigationBarsPadding().padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("本地面板模式", color = t.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                listOf("auto" to "自动识别", "clash" to "Clash / Mihomo", "singbox" to "sing-box").forEach { item ->
-                    ExtraRow(Icons.Rounded.Web, item.second, "决定本地面板按哪种 API 语义连接", if (localMode == item.first) "已选" else "") {
+                listOf("auto" to "自动：优先本地 Zashboard", "builtin" to "河图内置面板", "zashboard" to "本地 Zashboard").forEach { item ->
+                    ExtraRow(Icons.Rounded.Web, item.second, "自动模式在未安装 Zashboard 时打开内置面板", if (localMode == item.first) "已选" else "") {
                         localMode = item.first
                         prefs.edit().putString("proxyWebPanelLocalMode", item.first).apply()
                         modePicker = false
@@ -369,7 +396,7 @@ class ProxyWebPanelViewerActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val name = intent.getStringExtra(EXTRA_PANEL_NAME).orEmpty().ifBlank { "Web 面板" }
         val url = intent.getStringExtra(EXTRA_PANEL_URL).orEmpty()
-        if (!url.startsWith("https://")) {
+        if (!HetuWebPanels.validUrl(url)) {
             finish()
             return
         }
@@ -520,8 +547,8 @@ private fun ExtraSwitchRow(title: String, subtitle: String, checked: Boolean, on
     val t = LocalHetuTokens.current
     Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text(title, color = t.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-            Text(subtitle, color = t.textSecondary, fontSize = 11.5.sp, lineHeight = 16.sp)
+            Text(ht(title), color = t.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Text(ht(subtitle), color = t.textSecondary, fontSize = 11.5.sp, lineHeight = 16.sp)
         }
         Switch(checked = checked, onCheckedChange = onChanged)
     }
@@ -763,124 +790,6 @@ private fun ProxyNotificationSettingsScreen(onBack: () -> Unit) {
     }
 }
 
-private fun validRuntimePath(path: String): Boolean =
-    path.startsWith("/data/adb/hetu/") && !path.contains("/../") && !path.endsWith("/..")
-
-private suspend fun readRuntimeFile(context: Context, path: String): String = withContext(Dispatchers.IO) {
-    if (!validRuntimePath(path)) throw IllegalArgumentException("不允许编辑此路径")
-    val quoted = RootBridge.quote(path)
-    val command = "set -e; test -f " + quoted + "; size=$(wc -c < " + quoted + "); [ \"${'$'}size\" -le 2097152 ]; cat " + quoted
-    val result = RootBridge.rootShell(context, command, 10_000L)
-    if (!result.ok()) throw IllegalStateException(result.output.ifBlank { "无法读取运行文件" })
-    if (result.output.indexOf('\u0000') >= 0) throw IllegalArgumentException("该文件包含二进制数据，不能使用文本编辑器")
-    result.output
-}
-
-private suspend fun writeRuntimeFile(context: Context, path: String, text: String) = withContext(Dispatchers.IO) {
-    if (!validRuntimePath(path)) throw IllegalArgumentException("不允许编辑此路径")
-    val bytes = text.toByteArray(Charsets.UTF_8)
-    if (bytes.size > 2 * 1024 * 1024) throw IllegalArgumentException("文件超过 2 MiB")
-    val temp = File(context.cacheDir, "runtime-edit-" + System.nanoTime().toString(16))
-    temp.writeBytes(bytes)
-    try {
-        val quoted = RootBridge.quote(path)
-        val newPath = RootBridge.quote(path + ".hetu-new")
-        val command = "set -e; test -f " + quoted + "; cp -p " + quoted + " " + newPath + "; cat " + RootBridge.quote(temp.absolutePath) + " > " + newPath + "; mv -f " + newPath + " " + quoted
-        val result = RootBridge.rootShell(context, command, 12_000L)
-        if (!result.ok()) throw IllegalStateException(result.output.ifBlank { "保存失败" })
-    } finally {
-        temp.delete()
-    }
-}
-
-class RuntimeFileEditorActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        val path = intent.getStringExtra(EXTRA_RUNTIME_PATH).orEmpty()
-        setContent { HetuTheme { RuntimeFileEditorScreen(path) { finish() } } }
-    }
-}
-
-@Composable
-private fun RuntimeFileEditorScreen(path: String, onBack: () -> Unit) {
-    val context = LocalContext.current
-    val t = LocalHetuTokens.current
-    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val scope = rememberCoroutineScope()
-    var loaded by remember { mutableStateOf(false) }
-    var source by remember { mutableStateOf("") }
-    var error by remember { mutableStateOf("") }
-    var saving by remember { mutableStateOf(false) }
-    var editor by remember { mutableStateOf<CodeEditor?>(null) }
-
-    LaunchedEffect(path) {
-        val result = runCatching { readRuntimeFile(context, path) }
-        result.onSuccess { source = it; loaded = true }
-        result.onFailure { error = it.message ?: "读取失败"; loaded = true }
-    }
-
-    ExtraPage("运行文件编辑", path.removePrefix("/data/adb/hetu/"), onBack) {
-        if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                onClick = {
-                    val current = editor?.text?.toString() ?: source
-                    saving = true
-                    scope.launch {
-                        val result = runCatching { writeRuntimeFile(context, path, current) }
-                        result.onSuccess { error = "已原子保存"; source = current }
-                        result.onFailure { error = it.message ?: "保存失败" }
-                        saving = false
-                    }
-                },
-                enabled = loaded && error != "读取失败" && !saving,
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(16.dp),
-            ) {
-                if (saving) CircularProgressIndicator(Modifier.size(17.dp), strokeWidth = 2.dp) else Icon(Icons.Rounded.Save, null)
-                Spacer(Modifier.width(6.dp)); Text(if (saving) "保存中" else "保存")
-            }
-            OutlinedButton(
-                onClick = {
-                    val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
-                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText(path, editor?.text?.toString() ?: source))
-                },
-                enabled = loaded,
-                shape = RoundedCornerShape(16.dp),
-            ) { Icon(Icons.Rounded.ContentCopy, "复制") }
-        }
-        if (!loaded) {
-            Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-        } else if (source.isNotBlank() || error.isBlank()) {
-            Box(
-                Modifier.fillMaxWidth().weight(1f).crystalMaterial(RoundedCornerShape(18.dp), depth = CrystalDepth.InsetItem),
-            ) {
-                AndroidView(
-                    factory = { viewContext ->
-                        CodeEditor(viewContext).apply {
-                            if (path.endsWith(".yaml", true) || path.endsWith(".yml", true)) setEditorLanguage(HetuYamlLanguage())
-                            setText(source)
-                            typefaceText = Typeface.MONOSPACE
-                            setTextSize(13f)
-                            setLineNumberEnabled(true)
-                            setWordwrap(false)
-                            setTabWidth(2)
-                            setHighlightCurrentLine(true)
-                            if (path.endsWith(".yaml", true) || path.endsWith(".yml", true)) {
-                                colorScheme = HetuYamlLanguage.colors(if (dark) SchemeDarcula() else SchemeGitHub(), dark)
-                            }
-                            editor = this
-                        }
-                    },
-                    modifier = Modifier.fillMaxSize(),
-                    update = { editor = it },
-                )
-            }
-        }
-    }
-}
-
 class ProxyCoreImportActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -930,6 +839,8 @@ private val HETU_LIBRARIES = listOf(
     HetuLibraryInfo("miuix-blur", "miuix-blur", "0.9.3", "https://github.com/compose-multiplatform/miuix"),
     HetuLibraryInfo("miuix-squircle", "miuix-squircle", "0.9.3", "https://github.com/compose-multiplatform/miuix"),
     HetuLibraryInfo("sora", "Sora Editor", "0.24.6", "https://github.com/Rosemoe/sora-editor"),
+    HetuLibraryInfo("networknt-json-schema", "NetworkNT JSON Schema Validator", "1.5.9", "https://github.com/networknt/json-schema-validator"),
+    HetuLibraryInfo("sing-box-schema", "sing-box official JSON Schema", "2026-09-26", "https://sing-box.sagernet.org/schema.json"),
     HetuLibraryInfo("snakeyaml", "SnakeYAML", "2.3", "https://bitbucket.org/snakeyaml/snakeyaml"),
     HetuLibraryInfo("androidsvg", "AndroidSVG", "1.4", "https://github.com/BigBadaboom/androidsvg"),
     HetuLibraryInfo("mihomo", "Mihomo", "1.19.31", "https://github.com/MetaCubeX/mihomo"),

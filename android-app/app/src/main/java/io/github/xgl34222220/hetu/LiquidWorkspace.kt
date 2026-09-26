@@ -290,7 +290,12 @@ internal fun LiquidNodeCard(
                 ),
             )
             Text(
-                if (node.udp) "UDP" else "TCP",
+                buildString {
+                    append(if (node.udp) "UDP" else "TCP")
+                    if (selectorPrefs.getBoolean("proxySelectorDetectIpv6", true)) SelectorIpv6Probe.results[node.name]?.let {
+                        append(if (it) " · IPv6 ✓" else " · IPv6 未通")
+                    }
+                },
                 color = t.textSecondary,
                 fontSize = 10.5.sp,
                 lineHeight = 14.sp,

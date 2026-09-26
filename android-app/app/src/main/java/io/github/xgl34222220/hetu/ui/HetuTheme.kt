@@ -11,6 +11,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
@@ -128,7 +129,15 @@ private fun accentColor(raw: String, dark: Boolean): Color {
 @Composable
 fun HetuTheme(content: @Composable () -> Unit) {
     val context = LocalContext.current
-    val prefs = context.getSharedPreferences("hetu", 0)
+    val prefs = remember(context) { context.getSharedPreferences("hetu", 0) }
+    var themeRevision by remember { mutableIntStateOf(0) }
+    DisposableEffect(prefs) {
+        val keys = setOf("appLanguage", "appearance", "pureBlackDark", "enableMonet", "uiStyle", "colorStandard", "colorPalette", "uiScale", "accentHex", "enableBlur", "topBarBlurStyle", "liquidGlass")
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key -> if (key in keys) themeRevision++ }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+    themeRevision
     val appearance = prefs.getString("appearance", "system") ?: "system"
     val dark = appearance == "dark" || (appearance == "system" && isSystemInDarkTheme())
     val pureBlack = dark && prefs.getBoolean("pureBlackDark", false)
@@ -214,6 +223,8 @@ fun HetuTheme(content: @Composable () -> Unit) {
         }
         CompositionLocalProvider(
             LocalHetuTokens provides tokens,
+            androidx.compose.material3.LocalContentColor provides tokens.textPrimary,
+            LocalHetuLanguage provides prefs.getString("appLanguage", "system").orEmpty(),
             LocalHetuMotionEnabled provides motionEnabled,
             LocalOverscrollFactory provides if (motionEnabled) platformOverscrollFactory else null,
             LocalDensity provides scaledDensity,

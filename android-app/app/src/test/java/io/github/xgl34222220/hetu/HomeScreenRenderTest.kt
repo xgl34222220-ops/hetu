@@ -27,7 +27,7 @@ import java.io.File
 
 /** Full production home with inert sample-data callbacks. */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk=[35], qualifiers="w480dp-h2400dp-mdpi")
+@Config(sdk=[35], qualifiers = "zh-rCN-w480dp-h2400dp-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class HomeScreenRenderTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()

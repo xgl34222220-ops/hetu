@@ -27,10 +27,10 @@
   "android-app/app/src/main/assets/rules/china.txt": "4b2b57daca55e2102696b07d4764868328c7215b2de06db50f3acd66ccece502",
   "android-app/app/src/main/assets/rules/checksums.sha256": "0895e9d83582de54f2d9063af453a1379077c3f6bc09bdebfd1dd2fb72465cfb",
   "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java": "435821eeea1b5be9df45a48cc6abc27e7ea65ae2455c5d5a44a0c8128d4c38fd",
-  "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyPolicy.java": "ab5b87b5ec88f21f1e55795f32d78334cebe1ade760a83e0f0c71ad63a26a320",
+  "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyPolicy.java": "a3a17c2b466442df5e27e95b08e4fb448cbd1f332300cf0c6bcdb8621ac85b54",
   "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java": "ca65faa90f2896463ee26ebb937d5d8c0629f4005c37334b5b7ad33d390607b5",
   "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java": "b99077fff407ca62f1b785d0ac310e4b0b1b0d4d966e6f31c5b12e15f543a224",
   "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt": "5fe339d9cc7e6d4d2c70f6c365a1c04049e6664acb6f3906e4c7ebdb5148e683",
-  "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java": "5bbd0137f46f01056cb83a45bc63853275906130fb4c20a549390b5d87048072",
+  "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java": "c54e5a50fcc98292dbf71bea1170d2be6fdc453d427cd334b8c0249f05ae8f32",
   "android-app/app/src/main/java/io/github/xgl34222220/hetu/BootReceiver.java": "85b3853bbe1d05bb625a3c7044895c70c1fcdeba80a9b63fc4b1d0de16758580"
 }

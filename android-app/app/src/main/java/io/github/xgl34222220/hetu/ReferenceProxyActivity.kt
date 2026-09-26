@@ -406,7 +406,7 @@ private fun RefProxyShell(
                 lastAt = now
                 lastUp = next.uploadTotal
                 lastDown = next.downloadTotal
-                ProxyApiHistoryStore.record(context, upRate, downRate)
+                ProxyApiHistoryStore.record(context, upRate, downRate, next.connections)
             }
         } catch (cancel: CancellationException) {
             throw cancel
@@ -684,7 +684,7 @@ private fun RefProxyShell(
                         },
                 ) {
             when (page) {
-                RefProxyPage.Home -> PullToRefreshBox(
+                RefProxyPage.Home -> HetuRefreshBox(
                     isRefreshing = homeRefreshing,
                     onRefresh = {
                         if (!homeRefreshing) scope.launch {
@@ -1325,13 +1325,27 @@ internal fun RefPanel(
     }
     selectorPrefsRevision
     val expandSelectedInSheet = selectorPrefs.getBoolean("proxySelectorExpandSelectedInSheet", false)
+    var providerNames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var changingMode by remember { mutableStateOf(false) }
+    LaunchedEffect(state.running, selectorPrefsRevision) {
+        if (state.running && selectorPrefs.getBoolean("proxySelectorGroupByProvider", false)) {
+            try { providerNames = selectorProviderNames(context) }
+            catch (cancel: CancellationException) { throw cancel }
+            catch (_: Exception) { providerNames = emptyMap() }
+        } else providerNames = emptyMap()
+    }
+    suspend fun probeNode(node: String): Long {
+        val measured = repo.delay(node)
+        scope.launch { SelectorIpv6Probe.measure(context, node) }
+        return measured
+    }
     val tab = if (strategyOnly) RefPanelTab.Groups else selectedTab
     var refreshing by remember { mutableStateOf(false) }
     var providers by remember { mutableStateOf<List<DashboardProviderUi>>(emptyList()) }
     var rules by remember { mutableStateOf<List<ProxyRuleUi>>(emptyList()) }
     var overviewRuleCount by remember { mutableStateOf<Int?>(null) }
     var ruleSets by remember { mutableStateOf<List<DashboardRuleSetUi>>(emptyList()) }
-    var selectedGroupName by rememberSaveable { mutableStateOf<String?>(null) }
+    var expandedGroupNames by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var selectedGroupSheetName by rememberSaveable { mutableStateOf<String?>(null) }
     val selectedLocal = remember { mutableStateMapOf<String, String>() }
     val testing = remember { mutableStateMapOf<String, Boolean>() }
@@ -1439,8 +1453,10 @@ internal fun RefPanel(
         previousConnections = state.connections
     }
 
-    val filteredGroups = remember(state.groups, query, groupSortMode, delays.toMap(), selectedLocal.toMap()) {
-        val matched = state.groups.filter { group ->
+    val filteredGroups = remember(state.groups, state.trafficMode, selectorPrefsRevision, query, groupSortMode, delays.toMap(), selectedLocal.toMap()) {
+        val matched = SelectorPresentation.visibleGroups(state.groups,
+            selectorPrefs.getBoolean("proxySelectorShowHidden", false),
+            selectorPrefs.getBoolean("proxySelectorShowGlobalByMode", true), state.trafficMode).filter { group ->
             query.isBlank() || group.name.contains(query, true) || group.now.contains(query, true) ||
                 group.nodes.any { it.name.contains(query, true) }
         }
@@ -1474,7 +1490,7 @@ internal fun RefPanel(
                 RefPanelTab.Subscriptions -> providers = repo.providers()
                 RefPanelTab.Rules -> rules = repo.rules()
                 RefPanelTab.RuleSets -> ruleSets = repo.ruleSets()
-                RefPanelTab.Overview -> { overviewRuleCount = null; rules = repo.rules(); overviewRuleCount = rules.size }
+                RefPanelTab.Overview -> { overviewRuleCount = null; rules = repo.rules(); overviewRuleCount = rules.size; providers = repo.providers() }
                 else -> Unit
             }
         } catch (cancel: CancellationException) {
@@ -1515,7 +1531,7 @@ internal fun RefPanel(
                 targets.map { node ->
                     async {
                         val value = try {
-                            repo.delay(node)
+                            probeNode(node)
                         } catch (cancel: CancellationException) {
                             throw cancel
                         } catch (_: Exception) {
@@ -1661,6 +1677,7 @@ internal fun RefPanel(
                         rules = repo.rules()
                         overviewRuleCount = rules.size
                         capsuleError = false
+                        providers = repo.providers()
                         capsuleText = "流量状态已刷新"
                     }
                     RefPanelTab.Connections -> {
@@ -1684,7 +1701,7 @@ internal fun RefPanel(
 
     LaunchedEffect(tab) {
         if (tab != RefPanelTab.Groups) {
-            selectedGroupName = null
+            expandedGroupNames = emptyList()
             selectedGroupSheetName = null
         }
         onDetailVisibleChanged(false)
@@ -1726,7 +1743,7 @@ internal fun RefPanel(
                                 else -> 1
                             }
                             selectorPrefs.edit().putInt("proxySelectorGroupColumns", groupLayout).apply()
-                            selectedGroupName = null
+                            expandedGroupNames = emptyList()
                         },
                         onBack = onBack,
                         onOpenSettings = { apiSettings = true },
@@ -1740,11 +1757,10 @@ internal fun RefPanel(
                         busy = refreshing || providerRefreshing.values.any { it } || ruleSetRefreshing.values.any { it } || testing.values.any { it })
                 }
             }
-            PullToRefreshBox(
+            HetuRefreshBox(
                 isRefreshing = refreshing,
                 onRefresh = ::refresh,
                 modifier = Modifier.fillMaxWidth().weight(1f),
-                indicator = {},
             ) {
             LazyColumn(
             Modifier.fillMaxSize(),
@@ -1756,17 +1772,29 @@ internal fun RefPanel(
             ),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            if (tab == RefPanelTab.Groups && state.panelReady) item(key = "traffic-mode") {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("模式", color = t.textSecondary, fontSize = 12.sp)
+                    listOf("rule" to "规则", "global" to "全局", "direct" to "直连").forEach { (value, title) ->
+                        LiquidChoicePill(title, state.trafficMode.equals(value, true), {
+                            if (!changingMode) scope.launch {
+                                changingMode = true
+                                try { withContext(Dispatchers.IO) { MihomoControllerClient(context).setTrafficMode(value) }; onRefreshState() }
+                                catch (cancel: CancellationException) { throw cancel }
+                                catch (failure: Exception) { error = failure.message ?: "模式切换失败" }
+                                finally { changingMode = false }
+                            }
+                        })
+                    }
+                    if (changingMode) HetuBusyIndicator()
+                }
+            }
             if (!state.running) {
                 item { RefEmptyState("代理未运行", "启动代理后，在这里查看节点、应用连接和分流规则。", Icons.Rounded.PowerSettingsNew) }
             } else when (tab) {
                 RefPanelTab.Groups -> {
                     if (filteredGroups.isEmpty()) item { RefEmptyState("没有匹配的节点", if (query.isBlank()) "当前配置未提供策略组。" else "试试其他节点或策略组名称。", Icons.Rounded.Search) }
                     itemsIndexed(filteredGroups.chunked(groupColumns), key = { index, _ -> "${tab.name}-groups-$index" }, contentType = { _, _ -> "group-row" }) { _, pair ->
-                        val expandedGroup = pair.firstOrNull { it.name == selectedGroupName }
-                        // Keep the last content through the exit animation; a nullable let
-                        // otherwise removes the entire well before shrinkVertically runs.
-                        var closingGroup by remember(pair.map { it.name }) { mutableStateOf<ProxyGroupUi?>(null) }
-                        SideEffect { if (expandedGroup != null) closingGroup = expandedGroup }
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 pair.forEach { group ->
@@ -1774,7 +1802,7 @@ internal fun RefPanel(
                                     RefGroupCard(
                                         group = group,
                                         selected = selected,
-                                        expanded = selectedGroupName == group.name,
+                                        expanded = group.name in expandedGroupNames,
                                         delay = delays[selected] ?: group.nodes.firstOrNull { it.name == selected }?.lastDelay,
                                         testing = selected.isNotBlank() && testing[selected] == true,
                                         hazeState = hazeState,
@@ -1783,18 +1811,18 @@ internal fun RefPanel(
                                         onClick = {
                                             view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                                             if (expandSelectedInSheet) {
-                                                selectedGroupName = null
+                                                expandedGroupNames = emptyList()
                                                 selectedGroupSheetName = group.name
                                             } else {
                                                 selectedGroupSheetName = null
-                                                selectedGroupName = if (selectedGroupName == group.name) null else group.name
+                                                expandedGroupNames = SelectorPresentation.toggleExpanded(expandedGroupNames, group.name, selectorPrefs.getBoolean("proxySelectorCollapsePrevious", true))
                                             }
                                         },
                                         onDelay = {
                                             if (selected.isNotBlank() && testing[selected] != true) scope.launch {
                                                 testing[selected] = true
                                                 try {
-                                                    val measured = repo.delay(selected)
+                                                    val measured = probeNode(selected)
                                                     if (measured > 0L) delays[selected] = measured
                                                     view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                                                 } catch (_: Exception) {
@@ -1808,18 +1836,16 @@ internal fun RefPanel(
                                 }
                                 if (pair.size < groupColumns) Spacer(Modifier.weight(1f))
                             }
+                            pair.forEach { candidate ->
+                            val expandedGroup = candidate.takeIf { it.name in expandedGroupNames }
+                            var closingGroup by remember(candidate.name) { mutableStateOf<ProxyGroupUi?>(null) }
+                            SideEffect { if (expandedGroup != null) closingGroup = expandedGroup }
                             WorkspaceAccordion(visible = expandedGroup != null) {
                                 (expandedGroup ?: closingGroup)?.let { group ->
                                     val selected = selectedLocal[group.name] ?: group.now
                                     val nodeSort = selectorPrefs.getString("proxySelectorNodeSort", "config").orEmpty()
                                     val descending = selectorPrefs.getBoolean("proxySelectorSortDescending", false)
-                                    val orderedNodes = when (nodeSort) {
-                                        "name" -> group.nodes.sortedBy { it.name.lowercase() }
-                                        "latency" -> group.nodes.sortedWith(compareBy<ProxyNodeUi> {
-                                            (delays[it.name] ?: it.lastDelay)?.takeIf { value -> value > 0L } ?: Long.MAX_VALUE
-                                        }.thenBy { it.name.lowercase() })
-                                        else -> group.nodes
-                                    }.let { values -> if (descending) values.reversed() else values }
+                                    val orderedNodes = SelectorPresentation.nodes(group, nodeSort, descending, delays, providerNames)
                                     val visibleGroup = group.copy(nodes = orderedNodes)
                                     RefInlineGroupExpansion(
                                         group = visibleGroup,
@@ -1849,7 +1875,7 @@ internal fun RefPanel(
                                             if (testing[node] != true) scope.launch {
                                                 testing[node] = true
                                                 try {
-                                                    val measured = repo.delay(node)
+                                                    val measured = probeNode(node)
                                                     if (measured > 0L) delays[node] = measured
                                                 } catch (_: Exception) {
                                                     if ((delays[node] ?: 1L) <= 0L) delays.remove(node)
@@ -1864,7 +1890,7 @@ internal fun RefPanel(
                                                         async {
                                                             delay(index * 30L)
                                                             testing[node.name] = true
-                                                            try { repo.delay(node.name) }
+                                                            try { probeNode(node.name) }
                                                             catch (_: Exception) { -1L }
                                                         }
                                                     }
@@ -1886,8 +1912,9 @@ internal fun RefPanel(
                             }
                         }
                     }
+                    }
                 }
-                RefPanelTab.Overview -> item(key = "${tab.name}-traffic-overview", contentType = "traffic-overview") { RefTrafficOverview(state, overviewRuleCount) }
+                RefPanelTab.Overview -> item(key = "${tab.name}-traffic-overview", contentType = "traffic-overview") { RefTrafficOverview(state, overviewRuleCount, providers) }
                 RefPanelTab.Subscriptions -> items(filteredProviders, key = { "${tab.name}-provider-${it.name}" }, contentType = { "subscription-provider" }) { item ->
                     RefProviderRow(
                         item = item,
@@ -2045,13 +2072,7 @@ internal fun RefPanel(
             val selected = selectedLocal[group.name] ?: group.now
             val nodeSort = selectorPrefs.getString("proxySelectorNodeSort", "config").orEmpty()
             val descending = selectorPrefs.getBoolean("proxySelectorSortDescending", false)
-            val orderedNodes = when (nodeSort) {
-                "name" -> group.nodes.sortedBy { it.name.lowercase() }
-                "latency" -> group.nodes.sortedWith(compareBy<ProxyNodeUi> {
-                    (delays[it.name] ?: it.lastDelay)?.takeIf { value -> value > 0L } ?: Long.MAX_VALUE
-                }.thenBy { it.name.lowercase() })
-                else -> group.nodes
-            }.let { values -> if (descending) values.reversed() else values }
+            val orderedNodes = SelectorPresentation.nodes(group, nodeSort, descending, delays, providerNames)
             val visibleGroup = group.copy(nodes = orderedNodes)
 
             ModalBottomSheet(
@@ -2100,7 +2121,7 @@ internal fun RefPanel(
                                             async {
                                                 delay(index * 30L)
                                                 testing[node.name] = true
-                                                try { repo.delay(node.name) }
+                                                try { probeNode(node.name) }
                                                 catch (_: Exception) { -1L }
                                             }
                                         }
@@ -2155,7 +2176,7 @@ internal fun RefPanel(
                                 if (testing[node] != true) scope.launch {
                                     testing[node] = true
                                     try {
-                                        val measured = repo.delay(node)
+                                        val measured = probeNode(node)
                                         if (measured > 0L) delays[node] = measured
                                     } catch (_: Exception) {
                                         if ((delays[node] ?: 1L) <= 0L) delays.remove(node)
@@ -2185,7 +2206,7 @@ internal fun RefPanel(
             onSelect = { index ->
                 groupSortMode = sortValues[index].first
                 selectorPrefs.edit().putString("proxySelectorGroupSort", groupSortMode).apply()
-                selectedGroupName = null
+                expandedGroupNames = emptyList()
                 groupSortPicker = false
             },
         )
@@ -2257,6 +2278,8 @@ private fun RefPanelApiSettingsSheet(
         )
     }
     var history by remember { mutableStateOf(prefs.getBoolean("proxyApiHistoryEnabled", false)) }
+    var retention by remember { mutableStateOf(prefs.getInt("proxyApiHistoryRetentionDays", 7).toString()) }
+    var historyLimit by remember { mutableStateOf(prefs.getInt("proxyApiHistoryMaxMb", 16).toString()) }
     var busy by remember { mutableStateOf(false) }
     var feedback by remember { mutableStateOf("") }
     var feedbackError by remember { mutableStateOf(false) }
@@ -2295,6 +2318,8 @@ private fun RefPanelApiSettingsSheet(
             .putBoolean("proxyCustomDelayUrlEnabled", customDelay)
             .putString("proxyCustomDelayUrl", cleanDelay)
             .putBoolean("proxyApiHistoryEnabled", history)
+            .putInt("proxyApiHistoryRetentionDays", (retention.toIntOrNull() ?: 7).coerceIn(1, 90))
+            .putInt("proxyApiHistoryMaxMb", (historyLimit.toIntOrNull() ?: 16).coerceIn(4, 256))
             .apply()
         feedback = "面板 API 设置已保存"
         feedbackError = false
@@ -2333,12 +2358,18 @@ private fun RefPanelApiSettingsSheet(
                     WorkspaceInsetDivider()
                     WorkspaceSettingRow(
                         "Clash API 历史收集",
-                        "保存真实流量采样供概览趋势恢复",
+                        "打开河图时采集流量与连接，保存在本机",
                         Icons.Rounded.History,
                     ) {
                         LiquidSwitch(checked = history, onCheckedChange = { history = it })
                     }
                 }
+            }
+
+            if (history) {
+                LiquidGlassTextField(retention, { retention = it.filter(Char::isDigit).take(2) }, "历史保留天数", Modifier.fillMaxWidth(), supportingText = "1–90 天")
+                LiquidGlassTextField(historyLimit, { historyLimit = it.filter(Char::isDigit).take(3) }, "数据库上限（MiB）", Modifier.fillMaxWidth(), supportingText = "4–256 MiB，达到上限时清理最早记录")
+                TextButton(onClick = { scope.launch { ProxyApiHistoryStore.clear(context); feedback = "本地历史已清除"; feedbackError = false } }) { Text("清除本地历史") }
             }
 
             if (customApi) {
@@ -3013,7 +3044,16 @@ private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolea
 @Composable
 private fun RefInlineGroupExpansion(group: ProxyGroupUi, selected: String, delays: Map<String, Long>,
     testing: Map<String, Boolean>, onSelect: (String) -> Unit, onDelay: (String) -> Unit, onTestAll: () -> Unit) {
-    LiquidGroupWell(group, selected, delays, testing, onSelect, onDelay, onTestAll)
+    val prefs = LocalContext.current.getSharedPreferences("hetu", 0)
+    if (prefs.getBoolean("proxySelectorGroupByProvider", false) && group.nodes.any { it.provider.isNotBlank() }) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            group.nodes.groupBy { it.provider.ifBlank { "配置内节点" } }.forEach { (provider, nodes) ->
+                Text(provider + " · " + nodes.size, color = LocalHetuTokens.current.textSecondary,
+                    fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 8.dp))
+                LiquidGroupWell(group.copy(nodes = nodes), selected, delays, testing, onSelect, onDelay, onTestAll)
+            }
+        }
+    } else LiquidGroupWell(group, selected, delays, testing, onSelect, onDelay, onTestAll)
 }
 
 @Composable
@@ -3116,15 +3156,12 @@ private fun RefDelayBadge(value: Long?, testing: Boolean, onClick: (() -> Unit)?
 }
 
 @Composable
-private fun RefTrafficOverview(state: ProxyComposeState, ruleCount: Int?) {
+private fun RefTrafficOverview(state: ProxyComposeState, ruleCount: Int?, providers: List<DashboardProviderUi>) {
     val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val context = LocalContext.current
-    val history = remember {
-        mutableStateListOf<Triple<Long, Long, Long>>().apply {
-            addAll(ProxyApiHistoryStore.recent(context))
-        }
-    }
+    val history = remember { mutableStateListOf<Triple<Long, Long, Long>>() }
+    LaunchedEffect(Unit) { history.addAll(ProxyApiHistoryStore.recent(context)) }
     var lastUpload by remember { mutableLongStateOf(state.uploadTotal) }
     var lastDownload by remember { mutableLongStateOf(state.downloadTotal) }
     var lastAt by remember { mutableLongStateOf(0L) }
@@ -3158,31 +3195,8 @@ private fun RefTrafficOverview(state: ProxyComposeState, ruleCount: Int?) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         OverviewInstruments(state, ruleCount)
 
-        Surface(
-            shape = RoundedCornerShape(20.dp),
-            color = t.cardBackground,
-            shadowElevation = 0.dp,
-        ) {
-            Column(
-                Modifier.fillMaxWidth().padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    "订阅",
-                    color = t.textPrimary,
-                    fontSize = 18.sp,
-                    lineHeight = 23.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                )
-                Text(
-                    "刷新后显示数据",
-                    color = t.textSecondary,
-                    fontSize = 13.sp,
-                    lineHeight = 18.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-        }
+        OverviewSubscriptions(providers)
+        TrafficRankings(state.connections)
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             RefRateCard(
@@ -4155,6 +4169,7 @@ internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
 internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySettings: () -> Unit, onChanged: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("hetu", 0) }
+    var languagePicker by remember { mutableStateOf(false) }
     var modePicker by remember { mutableStateOf(false) }
     var ipv6Picker by remember { mutableStateOf(false) }
     var latencyPicker by remember { mutableStateOf(false) }
@@ -4185,6 +4200,15 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
         )
     }
     val scope = rememberCoroutineScope()
+    if (languagePicker) ModalBottomSheet(onDismissRequest = { languagePicker = false }, containerColor = Color.Transparent) {
+        Column(Modifier.fillMaxWidth().liquidSheetMaterial().navigationBarsPadding().padding(20.dp)) {
+            Text(ht("语言"), style = MaterialTheme.typography.titleLarge)
+            listOf("system" to "跟随系统", "zh-CN" to "简体中文", "zh-TW" to "繁體中文", "en" to "English", "ru" to "Русский").forEach { (code, name) ->
+                TextButton(onClick = { prefs.edit().putString("appLanguage", code).apply(); languagePicker = false }, modifier = Modifier.fillMaxWidth()) { Text(ht(name)) }
+            }
+            Text("Navigation and common actions are translated. Technical descriptions currently use Chinese.", style = MaterialTheme.typography.bodySmall)
+        }
+    }
     val backupExporter = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json"),
     ) { uri ->
@@ -4260,10 +4284,11 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
             RefGroup {
                 RefValueRow(
                     "语言",
-                    "跟随系统",
+                    when (LocalHetuLanguage.current) { "zh-CN" -> "简体中文"; "zh-TW" -> "繁體中文"; "en" -> "English"; "ru" -> "Русский"; else -> ht("跟随系统") },
                     Icons.Rounded.Translate,
                     Color.Unspecified,
                     highlightValue = false,
+                    onClick = { languagePicker = true },
                 )
                 RefDivider()
                 RefToolRow(
@@ -5162,7 +5187,7 @@ private fun RefToolRow(icon: ImageVector, accent: Color, title: String, subtitle
     trailingText: String = "", trailingBadge: Boolean = false, trailingColor: Color = Color(0xFF2563EB), onClick: () -> Unit) {
     val t = LocalHetuTokens.current
     val color = if (trailingColor == Color(0xFF2563EB)) MaterialTheme.colorScheme.primary else trailingColor
-    WorkspaceSettingRow(title, subtitle, icon, onClick = onClick) {
+    WorkspaceSettingRow(ht(title), ht(subtitle), icon, onClick = onClick) {
         Row(Modifier.heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             if (trailingText.isNotBlank()) Text(trailingText, Modifier.widthIn(max = 72.dp), color = if (trailingBadge) color else t.textSecondary,
                 fontSize = 12.sp, lineHeight = 18.sp, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -5189,7 +5214,7 @@ private fun RefValueRow(title: String, value: String, icon: ImageVector? = null,
 private fun RefSwitchRow(icon: ImageVector, accent: Color, title: String, subtitle: String,
     checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
     val view = LocalView.current
-    WorkspaceSettingRow(title, subtitle, icon,
+    WorkspaceSettingRow(ht(title), ht(subtitle), icon,
         modifier = Modifier.toggleable(checked, role = Role.Switch) {
             view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK); onCheckedChange(it)
         }) {
