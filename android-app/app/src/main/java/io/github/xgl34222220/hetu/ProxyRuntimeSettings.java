@@ -8,6 +8,9 @@ import java.util.*;
 /** Compares saved network settings with the snapshot of a completed transaction. */
 final class ProxyRuntimeSettings {
     static final String DIRTY_KEY = "proxyRootSettingsDirty";
+    // Bump only when deployed Root scripts/core behavior changes, never for UI-only APKs.
+    static final int RUNTIME_REVISION = 134;
+    static final String APPLIED_RUNTIME_REVISION_KEY = "proxyRootAppliedRuntimeRevision";
     private static final Set<String> RESTART_KEYS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
             "proxyBaseCore","proxyBaseMode","proxyBaseIpv6","proxyAppScope","proxyDnsHijack",
             "proxyBaseAutoOverwrite","proxyTcp","proxyUdp","proxyQuicBlocked","proxyCnIpDirect",
@@ -28,7 +31,17 @@ final class ProxyRuntimeSettings {
     static boolean pending(boolean running, SharedPreferences prefs) {
         if (!running || prefs == null) return false;
         return prefs.getBoolean(DIRTY_KEY, false) ||
-                prefs.getBoolean("proxyRootRuntimeRefreshPending", false);
+                runtimeUpgradePending(running, prefs);
+    }
+
+    static boolean runtimeUpgradePending(boolean running, SharedPreferences prefs) {
+        return running && prefs != null && runtimeUpgradePending(true,
+                prefs.getInt(APPLIED_RUNTIME_REVISION_KEY, 0),
+                prefs.getBoolean("proxyRootRuntimeRefreshPending", false));
+    }
+
+    static boolean runtimeUpgradePending(boolean running, int appliedRevision, boolean recordedPending) {
+        return running && (recordedPending || appliedRevision < RUNTIME_REVISION);
     }
 
     static String signature(SharedPreferences prefs) {

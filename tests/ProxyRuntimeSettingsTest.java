@@ -35,6 +35,11 @@ public final class ProxyRuntimeSettingsTest {
         check(macPolicy.equals(ProxyRuntimeSettings.signature(profile(ProxyRuntimeProfile.Ipv6.ENABLE),values)),"MAC set ordering cannot manufacture pending settings");
         check(ProxyRuntimeSettings.ipv6Label("disable").contains("本机"),"label distinguishes local policy from remote node egress");
         check(ProxyRuntimeSettings.ipv6Label("").contains("确认"),"unknown is not advertised as enabled or disabled");
+        check(ProxyRuntimeSettings.runtimeUpgradePending(true,0,false),"legacy live runtime needs explicit installation of new scripts");
+        check(!ProxyRuntimeSettings.runtimeUpgradePending(false,0,true),"stopped runtime applies upgrade on next start");
+        check(!ProxyRuntimeSettings.runtimeUpgradePending(true,ProxyRuntimeSettings.RUNTIME_REVISION,false),"UI-only APK updates do not require runtime restart");
+        check(ProxyRuntimeSettings.runtimeUpgradePending(true,ProxyRuntimeSettings.RUNTIME_REVISION,true),"recorded runtime upgrade is durable until successful explicit transaction");
+        check(!ProxyRuntimeSettings.runtimeUpgradePending(true,ProxyRuntimeSettings.RUNTIME_REVISION+1,false),"downgrade does not treat a newer runtime as missing files");
         System.out.println("ProxyRuntimeSettingsTest passed: "+checks);
     }
 }

@@ -1,5 +1,7 @@
 package io.github.xgl34222220.hetu
 
+import io.github.xgl34222220.hetu.ui.ReferenceButton as Button
+
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
@@ -236,15 +238,15 @@ class ProxySubStoreWebActivity : ComponentActivity() {
             settings.setSupportZoom(false)
             webChromeClient = WebChromeClient()
             webViewClient = WebViewClient()
-            loadUrl(SUB_STORE_FRONTEND + "?api=" + api)
         }
         webView = view
-        setContentView(view)
+        setSafeWebViewContent(view)
+        if (!view.restoreSavedPage(savedInstanceState)) view.loadUrl(SUB_STORE_FRONTEND + "?api=" + api)
     }
 
-    override fun onBackPressed() {
-        val view = webView
-        if (view != null && view.canGoBack()) view.goBack() else super.onBackPressed()
+    override fun onSaveInstanceState(outState: Bundle) {
+        webView?.savePage(outState)
+        super.onSaveInstanceState(outState)
     }
 
     override fun onDestroy() {

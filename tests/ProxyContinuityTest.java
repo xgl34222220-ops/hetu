@@ -43,9 +43,9 @@ public final class ProxyContinuityTest {
         check(MessagingFilterPolicy.subscriptionExceptions(Collections.singleton("weixin.qq.com")).isEmpty(),"explicit parent block is respected");
 
         String source="mode: rule\ndisable-keep-alive: false\nkeep-alive-idle: 120\nkeep-alive-interval: 60\nproxies: []\nproxy-groups:\n  - name: SELECT\n    type: select\n    proxies: [DIRECT]\n"
-                +"rule-providers:\n  source-adblock:\n    type: inline\n    behavior: domain\n    payload: ['+.source-ad.example.test']\n"
+                +"rule-providers:\n  source-adblock:\n    type: inline\n    behavior: domain\n    payload: ['+.source-ad.example.test']\n  broad-routing:\n    type: inline\n    behavior: domain\n    payload: ['+.tracker.example.test']\n"
                 +"rules:\n  - DOMAIN,stun.example.test,REJECT\n  - DST-PORT,853,REJECT\n"
-                +"  - RULE-SET,source-adblock,REJECT\n  - DOMAIN-SUFFIX,weixin.qq.com,DIRECT\n  - MATCH,SELECT\n";
+                +"  - RULE-SET,broad-routing,DIRECT\n  - RULE-SET,source-adblock,REJECT\n  - DOMAIN-SUFFIX,weixin.qq.com,DIRECT\n  - MATCH,SELECT\n";
         ProxyRuntimeProfile profile=new ProxyRuntimeProfile(ProxyRuntimeProfile.Core.MIHOMO,ProxyRuntimeProfile.Mode.TPROXY,
                 ProxyRuntimeProfile.Ipv6.ENABLE,ProxyRuntimeProfile.AppScope.BLACKLIST,ProxyRuntimeProfile.DnsHijack.TPROXY,
                 true,true,true,false,false,true);

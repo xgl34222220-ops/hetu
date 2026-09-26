@@ -6,6 +6,7 @@ import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.SystemClock;
 import org.json.JSONObject;
+import org.json.JSONArray;
 import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
@@ -221,6 +222,28 @@ final class RootProxyManager {
         }finally{CONTROL_LOCK.unlock();}
     }
 
+    private void verifyAdblockRuntime(MihomoControllerClient controller,boolean enabled,int expectedCount)throws Exception{
+        JSONArray rules=controller.rules().optJSONArray("rules");
+        if(rules==null)throw new IOException("Controller 未返回运行规则，过滤状态未确认");
+        boolean found=false;
+        for(int i=0;i<rules.length();i++){
+            JSONObject rule=rules.optJSONObject(i);
+            if(rule==null)continue;
+            JSONObject extra=rule.optJSONObject("extra");
+            boolean disabled=rule.optBoolean("disabled",false)||(extra!=null&&extra.optBoolean("disabled",false));
+            if(AdblockRuleInspection.isBlockingRule(rule.optString("type"),rule.optString("payload"),
+                    rule.optString("proxy"),disabled)){found=true;break;}
+        }
+        if(found!=enabled)throw new IOException(enabled?"Controller 尚未加载河图广告拦截规则":"Controller 仍在执行河图广告拦截规则");
+        if(!enabled)return;
+        JSONObject providers=controller.ruleProviders().optJSONObject("providers");
+        JSONObject block=providers==null?null:providers.optJSONObject(ProxyAdblockRules.PROVIDER_NAME);
+        JSONObject allow=providers==null?null:providers.optJSONObject(ProxyAdblockRules.ALLOW_PROVIDER_NAME);
+        if(block==null||allow==null||block.optInt("ruleCount",-1)<0||allow.optInt("ruleCount",-1)<0
+                ||(expectedCount>0&&block.optInt("ruleCount",0)==0))
+            throw new IOException("Controller 广告过滤文件尚未完整加载");
+    }
+
     String refreshAdblockRuntime()throws Exception{
         CONTROL_LOCK.lock();
         try{
@@ -248,6 +271,7 @@ final class RootProxyManager {
             try{
                 controller.reloadLocalRuleProvider(ProxyAdblockRules.ALLOW_PROVIDER_NAME);
                 controller.reloadLocalRuleProvider(ProxyAdblockRules.PROVIDER_NAME);
+                verifyAdblockRuntime(controller,true,snapshot.count);
             }catch(Exception providerError){
                 // Do not reload the entire proxy after a provider error: this can
                 // disturb live transports, and an old config without the providers
@@ -354,14 +378,18 @@ final class RootProxyManager {
 
             installHotReloadFiles(p);
             MihomoControllerClient controller=new MihomoControllerClient(context);
+            boolean effective=false;
             try{
                 controller.reloadConfig(CONFIG);
+                verifyAdblockRuntime(controller,profile.adblockChain,p.adblock==null?0:p.adblock.count);
+                effective=profile.adblockChain&&AdblockRuleInspection.isRuleMode(controller.configs().optString("mode", ""));
             }catch(Exception error){
                 RootBridge.rootShell(context,
                         "if [ -f "+RootBridge.quote(CONFIG+".before-reload")+" ]; then mv -f "
                                 +RootBridge.quote(CONFIG+".before-reload")+" "+RootBridge.quote(CONFIG)+"; fi",
                         5000L);
                 try{controller.reloadConfig(CONFIG);}catch(Exception ignored){}
+                prefs.edit().putString("proxyAdblockLastError","过滤设置未确认应用："+String.valueOf(error.getMessage())).apply();
                 throw error;
             }
             RootBridge.rootShell(context,"rm -f "+RootBridge.quote(CONFIG+".before-reload"),3000L);
@@ -370,6 +398,9 @@ final class RootProxyManager {
                     .putString("proxyRootAppliedSettings",p.settingsSignature)
                     .putInt("proxyAdblockLastRuleCount",p.adblock==null?0:p.adblock.count)
                     .putString("proxyAdblockLastRevision",p.adblock==null?"":p.adblock.revision)
+                    .putBoolean("proxyAdblockLastEffective",effective)
+                    .putBoolean("proxyAdblockCounterArmed",profile.adblockChain)
+                    .remove("proxyAdblockLastError")
                     .apply();
             return "运行配置已热重载";
         }finally{
@@ -396,7 +427,7 @@ final class RootProxyManager {
     }
 
     private String capabilityFingerprint(ProxyRuntimeProfile profile,RootProxyPolicy policy){
-        return "caps-v1|"+Build.FINGERPRINT+"|"+topologyFingerprint(profile,policy);
+        return "caps-v2|"+ProxyRuntimeSettings.RUNTIME_REVISION+"|"+Build.FINGERPRINT+"|"+topologyFingerprint(profile,policy);
     }
 
     JSONObject preflight(Prepared p)throws Exception{
@@ -645,12 +676,14 @@ final class RootProxyManager {
                 // their own effective/error fields; they must not create an endless "restart again"
                 // loop by leaving the generic settings signature permanently different.
                 .putString("proxyRootAppliedSettings",ProxyRuntimeSettings.signature(prefs))
+                .putInt(ProxyRuntimeSettings.APPLIED_RUNTIME_REVISION_KEY,ProxyRuntimeSettings.RUNTIME_REVISION)
                 .remove(ProxyRuntimeSettings.DIRTY_KEY)
                 .putString("proxyRootEffectiveIpv6",profile.ipv6.id)
                 .putLong("proxyRootHealthProbeElapsed",0L)
                 .putString("proxyRootValidatedFingerprint",validationKey)
                 .putString("proxyRootCapabilityFingerprint",capabilityKey)
                 .remove("proxyRootRuntimeRefreshPending")
+                .remove("proxyRootRuntimeRefreshPendingAt")
                 .remove("proxyRootBootError")
                 .apply();
         }
@@ -765,6 +798,8 @@ final class RootProxyManager {
                 "proxyAutoRecoverySuccess","proxyAutoRecoveryError","proxyLastNetworkSessionReset",
                 "proxyLastNetworkSessionResetCount","proxyLastNetworkSessionResetReason","proxyLastNetworkObservationAt","proxyLastNetworkObservationReason","proxyNetworkSessionResetError",
                 "proxyLastAutoStopAt","proxyLastAutoStopReason","proxyAdblockLastRevision","proxyAdblockLastError",
+                "proxySelectorDisconnectOnSelect","proxyLastSelectionAt","proxyLastSelectionGroup",
+                "proxyLastSelectionClosed","proxyLastSelectionCloseFailed",
                 "proxyAdblockHotReloadAt","proxyAdblockLastHitAt","proxyRootEgressProbeLastError",
                 "proxyNetworkIntegrity","proxyNetworkFault","proxyNetworkCheckedAt","proxyPolicyEgressState","proxyPolicyEgressCheckedAt"}){
             if(values.containsKey(key))events.append('\n').append(key).append('=').append(values.get(key));

@@ -102,6 +102,7 @@ private fun ProxyQuickPanelSheet(
     val repo = remember { ProxyDashboardRepository(context) }
     val haze = rememberHazeState()
     val delays = remember { mutableStateMapOf<String, Long>() }
+    val latencyMeasuredAt = remember { mutableMapOf<String, Long>() }
     val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf(ProxyComposeState()) }
     var selectedTab by rememberSaveable {
@@ -130,11 +131,10 @@ private fun ProxyQuickPanelSheet(
 
     suspend fun refreshState() {
         try {
+            val snapshotStartedAt = android.os.SystemClock.elapsedRealtime()
             val next = repo.state()
             state = next
-            next.groups.flatMap { it.nodes }.forEach { node ->
-                node.lastDelay?.takeIf { it > 0L }?.let { delays[node.name] = it }
-            }
+            syncCoreLatencyResults(next.groups, delays, latencyMeasuredAt, snapshotStartedAt)
             loadError = ""
         } catch (cancel: CancellationException) {
             throw cancel
@@ -213,6 +213,7 @@ private fun ProxyQuickPanelSheet(
                         state = state,
                         repo = repo,
                         delays = delays,
+                        measurementTimes = latencyMeasuredAt,
                         selectedTab = selectedTab,
                         onSelectedTabChange = { selectedTab = it },
                         searchRequest = 0,

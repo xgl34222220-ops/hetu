@@ -31,7 +31,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk=[35], qualifiers="w480dp-h2400dp-mdpi")
+@Config(sdk=[35], qualifiers = "zh-rCN-w480dp-h2400dp-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class NonHomeAlignmentTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
@@ -60,7 +60,7 @@ class NonHomeAlignmentTest {
         var dark by mutableStateOf(false)
         compose.setContent { key(dark) {
             app.getSharedPreferences("hetu",0).edit().putString("appearance",if(dark)"dark" else "light").commit()
-            HetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f,scale),LocalHetuMotionEnabled provides false) {
+            RasterHetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f,scale),LocalHetuMotionEnabled provides false) {
                 Column(Modifier.width(360.dp).crystalPageBackground().padding(16.dp).testTag("tools-scene")) {
                     Column(Modifier.fillMaxWidth().crystalMaterial(androidx.compose.foundation.shape.RoundedCornerShape(22.dp))) {
                         WorkspaceSettingRow("订阅管理","导入、更新与切换配置",Icons.Rounded.CloudDownload,Modifier.testTag("row:a")) {
@@ -88,7 +88,7 @@ class NonHomeAlignmentTest {
     @Test fun nodeFooterIsFixedForShortAndTwoLineNamesAndUdpIsReportedOnly() {
         val nodes=listOf(ProxyNodeUi("美国节点","Vless",true),ProxyNodeUi("日本节点长名称测试","Trojan",false))
         val g=ProxyGroupUi("AI 平台","Selector",nodes[1].name,nodes)
-        compose.setContent { HetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f,1f),LocalHetuMotionEnabled provides false) {
+        compose.setContent { RasterHetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f,1f),LocalHetuMotionEnabled provides false) {
             Column(Modifier.width(380.dp).crystalPageBackground().padding(16.dp).testTag("groups-scene")) {
                 Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                     StrategyGroupCard(g,g.now,true,87,false,Modifier.weight(1f),{}, {})
@@ -101,18 +101,18 @@ class NonHomeAlignmentTest {
         compose.onNodeWithTag("brand-tray:AI 平台",true).assertWidthIsEqualTo(34.dp)
         assertTrue(bounds("strategy-title:AI 平台").left < bounds("brand-tray:AI 平台").left)
         assertEquals(bounds("node:${nodes[0].name}").top,bounds("node:${nodes[1].name}").top,.5f)
-        compose.onNodeWithText("Vless",true).assertExists()
-        compose.onNodeWithText("Trojan",true).assertExists()
+        compose.onNodeWithText("VLESS",true).assertExists()
+        compose.onNodeWithText("TROJAN",true).assertExists()
         assertEquals("UDP", liquidNodeProtocolLabel(ProxyNodeUi("自动测速容器", "URLTest", true)))
         assertEquals("策略组", liquidNodeProtocolLabel(ProxyNodeUi("手动组", "Selector", false)))
-        compose.onNodeWithTag("node:${nodes[0].name}",true).assertHeightIsAtLeast(78.dp)
+        compose.onNodeWithTag("node:${nodes[0].name}",true).assertHeightIsAtLeast(56.dp)
         capture("groups-scene","nonhome104-groups")
     }
     @Test fun refreshStatesKeep48dpSlotAndDetailsRemainInlineWithoutDialogs() {
         var busy by mutableStateOf(false);var ok by mutableStateOf(false);var error by mutableStateOf("")
         var clicks=0
         val p=DashboardProviderUi("两年套餐","HTTP","","","2026-09-21T00:00:00Z",5_000_000_000L,20_000_000_000L,128_000_000_000L,1820000000,setOf("a","b"),true)
-        compose.setContent { HetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f,1f),LocalHetuMotionEnabled provides false) {
+        compose.setContent { RasterHetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f,1f),LocalHetuMotionEnabled provides false) {
             Column(Modifier.width(360.dp).crystalPageBackground().padding(16.dp).verticalScroll(rememberScrollState()).testTag("ticket-scene")) {
                 SubscriptionBoardingTicket(p.name,p,"example.invalid",refreshing=busy,success=ok,error=error,onEdit={},onRefresh={clicks++})
             }

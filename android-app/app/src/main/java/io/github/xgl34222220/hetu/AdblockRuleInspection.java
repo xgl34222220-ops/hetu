@@ -4,6 +4,25 @@ package io.github.xgl34222220.hetu;
 final class AdblockRuleInspection {
     private AdblockRuleInspection() {}
 
+    static boolean isRuleMode(String mode) {
+        return "rule".equalsIgnoreCase(mode==null?"":mode.trim());
+    }
+
+    static boolean isBlockingRule(String type,String payload,String policy,boolean disabled) {
+        if(disabled||!"REJECT".equalsIgnoreCase(policy))return false;
+        String normalized=(payload==null?"":payload).replaceAll("\\s+","");
+        if("RuleSet".equalsIgnoreCase(type)||"RULE-SET".equalsIgnoreCase(type))
+            return ProxyAdblockRules.PROVIDER_NAME.equals(normalized);
+        if(!"AND".equalsIgnoreCase(type))return false;
+        // Mihomo Logic.Payload serializes operators and RuleType names for the
+        // controller: it does not return the original YAML expression.
+        normalized=normalized.replace("RuleSet,","RULE-SET,");
+        String block="RULE-SET,"+ProxyAdblockRules.PROVIDER_NAME;
+        String allow="RULE-SET,"+ProxyAdblockRules.ALLOW_PROVIDER_NAME;
+        return normalized.equals("(("+block+"),(NOT,(("+allow+"))))")
+                ||normalized.equals("(("+block+")&&(NOT,(!("+allow+"))))");
+    }
+
     static boolean isInjected(String yaml) {
         if(yaml==null||yaml.isEmpty())return false;
         boolean provider=false,allowProvider=false,legacyRule=false,exceptionRule=false;

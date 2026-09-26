@@ -26,10 +26,10 @@ import io.github.xgl34222220.hetu.ui.*
 /** Shared non-home geometry. Longer text grows downwards; it never recentres the title. */
 internal object WorkspaceMetrics {
     val gutter = 16.dp
-    val icon = 28.dp
-    val iconGap = 16.dp
+    val icon = 36.dp
+    val iconGap = 14.dp
     val textInset = gutter + icon + iconGap
-    val rowMinimum = 70.dp
+    val rowMinimum = 80.dp
     val tap = 48.dp
     val easing = CubicBezierEasing(.16f, 1f, .30f, 1f)
 }
@@ -39,21 +39,21 @@ internal fun WorkspaceSettingRow(title: String, supporting: String, icon: ImageV
     modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, trailing: @Composable () -> Unit = {}) {
     val t = LocalHetuTokens.current
     Row(modifier.fillMaxWidth().heightIn(min = WorkspaceMetrics.rowMinimum)
-        .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
-        .padding(horizontal = WorkspaceMetrics.gutter, vertical = 12.dp),
-        verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(WorkspaceMetrics.iconGap)) {
-        Box(Modifier.size(WorkspaceMetrics.icon).padding(top = 2.dp), contentAlignment = Alignment.TopCenter) {
+        .then(if (onClick != null) Modifier.miuixTap(onClick = onClick) else Modifier)
+        .padding(horizontal = WorkspaceMetrics.gutter, vertical = 15.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(WorkspaceMetrics.iconGap)) {
+        Box(Modifier.size(WorkspaceMetrics.icon), contentAlignment = Alignment.Center) {
             if (icon != null) {
-                Icon(icon, null, Modifier.size(24.dp), tint = t.textPrimary)
+                HetuListIcon(icon, Modifier.size(28.dp))
             }
         }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(title, Modifier.fillMaxWidth().testTag("setting-title:$title"), color = t.textPrimary,
-                fontSize = 16.sp, lineHeight = 21.sp, fontWeight = FontWeight.Bold)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(ht(title), Modifier.fillMaxWidth().testTag("setting-title:$title"), color = t.textPrimary,
+                fontSize = 18.sp, lineHeight = 25.sp, fontWeight = FontWeight.SemiBold)
             if (supporting.isNotBlank()) Text(supporting, Modifier.fillMaxWidth().testTag("setting-support:$title"),
-                color = t.textSecondary, fontSize = 12.5.sp, lineHeight = 17.sp, fontWeight = FontWeight.SemiBold)
+                color = t.textSecondary, fontSize = 14.sp, lineHeight = 21.sp, fontWeight = FontWeight.Normal)
         }
-        Box(Modifier.widthIn(max = 96.dp).heightIn(min = WorkspaceMetrics.tap), contentAlignment = Alignment.TopEnd) { trailing() }
+        Box(Modifier.widthIn(max = 96.dp).heightIn(min = 32.dp), contentAlignment = Alignment.CenterEnd) { trailing() }
     }
 }
 
@@ -94,8 +94,8 @@ internal fun WorkspaceRefreshAction(label: String, refreshing: Boolean, success:
 internal fun WorkspaceAccordion(visible: Boolean, content: @Composable AnimatedVisibilityScope.() -> Unit) {
     val motion = LocalHetuMotionEnabled.current
     val springSpec = spring<IntSize>(
-        dampingRatio = Spring.DampingRatioLowBouncy,
-        stiffness = Spring.StiffnessLow,
+        dampingRatio = 1f,
+        stiffness = 460f,
     )
     val fadeDuration = if (motion) 150 else 0
     key(motion) {

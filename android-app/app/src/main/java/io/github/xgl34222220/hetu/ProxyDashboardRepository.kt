@@ -7,8 +7,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.io.IOException
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -45,10 +47,68 @@ internal class ProxyDashboardRepository(context: Context) {
     private val app = context.applicationContext
     private val api = MihomoControllerClient(app)
     private val controller = ProxyComposeController(app)
+    private data class ProbeSnapshot(val proxies: JSONObject, val providers: List<DashboardProviderUi>)
+    private val probeSnapshotMutex = Mutex()
+    private var cachedProbeSnapshot: ProbeSnapshot? = null
+    private var probeSnapshotAt = 0L
+
+    private suspend fun probeSnapshot(force: Boolean = false): ProbeSnapshot = probeSnapshotMutex.withLock {
+        val now = SystemClock.elapsedRealtime()
+        val cached = cachedProbeSnapshot
+        if (!force && cached != null && now - probeSnapshotAt in 0L..1500L) return@withLock cached
+        val raw = api.proxies()
+        val providerResponse = api.proxyProviders()
+        ProbeSnapshot(mergeProxySnapshots(raw, providerResponse), parseProviders(providerResponse)).also {
+            cachedProbeSnapshot = it
+            probeSnapshotAt = now
+        }
+    }
+
+    private fun probe(node: String, snapshot: ProbeSnapshot): Long {
+        val leaf = selectedProxyName(snapshot.proxies, node)
+        val entry = snapshot.proxies.optJSONObject(leaf) ?: throw IOException("节点已更新，请刷新策略组")
+        val provider = snapshot.providers.firstOrNull { it.name == entry.optString("provider-name") }
+        val group = snapshot.proxies.optJSONObject(node)?.takeIf { it.optJSONArray("all") != null }
+            ?: snapshot.proxies.keys().asSequence().mapNotNull { snapshot.proxies.optJSONObject(it) }
+                .firstOrNull { candidate ->
+                    val all = candidate.optJSONArray("all")
+                    candidate.optString("testUrl").isNotBlank() && all != null &&
+                        (0 until all.length()).any { all.optString(it) == leaf }
+                }
+        val testUrl = provider?.testUrl?.takeIf { it.isNotBlank() } ?: group?.optString("testUrl").orEmpty()
+        val expected = provider?.expectedStatus ?: group?.optString("expectedStatus", "200-399") ?: "200-399"
+        return if (provider != null) api.providerDelay(provider.name, leaf, testUrl, expected)
+        else api.delay(leaf, testUrl, expected)
+    }
+
+    private fun measuredProbe(node: String, snapshot: ProbeSnapshot): Long = try { probe(node, snapshot) }
+        catch (failure: MihomoControllerClient.DelayFailure) { if (failure.timedOut) -1L else -2L }
+
 
     suspend fun state(): ProxyComposeState = controller.state()
     suspend fun rules(): List<ProxyRuleUi> = controller.rules()
-    suspend fun select(group: String, node: String) = controller.select(group, node)
+    suspend fun select(group: String, node: String, disconnectPrevious: Boolean = false) = withContext(Dispatchers.IO) {
+        // Take a live snapshot before switching. A cached UI list includes unrelated
+        // DIRECT/message transports, and a post-switch list can include new sessions.
+        val previous = if (disconnectPrevious) api.proxies().optJSONObject(group)
+            ?.optString("now").orEmpty() else ""
+        val oldIds = if (disconnectPrevious && previous.isNotBlank() && previous != node)
+            selectionConnectionIds(api.connections(), group) else emptyList()
+        api.select(group, node)
+        // A failed switch never reaches cleanup. Missing/unknown chains are retained.
+        var failed = 0
+        for (id in oldIds) {
+            try { api.closeConnection(id) }
+            catch (cancel: CancellationException) { throw cancel }
+            catch (_: Exception) { failed++ }
+        }
+        app.getSharedPreferences("hetu", 0).edit()
+            .putLong("proxyLastSelectionAt", System.currentTimeMillis())
+            .putString("proxyLastSelectionGroup", group)
+            .putInt("proxyLastSelectionClosed", oldIds.size - failed)
+            .putInt("proxyLastSelectionCloseFailed", failed)
+            .apply()
+    }
     suspend fun closeConnection(id: String) = controller.closeConnection(id)
     suspend fun closeAll() = controller.closeAll()
     suspend fun ensureIcons(): Int = controller.ensureIcons()
@@ -94,150 +154,59 @@ internal class ProxyDashboardRepository(context: Context) {
         parseRuleSets(api.ruleProviders())
     }
 
-        /** Fast homepage probe: test only the currently selected nodes from strategy groups. */
+    /** Probe selected nodes only. Provider metadata is shared by the whole wave. */
     suspend fun quickDelay(): Map<String, Long> = withContext(Dispatchers.IO) {
-        val targets = controller.state().groups.map { it.now }.filter { it.isNotBlank() }.distinct()
-        if (targets.isEmpty()) return@withContext emptyMap()
-        coroutineScope {
-            targets.map { node ->
-                async {
-                    val value = try {
-                        delay(node)
-                    } catch (cancel: CancellationException) {
-                        throw cancel
-                    } catch (_: Exception) {
-                        -1L
-                    }
-                    node to value
-                }
-            }.awaitAll().toMap()
+        val snapshot = probeSnapshot(force = true)
+        val targets = snapshot.proxies.keys().asSequence().mapNotNull { name ->
+            if (name == "GLOBAL") null else snapshot.proxies.optJSONObject(name)
+                ?.takeIf { it.optJSONArray("all") != null }?.optString("now")?.takeIf { it.isNotBlank() }
+        }.distinct().toList()
+        measureSnapshot(targets, snapshot)
+    }
+
+    /** Every provider leaf is included, with bounded requests to the correct core endpoint. */
+    suspend fun globalDelay(): Map<String, Long> = withContext(Dispatchers.IO) {
+        val snapshot = probeSnapshot(force = true)
+        val targets = snapshot.proxies.keys().asSequence().filter { name ->
+            val node = snapshot.proxies.optJSONObject(name)
+            node != null && node.optJSONArray("all") == null &&
+                node.optString("type").lowercase() !in setOf("direct", "reject", "rejectdrop", "pass", "compatible")
+        }.toList()
+        measureSnapshot(targets, snapshot)
+    }
+
+    private suspend fun measureSnapshot(targets: List<String>, snapshot: ProbeSnapshot): Map<String, Long> {
+        val results = LinkedHashMap<String, Long>()
+        for (chunk in targets.distinct().chunked(6)) {
+            coroutineScope {
+                chunk.map { node -> async { node to measuredProbe(node, snapshot) } }.awaitAll()
+            }.forEach { (node, value) -> results[node] = value }
         }
+        return results
     }
 
-/**
- * Test every real leaf node using the same provider/group health-check URL as manual testing.
- * A failed fresh probe keeps Mihomo's most recent positive result instead of falsely turning
- * a known-good node into "超时" just because a generic probe endpoint is blocked.
- */
-suspend fun globalDelay(): Map<String, Long> = withContext(Dispatchers.IO) {
-    val initial = api.proxies()
-    val providers = remoteProviders(api.proxyProviders())
-    val providerByNode = HashMap<String, DashboardProviderUi>()
-    providers.forEach { provider ->
-        provider.nodes.forEach { node -> providerByNode.putIfAbsent(node, provider) }
-    }
-
-    val leaves = LinkedHashSet<String>()
-    val previous = HashMap<String, Long>()
-    val groupProbe = HashMap<String, Pair<String, String>>()
-
-    val names = initial.keys()
-    while (names.hasNext()) {
-        val name = names.next()
-        val item = initial.optJSONObject(name) ?: continue
-        val all = item.optJSONArray("all")
-        if (all != null) {
-            val url = item.optString("testUrl", "")
-            val expected = item.optString("expectedStatus", "200-399").ifBlank { "200-399" }
-            if (url.isNotBlank()) {
-                for (i in 0 until all.length()) {
-                    all.optString(i).takeIf { it.isNotBlank() }?.let { node ->
-                        groupProbe.putIfAbsent(node, url to expected)
-                    }
-                }
-            }
-            continue
+/** Match exact core-provided chain elements, never a rendered arrow-separated label. */
+internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<String> {
+    if (group.isBlank()) return emptyList()
+    val connections = snapshot.optJSONArray("connections") ?: return emptyList()
+    return buildSet {
+        for (index in 0 until connections.length()) {
+            val connection = connections.optJSONObject(index) ?: continue
+            val chains = connection.optJSONArray("chains") ?: continue
+            val id = connection.optString("id")
+            if (id.isNotBlank() && (0 until chains.length()).any { chains.optString(it) == group }) add(id)
         }
-        if (name == "GLOBAL") continue
-        val type = item.optString("type", "").lowercase()
-        if (type in setOf("direct", "reject", "rejectdrop", "pass", "compatible")) continue
-        leaves += name
-        latestDelay(item)?.takeIf { it > 0L }?.let { previous[name] = it }
-    }
-
-    // Use Mihomo's provider healthcheck first. This is the same provider-backed test path
-    // used by manual per-node testing, but one request can refresh many node histories.
-    coroutineScope {
-        providers.filter { it.vehicleType.equals("HTTP", true) }.map { provider ->
-            async {
-                try { api.healthCheckProxyProvider(provider.name) }
-                catch (cancel: CancellationException) { throw cancel }
-                catch (_: Exception) { }
-            }
-        }.awaitAll()
-    }
-
-    val result = LinkedHashMap<String, Long>()
-    repeat(5) { poll ->
-        if (poll > 0) delay(180L)
-        val fresh = try { api.proxies() } catch (_: Exception) { initial }
-        leaves.forEach { node ->
-            latestDelay(fresh.optJSONObject(node))?.takeIf { it > 0L }?.let { result[node] = it }
-        }
-        if (result.size >= leaves.size) return@repeat
-    }
-
-    // Only nodes whose provider healthcheck did not yield a fresh result fall back to the
-    // exact same per-node delay endpoint used by the working "全部测速" button.
-    val remaining = leaves.filter { (result[it] ?: -1L) <= 0L }
-    for (chunk in remaining.chunked(12)) {
-        coroutineScope {
-            chunk.map { node ->
-                async {
-                    val provider = providerByNode[node]
-                    val group = groupProbe[node]
-                    val value = try {
-                        when {
-                            provider != null -> api.delay(node, provider.testUrl, provider.expectedStatus)
-                            group != null -> api.delay(node, group.first, group.second)
-                            else -> api.delay(node)
-                        }
-                    } catch (cancel: CancellationException) {
-                        throw cancel
-                    } catch (_: Exception) {
-                        -1L
-                    }
-                    node to value
-                }
-            }.awaitAll().forEach { (node, value) ->
-                if (value > 0L) result[node] = value
-            }
-        }
-    }
-
-    // Never manufacture a fresh timeout just because a batch path failed. Keep the most
-    // recent positive Mihomo history; the UI leaves truly missing values unchanged.
-    leaves.forEach { node ->
-        if ((result[node] ?: -1L) <= 0L) previous[node]?.takeIf { it > 0L }?.let { result[node] = it }
-    }
-    result
+    }.toList()
 }
 
-suspend fun delay(node: String): Long = withContext(Dispatchers.IO) {
-        val provider = parseProviders(api.proxyProviders()).firstOrNull {
-            node in it.nodes && it.vehicleType.equals("HTTP", true)
-        }
-        if (provider != null) {
-            try {
-                return@withContext api.delay(node, provider.testUrl, provider.expectedStatus)
-            } catch (cancel: CancellationException) {
-                throw cancel
-            } catch (_: Exception) {
-                try { api.healthCheckProxyProvider(provider.name) } catch (_: Exception) { }
-                repeat(8) {
-                    delay(350)
-                    latestDelay(api.proxies().optJSONObject(node))?.let { return@withContext it }
-                }
-            }
-        }
+    suspend fun delay(node: String): Long = withContext(Dispatchers.IO) {
+        probe(node, probeSnapshot())
+    }
 
-        val raw = api.proxies()
-        val groupName = raw.keys().asSequence().firstOrNull { name ->
-            val all = raw.optJSONObject(name)?.optJSONArray("all") ?: return@firstOrNull false
-            (0 until all.length()).any { all.optString(it) == node }
-        }
-        val group = groupName?.let { raw.optJSONObject(it) }
-        api.delay(node, group?.optString("testUrl", "") ?: "", group?.optString("expectedStatus", "200-399") ?: "200-399")
+    suspend fun ipv6Delay(node: String): Long = withContext(Dispatchers.IO) {
+        val snapshot = probeSnapshot()
+        val leaf = selectedProxyName(snapshot.proxies, node)
+        api.delayIpv6(leaf, snapshot.proxies.optJSONObject(leaf)?.optString("provider-name").orEmpty())
     }
 
     suspend fun siteLatencies(): Map<String, Long> = withContext(Dispatchers.IO) {
@@ -354,12 +323,4 @@ suspend fun delay(node: String): Long = withContext(Dispatchers.IO) {
         else -> raw.uppercase().ifBlank { "RULE" }
     }
 
-    private fun latestDelay(node: JSONObject?): Long? {
-        val history = node?.optJSONArray("history") ?: return null
-        for (i in history.length() - 1 downTo 0) {
-            val value = history.optJSONObject(i)?.optLong("delay", -1L) ?: -1L
-            if (value > 0L) return value
-        }
-        return null
-    }
 }

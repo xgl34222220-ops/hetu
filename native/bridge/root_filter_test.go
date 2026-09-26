@@ -31,12 +31,20 @@ func TestRootFilterExceptionsAndRouting(t *testing.T) {
     for _, provider := range cfg.RuleProviders {
         if err = provider.Initial(); err != nil { t.Fatal(err) }
     }
+    // This is the Controller /rules wire payload consumed by the Android
+    // verification helper, not the raw logical expression from the YAML.
+    wantPayload := "((RuleSet,hetu-adblock) && (NOT,(!(RuleSet,hetu-adblock-allow))))"
+    foundPayload := false
+    for _, rule := range cfg.Rules {
+        if rule.RuleType() == C.AND && rule.Payload() == wantPayload && rule.Adapter() == "REJECT" { foundPayload = true }
+    }
+    if !foundPayload { t.Fatal("Mihomo controller filter payload changed; update Android rule inspection") }
     tunnel.UpdateRules(cfg.Rules,nil,cfg.RuleProviders)
     defer tunnel.UpdateRules(nil,nil,nil)
     cases := []struct{ host string; port uint16; want string }{
         {"szlong.weixin.qq.com",443,"DIRECT"},
         {"ad.weixin.qq.com",443,"REJECT"},
-        {"safe.tracker.example.test",443,"SELECT"},
+        {"safe.tracker.example.test",443,"DIRECT"},
         {"ads.tracker.example.test",443,"REJECT"},
         {"source-ad.example.test",443,"REJECT"},
         {"szlong.weixin.qq.com",853,"REJECT"},
@@ -60,7 +68,7 @@ func TestRootFilterExceptionsAndRouting(t *testing.T) {
     if block.Count() != 0 { t.Fatalf("empty update retained %d old rules",block.Count()) }
     emptyCases := []struct{ host string; port uint16; want string }{
         {"ad.weixin.qq.com",443,"DIRECT"},
-        {"ads.tracker.example.test",443,"SELECT"},
+        {"ads.tracker.example.test",443,"DIRECT"},
         {"source-ad.example.test",443,"REJECT"},
         {"szlong.weixin.qq.com",853,"REJECT"},
         {"stun.example.test",443,"REJECT"},

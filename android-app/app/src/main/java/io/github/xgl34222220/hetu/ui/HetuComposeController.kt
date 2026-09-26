@@ -297,7 +297,9 @@ internal class HetuComposeController(private val context: Context) {
         rules.reload()
         val changed = rules.updateRules(false)
         val warning = rules.summary().optString("lastRuleUpdateWarning", "")
-        val hot = if (changed) hotApplyRulesIfNeeded() else ""
+        // Manual update doubles as retry after a previous provider reload failed;
+        // unchanged downloaded content must not leave the old running rules in place.
+        val hot = hotApplyRulesIfNeeded()
         val base = when {
             changed && warning.isNotBlank() -> "规则已更新；$warning"
             changed -> "规则已更新"

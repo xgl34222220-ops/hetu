@@ -26,7 +26,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35], qualifiers = "w480dp-h2400dp-mdpi")
+@Config(sdk = [35], qualifiers = "zh-rCN-w480dp-h2400dp-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class InstrumentAlignmentRenderTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
@@ -66,7 +66,7 @@ class InstrumentAlignmentRenderTest {
     )
 
     @Test
-    fun referenceFourCardsKeepTwoByTwoGeometryAndBottomRails() {
+    fun referenceFourCardsReflowForNarrowScreensAndLargeFonts() {
         var width by mutableFloatStateOf(360f)
         var scale by mutableFloatStateOf(1f)
         var night by mutableStateOf(false)
@@ -76,7 +76,7 @@ class InstrumentAlignmentRenderTest {
                 app.getSharedPreferences("hetu", 0).edit()
                     .putString("appearance", if (night) "dark" else "light")
                     .commit()
-                HetuTheme {
+                RasterHetuTheme {
                     CompositionLocalProvider(
                         LocalDensity provides Density(1f, scale),
                         LocalHetuMotionEnabled provides false,
@@ -106,15 +106,20 @@ class InstrumentAlignmentRenderTest {
                 val usage = bounds("instrument-usage")
                 val resource = bounds("instrument-resource")
 
-                assertEquals("Top row must align", network.top, speed.top, .6f)
-                assertEquals("Bottom row must align", usage.top, resource.top, .6f)
-                assertTrue("Top cards must remain side-by-side", speed.left > network.right)
-                assertTrue("Bottom cards must remain side-by-side", resource.left > usage.right)
-                assertEquals("Reference gutter must remain 12dp", 12f, speed.left - network.right, 1f)
-                assertEquals("Reference gutter must remain 12dp", 12f, resource.left - usage.right, 1f)
-
-                assertEquals(3f, bounds("home-usage-progress").height, .6f)
-                assertEquals(3f, bounds("home-cpu-progress").height, .6f)
+                if ((w - 24f) / f < 280f) {
+                    assertTrue("Narrow/large-font cards must stack", speed.top > network.bottom)
+                    assertTrue("Subscription must follow speed", usage.top > speed.bottom)
+                    assertTrue("Resource must follow subscription", resource.top > usage.bottom)
+                    assertEquals(network.left, speed.left, .6f)
+                    assertEquals(network.width, speed.width, .6f)
+                } else {
+                    assertEquals("Top row must align", network.top, speed.top, .6f)
+                    assertEquals("Bottom row must align", usage.top, resource.top, .6f)
+                    assertTrue("Roomy cards should use two columns", speed.left > network.right)
+                    assertEquals("Separate cards retain the reference 12dp gutter", 12f, speed.left - network.right, 1f)
+                }
+                assertEquals(5f, bounds("home-usage-progress").height, .6f)
+                assertEquals(5f, bounds("home-cpu-progress").height, .6f)
                 compose.onNodeWithTag("home-usage-progress", true).assert(
                     SemanticsMatcher.expectValue(
                         SemanticsProperties.ProgressBarRangeInfo,
@@ -145,7 +150,7 @@ class InstrumentAlignmentRenderTest {
     fun unknownTelemetryKeepsTrackButDoesNotInventProgress() {
         var empty by mutableStateOf(false)
         compose.setContent {
-            HetuTheme {
+            RasterHetuTheme {
                 CompositionLocalProvider(
                     LocalDensity provides Density(1f, 1f),
                     LocalHetuMotionEnabled provides false,
@@ -182,7 +187,7 @@ class InstrumentAlignmentRenderTest {
     fun networkAndSubscriptionInteractionsRemainRealAndSeparate() {
         var subscriptions = 0
         compose.setContent {
-            HetuTheme {
+            RasterHetuTheme {
                 CompositionLocalProvider(
                     LocalDensity provides Density(1f, 1f),
                     LocalHetuMotionEnabled provides false,

@@ -15,8 +15,8 @@ android {
         applicationId = "io.github.xgl34222220.hetu"
         minSdk = 26
         targetSdk = 35
-        versionCode = 528
-        versionName = "0.4.0-test.128"
+        versionCode = 534
+        versionName = "0.4.0-test.134"
     }
 
     testOptions {
@@ -73,8 +73,11 @@ dependencies {
     implementation("com.materialkolor:material-kolor:2.0.0")
     implementation("dev.chrisbanes.haze:haze:1.6.10")
     implementation("dev.chrisbanes.haze:haze-materials:1.6.10")
-    implementation("top.yukonga.miuix.kmp:miuix-blur-android:0.9.3")
-    implementation("top.yukonga.miuix.kmp:miuix-squircle-android:0.9.3")
+    implementation("top.yukonga.miuix.kmp:miuix-ui-android:0.9.4")
+    implementation("top.yukonga.miuix.kmp:miuix-preference-android:0.9.4")
+    implementation("top.yukonga.miuix.kmp:miuix-icons-android:0.9.4")
+    implementation("top.yukonga.miuix.kmp:miuix-blur-android:0.9.4")
+    implementation("top.yukonga.miuix.kmp:miuix-squircle-android:0.9.4")
     implementation(platform("io.github.rosemoe:editor-bom:0.24.6"))
     implementation("io.github.rosemoe:editor")
 }
@@ -82,6 +85,7 @@ dependencies {
 // Presentation-only: safe YAML icon projection, SVG decoding, rendered regression tests.
 dependencies {
     implementation("org.yaml:snakeyaml:2.3")
+    implementation("com.networknt:json-schema-validator:1.5.9")
     implementation("com.caverock:androidsvg-aar:1.4")
     testImplementation(platform("androidx.compose:compose-bom:2026.03.00"))
     testImplementation("junit:junit:4.13.2")

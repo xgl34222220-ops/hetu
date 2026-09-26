@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
 .gradle/
+.kotlin/
 .upstream/
 local.properties
 android-app/build/

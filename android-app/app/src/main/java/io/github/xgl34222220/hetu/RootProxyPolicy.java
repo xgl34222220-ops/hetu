@@ -90,8 +90,32 @@ final class RootProxyPolicy {
         } catch (PackageManager.NameNotFoundException impossible) { }
 
         if (profile.appScope != ProxyRuntimeProfile.AppScope.CORE) {
+            Map<Integer, Map<String,Integer>> userPackages = new HashMap<>();
             for (String pkg : new TreeSet<>(selected)) {
                 if (pkg == null || pkg.isEmpty() || pkg.equals(context.getPackageName())) continue;
+                if (pkg.contains(":")) {
+                    String[] identity = pkg.split(":", 2);
+                    int user;
+                    try { user = Integer.parseInt(identity[0]); } catch (NumberFormatException invalid) { missing.add(pkg); continue; }
+                    if (user < 0 || user > 21473 || !identity[1].matches("[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)+")) { missing.add(pkg); continue; }
+                    if (!userPackages.containsKey(user)) {
+                        RootBridge.Result listed = RootBridge.rootShell(context, "pm list packages -U --user " + user, 8000);
+                        Map<String,Integer> resolved = new HashMap<>();
+                        if (listed.ok()) {
+                            java.util.regex.Matcher rows = Pattern.compile("(?m)^package:([A-Za-z0-9_.]+)\\s+uid:(\\d+)\\s*$").matcher(listed.output);
+                            while (rows.find()) {
+                                try { int uid = Integer.parseInt(rows.group(2)); if (uid / 100000 == user) resolved.put(rows.group(1), uid); }
+                                catch (NumberFormatException invalid) { }
+                            }
+                        }
+                        userPackages.put(user, resolved);
+                    }
+                    Integer uid = userPackages.get(user).get(identity[1]);
+                    if (uid == null) missing.add(pkg);
+                    else if (uid % 100000 < FIRST_APP_UID) skipped.add(pkg);
+                    else uids.add(uid);
+                    continue;
+                }
                 try {
                     ApplicationInfo info = pm.getApplicationInfo(pkg, 0);
                     if (info.uid < FIRST_APP_UID) skipped.add(pkg);

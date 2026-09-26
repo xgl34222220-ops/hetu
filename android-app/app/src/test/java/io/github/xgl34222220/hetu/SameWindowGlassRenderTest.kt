@@ -30,7 +30,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk=[35], qualifiers="w480dp-h1200dp-mdpi")
+@Config(sdk=[35], qualifiers = "zh-rCN-w480dp-h1200dp-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class SameWindowGlassRenderTest {
     @get:Rule val compose=createAndroidComposeRule<ComponentActivity>()
@@ -53,7 +53,7 @@ class SameWindowGlassRenderTest {
     @Test fun actualMenuIsInActivityWindowAndSupportsOutsideBackAndSingleDispatch() {
         var clicks=0
         app.getSharedPreferences("hetu",0).edit().putString("appearance","light").commit()
-        compose.setContent { HetuTheme {
+        compose.setContent { RasterHetuTheme {
             CompositionLocalProvider(LocalDensity provides Density(1f,1f),LocalHetuMotionEnabled provides false) {
                 val haze=remember{HazeState()}
                 Column(Modifier.fillMaxSize().hazeSource(haze).crystalPageBackground().padding(16.dp)) {
@@ -105,7 +105,7 @@ class SameWindowGlassRenderTest {
             file.delete()
         }
         var url by mutableStateOf(urls[0])
-        compose.setContent { HetuTheme { CompositionLocalProvider(LocalHetuMotionEnabled provides false) {
+        compose.setContent { RasterHetuTheme { CompositionLocalProvider(LocalHetuMotionEnabled provides false) {
             Row(Modifier.padding(16.dp).testTag("cached-brand-images")) {
                 LiquidBrandTray(ProxyGroupUi("Google","Selector","",emptyList(),url))
                 LiquidBrandTray(ProxyGroupUi("Microsoft","Selector","",emptyList(),urls[1]))

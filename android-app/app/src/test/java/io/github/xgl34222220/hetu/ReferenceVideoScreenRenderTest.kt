@@ -24,7 +24,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk=[35], qualifiers="w480dp-h1800dp-mdpi")
+@Config(sdk=[35], qualifiers = "zh-rCN-w480dp-h1800dp-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ReferenceVideoScreenRenderTest {
     @get:Rule val compose=createAndroidComposeRule<ComponentActivity>()
@@ -53,7 +53,7 @@ class ReferenceVideoScreenRenderTest {
         var page by mutableStateOf("tools")
         compose.setContent {
             key(page) {
-                HetuTheme {
+                RasterHetuTheme {
                     Box(
                         Modifier
                             .width(360.dp)
@@ -95,8 +95,10 @@ class ReferenceVideoScreenRenderTest {
         compose.onNodeWithText("基础代理配置",true).assertExists()
         compose.onNodeWithText("其他代理配置",true).assertExists()
         compose.onNodeWithText("语言",true).assertExists()
-        compose.onNodeWithText("主题设置",true).assertExists()
-        compose.onNodeWithText("开机自启",true).assertExists()
         capture("reference156785-settings-top")
+        compose.onNodeWithTag("settings-list").performScrollToNode(hasText("主题设置"))
+        compose.onNodeWithText("主题设置",true).assertExists()
+        compose.onNodeWithTag("settings-list").performScrollToNode(hasText("开机自启"))
+        compose.onNodeWithText("开机自启",true).assertExists()
     }
 }
