@@ -42,7 +42,7 @@ import kotlinx.coroutines.delay
 @Composable
 internal fun liquidColumns(width: Dp, requested: Int = 0): Int {
     val scale = LocalDensity.current.fontScale.coerceAtLeast(1f)
-    val capacity = ((width.value + 10f) / (156f * scale + 10f)).toInt().coerceIn(1, 3)
+    val capacity = ((width.value + 10f) / (136f * scale + 10f)).toInt().coerceIn(1, 3)
     return (if (requested == 0) 2 else requested.coerceIn(1, 3)).coerceAtMost(capacity)
 }
 
@@ -101,32 +101,30 @@ internal fun LiquidStrategyCard(
     val prefs = remember(context) { context.getSharedPreferences("hetu", 0) }
     val compact = prefs.getString("proxySelectorDensity", "standard") == "compact"
     val marquee = prefs.getString("proxySelectorNameOverflow", "wrap") == "scroll"
-    val measured = group.nodes.count { (it.lastDelay ?: 0L) > 0L }
     Column(
         modifier.crystalMaterial(RoundedCornerShape(HetuGlassRadius.Tile), selection = expanded)
             .testTag("strategy:${group.name}")
             .clickable(role = Role.Button, onClickLabel = "查看${group.name}节点", onClick = onExpand)
-            .padding(horizontal = 12.dp, vertical = if (compact) 10.dp else 14.dp),
-        verticalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 8.dp),
+            .padding(horizontal = 12.dp, vertical = if (compact) 8.dp else 10.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(group.name, Modifier.weight(1f).testTag("strategy-title:${group.name}"),
-                color = t.textPrimary, fontSize = 15.sp, lineHeight = 21.sp, fontWeight = FontWeight.SemiBold)
+                color = t.textPrimary, fontSize = 15.sp, lineHeight = 21.sp, fontWeight = FontWeight.SemiBold,
+                maxLines = 2, overflow = TextOverflow.Ellipsis)
             LiquidBrandTray(group)
         }
         Text(selected.ifBlank { "未选择" },
             Modifier.fillMaxWidth().testTag("strategy-selection:${group.name}")
                 .then(if (marquee) Modifier.basicMarquee() else Modifier),
-            color = t.textPrimary, fontSize = 12.5.sp, lineHeight = 19.sp,
-            maxLines = if (marquee) 1 else Int.MAX_VALUE, softWrap = !marquee,
+            color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp,
+            maxLines = if (marquee) 1 else 2, softWrap = !marquee,
             overflow = TextOverflow.Ellipsis)
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(liquidGroupType(group.type), Modifier.testTag("strategy-type:${group.name}"),
-                    color = t.textSecondary, fontSize = 11.5.sp, lineHeight = 17.sp)
-                HetuNumber("$measured/${group.nodes.size}", color = t.textSecondary,
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, lineHeight = 17.sp))
+                Text("${liquidGroupType(group.type)} · ${group.nodes.size}", Modifier.testTag("strategy-type:${group.name}"),
+                    color = t.textSecondary, fontSize = 10.5.sp, lineHeight = 16.sp)
             }
             LatencyChip(value, testing, onClick = onDelay, compact = true,
                 modifier = Modifier.testTag("strategy-delay:${group.name}"))

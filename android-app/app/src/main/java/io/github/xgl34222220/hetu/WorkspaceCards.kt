@@ -41,7 +41,7 @@ internal fun delayBand(value: Long?): String = when {
 
 /** Selection and latency are independent: selected 96ms remains green. */
 @Composable
-internal fun LatencyChip(value: Long?, testing: Boolean, onClick: (() -> Unit)? = null, modifier: Modifier = Modifier, compact: Boolean = false) {
+internal fun LatencyChip(value: Long?, testing: Boolean, onClick: (() -> Unit)? = null, modifier: Modifier = Modifier, compact: Boolean = false, prominent: Boolean = false) {
     val t = LocalHetuTokens.current
     val band = delayBand(value)
     val foreground = when (band) { "good" -> t.success; "fair" -> t.warning; "slow" -> t.warning; "failed" -> t.danger; else -> t.textSecondary }
@@ -52,7 +52,7 @@ internal fun LatencyChip(value: Long?, testing: Boolean, onClick: (() -> Unit)? 
     Box(modifier.then(if (onClick != null) Modifier.sizeIn(minWidth = if (compact) 48.dp else 72.dp, minHeight = 48.dp)
         .clickable(enabled = !testing, role = Role.Button, onClickLabel = "测速", onClick = onClick) else Modifier),
         contentAlignment = Alignment.Center) {
-        Surface(shape = CircleShape, color = if (showBusy || value == null) Color.Transparent else background,
+        Surface(shape = CircleShape, color = if (prominent || showBusy || value == null) Color.Transparent else background,
             modifier = Modifier.semantics { stateDescription = if (showBusy) "正在测速" else "$band $target" }) {
             Row(Modifier.padding(horizontal = if (compact) 6.dp else 9.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -61,7 +61,7 @@ internal fun LatencyChip(value: Long?, testing: Boolean, onClick: (() -> Unit)? 
                 HetuNumber(target, monospaced = true,
                     modifier = Modifier.testTag("latency-text:$target"),
                     color = if (showBusy || value == null) t.textSecondary else foreground,
-                    style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp, lineHeight = 18.sp, fontWeight = FontWeight.Medium))
+                    style = MaterialTheme.typography.labelMedium.copy(fontSize = if (prominent) 18.sp else 12.sp, lineHeight = if (prominent) 26.sp else 18.sp, fontWeight = if (prominent) FontWeight.SemiBold else FontWeight.Medium))
             }
         }
     }

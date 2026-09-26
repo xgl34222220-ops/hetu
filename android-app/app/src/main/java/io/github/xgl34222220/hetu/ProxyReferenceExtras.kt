@@ -455,7 +455,7 @@ private fun ProxySelectorPreferencesScreen(onBack: () -> Unit) {
     var desc by remember { mutableStateOf(prefs.getBoolean("proxySelectorSortDescending", false)) }
     var groupByProvider by remember { mutableStateOf(prefs.getBoolean("proxySelectorGroupByProvider", false)) }
     var collapsePrevious by remember { mutableStateOf(prefs.getBoolean("proxySelectorCollapsePrevious", true)) }
-    var expandSelectedInSheet by remember { mutableStateOf(prefs.getBoolean("proxySelectorExpandSelectedInSheet", false)) }
+    var expandSelectedInSheet by remember { mutableStateOf(prefs.getBoolean("proxySelectorExpandSelectedInSheet", true)) }
     var disconnect by remember { mutableStateOf(prefs.getBoolean("proxySelectorDisconnectOnSelect", false)) }
     var hidden by remember { mutableStateOf(prefs.getBoolean("proxySelectorShowHidden", false)) }
     var detectIpv6 by remember { mutableStateOf(prefs.getBoolean("proxySelectorDetectIpv6", true)) }

@@ -81,6 +81,7 @@ fun LiquidStatusCapsule(
     uptime: String,
     onToggle: () -> Unit,
     modifier: Modifier = Modifier,
+    embedded: Boolean = false,
 ) {
     val t = LocalHetuTokens.current
     val motion = LocalHetuMotionEnabled.current
@@ -99,7 +100,7 @@ fun LiquidStatusCapsule(
         modifier
             .fillMaxWidth()
             .heightIn(min = 78.dp)
-            .crystalMaterial(shape, depth = CrystalDepth.Card)
+            .then(if (embedded) Modifier else Modifier.crystalMaterial(shape, depth = CrystalDepth.Card))
             .padding(start = 16.dp, top = 12.dp, end = 12.dp, bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -159,12 +160,12 @@ private fun LiquidConnectionToggle(checked: Boolean, busy: Boolean, onClick: () 
 
 @Composable
 fun SegmentedLiquidActionPill(running: Boolean, busy: Boolean, onReload: () -> Unit,
-    onToggle: () -> Unit, onRestart: () -> Unit, modifier: Modifier = Modifier) {
+    onToggle: () -> Unit, onRestart: () -> Unit, modifier: Modifier = Modifier, embedded: Boolean = false) {
     val t = LocalHetuTokens.current
     val labels = listOf("重载", if (busy) "请稍候" else if (running) "停止" else "启动", "重启")
     val enabled = listOf(running && !busy, !busy, running && !busy)
     val callbacks = listOf(onReload, onToggle, onRestart)
-    Row(modifier.fillMaxWidth().crystalMaterial(RoundedCornerShape(HetuGlassRadius.Pill), depth = CrystalDepth.Sunken)
+    Row(modifier.fillMaxWidth().then(if (embedded) Modifier else Modifier.crystalMaterial(RoundedCornerShape(HetuGlassRadius.Pill), depth = CrystalDepth.Sunken))
         .padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         labels.forEachIndexed { index, label ->
             val source = remember(index) { MutableInteractionSource() }
@@ -275,7 +276,7 @@ fun LiquidGlassTextField(
         textStyle = textStyle,
         label = { Text(label) },
         placeholder = { if (placeholder.isNotBlank()) Text(placeholder) },
-        supportingText = { if (supportingText.isNotBlank()) Text(supportingText) },
+        supportingText = if (supportingText.isNotBlank()) { { Text(supportingText) } } else null,
         leadingIcon = if (leadingIcon == null) null else {
             { Icon(leadingIcon, null, modifier = Modifier.size(18.dp)) }
         },

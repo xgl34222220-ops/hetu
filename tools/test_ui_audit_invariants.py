@@ -95,13 +95,13 @@ assert "LatencyChip(" in refhome
 # Four dashboard tiles share glass material and stable tabular number rendering.
 assert 'ReferenceDashboardCard' in instrument and '"WAN"' in instrument and '"网速"' in instrument
 assert '"订阅"' in instrument and '"资源占用"' in instrument
-assert 'crystalMaterial(shape, depth = CrystalDepth.Card)' in instrument
+assert 'crystalMaterial(RoundedCornerShape(HetuGlassRadius.Card), depth = CrystalDepth.Card)' in instrument
 assert 'HetuNumber(' in instrument and 'monospaced = true' in instrument
 assert 'home-usage-progress' in instrument and 'home-cpu-progress' in instrument
 
 # Strategy/node selections use the same glass selection language as the floating dock.
 assert '.height(strategyHeight)' not in liquid and '.height(nodeHeight)' not in liquid, "Content cards must not clip to fixed heights"
-assert '156f * scale' in liquid and '.coerceAtMost(capacity)' in liquid, "Manual columns must respect font scale and available width"
+assert '136f * scale' in liquid and '.coerceAtMost(capacity)' in liquid, "Manual columns must respect font scale and available width"
 assert 'TextAutoSize.StepBased(' not in liquid, "Long names must reflow instead of shrinking to unreadable text"
 assert 'well.localBoundingBoxOf(coords, clipBounds = false)' in liquid, "Selection lens must follow real card bounds"
 assert 'nodeSelectionHeight' in liquid and 'nodeSelectionWidth' in liquid

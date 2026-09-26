@@ -106,7 +106,7 @@ class InstrumentAlignmentRenderTest {
                 val usage = bounds("instrument-usage")
                 val resource = bounds("instrument-resource")
 
-                if (w < 360f || f > 1.15f) {
+                if ((w - 24f) / f < 280f) {
                     assertTrue("Narrow/large-font cards must stack", speed.top > network.bottom)
                     assertTrue("Subscription must follow speed", usage.top > speed.bottom)
                     assertTrue("Resource must follow subscription", resource.top > usage.bottom)
@@ -116,7 +116,7 @@ class InstrumentAlignmentRenderTest {
                     assertEquals("Top row must align", network.top, speed.top, .6f)
                     assertEquals("Bottom row must align", usage.top, resource.top, .6f)
                     assertTrue("Roomy cards should use two columns", speed.left > network.right)
-                    assertEquals("Reference gutter must remain 12dp", 12f, speed.left - network.right, 1f)
+                    assertEquals("Shared panel uses a hairline divider", 1f, speed.left - network.right, 1f)
                 }
                 assertEquals(5f, bounds("home-usage-progress").height, .6f)
                 assertEquals(5f, bounds("home-cpu-progress").height, .6f)

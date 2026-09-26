@@ -899,38 +899,26 @@ internal fun RefHome(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item(key = "home-title") {
-            Box(
-                Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(vertical = 6.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    "河图",
-                    color = t.textPrimary,
-                    fontSize = 22.sp,
-                    lineHeight = 28.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = (-.6).sp,
-                )
+            Row(Modifier.fillMaxWidth().padding(start = 4.dp, top = 4.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("河图", color = t.textPrimary, fontSize = 28.sp, lineHeight = 36.sp,
+                        fontWeight = FontWeight.Bold, letterSpacing = (-.6).sp)
+                    Text("网络概览", color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+                }
+                IconButton(onClick = onSettings) {
+                    Icon(Icons.Rounded.Settings, "首页设置", Modifier.size(21.dp), tint = t.textSecondary)
+                }
             }
         }
 
         item(key = "home-status") {
-            RefReferenceHero(
-                state = state,
-                runtime = runtime,
-                busy = busy,
-                onToggle = onToggle,
-            )
-        }
-
-        item(key = "home-actions") {
-            RefReferenceActionStrip(
-                running = state.running,
-                busy = busy,
-                onToggle = onToggle,
-                onReload = onReload,
-                onRestart = onRestart,
-            )
+            Column(Modifier.fillMaxWidth().crystalMaterial(RoundedCornerShape(HetuGlassRadius.Hero))) {
+                RefReferenceHero(state = state, runtime = runtime, busy = busy, onToggle = onToggle)
+                HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = t.textMuted.copy(alpha = .10f))
+                RefReferenceActionStrip(running = state.running, busy = busy, onToggle = onToggle,
+                    onReload = onReload, onRestart = onRestart)
+            }
         }
 
         item(key = "home-shortcuts") {
@@ -1023,6 +1011,7 @@ private fun RefReferenceHero(
         uptime = uptime,
         onToggle = onToggle,
         modifier = Modifier.testTag("home-hero"),
+        embedded = true,
     )
 }
 
@@ -1041,6 +1030,7 @@ private fun RefReferenceActionStrip(
         onToggle = onToggle,
         onRestart = onRestart,
         modifier = Modifier.testTag("home-liquid-actions"),
+        embedded = true,
     )
 }
 
@@ -1090,24 +1080,16 @@ private fun RefReferenceShortcut(
         color = t.cardBackground,
         shadowElevation = 0.dp,
     ) {
-        Column(
-            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Text(
-                title,
-                color = t.textPrimary.copy(alpha = if (enabled) 1f else .45f),
-                fontSize = 16.sp,
-                lineHeight = 20.sp,
-                fontWeight = FontWeight.ExtraBold,
-            )
-            Text(
-                subtitle,
-                color = t.textSecondary.copy(alpha = if (enabled) 1f else .45f),
-                fontSize = 11.5.sp,
-                lineHeight = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
+        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Icon(if (title == "WebUI") Icons.Rounded.Language else Icons.Rounded.Article, null,
+                Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 1f else .4f))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(title, color = t.textPrimary.copy(alpha = if (enabled) 1f else .45f),
+                    fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold)
+                Text(subtitle, color = t.textSecondary.copy(alpha = if (enabled) 1f else .45f),
+                    fontSize = 11.sp, lineHeight = 16.sp)
+            }
         }
     }
 }
@@ -1156,7 +1138,7 @@ private fun RefLatencyPanel(
                 }
             }
             BoxWithConstraints(Modifier.fillMaxWidth()) {
-                if (maxWidth < 292.dp || LocalDensity.current.fontScale > 1.15f) {
+                if (maxWidth / LocalDensity.current.fontScale < 242.dp) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf("Baidu" to baidu, "Cloudflare" to cloudflare, "Google" to google).forEach { (name, delay) ->
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -1199,6 +1181,7 @@ private fun RefLatencyColumn(
             value = value,
             testing = testing,
             compact = true,
+            prominent = true,
         )
     }
 }
@@ -1338,7 +1321,7 @@ internal fun RefPanel(
         onDispose { selectorPrefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
     selectorPrefsRevision
-    val expandSelectedInSheet = selectorPrefs.getBoolean("proxySelectorExpandSelectedInSheet", false)
+    val expandSelectedInSheet = selectorPrefs.getBoolean("proxySelectorExpandSelectedInSheet", true)
     var providerNames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var changingMode by remember { mutableStateOf(false) }
     LaunchedEffect(state.running, selectorPrefsRevision) {
@@ -1372,6 +1355,50 @@ internal fun RefPanel(
     var capsuleText by remember { mutableStateOf("") }
     var capsuleError by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
+    var groupTrail by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    val selectionPending = remember { mutableStateMapOf<String, String>() }
+    val selectionErrors = remember { mutableStateMapOf<String, String>() }
+    LaunchedEffect(state.groups) {
+        selectedLocal.keys.toList().forEach { name ->
+            val current = state.groups.firstOrNull { it.name == name }
+            if (current == null || current.now == selectedLocal[name]) selectedLocal.remove(name)
+        }
+    }
+    fun selectNode(group: ProxyGroupUi, node: String) {
+        if (selectionPending.containsKey(group.name) || node == (selectedLocal[group.name] ?: group.now)) return
+        selectionPending[group.name] = node
+        selectionErrors.remove(group.name)
+        error = ""
+        capsuleText = ""
+        capsuleError = false
+        scope.launch {
+            try {
+                repo.select(group.name, node,
+                    disconnectPrevious = selectorPrefs.getBoolean("proxySelectorDisconnectOnSelect", false))
+                selectedLocal[group.name] = node
+                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                try { onRefreshState() }
+                catch (cancel: CancellationException) { throw cancel }
+                catch (_: Exception) { selectionErrors[group.name] = "已切换，状态刷新失败，请下拉刷新" }
+            } catch (cancel: CancellationException) { throw cancel }
+            catch (failure: Exception) {
+                val message = "切换失败：${failure.message ?: "请检查控制器连接"}"
+                selectionErrors[group.name] = message
+                error = message
+            } finally { selectionPending.remove(group.name) }
+        }
+    }
+    fun testNodes(names: List<String>) {
+        val pending = names.filter { testing[it] != true }
+        if (pending.isEmpty()) return
+        pending.forEach { testing[it] = true }
+        scope.launch {
+            measureStrategyNodes(pending, ::probeNode,
+                onTesting = { name, active -> if (active) testing[name] = true else testing.remove(name) },
+                onMeasured = { name, value -> delays[name] = value })
+        }
+    }
+
     var searchOpen by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     var groupLayout by rememberSaveable { mutableIntStateOf(selectorPrefs.getInt("proxySelectorGroupColumns", 0).coerceIn(0, 2)) }
@@ -1529,47 +1556,23 @@ internal fun RefPanel(
             return
         }
 
-        // Remove legacy false-timeout values left by older test builds. A failed refresh
-        // means "no new value", not "this node is definitely timed out".
-        targets.forEach { node ->
-            if ((delays[node] ?: 1L) <= 0L) delays.remove(node)
-            testing[node] = true
-        }
-
         var completed = 0
         var failed = 0
         capsuleText = "当前节点测速 0/${targets.size}"
         capsuleError = false
-        try {
-            coroutineScope {
-                targets.map { node ->
-                    async {
-                        val value = try {
-                            probeNode(node)
-                        } catch (cancel: CancellationException) {
-                            throw cancel
-                        } catch (_: Exception) {
-                            -1L
-                        }
-                        if (value > 0L) {
-                            delays[node] = value
-                        } else {
-                            failed++
-                        }
-                        testing.remove(node)
-                        completed++
-                        capsuleText = "当前节点测速 $completed/${targets.size}"
-                    }
-                }.awaitAll()
-            }
-        } finally {
-            targets.forEach { testing.remove(it) }
-        }
+        measureStrategyNodes(targets.filter { testing[it] != true }, ::probeNode,
+            onTesting = { name, active -> if (active) testing[name] = true else testing.remove(name) },
+            onMeasured = { name, value ->
+                delays[name] = value
+                if (value <= 0L) failed++
+                completed++
+                capsuleText = "当前节点测速 $completed/${targets.size}"
+            })
         capsuleError = failed > 0
         capsuleText = if (failed == 0) {
             "当前节点测速完成 · ${targets.size}/${targets.size}"
         } else {
-            "当前节点测速完成 · ${targets.size - failed} 成功 / $failed 未更新"
+            "当前节点测速完成 · ${targets.size - failed} 成功 / $failed 超时或失败"
         }
         view.performHapticFeedback(if (failed == 0) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.CLOCK_TICK)
     }
@@ -1812,7 +1815,7 @@ internal fun RefPanel(
                                     RefGroupCard(
                                         group = group,
                                         selected = selected,
-                                        expanded = group.name in expandedGroupNames,
+                                        expanded = group.name in expandedGroupNames || group.name == selectedGroupSheetName,
                                         delay = delays[selected] ?: group.nodes.firstOrNull { it.name == selected }?.lastDelay,
                                         testing = selected.isNotBlank() && testing[selected] == true,
                                         hazeState = hazeState,
@@ -1822,26 +1825,14 @@ internal fun RefPanel(
                                             view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                                             if (expandSelectedInSheet) {
                                                 expandedGroupNames = emptyList()
+                                                groupTrail = emptyList()
                                                 selectedGroupSheetName = group.name
                                             } else {
                                                 selectedGroupSheetName = null
                                                 expandedGroupNames = SelectorPresentation.toggleExpanded(expandedGroupNames, group.name, selectorPrefs.getBoolean("proxySelectorCollapsePrevious", true))
                                             }
                                         },
-                                        onDelay = {
-                                            if (selected.isNotBlank() && testing[selected] != true) scope.launch {
-                                                testing[selected] = true
-                                                try {
-                                                    val measured = probeNode(selected)
-                                                    if (measured > 0L) delays[selected] = measured
-                                                    view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                                } catch (_: Exception) {
-                                                    if ((delays[selected] ?: 1L) <= 0L) delays.remove(selected)
-                                                } finally {
-                                                    testing.remove(selected)
-                                                }
-                                            }
-                                        },
+                                        onDelay = { if (selected.isNotBlank()) testNodes(listOf(selected)) },
                                     )
                                 }
                                 if (pair.size < groupColumns) Spacer(Modifier.weight(1f))
@@ -1862,56 +1853,9 @@ internal fun RefPanel(
                                         selected = selected,
                                         delays = delays,
                                         testing = testing,
-                                        onSelect = { node ->
-                                            val previous = selectedLocal[group.name] ?: group.now
-                                            selectedLocal[group.name] = node
-                                            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                            scope.launch {
-                                                try {
-                                                    repo.select(group.name, node,
-                                                        disconnectPrevious = selectorPrefs.getBoolean("proxySelectorDisconnectOnSelect", false))
-                                                    onRefreshState()
-                                                } catch (_: Exception) {
-                                                    if (previous.isBlank()) selectedLocal.remove(group.name) else selectedLocal[group.name] = previous
-                                                }
-                                            }
-                                        },
-                                        onDelay = { node ->
-                                            if (testing[node] != true) scope.launch {
-                                                testing[node] = true
-                                                try {
-                                                    val measured = probeNode(node)
-                                                    if (measured > 0L) delays[node] = measured
-                                                } catch (_: Exception) {
-                                                    if ((delays[node] ?: 1L) <= 0L) delays.remove(node)
-                                                } finally { testing.remove(node) }
-                                            }
-                                        },
-                                        onTestAll = {
-                                            val pending = group.nodes.filter { testing[it.name] != true }
-                                            if (pending.isNotEmpty()) scope.launch {
-                                                try {
-                                                    val wave = pending.mapIndexed { index, node ->
-                                                        async {
-                                                            delay(index * 30L)
-                                                            testing[node.name] = true
-                                                            try { probeNode(node.name) }
-                                                            catch (_: Exception) { -1L }
-                                                        }
-                                                    }
-                                                    pending.forEachIndexed { index, node ->
-                                                        val measured = wave[index].await()
-                                                        if (measured > 0L) delays[node.name] = measured
-                                                        else if ((delays[node.name] ?: 1L) <= 0L) delays.remove(node.name)
-                                                        delay(32L)
-                                                        testing.remove(node.name)
-                                                    }
-                                                    view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-                                                } finally {
-                                                    pending.forEach { testing.remove(it.name) }
-                                                }
-                                            }
-                                        },
+                                        onSelect = { node -> selectNode(group, node) },
+                                        onDelay = { node -> testNodes(listOf(node)) },
+                                        onTestAll = { testNodes(group.nodes.map { it.name }) },
                                     )
                                 }
                             }
@@ -2074,120 +2018,35 @@ internal fun RefPanel(
 
     selectedGroupSheetName?.let { sheetGroupName ->
         state.groups.firstOrNull { it.name == sheetGroupName }?.let { group ->
-            val selected = selectedLocal[group.name] ?: group.now
-            val nodeSort = selectorPrefs.getString("proxySelectorNodeSort", "config").orEmpty()
-            val descending = selectorPrefs.getBoolean("proxySelectorSortDescending", false)
-            val orderedNodes = SelectorPresentation.nodes(group, nodeSort, descending, delays, providerNames)
-            val visibleGroup = group.copy(nodes = orderedNodes)
-
             ModalBottomSheet(
-                onDismissRequest = { selectedGroupSheetName = null },
+                onDismissRequest = { selectedGroupSheetName = null; groupTrail = emptyList() },
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
                 containerColor = Color.Transparent,
                 shape = RoundedCornerShape(topStart = HetuGlassRadius.Sheet, topEnd = HetuGlassRadius.Sheet),
                 dragHandle = { RefSheetDragHandle() },
             ) {
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .fillMaxHeight(.82f)
-                        .liquidSheetMaterial()
-                        .navigationBarsPadding()
-                        .padding(horizontal = 14.dp, vertical = 6.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                "策略节点",
-                                color = t.textSecondary,
-                                fontSize = 11.sp,
-                                lineHeight = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                            )
-                            Text(
-                                group.name,
-                                color = t.textPrimary,
-                                fontSize = 21.sp,
-                                lineHeight = 27.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        TextButton(
-                            onClick = {
-                                val pending = group.nodes.filter { testing[it.name] != true }
-                                if (pending.isNotEmpty()) scope.launch {
-                                    try {
-                                        val wave = pending.mapIndexed { index, node ->
-                                            async {
-                                                delay(index * 30L)
-                                                testing[node.name] = true
-                                                try { probeNode(node.name) }
-                                                catch (_: Exception) { -1L }
-                                            }
-                                        }
-                                        pending.forEachIndexed { index, node ->
-                                            val measured = wave[index].await()
-                                            if (measured > 0L) delays[node.name] = measured
-                                            else if ((delays[node.name] ?: 1L) <= 0L) delays.remove(node.name)
-                                            delay(32L)
-                                            testing.remove(node.name)
-                                        }
-                                        view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-                                    } finally {
-                                        pending.forEach { testing.remove(it.name) }
-                                    }
-                                }
-                            },
-                        ) { Text("全部测速") }
-                    }
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .verticalScroll(rememberScrollState()),
-                    ) {
-                        RefInlineGroupExpansion(
-                            group = visibleGroup,
-                            selected = selected,
-                            delays = delays,
-                            testing = testing,
-                            onSelect = { node ->
-                                val previous = selectedLocal[group.name] ?: group.now
-                                selectedLocal[group.name] = node
-                                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                scope.launch {
-                                    try {
-                                        repo.select(group.name, node,
-                                            disconnectPrevious = selectorPrefs.getBoolean("proxySelectorDisconnectOnSelect", false))
-                                        onRefreshState()
-                                    } catch (_: Exception) {
-                                        if (previous.isBlank()) selectedLocal.remove(group.name)
-                                        else selectedLocal[group.name] = previous
-                                    }
-                                }
-                            },
-                            onDelay = { node ->
-                                if (testing[node] != true) scope.launch {
-                                    testing[node] = true
-                                    try {
-                                        val measured = probeNode(node)
-                                        if (measured > 0L) delays[node] = measured
-                                    } catch (_: Exception) {
-                                        if ((delays[node] ?: 1L) <= 0L) delays.remove(node)
-                                    } finally {
-                                        testing.remove(node)
-                                    }
-                                }
-                            },
-                            onTestAll = {},
-                        )
-                    }
-                }
+                StrategyNodePanel(
+                    group = group.copy(nodes = group.nodes.map { it.copy(provider = providerNames[it.name] ?: it.provider) }),
+                    selected = selectedLocal[group.name] ?: group.now,
+                    delays = delays, testing = testing, pending = selectionPending[group.name],
+                    error = selectionErrors[group.name].orEmpty(), groupNames = state.groups.map { it.name }.toSet(),
+                    canGoBack = groupTrail.isNotEmpty(),
+                    onSelect = { selectNode(group, it) }, onDelay = { testNodes(listOf(it)) },
+                    onTestAll = { testNodes(group.nodes.map { it.name }) },
+                    onOpenGroup = { name ->
+                        val previous = groupTrail.indexOf(name)
+                        groupTrail = if (previous >= 0) groupTrail.take(previous) else groupTrail + group.name
+                        selectedGroupSheetName = name
+                    },
+                    onBack = { groupTrail.lastOrNull()?.let { selectedGroupSheetName = it; groupTrail = groupTrail.dropLast(1) } },
+                    onClose = { selectedGroupSheetName = null; groupTrail = emptyList() },
+                    modifier = Modifier.fillMaxWidth().fillMaxHeight(.92f).liquidSheetMaterial()
+                        .imePadding().navigationBarsPadding().padding(top = 12.dp),
+                    initialSort = selectorPrefs.getString("proxySelectorNodeSort", "config").orEmpty(),
+                    initialDescending = selectorPrefs.getBoolean("proxySelectorSortDescending", false),
+                    initialGrid = selectorPrefs.getInt("proxySelectorNodeColumns", 1) > 1,
+                    groupByProvider = selectorPrefs.getBoolean("proxySelectorGroupByProvider", false),
+                )
             }
         }
     }
@@ -2762,11 +2621,13 @@ private fun RefPanelGlassHeader(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(
-            Modifier.fillMaxWidth().height(48.dp),
+            Modifier.fillMaxWidth().heightIn(min = 48.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             when (selected) {
                 RefPanelTab.Groups -> {
+                    Text(title, Modifier.weight(1f), color = t.textPrimary, fontSize = 26.sp,
+                        lineHeight = 34.sp, fontWeight = FontWeight.Bold)
                     RefPanelHeaderAction(
                         icon = if (searchOpen) Icons.Rounded.Close else Icons.Rounded.Search,
                         contentDescription = if (searchOpen) "关闭搜索" else "搜索",
@@ -2779,7 +2640,6 @@ private fun RefPanelGlassHeader(
                         active = groupColumns == 1,
                         onClick = onToggleGroupLayout,
                     )
-                    Spacer(Modifier.weight(1f))
                     RefPanelHeaderAction(
                         icon = Icons.Rounded.Sort,
                         contentDescription = when (groupSortMode) {
@@ -2847,7 +2707,7 @@ private fun RefPanelGlassHeader(
             }
         }
 
-        Text(
+        if (selected != RefPanelTab.Groups) Text(
             title,
             color = t.textPrimary,
             fontSize = 32.sp,

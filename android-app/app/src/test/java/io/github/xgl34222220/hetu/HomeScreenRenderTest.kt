@@ -51,7 +51,7 @@ class HomeScreenRenderTest {
                 HetuTheme {
                     // Software capture keeps the actual dock layout; GPU squircle/glass is device-only.
                     CompositionLocalProvider(LocalDensity provides Density(1f,font),LocalHetuMotionEnabled provides false,LocalHetuDockHeight provides dockHeight,LocalSquircleEnabled provides false) {
-                        Box(Modifier.width(width.dp).height(1100.dp).testTag("home-screen")) {
+                        Box(Modifier.width(width.dp).height(800.dp).testTag("home-screen")) {
                             RefHome(
                                 state=ProxyComposeState(running=true,panelReady=true,config="原始配置 · 不修改内容",mode="TPROXY"),
                                 runtime=ProxyRuntimeSnapshot(running=true,elapsedSeconds=30,rssBytes=92_274_688,
@@ -103,7 +103,7 @@ class HomeScreenRenderTest {
             compose.onNodeWithText("↓ 实时下行", true).assertDoesNotExist()
             compose.runOnIdle { assertEquals(0,restarts);assertEquals(0,toggles);assertEquals(0,reloads) }
             capture("home-${w}-${scale}-${if(dark) "dark" else "light"}-top")
-            compose.onNode(hasScrollToIndexAction()).performScrollToIndex(5)
+            compose.onNode(hasScrollToIndexAction()).performScrollToIndex(4)
             compose.onNodeWithTag("instrument-usage",true).assertExists()
             compose.onNodeWithText("CPU",true).performScrollTo().assertIsDisplayed()
             val cpu = compose.onNodeWithText("CPU", true).fetchSemanticsNode().boundsInRoot

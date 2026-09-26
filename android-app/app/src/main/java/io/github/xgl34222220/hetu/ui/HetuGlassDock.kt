@@ -216,8 +216,8 @@ fun HetuGlassDock(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(start = 6.dp, top = 6.dp, end = 6.dp, bottom = if (floating) 6.dp else bottomInset + 6.dp),
-            indicatorColor = scheme.primary.copy(alpha = if (dark) .28f else .16f),
-            indicatorBorderColor = Color.White.copy(alpha = if (dark) .18f else .46f),
+            indicatorColor = scheme.primary.copy(alpha = if (dark) .22f else .10f),
+            indicatorBorderColor = Color.White.copy(alpha = if (dark) .14f else .28f),
             indicatorShadow = 3.dp,
             selectedColor = scheme.primary,
             unselectedColor = scheme.onSurfaceVariant.copy(alpha = .90f),

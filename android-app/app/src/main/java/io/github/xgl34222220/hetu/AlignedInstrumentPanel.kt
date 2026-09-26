@@ -3,6 +3,7 @@ package io.github.xgl34222220.hetu
 import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
@@ -41,7 +42,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-/** Home dashboard measured from the 156785 reference video. */
+/** Compact dashboard: one shared surface, four independently interactive metrics. */
 internal fun instrumentFraction(value: Long, total: Long): Float? =
     if (total > 0L && value >= 0L) (value.toDouble() / total.toDouble()).toFloat().coerceIn(0f, 1f) else null
 
@@ -70,9 +71,9 @@ private fun ReferenceDashboardCard(
     Column(
         modifier
             .heightIn(min = 102.dp)
-            .crystalMaterial(shape, depth = CrystalDepth.Card)
+            .clip(shape)
             .then(interaction)
-            .padding(horizontal = 14.dp, vertical = 11.dp),
+            .padding(horizontal = 12.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
         content = content,
     )
@@ -110,10 +111,10 @@ private fun ReferenceProgress(
 
 @Composable
 private fun ReferenceInstrumentPair(stacked: Boolean, first: @Composable (Modifier) -> Unit, second: @Composable (Modifier) -> Unit) {
-    if (stacked) Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        first(Modifier.fillMaxWidth()); second(Modifier.fillMaxWidth())
-    } else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        first(Modifier.weight(1f)); second(Modifier.weight(1f))
+    if (stacked) Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+        first(Modifier.fillMaxWidth()); HorizontalDivider(color = LocalHetuTokens.current.textMuted.copy(alpha = .1f)); second(Modifier.fillMaxWidth())
+    } else Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+        first(Modifier.weight(1f)); VerticalDivider(Modifier.padding(vertical = 12.dp), color = LocalHetuTokens.current.textMuted.copy(alpha = .1f)); second(Modifier.weight(1f))
     }
 }
 
@@ -183,8 +184,8 @@ internal fun AlignedInstrumentPanel(
     }
 
     BoxWithConstraints(Modifier.fillMaxWidth().testTag("workspace-bento")) {
-        val stacked = maxWidth < 320.dp || LocalDensity.current.fontScale > 1.15f
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        val stacked = maxWidth / LocalDensity.current.fontScale < 280.dp
+        Column(Modifier.crystalMaterial(RoundedCornerShape(HetuGlassRadius.Card), depth = CrystalDepth.Card)) {
             ReferenceInstrumentPair(stacked, first = { tile ->
             ReferenceDashboardCard(
                 tile.testTag("instrument-network"),
@@ -195,11 +196,12 @@ internal fun AlignedInstrumentPanel(
                 onLongClick = { details = true },
             ) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("WAN", color = t.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Text(if (lan) "LAN" else "WAN", color = t.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.weight(1f))
                     Box(
                         Modifier
                             .clip(RoundedCornerShape(10.dp))
+                            .clickable { details = true }
                             .background(t.controlBackground)
                             .padding(horizontal = 8.dp, vertical = 3.dp),
                     ) {
@@ -210,9 +212,9 @@ internal fun AlignedInstrumentPanel(
                     text = address,
                     modifier = Modifier.fillMaxWidth().testTag("instrument-network-value"),
                     color = t.textPrimary,
-                    monospaced = true,
+                    monospaced = false,
                     style = MaterialTheme.typography.titleSmall.copy(
-                        fontSize = 15.sp,
+                        fontSize = 14.sp,
                         lineHeight = 20.sp,
                         fontWeight = FontWeight.ExtraBold,
                     ),
@@ -237,6 +239,7 @@ internal fun AlignedInstrumentPanel(
                 ReferenceMetricLine("下行", if (runtime.running) refSpeed(down) else "0 B/s")
             }
             })
+            HorizontalDivider(Modifier.padding(horizontal = 12.dp), color = t.textMuted.copy(alpha = .10f))
             ReferenceInstrumentPair(stacked, first = { tile ->
             ReferenceDashboardCard(
                 tile.testTag("instrument-usage"),
