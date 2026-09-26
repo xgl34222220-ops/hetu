@@ -27,10 +27,10 @@ internal object SelectorPresentation {
 
 internal object SelectorIpv6Probe {
     val results = mutableStateMapOf<String, Boolean>()
-    suspend fun measure(context: Context, node: String) {
+    suspend fun measure(context: Context, node: String, repository: ProxyDashboardRepository = ProxyDashboardRepository(context)) {
         if (!context.getSharedPreferences("hetu", 0).getBoolean("proxySelectorDetectIpv6", true)) return
         val connected = withContext(Dispatchers.IO) {
-            try { MihomoControllerClient(context).delayIpv6(node) > 0 }
+            try { repository.ipv6Delay(node) > 0 }
             catch (cancel: CancellationException) { throw cancel }
             catch (_: Exception) { false }
         }

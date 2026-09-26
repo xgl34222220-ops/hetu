@@ -25,11 +25,11 @@ import io.github.xgl34222220.hetu.ui.*
 
 /** Shared non-home geometry. Longer text grows downwards; it never recentres the title. */
 internal object WorkspaceMetrics {
-    val gutter = 12.dp
-    val icon = 28.dp
-    val iconGap = 10.dp
+    val gutter = 16.dp
+    val icon = 36.dp
+    val iconGap = 14.dp
     val textInset = gutter + icon + iconGap
-    val rowMinimum = 56.dp
+    val rowMinimum = 80.dp
     val tap = 48.dp
     val easing = CubicBezierEasing(.16f, 1f, .30f, 1f)
 }
@@ -40,20 +40,20 @@ internal fun WorkspaceSettingRow(title: String, supporting: String, icon: ImageV
     val t = LocalHetuTokens.current
     Row(modifier.fillMaxWidth().heightIn(min = WorkspaceMetrics.rowMinimum)
         .then(if (onClick != null) Modifier.miuixTap(onClick = onClick) else Modifier)
-        .padding(horizontal = WorkspaceMetrics.gutter, vertical = 9.dp),
+        .padding(horizontal = WorkspaceMetrics.gutter, vertical = 15.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(WorkspaceMetrics.iconGap)) {
-        Box(Modifier.size(WorkspaceMetrics.icon).padding(top = 2.dp), contentAlignment = Alignment.TopCenter) {
+        Box(Modifier.size(WorkspaceMetrics.icon), contentAlignment = Alignment.Center) {
             if (icon != null) {
-                HetuListIcon(icon, Modifier.size(24.dp))
+                HetuListIcon(icon, Modifier.size(28.dp))
             }
         }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(ht(title), Modifier.fillMaxWidth().testTag("setting-title:$title"), color = t.textPrimary,
-                fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium)
+                fontSize = 18.sp, lineHeight = 25.sp, fontWeight = FontWeight.SemiBold)
             if (supporting.isNotBlank()) Text(supporting, Modifier.fillMaxWidth().testTag("setting-support:$title"),
-                color = t.textSecondary, fontSize = 11.sp, lineHeight = 16.sp, fontWeight = FontWeight.Normal)
+                color = t.textSecondary, fontSize = 14.sp, lineHeight = 21.sp, fontWeight = FontWeight.Normal)
         }
-        Box(Modifier.widthIn(max = 96.dp).heightIn(min = 32.dp), contentAlignment = Alignment.TopEnd) { trailing() }
+        Box(Modifier.widthIn(max = 96.dp).heightIn(min = 32.dp), contentAlignment = Alignment.CenterEnd) { trailing() }
     }
 }
 

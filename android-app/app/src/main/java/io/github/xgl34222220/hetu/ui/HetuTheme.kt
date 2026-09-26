@@ -54,13 +54,13 @@ data class HetuTokens(
 
 val LocalHetuTokens = staticCompositionLocalOf {
     HetuTokens(
-        pageBackground = Color(0xFFECEBFA),
-        cardBackground = Color(0xFFF9F7FF),
-        elevatedCardBackground = Color(0xFFFDFCFF),
-        heroBackground = Color(0xFFE1DDFF),
-        textPrimary = Color(0xFF191720),
-        textSecondary = Color(0xFF5E5A67),
-        textMuted = Color(0xFF8A8794),
+        pageBackground = Color(0xFFF3F4F7),
+        cardBackground = Color(0xFFFCFCFE),
+        elevatedCardBackground = Color(0xFFFFFFFF),
+        heroBackground = Color(0xFFE6EEFD),
+        textPrimary = Color(0xFF1B2029),
+        textSecondary = Color(0xFF626A78),
+        textMuted = Color(0xFF76808D),
         success = Color(0xFF18794E),
         warning = Color(0xFF946200),
         danger = Color(0xFFC52A34),
@@ -160,13 +160,13 @@ fun HetuTheme(content: @Composable () -> Unit) {
     } else storedPrimary
     val baseLight = lightColorScheme(
         primary = fixedPrimary,
-        primaryContainer = Color(0xFFDEDEEA),
+        primaryContainer = Color(0xFFE3EAF6),
         secondary = fixedPrimary,
-        background = Color(0xFFECEBFA),
-        surface = Color(0xFFF9F7FF),
+        background = Color(0xFFF3F4F7),
+        surface = Color(0xFFFCFCFE),
         error = Color(0xFFC52A34),
-        onBackground = Color(0xFF191720),
-        onSurface = Color(0xFF191720),
+        onBackground = Color(0xFF1B2029),
+        onSurface = Color(0xFF1B2029),
     )
     val baseDark = darkColorScheme(
         primary = fixedPrimary,
@@ -212,19 +212,19 @@ fun HetuTheme(content: @Composable () -> Unit) {
             )
         } else {
             HetuTokens(
-                pageBackground = Color(0xFFECEBFA),
-                cardBackground = Color(0xFFF9F7FF),
-                elevatedCardBackground = Color(0xFFFDFCFF),
-                heroBackground = Color(0xFFE1DDFF),
-                textPrimary = Color(0xFF191720),
-                textSecondary = Color(0xFF5E5A67),
-                textMuted = Color(0xFF8A8794),
+                pageBackground = Color(0xFFF3F4F7),
+                cardBackground = Color(0xFFFCFCFE),
+                elevatedCardBackground = Color(0xFFFFFFFF),
+                heroBackground = Color(0xFFE6EEFD),
+                textPrimary = Color(0xFF1B2029),
+                textSecondary = Color(0xFF626A78),
+                textMuted = Color(0xFF76808D),
                 success = Color(0xFF18794E),
                 warning = Color(0xFF946200),
                 danger = Color(0xFFC52A34),
-                outline = Color(0xFFD8D5EA),
-                controlBackground = Color(0xFFECE9F7),
-                selectionBackground = scheme.primary.copy(alpha = .10f).compositeOver(Color(0xFFF9F7FF)),
+                outline = Color(0xFFE3E7ED),
+                controlBackground = Color(0xFFEBEEF3),
+                selectionBackground = scheme.primary.copy(alpha = .10f).compositeOver(Color(0xFFFCFCFE)),
             )
         }
         CompositionLocalProvider(

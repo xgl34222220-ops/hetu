@@ -105,8 +105,8 @@ final class MihomoStartupConfig {
             yaml=disableDnsIpv6(yaml);
             yaml+="\nipv6: false\n";
         }
-        // Preserve every source rule in its original relative position. Hetu additions live
-        // immediately before the final MATCH so WebRTC/DNS/privacy guards in the source stay authoritative.
+        // Preserve every source rule in its original relative position. Advertising is
+        // checked before general routing, after explicit leading guards/whitelists.
         if(profile.adblockChain)
             yaml=ensureAdblock(yaml);
         if(profile.cnIpDirect)
@@ -377,17 +377,22 @@ final class MihomoStartupConfig {
         return trimOne(out.toString());
     }
 
-    private static boolean isSpecificDirectWhitelist(String raw){
+    private static String ruleScalar(String raw){
         String t=raw==null?"":raw.trim();
-        if(!t.startsWith("-"))return false;
-        t=t.substring(1).trim();
-        String[] parts=t.split(",");
-        if(parts.length<3)return false;
-        String type=parts[0].trim().toUpperCase(Locale.ROOT);
-        boolean direct=false;
-        for(int i=2;i<parts.length;i++)if("DIRECT".equalsIgnoreCase(parts[i].trim())){direct=true;break;}
-        if(!direct)return false;
-        switch(type){
+        if(!t.startsWith("-"))return "";
+        return unquoteYamlScalar(stripYamlInlineComment(t.substring(1).trim()));
+    }
+
+    private static boolean isSpecificDirectWhitelist(String scalar){
+        String[] parts=scalar.split(",");
+        if(parts.length<3||parts.length>4||!"DIRECT".equalsIgnoreCase(parts[2].trim())
+                ||(parts.length==4&&!"no-resolve".equalsIgnoreCase(parts[3].trim())))return false;
+        switch(parts[0].trim().toUpperCase(Locale.ROOT)){
+            case "RULE-SET":
+                // Explicitly named allow providers express user exemptions. Do
+                // not mistake generic China/Bank/Direct routing lists for one.
+                String name=parts[1].trim().toLowerCase(Locale.ROOT);
+                return name.contains("白名单")||Pattern.compile("(?:^|[-_ ])(?:whitelist|allowlist|white[-_]list|allow[-_]list)(?:$|[-_ ])").matcher(name).find();
             case "PROCESS-NAME":
             case "PROCESS-NAME-WILDCARD":
             case "PROCESS-PATH":
@@ -401,26 +406,21 @@ final class MihomoStartupConfig {
         }
     }
 
-    private static String insertAdblockRuleRespectingUserPolicy(String source)throws IOException{
-        // Subtract exceptions at match time: removing an allowlisted child from the
-        // exported list cannot exempt it from a blocked parent suffix. A non-match
-        // continues through the user's rules; it must not force DIRECT or skip guards.
-        String rule="  - AND,((RULE-SET,"+ProxyAdblockRules.PROVIDER_NAME+
-                "),(NOT,((RULE-SET,"+ProxyAdblockRules.ALLOW_PROVIDER_NAME+")))),REJECT\n";
-        String anchored=insertRuleBeforeSourceAdblockAnchor(source,rule);
-        if(anchored!=null)return anchored;
-        return insertRulesBeforeFinalMatch(
-                source,
-                rule,
-                "代理串联去广告需要普通 rules: 列表；当前源配置使用行内 rules 写法");
+    private static boolean isRejectGuard(String scalar){
+        String[] parts=scalar.split(",");
+        if(parts.length<2)return false;
+        int policy=parts.length-1;
+        if("no-resolve".equalsIgnoreCase(parts[policy].trim()))policy--;
+        return policy>0&&("REJECT".equalsIgnoreCase(parts[policy].trim())
+                ||"REJECT-DROP".equalsIgnoreCase(parts[policy].trim()));
     }
 
-    /**
-     * Reuse the source YAML's own ad-block placement when it has one. This preserves
-     * WebRTC/DNS/IPv6 security rules and explicit whitelists above the source adblock,
-     * while keeping Hetu's REJECT ahead of later app/CN/DIRECT routing.
-     */
-    private static String insertRuleBeforeSourceAdblockAnchor(String source,String injected)throws IOException{
+    private static String insertAdblockRuleRespectingUserPolicy(String source)throws IOException{
+        // Removing an allowlisted child from a suffix file does not exempt it
+        // from a blocked parent. Subtract exceptions at match time and continue
+        // through the source routing policy instead of forcing DIRECT.
+        String rule="  - AND,((RULE-SET,"+ProxyAdblockRules.PROVIDER_NAME+
+                "),(NOT,((RULE-SET,"+ProxyAdblockRules.ALLOW_PROVIDER_NAME+")))),REJECT\n";
         String[] lines=normalize(source).split("\n",-1);
         int index=-1;Matcher found=null;Pattern top=Pattern.compile("^rules\\s*:(.*)$");
         for(int i=0;i<lines.length;i++){
@@ -428,42 +428,46 @@ final class MihomoStartupConfig {
             Matcher m=top.matcher(lines[i]);
             if(m.find()){index=i;found=m;break;}
         }
-        if(index<0)return null;
+        if(index<0)return trimOne(source)+"\nrules:\n"+rule;
         String rest=found.group(1).trim();
         if(rest.startsWith("#"))rest="";
         if(!rest.isEmpty()&&!rest.equals("[]"))
             throw new IOException("代理串联去广告需要普通 rules: 列表；当前源配置使用行内 rules 写法");
-
         int end=lines.length;
         for(int i=index+1;i<lines.length;i++){
             String t=lines[i].trim();
             if(t.isEmpty()||t.startsWith("#"))continue;
-            if(indent(lines[i])==0){end=i;break;}
+            // YAML permits an unindented sequence directly under rules:.
+            if(indent(lines[i])==0&&!t.startsWith("-")){end=i;break;}
         }
-        int anchor=-1;
+        int insertion=end;
+        String listIndent="  ";
         for(int i=index+1;i<end;i++){
-            if(isSourceAdblockRule(lines[i])){anchor=i;break;}
+            String scalar=ruleScalar(lines[i]);
+            if(scalar.isEmpty())continue;
+            listIndent=spaces(indent(lines[i]));
+            // Preserve deliberate leading exceptions and security rejects. An
+            // arbitrary RULE-SET/GEOSITE/GEOIP is routing, not an allowlist:
+            // putting our filter behind it silently bypasses advertising checks.
+            if(!isSourceAdblockRule(scalar)
+                    &&(isSpecificDirectWhitelist(scalar)||isRejectGuard(scalar)))continue;
+            insertion=i;break;
         }
-        if(anchor<0)return null;
-
+        String injected=listIndent+rule.substring(2);
         StringBuilder out=new StringBuilder();
         for(int i=0;i<lines.length;i++){
-            if(i==anchor)out.append(injected);
-            out.append(lines[i]).append('\n');
+            if(i==insertion)out.append(injected);
+            out.append(i==index?"rules:":lines[i]).append('\n');
         }
+        if(insertion==lines.length)out.append(injected);
         return trimOne(out.toString());
     }
 
-    private static boolean isSourceAdblockRule(String raw){
-        String t=raw==null?"":raw.trim();
-        if(!t.startsWith("-"))return false;
-        String upper=t.toUpperCase(Locale.ROOT);
-        if(!upper.startsWith("- RULE-SET,"))return false;
-        return t.contains("广告")
-                || upper.contains("ADBLOCK")
-                || upper.contains("ADGUARD")
-                || upper.contains("ANTI-AD")
-                || upper.contains("ANTIAD");
+    private static boolean isSourceAdblockRule(String scalar){
+        String upper=scalar.toUpperCase(Locale.ROOT);
+        if(!upper.startsWith("RULE-SET,"))return false;
+        return scalar.contains("广告")||upper.contains("ADBLOCK")||upper.contains("ADGUARD")
+                ||upper.contains("ANTI-AD")||upper.contains("ANTIAD");
     }
 
     /**

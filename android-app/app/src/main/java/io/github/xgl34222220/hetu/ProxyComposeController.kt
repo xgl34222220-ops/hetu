@@ -28,6 +28,7 @@ internal data class ProxyNodeUi(
     val udp: Boolean = false,
     val lastDelay: Long? = null,
     val provider: String = "",
+    val lastDelayAt: Long = 0L,
 )
 
 internal data class ProxyGroupUi(
@@ -217,7 +218,7 @@ internal class ProxyComposeController(context: Context) {
         if (running) {
             try { trafficMode = api.configs().optString("mode", "") } catch (_: Exception) { }
             try {
-                groups = parseGroups(api.proxies(), iconMap)
+                groups = parseGroups(mergeProxySnapshots(api.proxies(), api.proxyProviders()), iconMap)
                 panelReady = true
             } catch (_: Exception) { }
             try {
@@ -338,7 +339,7 @@ internal class ProxyComposeController(context: Context) {
         result
     }
     suspend fun select(group: String, node: String) = withContext(Dispatchers.IO) { api.select(group, node) }
-    suspend fun delay(node: String): Long = withContext(Dispatchers.IO) { api.delay(node) }
+    suspend fun delay(node: String): Long = ProxyDashboardRepository(app).delay(node)
     suspend fun closeAll() = withContext(Dispatchers.IO) { api.closeAll() }
     suspend fun closeConnection(id: String) = withContext(Dispatchers.IO) { api.closeConnection(id) }
     suspend fun diagnostics(): String = withContext(Dispatchers.IO) { root.diagnostics() }
@@ -356,81 +357,9 @@ internal class ProxyComposeController(context: Context) {
         api.updateRuleProvider(name)
     }
 
-    /** Prefer Mihomo's native group URLTest, then fill only uncovered leaf nodes individually. */
-    suspend fun globalDelay(): Map<String, Long> = withContext(Dispatchers.IO) {
-        val raw = api.proxies()
-        val leaves = LinkedHashSet<String>()
-        val iterator = raw.keys()
-        while (iterator.hasNext()) {
-            val name = iterator.next()
-            val item = raw.optJSONObject(name) ?: continue
-            if (item.optJSONArray("all") != null) continue
-            val type = item.optString("type", "").lowercase(Locale.ROOT)
-            if (type in setOf("direct", "reject", "rejectdrop", "pass", "compatible")) continue
-            leaves += name
-        }
+    /** Share provider routing and failure semantics with the native strategy panel. */
+    suspend fun globalDelay(): Map<String, Long> = ProxyDashboardRepository(app).globalDelay()
 
-        val result = LinkedHashMap<String, Long>()
-        val pending = LinkedHashSet(leaves)
-        val testedGroups = HashSet<String>()
-
-        while (pending.size > 1) {
-            var bestGroup: String? = null
-            var bestCoverage = 0
-            val groups = raw.keys()
-            while (groups.hasNext()) {
-                val groupName = groups.next()
-                if (groupName in testedGroups) continue
-                val all = raw.optJSONObject(groupName)?.optJSONArray("all") ?: continue
-                var coverage = 0
-                for (i in 0 until all.length()) if (all.optString(i) in pending) coverage++
-                if (coverage > bestCoverage) {
-                    bestCoverage = coverage
-                    bestGroup = groupName
-                }
-            }
-            if (bestGroup == null || bestCoverage < 2) break
-            testedGroups += bestGroup
-            val before = pending.size
-            try {
-                val measured = api.groupDelay(bestGroup)
-                val names = measured.keys()
-                while (names.hasNext()) {
-                    val name = names.next()
-                    val value = measured.optLong(name, -1L)
-                    if (value > 0L && name in leaves) {
-                        result[name] = value
-                        pending.remove(name)
-                    }
-                }
-            } catch (cancel: CancellationException) {
-                throw cancel
-            } catch (_: Exception) { }
-            if (pending.size == before && testedGroups.size > 6) break
-        }
-
-        for (chunk in pending.toList().chunked(3)) {
-            val part = coroutineScope {
-                chunk.map { node ->
-                    async {
-                        val value = try {
-                            api.delay(node)
-                        } catch (cancel: CancellationException) {
-                            throw cancel
-                        } catch (_: Exception) {
-                            -1L
-                        }
-                        node to value
-                    }
-                }.awaitAll()
-            }
-            for ((name, value) in part) result[name] = value
-        }
-        for (name in leaves) if (name !in result) result[name] = -1L
-        result
-    }
-
-    /** Cache config-declared group icons; ordinary refresh only downloads files that are absent. */
     suspend fun ensureIcons(): Int = withContext(Dispatchers.IO) {
         val profile = ProxyRuntimeProfile.load(prefs)
         val entry = configs.selected(profile.core) ?: return@withContext 0
@@ -554,7 +483,7 @@ internal class ProxyComposeController(context: Context) {
         configs.write(entry, text)
     }
 
-    private fun parseGroups(root: JSONObject, iconMap: Map<String, String>): List<ProxyGroupUi> {
+    internal fun parseGroups(root: JSONObject, iconMap: Map<String, String>): List<ProxyGroupUi> {
         val result = ArrayList<ProxyGroupUi>()
         val iterator = root.keys()
         while (iterator.hasNext()) {
@@ -567,19 +496,16 @@ internal class ProxyComposeController(context: Context) {
                 val node = all.optString(i)
                 if (node.isBlank()) continue
                 val nodeInfo = root.optJSONObject(node)
-                val history = nodeInfo?.optJSONArray("history")
-                var lastDelay: Long? = null
-                if (history != null) {
-                    for (historyIndex in history.length() - 1 downTo 0) {
-                        val value = history.optJSONObject(historyIndex)?.optLong("delay", -1L) ?: -1L
-                        if (value > 0L) { lastDelay = value; break }
-                    }
-                }
+                val preferredUrl = if (prefs.getBoolean("proxyCustomDelayUrlEnabled", false))
+                    prefs.getString("proxyCustomDelayUrl", "").orEmpty() else ""
+                val sample = resolvedCoreLatency(root, node, preferredUrl)
                 nodes += ProxyNodeUi(
                     name = node,
                     type = nodeInfo?.optString("type", "") ?: "",
                     udp = nodeInfo?.optBoolean("udp", false) ?: false,
-                    lastDelay = lastDelay,
+                    lastDelay = sample?.delay,
+                    lastDelayAt = sample?.timestamp ?: 0L,
+                    provider = nodeInfo?.optString("provider-name").orEmpty(),
                 )
             }
             val iconUrl = iconMap[name].orEmpty()

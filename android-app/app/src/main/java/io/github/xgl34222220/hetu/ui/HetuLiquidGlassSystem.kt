@@ -55,8 +55,8 @@ object HetuGlassRadius {
 }
 
 object HetuBottomBarMetrics {
-    val FloatingHorizontal = 20.dp
-    val FloatingBottom = 12.dp
+    val FloatingHorizontal = 24.dp
+    val FloatingBottom = 8.dp
     val ContentGap = 20.dp
 }
 

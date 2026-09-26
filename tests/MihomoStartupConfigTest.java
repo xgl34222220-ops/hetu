@@ -37,14 +37,14 @@ public final class MihomoStartupConfigTest {
   String privacyAdSource="mode: rule\nproxies: []\nproxy-groups: []\nrules:\n"
       +"  - DOMAIN-SUFFIX,stun.example,REJECT\n"
       +"  - IP-CIDR6,::/0,REJECT,no-resolve\n"
-      +"  - RULE-SET,Bank_CN,DIRECT\n"
+      +"  - DOMAIN,bank.example.test,DIRECT\n"
       +"  - RULE-SET,去广告,广告拦截\n"
       +"  - DOMAIN-SUFFIX,wechat.com,DIRECT\n"
       +"  - MATCH,DIRECT\n";
   MihomoStartupConfig.Result privacyAd=MihomoStartupConfig.generate(privacyAdSource,adProfile);
   int pStun=privacyAd.yaml.indexOf("DOMAIN-SUFFIX,stun.example,REJECT");
   int pV6=privacyAd.yaml.indexOf("IP-CIDR6,::/0,REJECT");
-  int pBank=privacyAd.yaml.indexOf("RULE-SET,Bank_CN,DIRECT");
+  int pBank=privacyAd.yaml.indexOf("DOMAIN,bank.example.test,DIRECT");
   int pHetuAd=privacyAd.yaml.indexOf("AND,((RULE-SET,hetu-adblock)");
   int pSourceAd=privacyAd.yaml.indexOf("RULE-SET,去广告,广告拦截");
   int pWechat=privacyAd.yaml.indexOf("DOMAIN-SUFFIX,wechat.com,DIRECT");

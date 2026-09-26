@@ -38,6 +38,8 @@ import io.github.xgl34222220.hetu.ui.RuleSourceItem
 import io.github.xgl34222220.hetu.ui.RulesSnapshot
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -105,6 +107,7 @@ private data class ChainSnapshot(
     val startupInjected: Boolean = false,
     val controllerLoaded: Boolean = false,
     val effective: Boolean = false,
+    val trafficMode: String = "",
     val lastError: String = "",
     val vpnFallbackRunning: Boolean = false,
     val hostsFallbackRunning: Boolean = false,
@@ -217,10 +220,11 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
         val startupInjected = AdblockRuleInspection.isInjected(startup)
         val liveRules = if (state?.running == true) runCatching { proxyController.rules() }.getOrDefault(emptyList()) else emptyList()
         val adRule = liveRules.firstOrNull {
-            it.payload.contains(ProxyAdblockRules.PROVIDER_NAME, true) ||
-                it.type.contains(ProxyAdblockRules.PROVIDER_NAME, true)
+            AdblockRuleInspection.isBlockingRule(it.type, it.payload, it.proxy, it.disabled)
         }
-        val controllerLoaded = adRule != null
+        val providers = if (adRule != null) runCatching { proxyController.ruleProviders() }.getOrDefault(emptyList()) else emptyList()
+        val controllerLoaded = adRule != null && providers.any { it.name == ProxyAdblockRules.PROVIDER_NAME && it.ruleCount >= 0 } &&
+            providers.any { it.name == ProxyAdblockRules.ALLOW_PROVIDER_NAME && it.ruleCount >= 0 }
         val apiHits = adRule?.hitCount ?: 0L
         val logStats = if (state?.running == true) runCatching { runtimeInspector.adblockRuntimeStats() }.getOrDefault(AdblockRuntimeStats()) else AdblockRuntimeStats()
         val persistedHits = prefs.getLong("proxyAdblockSessionHits", 0L)
@@ -238,7 +242,10 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
         }
         val lastError = prefs.getString("proxyAdblockLastError", "").orEmpty()
         val running = state?.running == true
-        val effective = chainEnabled && running && startupInjected && controllerLoaded
+        // Desired switch state and the applied chain can differ after a failed update.
+        // Report only the verified live state; global/direct modes bypass routing rules.
+        val effective = running && controllerLoaded && AdblockRuleInspection.isRuleMode(state?.trafficMode)
+
         prefs.edit()
             .putBoolean("proxyRootRuntimeRunning", running)
             .putBoolean("proxyAdblockUiStartupInjected", startupInjected)
@@ -255,6 +262,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
             startupInjected = startupInjected,
             controllerLoaded = controllerLoaded,
             effective = effective,
+            trafficMode = state?.trafficMode.orEmpty(),
             lastError = lastError,
             vpnFallbackRunning = DnsVpnService.running,
             hostsFallbackRunning = false,
@@ -357,7 +365,8 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                                 when {
                                     snapshot.effective && snapshot.lastError.isNotBlank() -> "过滤链已加载 · 最近规则更新未确认"
                                     snapshot.effective && snapshot.rules.count == 0 -> "过滤链已加载 · 当前没有启用的拦截规则"
-                                    snapshot.effective -> "已生效 · Mihomo 当前已加载河图广告规则链"
+                                    snapshot.effective -> "规则已加载 · 等待实际域名命中"
+                                    snapshot.controllerLoaded && !AdblockRuleInspection.isRuleMode(snapshot.trafficMode) -> "规则已加载 · 当前模式跳过规则过滤"
                                     chainEnabled && snapshot.running -> "已开启 · 正在验证当前运行链"
                                     chainEnabled -> "已开启 · 启动 Root 代理后自动验证"
                                     else -> "代理仅负责转发，不执行河图广告规则"
@@ -368,15 +377,44 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                         }
                         LiquidSwitch(
                             checked = chainEnabled,
-                            onCheckedChange = {
-                                chainEnabled = it
-                                prefs.edit().putBoolean("proxyAdblockChain", it).apply()
-                                notice = if (snapshot.running) "设置已保存，重启 Root 代理后生效" else "设置已保存"
-                                revision++
+                            enabled = !busy,
+                            onCheckedChange = { enabled ->
+                                chainEnabled = enabled
+                                scope.launch {
+                                    busy = true
+                                    try {
+                                        notice = withContext(Dispatchers.IO) { ProxyAdblockRuntimeBridge.setEnabled(context, enabled) }
+                                    } catch (cancel: CancellationException) {
+                                        throw cancel
+                                    } catch (error: Exception) {
+                                        notice = "设置已保存，当前过滤状态未确认：${error.message ?: "热更新失败"}"
+                                    } finally {
+                                        busy = false
+                                        revision++
+                                    }
+                                }
                             },
                         )
                     }
                     HorizontalDivider(color = if (dark) t.outline else Color(0xFFF1F5F9))
+                    if (snapshot.controllerLoaded && snapshot.trafficMode.lowercase() in listOf("global", "direct")) {
+                        TextButton(enabled = !busy, onClick = {
+                            scope.launch {
+                                busy = true
+                                try {
+                                    withContext(Dispatchers.IO) { MihomoControllerClient(context).setTrafficMode("rule") }
+                                    notice = "已切换规则模式"
+                                } catch (cancel: CancellationException) {
+                                    throw cancel
+                                } catch (error: Exception) {
+                                    notice = error.message ?: "切换失败"
+                                } finally {
+                                    busy = false
+                                    revision++
+                                }
+                            }
+                        }) { Text("切换规则模式，启用广告过滤") }
+                    }
                     RuleMetricSummary(
                         rules = snapshot.rules.count,
                         sources = snapshot.rules.sources.count { it.enabled },
@@ -393,8 +431,9 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                 snapshot.running && snapshot.lastError.isNotBlank() -> if (snapshot.effective) "过滤链正在运行 · 最近规则更新未确认" else "本次过滤未完整加载"
                 snapshot.effective && snapshot.rules.count == 0 -> "过滤链已加载 · 当前规则为空"
                 snapshot.effective && displayedHitCount > 0L -> "已生效 · 已记录 ${displayedHitCount} 次域名规则命中"
-                snapshot.effective -> "已生效 · 当前运行日志暂未记录到域名规则命中"
-                !chainEnabled -> "广告串联已关闭"
+                snapshot.effective -> "过滤链已加载 · 当前尚无拦截记录"
+                snapshot.controllerLoaded && !AdblockRuleInspection.isRuleMode(snapshot.trafficMode) -> "规则已加载 · 需要切换到规则模式"
+                !chainEnabled && !snapshot.controllerLoaded -> "广告串联已关闭"
                 !snapshot.running -> "等待代理启动"
                 else -> "运行链未完整加载"
             }

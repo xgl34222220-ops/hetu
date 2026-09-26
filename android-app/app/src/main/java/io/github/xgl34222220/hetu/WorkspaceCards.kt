@@ -44,11 +44,11 @@ internal fun delayBand(value: Long?): String = when {
 internal fun LatencyChip(value: Long?, testing: Boolean, onClick: (() -> Unit)? = null, modifier: Modifier = Modifier, compact: Boolean = false, prominent: Boolean = false) {
     val t = LocalHetuTokens.current
     val band = delayBand(value)
-    val foreground = when (band) { "failed" -> t.danger; "unknown" -> t.textSecondary; else -> MaterialTheme.colorScheme.primary }
-    val background = if (band == "failed") t.dangerContainer else t.selectionBackground
+    val foreground = when (band) { "failed" -> t.danger; "unknown" -> t.textSecondary; "good" -> t.success; "fair" -> t.success; else -> t.warning }
+    val background = when (band) { "failed" -> t.dangerContainer; "good", "fair" -> t.successContainer; "slow" -> t.warningContainer; else -> t.controlBackground }
     var showBusy by remember { mutableStateOf(false) }
     LaunchedEffect(testing) { if (testing) { delay(150); showBusy = true } else showBusy = false }
-    val target = if (showBusy) "测速中" else when { value == null -> "— ms"; value <= 0L -> "超时"; else -> "$value ms" }
+    val target = if (showBusy) "测速中" else when { value == null -> "— ms"; value == -1L -> "超时"; value <= 0L -> "失败"; else -> "$value ms" }
     Box(modifier.then(if (onClick != null) Modifier.sizeIn(minWidth = if (compact) 48.dp else 72.dp, minHeight = if (compact) 32.dp else 48.dp)
         .clickable(enabled = !testing, role = Role.Button, onClickLabel = "测速", onClick = onClick) else Modifier),
         contentAlignment = Alignment.Center) {
@@ -61,7 +61,7 @@ internal fun LatencyChip(value: Long?, testing: Boolean, onClick: (() -> Unit)? 
                 HetuNumber(target, monospaced = true,
                     modifier = Modifier.testTag("latency-text:$target"),
                     color = if (showBusy || value == null) t.textSecondary else foreground,
-                    style = MaterialTheme.typography.labelMedium.copy(fontSize = if (prominent) 16.sp else 11.sp, lineHeight = if (prominent) 23.sp else 16.sp, fontWeight = if (prominent) FontWeight.SemiBold else FontWeight.Medium))
+                    style = MaterialTheme.typography.labelMedium.copy(fontSize = if (prominent) 16.sp else 13.sp, lineHeight = if (prominent) 23.sp else 19.sp, fontWeight = if (prominent) FontWeight.SemiBold else FontWeight.Medium))
             }
         }
     }

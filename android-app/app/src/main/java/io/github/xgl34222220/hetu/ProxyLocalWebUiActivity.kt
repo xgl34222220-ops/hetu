@@ -2,7 +2,6 @@ package io.github.xgl34222220.hetu
 
 import android.annotation.SuppressLint
 import android.os.Bundle
-import android.view.ViewGroup
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -45,34 +44,28 @@ class ProxyLocalWebUiActivity : ComponentActivity() {
             setBackgroundColor(android.graphics.Color.TRANSPARENT)
         }
         webView = view
-        setContentView(
-            view,
-            ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT),
-        )
+        setSafeWebViewContent(view)
+        if (view.restoreSavedPage(savedInstanceState)) return
 
-        val html = WEB_UI
-            .replace("__PORT__", port.toString())
-            .replace("__SECRET_JSON__", JSONObject.quote(secret))
-        view.loadDataWithBaseURL(
-            "http://127.0.0.1:$port/",
-            html,
-            "text/html",
-            "UTF-8",
-            null,
-        )
         val mode = prefs.getString("proxyWebPanelLocalMode", "auto").orEmpty()
         if (mode != "builtin" && WebPanelAssets.installed(this)) {
             val endpoint = "http://127.0.0.1:$port${WebPanelAssets.PREFIX}#/setup?hostname=127.0.0.1&port=$port&secret=" +
                 android.net.Uri.encode(secret) + "&disableUpgradeCore=1&disableTunMode=1"
             view.loadUrl(endpoint)
-        } else if (mode == "zashboard") {
-            android.widget.Toast.makeText(this, "尚未安装 Zashboard，已打开内置面板；请在 Web 面板设置中安装", android.widget.Toast.LENGTH_LONG).show()
+        } else {
+            val html = WEB_UI
+                .replace("__PORT__", port.toString())
+                .replace("__SECRET_JSON__", JSONObject.quote(secret))
+            view.loadDataWithBaseURL("http://127.0.0.1:$port/", html, "text/html", "UTF-8", null)
+            if (mode == "zashboard") {
+                android.widget.Toast.makeText(this, "尚未安装 Zashboard，已打开内置面板；请在 Web 面板设置中安装", android.widget.Toast.LENGTH_LONG).show()
+            }
         }
     }
 
-    override fun onBackPressed() {
-        val view = webView
-        if (view != null && view.canGoBack()) view.goBack() else super.onBackPressed()
+    override fun onSaveInstanceState(outState: Bundle) {
+        webView?.savePage(outState)
+        super.onSaveInstanceState(outState)
     }
 
     override fun onDestroy() {

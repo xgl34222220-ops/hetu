@@ -71,15 +71,15 @@ class RecordingMiuixInteractionTest {
             }
             val first = compose.onNodeWithTag("strategy:节点选择",true).fetchSemanticsNode().boundsInRoot
             val second = compose.onNodeWithTag("strategy:自动选择",true).fetchSemanticsNode().boundsInRoot
-            assertTrue(first.height in 74f..96f)
+            assertTrue("Readable strategy card must retain compact geometry: $first", first.height in 108f..136f)
             assertEquals(first.top,second.top,1f)
             compose.onNodeWithText("模式").assertDoesNotExist()
-            capture("test133-reference-strategy")
+            capture("test134-reference-strategy")
             compose.onNodeWithTag("strategy:节点选择",true).performClick()
             compose.onAllNodes(isDialog()).assertCountEquals(0)
             compose.onNodeWithTag("sunken-well:节点选择",true).assertExists()
             compose.onNodeWithTag("node:香港 01",true).assertIsSelected()
-            capture("test133-reference-expanded")
+            capture("test134-reference-expanded")
             server.enqueue(MockResponse().setResponseCode(500).setBody("switch failed"))
             compose.onNodeWithTag("node:日本 01",true).performClick()
             compose.waitUntil(5000) { compose.onAllNodesWithText("切换失败",substring=true).fetchSemanticsNodes().isNotEmpty() }

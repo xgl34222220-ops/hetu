@@ -23,7 +23,7 @@ class StrategyPanelBehaviorTest {
         val active = mutableSetOf<String>(); val measured = mutableMapOf<String, Long>()
         measureStrategyNodes((1..30).map { "$it" } + "1", probe = { name ->
             concurrent++; peak = maxOf(peak, concurrent)
-            try { delay(5); if (name == "2") error("timeout"); name.toLong() }
+            try { delay(5); if (name == "2") throw MihomoControllerClient.DelayFailure(true); name.toLong() }
             finally { concurrent-- }
         }, onTesting = { name, busy -> if (busy) active.add(name) else active.remove(name); Unit },
             onMeasured = { name, value -> measured[name] = value })

@@ -413,15 +413,15 @@ class ProxyWebPanelViewerActivity : ComponentActivity() {
             settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
             webChromeClient = WebChromeClient()
             webViewClient = WebViewClient()
-            loadUrl(url)
         }
         webView = view
-        setContentView(view)
+        setSafeWebViewContent(view)
+        if (!view.restoreSavedPage(savedInstanceState)) view.loadUrl(url)
     }
 
-    override fun onBackPressed() {
-        val view = webView
-        if (view != null && view.canGoBack()) view.goBack() else super.onBackPressed()
+    override fun onSaveInstanceState(outState: Bundle) {
+        webView?.savePage(outState)
+        super.onSaveInstanceState(outState)
     }
 
     override fun onDestroy() {

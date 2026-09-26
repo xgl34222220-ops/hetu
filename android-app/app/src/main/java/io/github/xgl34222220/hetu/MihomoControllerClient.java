@@ -12,12 +12,28 @@ import java.util.concurrent.Semaphore;
 /** Authenticated localhost-only Mihomo Clash API client for strategy, delay, providers, rules and connections UI. */
 final class MihomoControllerClient {
     private static final int LIMIT=6*1024*1024;
+    static final String IPV6_DELAY_URL="https://[2606:4700:4700::1111]/cdn-cgi/trace";
     private static final Semaphore DELAY_SLOTS=new Semaphore(12,true);
     private static final String[] DEFAULT_DELAY_URLS={
-        "https://connectivitycheck.platform.hicloud.com/generate_204",
         "https://www.gstatic.com/generate_204",
         "https://cp.cloudflare.com/generate_204"
     };
+
+    /** Only a core-confirmed failed probe is a node failure, never an API transport error. */
+    static final class DelayFailure extends IOException {
+        final boolean timedOut;
+        DelayFailure(boolean timedOut) {
+            super(timedOut ? "节点测速超时" : "节点测速失败");
+            this.timedOut=timedOut;
+        }
+    }
+    static final class ControllerHttpException extends IOException {
+        final int statusCode;
+        ControllerHttpException(int statusCode, String detail) {
+            super("Mihomo 控制接口返回 "+statusCode+(detail.isEmpty()?"":"："+compact(detail)));
+            this.statusCode=statusCode;
+        }
+    }
     private final Context context;
     MihomoControllerClient(Context c){context=c.getApplicationContext();}
 
@@ -88,10 +104,15 @@ final class MihomoControllerClient {
     }
     // An IPv6-only literal and no fallback: an IPv4 result must never pass this probe.
     long delayIpv6(String node)throws Exception{
+        return delayIpv6(node, "");
+    }
+    long delayIpv6(String node,String provider)throws Exception{
         DELAY_SLOTS.acquire();
         try{
-            String url=URLEncoder.encode("https://[2606:4700:4700::1111]/cdn-cgi/trace","UTF-8");
-            return request("GET","/proxies/"+Uri.encode(node)+"/delay?timeout=4000&url="+url+"&expected=200",null,5500).optLong("delay",-1L);
+            String url=URLEncoder.encode(IPV6_DELAY_URL,"UTF-8");
+            String path=provider==null||provider.isEmpty()?"/proxies/"+Uri.encode(node)+"/delay":
+                "/providers/proxies/"+Uri.encode(provider)+"/"+Uri.encode(node)+"/healthcheck";
+            return request("GET",path+"?timeout=4000&url="+url+"&expected=200",null,5500).optLong("delay",-1L);
         }finally{DELAY_SLOTS.release();}
     }
 
@@ -129,30 +150,37 @@ final class MihomoControllerClient {
     }
 
     long delay(String node,String preferredUrl,String expected)throws Exception{
+        return delayPath("/proxies/"+Uri.encode(node)+"/delay",preferredUrl,expected);
+    }
+
+    long providerDelay(String provider,String node,String preferredUrl,String expected)throws Exception{
+        return delayPath("/providers/proxies/"+Uri.encode(provider)+"/"+Uri.encode(node)+"/healthcheck",preferredUrl,expected);
+    }
+
+    private long delayPath(String path,String preferredUrl,String expected)throws Exception{
         DELAY_SLOTS.acquire();
         try{
-            Exception last=null;
+            DelayFailure last=null;
             ArrayList<String> urls=new ArrayList<>();
-            // An explicit user custom URL is tested first, followed by provider/native fallbacks.
             addDelayUrls(urls,preferredUrl);
             String expectedRange=(expected==null||expected.trim().isEmpty())?"200-399":expected.trim();
             for(String rawUrl:urls){
                 try{
                     String test=URLEncoder.encode(rawUrl,"UTF-8");
                     String status=URLEncoder.encode(expectedRange,"UTF-8");
-                    JSONObject v=request(
-                        "GET",
-                        "/proxies/"+Uri.encode(node)+"/delay?timeout=10000&url="+test+"&expected="+status,
-                        null,
-                        13000
-                    );
+                    JSONObject v=request("GET",path+"?timeout=10000&url="+test+"&expected="+status,null,13000);
                     long d=v.optLong("delay",-1);
                     if(d>0)return d;
-                    last=new IOException("延迟测试未返回有效结果");
-                }catch(Exception e){last=e;}
+                    if(d==0)last=new DelayFailure(false);
+                    else throw new IOException("测速接口未返回延迟数据");
+                }catch(ControllerHttpException error){
+                    if(error.statusCode==504)last=new DelayFailure(true);
+                    else if(error.statusCode==503)last=new DelayFailure(false);
+                    else throw error;
+                }
             }
             if(last!=null)throw last;
-            throw new IOException("延迟测试超时");
+            throw new IOException("没有可用的测速地址");
         }finally{
             DELAY_SLOTS.release();
         }
@@ -230,7 +258,7 @@ final class MihomoControllerClient {
                 if(len<0||len>LIMIT)throw new IOException("控制接口响应过大");bytes=readFixed(in,len);
             }else bytes=readToEnd(in);
             String text=new String(bytes,StandardCharsets.UTF_8);
-            if(code<200||code>=300)throw new IOException("Mihomo 控制接口返回 "+code+(text.trim().isEmpty()?"":"："+compact(text)));
+            if(code<200||code>=300)throw new ControllerHttpException(code,text.trim());
             return text.trim().isEmpty()?new JSONObject():new JSONObject(text);
         }finally{try{socket.close();}catch(Exception ignored){}}
     }

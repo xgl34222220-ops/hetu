@@ -143,7 +143,7 @@ fun HetuListIcon(icon: ImageVector, modifier: Modifier = Modifier) {
     }
     Box(modifier.size(28.dp),
         contentAlignment = Alignment.Center) {
-        Icon(lineIcon, null, Modifier.size(21.dp), tint = LocalHetuTokens.current.textPrimary)
+        Icon(lineIcon, null, Modifier.size(27.dp), tint = LocalHetuTokens.current.textPrimary)
     }
 }
 

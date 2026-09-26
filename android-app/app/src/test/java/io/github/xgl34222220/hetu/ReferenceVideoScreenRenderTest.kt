@@ -95,8 +95,10 @@ class ReferenceVideoScreenRenderTest {
         compose.onNodeWithText("基础代理配置",true).assertExists()
         compose.onNodeWithText("其他代理配置",true).assertExists()
         compose.onNodeWithText("语言",true).assertExists()
-        compose.onNodeWithText("主题设置",true).assertExists()
-        compose.onNodeWithText("开机自启",true).assertExists()
         capture("reference156785-settings-top")
+        compose.onNodeWithTag("settings-list").performScrollToNode(hasText("主题设置"))
+        compose.onNodeWithText("主题设置",true).assertExists()
+        compose.onNodeWithTag("settings-list").performScrollToNode(hasText("开机自启"))
+        compose.onNodeWithText("开机自启",true).assertExists()
     }
 }

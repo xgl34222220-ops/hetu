@@ -100,28 +100,38 @@ internal fun LiquidStrategyCard(
     val prefs = LocalContext.current.getSharedPreferences("hetu", 0)
     val overflow = prefs.getString("proxySelectorNameOverflow", "ellipsis")
     val compact = prefs.getString("proxySelectorDensity", "standard") == "compact"
-    Column(modifier.crystalMaterial(RoundedCornerShape(12.dp), selection = expanded)
+    val motion = LocalHetuMotionEnabled.current
+    val background by androidx.compose.animation.animateColorAsState(
+        if (expanded) t.selectionBackground else t.cardBackground,
+        tween(if (motion) 180 else 0), label = "strategy-surface")
+    Column(modifier.crystalMaterial(RoundedCornerShape(18.dp), tint = background)
         .testTag("strategy:${group.name}")
         .miuixTap(onClickLabel = "查看${group.name}节点", onClick = onExpand)
-        .padding(horizontal = 10.dp, vertical = if (compact) 5.dp else 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+        .padding(horizontal = 12.dp, vertical = if (compact) 8.dp else 10.dp),
+        verticalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 6.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top,
             horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                Text(group.name, Modifier.testTag("strategy-title:${group.name}"),
-                    color = t.textPrimary, fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold,
-                    maxLines = if (overflow == "wrap") 2 else 1, overflow = TextOverflow.Ellipsis)
-                Text("${group.type} · ${group.nodes.count { (it.lastDelay ?: 0) > 0 }}/${group.nodes.size}",
-                    Modifier.testTag("strategy-type:${group.name}"), color = t.textSecondary,
-                    fontSize = 10.sp, lineHeight = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
+            Text(group.name, Modifier.weight(1f).testTag("strategy-title:${group.name}"),
+                color = t.textPrimary, fontSize = 17.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold,
+                maxLines = if (overflow == "wrap") 2 else 1, overflow = TextOverflow.Ellipsis)
             LiquidBrandTray(group)
         }
+        // Keep the selected endpoint on its own line. A latency value must never
+        // squeeze it to two letters, and card summaries must remain still while scrolling.
+        Text(selected.ifBlank { "未选择节点" },
+            Modifier.fillMaxWidth().testTag("strategy-selection:${group.name}"),
+            color = t.textPrimary, fontSize = 14.sp, lineHeight = 21.sp,
+            maxLines = if (overflow == "wrap" && !compact) 2 else 1, overflow = TextOverflow.Ellipsis)
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(selected.ifBlank { "未选择" }, Modifier.weight(1f).testTag("strategy-selection:${group.name}")
-                .then(if (overflow == "scroll") Modifier.basicMarquee() else Modifier),
-                color = t.textPrimary, fontSize = 11.sp, lineHeight = 17.sp,
-                maxLines = if (overflow == "wrap") 2 else 1, overflow = TextOverflow.Ellipsis)
+            horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(group.type.uppercase(), Modifier.testTag("strategy-type:${group.name}"),
+                    color = t.textSecondary, fontSize = 11.sp, lineHeight = 15.sp,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("${group.nodes.count { (it.lastDelay ?: 0) > 0 }}/${group.nodes.size} 可用",
+                    color = t.textSecondary, fontSize = 11.sp, lineHeight = 15.sp,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
             LatencyChip(value, testing, onClick = onDelay, compact = true,
                 modifier = Modifier.testTag("strategy-delay:${group.name}"))
         }
@@ -138,13 +148,13 @@ internal fun LiquidNodeCard(
     val overflow = prefs.getString("proxySelectorNameOverflow", "ellipsis")
     val compact = prefs.getString("proxySelectorDensity", "standard") == "compact"
     Column(modifier.testTag("node:${node.name}")
-        .crystalMaterial(RoundedCornerShape(8.dp), depth = CrystalDepth.InsetItem, selection = active)
+        .crystalMaterial(RoundedCornerShape(12.dp), depth = CrystalDepth.InsetItem, selection = active)
         .miuixTap(role = Role.RadioButton, onClick = onSelect)
         .semantics { selected = active; contentDescription = node.name }
-        .padding(horizontal = 9.dp, vertical = if (compact) 4.dp else 7.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        .padding(horizontal = 12.dp, vertical = if (compact) 8.dp else 11.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(node.name, Modifier.fillMaxWidth().testTag("node-label:${node.name}")
             .then(if (overflow == "scroll") Modifier.basicMarquee() else Modifier),
-            color = t.textPrimary, fontSize = 12.sp, lineHeight = 18.sp, fontWeight = FontWeight.Medium,
+            color = t.textPrimary, fontSize = 14.sp, lineHeight = 21.sp, fontWeight = FontWeight.Medium,
             maxLines = if (overflow == "wrap") Int.MAX_VALUE else 1, overflow = TextOverflow.Ellipsis)
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(buildString {
@@ -154,7 +164,7 @@ internal fun LiquidNodeCard(
                     append(if (it) " · IPv6 ✓" else " · IPv6 未通")
                 }
             }, Modifier.weight(1f).testTag("node-protocol:${node.name}"), color = t.textSecondary,
-                fontSize = 10.sp, lineHeight = 15.sp)
+                fontSize = 12.sp, lineHeight = 18.sp)
             LatencyChip(value, testing, onClick = onDelay, compact = true,
                 modifier = Modifier.testTag("node-delay:${node.name}"))
         }

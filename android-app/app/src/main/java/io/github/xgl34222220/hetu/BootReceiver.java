@@ -13,15 +13,17 @@ public final class BootReceiver extends BroadcastReceiver {
         SharedPreferences prefs = context.getSharedPreferences("hetu", Context.MODE_PRIVATE);
 
         if (Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) {
-            // Never interrupt a healthy live Root proxy merely because the APK changed.
-            // UI-only updates must not manufacture a permanent "restart required" banner.
-            // Runtime files are deployed atomically on the next explicit start/restart.
-            prefs.edit()
+            // Preserve live transports. A runtime revision (not APK version) tells
+            // the UI that new scripts still need one explicit start/restart.
+            boolean running=prefs.getBoolean("proxyRootRuntimeRunning",false);
+            boolean pending=ProxyRuntimeSettings.runtimeUpgradePending(running,prefs);
+            SharedPreferences.Editor edit=prefs.edit()
                     .putLong("proxyRootPackageReplacedAt", System.currentTimeMillis())
-                    .remove("proxyRootRuntimeRefreshPending")
-                    .remove("proxyRootRuntimeRefreshPendingAt")
-                    .remove("proxyRootUpgradeError")
-                    .apply();
+                    .remove("proxyRootUpgradeError");
+            if(pending) edit.putBoolean("proxyRootRuntimeRefreshPending",true)
+                    .putLong("proxyRootRuntimeRefreshPendingAt",System.currentTimeMillis());
+            else edit.remove("proxyRootRuntimeRefreshPending").remove("proxyRootRuntimeRefreshPendingAt");
+            edit.apply();
             return;
         }
 

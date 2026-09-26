@@ -40,6 +40,7 @@ has(){ return 1; }
 fail(){ printf 'FAIL %s\\n' "$1"; exit 23; }
 probetp4(){ printf 'TP4 %s\\n' "$*"; }
 probetp6(){ printf 'TP6 %s\\n' "$*"; }
+probe_tcp_ownership(){ printf 'TCP-OWNERSHIP %s\\n' "$*"; }
 probered4(){ printf 'REDIRECT4 %s\\n' "$*"; }
 probered6(){ printf 'REDIRECT6 %s\\n' "$*"; }
 '''
@@ -60,7 +61,8 @@ has(){ return 0; }
 probe_ingress tproxy 19898 0 enable 1 1 tproxy 0 0 11053 || exit 1
 ''')
         for expected in ('TP4 19898', 'TP6 19898', 'REDIRECT4 11053 tcp',
-                         'REDIRECT4 11053 udp', 'REDIRECT6 11053 tcp', 'REDIRECT6 11053 udp'):
+                         'REDIRECT4 11053 udp', 'REDIRECT6 11053 tcp', 'REDIRECT6 11053 udp',
+                         'TCP-OWNERSHIP xt4', 'TCP-OWNERSHIP xt6'):
             assert expected in trace, f'Transparent mode lost required capability check: {expected}'
             checks += 1
 

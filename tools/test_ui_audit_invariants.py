@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Runtime fences and view lifecycle invariants; pixels/interactions are tested with Compose."""
+"""Audited runtime baseline and view lifecycle invariants; behavior/pixels have separate tests."""
 from pathlib import Path
 import hashlib, json, re
 root = Path(__file__).resolve().parents[1]
 src = root / "android-app/app/src/main/java/io/github/xgl34222220/hetu"
 for name, expected in json.loads((root / "tests/ui-runtime-baseline.json").read_text()).items():
     actual = hashlib.sha256((root / name).read_bytes()).hexdigest()
-    assert actual == expected, f"UI change modified protected runtime file: {name}"
+    assert actual == expected, f"Runtime file differs from the reviewed regression baseline: {name}"
 main = (src / "ReferenceProxyActivity.kt").read_text()
 cards = (src / "WorkspaceCards.kt").read_text()
 icon = (src / "ConfiguredGroupIcon.kt").read_text()
@@ -48,7 +48,9 @@ runtime_settings = (src / "ProxyRuntimeSettings.java").read_text()
 boot = (src / "BootReceiver.java").read_text()
 assert 'proxyRootSettingsDirty' in runtime_settings and 'markDirty' in runtime_settings
 assert '.remove("proxyRootRuntimeRefreshPending")' in boot
-assert '.putBoolean("proxyRootRuntimeRefreshPending", true)' not in boot
+assert 'runtimeUpgradePending(running,prefs)' in boot
+assert 'RUNTIME_REVISION' in runtime_settings and 'APPLIED_RUNTIME_REVISION_KEY' in runtime_settings
+assert '.putInt(ProxyRuntimeSettings.APPLIED_RUNTIME_REVISION_KEY,ProxyRuntimeSettings.RUNTIME_REVISION)' in root_manager
 theme = (src / "ui/HetuTheme.kt").read_text()
 crystal = (src / "ui/CrystalMaterial.kt").read_text()
 liquid = (src / "LiquidWorkspace.kt").read_text()
@@ -60,12 +62,12 @@ instrument = (src / "AlignedInstrumentPanel.kt").read_text()
 icon = (src / "ConfiguredGroupIcon.kt").read_text()
 dock = (src / "ui/HetuGlassDock.kt").read_text()
 
-# Liquid Glass visual contract (design.md is the source of truth).
+# Current visual contract (design.md is the source of truth).
 design = (root / "design.md").read_text()
 liquid_system = (src / "ui/HetuLiquidGlassSystem.kt").read_text()
 ui_kit = (src / "ui/HetuUiKit.kt").read_text()
 
-assert "BoxProxy 录屏参考规范" in design
+assert "可读界面与策略面板规范" in design and "test.134" in design
 assert "HetuGlassRadius" in liquid_system and "HetuMotionSpec" in liquid_system
 assert "LiquidStatusCapsule" in liquid_system and "SegmentedLiquidActionPill" in liquid_system
 assert "LiquidSelectionIndicator" in liquid_system
@@ -73,9 +75,9 @@ assert "LiquidGlassTextField" in liquid_system and "glassInputWell" in liquid_sy
 assert "LocalOverscrollFactory provides if (motionEnabled)" in theme
 assert "pageEnter.snapTo(1f)" in refhome
 
-# Recording palette and native library components replace the old mesh material.
-assert "Color(0xFFECEBFA)" in theme and "Color(0xFFF9F7FF)" in theme
-assert "Color(0xFFE1DDFF)" in theme and "Color(0xFF0E1014)" in theme
+# Readable neutral surfaces and actual native library components.
+assert "Color(0xFFF3F4F7)" in theme and "Color(0xFFFCFCFE)" in theme
+assert "Color(0xFFE6EEFD)" in theme and "Color(0xFF0E1014)" in theme
 assert "MiuixTheme(colors = colors" in theme and "MiuixOverscrollFactory" in theme
 assert "Brush.radialGradient(" not in crystal and "return background(LocalHetuTokens.current.pageBackground)" in crystal
 miuix = (src / "ui/ReferenceMiuix.kt").read_text()
@@ -116,7 +118,7 @@ assert 'nodeSelectionHeight' in liquid and 'nodeSelectionWidth' in liquid
 assert 'Int.MAX_VALUE' in liquid and 'lineHeight = 18.sp' in liquid
 assert 'ConfiguredGroupIcon(group, Modifier.size(32.dp))' in liquid
 assert 'LatencyChip(' in liquid
-assert 'selection = expanded' in liquid
+assert 'if (expanded) t.selectionBackground else t.cardBackground' in liquid
 assert 'LiquidSelectionIndicator(' in liquid and 'node-selection-indicator:' in liquid
 assert 'animateDpAsState(' in liquid and 'nodeSelectionX' in liquid and 'nodeSelectionY' in liquid
 assert 'selection = active' in liquid and 'contentDescription = node.name' in liquid
@@ -125,9 +127,10 @@ assert 'Color(0xFFE8E6F7)' not in liquid
 # Floating dock geometry and content clearance are shared tokens, not duplicated literals.
 assert 'HetuBottomBarMetrics.FloatingHorizontal' in dock
 assert 'HetuBottomBarMetrics.FloatingBottom' in dock
-assert 'dockItemHeight + 12.dp' in dock and 'itemHeight = dockItemHeight' in dock
-assert '20.sp.toDp()' in dock, "Dock height must account for scaled text"
-assert 'refractionHeight = 17.dp.toPx()' in dock and 'chromaticAberration = .045f' in dock, "Dock shell must retain LuoShu liquid-glass optics"
+assert 'itemHeight + 8.dp' in dock and 'height(itemHeight)' in dock
+assert '18.sp.toDp()' in dock, "Dock height must account for scaled text"
+assert 'hazeEffect' in dock and 'animateDpAsState' in dock and 'detectHorizontalDragGestures' in dock
+assert 'chromaticAberration' not in dock, "The compact dock must not restore the bulky refractive lens"
 assert 'HetuBottomBarMetrics.ContentGap' in ui_kit
 
 # API/config inputs must use inset glass wells.

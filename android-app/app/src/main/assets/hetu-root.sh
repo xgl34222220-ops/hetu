@@ -418,6 +418,15 @@ bypass6(){
 
 probetp4(){ P="$1"; xt4 -t mangle -N HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -A HETU_PROBE -p udp -j TPROXY --on-port "$P" --tproxy-mark "$PROBE_MARK/$PROBE_MASK" >/dev/null 2>&1; R=$?; xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"; }
 probetp6(){ P="$1"; has ip6tables || return 1; xt6 -t mangle -N HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -A HETU_PROBE -p udp -j TPROXY --on-port "$P" --tproxy-mark "$PROBE_MARK/$PROBE_MASK" >/dev/null 2>&1; R=$?; xt6 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"; }
+probe_tcp_ownership(){
+  TCP_PROBE_BIN="$1"; TCP_PROBE_RESULT=0
+  "$TCP_PROBE_BIN" -t mangle -N HETU_TCP_PROBE >/dev/null 2>&1 || return 1
+  "$TCP_PROBE_BIN" -t mangle -A HETU_TCP_PROBE -p tcp -m conntrack --ctstate ESTABLISHED -m connmark ! --mark "$PROBE_MARK/$PROBE_MASK" -j RETURN >/dev/null 2>&1 || TCP_PROBE_RESULT=1
+  "$TCP_PROBE_BIN" -t mangle -A HETU_TCP_PROBE -p tcp -j CONNMARK --set-xmark "$PROBE_MARK/$PROBE_MASK" >/dev/null 2>&1 || TCP_PROBE_RESULT=1
+  "$TCP_PROBE_BIN" -t mangle -F HETU_TCP_PROBE >/dev/null 2>&1 || true
+  "$TCP_PROBE_BIN" -t mangle -X HETU_TCP_PROBE >/dev/null 2>&1 || true
+  return "$TCP_PROBE_RESULT"
+}
 probered4(){ P="$1"; PROTO="${2:-tcp}"; xt4 -t nat -N HETU_PROBE >/dev/null 2>&1 || true; xt4 -t nat -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t nat -A HETU_PROBE -p "$PROTO" -j REDIRECT --to-ports "$P" >/dev/null 2>&1; R=$?; xt4 -t nat -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t nat -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"; }
 probered6(){ P="$1"; PROTO="${2:-tcp}"; has ip6tables || return 1; xt6 -t nat -N HETU_PROBE >/dev/null 2>&1 || true; xt6 -t nat -F HETU_PROBE >/dev/null 2>&1 || true; xt6 -t nat -A HETU_PROBE -p "$PROTO" -j REDIRECT --to-ports "$P" >/dev/null 2>&1; R=$?; xt6 -t nat -F HETU_PROBE >/dev/null 2>&1 || true; xt6 -t nat -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"; }
 probeowner(){
@@ -458,6 +467,7 @@ probe_ingress(){
     probered4 "$DP" udp || fail "当前 iptables 不支持 UDP DNS REDIRECT"
   fi
   [ "$NEED_TP" = 1 ] && { port "$TP" || fail "TPROXY 端口无效"; probetp4 "$TP" || fail "当前内核或 iptables 不支持 TPROXY"; }
+  if [ "$M" = tproxy ] && [ "$TCP" = 1 ]; then probe_tcp_ownership xt4 || fail "当前内核缺少 TCP 连接跟踪支持，无法安全接管已有网络"; fi
   [ "$NEED_RP" = 1 ] && { port "$RP" || fail "Redirect 端口无效"; probered4 "$RP" tcp || fail "当前 iptables 不支持 REDIRECT"; }
   if [ "$M" != tun ] && [ "$M" != ebpf ] && [ "$NEED_TP" = 0 ] && [ "$NEED_RP" = 0 ] && [ "$DNS" = off ]; then fail "TCP、UDP 与 DNS 接管均已关闭，代理没有可接管流量"; fi
 
@@ -466,6 +476,7 @@ probe_ingress(){
       has ip6tables || fail "当前 IPv6 接管或过滤策略需要 ip6tables"
     fi
     [ "$NEED_TP" = 0 ] || probetp6 "$TP" || fail "IPv6 TPROXY 不可用，可改用严格 IPv4 或 IPv6 不进核心"
+    if [ "$M" = tproxy ] && [ "$TCP" = 1 ]; then probe_tcp_ownership xt6 || fail "IPv6 TCP 连接跟踪不可用，可改用 IPv6 不进核心"; fi
     [ "$NEED_RP" = 0 ] || probered6 "$RP" tcp || fail "IPv6 REDIRECT 不可用，可改用严格 IPv4 或 IPv6 不进核心"
     if [ "$NEED_DNS_REDIRECT" = 1 ]; then probered6 "$DP" tcp || fail "IPv6 TCP DNS REDIRECT 不可用"; probered6 "$DP" udp || fail "IPv6 UDP DNS REDIRECT 不可用"; fi
   fi
@@ -567,6 +578,22 @@ local_destination_return(){
   done
 }
 
+# A TCP session established before interception belongs to its original remote
+# socket. Sending its ACK/data to a fresh transparent listener cannot migrate
+# that session: it drops/resets the stream until the app reconnects. Remember
+# only Hetu-selected TCP flows in our private conntrack bit and preserve older
+# unowned streams. Never return every ESTABLISHED flow: proxied ACK/data must
+# continue through TPROXY. DNS NAT and UDP keep their independent policies.
+preserve_existing_tcp(){
+  "$1" -t mangle -A "$2" -p tcp -m conntrack --ctstate ESTABLISHED -m connmark ! --mark "$MARK/$MASK" -j RETURN
+}
+remember_local_tcp(){
+  "$1" -t mangle -A "$2" -p tcp -m mark --mark "$MARK/$MASK" -j CONNMARK --set-xmark "$MARK/$MASK"
+}
+remember_shared_tcp(){
+  "$1" -t mangle -A "$2" -p tcp -j CONNMARK --set-xmark "$MARK/$MASK"
+}
+
 install_mangle4(){
   P="$1"; M="$2"; TCP="$3"; UDP="$4"; DNS="$5"; S="$6"; UIDS="$7"; SHARE="$8"; CIDRS="$9"; IFACES="${10}"; DUIDS="${11}"; DGIDS="${12:-}"; MACS="${13:-}"
   NEED=0; case "$M" in tproxy) if [ "$TCP" = 1 ] || [ "$UDP" = 1 ]; then NEED=1; fi;; enhance) [ "$UDP" = 1 ] && NEED=1;; esac; [ "$NEED" = 1 ] || return 0
@@ -584,10 +611,15 @@ install_mangle4(){
     xt4 -t mangle -A "$MOUT" -p udp --dport 53 -j RETURN || return 1
   fi
   bypass4 "$MOUT" mangle "$CIDRS" || return 1; bypass4 "$MPRE" mangle "$CIDRS" || return 1
+  if [ "$M" = tproxy ] && [ "$TCP" = 1 ]; then
+    preserve_existing_tcp xt4 "$MOUT" || return 1
+    if [ "$SHARE" = 1 ]; then preserve_existing_tcp xt4 "$MPRE" || return 1; remember_shared_tcp xt4 "$MPRE" || return 1; fi
+  fi
   if [ "$M" = tproxy ]; then
     [ "$TCP" = 0 ] || { scoped_mark xt4 mangle "$MOUT" "$S" "$UIDS" tcp "" "$MARK/$MASK" || return 1; if [ "$SHARE" = 1 ]; then xt4 -t mangle -A "$MPRE" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt4 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
     [ "$UDP" = 0 ] || { scoped_mark xt4 mangle "$MOUT" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; if [ "$SHARE" = 1 ]; then xt4 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt4 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
   elif [ "$M" = enhance ] && [ "$UDP" = 1 ]; then scoped_mark xt4 mangle "$MOUT" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; if [ "$SHARE" = 1 ]; then xt4 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt4 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; fi
+  if [ "$M" = tproxy ] && [ "$TCP" = 1 ]; then remember_local_tcp xt4 "$MOUT" || return 1; fi
   xt4 -t mangle -A OUTPUT -j "$MOUT" || return 1; xt4 -t mangle -A PREROUTING -j "$MPRE" || return 1
 }
 
@@ -608,10 +640,15 @@ install_mangle6(){
     xt6 -t mangle -A "$MOUT" -p udp --dport 53 -j RETURN || return 1
   fi
   bypass6 "$MOUT" mangle "$CIDRS" || return 1; bypass6 "$MPRE" mangle "$CIDRS" || return 1
+  if [ "$M" = tproxy ] && [ "$TCP" = 1 ]; then
+    preserve_existing_tcp xt6 "$MOUT" || return 1
+    if [ "$SHARE" = 1 ]; then preserve_existing_tcp xt6 "$MPRE" || return 1; remember_shared_tcp xt6 "$MPRE" || return 1; fi
+  fi
   if [ "$M" = tproxy ]; then
     [ "$TCP" = 0 ] || { scoped_mark xt6 mangle "$MOUT" "$S" "$UIDS" tcp "" "$MARK/$MASK" || return 1; if [ "$SHARE" = 1 ]; then xt6 -t mangle -A "$MPRE" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt6 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
     [ "$UDP" = 0 ] || { scoped_mark xt6 mangle "$MOUT" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; if [ "$SHARE" = 1 ]; then xt6 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt6 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
   elif [ "$M" = enhance ] && [ "$UDP" = 1 ]; then scoped_mark xt6 mangle "$MOUT" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; if [ "$SHARE" = 1 ]; then xt6 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt6 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; fi
+  if [ "$M" = tproxy ] && [ "$TCP" = 1 ]; then remember_local_tcp xt6 "$MOUT" || return 1; fi
   xt6 -t mangle -A OUTPUT -j "$MOUT" || return 1; xt6 -t mangle -A PREROUTING -j "$MPRE" || return 1
 }
 
