@@ -78,6 +78,7 @@ fun HetuGlassDock(
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val dockItemHeight = maxOf(60.dp, 37.dp + with(LocalDensity.current) { 20.sp.toDp() })
     val context = LocalContext.current
     val prefs = remember(context) { context.getSharedPreferences("hetu", 0) }
     var floating by remember { mutableStateOf(prefs.getBoolean("floatingBottomBar", true)) }
@@ -189,7 +190,7 @@ fun HetuGlassDock(
                 else Modifier
             )
             .fillMaxWidth()
-            .height(72.dp + if (floating) 0.dp else bottomInset),
+            .height(dockItemHeight + 12.dp + if (floating) 0.dp else bottomInset),
     ) {
         Box(
             modifier = Modifier
@@ -211,7 +212,7 @@ fun HetuGlassDock(
             items = items,
             selected = selected,
             onSelect = onSelect,
-            itemHeight = 60.dp,
+            itemHeight = dockItemHeight,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(start = 6.dp, top = 6.dp, end = 6.dp, bottom = if (floating) 6.dp else bottomInset + 6.dp),
@@ -444,9 +445,11 @@ private fun DockItems(
                     Spacer(Modifier.height(3.dp))
                     Text(
                         ht(item.label),
+                        modifier = Modifier.fillMaxWidth(),
                         color = itemColor,
                         fontSize = 12.sp,
-                        lineHeight = 17.sp,
+                        lineHeight = 20.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                         fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
                         maxLines = 1,
                     )

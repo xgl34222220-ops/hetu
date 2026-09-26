@@ -89,9 +89,9 @@ private fun ReferenceProgress(
     Box(
         Modifier
             .fillMaxWidth()
-            .height(3.dp)
+            .height(5.dp)
             .clip(CircleShape)
-            .background(Color(0xFFD7E0F5))
+            .background(t.controlBackground)
             .testTag(tag)
             .semantics {
                 if (p != null) progressBarRangeInfo = ProgressBarRangeInfo(p, 0f..1f)
@@ -109,27 +109,22 @@ private fun ReferenceProgress(
 }
 
 @Composable
+private fun ReferenceInstrumentPair(stacked: Boolean, first: @Composable (Modifier) -> Unit, second: @Composable (Modifier) -> Unit) {
+    if (stacked) Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        first(Modifier.fillMaxWidth()); second(Modifier.fillMaxWidth())
+    } else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        first(Modifier.weight(1f)); second(Modifier.weight(1f))
+    }
+}
+
+@Composable
 private fun ReferenceMetricLine(label: String, value: String) {
     val t = LocalHetuTokens.current
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            label,
-            color = t.textSecondary,
-            fontSize = 12.sp,
-            lineHeight = 17.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Spacer(Modifier.weight(1f))
-        HetuNumber(
-            text = value,
-            color = t.textPrimary,
-            monospaced = true,
-            style = MaterialTheme.typography.labelLarge.copy(
-                fontSize = 13.5.sp,
-                lineHeight = 18.sp,
-                fontWeight = FontWeight.ExtraBold,
-            ),
-        )
+    FlowRow(Modifier.fillMaxWidth(), maxItemsInEachRow = 2,
+        horizontalArrangement = Arrangement.SpaceBetween, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(label, Modifier.padding(end = 8.dp), color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+        HetuNumber(value.replace(' ', '\u00a0'), monospaced = true, color = t.textPrimary,
+            style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold))
     }
 }
 
@@ -187,16 +182,12 @@ internal fun AlignedInstrumentPanel(
         else -> if (runtime.running) "等待出口检测" else "代理已停止"
     }
 
-    Column(
-        Modifier.fillMaxWidth().testTag("workspace-bento"),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
+    BoxWithConstraints(Modifier.fillMaxWidth().testTag("workspace-bento")) {
+        val stacked = maxWidth < 320.dp || LocalDensity.current.fontScale > 1.15f
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            ReferenceInstrumentPair(stacked, first = { tile ->
             ReferenceDashboardCard(
-                Modifier.weight(1f).testTag("instrument-network"),
+                tile.testTag("instrument-network"),
                 onClick = {
                     view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                     lan = !lan
@@ -204,15 +195,15 @@ internal fun AlignedInstrumentPanel(
                 onLongClick = { details = true },
             ) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("WAN", color = t.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+                    Text("WAN", color = t.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.weight(1f))
                     Box(
                         Modifier
                             .clip(RoundedCornerShape(10.dp))
-                            .background(Color(0xFFE7ECFA))
+                            .background(t.controlBackground)
                             .padding(horizontal = 8.dp, vertical = 3.dp),
                     ) {
-                        Text("详情", color = HetuMicroCrystal.KleinBlue, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Text("详情", color = MaterialTheme.colorScheme.primary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     }
                 }
                 HetuNumber(
@@ -237,26 +228,22 @@ internal fun AlignedInstrumentPanel(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-
+            }, second = { tile ->
             ReferenceDashboardCard(
-                Modifier.weight(1f).testTag("instrument-speed"),
+                tile.testTag("instrument-speed"),
             ) {
-                Text("网速", color = t.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+                Text("网速", color = t.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 ReferenceMetricLine("上行", if (runtime.running) refSpeed(up) else "0 B/s")
                 ReferenceMetricLine("下行", if (runtime.running) refSpeed(down) else "0 B/s")
             }
-        }
-
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
+            })
+            ReferenceInstrumentPair(stacked, first = { tile ->
             ReferenceDashboardCard(
-                Modifier.weight(1f).testTag("instrument-usage"),
+                tile.testTag("instrument-usage"),
                 onClick = onSubscription,
             ) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("订阅", color = t.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+                    Text("订阅", color = t.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.weight(1f))
                     Text(
                         usageRatio?.let { "剩余 ${((1f - it) * 100f).toInt()}%" } ?: "未上报",
@@ -270,11 +257,11 @@ internal fun AlignedInstrumentPanel(
                 Spacer(Modifier.height(2.dp))
                 ReferenceProgress(usageRatio, "home-usage-progress", HetuMicroCrystal.KleinBlue)
             }
-
+            }, second = { tile ->
             ReferenceDashboardCard(
-                Modifier.weight(1f).testTag("instrument-resource"),
+                tile.testTag("instrument-resource"),
             ) {
-                Text("资源占用", color = t.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+                Text("资源占用", color = t.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 ReferenceMetricLine("内存", if (runtime.running && memory >= 0L) refBytes(memory) else "—")
                 ReferenceMetricLine(
                     "CPU",
@@ -285,6 +272,7 @@ internal fun AlignedInstrumentPanel(
                 Spacer(Modifier.height(2.dp))
                 ReferenceProgress(cpuRatio, "home-cpu-progress", HetuMicroCrystal.KleinBlue)
             }
+            })
         }
     }
 

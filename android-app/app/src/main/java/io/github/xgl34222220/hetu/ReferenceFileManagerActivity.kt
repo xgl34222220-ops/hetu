@@ -136,7 +136,15 @@ internal fun ReferenceFileManagerScreen(onClose: () -> Unit) {
         HetuRefreshBox(loading, { revision++ }, Modifier.weight(1f)) {
             LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, hetuContentBottomPadding()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (!loading && filtered.isEmpty()) item {
-                    GroupedInsetSection { Text(if (query.isBlank()) "此目录暂无文件" else "没有匹配的文件", color = t.textSecondary, modifier = Modifier.padding(16.dp)) }
+                    GroupedInsetSection {
+                        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(if (error) "目录读取失败" else if (query.isBlank()) "此目录暂无文件" else "没有匹配的文件", color = t.textPrimary, fontSize = 16.sp)
+                            Text(if (error) "检查上方错误信息后重试" else if (query.isBlank()) "可以新建配置，或导入已有文件" else "换个关键词，或清空搜索查看所有文件", color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+                            TextButton(onClick = { if (error) revision++ else if (query.isNotBlank()) query = "" else { selected = null; form = "add" } }) {
+                                Text(if (error) "重试" else if (query.isNotBlank()) "清空搜索" else "新建或导入")
+                            }
+                        }
+                    }
                 }
                 items(filtered, key = { it.path }, contentType = { if (it.directory) "folder" else "file" }) { entry ->
                     Row(Modifier.fillMaxWidth().animateItem().crystalMaterial(RoundedCornerShape(16.dp)).clickable {

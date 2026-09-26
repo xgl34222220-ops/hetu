@@ -45,6 +45,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -95,7 +97,9 @@ fun HetuNumber(
 ) {
     // Full text is never silently clipped or ellipsized. Width/layout adapts instead.
     Text(text, modifier, color = color,
-        style = style.copy(fontFeatureSettings = "tnum", fontFamily = if (monospaced) FontFamily.Monospace else FontFamily.SansSerif),
+        style = style.copy(fontFeatureSettings = "tnum", fontFamily = if (monospaced) FontFamily.Monospace else FontFamily.SansSerif,
+            platformStyle = PlatformTextStyle(includeFontPadding = true),
+            lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None)),
         softWrap = true, overflow = TextOverflow.Visible)
 }
 

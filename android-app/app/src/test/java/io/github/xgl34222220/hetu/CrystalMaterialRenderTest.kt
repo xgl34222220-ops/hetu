@@ -105,7 +105,9 @@ class CrystalMaterialRenderTest {
     }
     @Test fun imageRequestsUseExistingCoreWithoutDirectFallbackWhenRunning() {
         val prefs=app.getSharedPreferences("hetu",0)
-        val repository=ProxyGroupIconRepository.get(app)
+        // Robolectric replaces Application between methods; isolate this instance's preferences.
+        val repository=ProxyGroupIconRepository::class.java.getDeclaredConstructor(Context::class.java)
+            .apply { isAccessible = true }.newInstance(app)
         try {
             prefs.edit().putBoolean("proxyRootRuntimeRunning",true).putInt("proxyControllerPort",29134).commit()
             val proxy=repository.imageProxy()

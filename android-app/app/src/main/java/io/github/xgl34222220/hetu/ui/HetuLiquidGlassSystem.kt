@@ -126,37 +126,11 @@ fun LiquidStatusCapsule(
 
         Spacer(Modifier.width(10.dp))
 
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    status,
-                    Modifier.testTag("home-run-state"),
-                    color = if (running) t.success else t.textPrimary,
-                    fontSize = 16.sp,
-                    lineHeight = 20.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    maxLines = 1,
-                )
-                Spacer(Modifier.width(7.dp))
-                Text(
-                    "$core · $mode",
-                    color = t.textSecondary,
-                    fontSize = 11.5.sp,
-                    lineHeight = 15.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Text(
-                "$uptime · $config",
-                color = t.textSecondary,
-                fontSize = 11.5.sp,
-                lineHeight = 16.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(status, Modifier.testTag("home-run-state"), color = if (running) t.success else t.textPrimary,
+                fontSize = 17.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold)
+            Text("$core · $mode", color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+            Text("$uptime · $config", color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
         }
 
         Spacer(Modifier.width(10.dp))
@@ -169,160 +143,42 @@ fun LiquidStatusCapsule(
 }
 
 @Composable
-private fun LiquidConnectionToggle(
-    checked: Boolean,
-    busy: Boolean,
-    onClick: () -> Unit,
-) {
+private fun LiquidConnectionToggle(checked: Boolean, busy: Boolean, onClick: () -> Unit) {
     val t = LocalHetuTokens.current
-    val motion = LocalHetuMotionEnabled.current
-    val shape = RoundedCornerShape(HetuGlassRadius.Pill)
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (pressed) HetuMotionSpec.PressedScale else 1f,
-        animationSpec = tween(if (motion) HetuMotionSpec.PressDurationMs else 0),
-        label = "connectPress",
-    )
-
-    BoxWithConstraints(
-        Modifier
-            .width(88.dp)
-            .height(40.dp)
-            .graphicsLayer { scaleX = scale; scaleY = scale }
-            .crystalMaterial(shape, depth = CrystalDepth.Sunken, selection = checked)
-            .clickable(
-                enabled = !busy,
-                interactionSource = interaction,
-                indication = null,
-                role = Role.Button,
-                onClick = onClick,
-            ),
-    ) {
-        val thumbWidth = 34.dp
-        val target = if (checked) maxWidth - thumbWidth - 4.dp else 4.dp
-        val x by animateDpAsState(
-            targetValue = target,
-            animationSpec = spring(
-                dampingRatio = if (motion) .70f else 1f,
-                stiffness = if (motion) 420f else 10_000f,
-            ),
-            label = "connectThumb",
-        )
-        Text(
-            if (busy) "…" else if (checked) "断开" else "连接",
-            modifier = Modifier.align(Alignment.Center),
-            color = if (checked) MaterialTheme.colorScheme.primary else t.textSecondary,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-        )
-        Box(
-            Modifier
-                .offset(x = x)
-                .align(Alignment.CenterStart)
-                .size(34.dp)
-                .crystalMaterial(RoundedCornerShape(17.dp), depth = CrystalDepth.Popover, selection = checked),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                Icons.Rounded.PowerSettingsNew,
-                contentDescription = if (checked) "断开代理" else "连接代理",
-                tint = if (checked) MaterialTheme.colorScheme.primary else t.textSecondary,
-                modifier = Modifier.size(17.dp),
-            )
-        }
+    Row(Modifier.heightIn(min = 48.dp).crystalMaterial(CircleShape, depth = CrystalDepth.Sunken, selection = checked)
+        .clickable(enabled = !busy, role = Role.Button, onClick = onClick)
+        .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (busy) HetuBusyIndicator(Modifier.size(18.dp))
+        else Icon(Icons.Rounded.PowerSettingsNew, if (checked) "断开代理" else "连接代理", Modifier.size(18.dp),
+            tint = if (checked) MaterialTheme.colorScheme.primary else t.textSecondary)
+        Text(if (busy) "处理中" else if (checked) "断开" else "连接", fontSize = 12.sp, lineHeight = 18.sp,
+            color = if (checked) MaterialTheme.colorScheme.primary else t.textSecondary)
     }
 }
 
-/**
- * Three-command liquid rail. The highlight remains inside one physical shell and
- * springs to the last invoked command instead of rendering three unrelated cards.
- */
 @Composable
-fun SegmentedLiquidActionPill(
-    running: Boolean,
-    busy: Boolean,
-    onReload: () -> Unit,
-    onToggle: () -> Unit,
-    onRestart: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
+fun SegmentedLiquidActionPill(running: Boolean, busy: Boolean, onReload: () -> Unit,
+    onToggle: () -> Unit, onRestart: () -> Unit, modifier: Modifier = Modifier) {
     val t = LocalHetuTokens.current
-    val motion = LocalHetuMotionEnabled.current
-    var selected by remember { mutableIntStateOf(1) }
     val labels = listOf("重载", if (busy) "请稍候" else if (running) "停止" else "启动", "重启")
     val enabled = listOf(running && !busy, !busy, running && !busy)
     val callbacks = listOf(onReload, onToggle, onRestart)
-    val shape = RoundedCornerShape(HetuGlassRadius.Pill)
-
-    BoxWithConstraints(
-        modifier
-            .fillMaxWidth()
-            .height(54.dp)
-            .crystalMaterial(shape, depth = CrystalDepth.Sunken),
-    ) {
-        val segmentWidth = maxWidth / 3f
-        val targetX = segmentWidth * selected.toFloat()
-        val indicatorX by animateDpAsState(
-            targetValue = targetX,
-            animationSpec = spring(
-                dampingRatio = if (motion) HetuMotionSpec.SelectionDamping else 1f,
-                stiffness = if (motion) HetuMotionSpec.SelectionStiffness else 10_000f,
-            ),
-            label = "actionIndicator",
-        )
-        Box(
-            Modifier
-                .offset(x = indicatorX)
-                .padding(5.dp)
-                .width(segmentWidth - 10.dp)
-                .fillMaxHeight()
-                .crystalMaterial(
-                    RoundedCornerShape(22.dp),
-                    depth = CrystalDepth.Card,
-                    selection = true,
-                ),
-        )
-
-        Row(Modifier.fillMaxSize()) {
-            labels.forEachIndexed { index, label ->
-                val source = remember(index) { MutableInteractionSource() }
-                val pressed by source.collectIsPressedAsState()
-                val scale by animateFloatAsState(
-                    targetValue = if (pressed) HetuMotionSpec.PressedScale else 1f,
-                    animationSpec = tween(if (motion) HetuMotionSpec.PressDurationMs else 0),
-                    label = "actionPress$index",
-                )
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .graphicsLayer { scaleX = scale; scaleY = scale }
-                        .semantics { role = Role.Button }
-                        .clickable(
-                            enabled = enabled[index],
-                            interactionSource = source,
-                            indication = null,
-                        ) {
-                            selected = index
-                            callbacks[index]()
-                        },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        label,
-                        color = when {
-                            !enabled[index] -> t.textMuted.copy(alpha = .48f)
-                            index == 1 && running -> t.danger
-                            selected == index -> MaterialTheme.colorScheme.primary
-                            else -> t.textPrimary
-                        },
-                        fontSize = 13.sp,
-                        lineHeight = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                    )
-                }
+    Row(modifier.fillMaxWidth().crystalMaterial(RoundedCornerShape(HetuGlassRadius.Pill), depth = CrystalDepth.Sunken)
+        .padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        labels.forEachIndexed { index, label ->
+            val source = remember(index) { MutableInteractionSource() }
+            val pressed by source.collectIsPressedAsState()
+            Box(Modifier.weight(1f).heightIn(min = 48.dp)
+                .background(if (pressed) t.controlBackground else Color.Transparent, CircleShape)
+                .clickable(enabled = enabled[index], interactionSource = source, indication = null, role = Role.Button, onClick = callbacks[index])
+                .padding(horizontal = 4.dp, vertical = 10.dp), contentAlignment = Alignment.Center) {
+                Text(label, color = when {
+                    !enabled[index] -> t.textMuted
+                    index == 1 && running -> t.danger
+                    index == 1 -> MaterialTheme.colorScheme.primary
+                    else -> t.textPrimary
+                }, fontSize = 13.sp, lineHeight = 19.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -340,13 +196,14 @@ fun LiquidSelectionIndicator(
     val shape = RoundedCornerShape(HetuGlassRadius.Tile)
     Box(
         modifier
-            .graphicsLayer { alpha = .62f }
+            .graphicsLayer { alpha = .95f }
             .crystalMaterial(
                 shape = shape,
                 depth = CrystalDepth.Card,
                 selection = true,
             )
-            .border(1.dp, primary.copy(alpha = .22f), shape),
+            .background(primary.copy(alpha = .14f), shape)
+            .border(.7.dp, primary.copy(alpha = .32f), shape),
     )
 }
 

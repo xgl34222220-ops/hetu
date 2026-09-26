@@ -900,7 +900,7 @@ internal fun RefHome(
     ) {
         item(key = "home-title") {
             Box(
-                Modifier.fillMaxWidth().height(48.dp),
+                Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(vertical = 6.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -1144,10 +1144,10 @@ private fun RefLatencyPanel(
                     lineHeight = 20.sp,
                     fontWeight = FontWeight.ExtraBold,
                 )
-                IconButton(onClick = onTune, modifier = Modifier.size(34.dp)) {
+                IconButton(onClick = onTune, modifier = Modifier.size(48.dp)) {
                     Icon(Icons.Rounded.Tune, "延迟设置", Modifier.size(18.dp), tint = t.textSecondary)
                 }
-                IconButton(onClick = onClick, enabled = !testing, modifier = Modifier.size(34.dp)) {
+                IconButton(onClick = onClick, enabled = !testing, modifier = Modifier.size(48.dp)) {
                     if (testing) {
                         CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 1.8.dp)
                     } else {
@@ -1155,15 +1155,21 @@ private fun RefLatencyPanel(
                     }
                 }
             }
-            Row(
-                Modifier.fillMaxWidth().heightIn(min = 42.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                RefLatencyColumn("Baidu", baidu, testing, Modifier.weight(1f))
-                Box(Modifier.width(1.dp).height(34.dp).background(t.outline.copy(alpha = .70f)))
-                RefLatencyColumn("Cloudflare", cloudflare, testing, Modifier.weight(1f))
-                Box(Modifier.width(1.dp).height(34.dp).background(t.outline.copy(alpha = .70f)))
-                RefLatencyColumn("Google", google, testing, Modifier.weight(1f))
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                if (maxWidth < 292.dp || LocalDensity.current.fontScale > 1.15f) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("Baidu" to baidu, "Cloudflare" to cloudflare, "Google" to google).forEach { (name, delay) ->
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Text(name, Modifier.weight(1f), color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+                                LatencyChip(delay, testing, compact = true)
+                            }
+                        }
+                    }
+                } else Row(Modifier.fillMaxWidth().padding(bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    RefLatencyColumn("Baidu", baidu, testing, Modifier.weight(1f))
+                    RefLatencyColumn("Cloudflare", cloudflare, testing, Modifier.weight(1f))
+                    RefLatencyColumn("Google", google, testing, Modifier.weight(1f))
+                }
             }
         }
     }
@@ -1180,13 +1186,13 @@ private fun RefLatencyColumn(
     Column(
         modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(1.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(
             label,
             color = t.textSecondary,
-            fontSize = 10.5.sp,
-            lineHeight = 14.sp,
+            fontSize = 12.sp,
+            lineHeight = 18.sp,
             fontWeight = FontWeight.Medium,
         )
         LatencyChip(
@@ -1717,11 +1723,7 @@ internal fun RefPanel(
 
     BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding()) {
         val autoGroupColumns = liquidColumns(maxWidth - 24.dp)
-        val groupColumns = if (maxWidth < 292.dp) 1 else when (groupLayout) {
-            1 -> 1
-            2 -> 2
-            else -> autoGroupColumns
-        }
+        val groupColumns = liquidColumns(maxWidth - 24.dp, groupLayout)
         Column(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     RefPanelGlassHeader(
@@ -3460,157 +3462,68 @@ private fun RefRateCard(
 
 @Composable
 internal fun RefProviderRow(
-    item: DashboardProviderUi,
-    refreshing: Boolean,
-    success: Boolean,
-    onRefresh: () -> Unit,
-    onClick: () -> Unit,
-    error: String = "",
+    item: DashboardProviderUi, refreshing: Boolean, success: Boolean,
+    onRefresh: () -> Unit, onClick: () -> Unit, error: String = "",
 ) {
     val t = LocalHetuTokens.current
-    val primary = HetuMicroCrystal.KleinBlue
+    val primary = MaterialTheme.colorScheme.primary
     val known = item.hasSubscriptionInfo && item.total > 0L
-    val shape = RoundedCornerShape(20.dp)
     Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .background(t.cardBackground)
-            .clickable(onClick = onClick)
-            .padding(16.dp)
-            .testTag("subscription-provider:${item.name}"),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        Modifier.fillMaxWidth().crystalMaterial(RoundedCornerShape(22.dp))
+            .clickable(onClick = onClick).padding(16.dp).testTag("subscription-provider:${item.name}"),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                item.name,
-                Modifier.weight(1f),
-                color = t.textPrimary,
-                fontSize = 18.sp,
-                lineHeight = 23.sp,
-                fontWeight = FontWeight.ExtraBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (known) {
-                Box(
-                    Modifier
-                        .clip(RoundedCornerShape(11.dp))
-                        .background(Color(0xFFE2E8FA))
-                        .padding(horizontal = 10.dp, vertical = 5.dp),
-                ) {
-                    Text(
-                        "${((1f - item.ratio) * 100f).toInt()}%",
-                        color = primary,
-                        fontSize = 14.sp,
-                        lineHeight = 18.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                    )
+            Text(item.name, Modifier.weight(1f), color = t.textPrimary, fontSize = 17.sp,
+                lineHeight = 24.sp, fontWeight = FontWeight.SemiBold)
+            WorkspaceRefreshAction(item.name, refreshing, success, error.isNotBlank(), actionLabel = "更新订阅", onClick = onRefresh)
+        }
+        if (known) {
+            Box(Modifier.background(t.controlBackground, CircleShape).padding(horizontal = 10.dp, vertical = 5.dp)) {
+                HetuNumber("剩余 ${((1f - item.ratio.coerceIn(0f, 1f)) * 100f).toInt()}%",
+                    Modifier.testTag("subscription-percent:${item.name}"), color = primary,
+                    style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp, lineHeight = 19.sp))
+            }
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                if (maxWidth < 300.dp || LocalDensity.current.fontScale > 1.15f) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("上传" to item.upload, "下载" to item.download, "剩余" to item.remaining).forEach { (label, bytes) ->
+                            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(label, Modifier.padding(end = 12.dp), color = t.textSecondary, fontSize = 12.sp)
+                                HetuNumber(refBytes(bytes), color = if (label == "剩余") primary else t.textPrimary,
+                                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 17.sp, lineHeight = 24.sp))
+                            }
+                        }
+                    }
+                } else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    RefProviderMetric("上传", refBytes(item.upload), Modifier.weight(1f))
+                    RefProviderMetric("下载", refBytes(item.download), Modifier.weight(1f))
+                    RefProviderMetric("剩余", refBytes(item.remaining), Modifier.weight(1f), primary)
                 }
             }
-            Spacer(Modifier.width(4.dp))
-            WorkspaceRefreshAction(
-                item.name,
-                refreshing,
-                success,
-                error.isNotBlank(),
-                actionLabel = "更新订阅",
-                onClick = onRefresh,
-            )
-        }
-
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                ticketExpireAt(item.expire),
-                Modifier.weight(1f),
-                color = t.textSecondary,
-                fontSize = 12.5.sp,
-                lineHeight = 17.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                refUpdatedAt(item.updatedAt),
-                color = t.textSecondary,
-                fontSize = 12.5.sp,
-                lineHeight = 17.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-            )
-        }
-
-        if (known) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                RefProviderMetric("上传", refBytes(item.upload), Modifier.weight(1f))
-                RefProviderMetric("下载", refBytes(item.download), Modifier.weight(1f))
-                RefProviderMetric("剩余", refBytes(item.remaining), Modifier.weight(1f), primary)
+            HetuReadOnlyProgress(item.ratio)
+            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("已用 ${refBytes(item.used)}", Modifier.padding(end = 10.dp), color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+                Text("总计 ${refBytes(item.total)}", color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
             }
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(4.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFD7E0F5)),
-            ) {
-                Box(
-                    Modifier
-                        .fillMaxWidth(item.ratio.coerceIn(.01f, 1f))
-                        .fillMaxHeight()
-                        .background(primary, CircleShape),
-                )
-            }
-            Row(Modifier.fillMaxWidth()) {
-                Text(
-                    "已用 ${refBytes(item.used)}",
-                    Modifier.weight(1f),
-                    color = t.textSecondary,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    "总计 ${refBytes(item.total)}",
-                    color = t.textSecondary,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-        } else {
-            Text(
-                "订阅未上报流量信息",
-                color = t.textSecondary,
-                fontSize = 12.sp,
-                lineHeight = 18.sp,
-            )
+        } else Text("订阅未上报流量信息", color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+            verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(ticketExpireAt(item.expire), Modifier.padding(end = 12.dp), color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+            Text(refUpdatedAt(item.updatedAt), color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
         }
-
-        if (error.isNotBlank() && !refreshing) {
-            HetuTaskFeedback("${item.name} 更新失败：$error", error = true)
-        }
+        if (error.isNotBlank() && !refreshing) HetuTaskFeedback("${item.name} 更新失败：$error", error = true)
     }
 }
 
 @Composable
-private fun RefProviderMetric(
-    label: String,
-    value: String,
-    modifier: Modifier,
-    valueColor: Color = LocalHetuTokens.current.textPrimary,
-) {
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            value,
-            color = valueColor,
-            fontSize = 18.sp,
-            lineHeight = 22.sp,
-            fontWeight = FontWeight.ExtraBold,
-            maxLines = 1,
-        )
-        Text(
-            label,
-            color = LocalHetuTokens.current.textSecondary,
-            fontSize = 11.5.sp,
-            lineHeight = 16.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
+private fun RefProviderMetric(label: String, value: String, modifier: Modifier,
+    valueColor: Color = LocalHetuTokens.current.textPrimary) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        HetuNumber(value.replace(' ', '\u00a0'), color = valueColor,
+            style = MaterialTheme.typography.titleMedium.copy(fontSize = 17.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold))
+        Text(label, color = LocalHetuTokens.current.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
     }
 }
 
@@ -4001,38 +3914,13 @@ internal fun RefRuleSetRow(item: DashboardRuleSetUi, refreshing: Boolean, succes
 @Composable
 internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
     val context = LocalContext.current
-    LazyColumn(
-        Modifier.fillMaxSize().statusBarsPadding(),
-        contentPadding = PaddingValues(
-            start = 12.dp,
-            top = 8.dp,
-            end = 12.dp,
-            bottom = hetuContentBottomPadding(),
-        ),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
+    val t = LocalHetuTokens.current
+    LazyColumn(Modifier.fillMaxSize().statusBarsPadding(),
+        contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = hetuContentBottomPadding()),
+        verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { RefTitleBar("工具") }
-
-        item {
-            RefGroup {
-                RefToolRow(
-                    Icons.Rounded.Code,
-                    Color.Unspecified,
-                    "脚本",
-                    "服务启动前、停止后脚本与环境变量",
-                ) {
-                    context.startActivity(Intent(context, ProxyScriptsActivity::class.java))
-                }
-                RefDivider()
-                RefToolRow(
-                    Icons.Rounded.Article,
-                    Color.Unspecified,
-                    "日志查看",
-                    "切换、刷新与清理 Root / Mihomo 日志",
-                ) {
-                    onLog("")
-                }
-                RefDivider()
+        item { Text("核心网络", Modifier.padding(start = 6.dp, top = 8.dp), color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp) }
+        item { RefGroup {
                 RefToolRow(
                     Icons.Rounded.Apps,
                     Color.Unspecified,
@@ -4041,11 +3929,7 @@ internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
                 ) {
                     context.startActivity(Intent(context, ProxyAppSelectionActivity::class.java))
                 }
-            }
-        }
-
-        item {
-            RefGroup {
+                RefDivider()
                 RefToolRow(
                     Icons.Rounded.Wifi,
                     Color.Unspecified,
@@ -4072,11 +3956,18 @@ internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
                 ) {
                     context.startActivity(Intent(context, ProxyBypassRulesActivity::class.java))
                 }
-            }
-        }
-
-        item {
-            RefGroup {
+                RefDivider()
+                RefToolRow(
+                    Icons.Rounded.Place,
+                    Color.Unspecified,
+                    "CNIP 设置",
+                    "配置 CNIP 数据源并更新地理数据",
+                ) {
+                    context.startActivity(Intent(context, ProxyCnIpSettingsActivity::class.java))
+                }
+        } }
+        item { Text("规则与订阅", Modifier.padding(start = 6.dp, top = 8.dp), color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp) }
+        item { RefGroup {
                 RefToolRow(
                     Icons.Rounded.Link,
                     Color.Unspecified,
@@ -4096,12 +3987,32 @@ internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
                 }
                 RefDivider()
                 RefToolRow(
-                    Icons.Rounded.Place,
+                    Icons.Rounded.Shield,
                     Color.Unspecified,
-                    "CNIP 设置",
-                    "配置 CNIP 数据源并更新地理数据",
+                    "广告过滤",
+                    "订阅规则、放行与拦截记录",
                 ) {
-                    context.startActivity(Intent(context, ProxyCnIpSettingsActivity::class.java))
+                    context.startActivity(Intent(context, ProxyAdblockChainActivity::class.java))
+                }
+        } }
+        item { Text("运行维护", Modifier.padding(start = 6.dp, top = 8.dp), color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp) }
+        item { RefGroup {
+                RefToolRow(
+                    Icons.Rounded.Article,
+                    Color.Unspecified,
+                    "日志查看",
+                    "切换、刷新与清理 Root / Mihomo 日志",
+                ) {
+                    onLog("")
+                }
+                RefDivider()
+                RefToolRow(
+                    Icons.Rounded.Code,
+                    Color.Unspecified,
+                    "脚本",
+                    "服务启动前、停止后脚本与环境变量",
+                ) {
+                    context.startActivity(Intent(context, ProxyScriptsActivity::class.java))
                 }
                 RefDivider()
                 RefToolRow(
@@ -4121,11 +4032,7 @@ internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
                 ) {
                     context.startActivity(Intent(context, ProxyStartupConfigActivity::class.java))
                 }
-            }
-        }
-
-        item {
-            RefGroup {
+                RefDivider()
                 RefToolRow(
                     Icons.Rounded.Web,
                     Color.Unspecified,
@@ -4147,17 +4054,7 @@ internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
                 ) {
                     context.startActivity(Intent(context, ProxyCoreActivity::class.java))
                 }
-                RefDivider()
-                RefToolRow(
-                    Icons.Rounded.Shield,
-                    Color.Unspecified,
-                    "广告过滤",
-                    "订阅规则、放行与拦截记录",
-                ) {
-                    context.startActivity(Intent(context, ProxyAdblockChainActivity::class.java))
-                }
-            }
-        }
+        } }
     }
 }
 

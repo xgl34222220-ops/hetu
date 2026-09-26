@@ -137,7 +137,7 @@ private fun ProxyLogViewerScreen(onBack: () -> Unit) {
     var clearConfirm by remember { mutableStateOf(false) }
     val prefs = remember { context.getSharedPreferences("hetu", 0) }
     var autoRefresh by rememberSaveable { mutableStateOf(prefs.getBoolean("logAutoRefresh", false)) }
-    var cards by rememberSaveable { mutableStateOf(prefs.getBoolean("logCardView", false)) }
+    var cards by rememberSaveable { mutableStateOf(prefs.getBoolean("logCardView", true)) }
     var query by rememberSaveable { mutableStateOf("") }
     var level by rememberSaveable { mutableStateOf("all") }
     val lifecycle = LocalLifecycleOwner.current
@@ -147,7 +147,7 @@ private fun ProxyLogViewerScreen(onBack: () -> Unit) {
         }
     }
     val visibleLines = remember(content, query, level) {
-        content.lines().filter { line -> line.contains(query, true) && (level == "all" || line.contains(level, true)) }
+        content.lines().filter { line -> line.isNotBlank() && line.contains(query, true) && (level == "all" || line.contains(level, true)) }
     }
 
     LaunchedEffect(revision, selectedPath) {
@@ -278,10 +278,10 @@ private fun ProxyLogViewerScreen(onBack: () -> Unit) {
         LazyColumn(Modifier.fillMaxWidth().weight(1f), contentPadding = PaddingValues(12.dp, 4.dp, 12.dp, hetuContentBottomPadding()), verticalArrangement = Arrangement.spacedBy(if (cards) 6.dp else 0.dp)) {
             if (visibleLines.isEmpty()) item { Text("没有匹配的日志", color = t.textSecondary, modifier = Modifier.padding(12.dp)) }
             itemsIndexed(visibleLines, key = { index, _ -> index }) { _, line ->
-                androidx.compose.foundation.text.selection.SelectionContainer {
-                    Text(line, modifier = Modifier.fillMaxWidth().then(if (cards) Modifier.crystalMaterial(RoundedCornerShape(12.dp)).padding(12.dp) else Modifier.padding(horizontal = 8.dp, vertical = 2.dp)),
-                        color = when { line.contains("error", true) -> t.danger; line.contains("warn", true) -> t.warning; else -> t.textPrimary },
-                        fontFamily = FontFamily.Monospace, fontSize = 11.5.sp, lineHeight = 17.sp)
+                if (cards) StructuredLogCard(line)
+                else androidx.compose.foundation.text.selection.SelectionContainer {
+                    Text(line, modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                        color = t.textPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp, lineHeight = 19.sp)
                 }
             }
         }

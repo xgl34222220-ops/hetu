@@ -164,7 +164,7 @@ private fun ExtraRow(
         Spacer(Modifier.width(11.dp))
         Column(Modifier.weight(1f)) {
             Text(ht(title), color = t.textPrimary, fontSize = 14.5.sp, lineHeight = 19.sp, fontWeight = FontWeight.SemiBold)
-            Text(ht(subtitle), color = t.textSecondary, fontSize = 11.5.sp, lineHeight = 16.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(ht(subtitle), color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
         }
         if (value.isNotBlank()) {
             Text(value, color = t.textSecondary, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -450,7 +450,7 @@ private fun ProxySelectorPreferencesScreen(onBack: () -> Unit) {
     var groupColumns by remember { mutableIntStateOf(prefs.getInt("proxySelectorGroupColumns", 0)) }
     var nodeColumns by remember { mutableIntStateOf(prefs.getInt("proxySelectorNodeColumns", 0)) }
     var density by remember { mutableStateOf(prefs.getString("proxySelectorDensity", "standard").orEmpty()) }
-    var overflow by remember { mutableStateOf(prefs.getString("proxySelectorNameOverflow", "clip").orEmpty()) }
+    var overflow by remember { mutableStateOf(prefs.getString("proxySelectorNameOverflow", "wrap").orEmpty().let { if (it == "clip") "wrap" else it }) }
     var sort by remember { mutableStateOf(prefs.getString("proxySelectorNodeSort", "config").orEmpty()) }
     var desc by remember { mutableStateOf(prefs.getBoolean("proxySelectorSortDescending", false)) }
     var groupByProvider by remember { mutableStateOf(prefs.getBoolean("proxySelectorGroupByProvider", false)) }
@@ -480,7 +480,7 @@ private fun ProxySelectorPreferencesScreen(onBack: () -> Unit) {
                     HorizontalDivider(color = t.outline)
                     ExtraRow(Icons.Rounded.DensityMedium, "显示密度", "标准或紧凑卡片", if (density == "compact") "紧凑" else "标准") { picker = "density" }
                     HorizontalDivider(color = t.outline)
-                    ExtraRow(Icons.Rounded.TextFields, "名称溢出", "裁剪 / 滚动 / 换行", when (overflow) { "scroll" -> "滚动"; "wrap" -> "换行"; else -> "裁剪" }) { picker = "overflow" }
+                    ExtraRow(Icons.Rounded.TextFields, "名称溢出", "完整换行 / 滚动", when (overflow) { "scroll" -> "滚动"; "wrap" -> "换行"; else -> "换行" }) { picker = "overflow" }
                 }
             }
             item {
@@ -516,7 +516,7 @@ private fun ProxySelectorPreferencesScreen(onBack: () -> Unit) {
             "groupColumns" -> listOf("0" to "自动", "1" to "单列", "2" to "双列")
             "nodeColumns" -> listOf("0" to "自动", "1" to "单列", "2" to "双列", "3" to "三列")
             "density" -> listOf("standard" to "标准", "compact" to "紧凑")
-            "overflow" -> listOf("clip" to "裁剪", "scroll" to "滚动", "wrap" to "换行")
+            "overflow" -> listOf("wrap" to "完整换行", "scroll" to "滚动")
             else -> listOf("config" to "配置顺序", "name" to "名称", "latency" to "延迟")
         }
         ModalBottomSheet(

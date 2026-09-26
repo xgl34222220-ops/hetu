@@ -1,6 +1,10 @@
 package io.github.xgl34222220.hetu
 
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.*
@@ -34,27 +38,46 @@ internal fun TrafficRankings(connections: List<ProxyConnectionUi>) {
         if (historical) history = ProxyApiHistoryStore.ranking(context, dimension, sort, System.currentTimeMillis() - 86_400_000)
     }
     val rows = remember(connections, dimension, sort, historical, history) { if (historical) history else rankConnections(connections, dimension, sort) }
+    var expandedName by rememberSaveable(dimension) { mutableStateOf<String?>(null) }
     GroupedInsetSection {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(if(historical) "24 小时排行" else "实时排行", color = t.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                 TextButton(onClick = { sort = if (sort == "count") "traffic" else "count"; prefs.edit().putString("overviewRankSort", sort).apply() }) { Text(if (sort == "count") "按连接数" else "按流量", fontSize = 12.sp) }
             }
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf("host" to "域名 / IP", "app" to "应用", "route" to "代理链").forEach { (key,label) -> LiquidChoicePill(label, dimension == key, { dimension = key; prefs.edit().putString("overviewRankDimension", key).apply() }) }
             }
-            if(prefs.getBoolean("proxyApiHistoryEnabled", false)) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if(prefs.getBoolean("proxyApiHistoryEnabled", false)) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 LiquidChoicePill("实时", !historical, { historical = false }); LiquidChoicePill("24 小时", historical, { historical = true })
             }
             if(rows.isEmpty()) Text(if(historical) "暂无已采集历史" else "暂无实时连接数据", color = t.textSecondary, fontSize = 12.sp)
-            rows.forEachIndexed { index,row ->
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("${index+1}", color = t.textMuted, fontSize = 12.sp)
-                    Column(Modifier.weight(1f)) {
-                        Text(row.name, color = t.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 13.sp)
-                        Text("↑ ${refBytes(row.upload)}  ↓ ${refBytes(row.download)}", color = t.textSecondary, fontSize = 11.sp)
+            rows.forEachIndexed { index, row ->
+                Column(Modifier.fillMaxWidth().clickable { expandedName = if (expandedName == row.name) null else row.name }
+                    .padding(vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Box(Modifier.widthIn(min = 32.dp).heightIn(min = 32.dp)
+                            .background(t.controlBackground, RoundedCornerShape(10.dp)).padding(6.dp),
+                            contentAlignment = Alignment.Center) {
+                            HetuNumber("${index + 1}", Modifier.testTag("rank-number:$index"), color = t.textSecondary,
+                                style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp, lineHeight = 19.sp))
+                        }
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(row.name, color = t.textPrimary, maxLines = if (expandedName == row.name) Int.MAX_VALUE else 2,
+                                overflow = TextOverflow.Ellipsis, fontSize = 13.sp, lineHeight = 20.sp)
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Text("↑ ${refBytes(row.upload)}", color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+                                Text("↓ ${refBytes(row.download)}", color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+                            }
+                        }
+                        HetuNumber("${row.connections} 条", color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.labelLarge.copy(fontSize = 12.sp, lineHeight = 18.sp))
                     }
-                    Text("${row.connections} 条", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp)
+                    val maximum = rows.maxOfOrNull { if (sort == "traffic") it.upload + it.download else it.connections.toLong() } ?: 0L
+                    if (maximum > 0L) HetuReadOnlyProgress(
+                        (if (sort == "traffic") row.upload + row.download else row.connections.toLong()).toFloat() / maximum,
+                        Modifier.padding(start = 42.dp))
                 }
             }
         }
