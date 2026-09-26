@@ -9,6 +9,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.*
@@ -35,7 +37,7 @@ class HomeScreenRenderTest {
         var night by mutableStateOf(false)
         var font by mutableFloatStateOf(1f)
         var width by mutableIntStateOf(360)
-        var restarts=0;var toggles=0;var reloads=0
+        var restarts=0;var toggles=0;var reloads=0;var diagnostics=0;var logs=0
         val app=ApplicationProvider.getApplicationContext<Context>()
         compose.setContent {
             key(night) {
@@ -51,19 +53,28 @@ class HomeScreenRenderTest {
                                 siteDelays=mapOf("Baidu" to 44L,"Cloudflare" to 186L,"Google" to 162L),
                                 upRate=1331,downRate=2150,cpuPercent=5.7f,operation="",message="",testing=false,
                                 hazeState=remember { HazeState() },glassEnabled=false,onRefresh={},onToggle={toggles++},onReload={reloads++},
-                                onRestart={restarts++},onDelay={},onLog={},onSubscription={},diagnosticLoading=false,onConnections={},onSettings={},onDiagnostics={})
+                                onRestart={restarts++},onDelay={},onLog={logs++},onSubscription={},diagnosticLoading=false,onConnections={},onSettings={},onDiagnostics={diagnostics++})
                         }
                     }
                 }
             }
         }
-        for(w in listOf(360,412)) for(scale in listOf(1f,1.5f)) for(dark in listOf(false,true)) {
+        for(w in listOf(320,360,412)) for(scale in listOf(1f,1.5f)) for(dark in listOf(false,true)) {
             compose.runOnIdle { width=w;font=scale;night=dark }
             compose.waitForIdle()
             compose.onNodeWithTag("home-run-state", true).assertTextEquals("运行中")
             compose.onNodeWithTag("home-liquid-actions", true).assertExists()
             compose.onNodeWithText("停止",true).assertExists()
             compose.onNodeWithText("44 ms", true).assertExists()
+            for (value in listOf("44 ms", "186 ms", "162 ms", "WebUI", "Web 界面", "日志", "长按诊断")) {
+                val layouts = mutableListOf<TextLayoutResult>()
+                compose.onNodeWithText(value, true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+                assertTrue("Missing measured latency text: $value", layouts.isNotEmpty())
+                layouts.forEach { layout ->
+                    assertFalse("Latency text clipped vertically at width=$w font=$scale: $value (${layout.size})", layout.didOverflowHeight)
+                    assertTrue("Latency line cut off: $value", layout.getLineBottom(0) <= layout.size.height + .5f)
+                }
+            }
             val heroBounds = compose.onNodeWithTag("home-hero", true).fetchSemanticsNode().boundsInRoot
             val actionBounds = compose.onNodeWithTag("home-liquid-actions", true).fetchSemanticsNode().boundsInRoot
             compose.runOnIdle {
@@ -87,6 +98,8 @@ class HomeScreenRenderTest {
         }
         compose.onNodeWithText("重启",true).performScrollTo().performClick()
         compose.runOnIdle { assertEquals(1,restarts);assertEquals(0,toggles);assertEquals(0,reloads) }
+        compose.onNodeWithText("日志").performScrollTo().performTouchInput { longClick() }
+        compose.runOnIdle { assertEquals(1,diagnostics);assertEquals(0,logs);assertEquals(1,restarts) }
     }
     private fun capture(name:String) {
         compose.waitForIdle()

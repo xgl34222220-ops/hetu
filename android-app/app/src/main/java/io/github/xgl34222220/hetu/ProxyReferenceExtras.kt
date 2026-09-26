@@ -495,7 +495,7 @@ private fun ProxySelectorPreferencesScreen(onBack: () -> Unit) {
             }
             item {
                 ExtraCard {
-                    ExtraSwitchRow("切换节点后断开旧连接", "避免已有长连接继续使用旧节点", disconnect) { disconnect = it; putBool("proxySelectorDisconnectOnSelect", it) }
+                    ExtraSwitchRow("切换节点后断开旧连接", "仅断开经过当前策略组的旧连接，保留直连和其他策略连接", disconnect) { disconnect = it; putBool("proxySelectorDisconnectOnSelect", it) }
                     ExtraSwitchRow("显示隐藏策略", "显示配置中标记为隐藏的策略组", hidden) { hidden = it; putBool("proxySelectorShowHidden", it) }
                     ExtraSwitchRow("测速时检测 IPv6", "支持时同时识别 IPv6 连通性", detectIpv6) { detectIpv6 = it; putBool("proxySelectorDetectIpv6", it) }
                     ExtraSwitchRow("按模式显示 GLOBAL", "仅在适合的模式显示 GLOBAL 策略", globalMode) { globalMode = it; putBool("proxySelectorShowGlobalByMode", it) }

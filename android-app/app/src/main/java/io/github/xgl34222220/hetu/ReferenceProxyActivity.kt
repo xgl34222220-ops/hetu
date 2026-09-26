@@ -19,6 +19,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -947,9 +948,10 @@ internal fun RefHome(
                 }
                 RefReferenceShortcut(
                     title = "日志",
-                    subtitle = "查看",
+                    subtitle = if (diagnosticLoading) "正在诊断…" else "长按诊断",
                     modifier = Modifier.weight(1f),
                     enabled = true,
+                    onLongClick = if (diagnosticLoading) null else onDiagnostics,
                     onClick = onLog,
                 )
             }
@@ -1072,19 +1074,24 @@ private fun RefReferenceShortcut(
     subtitle: String,
     modifier: Modifier,
     enabled: Boolean,
+    onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
     val t = LocalHetuTokens.current
     Surface(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier.height(64.dp),
+        modifier = modifier.heightIn(min = 64.dp).combinedClickable(
+            enabled = enabled,
+            role = Role.Button,
+            onLongClickLabel = if (onLongClick != null) "消息与网络诊断" else null,
+            onLongClick = onLongClick,
+            onClick = onClick,
+        ),
         shape = RoundedCornerShape(20.dp),
         color = t.cardBackground,
         shadowElevation = 0.dp,
     ) {
         Column(
-            Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 12.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.Center,
         ) {
             Text(
@@ -1121,8 +1128,9 @@ private fun RefLatencyPanel(
         shadowElevation = 0.dp,
     ) {
         Column(
-            Modifier.fillMaxWidth().height(88.dp).padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
+            Modifier.fillMaxWidth().heightIn(min = 88.dp)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Row(
                 Modifier.fillMaxWidth(),
@@ -1148,7 +1156,7 @@ private fun RefLatencyPanel(
                 }
             }
             Row(
-                Modifier.fillMaxWidth().height(42.dp),
+                Modifier.fillMaxWidth().heightIn(min = 42.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 RefLatencyColumn("Baidu", baidu, testing, Modifier.weight(1f))
@@ -1858,13 +1866,8 @@ internal fun RefPanel(
                                             view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                                             scope.launch {
                                                 try {
-                                                    val previousConnections = if (selectorPrefs.getBoolean("proxySelectorDisconnectOnSelect", false)) {
-                                                        state.connections.map { it.id }
-                                                    } else emptyList()
-                                                    repo.select(group.name, node)
-                                                    if (previousConnections.isNotEmpty()) {
-                                                        previousConnections.forEach { id -> runCatching { repo.closeConnection(id) } }
-                                                    }
+                                                    repo.select(group.name, node,
+                                                        disconnectPrevious = selectorPrefs.getBoolean("proxySelectorDisconnectOnSelect", false))
                                                     onRefreshState()
                                                 } catch (_: Exception) {
                                                     if (previous.isBlank()) selectedLocal.remove(group.name) else selectedLocal[group.name] = previous
@@ -2157,14 +2160,8 @@ internal fun RefPanel(
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                                 scope.launch {
                                     try {
-                                        val previousConnections =
-                                            if (selectorPrefs.getBoolean("proxySelectorDisconnectOnSelect", false)) {
-                                                state.connections.map { it.id }
-                                            } else emptyList()
-                                        repo.select(group.name, node)
-                                        if (previousConnections.isNotEmpty()) {
-                                            previousConnections.forEach { id -> runCatching { repo.closeConnection(id) } }
-                                        }
+                                        repo.select(group.name, node,
+                                            disconnectPrevious = selectorPrefs.getBoolean("proxySelectorDisconnectOnSelect", false))
                                         onRefreshState()
                                     } catch (_: Exception) {
                                         if (previous.isBlank()) selectedLocal.remove(group.name)

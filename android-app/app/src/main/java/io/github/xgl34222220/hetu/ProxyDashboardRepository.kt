@@ -48,7 +48,28 @@ internal class ProxyDashboardRepository(context: Context) {
 
     suspend fun state(): ProxyComposeState = controller.state()
     suspend fun rules(): List<ProxyRuleUi> = controller.rules()
-    suspend fun select(group: String, node: String) = controller.select(group, node)
+    suspend fun select(group: String, node: String, disconnectPrevious: Boolean = false) = withContext(Dispatchers.IO) {
+        // Take a live snapshot before switching. A cached UI list includes unrelated
+        // DIRECT/message transports, and a post-switch list can include new sessions.
+        val previous = if (disconnectPrevious) api.proxies().optJSONObject(group)
+            ?.optString("now").orEmpty() else ""
+        val oldIds = if (disconnectPrevious && previous.isNotBlank() && previous != node)
+            selectionConnectionIds(api.connections(), group) else emptyList()
+        api.select(group, node)
+        // A failed switch never reaches cleanup. Missing/unknown chains are retained.
+        var failed = 0
+        for (id in oldIds) {
+            try { api.closeConnection(id) }
+            catch (cancel: CancellationException) { throw cancel }
+            catch (_: Exception) { failed++ }
+        }
+        app.getSharedPreferences("hetu", 0).edit()
+            .putLong("proxyLastSelectionAt", System.currentTimeMillis())
+            .putString("proxyLastSelectionGroup", group)
+            .putInt("proxyLastSelectionClosed", oldIds.size - failed)
+            .putInt("proxyLastSelectionCloseFailed", failed)
+            .apply()
+    }
     suspend fun closeConnection(id: String) = controller.closeConnection(id)
     suspend fun closeAll() = controller.closeAll()
     suspend fun ensureIcons(): Int = controller.ensureIcons()
@@ -211,6 +232,20 @@ suspend fun globalDelay(): Map<String, Long> = withContext(Dispatchers.IO) {
         if ((result[node] ?: -1L) <= 0L) previous[node]?.takeIf { it > 0L }?.let { result[node] = it }
     }
     result
+}
+
+/** Match exact core-provided chain elements, never a rendered arrow-separated label. */
+internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<String> {
+    if (group.isBlank()) return emptyList()
+    val connections = snapshot.optJSONArray("connections") ?: return emptyList()
+    return buildSet {
+        for (index in 0 until connections.length()) {
+            val connection = connections.optJSONObject(index) ?: continue
+            val chains = connection.optJSONArray("chains") ?: continue
+            val id = connection.optString("id")
+            if (id.isNotBlank() && (0 until chains.length()).any { chains.optString(it) == group }) add(id)
+        }
+    }.toList()
 }
 
 suspend fun delay(node: String): Long = withContext(Dispatchers.IO) {
