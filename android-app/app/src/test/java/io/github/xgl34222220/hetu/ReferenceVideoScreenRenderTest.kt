@@ -24,7 +24,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk=[35], qualifiers="w480dp-h1800dp-mdpi")
+@Config(sdk=[35], qualifiers = "zh-rCN-w480dp-h1800dp-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ReferenceVideoScreenRenderTest {
     @get:Rule val compose=createAndroidComposeRule<ComponentActivity>()

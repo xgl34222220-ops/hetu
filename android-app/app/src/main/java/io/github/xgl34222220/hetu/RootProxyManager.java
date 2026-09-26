@@ -765,6 +765,8 @@ final class RootProxyManager {
                 "proxyAutoRecoverySuccess","proxyAutoRecoveryError","proxyLastNetworkSessionReset",
                 "proxyLastNetworkSessionResetCount","proxyLastNetworkSessionResetReason","proxyLastNetworkObservationAt","proxyLastNetworkObservationReason","proxyNetworkSessionResetError",
                 "proxyLastAutoStopAt","proxyLastAutoStopReason","proxyAdblockLastRevision","proxyAdblockLastError",
+                "proxySelectorDisconnectOnSelect","proxyLastSelectionAt","proxyLastSelectionGroup",
+                "proxyLastSelectionClosed","proxyLastSelectionCloseFailed",
                 "proxyAdblockHotReloadAt","proxyAdblockLastHitAt","proxyRootEgressProbeLastError",
                 "proxyNetworkIntegrity","proxyNetworkFault","proxyNetworkCheckedAt","proxyPolicyEgressState","proxyPolicyEgressCheckedAt"}){
             if(values.containsKey(key))events.append('\n').append(key).append('=').append(values.get(key));

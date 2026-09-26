@@ -32,6 +32,12 @@ internal object HetuSettingsBackup {
         "accentHex",
         "colorPalette",
         "pureBlackDark",
+        "appLanguage",
+        "predictiveBackAnimation",
+        "predictiveBackFollowEdge",
+        "topBarBlurStyle",
+        "logAutoRefresh",
+        "logCardView",
     )
 
     private val prefixes = listOf(
@@ -49,6 +55,12 @@ internal object HetuSettingsBackup {
         "latency",
         "notification",
         "proxyStatus",
+        "proxySelector",
+        "proxyWebPanel",
+        "proxyApiHistoryRetentionDays",
+        "proxyApiHistoryMaxMb",
+        "overview",
+        "subscriptionHealth",
     )
 
     private val excluded = setOf(

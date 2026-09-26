@@ -41,27 +41,27 @@ internal fun delayBand(value: Long?): String = when {
 
 /** Selection and latency are independent: selected 96ms remains green. */
 @Composable
-internal fun LatencyChip(value: Long?, testing: Boolean, onClick: (() -> Unit)? = null, modifier: Modifier = Modifier, compact: Boolean = false) {
+internal fun LatencyChip(value: Long?, testing: Boolean, onClick: (() -> Unit)? = null, modifier: Modifier = Modifier, compact: Boolean = false, prominent: Boolean = false) {
     val t = LocalHetuTokens.current
     val band = delayBand(value)
-    val foreground = when (band) { "good" -> t.success; "fair" -> t.warning; "failed", "slow" -> t.danger; else -> t.textSecondary }
-    val background = when (band) { "good" -> t.successContainer; "fair" -> t.warningContainer; "failed", "slow" -> t.dangerContainer; else -> t.controlBackground }
+    val foreground = when (band) { "good" -> t.success; "fair" -> t.warning; "slow" -> t.warning; "failed" -> t.danger; else -> t.textSecondary }
+    val background = when (band) { "good" -> t.successContainer; "fair", "slow" -> t.warningContainer; "failed" -> t.dangerContainer; else -> t.controlBackground }
     var showBusy by remember { mutableStateOf(false) }
     LaunchedEffect(testing) { if (testing) { delay(150); showBusy = true } else showBusy = false }
     val target = if (showBusy) "测速中" else when { value == null -> "— ms"; value <= 0L -> "超时"; else -> "$value ms" }
-    val motion = LocalHetuMotionEnabled.current
     Box(modifier.then(if (onClick != null) Modifier.sizeIn(minWidth = if (compact) 48.dp else 72.dp, minHeight = 48.dp)
         .clickable(enabled = !testing, role = Role.Button, onClickLabel = "测速", onClick = onClick) else Modifier),
         contentAlignment = Alignment.Center) {
-        Surface(shape = CircleShape, color = if (showBusy || value == null) Color.Transparent else background,
+        Surface(shape = CircleShape, color = if (prominent || showBusy || value == null) Color.Transparent else background,
             modifier = Modifier.semantics { stateDescription = if (showBusy) "正在测速" else "$band $target" }) {
             Row(Modifier.padding(horizontal = if (compact) 6.dp else 9.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (showBusy) HetuBusyIndicator(Modifier.size(12.dp), t.textSecondary)
-                AnimatedContent(target, transitionSpec = { fadeIn(tween(if (motion) 150 else 0)).togetherWith(fadeOut(tween(if (motion) 90 else 0))) }, label = "latency") {
-                    HetuNumber(it, monospaced = true, color = if (showBusy || value == null) t.textSecondary.copy(alpha = .65f) else foreground,
-                        style = MaterialTheme.typography.labelMedium.copy(fontSize = if (compact) 10.5.sp else 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.SemiBold))
-                }
+                // Changing text must not animate through a clipped intermediate size.
+                HetuNumber(target, monospaced = true,
+                    modifier = Modifier.testTag("latency-text:$target"),
+                    color = if (showBusy || value == null) t.textSecondary else foreground,
+                    style = MaterialTheme.typography.labelMedium.copy(fontSize = if (prominent) 18.sp else 12.sp, lineHeight = if (prominent) 26.sp else 18.sp, fontWeight = if (prominent) FontWeight.SemiBold else FontWeight.Medium))
             }
         }
     }

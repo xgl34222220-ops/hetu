@@ -15,8 +15,8 @@ android {
         applicationId = "io.github.xgl34222220.hetu"
         minSdk = 26
         targetSdk = 35
-        versionCode = 528
-        versionName = "0.4.0-test.128"
+        versionCode = 532
+        versionName = "0.4.0-test.132"
     }
 
     testOptions {
@@ -82,6 +82,7 @@ dependencies {
 // Presentation-only: safe YAML icon projection, SVG decoding, rendered regression tests.
 dependencies {
     implementation("org.yaml:snakeyaml:2.3")
+    implementation("com.networknt:json-schema-validator:1.5.9")
     implementation("com.caverock:androidsvg-aar:1.4")
     testImplementation(platform("androidx.compose:compose-bom:2026.03.00"))
     testImplementation("junit:junit:4.13.2")

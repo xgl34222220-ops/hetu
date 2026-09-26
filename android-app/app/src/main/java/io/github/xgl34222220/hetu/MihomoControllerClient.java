@@ -81,6 +81,19 @@ final class MihomoControllerClient {
     JSONObject ruleProviders()throws Exception{return request("GET","/providers/rules",null,12000);}
     JSONObject proxyProviders()throws Exception{return request("GET","/providers/proxies",null,12000);}
     JSONObject version()throws Exception{return request("GET","/version",null);}
+    JSONObject configs()throws Exception{return request("GET","/configs",null);}
+    void setTrafficMode(String mode)throws Exception{
+        if(!"rule".equals(mode)&&!"global".equals(mode)&&!"direct".equals(mode))throw new IllegalArgumentException("无效的流量模式");
+        request("PATCH","/configs",new JSONObject().put("mode",mode));
+    }
+    // An IPv6-only literal and no fallback: an IPv4 result must never pass this probe.
+    long delayIpv6(String node)throws Exception{
+        DELAY_SLOTS.acquire();
+        try{
+            String url=URLEncoder.encode("https://[2606:4700:4700::1111]/cdn-cgi/trace","UTF-8");
+            return request("GET","/proxies/"+Uri.encode(node)+"/delay?timeout=4000&url="+url+"&expected=200",null,5500).optLong("delay",-1L);
+        }finally{DELAY_SLOTS.release();}
+    }
 
     void reloadConfig(String path)throws Exception{
         if(path==null||path.trim().isEmpty())throw new IOException("重载配置路径为空");

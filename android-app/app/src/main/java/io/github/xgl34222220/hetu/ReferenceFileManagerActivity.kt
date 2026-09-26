@@ -1,367 +1,235 @@
 package io.github.xgl34222220.hetu
 
-import io.github.xgl34222220.hetu.ui.CrystalSurface as Surface
-import io.github.xgl34222220.hetu.ui.*
-
+import android.content.Intent
 import android.os.Bundle
+import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.background
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.ChevronRight
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Description
-import androidx.compose.material.icons.rounded.Folder
-import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.github.xgl34222220.hetu.ui.HetuTheme
-import io.github.xgl34222220.hetu.ui.LocalHetuTokens
+import io.github.xgl34222220.hetu.ui.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-private const val REF_FILE_ROOT = "/data/adb/hetu"
-
-private data class RefFileItem(
-    val name: String,
-    val path: String,
-    val directory: Boolean,
-    val size: Long,
-)
-
-private data class RefFileBadge(val label: String, val background: Color, val foreground: Color)
-
-private fun refFileBadge(name: String): RefFileBadge {
-    return when (name.substringAfterLast('.', "").lowercase()) {
-        "yaml", "yml" -> RefFileBadge("YAML", Color(0xFFEFF6FF), Color(0xFF2563EB))
-        "log" -> RefFileBadge("LOG", Color(0xFFF1F5F9), Color(0xFF64748B))
-        "pid" -> RefFileBadge("PID", Color(0xFFF5F3FF), Color(0xFF7C3AED))
-        "db", "sqlite", "sqlite3" -> RefFileBadge("DB", Color(0xFFECFDF5), Color(0xFF059669))
-        "sh" -> RefFileBadge("SH", Color(0xFFFFF7ED), Color(0xFFEA580C))
-        "json", "jsonc" -> RefFileBadge("JSON", Color(0xFFECFEFF), Color(0xFF0891B2))
-        "conf", "ini" -> RefFileBadge("CONF", Color(0xFFEEF2FF), Color(0xFF4F46E5))
-        else -> RefFileBadge("FILE", Color(0xFFF8FAFC), Color(0xFF64748B))
-    }
-}
-
-
 class ReferenceFileManagerActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        super.onCreate(savedInstanceState); enableEdgeToEdge()
         setContent { HetuTheme { ReferenceFileManagerScreen { finish() } } }
     }
 }
 
-private fun shellQuote(value: String): String = "'" + value.replace("'", "'\\''") + "'"
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun RefBreadcrumb(path: String, onNavigate: (String) -> Unit) {
+internal fun ReferenceFileManagerScreen(onClose: () -> Unit) {
+    val context = LocalContext.current
     val t = LocalHetuTokens.current
-    val relative = path.removePrefix(REF_FILE_ROOT).trim('/')
-    val parts = buildList {
-        add("hetu")
-        if (relative.isNotBlank()) addAll(relative.split('/').filter { it.isNotBlank() })
+    val repo = remember { RuntimeFilesRepository(context) }
+    val scope = rememberCoroutineScope()
+    var path by rememberSaveable { mutableStateOf(RuntimeFilesRepository.ROOT) }
+    var query by rememberSaveable { mutableStateOf("") }
+    var sort by rememberSaveable { mutableStateOf("name") }
+    var revision by remember { mutableIntStateOf(0) }
+    var entries by remember { mutableStateOf(emptyList<RuntimeFileEntry>()) }
+    var loading by remember { mutableStateOf(true) }
+    var working by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf(false) }
+    var selected by remember { mutableStateOf<RuntimeFileEntry?>(null) }
+    var form by remember { mutableStateOf<String?>(null) }
+    var name by rememberSaveable { mutableStateOf("") }
+    var address by rememberSaveable { mutableStateOf("") }
+    var userAgent by rememberSaveable { mutableStateOf("Hetu-Android") }
+    var preview by remember { mutableStateOf<RuntimeFileContent?>(null) }
+    var previewing by remember { mutableStateOf(false) }
+    var exportPath by rememberSaveable { mutableStateOf("") }
+
+    fun operate(success: String, action: suspend () -> Unit) {
+        if (working) return
+        working = true; message = "正在处理…"; error = false
+        scope.launch {
+            try { action(); message = success; error = false; revision++ }
+            catch (cancel: CancellationException) { throw cancel }
+            catch (failure: Exception) { error = true; message = failure.message ?: "操作失败" }
+            finally { working = false }
+        }
     }
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .crystalMaterial(
-                RoundedCornerShape(HetuGlassRadius.Input),
-                depth = CrystalDepth.InsetItem,
-            )
-    ) {
-        Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 5.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            parts.forEachIndexed { index, part ->
-                val target = if (index == 0) REF_FILE_ROOT else REF_FILE_ROOT + "/" + parts.drop(1).take(index).joinToString("/")
-                val current = index == parts.lastIndex
-                TextButton(
-                    onClick = { if (!current) onNavigate(target) },
-                    enabled = !current,
-                    contentPadding = PaddingValues(horizontal = 7.dp, vertical = 3.dp),
-                    modifier = Modifier.heightIn(min = 34.dp),
-                ) {
-                    Text(
-                        part,
-                        color = if (current) t.textPrimary else MaterialTheme.colorScheme.primary,
-                        fontSize = 12.sp,
-                        fontWeight = if (current) FontWeight.SemiBold else FontWeight.Medium,
-                        maxLines = 1,
-                    )
-                }
-                if (!current) Icon(Icons.Rounded.ChevronRight, null, Modifier.size(15.dp), tint = t.textMuted)
+    val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) operate("已导入，同名文件已保留副本") {
+            val fileName = withContext(Dispatchers.IO) {
+                context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
+                    if (it.moveToFirst()) it.getString(0) else null
+                } ?: "导入文件.txt"
+            }
+            repo.importFile(path, fileName, uri)
+        }
+    }
+    val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+        val target = exportPath
+        if (uri != null && target.isNotBlank()) operate("导出成功") { repo.export(RuntimeFileEntry(File(target).name, target, false, 0), uri) }
+    }
+    fun back() { if (path == RuntimeFilesRepository.ROOT) onClose() else { path = File(path).parent ?: RuntimeFilesRepository.ROOT; query = "" } }
+    BackHandler { back() }
+    LaunchedEffect(path, revision) {
+        loading = true
+        try {
+            if (path == RuntimeFilesRepository.ROOT) ProxyComposeController(context).ensureRuntimeFiles()
+            entries = repo.list(path)
+        } catch (cancel: CancellationException) { throw cancel }
+        catch (failure: Exception) { entries = emptyList(); error = true; message = failure.message ?: "无法读取目录" }
+        finally { loading = false }
+    }
+    val filtered = remember(entries, query, sort) {
+        val matched = entries.filter { it.name.contains(query.trim(), true) }
+        when (sort) {
+            "size" -> matched.sortedWith(compareBy<RuntimeFileEntry> { !it.directory }.thenByDescending { it.size })
+            "date" -> matched.sortedWith(compareBy<RuntimeFileEntry> { !it.directory }.thenByDescending { it.modified })
+            else -> matched.sortedWith(compareBy<RuntimeFileEntry> { !it.directory }.thenBy { it.name.lowercase() })
+        }
+    }
+    Column(Modifier.fillMaxSize().crystalPageBackground().statusBarsPadding().testTag("runtime-files")) {
+        HetuPageHeader("文件管理", ::back, "${entries.size} 项") {
+            IconButton(onClick = { revision++ }, enabled = !loading) { Icon(Icons.Rounded.Refresh, "刷新") }
+            IconButton(onClick = { selected = null; form = "add" }, enabled = !working) { Icon(Icons.Rounded.Add, "新建或导入") }
+        }
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = { path = RuntimeFilesRepository.ROOT }) { Text("hetu") }
+            var current = RuntimeFilesRepository.ROOT
+            path.removePrefix(RuntimeFilesRepository.ROOT).split('/').filter { it.isNotBlank() }.forEach { segment ->
+                current += "/$segment"; val target = current
+                Icon(Icons.Rounded.ChevronRight, null, Modifier.size(14.dp), tint = t.textMuted)
+                TextButton(onClick = { path = target }) { Text(segment) }
             }
         }
-    }
-}
-
-
-private suspend fun readDirectory(context: android.content.Context, path: String): List<RefFileItem> = withContext(Dispatchers.IO) {
-    if (!path.startsWith(REF_FILE_ROOT)) return@withContext emptyList()
-    val command = """
-        P=${shellQuote(path)}
-        [ -d "${'$'}P" ] || exit 0
-        for f in "${'$'}P"/* "${'$'}P"/.*; do
-          [ -e "${'$'}f" ] || continue
-          n=${'$'}(basename "${'$'}f")
-          [ "${'$'}n" = "." ] && continue
-          [ "${'$'}n" = ".." ] && continue
-          if [ -d "${'$'}f" ]; then
-            printf 'D\t%s\t0\n' "${'$'}n"
-          else
-            s=${'$'}(wc -c < "${'$'}f" 2>/dev/null || echo 0)
-            printf 'F\t%s\t%s\n' "${'$'}n" "${'$'}s"
-          fi
-        done
-    """.trimIndent()
-    val result = RootBridge.rootShell(context.applicationContext, command, 8_000L)
-    if (!result.ok()) return@withContext emptyList()
-    result.output.lineSequence().mapNotNull { line ->
-        val parts = line.split('\t')
-        if (parts.size < 3) return@mapNotNull null
-        val name = parts[1]
-        val dir = parts[0] == "D"
-        RefFileItem(name, "$path/$name", dir, parts[2].toLongOrNull() ?: 0L)
-    }.sortedWith(compareBy<RefFileItem> { !it.directory }.thenBy { it.name.lowercase() }).toList()
-}
-
-private suspend fun readTextFile(context: android.content.Context, path: String): String = withContext(Dispatchers.IO) {
-    if (!path.startsWith(REF_FILE_ROOT)) return@withContext "不允许读取此路径"
-    val command = "head -c 24000 ${shellQuote(path)} 2>/dev/null"
-    val result = RootBridge.rootShell(context.applicationContext, command, 8_000L)
-    if (!result.ok()) "无法读取文件" else result.output.ifBlank { "空文件" }
-}
-
-@Composable
-private fun ReferenceFileManagerScreen(onClose: () -> Unit) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val t = LocalHetuTokens.current
-    var path by rememberSaveable { mutableStateOf(REF_FILE_ROOT) }
-    var refresh by remember { mutableIntStateOf(0) }
-    var previewTitle by remember { mutableStateOf<String?>(null) }
-    var previewPath by remember { mutableStateOf("") }
-    var previewText by remember { mutableStateOf("") }
-    var loadError by remember { mutableStateOf("") }
-    val items by produceState(initialValue = emptyList(), path, refresh) {
-        value = try {
-            if (path == REF_FILE_ROOT) {
-                ProxyComposeController(context).ensureRuntimeFiles()
-            }
-            loadError = ""
-            readDirectory(context, path)
-        } catch (cancel: CancellationException) {
-            throw cancel
-        } catch (error: Exception) {
-            loadError = error.message ?: "无法读取河图运行目录"
-            emptyList()
+        LiquidGlassTextField(query, { query = it }, "搜索文件或文件夹", Modifier.fillMaxWidth().padding(horizontal = 16.dp), leadingIcon = Icons.Rounded.Search)
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("name" to "名称", "date" to "最近修改", "size" to "大小").forEach { (key, label) -> LiquidChoicePill(label, sort == key, { sort = key }) }
         }
-    }
-
-    fun goBack() {
-        if (path == REF_FILE_ROOT) onClose()
-        else {
-            val parent = File(path).parentFile?.path.orEmpty()
-            path = parent.takeIf { it.startsWith(REF_FILE_ROOT) } ?: REF_FILE_ROOT
-        }
-    }
-
-    LazyColumn(
-        Modifier.fillMaxSize().crystalPageBackground(),
-        contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = hetuContentBottomPadding()),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        item {
-            Row(
-                Modifier.fillMaxWidth().statusBarsPadding().heightIn(min = 56.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = ::goBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回") }
-                Text("文件管理", color = t.textPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                IconButton(onClick = { refresh++ }) { Icon(Icons.Rounded.Refresh, "刷新") }
-            }
-        }
-        item {
-            RefBreadcrumb(path) { target -> path = target }
-        }
-        item {
-            GroupedInsetSection {
-                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(0.dp)) {
-                    if (items.isEmpty()) {
-                        Text(
-                            loadError.ifBlank { "此目录暂无运行文件" },
-                            Modifier.padding(vertical = 18.dp),
-                            color = if (loadError.isBlank()) t.textSecondary else MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    } else {
-                        items.forEachIndexed { index, item ->
-                            Row(
-                                Modifier.fillMaxWidth().clickable {
-                                    if (item.directory) path = item.path
-                                    else {
-                                        previewTitle = item.name
-                                        previewPath = item.path
-                                        previewText = "正在读取…"
-                                    }
-                                }.padding(vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                val badge = if (item.directory) null else refFileBadge(item.name)
-                                Box(
-                                    Modifier.size(34.dp).background(
-                                        badge?.background ?: MaterialTheme.colorScheme.primary.copy(alpha = .08f),
-                                        RoundedCornerShape(11.dp),
-                                    ),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Icon(
-                                        if (item.directory) Icons.Rounded.Folder else Icons.Rounded.Description,
-                                        null,
-                                        tint = badge?.foreground ?: MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(19.dp),
-                                    )
-                                }
-                                Spacer(Modifier.width(11.dp))
-                                Column(Modifier.weight(1f)) {
-                                    Text(item.name, color = t.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    if (!item.directory) Text(refFileSize(item.size), color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
-                                }
-                                if (badge != null) {
-                                    Surface(shape = CircleShape, color = badge.background) {
-                                        Text(
-                                            badge.label,
-                                            color = badge.foreground,
-                                            fontSize = 9.5.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp),
-                                        )
-                                    }
-                                    Spacer(Modifier.width(6.dp))
-                                }
-                                Icon(Icons.Rounded.ChevronRight, null, tint = t.textSecondary, modifier = Modifier.size(18.dp))
+        if (message.isNotBlank()) HetuTaskFeedback(message, error, working, Modifier.padding(horizontal = 16.dp))
+        HetuRefreshBox(loading, { revision++ }, Modifier.weight(1f)) {
+            LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, hetuContentBottomPadding()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (!loading && filtered.isEmpty()) item {
+                    GroupedInsetSection {
+                        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(if (error) "目录读取失败" else if (query.isBlank()) "此目录暂无文件" else "没有匹配的文件", color = t.textPrimary, fontSize = 16.sp)
+                            Text(if (error) "检查上方错误信息后重试" else if (query.isBlank()) "可以新建配置，或导入已有文件" else "换个关键词，或清空搜索查看所有文件", color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+                            TextButton(onClick = { if (error) revision++ else if (query.isNotBlank()) query = "" else { selected = null; form = "add" } }) {
+                                Text(if (error) "重试" else if (query.isNotBlank()) "清空搜索" else "新建或导入")
                             }
-                            if (index < items.lastIndex) HorizontalDivider(color = t.outline)
+                        }
+                    }
+                }
+                items(filtered, key = { it.path }, contentType = { if (it.directory) "folder" else "file" }) { entry ->
+                    Row(Modifier.fillMaxWidth().animateItem().crystalMaterial(RoundedCornerShape(16.dp)).clickable {
+                        if (entry.directory) { path = entry.path; query = "" }
+                        else { selected = entry; preview = null; previewing = true }
+                    }.padding(start = 12.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        HetuListIcon(if (entry.directory) Icons.Rounded.Folder else Icons.Rounded.Description)
+                        Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
+                            Text(entry.name, color = t.textPrimary, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(if (entry.directory) "文件夹" else refBytes(entry.size), color = t.textSecondary, fontSize = 11.sp)
+                        }
+                        IconButton(onClick = { selected = entry; form = "actions" }) { Icon(Icons.Rounded.MoreVert, "${entry.name} 更多操作", tint = t.textSecondary) }
+                    }
+                }
+            }
+        }
+    }
+    if (previewing) {
+        LaunchedEffect(selected?.path) {
+            try { preview = repo.read(requireNotNull(selected).path) }
+            catch (cancel: CancellationException) { throw cancel }
+            catch (failure: Exception) { previewing = false; error = true; message = failure.message ?: "无法读取文件" }
+        }
+        ModalBottomSheet(onDismissRequest = { previewing = false }, containerColor = Color.Transparent) {
+            Column(Modifier.fillMaxWidth().fillMaxHeight(.86f).liquidSheetMaterial().navigationBarsPadding().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(selected?.name.orEmpty(), Modifier.weight(1f), color = t.textPrimary, fontSize = 19.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    TextButton(enabled = preview?.editable == true, onClick = {
+                        context.startActivity(Intent(context, RuntimeFileEditorActivity::class.java).putExtra(EXTRA_RUNTIME_PATH, selected?.path)); previewing = false
+                    }) { Text("编辑") }
+                    IconButton(onClick = { previewing = false }) { Icon(Icons.Rounded.Close, "关闭") }
+                }
+                Text(preview?.description ?: "正在读取…", color = t.textSecondary, fontSize = 11.sp)
+                if (preview == null) HetuBusyIndicator() else androidx.compose.foundation.text.selection.SelectionContainer(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                    Text(preview!!.text, color = t.textPrimary, fontFamily = FontFamily.Monospace, fontSize = 12.sp, lineHeight = 18.sp)
+                }
+            }
+        }
+    }
+    form?.let { kind ->
+        ModalBottomSheet(onDismissRequest = { if (!working) form = null }, containerColor = Color.Transparent) {
+            Column(Modifier.fillMaxWidth().liquidSheetMaterial().navigationBarsPadding().imePadding().verticalScroll(rememberScrollState()).padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(when (kind) { "add" -> "新建与导入"; "actions" -> selected?.name.orEmpty(); "file" -> "新建文件"; "folder" -> "新建文件夹"; "rename" -> "重命名"; "delete" -> "删除文件"; "update" -> "更新文件"; else -> "从链接下载" }, color = t.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                @Composable fun Action(label: String, onClick: () -> Unit) { TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(label) } }
+                when (kind) {
+                    "add" -> {
+                        Action("新建文件") { name = ""; form = "file" }
+                        Action("新建文件夹") { name = ""; form = "folder" }
+                        Action("从本地导入") { form = null; importer.launch(arrayOf("*/*")) }
+                        Action("从链接下载") { name = ""; address = ""; form = "download" }
+                    }
+                    "actions" -> {
+                        val item = requireNotNull(selected)
+                        Action("重命名") { name = item.name; form = "rename" }
+                        if (!item.directory) Action("导出") { exportPath = item.path; form = null; exporter.launch(item.name) }
+                        if (!item.directory && repo.source(item.path).isNotBlank()) Action("从原地址更新") { address = repo.source(item.path); form = "update" }
+                        Action("删除") { form = "delete" }
+                    }
+                    else -> {
+                        if (kind == "delete") Text("确定删除“${selected?.name}”${if (selected?.directory == true) "及其中的文件" else ""}？此操作无法撤销。", color = t.textSecondary)
+                        else if (kind == "update") Text("从保存的下载地址更新“${selected?.name}”，将替换当前文件。", color = t.textSecondary)
+                        else LiquidGlassTextField(name, { name = it }, "名称", Modifier.fillMaxWidth())
+                        if (kind == "download") {
+                            LiquidGlassTextField(address, { address = it }, "HTTPS 链接", Modifier.fillMaxWidth())
+                            LiquidGlassTextField(userAgent, { userAgent = it }, "User-Agent", Modifier.fillMaxWidth())
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            TextButton(onClick = { form = null }, modifier = Modifier.weight(1f)) { Text("取消") }
+                            Button(enabled = !working && (name.isNotBlank() || kind in listOf("delete", "update")), modifier = Modifier.weight(1f), onClick = {
+                                val item = selected; val label = name; val url = address; val agent = userAgent; val directory = path
+                                form = null
+                                operate(when (kind) { "delete" -> "已删除"; "rename" -> "已重命名"; "download", "update" -> "下载完成"; else -> "已创建" }) {
+                                    when (kind) {
+                                        "file", "folder" -> repo.create(directory, label, kind == "folder")
+                                        "rename" -> repo.rename(requireNotNull(item), label)
+                                        "delete" -> repo.delete(requireNotNull(item))
+                                        "update" -> repo.download(directory, requireNotNull(item).name, url, agent, item)
+                                        else -> repo.download(directory, label, url, agent)
+                                    }
+                                }
+                            }) { Text(if (kind == "delete") "删除" else "确定") }
                         }
                     }
                 }
             }
         }
     }
-
-    previewTitle?.let { title ->
-        LaunchedEffect(title) {
-            val item = items.firstOrNull { it.name == title }
-            if (item != null) previewText = readTextFile(context, item.path)
-        }
-        RefFilePreviewSheet(
-            title = title,
-            text = previewText,
-            onEdit = {
-                if (previewPath.isNotBlank()) {
-                    context.startActivity(
-                        android.content.Intent(context, RuntimeFileEditorActivity::class.java)
-                            .putExtra(EXTRA_RUNTIME_PATH, previewPath),
-                    )
-                    previewTitle = null
-                }
-            },
-            onDismiss = { previewTitle = null },
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun RefFilePreviewSheet(
-    title: String,
-    text: String,
-    onEdit: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val t = LocalHetuTokens.current
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(topStart = HetuGlassRadius.Sheet, topEnd = HetuGlassRadius.Sheet),
-        containerColor = Color.Transparent,
-        contentColor = t.textPrimary,
-        tonalElevation = 0.dp,
-        scrimColor = Color.Black.copy(alpha = .35f),
-    ) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(.82f)
-                .liquidSheetMaterial()
-                .navigationBarsPadding()
-                .padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    title,
-                    modifier = Modifier.weight(1f),
-                    color = t.textPrimary,
-                    fontSize = 19.sp,
-                    lineHeight = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                TextButton(onClick = onEdit) {
-                    Icon(Icons.Rounded.Description, null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("编辑")
-                }
-                IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Rounded.Close, "关闭", tint = t.textSecondary)
-                }
-            }
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .crystalMaterial(
-                        RoundedCornerShape(HetuGlassRadius.Tile),
-                        depth = CrystalDepth.InsetItem,
-                    )
-                    .padding(14.dp)
-                    .verticalScroll(rememberScrollState()),
-            ) {
-                Text(text, color = t.textPrimary, style = MaterialTheme.typography.bodySmall)
-            }
-        }
-    }
-}
-
-private fun refFileSize(value: Long): String {
-    if (value <= 0L) return "0 B"
-    val units = arrayOf("B", "KB", "MB", "GB")
-    var v = value.toDouble()
-    var i = 0
-    while (v >= 1024.0 && i < units.lastIndex) { v /= 1024.0; i++ }
-    return if (i == 0) "${v.toLong()} ${units[i]}" else String.format(java.util.Locale.US, "%.1f %s", v, units[i])
 }

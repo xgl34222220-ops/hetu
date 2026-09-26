@@ -95,14 +95,17 @@ assert "LatencyChip(" in refhome
 # Four dashboard tiles share glass material and stable tabular number rendering.
 assert 'ReferenceDashboardCard' in instrument and '"WAN"' in instrument and '"网速"' in instrument
 assert '"订阅"' in instrument and '"资源占用"' in instrument
-assert 'crystalMaterial(shape, depth = CrystalDepth.Card)' in instrument
+assert 'crystalMaterial(RoundedCornerShape(HetuGlassRadius.Card), depth = CrystalDepth.Card)' in instrument
 assert 'HetuNumber(' in instrument and 'monospaced = true' in instrument
 assert 'home-usage-progress' in instrument and 'home-cpu-progress' in instrument
 
 # Strategy/node selections use the same glass selection language as the floating dock.
-assert 'strategyHeight' in liquid and 'nodeHeight' in liquid and '80.dp' in liquid and '78.dp' in liquid
-assert 'if (width < 292.dp' in liquid, "Phone strategy grid should use two columns when space permits"
-assert 'TextAutoSize.StepBased' in liquid, "Long node names must shrink instead of becoming ellipsis-heavy"
+assert '.height(strategyHeight)' not in liquid and '.height(nodeHeight)' not in liquid, "Content cards must not clip to fixed heights"
+assert '136f * scale' in liquid and '.coerceAtMost(capacity)' in liquid, "Manual columns must respect font scale and available width"
+assert 'TextAutoSize.StepBased(' not in liquid, "Long names must reflow instead of shrinking to unreadable text"
+assert 'well.localBoundingBoxOf(coords, clipBounds = false)' in liquid, "Selection lens must follow real card bounds"
+assert 'nodeSelectionHeight' in liquid and 'nodeSelectionWidth' in liquid
+assert 'Int.MAX_VALUE' in liquid and 'lineHeight = 21.sp' in liquid
 assert 'ConfiguredGroupIcon(group, Modifier.size(32.dp))' in liquid
 assert 'LatencyChip(' in liquid
 assert 'selection = expanded' in liquid
@@ -114,7 +117,8 @@ assert 'Color(0xFFE8E6F7)' not in liquid
 # Floating dock geometry and content clearance are shared tokens, not duplicated literals.
 assert 'HetuBottomBarMetrics.FloatingHorizontal' in dock
 assert 'HetuBottomBarMetrics.FloatingBottom' in dock
-assert '.height(72.dp' in dock and 'itemHeight = 60.dp' in dock
+assert 'dockItemHeight + 12.dp' in dock and 'itemHeight = dockItemHeight' in dock
+assert '20.sp.toDp()' in dock, "Dock height must account for scaled text"
 assert 'refractionHeight = 17.dp.toPx()' in dock and 'chromaticAberration = .045f' in dock, "Dock shell must retain LuoShu liquid-glass optics"
 assert 'HetuBottomBarMetrics.ContentGap' in ui_kit
 

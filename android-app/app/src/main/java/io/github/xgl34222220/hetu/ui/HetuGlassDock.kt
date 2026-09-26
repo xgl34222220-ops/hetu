@@ -2,6 +2,11 @@ package io.github.xgl34222220.hetu.ui
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -73,6 +78,7 @@ fun HetuGlassDock(
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.background.luminance() < .5f
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val dockItemHeight = maxOf(60.dp, 37.dp + with(LocalDensity.current) { 20.sp.toDp() })
     val context = LocalContext.current
     val prefs = remember(context) { context.getSharedPreferences("hetu", 0) }
     var floating by remember { mutableStateOf(prefs.getBoolean("floatingBottomBar", true)) }
@@ -184,7 +190,7 @@ fun HetuGlassDock(
                 else Modifier
             )
             .fillMaxWidth()
-            .height(72.dp + if (floating) 0.dp else bottomInset),
+            .height(dockItemHeight + 12.dp + if (floating) 0.dp else bottomInset),
     ) {
         Box(
             modifier = Modifier
@@ -206,12 +212,12 @@ fun HetuGlassDock(
             items = items,
             selected = selected,
             onSelect = onSelect,
-            itemHeight = 60.dp,
+            itemHeight = dockItemHeight,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(start = 6.dp, top = 6.dp, end = 6.dp, bottom = if (floating) 6.dp else bottomInset + 6.dp),
-            indicatorColor = scheme.primary.copy(alpha = if (dark) .28f else .16f),
-            indicatorBorderColor = Color.White.copy(alpha = if (dark) .18f else .46f),
+            indicatorColor = scheme.primary.copy(alpha = if (dark) .22f else .10f),
+            indicatorBorderColor = Color.White.copy(alpha = if (dark) .14f else .28f),
             indicatorShadow = 3.dp,
             selectedColor = scheme.primary,
             unselectedColor = scheme.onSurfaceVariant.copy(alpha = .90f),
@@ -240,14 +246,45 @@ private fun DockItems(
 ) {
     BoxWithConstraints(modifier = modifier) {
         val itemWidth = maxWidth / items.size.toFloat()
-        val targetIndex = selected.coerceIn(0, items.lastIndex)
+        val motion = LocalHetuMotionEnabled.current
+        val view = LocalView.current
+        val widthPx = with(LocalDensity.current) { itemWidth.toPx() }
+        val selectedCallback by rememberUpdatedState(onSelect)
+        var dragging by remember { mutableStateOf(false) }
+        var dragIndex by remember { mutableFloatStateOf(selected.toFloat()) }
+        var hovered by remember { mutableIntStateOf(selected) }
+        val committedIndex = selected.coerceIn(0, items.lastIndex)
+        val latestCommittedIndex by rememberUpdatedState(committedIndex)
+        val targetIndex = if (dragging) hovered else committedIndex
+        val dragModifier = Modifier.pointerInput(items.size, widthPx) {
+            detectHorizontalDragGestures(
+                onDragStart = { position ->
+                    dragging = true
+                    dragIndex = (position.x / widthPx - .5f).coerceIn(0f, items.lastIndex.toFloat())
+                    hovered = kotlin.math.round(dragIndex).toInt().coerceIn(0, items.lastIndex)
+                },
+                onDragCancel = { dragging = false },
+                onDragEnd = {
+                    val next = hovered
+                    dragging = false
+                    if (next != latestCommittedIndex) selectedCallback(next)
+                },
+                onHorizontalDrag = { change, amount ->
+                    change.consume()
+                    dragIndex = (dragIndex + amount / widthPx).coerceIn(-.18f, items.lastIndex + .18f)
+                    val next = kotlin.math.round(dragIndex).toInt().coerceIn(0, items.lastIndex)
+                    if (next != hovered) view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                    hovered = next
+                },
+            )
+        }
         val indicatorInset = 4.dp
         val liquidStretch = remember { Animatable(0f) }
         var travelDirection by remember { mutableFloatStateOf(0f) }
         var previousIndex by remember { mutableIntStateOf(targetIndex) }
 
         LaunchedEffect(targetIndex) {
-            if (targetIndex != previousIndex) {
+            if (targetIndex != previousIndex && motion && !dragging) {
                 travelDirection = if (targetIndex > previousIndex) 1f else -1f
                 previousIndex = targetIndex
                 liquidStretch.snapTo(1f)
@@ -262,8 +299,8 @@ private fun DockItems(
         }
 
         val indicatorX by animateDpAsState(
-            targetValue = itemWidth * targetIndex.toFloat(),
-            animationSpec = spring(
+            targetValue = itemWidth * if (dragging) dragIndex else committedIndex.toFloat(),
+            animationSpec = if (dragging || !motion) snap() else spring(
                 dampingRatio = if (liquidGlass) .68f else .84f,
                 stiffness = if (liquidGlass) 310f else Spring.StiffnessMediumLow,
             ),
@@ -355,7 +392,7 @@ private fun DockItems(
                 .border(1.dp, indicatorBorderColor, indicatorShape),
         )
 
-        Row(Modifier.fillMaxWidth().selectableGroup()) {
+        Row(Modifier.fillMaxWidth().then(dragModifier).selectableGroup()) {
             items.forEachIndexed { index, item ->
                 val active = index == targetIndex
                 val interactionSource = remember(item.label) { MutableInteractionSource() }
@@ -363,7 +400,7 @@ private fun DockItems(
                 val baseItemColor = if (active) selectedColor else unselectedColor
                 val itemColor by animateColorAsState(
                     targetValue = if (pressed) baseItemColor.copy(alpha = .62f) else baseItemColor,
-                    animationSpec = tween(170),
+                    animationSpec = tween(if (motion) 170 else 0),
                     label = "${item.label}DockColor",
                 )
                 val itemScale by animateFloatAsState(
@@ -372,7 +409,7 @@ private fun DockItems(
                         active && liquidGlass -> 1.035f
                         else -> 1f
                     },
-                    animationSpec = spring(dampingRatio = .66f, stiffness = 520f),
+                    animationSpec = if (motion) spring(dampingRatio = .66f, stiffness = 520f) else snap(),
                     label = "${item.label}DockScale",
                 )
                 Column(
@@ -389,14 +426,14 @@ private fun DockItems(
                             role = Role.Tab,
                             interactionSource = interactionSource,
                             indication = null,
-                            onClick = { if (!active) onSelect(index) },
+                            onClick = { if (!active) { view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK); onSelect(index) } },
                         ),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
                     Icon(
                         imageVector = item.icon,
-                        contentDescription = item.label,
+                        contentDescription = ht(item.label),
                         tint = itemColor,
                         modifier = Modifier
                             .size(22.dp)
@@ -407,10 +444,12 @@ private fun DockItems(
                     )
                     Spacer(Modifier.height(3.dp))
                     Text(
-                        item.label,
+                        ht(item.label),
+                        modifier = Modifier.fillMaxWidth(),
                         color = itemColor,
                         fontSize = 12.sp,
-                        lineHeight = 17.sp,
+                        lineHeight = 20.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                         fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
                         maxLines = 1,
                     )

@@ -30,7 +30,7 @@ import java.net.Proxy
 import java.net.InetSocketAddress
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk=[35], qualifiers="w480dp-h1600dp-mdpi")
+@Config(sdk=[35], qualifiers = "zh-rCN-w480dp-h1600dp-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class CrystalMaterialRenderTest {
     @get:Rule val compose=createAndroidComposeRule<ComponentActivity>()
@@ -105,7 +105,9 @@ class CrystalMaterialRenderTest {
     }
     @Test fun imageRequestsUseExistingCoreWithoutDirectFallbackWhenRunning() {
         val prefs=app.getSharedPreferences("hetu",0)
-        val repository=ProxyGroupIconRepository.get(app)
+        // Robolectric replaces Application between methods; isolate this instance's preferences.
+        val repository=ProxyGroupIconRepository::class.java.getDeclaredConstructor(Context::class.java)
+            .apply { isAccessible = true }.newInstance(app)
         try {
             prefs.edit().putBoolean("proxyRootRuntimeRunning",true).putInt("proxyControllerPort",29134).commit()
             val proxy=repository.imageProxy()

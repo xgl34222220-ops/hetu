@@ -19,6 +19,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -406,7 +407,7 @@ private fun RefProxyShell(
                 lastAt = now
                 lastUp = next.uploadTotal
                 lastDown = next.downloadTotal
-                ProxyApiHistoryStore.record(context, upRate, downRate)
+                ProxyApiHistoryStore.record(context, upRate, downRate, next.connections)
             }
         } catch (cancel: CancellationException) {
             throw cancel
@@ -684,7 +685,7 @@ private fun RefProxyShell(
                         },
                 ) {
             when (page) {
-                RefProxyPage.Home -> PullToRefreshBox(
+                RefProxyPage.Home -> HetuRefreshBox(
                     isRefreshing = homeRefreshing,
                     onRefresh = {
                         if (!homeRefreshing) scope.launch {
@@ -898,38 +899,26 @@ internal fun RefHome(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item(key = "home-title") {
-            Box(
-                Modifier.fillMaxWidth().height(48.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    "河图",
-                    color = t.textPrimary,
-                    fontSize = 22.sp,
-                    lineHeight = 28.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = (-.6).sp,
-                )
+            Row(Modifier.fillMaxWidth().padding(start = 4.dp, top = 4.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("河图", color = t.textPrimary, fontSize = 28.sp, lineHeight = 36.sp,
+                        fontWeight = FontWeight.Bold, letterSpacing = (-.6).sp)
+                    Text("网络概览", color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+                }
+                IconButton(onClick = onSettings) {
+                    Icon(Icons.Rounded.Settings, "首页设置", Modifier.size(21.dp), tint = t.textSecondary)
+                }
             }
         }
 
         item(key = "home-status") {
-            RefReferenceHero(
-                state = state,
-                runtime = runtime,
-                busy = busy,
-                onToggle = onToggle,
-            )
-        }
-
-        item(key = "home-actions") {
-            RefReferenceActionStrip(
-                running = state.running,
-                busy = busy,
-                onToggle = onToggle,
-                onReload = onReload,
-                onRestart = onRestart,
-            )
+            Column(Modifier.fillMaxWidth().crystalMaterial(RoundedCornerShape(HetuGlassRadius.Hero))) {
+                RefReferenceHero(state = state, runtime = runtime, busy = busy, onToggle = onToggle)
+                HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = t.textMuted.copy(alpha = .10f))
+                RefReferenceActionStrip(running = state.running, busy = busy, onToggle = onToggle,
+                    onReload = onReload, onRestart = onRestart)
+            }
         }
 
         item(key = "home-shortcuts") {
@@ -947,9 +936,10 @@ internal fun RefHome(
                 }
                 RefReferenceShortcut(
                     title = "日志",
-                    subtitle = "查看",
+                    subtitle = if (diagnosticLoading) "正在诊断…" else "长按诊断",
                     modifier = Modifier.weight(1f),
                     enabled = true,
+                    onLongClick = if (diagnosticLoading) null else onDiagnostics,
                     onClick = onLog,
                 )
             }
@@ -1021,6 +1011,7 @@ private fun RefReferenceHero(
         uptime = uptime,
         onToggle = onToggle,
         modifier = Modifier.testTag("home-hero"),
+        embedded = true,
     )
 }
 
@@ -1039,6 +1030,7 @@ private fun RefReferenceActionStrip(
         onToggle = onToggle,
         onRestart = onRestart,
         modifier = Modifier.testTag("home-liquid-actions"),
+        embedded = true,
     )
 }
 
@@ -1072,35 +1064,32 @@ private fun RefReferenceShortcut(
     subtitle: String,
     modifier: Modifier,
     enabled: Boolean,
+    onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
     val t = LocalHetuTokens.current
     Surface(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier.height(64.dp),
+        modifier = modifier.heightIn(min = 64.dp).combinedClickable(
+            enabled = enabled,
+            role = Role.Button,
+            onLongClickLabel = if (onLongClick != null) "消息与网络诊断" else null,
+            onLongClick = onLongClick,
+            onClick = onClick,
+        ),
         shape = RoundedCornerShape(20.dp),
         color = t.cardBackground,
         shadowElevation = 0.dp,
     ) {
-        Column(
-            Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Text(
-                title,
-                color = t.textPrimary.copy(alpha = if (enabled) 1f else .45f),
-                fontSize = 16.sp,
-                lineHeight = 20.sp,
-                fontWeight = FontWeight.ExtraBold,
-            )
-            Text(
-                subtitle,
-                color = t.textSecondary.copy(alpha = if (enabled) 1f else .45f),
-                fontSize = 11.5.sp,
-                lineHeight = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
+        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Icon(if (title == "WebUI") Icons.Rounded.Language else Icons.Rounded.Article, null,
+                Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 1f else .4f))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(title, color = t.textPrimary.copy(alpha = if (enabled) 1f else .45f),
+                    fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold)
+                Text(subtitle, color = t.textSecondary.copy(alpha = if (enabled) 1f else .45f),
+                    fontSize = 11.sp, lineHeight = 16.sp)
+            }
         }
     }
 }
@@ -1121,8 +1110,9 @@ private fun RefLatencyPanel(
         shadowElevation = 0.dp,
     ) {
         Column(
-            Modifier.fillMaxWidth().height(88.dp).padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
+            Modifier.fillMaxWidth().heightIn(min = 88.dp)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Row(
                 Modifier.fillMaxWidth(),
@@ -1136,10 +1126,10 @@ private fun RefLatencyPanel(
                     lineHeight = 20.sp,
                     fontWeight = FontWeight.ExtraBold,
                 )
-                IconButton(onClick = onTune, modifier = Modifier.size(34.dp)) {
+                IconButton(onClick = onTune, modifier = Modifier.size(48.dp)) {
                     Icon(Icons.Rounded.Tune, "延迟设置", Modifier.size(18.dp), tint = t.textSecondary)
                 }
-                IconButton(onClick = onClick, enabled = !testing, modifier = Modifier.size(34.dp)) {
+                IconButton(onClick = onClick, enabled = !testing, modifier = Modifier.size(48.dp)) {
                     if (testing) {
                         CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 1.8.dp)
                     } else {
@@ -1147,15 +1137,21 @@ private fun RefLatencyPanel(
                     }
                 }
             }
-            Row(
-                Modifier.fillMaxWidth().height(42.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                RefLatencyColumn("Baidu", baidu, testing, Modifier.weight(1f))
-                Box(Modifier.width(1.dp).height(34.dp).background(t.outline.copy(alpha = .70f)))
-                RefLatencyColumn("Cloudflare", cloudflare, testing, Modifier.weight(1f))
-                Box(Modifier.width(1.dp).height(34.dp).background(t.outline.copy(alpha = .70f)))
-                RefLatencyColumn("Google", google, testing, Modifier.weight(1f))
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                if (maxWidth / LocalDensity.current.fontScale < 242.dp) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("Baidu" to baidu, "Cloudflare" to cloudflare, "Google" to google).forEach { (name, delay) ->
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Text(name, Modifier.weight(1f), color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+                                LatencyChip(delay, testing, compact = true)
+                            }
+                        }
+                    }
+                } else Row(Modifier.fillMaxWidth().padding(bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    RefLatencyColumn("Baidu", baidu, testing, Modifier.weight(1f))
+                    RefLatencyColumn("Cloudflare", cloudflare, testing, Modifier.weight(1f))
+                    RefLatencyColumn("Google", google, testing, Modifier.weight(1f))
+                }
             }
         }
     }
@@ -1172,19 +1168,20 @@ private fun RefLatencyColumn(
     Column(
         modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(1.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(
             label,
             color = t.textSecondary,
-            fontSize = 10.5.sp,
-            lineHeight = 14.sp,
+            fontSize = 12.sp,
+            lineHeight = 18.sp,
             fontWeight = FontWeight.Medium,
         )
         LatencyChip(
             value = value,
             testing = testing,
             compact = true,
+            prominent = true,
         )
     }
 }
@@ -1324,14 +1321,28 @@ internal fun RefPanel(
         onDispose { selectorPrefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
     selectorPrefsRevision
-    val expandSelectedInSheet = selectorPrefs.getBoolean("proxySelectorExpandSelectedInSheet", false)
+    val expandSelectedInSheet = selectorPrefs.getBoolean("proxySelectorExpandSelectedInSheet", true)
+    var providerNames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var changingMode by remember { mutableStateOf(false) }
+    LaunchedEffect(state.running, selectorPrefsRevision) {
+        if (state.running && selectorPrefs.getBoolean("proxySelectorGroupByProvider", false)) {
+            try { providerNames = selectorProviderNames(context) }
+            catch (cancel: CancellationException) { throw cancel }
+            catch (_: Exception) { providerNames = emptyMap() }
+        } else providerNames = emptyMap()
+    }
+    suspend fun probeNode(node: String): Long {
+        val measured = repo.delay(node)
+        scope.launch { SelectorIpv6Probe.measure(context, node) }
+        return measured
+    }
     val tab = if (strategyOnly) RefPanelTab.Groups else selectedTab
     var refreshing by remember { mutableStateOf(false) }
     var providers by remember { mutableStateOf<List<DashboardProviderUi>>(emptyList()) }
     var rules by remember { mutableStateOf<List<ProxyRuleUi>>(emptyList()) }
     var overviewRuleCount by remember { mutableStateOf<Int?>(null) }
     var ruleSets by remember { mutableStateOf<List<DashboardRuleSetUi>>(emptyList()) }
-    var selectedGroupName by rememberSaveable { mutableStateOf<String?>(null) }
+    var expandedGroupNames by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var selectedGroupSheetName by rememberSaveable { mutableStateOf<String?>(null) }
     val selectedLocal = remember { mutableStateMapOf<String, String>() }
     val testing = remember { mutableStateMapOf<String, Boolean>() }
@@ -1344,6 +1355,50 @@ internal fun RefPanel(
     var capsuleText by remember { mutableStateOf("") }
     var capsuleError by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
+    var groupTrail by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    val selectionPending = remember { mutableStateMapOf<String, String>() }
+    val selectionErrors = remember { mutableStateMapOf<String, String>() }
+    LaunchedEffect(state.groups) {
+        selectedLocal.keys.toList().forEach { name ->
+            val current = state.groups.firstOrNull { it.name == name }
+            if (current == null || current.now == selectedLocal[name]) selectedLocal.remove(name)
+        }
+    }
+    fun selectNode(group: ProxyGroupUi, node: String) {
+        if (selectionPending.containsKey(group.name) || node == (selectedLocal[group.name] ?: group.now)) return
+        selectionPending[group.name] = node
+        selectionErrors.remove(group.name)
+        error = ""
+        capsuleText = ""
+        capsuleError = false
+        scope.launch {
+            try {
+                repo.select(group.name, node,
+                    disconnectPrevious = selectorPrefs.getBoolean("proxySelectorDisconnectOnSelect", false))
+                selectedLocal[group.name] = node
+                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                try { onRefreshState() }
+                catch (cancel: CancellationException) { throw cancel }
+                catch (_: Exception) { selectionErrors[group.name] = "已切换，状态刷新失败，请下拉刷新" }
+            } catch (cancel: CancellationException) { throw cancel }
+            catch (failure: Exception) {
+                val message = "切换失败：${failure.message ?: "请检查控制器连接"}"
+                selectionErrors[group.name] = message
+                error = message
+            } finally { selectionPending.remove(group.name) }
+        }
+    }
+    fun testNodes(names: List<String>) {
+        val pending = names.filter { testing[it] != true }
+        if (pending.isEmpty()) return
+        pending.forEach { testing[it] = true }
+        scope.launch {
+            measureStrategyNodes(pending, ::probeNode,
+                onTesting = { name, active -> if (active) testing[name] = true else testing.remove(name) },
+                onMeasured = { name, value -> delays[name] = value })
+        }
+    }
+
     var searchOpen by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     var groupLayout by rememberSaveable { mutableIntStateOf(selectorPrefs.getInt("proxySelectorGroupColumns", 0).coerceIn(0, 2)) }
@@ -1439,8 +1494,10 @@ internal fun RefPanel(
         previousConnections = state.connections
     }
 
-    val filteredGroups = remember(state.groups, query, groupSortMode, delays.toMap(), selectedLocal.toMap()) {
-        val matched = state.groups.filter { group ->
+    val filteredGroups = remember(state.groups, state.trafficMode, selectorPrefsRevision, query, groupSortMode, delays.toMap(), selectedLocal.toMap()) {
+        val matched = SelectorPresentation.visibleGroups(state.groups,
+            selectorPrefs.getBoolean("proxySelectorShowHidden", false),
+            selectorPrefs.getBoolean("proxySelectorShowGlobalByMode", true), state.trafficMode).filter { group ->
             query.isBlank() || group.name.contains(query, true) || group.now.contains(query, true) ||
                 group.nodes.any { it.name.contains(query, true) }
         }
@@ -1474,7 +1531,7 @@ internal fun RefPanel(
                 RefPanelTab.Subscriptions -> providers = repo.providers()
                 RefPanelTab.Rules -> rules = repo.rules()
                 RefPanelTab.RuleSets -> ruleSets = repo.ruleSets()
-                RefPanelTab.Overview -> { overviewRuleCount = null; rules = repo.rules(); overviewRuleCount = rules.size }
+                RefPanelTab.Overview -> { overviewRuleCount = null; rules = repo.rules(); overviewRuleCount = rules.size; providers = repo.providers() }
                 else -> Unit
             }
         } catch (cancel: CancellationException) {
@@ -1499,47 +1556,23 @@ internal fun RefPanel(
             return
         }
 
-        // Remove legacy false-timeout values left by older test builds. A failed refresh
-        // means "no new value", not "this node is definitely timed out".
-        targets.forEach { node ->
-            if ((delays[node] ?: 1L) <= 0L) delays.remove(node)
-            testing[node] = true
-        }
-
         var completed = 0
         var failed = 0
         capsuleText = "当前节点测速 0/${targets.size}"
         capsuleError = false
-        try {
-            coroutineScope {
-                targets.map { node ->
-                    async {
-                        val value = try {
-                            repo.delay(node)
-                        } catch (cancel: CancellationException) {
-                            throw cancel
-                        } catch (_: Exception) {
-                            -1L
-                        }
-                        if (value > 0L) {
-                            delays[node] = value
-                        } else {
-                            failed++
-                        }
-                        testing.remove(node)
-                        completed++
-                        capsuleText = "当前节点测速 $completed/${targets.size}"
-                    }
-                }.awaitAll()
-            }
-        } finally {
-            targets.forEach { testing.remove(it) }
-        }
+        measureStrategyNodes(targets.filter { testing[it] != true }, ::probeNode,
+            onTesting = { name, active -> if (active) testing[name] = true else testing.remove(name) },
+            onMeasured = { name, value ->
+                delays[name] = value
+                if (value <= 0L) failed++
+                completed++
+                capsuleText = "当前节点测速 $completed/${targets.size}"
+            })
         capsuleError = failed > 0
         capsuleText = if (failed == 0) {
             "当前节点测速完成 · ${targets.size}/${targets.size}"
         } else {
-            "当前节点测速完成 · ${targets.size - failed} 成功 / $failed 未更新"
+            "当前节点测速完成 · ${targets.size - failed} 成功 / $failed 超时或失败"
         }
         view.performHapticFeedback(if (failed == 0) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.CLOCK_TICK)
     }
@@ -1661,6 +1694,7 @@ internal fun RefPanel(
                         rules = repo.rules()
                         overviewRuleCount = rules.size
                         capsuleError = false
+                        providers = repo.providers()
                         capsuleText = "流量状态已刷新"
                     }
                     RefPanelTab.Connections -> {
@@ -1684,7 +1718,7 @@ internal fun RefPanel(
 
     LaunchedEffect(tab) {
         if (tab != RefPanelTab.Groups) {
-            selectedGroupName = null
+            expandedGroupNames = emptyList()
             selectedGroupSheetName = null
         }
         onDetailVisibleChanged(false)
@@ -1692,11 +1726,7 @@ internal fun RefPanel(
 
     BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding()) {
         val autoGroupColumns = liquidColumns(maxWidth - 24.dp)
-        val groupColumns = if (maxWidth < 292.dp) 1 else when (groupLayout) {
-            1 -> 1
-            2 -> 2
-            else -> autoGroupColumns
-        }
+        val groupColumns = liquidColumns(maxWidth - 24.dp, groupLayout)
         Column(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     RefPanelGlassHeader(
@@ -1726,7 +1756,7 @@ internal fun RefPanel(
                                 else -> 1
                             }
                             selectorPrefs.edit().putInt("proxySelectorGroupColumns", groupLayout).apply()
-                            selectedGroupName = null
+                            expandedGroupNames = emptyList()
                         },
                         onBack = onBack,
                         onOpenSettings = { apiSettings = true },
@@ -1740,11 +1770,10 @@ internal fun RefPanel(
                         busy = refreshing || providerRefreshing.values.any { it } || ruleSetRefreshing.values.any { it } || testing.values.any { it })
                 }
             }
-            PullToRefreshBox(
+            HetuRefreshBox(
                 isRefreshing = refreshing,
                 onRefresh = ::refresh,
                 modifier = Modifier.fillMaxWidth().weight(1f),
-                indicator = {},
             ) {
             LazyColumn(
             Modifier.fillMaxSize(),
@@ -1756,17 +1785,29 @@ internal fun RefPanel(
             ),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            if (tab == RefPanelTab.Groups && state.panelReady) item(key = "traffic-mode") {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("模式", color = t.textSecondary, fontSize = 12.sp)
+                    listOf("rule" to "规则", "global" to "全局", "direct" to "直连").forEach { (value, title) ->
+                        LiquidChoicePill(title, state.trafficMode.equals(value, true), {
+                            if (!changingMode) scope.launch {
+                                changingMode = true
+                                try { withContext(Dispatchers.IO) { MihomoControllerClient(context).setTrafficMode(value) }; onRefreshState() }
+                                catch (cancel: CancellationException) { throw cancel }
+                                catch (failure: Exception) { error = failure.message ?: "模式切换失败" }
+                                finally { changingMode = false }
+                            }
+                        })
+                    }
+                    if (changingMode) HetuBusyIndicator()
+                }
+            }
             if (!state.running) {
                 item { RefEmptyState("代理未运行", "启动代理后，在这里查看节点、应用连接和分流规则。", Icons.Rounded.PowerSettingsNew) }
             } else when (tab) {
                 RefPanelTab.Groups -> {
                     if (filteredGroups.isEmpty()) item { RefEmptyState("没有匹配的节点", if (query.isBlank()) "当前配置未提供策略组。" else "试试其他节点或策略组名称。", Icons.Rounded.Search) }
                     itemsIndexed(filteredGroups.chunked(groupColumns), key = { index, _ -> "${tab.name}-groups-$index" }, contentType = { _, _ -> "group-row" }) { _, pair ->
-                        val expandedGroup = pair.firstOrNull { it.name == selectedGroupName }
-                        // Keep the last content through the exit animation; a nullable let
-                        // otherwise removes the entire well before shrinkVertically runs.
-                        var closingGroup by remember(pair.map { it.name }) { mutableStateOf<ProxyGroupUi?>(null) }
-                        SideEffect { if (expandedGroup != null) closingGroup = expandedGroup }
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 pair.forEach { group ->
@@ -1774,7 +1815,7 @@ internal fun RefPanel(
                                     RefGroupCard(
                                         group = group,
                                         selected = selected,
-                                        expanded = selectedGroupName == group.name,
+                                        expanded = group.name in expandedGroupNames || group.name == selectedGroupSheetName,
                                         delay = delays[selected] ?: group.nodes.firstOrNull { it.name == selected }?.lastDelay,
                                         testing = selected.isNotBlank() && testing[selected] == true,
                                         hazeState = hazeState,
@@ -1783,111 +1824,46 @@ internal fun RefPanel(
                                         onClick = {
                                             view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                                             if (expandSelectedInSheet) {
-                                                selectedGroupName = null
+                                                expandedGroupNames = emptyList()
+                                                groupTrail = emptyList()
                                                 selectedGroupSheetName = group.name
                                             } else {
                                                 selectedGroupSheetName = null
-                                                selectedGroupName = if (selectedGroupName == group.name) null else group.name
+                                                expandedGroupNames = SelectorPresentation.toggleExpanded(expandedGroupNames, group.name, selectorPrefs.getBoolean("proxySelectorCollapsePrevious", true))
                                             }
                                         },
-                                        onDelay = {
-                                            if (selected.isNotBlank() && testing[selected] != true) scope.launch {
-                                                testing[selected] = true
-                                                try {
-                                                    val measured = repo.delay(selected)
-                                                    if (measured > 0L) delays[selected] = measured
-                                                    view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                                } catch (_: Exception) {
-                                                    if ((delays[selected] ?: 1L) <= 0L) delays.remove(selected)
-                                                } finally {
-                                                    testing.remove(selected)
-                                                }
-                                            }
-                                        },
+                                        onDelay = { if (selected.isNotBlank()) testNodes(listOf(selected)) },
                                     )
                                 }
                                 if (pair.size < groupColumns) Spacer(Modifier.weight(1f))
                             }
+                            pair.forEach { candidate ->
+                            val expandedGroup = candidate.takeIf { it.name in expandedGroupNames }
+                            var closingGroup by remember(candidate.name) { mutableStateOf<ProxyGroupUi?>(null) }
+                            SideEffect { if (expandedGroup != null) closingGroup = expandedGroup }
                             WorkspaceAccordion(visible = expandedGroup != null) {
                                 (expandedGroup ?: closingGroup)?.let { group ->
                                     val selected = selectedLocal[group.name] ?: group.now
                                     val nodeSort = selectorPrefs.getString("proxySelectorNodeSort", "config").orEmpty()
                                     val descending = selectorPrefs.getBoolean("proxySelectorSortDescending", false)
-                                    val orderedNodes = when (nodeSort) {
-                                        "name" -> group.nodes.sortedBy { it.name.lowercase() }
-                                        "latency" -> group.nodes.sortedWith(compareBy<ProxyNodeUi> {
-                                            (delays[it.name] ?: it.lastDelay)?.takeIf { value -> value > 0L } ?: Long.MAX_VALUE
-                                        }.thenBy { it.name.lowercase() })
-                                        else -> group.nodes
-                                    }.let { values -> if (descending) values.reversed() else values }
+                                    val orderedNodes = SelectorPresentation.nodes(group, nodeSort, descending, delays, providerNames)
                                     val visibleGroup = group.copy(nodes = orderedNodes)
                                     RefInlineGroupExpansion(
                                         group = visibleGroup,
                                         selected = selected,
                                         delays = delays,
                                         testing = testing,
-                                        onSelect = { node ->
-                                            val previous = selectedLocal[group.name] ?: group.now
-                                            selectedLocal[group.name] = node
-                                            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                            scope.launch {
-                                                try {
-                                                    val previousConnections = if (selectorPrefs.getBoolean("proxySelectorDisconnectOnSelect", false)) {
-                                                        state.connections.map { it.id }
-                                                    } else emptyList()
-                                                    repo.select(group.name, node)
-                                                    if (previousConnections.isNotEmpty()) {
-                                                        previousConnections.forEach { id -> runCatching { repo.closeConnection(id) } }
-                                                    }
-                                                    onRefreshState()
-                                                } catch (_: Exception) {
-                                                    if (previous.isBlank()) selectedLocal.remove(group.name) else selectedLocal[group.name] = previous
-                                                }
-                                            }
-                                        },
-                                        onDelay = { node ->
-                                            if (testing[node] != true) scope.launch {
-                                                testing[node] = true
-                                                try {
-                                                    val measured = repo.delay(node)
-                                                    if (measured > 0L) delays[node] = measured
-                                                } catch (_: Exception) {
-                                                    if ((delays[node] ?: 1L) <= 0L) delays.remove(node)
-                                                } finally { testing.remove(node) }
-                                            }
-                                        },
-                                        onTestAll = {
-                                            val pending = group.nodes.filter { testing[it.name] != true }
-                                            if (pending.isNotEmpty()) scope.launch {
-                                                try {
-                                                    val wave = pending.mapIndexed { index, node ->
-                                                        async {
-                                                            delay(index * 30L)
-                                                            testing[node.name] = true
-                                                            try { repo.delay(node.name) }
-                                                            catch (_: Exception) { -1L }
-                                                        }
-                                                    }
-                                                    pending.forEachIndexed { index, node ->
-                                                        val measured = wave[index].await()
-                                                        if (measured > 0L) delays[node.name] = measured
-                                                        else if ((delays[node.name] ?: 1L) <= 0L) delays.remove(node.name)
-                                                        delay(32L)
-                                                        testing.remove(node.name)
-                                                    }
-                                                    view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-                                                } finally {
-                                                    pending.forEach { testing.remove(it.name) }
-                                                }
-                                            }
-                                        },
+                                        onSelect = { node -> selectNode(group, node) },
+                                        onDelay = { node -> testNodes(listOf(node)) },
+                                        onTestAll = { testNodes(group.nodes.map { it.name }) },
                                     )
                                 }
                             }
                         }
                     }
+                    }
                 }
-                RefPanelTab.Overview -> item(key = "${tab.name}-traffic-overview", contentType = "traffic-overview") { RefTrafficOverview(state, overviewRuleCount) }
+                RefPanelTab.Overview -> item(key = "${tab.name}-traffic-overview", contentType = "traffic-overview") { RefTrafficOverview(state, overviewRuleCount, providers) }
                 RefPanelTab.Subscriptions -> items(filteredProviders, key = { "${tab.name}-provider-${it.name}" }, contentType = { "subscription-provider" }) { item ->
                     RefProviderRow(
                         item = item,
@@ -2042,132 +2018,35 @@ internal fun RefPanel(
 
     selectedGroupSheetName?.let { sheetGroupName ->
         state.groups.firstOrNull { it.name == sheetGroupName }?.let { group ->
-            val selected = selectedLocal[group.name] ?: group.now
-            val nodeSort = selectorPrefs.getString("proxySelectorNodeSort", "config").orEmpty()
-            val descending = selectorPrefs.getBoolean("proxySelectorSortDescending", false)
-            val orderedNodes = when (nodeSort) {
-                "name" -> group.nodes.sortedBy { it.name.lowercase() }
-                "latency" -> group.nodes.sortedWith(compareBy<ProxyNodeUi> {
-                    (delays[it.name] ?: it.lastDelay)?.takeIf { value -> value > 0L } ?: Long.MAX_VALUE
-                }.thenBy { it.name.lowercase() })
-                else -> group.nodes
-            }.let { values -> if (descending) values.reversed() else values }
-            val visibleGroup = group.copy(nodes = orderedNodes)
-
             ModalBottomSheet(
-                onDismissRequest = { selectedGroupSheetName = null },
+                onDismissRequest = { selectedGroupSheetName = null; groupTrail = emptyList() },
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
                 containerColor = Color.Transparent,
                 shape = RoundedCornerShape(topStart = HetuGlassRadius.Sheet, topEnd = HetuGlassRadius.Sheet),
                 dragHandle = { RefSheetDragHandle() },
             ) {
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .fillMaxHeight(.82f)
-                        .liquidSheetMaterial()
-                        .navigationBarsPadding()
-                        .padding(horizontal = 14.dp, vertical = 6.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                "策略节点",
-                                color = t.textSecondary,
-                                fontSize = 11.sp,
-                                lineHeight = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                            )
-                            Text(
-                                group.name,
-                                color = t.textPrimary,
-                                fontSize = 21.sp,
-                                lineHeight = 27.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        TextButton(
-                            onClick = {
-                                val pending = group.nodes.filter { testing[it.name] != true }
-                                if (pending.isNotEmpty()) scope.launch {
-                                    try {
-                                        val wave = pending.mapIndexed { index, node ->
-                                            async {
-                                                delay(index * 30L)
-                                                testing[node.name] = true
-                                                try { repo.delay(node.name) }
-                                                catch (_: Exception) { -1L }
-                                            }
-                                        }
-                                        pending.forEachIndexed { index, node ->
-                                            val measured = wave[index].await()
-                                            if (measured > 0L) delays[node.name] = measured
-                                            else if ((delays[node.name] ?: 1L) <= 0L) delays.remove(node.name)
-                                            delay(32L)
-                                            testing.remove(node.name)
-                                        }
-                                        view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-                                    } finally {
-                                        pending.forEach { testing.remove(it.name) }
-                                    }
-                                }
-                            },
-                        ) { Text("全部测速") }
-                    }
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .verticalScroll(rememberScrollState()),
-                    ) {
-                        RefInlineGroupExpansion(
-                            group = visibleGroup,
-                            selected = selected,
-                            delays = delays,
-                            testing = testing,
-                            onSelect = { node ->
-                                val previous = selectedLocal[group.name] ?: group.now
-                                selectedLocal[group.name] = node
-                                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                scope.launch {
-                                    try {
-                                        val previousConnections =
-                                            if (selectorPrefs.getBoolean("proxySelectorDisconnectOnSelect", false)) {
-                                                state.connections.map { it.id }
-                                            } else emptyList()
-                                        repo.select(group.name, node)
-                                        if (previousConnections.isNotEmpty()) {
-                                            previousConnections.forEach { id -> runCatching { repo.closeConnection(id) } }
-                                        }
-                                        onRefreshState()
-                                    } catch (_: Exception) {
-                                        if (previous.isBlank()) selectedLocal.remove(group.name)
-                                        else selectedLocal[group.name] = previous
-                                    }
-                                }
-                            },
-                            onDelay = { node ->
-                                if (testing[node] != true) scope.launch {
-                                    testing[node] = true
-                                    try {
-                                        val measured = repo.delay(node)
-                                        if (measured > 0L) delays[node] = measured
-                                    } catch (_: Exception) {
-                                        if ((delays[node] ?: 1L) <= 0L) delays.remove(node)
-                                    } finally {
-                                        testing.remove(node)
-                                    }
-                                }
-                            },
-                            onTestAll = {},
-                        )
-                    }
-                }
+                StrategyNodePanel(
+                    group = group.copy(nodes = group.nodes.map { it.copy(provider = providerNames[it.name] ?: it.provider) }),
+                    selected = selectedLocal[group.name] ?: group.now,
+                    delays = delays, testing = testing, pending = selectionPending[group.name],
+                    error = selectionErrors[group.name].orEmpty(), groupNames = state.groups.map { it.name }.toSet(),
+                    canGoBack = groupTrail.isNotEmpty(),
+                    onSelect = { selectNode(group, it) }, onDelay = { testNodes(listOf(it)) },
+                    onTestAll = { testNodes(group.nodes.map { it.name }) },
+                    onOpenGroup = { name ->
+                        val previous = groupTrail.indexOf(name)
+                        groupTrail = if (previous >= 0) groupTrail.take(previous) else groupTrail + group.name
+                        selectedGroupSheetName = name
+                    },
+                    onBack = { groupTrail.lastOrNull()?.let { selectedGroupSheetName = it; groupTrail = groupTrail.dropLast(1) } },
+                    onClose = { selectedGroupSheetName = null; groupTrail = emptyList() },
+                    modifier = Modifier.fillMaxWidth().fillMaxHeight(.92f).liquidSheetMaterial()
+                        .imePadding().navigationBarsPadding().padding(top = 12.dp),
+                    initialSort = selectorPrefs.getString("proxySelectorNodeSort", "config").orEmpty(),
+                    initialDescending = selectorPrefs.getBoolean("proxySelectorSortDescending", false),
+                    initialGrid = selectorPrefs.getInt("proxySelectorNodeColumns", 1) > 1,
+                    groupByProvider = selectorPrefs.getBoolean("proxySelectorGroupByProvider", false),
+                )
             }
         }
     }
@@ -2185,7 +2064,7 @@ internal fun RefPanel(
             onSelect = { index ->
                 groupSortMode = sortValues[index].first
                 selectorPrefs.edit().putString("proxySelectorGroupSort", groupSortMode).apply()
-                selectedGroupName = null
+                expandedGroupNames = emptyList()
                 groupSortPicker = false
             },
         )
@@ -2257,6 +2136,8 @@ private fun RefPanelApiSettingsSheet(
         )
     }
     var history by remember { mutableStateOf(prefs.getBoolean("proxyApiHistoryEnabled", false)) }
+    var retention by remember { mutableStateOf(prefs.getInt("proxyApiHistoryRetentionDays", 7).toString()) }
+    var historyLimit by remember { mutableStateOf(prefs.getInt("proxyApiHistoryMaxMb", 16).toString()) }
     var busy by remember { mutableStateOf(false) }
     var feedback by remember { mutableStateOf("") }
     var feedbackError by remember { mutableStateOf(false) }
@@ -2295,6 +2176,8 @@ private fun RefPanelApiSettingsSheet(
             .putBoolean("proxyCustomDelayUrlEnabled", customDelay)
             .putString("proxyCustomDelayUrl", cleanDelay)
             .putBoolean("proxyApiHistoryEnabled", history)
+            .putInt("proxyApiHistoryRetentionDays", (retention.toIntOrNull() ?: 7).coerceIn(1, 90))
+            .putInt("proxyApiHistoryMaxMb", (historyLimit.toIntOrNull() ?: 16).coerceIn(4, 256))
             .apply()
         feedback = "面板 API 设置已保存"
         feedbackError = false
@@ -2333,12 +2216,18 @@ private fun RefPanelApiSettingsSheet(
                     WorkspaceInsetDivider()
                     WorkspaceSettingRow(
                         "Clash API 历史收集",
-                        "保存真实流量采样供概览趋势恢复",
+                        "打开河图时采集流量与连接，保存在本机",
                         Icons.Rounded.History,
                     ) {
                         LiquidSwitch(checked = history, onCheckedChange = { history = it })
                     }
                 }
+            }
+
+            if (history) {
+                LiquidGlassTextField(retention, { retention = it.filter(Char::isDigit).take(2) }, "历史保留天数", Modifier.fillMaxWidth(), supportingText = "1–90 天")
+                LiquidGlassTextField(historyLimit, { historyLimit = it.filter(Char::isDigit).take(3) }, "数据库上限（MiB）", Modifier.fillMaxWidth(), supportingText = "4–256 MiB，达到上限时清理最早记录")
+                TextButton(onClick = { scope.launch { ProxyApiHistoryStore.clear(context); feedback = "本地历史已清除"; feedbackError = false } }) { Text("清除本地历史") }
             }
 
             if (customApi) {
@@ -2732,11 +2621,13 @@ private fun RefPanelGlassHeader(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(
-            Modifier.fillMaxWidth().height(48.dp),
+            Modifier.fillMaxWidth().heightIn(min = 48.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             when (selected) {
                 RefPanelTab.Groups -> {
+                    Text(title, Modifier.weight(1f), color = t.textPrimary, fontSize = 26.sp,
+                        lineHeight = 34.sp, fontWeight = FontWeight.Bold)
                     RefPanelHeaderAction(
                         icon = if (searchOpen) Icons.Rounded.Close else Icons.Rounded.Search,
                         contentDescription = if (searchOpen) "关闭搜索" else "搜索",
@@ -2749,7 +2640,6 @@ private fun RefPanelGlassHeader(
                         active = groupColumns == 1,
                         onClick = onToggleGroupLayout,
                     )
-                    Spacer(Modifier.weight(1f))
                     RefPanelHeaderAction(
                         icon = Icons.Rounded.Sort,
                         contentDescription = when (groupSortMode) {
@@ -2817,7 +2707,7 @@ private fun RefPanelGlassHeader(
             }
         }
 
-        Text(
+        if (selected != RefPanelTab.Groups) Text(
             title,
             color = t.textPrimary,
             fontSize = 32.sp,
@@ -3013,7 +2903,16 @@ private fun RefGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolea
 @Composable
 private fun RefInlineGroupExpansion(group: ProxyGroupUi, selected: String, delays: Map<String, Long>,
     testing: Map<String, Boolean>, onSelect: (String) -> Unit, onDelay: (String) -> Unit, onTestAll: () -> Unit) {
-    LiquidGroupWell(group, selected, delays, testing, onSelect, onDelay, onTestAll)
+    val prefs = LocalContext.current.getSharedPreferences("hetu", 0)
+    if (prefs.getBoolean("proxySelectorGroupByProvider", false) && group.nodes.any { it.provider.isNotBlank() }) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            group.nodes.groupBy { it.provider.ifBlank { "配置内节点" } }.forEach { (provider, nodes) ->
+                Text(provider + " · " + nodes.size, color = LocalHetuTokens.current.textSecondary,
+                    fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 8.dp))
+                LiquidGroupWell(group.copy(nodes = nodes), selected, delays, testing, onSelect, onDelay, onTestAll)
+            }
+        }
+    } else LiquidGroupWell(group, selected, delays, testing, onSelect, onDelay, onTestAll)
 }
 
 @Composable
@@ -3116,15 +3015,12 @@ private fun RefDelayBadge(value: Long?, testing: Boolean, onClick: (() -> Unit)?
 }
 
 @Composable
-private fun RefTrafficOverview(state: ProxyComposeState, ruleCount: Int?) {
+private fun RefTrafficOverview(state: ProxyComposeState, ruleCount: Int?, providers: List<DashboardProviderUi>) {
     val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val context = LocalContext.current
-    val history = remember {
-        mutableStateListOf<Triple<Long, Long, Long>>().apply {
-            addAll(ProxyApiHistoryStore.recent(context))
-        }
-    }
+    val history = remember { mutableStateListOf<Triple<Long, Long, Long>>() }
+    LaunchedEffect(Unit) { history.addAll(ProxyApiHistoryStore.recent(context)) }
     var lastUpload by remember { mutableLongStateOf(state.uploadTotal) }
     var lastDownload by remember { mutableLongStateOf(state.downloadTotal) }
     var lastAt by remember { mutableLongStateOf(0L) }
@@ -3158,31 +3054,8 @@ private fun RefTrafficOverview(state: ProxyComposeState, ruleCount: Int?) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         OverviewInstruments(state, ruleCount)
 
-        Surface(
-            shape = RoundedCornerShape(20.dp),
-            color = t.cardBackground,
-            shadowElevation = 0.dp,
-        ) {
-            Column(
-                Modifier.fillMaxWidth().padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    "订阅",
-                    color = t.textPrimary,
-                    fontSize = 18.sp,
-                    lineHeight = 23.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                )
-                Text(
-                    "刷新后显示数据",
-                    color = t.textSecondary,
-                    fontSize = 13.sp,
-                    lineHeight = 18.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-        }
+        OverviewSubscriptions(providers)
+        TrafficRankings(state.connections)
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             RefRateCard(
@@ -3449,157 +3322,68 @@ private fun RefRateCard(
 
 @Composable
 internal fun RefProviderRow(
-    item: DashboardProviderUi,
-    refreshing: Boolean,
-    success: Boolean,
-    onRefresh: () -> Unit,
-    onClick: () -> Unit,
-    error: String = "",
+    item: DashboardProviderUi, refreshing: Boolean, success: Boolean,
+    onRefresh: () -> Unit, onClick: () -> Unit, error: String = "",
 ) {
     val t = LocalHetuTokens.current
-    val primary = HetuMicroCrystal.KleinBlue
+    val primary = MaterialTheme.colorScheme.primary
     val known = item.hasSubscriptionInfo && item.total > 0L
-    val shape = RoundedCornerShape(20.dp)
     Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .background(t.cardBackground)
-            .clickable(onClick = onClick)
-            .padding(16.dp)
-            .testTag("subscription-provider:${item.name}"),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        Modifier.fillMaxWidth().crystalMaterial(RoundedCornerShape(22.dp))
+            .clickable(onClick = onClick).padding(16.dp).testTag("subscription-provider:${item.name}"),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                item.name,
-                Modifier.weight(1f),
-                color = t.textPrimary,
-                fontSize = 18.sp,
-                lineHeight = 23.sp,
-                fontWeight = FontWeight.ExtraBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (known) {
-                Box(
-                    Modifier
-                        .clip(RoundedCornerShape(11.dp))
-                        .background(Color(0xFFE2E8FA))
-                        .padding(horizontal = 10.dp, vertical = 5.dp),
-                ) {
-                    Text(
-                        "${((1f - item.ratio) * 100f).toInt()}%",
-                        color = primary,
-                        fontSize = 14.sp,
-                        lineHeight = 18.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                    )
+            Text(item.name, Modifier.weight(1f), color = t.textPrimary, fontSize = 17.sp,
+                lineHeight = 24.sp, fontWeight = FontWeight.SemiBold)
+            WorkspaceRefreshAction(item.name, refreshing, success, error.isNotBlank(), actionLabel = "更新订阅", onClick = onRefresh)
+        }
+        if (known) {
+            Box(Modifier.background(t.controlBackground, CircleShape).padding(horizontal = 10.dp, vertical = 5.dp)) {
+                HetuNumber("剩余 ${((1f - item.ratio.coerceIn(0f, 1f)) * 100f).toInt()}%",
+                    Modifier.testTag("subscription-percent:${item.name}"), color = primary,
+                    style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp, lineHeight = 19.sp))
+            }
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                if (maxWidth < 300.dp || LocalDensity.current.fontScale > 1.15f) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("上传" to item.upload, "下载" to item.download, "剩余" to item.remaining).forEach { (label, bytes) ->
+                            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(label, Modifier.padding(end = 12.dp), color = t.textSecondary, fontSize = 12.sp)
+                                HetuNumber(refBytes(bytes), color = if (label == "剩余") primary else t.textPrimary,
+                                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 17.sp, lineHeight = 24.sp))
+                            }
+                        }
+                    }
+                } else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    RefProviderMetric("上传", refBytes(item.upload), Modifier.weight(1f))
+                    RefProviderMetric("下载", refBytes(item.download), Modifier.weight(1f))
+                    RefProviderMetric("剩余", refBytes(item.remaining), Modifier.weight(1f), primary)
                 }
             }
-            Spacer(Modifier.width(4.dp))
-            WorkspaceRefreshAction(
-                item.name,
-                refreshing,
-                success,
-                error.isNotBlank(),
-                actionLabel = "更新订阅",
-                onClick = onRefresh,
-            )
-        }
-
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                ticketExpireAt(item.expire),
-                Modifier.weight(1f),
-                color = t.textSecondary,
-                fontSize = 12.5.sp,
-                lineHeight = 17.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                refUpdatedAt(item.updatedAt),
-                color = t.textSecondary,
-                fontSize = 12.5.sp,
-                lineHeight = 17.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-            )
-        }
-
-        if (known) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                RefProviderMetric("上传", refBytes(item.upload), Modifier.weight(1f))
-                RefProviderMetric("下载", refBytes(item.download), Modifier.weight(1f))
-                RefProviderMetric("剩余", refBytes(item.remaining), Modifier.weight(1f), primary)
+            HetuReadOnlyProgress(item.ratio)
+            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("已用 ${refBytes(item.used)}", Modifier.padding(end = 10.dp), color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+                Text("总计 ${refBytes(item.total)}", color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
             }
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(4.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFD7E0F5)),
-            ) {
-                Box(
-                    Modifier
-                        .fillMaxWidth(item.ratio.coerceIn(.01f, 1f))
-                        .fillMaxHeight()
-                        .background(primary, CircleShape),
-                )
-            }
-            Row(Modifier.fillMaxWidth()) {
-                Text(
-                    "已用 ${refBytes(item.used)}",
-                    Modifier.weight(1f),
-                    color = t.textSecondary,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    "总计 ${refBytes(item.total)}",
-                    color = t.textSecondary,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-        } else {
-            Text(
-                "订阅未上报流量信息",
-                color = t.textSecondary,
-                fontSize = 12.sp,
-                lineHeight = 18.sp,
-            )
+        } else Text("订阅未上报流量信息", color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+            verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(ticketExpireAt(item.expire), Modifier.padding(end = 12.dp), color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
+            Text(refUpdatedAt(item.updatedAt), color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
         }
-
-        if (error.isNotBlank() && !refreshing) {
-            HetuTaskFeedback("${item.name} 更新失败：$error", error = true)
-        }
+        if (error.isNotBlank() && !refreshing) HetuTaskFeedback("${item.name} 更新失败：$error", error = true)
     }
 }
 
 @Composable
-private fun RefProviderMetric(
-    label: String,
-    value: String,
-    modifier: Modifier,
-    valueColor: Color = LocalHetuTokens.current.textPrimary,
-) {
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            value,
-            color = valueColor,
-            fontSize = 18.sp,
-            lineHeight = 22.sp,
-            fontWeight = FontWeight.ExtraBold,
-            maxLines = 1,
-        )
-        Text(
-            label,
-            color = LocalHetuTokens.current.textSecondary,
-            fontSize = 11.5.sp,
-            lineHeight = 16.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
+private fun RefProviderMetric(label: String, value: String, modifier: Modifier,
+    valueColor: Color = LocalHetuTokens.current.textPrimary) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        HetuNumber(value.replace(' ', '\u00a0'), color = valueColor,
+            style = MaterialTheme.typography.titleMedium.copy(fontSize = 17.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold))
+        Text(label, color = LocalHetuTokens.current.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
     }
 }
 
@@ -3990,38 +3774,13 @@ internal fun RefRuleSetRow(item: DashboardRuleSetUi, refreshing: Boolean, succes
 @Composable
 internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
     val context = LocalContext.current
-    LazyColumn(
-        Modifier.fillMaxSize().statusBarsPadding(),
-        contentPadding = PaddingValues(
-            start = 12.dp,
-            top = 8.dp,
-            end = 12.dp,
-            bottom = hetuContentBottomPadding(),
-        ),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
+    val t = LocalHetuTokens.current
+    LazyColumn(Modifier.fillMaxSize().statusBarsPadding(),
+        contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = hetuContentBottomPadding()),
+        verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { RefTitleBar("工具") }
-
-        item {
-            RefGroup {
-                RefToolRow(
-                    Icons.Rounded.Code,
-                    Color.Unspecified,
-                    "脚本",
-                    "服务启动前、停止后脚本与环境变量",
-                ) {
-                    context.startActivity(Intent(context, ProxyScriptsActivity::class.java))
-                }
-                RefDivider()
-                RefToolRow(
-                    Icons.Rounded.Article,
-                    Color.Unspecified,
-                    "日志查看",
-                    "切换、刷新与清理 Root / Mihomo 日志",
-                ) {
-                    onLog("")
-                }
-                RefDivider()
+        item { Text("核心网络", Modifier.padding(start = 6.dp, top = 8.dp), color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp) }
+        item { RefGroup {
                 RefToolRow(
                     Icons.Rounded.Apps,
                     Color.Unspecified,
@@ -4030,11 +3789,7 @@ internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
                 ) {
                     context.startActivity(Intent(context, ProxyAppSelectionActivity::class.java))
                 }
-            }
-        }
-
-        item {
-            RefGroup {
+                RefDivider()
                 RefToolRow(
                     Icons.Rounded.Wifi,
                     Color.Unspecified,
@@ -4061,11 +3816,18 @@ internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
                 ) {
                     context.startActivity(Intent(context, ProxyBypassRulesActivity::class.java))
                 }
-            }
-        }
-
-        item {
-            RefGroup {
+                RefDivider()
+                RefToolRow(
+                    Icons.Rounded.Place,
+                    Color.Unspecified,
+                    "CNIP 设置",
+                    "配置 CNIP 数据源并更新地理数据",
+                ) {
+                    context.startActivity(Intent(context, ProxyCnIpSettingsActivity::class.java))
+                }
+        } }
+        item { Text("规则与订阅", Modifier.padding(start = 6.dp, top = 8.dp), color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp) }
+        item { RefGroup {
                 RefToolRow(
                     Icons.Rounded.Link,
                     Color.Unspecified,
@@ -4085,12 +3847,32 @@ internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
                 }
                 RefDivider()
                 RefToolRow(
-                    Icons.Rounded.Place,
+                    Icons.Rounded.Shield,
                     Color.Unspecified,
-                    "CNIP 设置",
-                    "配置 CNIP 数据源并更新地理数据",
+                    "广告过滤",
+                    "订阅规则、放行与拦截记录",
                 ) {
-                    context.startActivity(Intent(context, ProxyCnIpSettingsActivity::class.java))
+                    context.startActivity(Intent(context, ProxyAdblockChainActivity::class.java))
+                }
+        } }
+        item { Text("运行维护", Modifier.padding(start = 6.dp, top = 8.dp), color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp) }
+        item { RefGroup {
+                RefToolRow(
+                    Icons.Rounded.Article,
+                    Color.Unspecified,
+                    "日志查看",
+                    "切换、刷新与清理 Root / Mihomo 日志",
+                ) {
+                    onLog("")
+                }
+                RefDivider()
+                RefToolRow(
+                    Icons.Rounded.Code,
+                    Color.Unspecified,
+                    "脚本",
+                    "服务启动前、停止后脚本与环境变量",
+                ) {
+                    context.startActivity(Intent(context, ProxyScriptsActivity::class.java))
                 }
                 RefDivider()
                 RefToolRow(
@@ -4110,11 +3892,7 @@ internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
                 ) {
                     context.startActivity(Intent(context, ProxyStartupConfigActivity::class.java))
                 }
-            }
-        }
-
-        item {
-            RefGroup {
+                RefDivider()
                 RefToolRow(
                     Icons.Rounded.Web,
                     Color.Unspecified,
@@ -4136,17 +3914,7 @@ internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
                 ) {
                     context.startActivity(Intent(context, ProxyCoreActivity::class.java))
                 }
-                RefDivider()
-                RefToolRow(
-                    Icons.Rounded.Shield,
-                    Color.Unspecified,
-                    "广告过滤",
-                    "订阅规则、放行与拦截记录",
-                ) {
-                    context.startActivity(Intent(context, ProxyAdblockChainActivity::class.java))
-                }
-            }
-        }
+        } }
     }
 }
 
@@ -4155,6 +3923,7 @@ internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
 internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySettings: () -> Unit, onChanged: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("hetu", 0) }
+    var languagePicker by remember { mutableStateOf(false) }
     var modePicker by remember { mutableStateOf(false) }
     var ipv6Picker by remember { mutableStateOf(false) }
     var latencyPicker by remember { mutableStateOf(false) }
@@ -4185,6 +3954,15 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
         )
     }
     val scope = rememberCoroutineScope()
+    if (languagePicker) ModalBottomSheet(onDismissRequest = { languagePicker = false }, containerColor = Color.Transparent) {
+        Column(Modifier.fillMaxWidth().liquidSheetMaterial().navigationBarsPadding().padding(20.dp)) {
+            Text(ht("语言"), style = MaterialTheme.typography.titleLarge)
+            listOf("system" to "跟随系统", "zh-CN" to "简体中文", "zh-TW" to "繁體中文", "en" to "English", "ru" to "Русский").forEach { (code, name) ->
+                TextButton(onClick = { prefs.edit().putString("appLanguage", code).apply(); languagePicker = false }, modifier = Modifier.fillMaxWidth()) { Text(ht(name)) }
+            }
+            Text("Navigation and common actions are translated. Technical descriptions currently use Chinese.", style = MaterialTheme.typography.bodySmall)
+        }
+    }
     val backupExporter = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json"),
     ) { uri ->
@@ -4260,10 +4038,11 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
             RefGroup {
                 RefValueRow(
                     "语言",
-                    "跟随系统",
+                    when (LocalHetuLanguage.current) { "zh-CN" -> "简体中文"; "zh-TW" -> "繁體中文"; "en" -> "English"; "ru" -> "Русский"; else -> ht("跟随系统") },
                     Icons.Rounded.Translate,
                     Color.Unspecified,
                     highlightValue = false,
+                    onClick = { languagePicker = true },
                 )
                 RefDivider()
                 RefToolRow(
@@ -5162,7 +4941,7 @@ private fun RefToolRow(icon: ImageVector, accent: Color, title: String, subtitle
     trailingText: String = "", trailingBadge: Boolean = false, trailingColor: Color = Color(0xFF2563EB), onClick: () -> Unit) {
     val t = LocalHetuTokens.current
     val color = if (trailingColor == Color(0xFF2563EB)) MaterialTheme.colorScheme.primary else trailingColor
-    WorkspaceSettingRow(title, subtitle, icon, onClick = onClick) {
+    WorkspaceSettingRow(ht(title), ht(subtitle), icon, onClick = onClick) {
         Row(Modifier.heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             if (trailingText.isNotBlank()) Text(trailingText, Modifier.widthIn(max = 72.dp), color = if (trailingBadge) color else t.textSecondary,
                 fontSize = 12.sp, lineHeight = 18.sp, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -5189,7 +4968,7 @@ private fun RefValueRow(title: String, value: String, icon: ImageVector? = null,
 private fun RefSwitchRow(icon: ImageVector, accent: Color, title: String, subtitle: String,
     checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
     val view = LocalView.current
-    WorkspaceSettingRow(title, subtitle, icon,
+    WorkspaceSettingRow(ht(title), ht(subtitle), icon,
         modifier = Modifier.toggleable(checked, role = Role.Switch) {
             view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK); onCheckedChange(it)
         }) {

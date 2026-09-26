@@ -30,7 +30,7 @@ import java.time.Instant
 import java.time.ZoneId
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk=[35],qualifiers="w480dp-h2400dp-mdpi")
+@Config(sdk=[35],qualifiers = "zh-rCN-w480dp-h2400dp-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class InstrumentRenderTest {
     @get:Rule val compose=createAndroidComposeRule<ComponentActivity>()
@@ -50,7 +50,7 @@ class InstrumentRenderTest {
     private fun provider()=DashboardProviderUi("两年套餐 · 长名称测试","HTTP","","","2026-09-20T07:48:00Z",
         5_000_000_000L,20_000_000_000L,128_000_000_000L,1_820_000_000L,setOf("日本","美国"),true)
 
-    @Test fun fourReferenceCardsKeepRealProgressAndTwelveDpGutters() {
+    @Test fun sharedInstrumentPanelKeepsRealProgressAndHairlineDividers() {
         var night by mutableStateOf(false)
         compose.setContent { key(night) {
             app.getSharedPreferences("hetu",0).edit().putString("appearance",if(night)"dark" else "light").commit()
@@ -65,7 +65,7 @@ class InstrumentRenderTest {
             compose.runOnIdle{night=dark};compose.waitForIdle()
             val net=compose.onNodeWithTag("instrument-network",true).fetchSemanticsNode().boundsInRoot
             val speed=compose.onNodeWithTag("instrument-speed",true).fetchSemanticsNode().boundsInRoot
-            assertEquals("Reference cards must keep a 12dp gutter",12f,speed.left-net.right,1f)
+            assertEquals("Shared panel must keep a 1dp divider",1f,speed.left-net.right,1f)
             compose.onNodeWithTag("home-usage-progress",true).assert(SemanticsMatcher.expectValue(SemanticsProperties.ProgressBarRangeInfo,ProgressBarRangeInfo(25f/128f,0f..1f)))
             compose.onNodeWithTag("home-cpu-progress",true).assert(SemanticsMatcher.expectValue(SemanticsProperties.ProgressBarRangeInfo,ProgressBarRangeInfo(.063f,0f..1f)))
             compose.onNodeWithTag("instrument-network-badge",true).assertDoesNotExist()

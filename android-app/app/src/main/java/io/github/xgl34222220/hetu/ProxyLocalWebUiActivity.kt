@@ -32,7 +32,15 @@ class ProxyLocalWebUiActivity : ComponentActivity() {
             settings.allowFileAccess = false
             settings.allowContentAccess = false
             settings.setSupportZoom(false)
-            webViewClient = WebViewClient()
+            webViewClient = object : WebViewClient() {
+                override fun shouldInterceptRequest(view: WebView?, request: android.webkit.WebResourceRequest?): android.webkit.WebResourceResponse? {
+                    val uri = request?.url ?: return null
+                    if (uri.host == "127.0.0.1" && uri.port == port && uri.path.orEmpty().startsWith(WebPanelAssets.PREFIX)) {
+                        return WebPanelAssets.response(this@ProxyLocalWebUiActivity, uri.path.orEmpty())
+                    }
+                    return null
+                }
+            }
             webChromeClient = WebChromeClient()
             setBackgroundColor(android.graphics.Color.TRANSPARENT)
         }
@@ -52,6 +60,14 @@ class ProxyLocalWebUiActivity : ComponentActivity() {
             "UTF-8",
             null,
         )
+        val mode = prefs.getString("proxyWebPanelLocalMode", "auto").orEmpty()
+        if (mode != "builtin" && WebPanelAssets.installed(this)) {
+            val endpoint = "http://127.0.0.1:$port${WebPanelAssets.PREFIX}#/setup?hostname=127.0.0.1&port=$port&secret=" +
+                android.net.Uri.encode(secret) + "&disableUpgradeCore=1&disableTunMode=1"
+            view.loadUrl(endpoint)
+        } else if (mode == "zashboard") {
+            android.widget.Toast.makeText(this, "尚未安装 Zashboard，已打开内置面板；请在 Web 面板设置中安装", android.widget.Toast.LENGTH_LONG).show()
+        }
     }
 
     override fun onBackPressed() {

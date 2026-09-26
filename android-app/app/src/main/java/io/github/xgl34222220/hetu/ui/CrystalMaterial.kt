@@ -154,7 +154,7 @@ fun Modifier.crystalMaterial(
                 .clip(shape)
                 .then(blur)
                 .background(fill, shape)
-                .border(if (selection) .9.dp else .55.dp, outline, shape)
+                .background(if (selection) primary.copy(alpha = .06f) else Color.Transparent, shape)
                 .drawWithCache {
                     val outlineShape = shape.createOutline(size, layoutDirection, this)
                     val highlight = Brush.linearGradient(
@@ -216,8 +216,8 @@ fun Modifier.crystalMaterial(
             .then(blur)
             .background(fill, shape)
             .border(
-                if (selection) 1.4.dp else 1.dp,
-                if (selection) primary.copy(alpha = .62f) else Color.White.copy(alpha = .14f),
+                if (selection) .8.dp else .4.dp,
+                if (selection) primary.copy(alpha = .62f) else Color.White.copy(alpha = .045f),
                 shape,
             )
             .drawWithCache {
