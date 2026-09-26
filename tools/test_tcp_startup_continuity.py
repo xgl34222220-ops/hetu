@@ -94,7 +94,7 @@ def spawn(stack, *args):
 
 
 def listener(stack, family, port, identity, udp=False, transparent=False,
-             local_only=False):
+             local_only=False, bind_address=None):
     af = socket.AF_INET if family == 4 else socket.AF_INET6
     sock = stack.enter_context(socket.socket(af, socket.SOCK_DGRAM if udp else socket.SOCK_STREAM))
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -103,7 +103,7 @@ def listener(stack, family, port, identity, udp=False, transparent=False,
     if transparent:
         sock.setsockopt(socket.SOL_IP if family == 4 else socket.IPPROTO_IPV6,
                         19 if family == 4 else 75, 1)  # IP{V6}_TRANSPARENT
-    address = ('127.0.0.1' if family == 4 else '::1') if local_only else ('0.0.0.0' if family == 4 else '::')
+    address = bind_address or (('127.0.0.1' if family == 4 else '::1') if local_only else ('0.0.0.0' if family == 4 else '::'))
     sock.bind((address, port))
 
     def serve_stream(connection):
@@ -164,8 +164,12 @@ def peer():
     with contextlib.ExitStack() as stack:
         for family in (4, 6):
             listener(stack, family, 24443, 'remote')
-            listener(stack, family, 53, 'remote-dns')
-            listener(stack, family, 53, 'remote-dns', udp=True)
+            # Connected UDP clients accept replies only from their configured
+            # destination. A wildcard socket would select the peer's veth
+            # address for sendto(), instead of this remote resolver address.
+            listener(stack, family, 53, 'remote-dns', bind_address=DESTINATIONS[family])
+            listener(stack, family, 53, 'remote-dns', udp=True,
+                     bind_address=DESTINATIONS[family])
         emit({'ready': True})
         # EOF on the private control pipe ends the child and its netns even if
         # the test process fails. No named namespaces or persistent mounts.
@@ -220,7 +224,8 @@ def exchange(process, identity, label, rounds=3):
     for index in range(rounds):
         nonce = f'{label}-{index}'
         result = command(process, {'nonce': nonce})
-        assert result == {'ok': True, 'identity': identity, 'nonce': nonce}, result
+        assert result == {'ok': True, 'identity': identity, 'nonce': nonce}, \
+            (label, index, identity, result)
         time.sleep(0.04)  # Let later packets exercise established conntrack state.
 
 
