@@ -76,12 +76,28 @@ def network():
                 ('filter', ('OUTPUT', 'FORWARD')))}
 
 
-def dispatch(rules, *, address, interface, mark=0, protocol='tcp', local_addresses=(), direction='ORIGINAL'):
-    """Small packet matcher for the actual emitted PREROUTING rules."""
+def dispatch(rules, *, address, interface, mark=0, protocol='tcp', local_addresses=(),
+             direction='ORIGINAL', connection_mark=0, connection_state='NEW',
+             uid=10001, gid=10001, destination_port=443, packet_state=None,
+             local_route_mark=0x200000):
+    """Match emitted rules and execute non-terminal mark targets in chain order.
+
+    nfmark and ctmark are separate values. The optional state makes subsequent
+    packets in one connection testable without assuming every packet is NEW.
+    """
+    state = packet_state if packet_state is not None else {}
+    state.setdefault('mark', mark)
+    state.setdefault('connection_mark', connection_mark)
+
+    def mask_value(value):
+        parts = value.split('/')
+        return int(parts[0], 0), int(parts[1], 0) if len(parts) > 1 else 0xffffffff
+
     for rule in rules:
         matches = True
         i = 0
         negate = False
+        module = None
         while i < len(rule):
             arg = rule[i]
             if arg == '!':
@@ -90,26 +106,56 @@ def dispatch(rules, *, address, interface, mark=0, protocol='tcp', local_address
                 continue
             if arg == '-j':
                 if matches:
-                    return rule[i + 1]
+                    target = rule[i + 1]
+                    options = rule[i + 2:]
+                    if target in ('MARK', 'CONNMARK'):
+                        assert len(options) == 2 and options[0] == '--set-xmark', rule
+                        number, mask = mask_value(options[1])
+                        key = 'mark' if target == 'MARK' else 'connection_mark'
+                        state[key] = (state[key] & (~mask & 0xffffffff)) ^ number
+                        # These targets continue to later rules; they are not a
+                        # verdict and must not stop before the TPROXY target.
+                    elif target == 'TPROXY':
+                        index = options.index('--tproxy-mark')
+                        number, mask = mask_value(options[index + 1])
+                        state['mark'] = (state['mark'] & (~mask & 0xffffffff)) ^ number
+                        return target
+                    elif target in ('RETURN', 'ACCEPT', 'DROP', 'REJECT'):
+                        return target
+                    else:
+                        raise AssertionError(rule)
                 break
             if arg == '-m':
+                module = rule[i + 1]
+                assert module in ('mark', 'connmark', 'conntrack', 'addrtype', 'owner'), rule
                 i += 2
                 continue
             value = rule[i + 1]
-            if arg == '-i':
+            if arg in ('-i', '-o'):
                 result = interface == value
             elif arg == '--dst-type':
-                # The policy route marks loopback packets LOCAL too.
-                result = address in local_addresses or bool(mark)
+                # Only the configured Hetu routing bit makes the destination
+                # LOCAL; an unrelated firewall's packet mark does not.
+                result = address in local_addresses or bool(state['mark'] & local_route_mark)
             elif arg == '-d':
                 result = ipaddress.ip_address(address) in ipaddress.ip_network(value, strict=False)
             elif arg == '-p':
                 result = protocol == value
             elif arg == '--mark':
-                number, mask = (int(part, 0) for part in value.split('/'))
-                result = mark & mask == number
+                assert module in ('mark', 'connmark'), rule
+                number, mask = mask_value(value)
+                actual = state['connection_mark'] if module == 'connmark' else state['mark']
+                result = actual & mask == number
             elif arg == '--ctdir':
                 result = direction == value
+            elif arg == '--ctstate':
+                result = connection_state in value.split(',')
+            elif arg in ('--uid-owner', '--gid-owner'):
+                parts = value.split('-')
+                lower, upper = int(parts[0]), int(parts[-1])
+                result = lower <= (uid if arg == '--uid-owner' else gid) <= upper
+            elif arg == '--dport':
+                result = destination_port == int(value)
             else:
                 raise AssertionError(rule)
             matches &= not result if negate else result
@@ -215,11 +261,67 @@ install_mangle{family} 19898 tproxy 1 1 redirect core '' 1 '' '' '' || exit 1
                     assert dispatch(rules, address=later_local, interface='rmnet0', direction='REPLY') == 'RETURN'
                     checks += 1
 
+                outgoing = json.loads(state_path.read_text())[binary + ':mangle']['HETU_MOUT']
+                private_bit, foreign_bit = 0x200000, 0x4000
+                # Old TCP retains its original path even with an unrelated
+                # nonzero connmark; matching the packet's mark instead is wrong.
+                old = {'mark': 0, 'connection_mark': foreign_bit}
+                assert dispatch(outgoing, address=remote, interface='wlan0',
+                                connection_state='ESTABLISHED', packet_state=old) == 'RETURN'
+                assert old == {'mark': 0, 'connection_mark': foreign_bit}
+                assert dispatch(rules, address=remote, interface='swlan0',
+                                connection_state='ESTABLISHED', packet_state=old) == 'RETURN'
+                checks += 3
+                # The selected first packet writes only Hetu's private bits.
+                # Later packets have no packet mark but inherit this ctmark.
+                first = {'mark': foreign_bit, 'connection_mark': foreign_bit}
+                dispatch(outgoing, address=remote, interface='wlan0', packet_state=first)
+                assert first == {'mark': private_bit | foreign_bit,
+                                 'connection_mark': private_bit | foreign_bit}
+                later = {'mark': foreign_bit, 'connection_mark': first['connection_mark']}
+                dispatch(outgoing, address=remote, interface='wlan0',
+                         connection_state='ESTABLISHED', packet_state=later)
+                assert later == first
+                assert dispatch(rules, address=remote, interface='lo',
+                                connection_state='ESTABLISHED', packet_state=later) == 'TPROXY'
+                checks += 3
+                # Shared new TCP reaches the target after CONNMARK continues.
+                shared = {'mark': foreign_bit, 'connection_mark': foreign_bit}
+                assert dispatch(rules, address=remote, interface='swlan0', packet_state=shared) == 'TPROXY'
+                assert shared == {'mark': private_bit | foreign_bit,
+                                  'connection_mark': private_bit | foreign_bit}
+                checks += 2
+                # UDP must not accidentally inherit the TCP preservation rule.
+                udp = {'mark': 0, 'connection_mark': foreign_bit}
+                assert dispatch(rules, address=remote, interface='swlan0', protocol='udp',
+                                connection_state='ESTABLISHED', packet_state=udp) == 'TPROXY'
+                assert udp['connection_mark'] == foreign_bit
+                checks += 2
+                for protocol in ('tcp', 'udp'):
+                    dns = {'mark': 0, 'connection_mark': foreign_bit}
+                    assert dispatch(outgoing, address=remote, interface='wlan0', protocol=protocol,
+                                    destination_port=53, packet_state=dns) == 'RETURN'
+                    assert dns == {'mark': 0, 'connection_mark': foreign_bit}
+                    checks += 2
+
+            reset()
+            shell(f'''MARK=0x200000; MASK=0x200000; TABLE=20260; PREF=14500
+v6supported(){{ return 0; }}
+install_mangle{family} 19898 tproxy 1 1 redirect whitelist 10001 0 '' '' '' || exit 1
+''')
+            outgoing = json.loads(state_path.read_text())[binary + ':mangle']['HETU_MOUT']
+            for app_uid, expected in ((10001, 0x204000), (10002, 0x4000)):
+                packet = {'mark': 0x4000, 'connection_mark': 0x4000}
+                dispatch(outgoing, address=remote, interface='wlan0', uid=app_uid, packet_state=packet)
+                assert packet == {'mark': expected, 'connection_mark': expected}, (app_uid, packet)
+                checks += 1
+
         reset()
         shell('''MARK=0x200000; MASK=0x200000; TABLE=20260; PREF=14500
 if install_mangle4 19898 tproxy 1 1 redirect core '' 1 '' '' ''; then exit 1; fi
 ''', HETU_NO_ADDRTYPE='1', HETU_NO_CONNTRACK='1')
         checks += 1
+        print(f'Root controller network rule checks passed: {checks}', flush=True)
 
         core_dir = directory / 'private/bin'
         core_dir.mkdir(parents=True)
