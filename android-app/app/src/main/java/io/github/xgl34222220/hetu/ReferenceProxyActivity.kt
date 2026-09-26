@@ -1,5 +1,13 @@
 package io.github.xgl34222220.hetu
 
+import io.github.xgl34222220.hetu.ui.ReferenceButton as Button
+
+import androidx.compose.material.icons.outlined.Link
+import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.outlined.Settings
+
+import io.github.xgl34222220.hetu.ui.ReferenceModalBottomSheet as ModalBottomSheet
+
 import io.github.xgl34222220.hetu.ui.CrystalSurface as Surface
 import android.content.Intent
 import android.graphics.BitmapFactory
@@ -171,7 +179,7 @@ class ReferenceProxyActivity : ComponentActivity() {
 private enum class RefProxyPage { Home, Panel, Strategy, Tools, Settings }
 internal data class RefSubscriptionCache(val used: Long = 0L, val total: Long = 0L, val count: Int = 0)
 internal enum class RefPanelTab(val label: String) {
-    Groups("节点"), Overview("概览"), Subscriptions("订阅"), Connections("连接"), Rules("规则"), RuleSets("规则集")
+    Overview("概览"), Groups("策略"), Subscriptions("订阅"), Connections("连接"), Rules("规则"), RuleSets("规则集")
 }
 
 @Composable
@@ -626,20 +634,20 @@ private fun RefProxyShell(
 
     val dockPages = remember(showPanelTab) {
         if (showPanelTab) {
-            listOf(RefProxyPage.Home, RefProxyPage.Panel, RefProxyPage.Strategy, RefProxyPage.Tools, RefProxyPage.Settings)
+            listOf(RefProxyPage.Home, RefProxyPage.Panel, RefProxyPage.Tools, RefProxyPage.Settings)
         } else {
-            listOf(RefProxyPage.Home, RefProxyPage.Strategy, RefProxyPage.Tools, RefProxyPage.Settings)
+            listOf(RefProxyPage.Home, RefProxyPage.Tools, RefProxyPage.Settings)
         }
     }
-    LaunchedEffect(showPanelTab) { if (!showPanelTab && page == RefProxyPage.Panel) page = RefProxyPage.Home }
+    LaunchedEffect(page) { if (page == RefProxyPage.Strategy) { panelTab = RefPanelTab.Groups; page = RefProxyPage.Panel } }
     val dock = remember(showPanelTab) {
         dockPages.map { destination ->
             when (destination) {
                 RefProxyPage.Home -> DockItem("首页", Icons.Rounded.Home, .94f)
-                RefProxyPage.Panel -> DockItem("面板", Icons.Rounded.Link, .96f)
+                RefProxyPage.Panel -> DockItem("面板", Icons.Outlined.Link, .96f)
                 RefProxyPage.Strategy -> DockItem("策略", Icons.Rounded.Tune, .96f)
-                RefProxyPage.Tools -> DockItem("工具", Icons.Rounded.GridView, .96f)
-                RefProxyPage.Settings -> DockItem("设置", Icons.Rounded.Settings, .94f)
+                RefProxyPage.Tools -> DockItem("工具", Icons.Outlined.GridView, .96f)
+                RefProxyPage.Settings -> DockItem("设置", Icons.Outlined.Settings, .94f)
             }
         }
     }
@@ -681,7 +689,8 @@ private fun RefProxyShell(
                         .fillMaxSize()
                         .graphicsLayer {
                             alpha = 1f
-                            translationY = (1f - pageEnter.value) * 10.dp.toPx()
+                            alpha = .7f + .3f * pageEnter.value
+                            translationX = (1f - pageEnter.value) * 24.dp.toPx()
                         },
                 ) {
             when (page) {
@@ -814,9 +823,6 @@ private fun RefProxyShell(
                 selected = dockPages.indexOf(page).coerceAtLeast(0),
                 onSelect = {
                     val destination = dockPages[it]
-                    if (destination == RefProxyPage.Panel && panelTab == RefPanelTab.Groups) {
-                        panelTab = RefPanelTab.Overview
-                    }
                     page = destination
                 },
                 hazeState = haze,
@@ -899,26 +905,17 @@ internal fun RefHome(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item(key = "home-title") {
-            Row(Modifier.fillMaxWidth().padding(start = 4.dp, top = 4.dp, bottom = 4.dp),
-                verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text("河图", color = t.textPrimary, fontSize = 28.sp, lineHeight = 36.sp,
-                        fontWeight = FontWeight.Bold, letterSpacing = (-.6).sp)
-                    Text("网络概览", color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
-                }
-                IconButton(onClick = onSettings) {
-                    Icon(Icons.Rounded.Settings, "首页设置", Modifier.size(21.dp), tint = t.textSecondary)
-                }
+            Box(Modifier.fillMaxWidth().heightIn(min = 58.dp), contentAlignment = Alignment.Center) {
+                Text("河图", color = t.textPrimary, fontSize = 23.sp, lineHeight = 31.sp,
+                    fontWeight = FontWeight.Bold)
             }
         }
-
         item(key = "home-status") {
-            Column(Modifier.fillMaxWidth().crystalMaterial(RoundedCornerShape(HetuGlassRadius.Hero))) {
-                RefReferenceHero(state = state, runtime = runtime, busy = busy, onToggle = onToggle)
-                HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = t.textMuted.copy(alpha = .10f))
-                RefReferenceActionStrip(running = state.running, busy = busy, onToggle = onToggle,
-                    onReload = onReload, onRestart = onRestart)
-            }
+            RefReferenceHero(state = state, runtime = runtime, busy = busy, onToggle = onToggle)
+        }
+        item(key = "home-actions") {
+            RefReferenceActionStrip(running = state.running, busy = busy, onToggle = onToggle,
+                onReload = onReload, onRestart = onRestart)
         }
 
         item(key = "home-shortcuts") {
@@ -936,7 +933,7 @@ internal fun RefHome(
                 }
                 RefReferenceShortcut(
                     title = "日志",
-                    subtitle = if (diagnosticLoading) "正在诊断…" else "长按诊断",
+                    subtitle = if (diagnosticLoading) "正在诊断…" else "查看",
                     modifier = Modifier.weight(1f),
                     enabled = true,
                     onLongClick = if (diagnosticLoading) null else onDiagnostics,
@@ -1082,13 +1079,11 @@ private fun RefReferenceShortcut(
     ) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Icon(if (title == "WebUI") Icons.Rounded.Language else Icons.Rounded.Article, null,
-                Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 1f else .4f))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(title, color = t.textPrimary.copy(alpha = if (enabled) 1f else .45f),
-                    fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold)
+                    fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold)
                 Text(subtitle, color = t.textSecondary.copy(alpha = if (enabled) 1f else .45f),
-                    fontSize = 11.sp, lineHeight = 16.sp)
+                    fontSize = 12.sp, lineHeight = 18.sp)
             }
         }
     }
@@ -1126,10 +1121,10 @@ private fun RefLatencyPanel(
                     lineHeight = 20.sp,
                     fontWeight = FontWeight.ExtraBold,
                 )
-                IconButton(onClick = onTune, modifier = Modifier.size(48.dp)) {
+                top.yukonga.miuix.kmp.basic.IconButton(onClick = onTune, modifier = Modifier.size(32.dp), minWidth = 32.dp, minHeight = 28.dp) {
                     Icon(Icons.Rounded.Tune, "延迟设置", Modifier.size(18.dp), tint = t.textSecondary)
                 }
-                IconButton(onClick = onClick, enabled = !testing, modifier = Modifier.size(48.dp)) {
+                top.yukonga.miuix.kmp.basic.IconButton(onClick = onClick, enabled = !testing, modifier = Modifier.size(32.dp), minWidth = 32.dp, minHeight = 28.dp) {
                     if (testing) {
                         CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 1.8.dp)
                     } else {
@@ -1321,7 +1316,7 @@ internal fun RefPanel(
         onDispose { selectorPrefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
     selectorPrefsRevision
-    val expandSelectedInSheet = selectorPrefs.getBoolean("proxySelectorExpandSelectedInSheet", true)
+    val expandSelectedInSheet = selectorPrefs.getBoolean("proxySelectorExpandSelectedInSheet", false)
     var providerNames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var changingMode by remember { mutableStateOf(false) }
     LaunchedEffect(state.running, selectorPrefsRevision) {
@@ -1401,13 +1396,12 @@ internal fun RefPanel(
 
     var searchOpen by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
-    var groupLayout by rememberSaveable { mutableIntStateOf(selectorPrefs.getInt("proxySelectorGroupColumns", 0).coerceIn(0, 2)) }
+    var groupLayout by rememberSaveable { mutableIntStateOf(selectorPrefs.getInt("proxySelectorGroupColumns", 0).coerceIn(0, 3)) }
     var groupSortMode by rememberSaveable { mutableStateOf(selectorPrefs.getString("proxySelectorGroupSort", "config").orEmpty().ifBlank { "config" }) }
     LaunchedEffect(selectorPrefsRevision) {
-        groupLayout = selectorPrefs.getInt("proxySelectorGroupColumns", 0).coerceIn(0, 2)
+        groupLayout = selectorPrefs.getInt("proxySelectorGroupColumns", 0).coerceIn(0, 3)
         groupSortMode = selectorPrefs.getString("proxySelectorGroupSort", "config").orEmpty().ifBlank { "config" }
     }
-    var groupSortPicker by rememberSaveable { mutableStateOf(false) }
     var apiSettings by rememberSaveable { mutableStateOf(false) }
     var connectionView by rememberSaveable { mutableStateOf("active") }
     var connectionProtocol by rememberSaveable { mutableStateOf("all") }
@@ -1724,7 +1718,9 @@ internal fun RefPanel(
         onDetailVisibleChanged(false)
     }
 
-    BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding()) {
+    val panelListState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val panelScroll = top.yukonga.miuix.kmp.basic.MiuixScrollBehavior()
+    BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding().nestedScroll(panelScroll.nestedScrollConnection)) {
         val autoGroupColumns = liquidColumns(maxWidth - 24.dp)
         val groupColumns = liquidColumns(maxWidth - 24.dp, groupLayout)
         Column(Modifier.fillMaxSize()) {
@@ -1734,7 +1730,7 @@ internal fun RefPanel(
                         tabs = if (strategyOnly) {
                             listOf(RefPanelTab.Groups)
                         } else {
-                            RefPanelTab.entries.filter { it != RefPanelTab.Groups }
+                            RefPanelTab.entries
                         },
                         selected = tab,
                         onSelect = onSelectedTabChange,
@@ -1747,7 +1743,8 @@ internal fun RefPanel(
                         },
                         onRefreshGroups = ::refresh,
                         groupSortMode = groupSortMode,
-                        onSortGroups = { groupSortPicker = true },
+                        onSortGroups = {},
+                        scrollBehavior = panelScroll,
                         groupColumns = groupColumns,
                         onToggleGroupLayout = {
                             groupLayout = when (groupLayout) {
@@ -1777,6 +1774,7 @@ internal fun RefPanel(
             ) {
             LazyColumn(
             Modifier.fillMaxSize(),
+            state = panelListState,
             contentPadding = PaddingValues(
                 start = 12.dp,
                 top = 8.dp,
@@ -1785,23 +1783,6 @@ internal fun RefPanel(
             ),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            if (tab == RefPanelTab.Groups && state.panelReady) item(key = "traffic-mode") {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("模式", color = t.textSecondary, fontSize = 12.sp)
-                    listOf("rule" to "规则", "global" to "全局", "direct" to "直连").forEach { (value, title) ->
-                        LiquidChoicePill(title, state.trafficMode.equals(value, true), {
-                            if (!changingMode) scope.launch {
-                                changingMode = true
-                                try { withContext(Dispatchers.IO) { MihomoControllerClient(context).setTrafficMode(value) }; onRefreshState() }
-                                catch (cancel: CancellationException) { throw cancel }
-                                catch (failure: Exception) { error = failure.message ?: "模式切换失败" }
-                                finally { changingMode = false }
-                            }
-                        })
-                    }
-                    if (changingMode) HetuBusyIndicator()
-                }
-            }
             if (!state.running) {
                 item { RefEmptyState("代理未运行", "启动代理后，在这里查看节点、应用连接和分流规则。", Icons.Rounded.PowerSettingsNew) }
             } else when (tab) {
@@ -1835,7 +1816,7 @@ internal fun RefPanel(
                                         onDelay = { if (selected.isNotBlank()) testNodes(listOf(selected)) },
                                     )
                                 }
-                                if (pair.size < groupColumns) Spacer(Modifier.weight(1f))
+                                repeat(groupColumns - pair.size) { Spacer(Modifier.weight(1f)) }
                             }
                             pair.forEach { candidate ->
                             val expandedGroup = candidate.takeIf { it.name in expandedGroupNames }
@@ -2012,6 +1993,25 @@ internal fun RefPanel(
             }
         }
         } // column: header remains above list, never overlaps tabs
+        if (tab == RefPanelTab.Groups && expandedGroupNames.isNotEmpty()) {
+            val groupName = expandedGroupNames.last()
+            Row(Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = hetuContentBottomPadding()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                top.yukonga.miuix.kmp.basic.IconButton(onClick = {
+                    val index = filteredGroups.indexOfFirst { it.name == groupName }
+                    if (index >= 0) scope.launch { panelListState.animateScrollToItem(index / groupColumns) }
+                }, modifier = Modifier.size(44.dp), backgroundColor = t.cardBackground) {
+                    Icon(Icons.Rounded.MyLocation, "定位展开的策略组", Modifier.size(20.dp))
+                }
+                top.yukonga.miuix.kmp.basic.Button(onClick = { expandedGroupNames = expandedGroupNames - groupName },
+                    cornerRadius = 24.dp, minHeight = 44.dp,
+                    colors = top.yukonga.miuix.kmp.basic.ButtonDefaults.buttonColorsPrimary()) {
+                    Text(groupName, color = Color.White, fontSize = 12.sp, maxLines = 1,
+                        modifier = Modifier.widthIn(max = 160.dp), overflow = TextOverflow.Ellipsis)
+                    Icon(Icons.Rounded.ExpandLess, "收起策略组", Modifier.size(18.dp), tint = Color.White)
+                }
+            }
+        }
     } // measured content width
 
 
@@ -2051,28 +2051,18 @@ internal fun RefPanel(
         }
     }
 
-    if (groupSortPicker) {
-        val sortValues = listOf(
-            "config" to "配置顺序",
-            "delay" to "当前节点延迟",
-            "name" to "名称 A–Z",
-        )
-        RefChoiceBottomSheet(
-            title = "策略组排序",
-            options = sortValues.map { (value, label) -> label to (groupSortMode == value) },
-            onDismiss = { groupSortPicker = false },
-            onSelect = { index ->
-                groupSortMode = sortValues[index].first
-                selectorPrefs.edit().putString("proxySelectorGroupSort", groupSortMode).apply()
-                expandedGroupNames = emptyList()
-                groupSortPicker = false
-            },
-        )
-    }
-
     if (apiSettings) {
         RefPanelApiSettingsSheet(
-            mode = state.mode,
+            mode = state.trafficMode,
+            onModeChange = { value ->
+                if (!changingMode) scope.launch {
+                    changingMode = true
+                    try { withContext(Dispatchers.IO) { MihomoControllerClient(context).setTrafficMode(value) }; onRefreshState() }
+                    catch (cancel: CancellationException) { throw cancel }
+                    catch (failure: Exception) { error = failure.message ?: "模式切换失败" }
+                    finally { changingMode = false }
+                }
+            },
             onDismiss = { apiSettings = false },
             onOpenAppSettings = {
                 apiSettings = false
@@ -2115,6 +2105,7 @@ internal fun RefPanel(
 @Composable
 private fun RefPanelApiSettingsSheet(
     mode: String,
+    onModeChange: (String) -> Unit,
     onDismiss: () -> Unit,
     onOpenAppSettings: () -> Unit,
 ) {
@@ -2190,18 +2181,19 @@ private fun RefPanelApiSettingsSheet(
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         dragHandle = { RefSheetDragHandle() },
     ) {
+        val dismiss = LocalReferenceDismiss.current
         Column(
-            Modifier.fillMaxWidth().fillMaxHeight(.86f).navigationBarsPadding().imePadding()
+            Modifier.fillMaxWidth().imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(start = 16.dp, end = 16.dp, bottom = 18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("API 配置", color = t.textPrimary, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
-            Text(
-                "当前模式：$mode",
-                color = t.textSecondary,
-                fontSize = 12.sp,
-                lineHeight = 17.sp,
+            Text("API 配置", Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center, color = t.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            top.yukonga.miuix.kmp.menu.WindowDropdownMenu(
+                entry = top.yukonga.miuix.kmp.basic.DropdownEntry(
+                    listOf("rule" to "规则", "global" to "全局", "direct" to "直连").map { (value,label) ->
+                        top.yukonga.miuix.kmp.basic.DropdownItem(label, selected = mode.equals(value, true), onClick = { onModeChange(value) })
+                    }), title = "模式 · $mode", insideMargin = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
             )
 
             Surface(shape = RoundedCornerShape(HetuGlassRadius.Card), color = t.cardBackground) {
@@ -2301,7 +2293,7 @@ private fun RefPanelApiSettingsSheet(
                 }
                 Button(
                     onClick = {
-                        if (save()) onDismiss()
+                        if (save()) dismiss { onDismiss() }
                     },
                     enabled = !busy,
                     modifier = Modifier.weight(1f).heightIn(min = 48.dp),
@@ -2609,155 +2601,34 @@ private fun RefPanelGlassHeader(
     onOpenSettings: () -> Unit,
     hazeState: HazeState,
     backdrop: LayerBackdrop?,
+    scrollBehavior: top.yukonga.miuix.kmp.basic.ScrollBehavior? = null,
 ) {
     val t = LocalHetuTokens.current
-    val scheme = MaterialTheme.colorScheme
-    val dark = scheme.background.luminance() < .5f
-
-    // Keep the header structurally transparent. Previous full-width glass shells created
-    // an oversized white slab on some OEM renderers. Only the compact controls carry glass.
-    Column(
-        Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Row(
-            Modifier.fillMaxWidth().heightIn(min = 48.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            when (selected) {
-                RefPanelTab.Groups -> {
-                    Text(title, Modifier.weight(1f), color = t.textPrimary, fontSize = 26.sp,
-                        lineHeight = 34.sp, fontWeight = FontWeight.Bold)
-                    RefPanelHeaderAction(
-                        icon = if (searchOpen) Icons.Rounded.Close else Icons.Rounded.Search,
-                        contentDescription = if (searchOpen) "关闭搜索" else "搜索",
-                        active = searchOpen,
-                        onClick = onSearchToggle,
-                    )
-                    RefPanelHeaderAction(
-                        icon = Icons.Rounded.FilterList,
-                        contentDescription = if (groupColumns == 2) "切换单列" else "切换双列",
-                        active = groupColumns == 1,
-                        onClick = onToggleGroupLayout,
-                    )
-                    RefPanelHeaderAction(
-                        icon = Icons.Rounded.Sort,
-                        contentDescription = when (groupSortMode) {
-                            "name" -> "策略组排序：名称"
-                            "delay" -> "策略组排序：延迟"
-                            else -> "策略组排序：配置顺序"
-                        },
-                        active = groupSortMode != "config",
-                        onClick = onSortGroups,
-                    )
-                    RefPanelHeaderAction(
-                        icon = Icons.Rounded.Settings,
-                        contentDescription = "面板设置",
-                        onClick = onOpenSettings,
-                    )
+    Column(Modifier.fillMaxWidth()) {
+        top.yukonga.miuix.kmp.basic.TopAppBar(
+            title = title, color = androidx.compose.ui.graphics.Color.Transparent,
+            scrollBehavior = scrollBehavior, defaultWindowInsetsPadding = false,
+            titlePadding = 4.dp, navigationIconPadding = 0.dp, actionIconPadding = 0.dp,
+            navigationIcon = {
+                RefPanelHeaderAction(icon = Icons.AutoMirrored.Rounded.ArrowBack,
+                    contentDescription = "返回首页", onClick = onBack)
+            },
+            actions = {
+                if (selected == RefPanelTab.Groups) {
+                    ReferenceStrategyFilterMenu()
+                    ReferenceStrategyMenu()
+                } else if (selected != RefPanelTab.Overview) {
+                    RefPanelHeaderAction(icon = if (searchOpen) Icons.Rounded.Close else Icons.Rounded.Search,
+                        contentDescription = if (searchOpen) "关闭搜索" else "搜索", active = searchOpen, onClick = onSearchToggle)
                 }
-                RefPanelTab.Overview -> {
-                    Spacer(Modifier.weight(1f))
-                    RefPanelHeaderAction(
-                        icon = Icons.Rounded.Settings,
-                        contentDescription = "面板设置",
-                        onClick = onOpenSettings,
-                    )
-                }
-                RefPanelTab.Subscriptions -> {
-                    RefPanelHeaderAction(
-                        icon = Icons.AutoMirrored.Rounded.ArrowBack,
-                        contentDescription = "返回首页",
-                        onClick = onBack,
-                    )
-                    Spacer(Modifier.weight(1f))
-                    RefPanelHeaderAction(
-                        icon = Icons.Rounded.Link,
-                        contentDescription = "刷新订阅",
-                        active = true,
-                        onClick = onRefreshGroups,
-                    )
-                    RefPanelHeaderAction(
-                        icon = Icons.Rounded.Settings,
-                        contentDescription = "面板设置",
-                        onClick = onOpenSettings,
-                    )
-                }
-                else -> {
-                    RefPanelHeaderAction(
-                        icon = Icons.AutoMirrored.Rounded.ArrowBack,
-                        contentDescription = "返回首页",
-                        onClick = onBack,
-                    )
-                    Spacer(Modifier.weight(1f))
-                    if (selected != RefPanelTab.Overview) {
-                        RefPanelHeaderAction(
-                            icon = if (searchOpen) Icons.Rounded.Close else Icons.Rounded.Search,
-                            contentDescription = if (searchOpen) "关闭搜索" else "搜索",
-                            active = searchOpen,
-                            onClick = onSearchToggle,
-                        )
-                    }
-                    RefPanelHeaderAction(
-                        icon = Icons.Rounded.Settings,
-                        contentDescription = "面板设置",
-                        onClick = onOpenSettings,
-                    )
-                }
-            }
-        }
-
-        if (selected != RefPanelTab.Groups) Text(
-            title,
-            color = t.textPrimary,
-            fontSize = 32.sp,
-            lineHeight = 40.sp,
-            fontWeight = FontWeight.ExtraBold,
-            letterSpacing = (-.8).sp,
-            modifier = Modifier.fillMaxWidth(),
+                RefPanelHeaderAction(icon = Icons.Rounded.Settings, contentDescription = "面板设置", onClick = onOpenSettings)
+            },
+            bottomContent = {
+                if (tabs.size > 1) RefPanelTabs(tabs, selected, true, onSelect)
+            },
         )
-        if (tabs.size > 1) {
-            RefPanelTabs(
-                tabs = tabs,
-                selected = selected,
-                liquidGlass = true,
-                onSelect = onSelect,
-            )
-        }
-        androidx.compose.animation.AnimatedVisibility(
-            visible = searchOpen && selected != RefPanelTab.Overview,
-            enter = androidx.compose.animation.expandVertically(
-                expandFrom = Alignment.Top,
-                animationSpec = androidx.compose.animation.core.tween(240),
-            ) + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(180)) +
-                androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(220)) { -it / 4 },
-            exit = androidx.compose.animation.shrinkVertically(
-                shrinkTowards = Alignment.Top,
-                animationSpec = androidx.compose.animation.core.tween(190),
-            ) + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(140)),
-        ) {
-            TextField(
-                value = query,
-                onValueChange = onQueryChange,
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                placeholder = { Text(when (selected) {
-                    RefPanelTab.Connections -> "搜索应用、域名或分流规则"
-                    RefPanelTab.Subscriptions -> "搜索订阅名称"
-                    RefPanelTab.Rules -> "搜索规则、目标或策略"
-                    RefPanelTab.RuleSets -> "搜索规则集"
-                    else -> "搜索策略组或节点"
-                }) },
-                leadingIcon = { Icon(Icons.Rounded.Search, null, Modifier.size(18.dp)) },
-                shape = RoundedCornerShape(18.dp),
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = if (dark) Color.White.copy(alpha = .07f) else Color.White.copy(alpha = .82f),
-                    unfocusedContainerColor = if (dark) Color.White.copy(alpha = .05f) else Color.White.copy(alpha = .72f),
-                    disabledContainerColor = Color.Transparent,
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                ),
-            )
+        androidx.compose.animation.AnimatedVisibility(searchOpen && selected != RefPanelTab.Overview) {
+            LiquidGlassTextField(query, onQueryChange, "搜索${selected.label}", Modifier.fillMaxWidth().padding(top = 8.dp))
         }
     }
 }
@@ -2808,72 +2679,18 @@ private fun RefPanelTabs(
     liquidGlass: Boolean = false,
     onSelect: (RefPanelTab) -> Unit,
 ) {
-    val t = LocalHetuTokens.current
-    val scheme = MaterialTheme.colorScheme
-    val dark = scheme.background.luminance() < .5f
-    val view = LocalView.current
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(9.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        tabs.forEach { tab ->
-            val active = tab == selected
-            val shape = RoundedCornerShape(14.dp)
-            val source = remember(tab) { MutableInteractionSource() }
-            val pressed by source.collectIsPressedAsState()
-            val scale by animateFloatAsState(
-                if (pressed) .96f else 1f,
-                spring(dampingRatio = .78f, stiffness = 520f),
-                label = "reference-tab-${tab.name}",
-            )
-            Box(
-                Modifier
-                    .height(38.dp)
-                    .graphicsLayer { scaleX = scale; scaleY = scale }
-                    .clip(shape)
-                    .then(
-                        if (active) {
-                            Modifier
-                                .shadow(
-                                    elevation = 2.dp,
-                                    shape = shape,
-                                    clip = false,
-                                    ambientColor = scheme.primary.copy(alpha = .08f),
-                                    spotColor = Color.Black.copy(alpha = .05f),
-                                )
-                                .background(t.selectionBackground, shape)
-                                .border(
-                                    .55.dp,
-                                    if (dark) Color.White.copy(alpha = .12f) else Color.White.copy(alpha = .52f),
-                                    shape,
-                                )
-                        } else {
-                            Modifier.background(Color.Transparent, shape)
-                        }
-                    )
-                    .clickable(interactionSource = source, indication = null) {
-                        if (!active) {
-                            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                            onSelect(tab)
-                        }
-                    }
-                    .padding(horizontal = 14.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    tab.label,
-                    color = if (active) scheme.primary else t.textSecondary,
-                    fontSize = 14.5.sp,
-                    lineHeight = 19.sp,
-                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
-                    maxLines = 1,
-                )
-            }
-        }
-    }
+    val context = LocalContext.current
+    top.yukonga.miuix.kmp.basic.TabRow(
+        tabs = tabs.map { it.label } + "日志",
+        selectedTabIndex = tabs.indexOf(selected).coerceAtLeast(0),
+        onTabSelected = { index ->
+            if (index < tabs.size) onSelect(tabs[index])
+            else context.startActivity(Intent(context, ProxyLogViewerActivity::class.java))
+        },
+        minWidth = 56.dp, maxWidth = 64.dp,
+        height = maxOf(38.dp, with(LocalDensity.current) { 23.sp.toDp() + 10.dp }),
+        cornerRadius = 12.dp, itemSpacing = 9.dp,
+    )
 }
 
 @Composable
@@ -3776,144 +3593,39 @@ internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
     val context = LocalContext.current
     val t = LocalHetuTokens.current
     LazyColumn(Modifier.fillMaxSize().statusBarsPadding(),
-        contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = hetuContentBottomPadding()),
-        verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = hetuContentBottomPadding()),
+        verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item { RefTitleBar("工具") }
-        item { Text("核心网络", Modifier.padding(start = 6.dp, top = 8.dp), color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp) }
         item { RefGroup {
-                RefToolRow(
-                    Icons.Rounded.Apps,
-                    Color.Unspecified,
-                    "应用管理",
-                    "黑名单、白名单、核心范围与批量选择",
-                ) {
-                    context.startActivity(Intent(context, ProxyAppSelectionActivity::class.java))
-                }
-                RefDivider()
-                RefToolRow(
-                    Icons.Rounded.Wifi,
-                    Color.Unspecified,
-                    "网络匹配",
-                    "设置网络匹配后要执行的操作",
-                ) {
-                    context.startActivity(Intent(context, ProxyNetworkAutomationActivity::class.java))
-                }
-                RefDivider()
-                RefToolRow(
-                    Icons.Rounded.WifiTethering,
-                    Color.Unspecified,
-                    "共享网络",
-                    "管理共享网络转发相关设置",
-                ) {
-                    context.startActivity(Intent(context, ProxySharedNetworkSettingsActivity::class.java))
-                }
-                RefDivider()
-                RefToolRow(
-                    Icons.Rounded.AltRoute,
-                    Color.Unspecified,
-                    "绕过规则",
-                    "管理本地 CIDR 与接口规则",
-                ) {
-                    context.startActivity(Intent(context, ProxyBypassRulesActivity::class.java))
-                }
-                RefDivider()
-                RefToolRow(
-                    Icons.Rounded.Place,
-                    Color.Unspecified,
-                    "CNIP 设置",
-                    "配置 CNIP 数据源并更新地理数据",
-                ) {
-                    context.startActivity(Intent(context, ProxyCnIpSettingsActivity::class.java))
-                }
+            RefToolRow(Icons.Rounded.FolderOpen, Color.Unspecified, "文件管理", "查看与处理应用文件") { context.startActivity(Intent(context, ReferenceFileManagerActivity::class.java)) }
+            RefDivider()
+            RefToolRow(Icons.Rounded.Code, Color.Unspecified, "脚本", "管理服务脚本") { context.startActivity(Intent(context, ProxyScriptsActivity::class.java)) }
         } }
-        item { Text("规则与订阅", Modifier.padding(start = 6.dp, top = 8.dp), color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp) }
+        item { RefGroup { RefToolRow(Icons.Rounded.Article, Color.Unspecified, "日志查看", "查看运行日志与调试输出") { onLog("") } } }
+        item { RefGroup { RefToolRow(Icons.Rounded.Apps, Color.Unspecified, "应用管理", "查看并管理应用代理规则") { context.startActivity(Intent(context, ProxyAppSelectionActivity::class.java)) } } }
         item { RefGroup {
-                RefToolRow(
-                    Icons.Rounded.Link,
-                    Color.Unspecified,
-                    "订阅管理",
-                    "配置订阅源并更新规则数据",
-                ) {
-                    context.startActivity(Intent(context, ProxySubscriptionActivity::class.java))
-                }
-                RefDivider()
-                RefToolRow(
-                    Icons.Rounded.Cloud,
-                    Color.Unspecified,
-                    "Sub-Store",
-                    "连接本机 Sub-Store 后端并打开官方管理面板",
-                ) {
-                    context.startActivity(Intent(context, ProxySubStoreActivity::class.java))
-                }
-                RefDivider()
-                RefToolRow(
-                    Icons.Rounded.Shield,
-                    Color.Unspecified,
-                    "广告过滤",
-                    "订阅规则、放行与拦截记录",
-                ) {
-                    context.startActivity(Intent(context, ProxyAdblockChainActivity::class.java))
-                }
+            RefToolRow(Icons.Rounded.Wifi, Color.Unspecified, "网络匹配", "设置网络匹配后要执行的操作") { context.startActivity(Intent(context, ProxyNetworkAutomationActivity::class.java)) }
+            RefDivider()
+            RefToolRow(Icons.Rounded.WifiTethering, Color.Unspecified, "共享网络", "管理共享网络转发相关设置") { context.startActivity(Intent(context, ProxySharedNetworkSettingsActivity::class.java)) }
+            RefDivider()
+            RefToolRow(Icons.Rounded.AltRoute, Color.Unspecified, "绕过规则", "管理本地 CIDR 与接口规则") { context.startActivity(Intent(context, ProxyBypassRulesActivity::class.java)) }
         } }
-        item { Text("运行维护", Modifier.padding(start = 6.dp, top = 8.dp), color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp) }
         item { RefGroup {
-                RefToolRow(
-                    Icons.Rounded.Article,
-                    Color.Unspecified,
-                    "日志查看",
-                    "切换、刷新与清理 Root / Mihomo 日志",
-                ) {
-                    onLog("")
-                }
-                RefDivider()
-                RefToolRow(
-                    Icons.Rounded.Code,
-                    Color.Unspecified,
-                    "脚本",
-                    "服务启动前、停止后脚本与环境变量",
-                ) {
-                    context.startActivity(Intent(context, ProxyScriptsActivity::class.java))
-                }
-                RefDivider()
-                RefToolRow(
-                    Icons.Rounded.FolderOpen,
-                    Color.Unspecified,
-                    "文件管理",
-                    "浏览和编辑 /data/adb/hetu 运行文件",
-                ) {
-                    context.startActivity(Intent(context, ReferenceFileManagerActivity::class.java))
-                }
-                RefDivider()
-                RefToolRow(
-                    Icons.Rounded.Description,
-                    Color.Unspecified,
-                    "启动配置",
-                    "查看、复制、导出或重新生成最终运行配置",
-                ) {
-                    context.startActivity(Intent(context, ProxyStartupConfigActivity::class.java))
-                }
-                RefDivider()
-                RefToolRow(
-                    Icons.Rounded.Web,
-                    Color.Unspecified,
-                    "Web 面板",
-                    "本地面板、自定义 HTTPS 面板、切换与缓存管理",
-                    trailingText = "管理",
-                    trailingColor = HetuMicroCrystal.KleinBlue,
-                ) {
-                    context.startActivity(Intent(context, ProxyWebPanelsActivity::class.java))
-                }
-                RefDivider()
-                RefToolRow(
-                    Icons.Rounded.Download,
-                    Color.Unspecified,
-                    "更新核心",
-                    "下载并安装核心",
-                    trailingText = state.core.ifBlank { "Mihomo" },
-                    trailingColor = HetuMicroCrystal.KleinBlue,
-                ) {
-                    context.startActivity(Intent(context, ProxyCoreActivity::class.java))
-                }
+            RefToolRow(Icons.Rounded.Link, Color.Unspecified, "订阅管理", "配置订阅源并更新规则数据") { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) }
+            RefDivider()
+            RefToolRow(Icons.Rounded.Place, Color.Unspecified, "CNIP 设置", "配置 CNIP 数据源并更新地理数据") { context.startActivity(Intent(context, ProxyCnIpSettingsActivity::class.java)) }
+        } }
+        item { RefGroup {
+            RefToolRow(Icons.Rounded.Web, Color.Unspecified, "Web 面板", "更新本地 WebUI 与自定义面板") { context.startActivity(Intent(context, ProxyWebPanelsActivity::class.java)) }
+            RefDivider()
+            RefToolRow(Icons.Rounded.Download, Color.Unspecified, "更新核心", "下载并安装核心", trailingText = state.core.ifBlank { "Mihomo" }) { context.startActivity(Intent(context, ProxyCoreActivity::class.java)) }
+        } }
+        item { RefGroup {
+            RefToolRow(Icons.Rounded.Cloud, Color.Unspecified, "Sub-Store", "订阅转换与管理") { context.startActivity(Intent(context, ProxySubStoreActivity::class.java)) }
+            RefDivider()
+            RefToolRow(Icons.Rounded.Shield, Color.Unspecified, "广告过滤", "订阅规则、放行与拦截记录") { context.startActivity(Intent(context, ProxyAdblockChainActivity::class.java)) }
+            RefDivider()
+            RefToolRow(Icons.Rounded.Description, Color.Unspecified, "启动配置", "查看、编辑与导出运行配置") { context.startActivity(Intent(context, ProxyStartupConfigActivity::class.java)) }
         } }
     }
 }
@@ -4169,7 +3881,7 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
                     icon = Icons.Rounded.SpaceDashboard,
                     accent = Color.Unspecified,
                     title = "显示连接面板入口",
-                    subtitle = "底栏独立显示概览、订阅、连接与规则入口",
+                    subtitle = "显示策略、订阅、连接与规则面板",
                     checked = showPanelEntry,
                 ) { enabled ->
                     showPanelEntry = enabled
@@ -4739,6 +4451,7 @@ private fun RefChoiceBottomSheet(
         scrimColor = Color.Black.copy(alpha = .35f),
         dragHandle = { RefSheetDragHandle() },
     ) {
+        val dismiss = LocalReferenceDismiss.current
         Column(
             Modifier.fillMaxWidth().liquidSheetMaterial().navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -4750,7 +4463,7 @@ private fun RefChoiceBottomSheet(
                 Row(
                     Modifier.fillMaxWidth()
                         .crystalMaterial(shape, depth = CrystalDepth.InsetItem, selection = selected)
-                        .clickable { onSelect(index) }
+                        .miuixTap { dismiss { onSelect(index) } }
                         .padding(horizontal = 14.dp, vertical = 13.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -4781,6 +4494,7 @@ private fun RefConfirmBottomSheet(
         scrimColor = Color.Black.copy(alpha = .35f),
         dragHandle = { RefSheetDragHandle() },
     ) {
+        val dismiss = LocalReferenceDismiss.current
         Column(
             Modifier.fillMaxWidth().liquidSheetMaterial().navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -4797,11 +4511,11 @@ private fun RefConfirmBottomSheet(
             Text(description, color = t.textSecondary, fontSize = 13.sp, lineHeight = 20.sp)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 TextButton(
-                    onClick = onDismiss,
+                    onClick = { dismiss { onDismiss() } },
                     modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                 ) { Text("取消") }
                 Button(
-                    onClick = onConfirm,
+                    onClick = { dismiss { onConfirm() } },
                     modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = t.danger),
                 ) { Text(confirmLabel) }
@@ -4942,7 +4656,7 @@ private fun RefToolRow(icon: ImageVector, accent: Color, title: String, subtitle
     val t = LocalHetuTokens.current
     val color = if (trailingColor == Color(0xFF2563EB)) MaterialTheme.colorScheme.primary else trailingColor
     WorkspaceSettingRow(ht(title), ht(subtitle), icon, onClick = onClick) {
-        Row(Modifier.heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(Modifier.heightIn(min = 32.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             if (trailingText.isNotBlank()) Text(trailingText, Modifier.widthIn(max = 72.dp), color = if (trailingBadge) color else t.textSecondary,
                 fontSize = 12.sp, lineHeight = 18.sp, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Icon(Icons.Rounded.ChevronRight, null, Modifier.size(16.dp), tint = t.textMuted)
@@ -4956,7 +4670,7 @@ private fun RefValueRow(title: String, value: String, icon: ImageVector? = null,
     val t = LocalHetuTokens.current
     val stacked = value.length > 12
     WorkspaceSettingRow(title, if (stacked) value else "", icon, onClick = onClick) {
-        Row(Modifier.heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(Modifier.heightIn(min = 32.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             if (!stacked) Text(value, Modifier.widthIn(max = 72.dp), color = if (highlightValue) MaterialTheme.colorScheme.primary else t.textSecondary,
                 fontSize = 13.sp, lineHeight = 18.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
             if (onClick != null) Icon(Icons.Rounded.ChevronRight, null, Modifier.size(16.dp), tint = t.textMuted)
@@ -4972,11 +4686,11 @@ private fun RefSwitchRow(icon: ImageVector, accent: Color, title: String, subtit
         modifier = Modifier.toggleable(checked, role = Role.Switch) {
             view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK); onCheckedChange(it)
         }) {
-        Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.CenterEnd) {
+        Box(Modifier.heightIn(min = 32.dp), contentAlignment = Alignment.CenterEnd) {
             LiquidSwitch(
                 checked = checked,
-                onCheckedChange = {},
-                enabled = false,
+                onCheckedChange = onCheckedChange,
+                enabled = true,
             )
         }
     }

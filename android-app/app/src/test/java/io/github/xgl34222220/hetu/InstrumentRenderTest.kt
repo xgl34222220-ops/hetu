@@ -54,7 +54,7 @@ class InstrumentRenderTest {
         var night by mutableStateOf(false)
         compose.setContent { key(night) {
             app.getSharedPreferences("hetu",0).edit().putString("appearance",if(night)"dark" else "light").commit()
-            HetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f,1f),LocalHetuMotionEnabled provides false) {
+            RasterHetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f,1f),LocalHetuMotionEnabled provides false) {
                 Column(Modifier.width(360.dp).crystalPageBackground().padding(16.dp).testTag("instrument-scene")) {
                     WorkspaceBento(ProxyRuntimeSnapshot(running=true,wanAddress="203.0.113.7",wanRegion="示例出口",wanState="success"),20,
                         1500,28000,25_000_000_000L,128_000_000_000L,2,136500000,6.3f,{})
@@ -65,7 +65,7 @@ class InstrumentRenderTest {
             compose.runOnIdle{night=dark};compose.waitForIdle()
             val net=compose.onNodeWithTag("instrument-network",true).fetchSemanticsNode().boundsInRoot
             val speed=compose.onNodeWithTag("instrument-speed",true).fetchSemanticsNode().boundsInRoot
-            assertEquals("Shared panel must keep a 1dp divider",1f,speed.left-net.right,1f)
+            assertEquals("Separate cards retain the reference 12dp gutter",12f,speed.left-net.right,1f)
             compose.onNodeWithTag("home-usage-progress",true).assert(SemanticsMatcher.expectValue(SemanticsProperties.ProgressBarRangeInfo,ProgressBarRangeInfo(25f/128f,0f..1f)))
             compose.onNodeWithTag("home-cpu-progress",true).assert(SemanticsMatcher.expectValue(SemanticsProperties.ProgressBarRangeInfo,ProgressBarRangeInfo(.063f,0f..1f)))
             compose.onNodeWithTag("instrument-network-badge",true).assertDoesNotExist()
@@ -78,7 +78,7 @@ class InstrumentRenderTest {
         var scale by mutableFloatStateOf(1f)
         var edited=0;var refreshed=0
         val item=provider()
-        compose.setContent { HetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f,scale),LocalHetuMotionEnabled provides false) {
+        compose.setContent { RasterHetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f,scale),LocalHetuMotionEnabled provides false) {
             Column(Modifier.width(360.dp).crystalPageBackground().padding(16.dp).verticalScroll(rememberScrollState()).testTag("ticket-scene")) {
                 InstrumentSubscriptionTicket(item.name,if(known)item else null,"example.invalid",onEdit={edited++},onRefresh={refreshed++})
             }
@@ -119,7 +119,7 @@ class InstrumentRenderTest {
         assertEquals(listOf(15,15,1),batches.map{it.size})
         assertEquals(rows,batches.flatten())
         assertTrue(instrumentRuleBatches(emptyList()).isEmpty())
-        compose.setContent { HetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f,1f),LocalHetuMotionEnabled provides false) {
+        compose.setContent { RasterHetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f,1f),LocalHetuMotionEnabled provides false) {
             Column(Modifier.width(360.dp).crystalPageBackground().padding(16.dp).testTag("rule-scene")) { RefRuleGroupCard(batches.first()) }
         } } }
         compose.onNodeWithText("host-0.example",true).assertExists()

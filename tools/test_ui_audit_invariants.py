@@ -38,7 +38,7 @@ assert "shared_mac_returns" in root_shell and "--mac-source" in root_shell
 assert 'SHARED_BYPASS_MACS=%s' in root_shell
 shared_ui = (src / "ProxyFocusedSettingsActivities.kt").read_text()
 assert 'proxySharedBypassMacs' in shared_ui and '"下游设备 / MAC"' in shared_ui and '"接口管理"' in shared_ui
-assert 'icon = Icons.Rounded.Sort' in main
+assert 'ReferenceStrategyMenu()' in main and 'WindowIconCascadingDropdownMenu' in (src / 'ReferenceStrategyMenu.kt').read_text()
 controller = (src / "ProxyComposeController.kt").read_text()
 root_manager = (src / "RootProxyManager.java").read_text()
 assert '.putString("proxyRootAppliedSettings", ProxyRuntimeSettings.signature(prefs))' in controller
@@ -65,7 +65,7 @@ design = (root / "design.md").read_text()
 liquid_system = (src / "ui/HetuLiquidGlassSystem.kt").read_text()
 ui_kit = (src / "ui/HetuUiKit.kt").read_text()
 
-assert "iOS / VisionOS 极简液态浮岛" in design
+assert "BoxProxy 录屏参考规范" in design
 assert "HetuGlassRadius" in liquid_system and "HetuMotionSpec" in liquid_system
 assert "LiquidStatusCapsule" in liquid_system and "SegmentedLiquidActionPill" in liquid_system
 assert "LiquidSelectionIndicator" in liquid_system
@@ -73,13 +73,21 @@ assert "LiquidGlassTextField" in liquid_system and "glassInputWell" in liquid_sy
 assert "LocalOverscrollFactory provides if (motionEnabled)" in theme
 assert "pageEnter.snapTo(1f)" in refhome
 
-# Cold-air canvas + translucent islands replace the previous lavender flat field.
-assert "Color(0xFFF5F7FB)" in theme
-assert "Color(0xA6FFFFFF)" in theme
-assert "Color(0xFF0E1014)" in theme
-assert "Brush.radialGradient" in crystal
-assert "Color(0xFF82DCFF)" in crystal and "Color(0xFFB4A0FF)" in crystal
-assert "HazeStyle(" in crystal and "hazeEffect" in crystal
+# Recording palette and native library components replace the old mesh material.
+assert "Color(0xFFECEBFA)" in theme and "Color(0xFFF9F7FF)" in theme
+assert "Color(0xFFE1DDFF)" in theme and "Color(0xFF0E1014)" in theme
+assert "MiuixTheme(colors = colors" in theme and "MiuixOverscrollFactory" in theme
+assert "Brush.radialGradient(" not in crystal and "return background(LocalHetuTokens.current.pageBackground)" in crystal
+miuix = (src / "ui/ReferenceMiuix.kt").read_text()
+assert "WindowDialog(" in miuix and "SinkFeedback(" in miuix
+assert "top.yukonga.miuix.kmp.basic.Switch(" in liquid_system
+assert "top.yukonga.miuix.kmp.basic.TextField(" in liquid_system
+assert "top.yukonga.miuix.kmp.basic.Card(" in crystal
+assert 'miuix-ui-android:0.9.4' in (root / 'android-app/app/build.gradle.kts').read_text()
+assert 'item(key = "home-actions")' in refhome
+assert 'RefProxyPage.Home, RefProxyPage.Panel, RefProxyPage.Tools, RefProxyPage.Settings' in refhome
+assert 'Overview("概览"), Groups("策略")' in refhome
+assert 'proxySelectorExpandSelectedInSheet", false' in refhome
 
 # Home must use the dock-derived Liquid Glass language, not the old giant hero.
 assert 'item(key = "home-shortcuts")' in refhome
@@ -95,7 +103,7 @@ assert "LatencyChip(" in refhome
 # Four dashboard tiles share glass material and stable tabular number rendering.
 assert 'ReferenceDashboardCard' in instrument and '"WAN"' in instrument and '"网速"' in instrument
 assert '"订阅"' in instrument and '"资源占用"' in instrument
-assert 'crystalMaterial(RoundedCornerShape(HetuGlassRadius.Card), depth = CrystalDepth.Card)' in instrument
+assert '.crystalMaterial(shape)' in instrument and 'Arrangement.spacedBy(12.dp)' in instrument
 assert 'HetuNumber(' in instrument and 'monospaced = true' in instrument
 assert 'home-usage-progress' in instrument and 'home-cpu-progress' in instrument
 
@@ -105,13 +113,13 @@ assert '136f * scale' in liquid and '.coerceAtMost(capacity)' in liquid, "Manual
 assert 'TextAutoSize.StepBased(' not in liquid, "Long names must reflow instead of shrinking to unreadable text"
 assert 'well.localBoundingBoxOf(coords, clipBounds = false)' in liquid, "Selection lens must follow real card bounds"
 assert 'nodeSelectionHeight' in liquid and 'nodeSelectionWidth' in liquid
-assert 'Int.MAX_VALUE' in liquid and 'lineHeight = 21.sp' in liquid
+assert 'Int.MAX_VALUE' in liquid and 'lineHeight = 18.sp' in liquid
 assert 'ConfiguredGroupIcon(group, Modifier.size(32.dp))' in liquid
 assert 'LatencyChip(' in liquid
 assert 'selection = expanded' in liquid
 assert 'LiquidSelectionIndicator(' in liquid and 'node-selection-indicator:' in liquid
 assert 'animateDpAsState(' in liquid and 'nodeSelectionX' in liquid and 'nodeSelectionY' in liquid
-assert 'selection = active' not in liquid
+assert 'selection = active' in liquid and 'contentDescription = node.name' in liquid
 assert 'Color(0xFFE8E6F7)' not in liquid
 
 # Floating dock geometry and content clearance are shared tokens, not duplicated literals.

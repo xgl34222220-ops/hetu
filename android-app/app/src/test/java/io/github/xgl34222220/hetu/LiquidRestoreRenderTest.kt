@@ -51,7 +51,7 @@ class LiquidRestoreRenderTest {
             ProxyNodeUi("香港节点", "URLTest"),ProxyNodeUi("台湾节点", "URLTest"))
         val group=ProxyGroupUi("AI 平台", "Selector", "日本节点", nodes)
         var selected="日本节点";var probes=0
-        compose.setContent { HetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f,1f),LocalHetuMotionEnabled provides false) {
+        compose.setContent { RasterHetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f,1f),LocalHetuMotionEnabled provides false) {
             Column(Modifier.width(360.dp).background(LocalHetuTokens.current.pageBackground).padding(16.dp).testTag("liquid-grid")) {
                 Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                     StrategyGroupCard(group,selected,true,87,false,Modifier.weight(1f),{}, {probes++})
@@ -73,7 +73,7 @@ class LiquidRestoreRenderTest {
     }
     @Test fun selectorHasNoWhiteRectangleAndHomeDestinationsRemainAvailable() {
         var logs=0;var connections=0;var diagnostics=0;var adblock=0
-        compose.setContent { HetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f,1f),LocalHetuMotionEnabled provides false) {
+        compose.setContent { RasterHetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f,1f),LocalHetuMotionEnabled provides false) {
             Column(Modifier.width(360.dp)) {
                 Box(Modifier.background(Color(0xFFEEF2F6)).testTag("selector-background")) { LiquidConfigIndicator(true) }
                 LiquidHomeMenu({logs++},{connections++},{diagnostics++},{adblock++},false)

@@ -48,7 +48,7 @@ class ReferenceParityRenderTest {
     @Test fun dockDragCommitsOnceAndCanReturnToInitialTab() {
         var selected by mutableIntStateOf(0); val selections = mutableListOf<Int>()
         app.getSharedPreferences("hetu", 0).edit().putBoolean("enableBlur", false).putBoolean("floatingBottomBar", false).commit()
-        compose.setContent { HetuTheme {
+        compose.setContent { RasterHetuTheme {
             val haze = remember { HazeState() }
             Column(Modifier.width(360.dp).testTag("scene")) {
                 HetuGlassDock(listOf(DockItem("首页", Icons.Rounded.Home), DockItem("面板", Icons.Rounded.Web), DockItem("策略", Icons.Rounded.Dns), DockItem("工具", Icons.Rounded.Build), DockItem("设置", Icons.Rounded.Settings)), selected,
@@ -69,8 +69,8 @@ class ReferenceParityRenderTest {
             draft = original + "# unsaved\n"
         }
         var exits = 0
-        compose.setContent { HetuTheme { RuntimeFileEditorScreen("/data/adb/hetu/config.yaml", model) { exits++ } } }
-        compose.onNodeWithText("有未保存修改").assertExists()
+        compose.setContent { RasterHetuTheme { RuntimeFileEditorScreen("/data/adb/hetu/config.yaml", model) { exits++ } } }
+        compose.onAllNodesWithText("有未保存修改")[0].assertExists()
         capture("runtime-editor", "reference129-editor-light")
         compose.runOnIdle { app.getSharedPreferences("hetu", 0).edit().putString("appearance", "dark").commit() }
         capture("runtime-editor", "reference129-editor-dark")
@@ -81,8 +81,8 @@ class ReferenceParityRenderTest {
         compose.runOnIdle { assertTrue(model.draft!!.contains("# unsaved")); assertEquals(0, exits) }
     }
     @Test fun healthFormFitsNarrowScreen() {
-        compose.setContent { HetuTheme { Box(Modifier.fillMaxSize().testTag("health-scene")) { SubscriptionHealthSheet({}, {}) } } }
-        compose.onNodeWithText("健康检查").assertExists()
+        compose.setContent { RasterHetuTheme { Box(Modifier.fillMaxSize().testTag("health-scene")) { SubscriptionHealthSheet({}, {}) } } }
+        compose.onAllNodesWithText("健康检查")[0].assertExists()
         capture("health-scene", "reference129-health")
     }
 }

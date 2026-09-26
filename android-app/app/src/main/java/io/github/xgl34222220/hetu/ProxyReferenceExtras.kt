@@ -1,5 +1,9 @@
 package io.github.xgl34222220.hetu
 
+import io.github.xgl34222220.hetu.ui.ReferenceButton as Button
+
+import io.github.xgl34222220.hetu.ui.ReferenceModalBottomSheet as ModalBottomSheet
+
 import android.annotation.SuppressLint
 import android.content.ComponentName
 import android.content.Context
@@ -450,12 +454,12 @@ private fun ProxySelectorPreferencesScreen(onBack: () -> Unit) {
     var groupColumns by remember { mutableIntStateOf(prefs.getInt("proxySelectorGroupColumns", 0)) }
     var nodeColumns by remember { mutableIntStateOf(prefs.getInt("proxySelectorNodeColumns", 0)) }
     var density by remember { mutableStateOf(prefs.getString("proxySelectorDensity", "standard").orEmpty()) }
-    var overflow by remember { mutableStateOf(prefs.getString("proxySelectorNameOverflow", "wrap").orEmpty().let { if (it == "clip") "wrap" else it }) }
+    var overflow by remember { mutableStateOf(prefs.getString("proxySelectorNameOverflow", "ellipsis").orEmpty()) }
     var sort by remember { mutableStateOf(prefs.getString("proxySelectorNodeSort", "config").orEmpty()) }
     var desc by remember { mutableStateOf(prefs.getBoolean("proxySelectorSortDescending", false)) }
     var groupByProvider by remember { mutableStateOf(prefs.getBoolean("proxySelectorGroupByProvider", false)) }
     var collapsePrevious by remember { mutableStateOf(prefs.getBoolean("proxySelectorCollapsePrevious", true)) }
-    var expandSelectedInSheet by remember { mutableStateOf(prefs.getBoolean("proxySelectorExpandSelectedInSheet", true)) }
+    var expandSelectedInSheet by remember { mutableStateOf(prefs.getBoolean("proxySelectorExpandSelectedInSheet", false)) }
     var disconnect by remember { mutableStateOf(prefs.getBoolean("proxySelectorDisconnectOnSelect", false)) }
     var hidden by remember { mutableStateOf(prefs.getBoolean("proxySelectorShowHidden", false)) }
     var detectIpv6 by remember { mutableStateOf(prefs.getBoolean("proxySelectorDetectIpv6", true)) }
@@ -474,13 +478,13 @@ private fun ProxySelectorPreferencesScreen(onBack: () -> Unit) {
         ) {
             item {
                 ExtraCard {
-                    ExtraRow(Icons.Rounded.ViewColumn, "策略组列数", "自动 / 单列 / 双列", when (groupColumns) { 1 -> "单列"; 2 -> "双列"; else -> "自动" }) { picker = "groupColumns" }
+                    ExtraRow(Icons.Rounded.ViewColumn, "策略组列数", "自动 / 单列 / 双列 / 三列", when (groupColumns) { 1 -> "单列"; 2 -> "双列"; 3 -> "三列"; else -> "自动" }) { picker = "groupColumns" }
                     HorizontalDivider(color = t.outline)
                     ExtraRow(Icons.Rounded.GridView, "节点列数", "展开策略后的节点网格", when (nodeColumns) { 1 -> "单列"; 2 -> "双列"; 3 -> "三列"; else -> "自动" }) { picker = "nodeColumns" }
                     HorizontalDivider(color = t.outline)
                     ExtraRow(Icons.Rounded.DensityMedium, "显示密度", "标准或紧凑卡片", if (density == "compact") "紧凑" else "标准") { picker = "density" }
                     HorizontalDivider(color = t.outline)
-                    ExtraRow(Icons.Rounded.TextFields, "名称溢出", "完整换行 / 滚动", when (overflow) { "scroll" -> "滚动"; "wrap" -> "换行"; else -> "换行" }) { picker = "overflow" }
+                    ExtraRow(Icons.Rounded.TextFields, "名称溢出", "省略 / 滚动 / 换行", when (overflow) { "scroll" -> "滚动"; "wrap" -> "换行"; else -> "省略" }) { picker = "overflow" }
                 }
             }
             item {
@@ -513,10 +517,10 @@ private fun ProxySelectorPreferencesScreen(onBack: () -> Unit) {
 
     picker?.let { type ->
         val options: List<Pair<String, String>> = when (type) {
-            "groupColumns" -> listOf("0" to "自动", "1" to "单列", "2" to "双列")
+            "groupColumns" -> listOf("0" to "自动", "1" to "单列", "2" to "双列", "3" to "三列")
             "nodeColumns" -> listOf("0" to "自动", "1" to "单列", "2" to "双列", "3" to "三列")
             "density" -> listOf("standard" to "标准", "compact" to "紧凑")
-            "overflow" -> listOf("wrap" to "完整换行", "scroll" to "滚动")
+            "overflow" -> listOf("ellipsis" to "省略", "scroll" to "滚动", "wrap" to "完整换行")
             else -> listOf("config" to "配置顺序", "name" to "名称", "latency" to "延迟")
         }
         ModalBottomSheet(
@@ -836,8 +840,11 @@ private val HETU_LIBRARIES = listOf(
     HetuLibraryInfo("compose", "Jetpack Compose", "BOM 2026.03.00", "https://developer.android.com/compose"),
     HetuLibraryInfo("materialkolor", "MaterialKolor", "2.0.0", "https://github.com/jordond/MaterialKolor"),
     HetuLibraryInfo("haze", "Haze", "1.6.10", "https://github.com/chrisbanes/haze"),
-    HetuLibraryInfo("miuix-blur", "miuix-blur", "0.9.3", "https://github.com/compose-multiplatform/miuix"),
-    HetuLibraryInfo("miuix-squircle", "miuix-squircle", "0.9.3", "https://github.com/compose-multiplatform/miuix"),
+    HetuLibraryInfo("miuix-ui", "miuix-ui", "0.9.4", "https://github.com/compose-multiplatform/miuix"),
+    HetuLibraryInfo("miuix-preference", "miuix-preference", "0.9.4", "https://github.com/compose-multiplatform/miuix"),
+    HetuLibraryInfo("miuix-icons", "miuix-icons", "0.9.4", "https://github.com/compose-multiplatform/miuix"),
+    HetuLibraryInfo("miuix-blur", "miuix-blur", "0.9.4", "https://github.com/compose-multiplatform/miuix"),
+    HetuLibraryInfo("miuix-squircle", "miuix-squircle", "0.9.4", "https://github.com/compose-multiplatform/miuix"),
     HetuLibraryInfo("sora", "Sora Editor", "0.24.6", "https://github.com/Rosemoe/sora-editor"),
     HetuLibraryInfo("networknt-json-schema", "NetworkNT JSON Schema Validator", "1.5.9", "https://github.com/networknt/json-schema-validator"),
     HetuLibraryInfo("sing-box-schema", "sing-box official JSON Schema", "2026-09-26", "https://sing-box.sagernet.org/schema.json"),

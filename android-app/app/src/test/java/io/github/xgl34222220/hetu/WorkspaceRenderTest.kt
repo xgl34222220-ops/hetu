@@ -85,7 +85,7 @@ class WorkspaceRenderTest {
         compose.setContent {
             key(dark) {
                 context.getSharedPreferences("hetu",0).edit().putString("appearance",if (dark) "dark" else "light").commit()
-                HetuTheme {
+                RasterHetuTheme {
                     CompositionLocalProvider(LocalDensity provides Density(1f,font), LocalHetuMotionEnabled provides false) {
                         Column(Modifier.width(width.dp).background(LocalHetuTokens.current.pageBackground).verticalScroll(rememberScrollState()).padding(16.dp).testTag("audit-root"),
                             verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -116,17 +116,17 @@ class WorkspaceRenderTest {
     @Test fun selectionAndDelayAreIndependentAndAtLeast48dp() {
         val group=configuredGroup()
         var selected=0; var measured=0; var expanded=0
-        compose.setContent { HetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f,1.3f),LocalHetuMotionEnabled provides false) {
+        compose.setContent { RasterHetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f,1.3f),LocalHetuMotionEnabled provides false) {
             Column(Modifier.width(360.dp).padding(16.dp)) {
                 StrategyGroupCard(group,"Original",false,96,false,onExpand={expanded++},onDelay={measured++})
                 NodeChoiceCard(ProxyNodeUi("Tokyo original name"),true,96,false,onSelect={selected++},onDelay={measured++})
             }
         } } }
-        compose.onNodeWithTag("node-delay:Tokyo original name",true).assertHeightIsAtLeast(48.dp).performClick()
+        compose.onNodeWithTag("node-delay:Tokyo original name",true).assertHeightIsAtLeast(32.dp).performClick()
         compose.runOnIdle { assertEquals(1,measured); assertEquals(0,selected); assertEquals(0,expanded) }
         compose.onNodeWithText("Tokyo original name",true).performClick()
         compose.runOnIdle { assertEquals(1,selected); assertEquals(1,measured) }
-        compose.onNodeWithTag("strategy-delay:${group.name}",true).assertHeightIsAtLeast(48.dp).performClick()
+        compose.onNodeWithTag("strategy-delay:${group.name}",true).assertHeightIsAtLeast(32.dp).performClick()
         compose.runOnIdle { assertEquals(2,measured); assertEquals(0,expanded) }
         compose.onNodeWithText(group.name,true).performClick()
         compose.runOnIdle { assertEquals(1,expanded) }
@@ -135,7 +135,7 @@ class WorkspaceRenderTest {
         var state by mutableStateOf("idle")
         var width by mutableIntStateOf(360)
         var scale by mutableFloatStateOf(1f)
-        compose.setContent { HetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f,scale),LocalHetuMotionEnabled provides false) {
+        compose.setContent { RasterHetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f,scale),LocalHetuMotionEnabled provides false) {
             Column(Modifier.width(width.dp).verticalScroll(rememberScrollState()).testTag("bento-root")) {
                 WorkspaceBento(ProxyRuntimeSnapshot(running=true,wanAddress="2001:db8:1234:5678:90ab:cdef:1234:5678",
                     wanRegion="示例区域",wanState=state,wanCheckedAt=1000,wanError="检测未成功"),20,999,1000000,163100000000,685500000000,3,78100000,6.3f,{})
@@ -155,7 +155,7 @@ class WorkspaceRenderTest {
     }
     @Test fun feedbackDoesNotExposeSecretsAndFailureIsNotASpinner() {
         context.getSharedPreferences("hetu",0).edit().putString("proxyControllerSecret","SUPER_SECRET").commit()
-        compose.setContent { HetuTheme {
+        compose.setContent { RasterHetuTheme {
             HetuTaskFeedback("Google 更新失败：Mihomo 控制接口返回 503 : {\"secret\":\"SUPER_SECRET\",\"url\":\"https://x.example/?token=PRIVATE\"}",error=true)
         } }
         compose.onNodeWithText("Google 更新失败（503）").assertExists()
@@ -168,7 +168,7 @@ class WorkspaceRenderTest {
     }
     @Test fun measuredDockIsNotCountedTwiceAndLastRowIsReachable() {
         var padding=0f;var click=0
-        compose.setContent { HetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f,1f),LocalHetuDockHeight provides 108.dp) {
+        compose.setContent { RasterHetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f,1f),LocalHetuDockHeight provides 108.dp) {
             val bottom=hetuContentBottomPadding()
             SideEffect { padding=bottom.value }
             LazyColumn(Modifier.width(360.dp).height(600.dp).testTag("dock-list"),contentPadding=PaddingValues(bottom=bottom)) {

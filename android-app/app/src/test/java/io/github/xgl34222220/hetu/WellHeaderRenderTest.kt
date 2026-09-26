@@ -38,7 +38,7 @@ class WellHeaderRenderTest {
             ProxyNodeUi("新加坡节点", "Vless", true),
             ProxyNodeUi("香港节点", "Trojan", false),
         ))
-        compose.setContent { HetuTheme {
+        compose.setContent { RasterHetuTheme {
             CompositionLocalProvider(
                 LocalDensity provides Density(1f,scale),
                 LocalHetuMotionEnabled provides false,

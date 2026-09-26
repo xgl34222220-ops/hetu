@@ -172,7 +172,7 @@ private fun StrategyNodeRow(node: ProxyNodeUi, active: Boolean, value: Long?, te
                 Icon(Icons.Rounded.ChevronRight, "查看${node.name}子策略", Modifier.size(18.dp), tint = t.textSecondary)
             }
             LatencyChip(value, testing, onClick = onDelay, compact = true,
-                modifier = Modifier.testTag("panel-node-delay:${node.name}"))
+                modifier = Modifier.heightIn(min = 48.dp).testTag("panel-node-delay:${node.name}"))
         }
         if (compact) {
             name(Modifier.fillMaxWidth())

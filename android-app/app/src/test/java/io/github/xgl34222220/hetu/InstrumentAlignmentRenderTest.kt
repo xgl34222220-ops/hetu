@@ -76,7 +76,7 @@ class InstrumentAlignmentRenderTest {
                 app.getSharedPreferences("hetu", 0).edit()
                     .putString("appearance", if (night) "dark" else "light")
                     .commit()
-                HetuTheme {
+                RasterHetuTheme {
                     CompositionLocalProvider(
                         LocalDensity provides Density(1f, scale),
                         LocalHetuMotionEnabled provides false,
@@ -116,7 +116,7 @@ class InstrumentAlignmentRenderTest {
                     assertEquals("Top row must align", network.top, speed.top, .6f)
                     assertEquals("Bottom row must align", usage.top, resource.top, .6f)
                     assertTrue("Roomy cards should use two columns", speed.left > network.right)
-                    assertEquals("Shared panel uses a hairline divider", 1f, speed.left - network.right, 1f)
+                    assertEquals("Separate cards retain the reference 12dp gutter", 12f, speed.left - network.right, 1f)
                 }
                 assertEquals(5f, bounds("home-usage-progress").height, .6f)
                 assertEquals(5f, bounds("home-cpu-progress").height, .6f)
@@ -150,7 +150,7 @@ class InstrumentAlignmentRenderTest {
     fun unknownTelemetryKeepsTrackButDoesNotInventProgress() {
         var empty by mutableStateOf(false)
         compose.setContent {
-            HetuTheme {
+            RasterHetuTheme {
                 CompositionLocalProvider(
                     LocalDensity provides Density(1f, 1f),
                     LocalHetuMotionEnabled provides false,
@@ -187,7 +187,7 @@ class InstrumentAlignmentRenderTest {
     fun networkAndSubscriptionInteractionsRemainRealAndSeparate() {
         var subscriptions = 0
         compose.setContent {
-            HetuTheme {
+            RasterHetuTheme {
                 CompositionLocalProvider(
                     LocalDensity provides Density(1f, 1f),
                     LocalHetuMotionEnabled provides false,

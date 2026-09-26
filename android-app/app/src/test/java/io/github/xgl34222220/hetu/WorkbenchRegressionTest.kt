@@ -134,7 +134,7 @@ class WorkbenchRegressionTest {
         var saves = 0; var searches = 0; var symbol = ""
         compose.setContent { key(night) {
             app.getSharedPreferences("hetu", 0).edit().putString("appearance", if (night) "dark" else "light").commit()
-            HetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f, font), LocalHetuMotionEnabled provides false) {
+            RasterHetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f, font), LocalHetuMotionEnabled provides false) {
                 Column(Modifier.width(360.dp).crystalPageBackground().testTag("workbench-scene")) {
                     YamlWorkbenchActions(true, false, false, false, {}, {}, {}, { searches++ }, {}, {}, { saves++ })
                     YamlWorkbenchAccessory(true) { symbol = it }
@@ -162,7 +162,7 @@ class WorkbenchRegressionTest {
         assertEquals(listOf("DIRECT" to 2, "Google" to 1), overviewRouteCounts(items))
         val state = ProxyComposeState(running = true, panelReady = true, connections = items,
             groups = listOf(ProxyGroupUi("Google", "Selector", "node", emptyList())))
-        compose.setContent { HetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f, 1f), LocalHetuMotionEnabled provides false) {
+        compose.setContent { RasterHetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f, 1f), LocalHetuMotionEnabled provides false) {
             Column(Modifier.width(360.dp).crystalPageBackground().padding(16.dp).testTag("overview-scene"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OverviewInstruments(state, 201)
                 OverviewRouteRanking(state)

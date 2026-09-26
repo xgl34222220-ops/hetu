@@ -97,35 +97,31 @@ internal fun LiquidStrategyCard(
     hazeState: HazeState? = null, glassEnabled: Boolean = false,
 ) {
     val t = LocalHetuTokens.current
-    val context = LocalContext.current
-    val prefs = remember(context) { context.getSharedPreferences("hetu", 0) }
+    val prefs = LocalContext.current.getSharedPreferences("hetu", 0)
+    val overflow = prefs.getString("proxySelectorNameOverflow", "ellipsis")
     val compact = prefs.getString("proxySelectorDensity", "standard") == "compact"
-    val marquee = prefs.getString("proxySelectorNameOverflow", "wrap") == "scroll"
-    Column(
-        modifier.crystalMaterial(RoundedCornerShape(HetuGlassRadius.Tile), selection = expanded)
-            .testTag("strategy:${group.name}")
-            .clickable(role = Role.Button, onClickLabel = "查看${group.name}节点", onClick = onExpand)
-            .padding(horizontal = 12.dp, vertical = if (compact) 8.dp else 10.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(group.name, Modifier.weight(1f).testTag("strategy-title:${group.name}"),
-                color = t.textPrimary, fontSize = 15.sp, lineHeight = 21.sp, fontWeight = FontWeight.SemiBold,
-                maxLines = 2, overflow = TextOverflow.Ellipsis)
+    Column(modifier.crystalMaterial(RoundedCornerShape(12.dp), selection = expanded)
+        .testTag("strategy:${group.name}")
+        .miuixTap(onClickLabel = "查看${group.name}节点", onClick = onExpand)
+        .padding(horizontal = 10.dp, vertical = if (compact) 5.dp else 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(group.name, Modifier.testTag("strategy-title:${group.name}"),
+                    color = t.textPrimary, fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold,
+                    maxLines = if (overflow == "wrap") 2 else 1, overflow = TextOverflow.Ellipsis)
+                Text("${group.type} · ${group.nodes.count { (it.lastDelay ?: 0) > 0 }}/${group.nodes.size}",
+                    Modifier.testTag("strategy-type:${group.name}"), color = t.textSecondary,
+                    fontSize = 10.sp, lineHeight = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
             LiquidBrandTray(group)
         }
-        Text(selected.ifBlank { "未选择" },
-            Modifier.fillMaxWidth().testTag("strategy-selection:${group.name}")
-                .then(if (marquee) Modifier.basicMarquee() else Modifier),
-            color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp,
-            maxLines = if (marquee) 1 else 2, softWrap = !marquee,
-            overflow = TextOverflow.Ellipsis)
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("${liquidGroupType(group.type)} · ${group.nodes.size}", Modifier.testTag("strategy-type:${group.name}"),
-                    color = t.textSecondary, fontSize = 10.5.sp, lineHeight = 16.sp)
-            }
+            horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(selected.ifBlank { "未选择" }, Modifier.weight(1f).testTag("strategy-selection:${group.name}")
+                .then(if (overflow == "scroll") Modifier.basicMarquee() else Modifier),
+                color = t.textPrimary, fontSize = 11.sp, lineHeight = 17.sp,
+                maxLines = if (overflow == "wrap") 2 else 1, overflow = TextOverflow.Ellipsis)
             LatencyChip(value, testing, onClick = onDelay, compact = true,
                 modifier = Modifier.testTag("strategy-delay:${group.name}"))
         }
@@ -138,35 +134,27 @@ internal fun LiquidNodeCard(
     modifier: Modifier = Modifier, onSelect: () -> Unit, onDelay: () -> Unit, index: Int = 0,
 ) {
     val t = LocalHetuTokens.current
-    val context = LocalContext.current
-    val prefs = remember(context) { context.getSharedPreferences("hetu", 0) }
+    val prefs = LocalContext.current.getSharedPreferences("hetu", 0)
+    val overflow = prefs.getString("proxySelectorNameOverflow", "ellipsis")
     val compact = prefs.getString("proxySelectorDensity", "standard") == "compact"
-    val marquee = prefs.getString("proxySelectorNameOverflow", "wrap") == "scroll"
-    Column(
-        modifier.testTag("node:${node.name}")
-            .crystalMaterial(RoundedCornerShape(HetuGlassRadius.Tile), depth = CrystalDepth.InsetItem)
-            .clickable(role = Role.RadioButton, onClick = onSelect)
-            .semantics { selected = active }
-            .padding(horizontal = 12.dp, vertical = if (compact) 8.dp else 12.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Text(node.name,
-            Modifier.fillMaxWidth().testTag("node-label:${node.name}")
-                .then(if (marquee) Modifier.basicMarquee() else Modifier),
-            color = t.textPrimary, fontSize = 14.sp, lineHeight = 21.sp, fontWeight = FontWeight.SemiBold,
-            maxLines = if (marquee) 1 else Int.MAX_VALUE, softWrap = !marquee, overflow = TextOverflow.Ellipsis)
-        Text(buildString {
-            append(if (node.udp) "UDP" else "TCP")
-            if (prefs.getBoolean("proxySelectorDetectIpv6", true)) SelectorIpv6Probe.results[node.name]?.let {
-                append(if (it) " · IPv6 ✓" else " · IPv6 未通")
-            }
-        }, color = t.textSecondary, fontSize = 11.5.sp, lineHeight = 17.sp)
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            if (active) Icon(Icons.Rounded.CheckCircle, contentDescription = "已选择",
-                tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
-            Text(liquidNodeProtocolLabel(node), Modifier.weight(1f).testTag("node-protocol:${node.name}"),
-                color = t.textSecondary, fontSize = 11.5.sp, lineHeight = 17.sp)
+    Column(modifier.testTag("node:${node.name}")
+        .crystalMaterial(RoundedCornerShape(8.dp), depth = CrystalDepth.InsetItem, selection = active)
+        .miuixTap(role = Role.RadioButton, onClick = onSelect)
+        .semantics { selected = active; contentDescription = node.name }
+        .padding(horizontal = 9.dp, vertical = if (compact) 4.dp else 7.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(node.name, Modifier.fillMaxWidth().testTag("node-label:${node.name}")
+            .then(if (overflow == "scroll") Modifier.basicMarquee() else Modifier),
+            color = t.textPrimary, fontSize = 12.sp, lineHeight = 18.sp, fontWeight = FontWeight.Medium,
+            maxLines = if (overflow == "wrap") Int.MAX_VALUE else 1, overflow = TextOverflow.Ellipsis)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(buildString {
+                append(liquidNodeProtocolLabel(node))
+                if (node.udp && !liquidNodeProtocolLabel(node).contains("UDP")) append(" · UDP")
+                if (prefs.getBoolean("proxySelectorDetectIpv6", true)) SelectorIpv6Probe.results[node.name]?.let {
+                    append(if (it) " · IPv6 ✓" else " · IPv6 未通")
+                }
+            }, Modifier.weight(1f).testTag("node-protocol:${node.name}"), color = t.textSecondary,
+                fontSize = 10.sp, lineHeight = 15.sp)
             LatencyChip(value, testing, onClick = onDelay, compact = true,
                 modifier = Modifier.testTag("node-delay:${node.name}"))
         }

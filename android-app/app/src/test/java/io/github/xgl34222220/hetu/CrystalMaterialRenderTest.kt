@@ -54,7 +54,7 @@ class CrystalMaterialRenderTest {
         var dark by mutableStateOf(false)
         compose.setContent { key(dark) {
             app.getSharedPreferences("hetu",0).edit().putString("appearance",if(dark)"dark" else "light").commit()
-            HetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f,1f),LocalCrystalBlurEnabled provides false) {
+            RasterHetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f,1f),LocalCrystalBlurEnabled provides false) {
                 Column(Modifier.width(360.dp).crystalPageBackground().padding(16.dp).testTag("crystal-showcase"),verticalArrangement=Arrangement.spacedBy(16.dp)) {
                     Text("河图",style=MaterialTheme.typography.headlineLarge)
                     CrystalSurface(modifier=Modifier.fillMaxWidth().height(100.dp).testTag("lit-card"),shape=androidx.compose.foundation.shape.RoundedCornerShape(22.dp)) {
@@ -74,7 +74,7 @@ class CrystalMaterialRenderTest {
                 assertNotEquals("Reference surface must not become pure white",0xffffffff.toInt(),upper)
                 assertNotEquals("Reference surface must not become pure white",0xffffffff.toInt(),lower)
             } else {
-                assertNotEquals("Dark card lost depth",upper,lower)
+                assertEquals("Reference cards use an even surface",upper,lower)
             }
             compose.onNodeWithText("— ms",true).assertExists()
             compose.onNodeWithText("未测速",true).assertDoesNotExist()
@@ -82,11 +82,11 @@ class CrystalMaterialRenderTest {
         }
     }
     @Test fun numericalTypographyIsSansExceptExplicitAddressOrLatency() {
-        compose.setContent { HetuTheme { Column {
+        compose.setContent { RasterHetuTheme { Column {
             HetuNumber("164.4 GB",Modifier.testTag("sans-number"))
             HetuNumber("203.0.113.7",Modifier.testTag("mono-number"),monospaced=true)
         } } }
-        for((tag,family) in listOf("sans-number" to FontFamily.SansSerif,"mono-number" to FontFamily.Monospace)) {
+        for((tag,family) in listOf("sans-number" to FontFamily.Default,"mono-number" to FontFamily.Default)) {
             val layouts=mutableListOf<TextLayoutResult>()
             compose.onNodeWithTag(tag,true).performSemanticsAction(SemanticsActions.GetTextLayoutResult){it(layouts)}
             assertEquals(family,layouts.single().layoutInput.style.fontFamily)
@@ -94,7 +94,7 @@ class CrystalMaterialRenderTest {
     }
     @Test fun frostedMenuKeepsActionsEnabledStatesAndNativeDismissal() {
         var log=0;var connection=0;var diagnostic=0;var adblock=0
-        compose.setContent { HetuTheme { Box(Modifier.width(360.dp)) {
+        compose.setContent { RasterHetuTheme { Box(Modifier.width(360.dp)) {
             LiquidHomeMenu({log++},{connection++},{diagnostic++},{adblock++},true)
         } } }
         compose.onNodeWithContentDescription("更多工具").performClick()

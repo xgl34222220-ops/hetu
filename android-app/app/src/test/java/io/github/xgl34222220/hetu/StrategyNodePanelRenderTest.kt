@@ -45,6 +45,7 @@ class StrategyNodePanelRenderTest {
             server.start()
             app.getSharedPreferences("hetu", 0).edit().clear().putString("appearance", "light")
                 .putBoolean("enableBlur", false).putBoolean("liquidGlass", false)
+                .putBoolean("proxySelectorExpandSelectedInSheet", true)
                 .putBoolean("proxyCustomApiEnabled", true).putString("proxyCustomApiHost", "127.0.0.1")
                 .putInt("proxyCustomApiPort", server.port).commit()
             val repo = ProxyDashboardRepository(app)
@@ -53,15 +54,15 @@ class StrategyNodePanelRenderTest {
                 ProxyGroupUi(it, if (it == "自动选择") "URLTest" else "Selector", "香港 01", nodes)
             }
             compose.setContent {
-                HetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f, 1f), LocalHetuMotionEnabled provides false,
+                RasterHetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f, 1f), LocalHetuMotionEnabled provides false,
                     LocalSquircleEnabled provides false) {
                     Box(Modifier.width(360.dp).height(800.dp).crystalPageBackground().testTag("panel-scene")) {
                         RefPanel(ProxyComposeState(running = true, panelReady = true, groups = groups, trafficMode = "rule"),
                             repo, remember { mutableStateMapOf() }, RefPanelTab.Groups, {}, 0,
-                            remember { HazeState() }, null, false, true, {}, {}, {}, {})
+                            remember { HazeState() }, null, false, false, {}, {}, {}, {})
                         HetuGlassDock(listOf(DockItem("首页", Icons.Rounded.Home), DockItem("面板", Icons.Rounded.Dashboard),
-                            DockItem("策略", Icons.Rounded.Tune), DockItem("工具", Icons.Rounded.Apps), DockItem("设置", Icons.Rounded.Settings)),
-                            2, {}, remember { HazeState() }, null, Modifier.align(Alignment.BottomCenter))
+                            DockItem("工具", Icons.Rounded.Apps), DockItem("设置", Icons.Rounded.Settings)),
+                            1, {}, remember { HazeState() }, null, Modifier.align(Alignment.BottomCenter))
                     }
                 } }
             }
@@ -69,7 +70,7 @@ class StrategyNodePanelRenderTest {
             val second = compose.onNodeWithTag("strategy:自动选择", true).fetchSemanticsNode().boundsInRoot
             assertEquals(first.top, second.top, 1f); assertTrue(second.left > first.right)
             assertTrue("Default strategy cards must stay compact", first.height <= 150f)
-            capture("test132-strategy-overview-light")
+            capture("test133-strategy-overview-light")
             compose.onNodeWithTag("strategy:AI 平台", true).performClick()
             compose.onNodeWithTag("strategy-node-panel", true).assertExists()
             server.enqueue(MockResponse().setResponseCode(500).setBody("switch failed"))
@@ -95,7 +96,7 @@ class StrategyNodePanelRenderTest {
         compose.setContent {
             key(dark) {
                 app.getSharedPreferences("hetu", 0).edit().putString("appearance", if (dark) "dark" else "light").putBoolean("enableBlur", false).commit()
-                HetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f, font), LocalHetuMotionEnabled provides false) {
+                RasterHetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f, font), LocalHetuMotionEnabled provides false) {
                     StrategyNodePanel(group, selected, mapOf(longName to 69L, "日本 01" to 332L), emptyMap(), pending, "",
                         setOf("自动选择"), false, onSelect = { selections++ }, onDelay = { probes++ }, onTestAll = { all++ },
                         onOpenGroup = { nested++ }, onBack = {}, onClose = {},
@@ -111,7 +112,7 @@ class StrategyNodePanelRenderTest {
             assertTrue("Separate latency must stay inside node", delay.left >= row.left && delay.right <= row.right + 1f)
             assertTrue("Latency target must be reachable", delay.height >= 48f)
             compose.onNodeWithTag("panel-node:节点 80", true).assertDoesNotExist()
-            if (w == 360 && f == 1f) capture("test132-node-panel-${if (night) "dark" else "light"}")
+            if (w == 360 && f == 1f) capture("test133-node-panel-${if (night) "dark" else "light"}")
         }
         compose.runOnIdle { width = 360; font = 1f; dark = false }; compose.waitForIdle()
         compose.onNodeWithTag("panel-node-delay:$longName", true).performClick()

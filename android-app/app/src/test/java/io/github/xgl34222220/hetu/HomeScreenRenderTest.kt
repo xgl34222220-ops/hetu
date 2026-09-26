@@ -48,7 +48,7 @@ class HomeScreenRenderTest {
         compose.setContent {
             key(night) {
                 app.getSharedPreferences("hetu",0).edit().putString("appearance",if(night) "dark" else "light").putBoolean("enableBlur", false).putBoolean("liquidGlass", false).commit()
-                HetuTheme {
+                RasterHetuTheme {
                     // Software capture keeps the actual dock layout; GPU squircle/glass is device-only.
                     CompositionLocalProvider(LocalDensity provides Density(1f,font),LocalHetuMotionEnabled provides false,LocalHetuDockHeight provides dockHeight,LocalSquircleEnabled provides false) {
                         Box(Modifier.width(width.dp).height(800.dp).testTag("home-screen")) {
@@ -63,7 +63,7 @@ class HomeScreenRenderTest {
                                 onRestart={restarts++},onDelay={},onLog={logs++},onSubscription={},diagnosticLoading=false,onConnections={},onSettings={},onDiagnostics={diagnostics++})
                             HetuGlassDock(
                                 listOf(DockItem("首页", Icons.Rounded.Home), DockItem("面板", Icons.Rounded.Dashboard),
-                                    DockItem("策略", Icons.Rounded.Tune), DockItem("工具", Icons.Rounded.Apps), DockItem("设置", Icons.Rounded.Settings)),
+                                    DockItem("工具", Icons.Rounded.Apps), DockItem("设置", Icons.Rounded.Settings)),
                                 0, {}, remember { HazeState() }, null,
                                 Modifier.align(Alignment.BottomCenter).testTag("home-real-dock").onSizeChanged { dockHeight = it.height.dp })
                         }
@@ -78,7 +78,7 @@ class HomeScreenRenderTest {
             compose.onNodeWithTag("home-liquid-actions", true).assertExists()
             compose.onNodeWithText("停止",true).assertExists()
             compose.onNodeWithText("44 ms", true).assertExists()
-            for (value in listOf("44 ms", "186 ms", "162 ms", "WebUI", "Web 界面", "日志", "长按诊断")) {
+            for (value in listOf("44 ms", "186 ms", "162 ms", "WebUI", "Web 界面", "日志", "查看")) {
                 val layouts = mutableListOf<TextLayoutResult>()
                 compose.onNodeWithText(value, true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
                 assertTrue("Missing measured latency text: $value", layouts.isNotEmpty())
@@ -103,13 +103,14 @@ class HomeScreenRenderTest {
             compose.onNodeWithText("↓ 实时下行", true).assertDoesNotExist()
             compose.runOnIdle { assertEquals(0,restarts);assertEquals(0,toggles);assertEquals(0,reloads) }
             capture("home-${w}-${scale}-${if(dark) "dark" else "light"}-top")
-            compose.onNode(hasScrollToIndexAction()).performScrollToIndex(4)
+            compose.onNode(hasScrollToIndexAction()).performScrollToIndex(5)
             compose.onNodeWithTag("instrument-usage",true).assertExists()
             compose.onNodeWithText("CPU",true).performScrollTo().assertIsDisplayed()
+            compose.onNode(hasScrollToIndexAction()).performTouchInput { swipeUp() }
             val cpu = compose.onNodeWithText("CPU", true).fetchSemanticsNode().boundsInRoot
             val dock = compose.onNodeWithTag("home-real-dock", true).fetchSemanticsNode().boundsInRoot
-            assertTrue("Last metric must scroll above actual dock", cpu.bottom < dock.top)
-            for (label in listOf("首页", "面板", "策略", "工具", "设置")) {
+            assertTrue("Last metric must scroll above actual dock at $w / $scale: $cpu / $dock", cpu.bottom < dock.top)
+            for (label in listOf("首页", "面板", "工具", "设置")) {
                 val layouts = mutableListOf<TextLayoutResult>()
                 compose.onNodeWithText(label, true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
                 assertTrue("Dock label has no text layout: $label", layouts.isNotEmpty())

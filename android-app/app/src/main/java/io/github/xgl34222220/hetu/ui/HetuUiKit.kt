@@ -97,7 +97,7 @@ fun HetuNumber(
 ) {
     // Full text is never silently clipped or ellipsized. Width/layout adapts instead.
     Text(text, modifier, color = color,
-        style = style.copy(fontFeatureSettings = "tnum", fontFamily = if (monospaced) FontFamily.Monospace else FontFamily.SansSerif,
+        style = style.copy(fontFeatureSettings = "tnum", fontFamily = FontFamily.Default,
             platformStyle = PlatformTextStyle(includeFontPadding = true),
             lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None)),
         softWrap = true, overflow = TextOverflow.Visible)
@@ -141,9 +141,9 @@ fun HetuListIcon(icon: ImageVector, modifier: Modifier = Modifier) {
         "DashboardCustomize" -> Icons.Outlined.DashboardCustomize
         else -> icon
     }
-    Box(modifier.size(36.dp).background(LocalHetuTokens.current.controlBackground, RoundedCornerShape(10.dp)),
+    Box(modifier.size(28.dp),
         contentAlignment = Alignment.Center) {
-        Icon(lineIcon, null, Modifier.size(21.dp), tint = MaterialTheme.colorScheme.primary)
+        Icon(lineIcon, null, Modifier.size(21.dp), tint = LocalHetuTokens.current.textPrimary)
     }
 }
 
@@ -184,20 +184,14 @@ internal fun Modifier.hetuTopBarBackdrop(): Modifier {
 
 @Composable
 fun HetuPageHeader(title: String, onBack: () -> Unit, subtitle: String = "", actions: @Composable RowScope.() -> Unit = {}) {
-    val t = LocalHetuTokens.current
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .hetuTopBarBackdrop()
-            .padding(horizontal = 4.dp)
-            .heightIn(min = 64.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        IconButton(onBack, Modifier.size(48.dp)) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回", tint = t.textPrimary) }
-        Column(Modifier.weight(1f).padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(ht(title), color = t.textPrimary, fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold)
-            if (subtitle.isNotBlank()) Text(ht(subtitle), color = t.textOnPage, fontSize = 12.sp, lineHeight = 17.sp)
-        }
-        actions()
-    }
+    top.yukonga.miuix.kmp.basic.TopAppBar(
+        title = ht(title), subtitle = ht(subtitle), color = Color.Transparent,
+        defaultWindowInsetsPadding = false, titlePadding = 4.dp,
+        navigationIconPadding = 0.dp, actionIconPadding = 0.dp,
+        navigationIcon = {
+            top.yukonga.miuix.kmp.basic.IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
+                Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回", tint = LocalHetuTokens.current.textPrimary)
+            }
+        }, actions = actions,
+    )
 }

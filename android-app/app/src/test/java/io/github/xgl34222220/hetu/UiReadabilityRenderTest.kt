@@ -92,8 +92,8 @@ class UiReadabilityRenderTest {
         compose.setContent {
             key(night) {
                 app.getSharedPreferences("hetu", 0).edit().putString("appearance", if (night) "dark" else "light")
-                    .putInt("proxySelectorNodeColumns", 3).putString("proxySelectorNameOverflow", "clip").commit()
-                HetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f, font), LocalHetuMotionEnabled provides false) {
+                    .putInt("proxySelectorNodeColumns", 3).putString("proxySelectorNameOverflow", "wrap").commit()
+                RasterHetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f, font), LocalHetuMotionEnabled provides false) {
                     Column(Modifier.width(width.dp).crystalPageBackground().padding(16.dp).testTag("readability-scene"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         BoxWithConstraints(Modifier.fillMaxWidth()) {
                             val cardWidth = if (liquidColumns(maxWidth) == 2) (maxWidth - 10.dp) / 2 else maxWidth
@@ -115,7 +115,7 @@ class UiReadabilityRenderTest {
             val lens = compose.onNodeWithTag("node-selection-indicator:AI 平台", true).fetchSemanticsNode().boundsInRoot
             assertEquals(selected.left, lens.left, 1f); assertEquals(selected.top, lens.top, 1f)
             assertEquals(selected.width, lens.width, 1f); assertEquals(selected.height, lens.height, 1f)
-            if (w == 360 && f <= 1.5f) capture("test132-policy-$w-$f-${if (dark) "dark" else "light"}")
+            if (w == 360 && f <= 1.5f) capture("test133-policy-$w-$f-${if (dark) "dark" else "light"}")
             if (w == 360 && f == 1f) for (v in listOf(69, 146, 332, 99999)) visibleInk("latency-text:$v ms")
         }
         compose.onNodeWithTag("strategy-delay:AI 平台", true).performClick()
@@ -131,7 +131,7 @@ class UiReadabilityRenderTest {
         val raw = "time=\"2026-09-26T19:10:02+08:00\" level=warning msg=\"dial tcp: i/o timeout\""
         compose.setContent { key(night) {
             app.getSharedPreferences("hetu", 0).edit().putString("appearance", if (night) "dark" else "light").commit()
-            HetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f, font), LocalHetuMotionEnabled provides false) {
+            RasterHetuTheme { CompositionLocalProvider(LocalDensity provides Density(1f, font), LocalHetuMotionEnabled provides false) {
                 Column(Modifier.width(320.dp).crystalPageBackground().padding(16.dp).testTag("readability-scene"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     RefProviderRow(provider, false, false, { refreshes++ }, { opens++ })
                     TrafficRankings(listOf(ProxyConnectionUi("1", "long-host-name.example:443", "", "", "DIRECT", 1250, 27000)))

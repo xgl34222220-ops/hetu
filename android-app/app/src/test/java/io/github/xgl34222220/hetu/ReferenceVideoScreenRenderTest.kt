@@ -53,7 +53,7 @@ class ReferenceVideoScreenRenderTest {
         var page by mutableStateOf("tools")
         compose.setContent {
             key(page) {
-                HetuTheme {
+                RasterHetuTheme {
                     Box(
                         Modifier
                             .width(360.dp)

@@ -1,5 +1,7 @@
 package io.github.xgl34222220.hetu
 
+import io.github.xgl34222220.hetu.ui.ReferenceModalBottomSheet as ModalBottomSheet
+
 import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -71,7 +73,7 @@ private fun ReferenceDashboardCard(
     Column(
         modifier
             .heightIn(min = 102.dp)
-            .clip(shape)
+            .crystalMaterial(shape)
             .then(interaction)
             .padding(horizontal = 12.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -111,10 +113,10 @@ private fun ReferenceProgress(
 
 @Composable
 private fun ReferenceInstrumentPair(stacked: Boolean, first: @Composable (Modifier) -> Unit, second: @Composable (Modifier) -> Unit) {
-    if (stacked) Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
-        first(Modifier.fillMaxWidth()); HorizontalDivider(color = LocalHetuTokens.current.textMuted.copy(alpha = .1f)); second(Modifier.fillMaxWidth())
-    } else Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-        first(Modifier.weight(1f)); VerticalDivider(Modifier.padding(vertical = 12.dp), color = LocalHetuTokens.current.textMuted.copy(alpha = .1f)); second(Modifier.weight(1f))
+    if (stacked) Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        first(Modifier.fillMaxWidth()); second(Modifier.fillMaxWidth())
+    } else Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        first(Modifier.weight(1f)); second(Modifier.weight(1f))
     }
 }
 
@@ -185,7 +187,7 @@ internal fun AlignedInstrumentPanel(
 
     BoxWithConstraints(Modifier.fillMaxWidth().testTag("workspace-bento")) {
         val stacked = maxWidth / LocalDensity.current.fontScale < 280.dp
-        Column(Modifier.crystalMaterial(RoundedCornerShape(HetuGlassRadius.Card), depth = CrystalDepth.Card)) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             ReferenceInstrumentPair(stacked, first = { tile ->
             ReferenceDashboardCard(
                 tile.testTag("instrument-network"),
@@ -239,7 +241,6 @@ internal fun AlignedInstrumentPanel(
                 ReferenceMetricLine("下行", if (runtime.running) refSpeed(down) else "0 B/s")
             }
             })
-            HorizontalDivider(Modifier.padding(horizontal = 12.dp), color = t.textMuted.copy(alpha = .10f))
             ReferenceInstrumentPair(stacked, first = { tile ->
             ReferenceDashboardCard(
                 tile.testTag("instrument-usage"),

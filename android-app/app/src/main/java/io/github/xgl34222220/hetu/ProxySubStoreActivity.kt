@@ -1,5 +1,7 @@
 package io.github.xgl34222220.hetu
 
+import io.github.xgl34222220.hetu.ui.ReferenceButton as Button
+
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent

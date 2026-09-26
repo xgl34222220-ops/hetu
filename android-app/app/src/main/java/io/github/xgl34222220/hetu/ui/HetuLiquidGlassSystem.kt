@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.PowerSettingsNew
+import androidx.compose.material.icons.rounded.CheckCircleOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
@@ -45,11 +46,11 @@ import androidx.compose.ui.unit.sp
 
 /** Shared geometry for the Liquid Glass system. Keep page code free of ad-hoc radii. */
 object HetuGlassRadius {
-    val Hero = 28.dp
-    val Card = 24.dp
-    val Tile = 20.dp
-    val Input = 20.dp
-    val Sheet = 30.dp
+    val Hero = 20.dp
+    val Card = 16.dp
+    val Tile = 12.dp
+    val Input = 12.dp
+    val Sheet = 22.dp
     val Pill = 999.dp
 }
 
@@ -84,62 +85,25 @@ fun LiquidStatusCapsule(
     embedded: Boolean = false,
 ) {
     val t = LocalHetuTokens.current
-    val motion = LocalHetuMotionEnabled.current
-    val shape = RoundedCornerShape(HetuGlassRadius.Hero)
-    val pulse = if (motion && running && !busy) {
-        val transition = rememberInfiniteTransition(label = "runtimePulse")
-        transition.animateFloat(
-            initialValue = .62f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(tween(1350), RepeatMode.Reverse),
-            label = "runtimePulseAlpha",
-        ).value
-    } else 1f
-
-    Row(
-        modifier
-            .fillMaxWidth()
-            .heightIn(min = 78.dp)
-            .then(if (embedded) Modifier else Modifier.crystalMaterial(shape, depth = CrystalDepth.Card))
-            .padding(start = 16.dp, top = 12.dp, end = 12.dp, bottom = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            Modifier
-                .size(16.dp)
-                .graphicsLayer {
-                    alpha = pulse
-                    scaleX = if (running) 1.08f else 1f
-                    scaleY = if (running) 1.08f else 1f
-                }
-                .background(
-                    if (running) t.success.copy(alpha = .16f) else Color.Transparent,
-                    CircleShape,
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Box(
-                Modifier
-                    .size(8.dp)
-                    .background(if (running) t.success else t.textMuted, CircleShape),
-            )
+    val accent = MaterialTheme.colorScheme.primary
+    Box(modifier.fillMaxWidth().heightIn(min = 122.dp)
+        .clip(RoundedCornerShape(HetuGlassRadius.Hero)).background(t.heroBackground)) {
+        Icon(if (running) androidx.compose.material.icons.Icons.Rounded.CheckCircleOutline else Icons.Rounded.PowerSettingsNew,
+            null, Modifier.align(Alignment.BottomEnd).offset(x = 15.dp, y = 21.dp).size(114.dp),
+            tint = accent.copy(alpha = if (running) .72f else .35f))
+        Column(Modifier.padding(horizontal = 17.dp, vertical = 14.dp).padding(end = 62.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(Modifier.size(8.dp).background(if (running) accent else t.textMuted, CircleShape))
+                Text(status, Modifier.testTag("home-run-state"), color = accent,
+                    fontSize = 20.sp, lineHeight = 27.sp, fontWeight = FontWeight.Bold)
+                if (busy) HetuBusyIndicator(Modifier.size(16.dp))
+            }
+            Text(uptime, color = t.textPrimary, fontSize = 13.sp, lineHeight = 19.sp)
+            Text("$core · $mode", color = t.textPrimary, fontSize = 13.sp, lineHeight = 19.sp)
+            Text(config, color = t.textPrimary, fontSize = 13.sp, lineHeight = 19.sp,
+                maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
-
-        Spacer(Modifier.width(10.dp))
-
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(status, Modifier.testTag("home-run-state"), color = if (running) t.success else t.textPrimary,
-                fontSize = 17.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold)
-            Text("$core · $mode", color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
-            Text("$uptime · $config", color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
-        }
-
-        Spacer(Modifier.width(10.dp))
-        LiquidConnectionToggle(
-            checked = running,
-            busy = busy,
-            onClick = onToggle,
-        )
     }
 }
 
@@ -165,21 +129,19 @@ fun SegmentedLiquidActionPill(running: Boolean, busy: Boolean, onReload: () -> U
     val labels = listOf("重载", if (busy) "请稍候" else if (running) "停止" else "启动", "重启")
     val enabled = listOf(running && !busy, !busy, running && !busy)
     val callbacks = listOf(onReload, onToggle, onRestart)
-    Row(modifier.fillMaxWidth().then(if (embedded) Modifier else Modifier.crystalMaterial(RoundedCornerShape(HetuGlassRadius.Pill), depth = CrystalDepth.Sunken))
-        .padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+    Row(modifier.fillMaxWidth().clip(CircleShape).background(t.cardBackground)
+        .height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
         labels.forEachIndexed { index, label ->
-            val source = remember(index) { MutableInteractionSource() }
-            val pressed by source.collectIsPressedAsState()
-            Box(Modifier.weight(1f).heightIn(min = 48.dp)
-                .background(if (pressed) t.controlBackground else Color.Transparent, CircleShape)
-                .clickable(enabled = enabled[index], interactionSource = source, indication = null, role = Role.Button, onClick = callbacks[index])
-                .padding(horizontal = 4.dp, vertical = 10.dp), contentAlignment = Alignment.Center) {
+            if (index > 0) Box(Modifier.width(.5.dp).height(22.dp).background(t.outline))
+            Box(Modifier.weight(1f).heightIn(min = 52.dp)
+                .miuixTap(enabled = enabled[index], onClick = callbacks[index])
+                .padding(horizontal = 4.dp, vertical = 12.dp), contentAlignment = Alignment.Center) {
                 Text(label, color = when {
                     !enabled[index] -> t.textMuted
                     index == 1 && running -> t.danger
-                    index == 1 -> MaterialTheme.colorScheme.primary
-                    else -> t.textPrimary
-                }, fontSize = 13.sp, lineHeight = 19.sp, fontWeight = FontWeight.SemiBold)
+                    index == 2 -> t.warning
+                    else -> MaterialTheme.colorScheme.primary
+                }, fontSize = 14.sp, lineHeight = 21.sp, fontWeight = FontWeight.Medium)
             }
         }
     }
@@ -193,19 +155,7 @@ fun SegmentedLiquidActionPill(running: Boolean, busy: Boolean, onReload: () -> U
 fun LiquidSelectionIndicator(
     modifier: Modifier = Modifier,
 ) {
-    val primary = MaterialTheme.colorScheme.primary
-    val shape = RoundedCornerShape(HetuGlassRadius.Tile)
-    Box(
-        modifier
-            .graphicsLayer { alpha = .95f }
-            .crystalMaterial(
-                shape = shape,
-                depth = CrystalDepth.Card,
-                selection = true,
-            )
-            .background(primary.copy(alpha = .14f), shape)
-            .border(.7.dp, primary.copy(alpha = .32f), shape),
-    )
+    Box(modifier.clip(RoundedCornerShape(8.dp)).background(LocalHetuTokens.current.selectionBackground))
 }
 
 /** Shared micro-crystal tile used by WAN, speed, subscription and resource metrics. */
@@ -266,32 +216,23 @@ fun LiquidGlassTextField(
     leadingIcon: ImageVector? = null,
     textStyle: TextStyle = LocalTextStyle.current,
 ) {
-    val t = LocalHetuTokens.current
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        modifier = modifier.glassInputWell(),
-        singleLine = singleLine,
-        enabled = enabled,
-        textStyle = textStyle,
-        label = { Text(label) },
-        placeholder = { if (placeholder.isNotBlank()) Text(placeholder) },
-        supportingText = if (supportingText.isNotBlank()) { { Text(supportingText) } } else null,
-        leadingIcon = if (leadingIcon == null) null else {
-            { Icon(leadingIcon, null, modifier = Modifier.size(18.dp)) }
-        },
-        shape = RoundedCornerShape(HetuGlassRadius.Input),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = Color.Transparent,
-            unfocusedContainerColor = Color.Transparent,
-            disabledContainerColor = Color.Transparent,
-            errorContainerColor = Color.Transparent,
-            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = .34f),
-            unfocusedBorderColor = Color.Transparent,
-            disabledBorderColor = Color.Transparent,
-            errorBorderColor = t.danger.copy(alpha = .55f),
-        ),
-    )
+    @Composable
+    fun Input(fieldModifier: Modifier) {
+        top.yukonga.miuix.kmp.basic.TextField(
+            value = value, onValueChange = onValueChange,
+            modifier = fieldModifier, label = label.ifBlank { placeholder },
+            singleLine = singleLine, enabled = enabled, textStyle = textStyle,
+            cornerRadius = HetuGlassRadius.Input,
+            insideMargin = androidx.compose.ui.unit.DpSize(12.dp, 10.dp),
+            leadingIcon = leadingIcon?.let { icon -> { Icon(icon, null, Modifier.size(18.dp)) } },
+        )
+    }
+    if (supportingText.isBlank()) Input(modifier)
+    else Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Input(Modifier.fillMaxWidth())
+        Text(supportingText, color = LocalHetuTokens.current.textSecondary,
+            fontSize = 11.sp, lineHeight = 16.sp, modifier = Modifier.padding(horizontal = 8.dp))
+    }
 }
 
 
@@ -308,7 +249,7 @@ fun GroupedInsetSection(
                 RoundedCornerShape(HetuGlassRadius.Card),
                 depth = CrystalDepth.Card,
             )
-            .padding(horizontal = 14.dp),
+            ,
         content = content,
     )
 }
@@ -321,63 +262,10 @@ fun LiquidSwitch(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    val t = LocalHetuTokens.current
-    val motion = LocalHetuMotionEnabled.current
-    val shape = RoundedCornerShape(HetuGlassRadius.Pill)
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (pressed) HetuMotionSpec.PressedScale else 1f,
-        animationSpec = tween(if (motion) HetuMotionSpec.PressDurationMs else 0),
-        label = "liquidSwitchPress",
+    top.yukonga.miuix.kmp.basic.Switch(
+        checked = checked, onCheckedChange = onCheckedChange,
+        modifier = modifier, enabled = enabled,
     )
-
-    BoxWithConstraints(
-        modifier
-            .width(52.dp)
-            .height(32.dp)
-            .graphicsLayer { scaleX = scale; scaleY = scale }
-            .crystalMaterial(shape, depth = CrystalDepth.Sunken, selection = checked)
-            .toggleable(
-                value = checked,
-                enabled = enabled,
-                role = Role.Switch,
-                interactionSource = interaction,
-                indication = null,
-                onValueChange = onCheckedChange,
-            ),
-    ) {
-        val thumb = 26.dp
-        val targetX = if (checked) maxWidth - thumb - 3.dp else 3.dp
-        val x by animateDpAsState(
-            targetValue = targetX,
-            animationSpec = spring(
-                dampingRatio = if (motion) .72f else 1f,
-                stiffness = if (motion) 480f else 10_000f,
-            ),
-            label = "liquidSwitchThumb",
-        )
-        Box(
-            Modifier
-                .offset(x = x)
-                .align(Alignment.CenterStart)
-                .size(thumb)
-                .crystalMaterial(
-                    RoundedCornerShape(13.dp),
-                    depth = CrystalDepth.Popover,
-                    selection = checked,
-                ),
-        )
-        if (checked) {
-            Box(
-                Modifier
-                    .matchParentSize()
-                    .padding(3.dp)
-                    .clip(shape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = .08f)),
-            )
-        }
-    }
 }
 
 
