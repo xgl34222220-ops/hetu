@@ -2,17 +2,17 @@ package io.github.xgl34222220.hetu
 
 import android.app.Application
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import androidx.activity.ComponentActivity
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.Density
 import org.junit.Assert.*
 import org.junit.Rule
@@ -27,7 +27,7 @@ import java.io.File
 @Config(sdk = [35], qualifiers = "w393dp-h900dp-mdpi", application = Application::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class CompactHomeDashboardTest {
-    @get:Rule val rule = createComposeRule()
+    @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
     private val calls = mutableListOf<String>()
 
     // Explicit test fixtures, never referenced by production code.
@@ -57,8 +57,21 @@ class CompactHomeDashboardTest {
     private fun snapshot(name: String) {
         rule.waitForIdle()
         val file = File("build/outputs/compact-home/$name.png")
-        file.parentFile.mkdirs()
-        file.outputStream().use { rule.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it) }
+        file.parentFile?.mkdirs()
+        // Robolectric has no live Window compositor for captureToImage's forceRedraw.
+        // Draw the actual measured activity view using native Skia instead of PixelCopy.
+        // This still renders the production composables, not a mock drawing of the layout.
+        rule.runOnIdle {
+            val view = rule.activity.window.decorView
+            assertTrue("Rendered view must have a real measured size", view.width > 0 && view.height > 0)
+            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+            view.draw(Canvas(bitmap))
+            val pixels = IntArray(view.width * view.height)
+            bitmap.getPixels(pixels, 0, view.width, 0, 0, view.width, view.height)
+            assertTrue("Snapshot must contain rendered detail, not a blank canvas", pixels.toSet().size > 32)
+            file.outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+            bitmap.recycle()
+        }
     }
 
     @Test fun actionsAreEqualWidthAndDispatchRealCallbacks() {
