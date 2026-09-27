@@ -1,0 +1,126 @@
+name: UI92 + original146 integration
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/ui92-runtime146-build.yml'
+      - 'updates/ui92-runtime146/**'
+      - 'android-app/**'
+      - 'native/**'
+      - 'tests/**'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: ui92-runtime146-integration
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify and apply the exact locally tested source
+        run: python3 updates/ui92-runtime146/apply.py
+      - name: Publish actual merged source without rewriting history
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, subprocess
+          paths = json.load(open('integration-evidence/changed-paths.json'))
+          subprocess.run(['git', 'add', '--', *paths], check=True)
+          PY
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'feat: integrate UI92 screens with original146 runtime and feature adapters [skip ci]'
+            git push origin HEAD:main
+          fi
+          git rev-parse HEAD > integration-evidence/source-commit.txt
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Prepare SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort | tail -n 1)
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" 'platforms;android-37.0' 'build-tools;37.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+      - uses: actions/download-artifact@v4
+        with:
+          name: Hetu-test92-ui1-preview
+          run-id: 36354316381
+          github-token: ${{ github.token }}
+          path: .reference-payload
+      - name: Restore exact user146 native bytes and verify every runtime asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t APKS < <(find .reference-payload -name '*.apk')
+          test "${#APKS[@]}" -eq 1
+          python3 updates/ui92-runtime146/recover_payload.py "${APKS[0]}"
+      - name: Compile APK and run 39 integration regression tests
+        working-directory: android-app
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:assembleDebug :app:testDebugUnitTest --tests '*CompactHomeDashboardTest' --tests '*Runtime146ContractTest' --tests '*Ui92IntegrationTest' --tests '*NodeSelectionContinuityTest' --tests '*ProxyLatencyRegressionTest' --stacktrace
+      - name: Verify APK, identity, signature, payload and test reports
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=android-app/app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/37.0.0/aapt" dump badging "$APK" > integration-evidence/apk-identity.txt
+          grep -q "package: name='io.github.xgl34222220.hetu'" integration-evidence/apk-identity.txt
+          grep -q "versionCode='1002'" integration-evidence/apk-identity.txt
+          grep -q "versionName='0.4.0-ui92-r146.1'" integration-evidence/apk-identity.txt
+          "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --verbose --print-certs "$APK" > integration-evidence/apk-signature.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, json, zipfile, xml.etree.ElementTree as ET
+          apk = Path('android-app/app/build/outputs/apk/debug/app-debug.apk')
+          expected = json.load(open('UI92_RUNTIME146_INPUTS.json'))['original146_payload']
+          with zipfile.ZipFile(apk) as z:
+              assert z.testzip() is None
+              for name, digest in expected.items():
+                  assert hashlib.sha256(z.read(name)).hexdigest() == digest, name
+          totals = dict(tests=0, failures=0, errors=0, skipped=0)
+          for report in Path('android-app/app/build/test-results/testDebugUnitTest').glob('TEST-*.xml'):
+              node = ET.parse(report).getroot()
+              for key in totals: totals[key] += int(node.get(key, '0'))
+          assert totals == dict(tests=39, failures=0, errors=0, skipped=0), totals
+          result = dict(totals, payload_entries=len(expected), apk_sha256=hashlib.sha256(apk.read_bytes()).hexdigest(), apk_bytes=apk.stat().st_size, source_commit=Path('integration-evidence/source-commit.txt').read_text().strip(), device_tested=False)
+          Path('integration-evidence/result.json').write_text(json.dumps(result, indent=2))
+          Path('Hetu-UI92-Runtime146-test1.apk').write_bytes(apk.read_bytes())
+          print(json.dumps(result, indent=2))
+          PY
+      - name: Export reviewed source and reports
+        if: always()
+        shell: bash
+        run: |
+          git archive --format=zip HEAD -o Hetu-UI92-Runtime146-source.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Hetu-UI92-Runtime146-test1
+          path: Hetu-UI92-Runtime146-test1.apk
+          retention-days: 14
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Hetu-UI92-Runtime146-source-and-evidence
+          path: |
+            Hetu-UI92-Runtime146-source.zip
+            integration-evidence/
+            android-app/app/build/test-results/testDebugUnitTest/
+            android-app/app/build/reports/tests/testDebugUnitTest/
+            android-app/app/build/outputs/compact-home/
+          retention-days: 14
+          if-no-files-found: error
