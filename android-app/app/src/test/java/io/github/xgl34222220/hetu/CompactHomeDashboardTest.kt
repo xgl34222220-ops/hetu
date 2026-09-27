@@ -78,24 +78,31 @@ class CompactHomeDashboardTest {
         render()
         val tags = listOf("home-reload", "home-toggle", "home-restart")
         val widths = tags.map { rule.onNodeWithTag(it).fetchSemanticsNode().boundsInRoot.width }
-        assertEquals(widths[0], widths[1], .5f)
-        assertEquals(widths[1], widths[2], .5f)
+        // A one-pixel remainder cannot be split among three physical pixel widths.
+        // Keep equal weights; reject any discrepancy larger than normal raster rounding.
+        println("Segment physical pixel widths: $widths")
+        assertTrue("Equal-weight segments may differ by at most one physical pixel: $widths",
+            widths.max() - widths.min() <= 1f)
         tags.forEach { rule.onNodeWithTag(it).assertIsEnabled().performClick() }
         assertEquals(listOf("reload", "toggle", "restart"), calls)
         snapshot("light-running")
     }
 
     @Test fun busyDisablesAllProxyActions() {
-        render(fixture().copy(busy = true, message = "正在重载配置"))
-        listOf("home-reload", "home-toggle", "home-restart").forEach { rule.onNodeWithTag(it).assertIsNotEnabled() }
-        rule.onNodeWithText("正在重载配置").assertIsDisplayed()
+        render(fixture().copy(busy = true, operation = HomeOperation.Reload, message = "正在重载配置"))
+        listOf("home-reload", "home-toggle", "home-restart").forEach { rule.onNodeWithTag(it).assertDoesNotExist() }
+        rule.onNodeWithTag("home-processing").assertIsDisplayed()
+        rule.onNodeWithTag("home-processing-shimmer").assertExists()
+        rule.onAllNodesWithText("正在重载").assertCountEquals(2)
+        rule.onNodeWithText("正在重载配置").assertDoesNotExist()
+        snapshot("processing-reload")
     }
 
     @Test fun stoppedOnlyEnablesStartAndDoesNotInventMetrics() {
         render(CompactHomeData(config = "未选择配置"))
         rule.onNodeWithTag("home-toggle").assertIsEnabled().performClick()
-        rule.onNodeWithTag("home-reload").assertIsNotEnabled()
-        rule.onNodeWithTag("home-restart").assertIsNotEnabled()
+        rule.onNodeWithTag("home-reload").assertDoesNotExist()
+        rule.onNodeWithTag("home-restart").assertDoesNotExist()
         rule.onNodeWithTag("home-latency-refresh").assertIsNotEnabled()
         rule.onNodeWithText("启动").assertIsDisplayed()
         assertEquals(listOf("toggle"), calls)
@@ -131,6 +138,11 @@ class CompactHomeDashboardTest {
         rule.onNodeWithText("192.168.1.8").assertIsDisplayed()
         rule.onNodeWithTag("home-network-details").performClick()
         rule.onNodeWithText("网络详情").assertIsDisplayed()
+        rule.onNodeWithTag("native-details-sheet").assertExists()
+        rule.onNodeWithTag("sheet-confirm").assertIsDisplayed()
+        rule.onNodeWithTag("sheet-confirm").performClick()
+        rule.waitForIdle()
+        rule.onNodeWithTag("native-details-sheet").assertDoesNotExist()
     }
 
     @Test fun shortcutsAndOverflowKeepExistingFunctionsReachable() {
@@ -170,5 +182,40 @@ class CompactHomeDashboardTest {
         rule.onNodeWithTag("compact-home").performScrollToNode(hasTestTag("home-cpu-bar"))
         rule.onNodeWithTag("home-cpu-bar").assertIsDisplayed()
         snapshot("large-text-bottom")
+    }
+
+    @Test fun shellProgressDoesNotChangeOperationOrLeakIntoHero() {
+        val raw = "停止守护\nKill Switch: iptables -D OUTPUT\nkill -9 1234"
+        val data = fixture().copy(busy = true, operation = HomeOperation.Restart, message = raw)
+        assertEquals(HomePhase.Processing, HomeLifecyclePresentation.phase(data))
+        assertEquals("正在重启", HomeLifecyclePresentation.operationTitle(data))
+        render(data)
+        rule.onNodeWithTag("home-processing").assertIsDisplayed()
+        rule.onNodeWithText(raw).assertDoesNotExist()
+        rule.onNodeWithText("Kill Switch", substring = true).assertDoesNotExist()
+        assertTrue("Busy hero must not expand for shell logs", rule.onNodeWithTag("home-hero").fetchSemanticsNode().boundsInRoot.height < 300f)
+        snapshot("processing-restart")
+    }
+
+    @Test fun lifecycleAndFeedbackAreTruthfulWithoutInventingMetrics() {
+        assertEquals(HomePhase.Stopped, HomeLifecyclePresentation.phase(CompactHomeData()))
+        assertEquals(HomePhase.Running, HomeLifecyclePresentation.phase(fixture()))
+        assertEquals(HomePhase.Processing, HomeLifecyclePresentation.phase(fixture().copy(operation = HomeOperation.Stop)))
+        assertEquals("操作未完成，请查看详情", HomeLifecyclePresentation.feedback("Permission denied: /data/adb/hetu"))
+        assertEquals("操作反馈已更新", HomeLifecyclePresentation.feedback("停止守护\niptables -D OUTPUT"))
+        assertNull(HomeLifecyclePresentation.feedback(" "))
+        render(fixture().copy(busy = true, operation = HomeOperation.Stop))
+        rule.onNodeWithTag("home-toggle").assertDoesNotExist()
+        rule.onNodeWithTag("home-processing").assertIsDisplayed()
+        snapshot("processing-stop")
+    }
+
+    @Test fun fullWidthStartReplacesStoppedSegments() {
+        render(CompactHomeData())
+        val start = rule.onNodeWithTag("home-toggle").fetchSemanticsNode().boundsInRoot.width
+        val pill = rule.onNodeWithTag("home-control-pill").fetchSemanticsNode().boundsInRoot.width
+        assertTrue("Stopped start must fill its capsule", start >= pill - 9f)
+        rule.onNodeWithTag("home-reload").assertDoesNotExist()
+        rule.onNodeWithTag("home-restart").assertDoesNotExist()
     }
 }

@@ -50,7 +50,7 @@ data class HetuTokens(
 
 val LocalHetuTokens = staticCompositionLocalOf {
     HetuTokens(
-        pageBackground = Color(0xFFF4F6F9),
+        pageBackground = Color(0xFFF4F6FB),
         cardBackground = Color(0xFFFFFFFF),
         elevatedCardBackground = Color(0xFFF1F5F9),
         heroBackground = Color(0xFFEDF4FF),
@@ -157,7 +157,7 @@ fun HetuTheme(content: @Composable () -> Unit) {
         primary = fixedPrimary,
         primaryContainer = Color(0xFFDBEAFE),
         secondary = Color(0xFF2563EB),
-        background = Color(0xFFF4F6F9),
+        background = Color(0xFFF4F6FB),
         surface = Color.White,
         error = Color(0xFFEF4444),
         onBackground = Color(0xFF0F172A),
@@ -201,7 +201,7 @@ fun HetuTheme(content: @Composable () -> Unit) {
             )
         } else {
             HetuTokens(
-                pageBackground = Color(0xFFF4F6F9),
+                pageBackground = Color(0xFFF4F6FB),
                 cardBackground = Color(0xFFFFFFFF),
                 elevatedCardBackground = Color(0xFFF1F5F9),
                 heroBackground = Color(0xFFEDF4FF),
@@ -221,7 +221,7 @@ fun HetuTheme(content: @Composable () -> Unit) {
             LocalHetuLanguage provides prefs.getString("appLanguage", "system").orEmpty(),
             LocalHetuMotionEnabled provides motionEnabled,
             LocalDensity provides scaledDensity,
-            content = inner,
+            content = { io.github.xgl34222220.hetu.ImmersiveUiHost { inner() } },
         )
     }
 

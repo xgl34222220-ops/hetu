@@ -50,6 +50,7 @@ import java.util.Locale
 internal data class CompactHomeData(
     val running: Boolean = false,
     val busy: Boolean = false,
+    val operation: HomeOperation? = null,
     val refreshing: Boolean = false,
     val testing: Boolean = false,
     val uptimeSeconds: Long = 0,
@@ -64,6 +65,8 @@ internal data class CompactHomeData(
     val lan: String = "—",
     val countryCode: String = "",
     val region: String = "",
+    val isp: String = "",
+    val asn: String = "",
     val lanInterface: String = "",
     val up: Long = 0,
     val down: Long = 0,
@@ -107,7 +110,7 @@ internal object CompactHomeFormat {
 private data class HomePalette(val page: Color, val card: Color, val text: Color,
     val muted: Color, val soft: Color, val blue: Color, val red: Color, val line: Color)
 private val LocalHomePalette = staticCompositionLocalOf {
-    HomePalette(Color(0xFFF4F6F9), Color.White, Color(0xFF1E293B), Color(0xFF64748B),
+    HomePalette(Color(0xFFF4F6FB), Color.White, Color(0xFF1E293B), Color(0xFF64748B),
         Color(0xFFF8FAFC), Color(0xFF2563EB), Color(0xFFEF4444), Color(0xFFF1F5F9))
 }
 private val LocalHomeMotion = staticCompositionLocalOf { false }
@@ -128,19 +131,8 @@ private fun homeMotionAvailable(requested: Boolean): Boolean {
 
 /** Uses semantic clickable (including keyboard/TalkBack); scrolling cancels a press normally. */
 @Composable
-private fun Modifier.homeClick(enabled: Boolean = true, label: String? = null, onClick: () -> Unit): Modifier {
-    val interactions = remember { MutableInteractionSource() }
-    val pressed by interactions.collectIsPressedAsState()
-    val motion = LocalHomeMotion.current
-    val scale by animateFloatAsState(
-        if (enabled && pressed && motion) .97f else 1f,
-        if (!motion) snap() else if (pressed) tween(120, easing = CubicBezierEasing(.4f, 0f, .2f, 1f))
-        else spring(dampingRatio = .78f, stiffness = 500f), label = "home-press",
-    )
-    return graphicsLayer { scaleX = scale; scaleY = scale }
-        .clickable(enabled = enabled, interactionSource = interactions, indication = null,
-            role = Role.Button, onClickLabel = label, onClick = onClick)
-}
+private fun Modifier.homeClick(enabled: Boolean = true, label: String? = null, onClick: () -> Unit): Modifier =
+    nativePress(enabled, label, LocalHomeMotion.current, onClick)
 
 @Composable
 private fun HomeCard(modifier: Modifier = Modifier, onClick: (() -> Unit)? = null,
@@ -148,9 +140,7 @@ private fun HomeCard(modifier: Modifier = Modifier, onClick: (() -> Unit)? = nul
     val p = LocalHomePalette.current
     val shape = RoundedCornerShape(24.dp)
     val interactive = if (onClick == null) modifier else modifier.homeClick(enabled, onClick = onClick)
-    Box(interactive.shadow(3.dp, shape, clip = false,
-        ambientColor = Color.Black.copy(alpha = .035f), spotColor = Color.Black.copy(alpha = .035f))
-        .clip(shape).background(p.card), content = content)
+    Box(interactive.diffuseCardShadow(shape).clip(shape).background(p.card), content = content)
 }
 
 @Composable
@@ -166,11 +156,11 @@ private fun HomeNumber(value: String, modifier: Modifier = Modifier, color: Colo
     val annotated = buildAnnotatedString {
         if (split > 0) {
             append(value.substring(0, split))
-            withStyle(SpanStyle(fontSize = 11.sp, fontWeight = FontWeight.Normal)) { append(value.substring(split)) }
+            withStyle(SpanStyle(fontSize = 11.sp, fontWeight = FontWeight.Normal, color = color.copy(alpha = .66f))) { append(value.substring(split)) }
         } else append(value)
     }
     Text(annotated, modifier, color = color, fontSize = size.sp, lineHeight = (size + 5).sp,
-        fontWeight = FontWeight.Bold, fontFamily = FontFamily.Default, maxLines = 2,
+        fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, maxLines = 2,
         overflow = TextOverflow.Ellipsis, textAlign = align,
         style = LocalTextStyle.current.copy(fontFeatureSettings = "tnum"))
 }
@@ -213,10 +203,23 @@ internal fun CompactHomeDashboard(
     val palette = if (!dark) light else HomePalette(
         MaterialTheme.colorScheme.background, Color(0xFF1C2430), Color(0xFFE2E8F0),
         Color(0xFF9AA9BD), Color(0xFF253142), Color(0xFF8AB4FF), Color(0xFFFF8585), Color(0xFF293545))
-    val motion = homeMotionAvailable(motionEnabled)
+    val motion = homeMotionAvailable(motionEnabled && io.github.xgl34222220.hetu.ui.LocalHetuMotionEnabled.current)
     CompositionLocalProvider(LocalHomePalette provides palette, LocalHomeMotion provides motion) {
         var more by remember { mutableStateOf(false) }
-        LazyColumn(modifier.fillMaxSize().background(palette.page).statusBarsPadding()
+        var feedbackDetails by remember { mutableStateOf<String?>(null) }
+        val snackbar = remember { SnackbarHostState() }
+        LaunchedEffect(data.message, data.busy, data.operation) {
+            if (data.busy || data.operation != null) {
+                snackbar.currentSnackbarData?.dismiss()
+            } else {
+                HomeLifecyclePresentation.feedback(data.message)?.let { summary ->
+                    if (snackbar.showSnackbar(summary, actionLabel = "详情", withDismissAction = true,
+                        duration = SnackbarDuration.Short) == SnackbarResult.ActionPerformed) feedbackDetails = data.message
+                }
+            }
+        }
+        Box(Modifier.fillMaxSize()) {
+        LazyColumn(modifier.fillMaxSize().background(palette.page).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
             .testTag("compact-home"), contentPadding = PaddingValues(
                 start = 16.dp, end = 16.dp, top = 8.dp,
                 bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 94.dp),
@@ -254,58 +257,22 @@ internal fun CompactHomeDashboard(
                 left = { HomeSubscription(data, it, onSubscription) },
                 right = { HomeResources(data, it) }) }
         }
+        SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding()
+            .padding(start = 16.dp, end = 16.dp, bottom = 96.dp))
+        }
+        feedbackDetails?.let { detail -> NativeDetailsSheet("操作详情", { feedbackDetails = null }) {
+            androidx.compose.foundation.text.selection.SelectionContainer {
+                Text(detail, color = palette.text, fontSize = 12.sp, lineHeight = 18.sp,
+                    fontFamily = FontFamily.Monospace)
+            }
+        } }
     }
 }
 
 @Composable
 private fun HomeHero(data: CompactHomeData, toggle: () -> Unit, reload: () -> Unit,
     restart: () -> Unit, settings: () -> Unit) {
-    val p = LocalHomePalette.current
-    HomeCard(Modifier.fillMaxWidth().testTag("home-hero")) {
-        Icon(if (data.running) Icons.Rounded.CheckCircle else Icons.Rounded.PowerSettingsNew,
-            null, Modifier.align(Alignment.TopEnd).offset(x = 18.dp, y = (-18).dp).size(116.dp),
-            tint = p.blue.copy(alpha = .075f))
-        Column(Modifier.fillMaxWidth().padding(18.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Box(Modifier.size(8.dp).background(if (data.running) p.blue else p.muted, CircleShape))
-                Text(if (data.busy) "正在处理" else if (data.running) "运行中" else "已停止",
-                    color = if (data.running || data.busy) p.blue else p.muted,
-                    fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                if (data.running) HomeLabel(CompactHomeFormat.uptime(data.uptimeSeconds), Modifier.weight(1f))
-            }
-            Spacer(Modifier.height(8.dp))
-            HomeLabel(listOf(data.core, data.mode).filter(String::isNotBlank).joinToString(" · "))
-            Text(data.config.ifBlank { "尚未选择配置" }, color = p.text, fontSize = 16.sp,
-                lineHeight = 22.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (data.message.isNotBlank()) {
-                Text(data.message, Modifier.padding(top = 6.dp).semantics { liveRegion = LiveRegionMode.Polite },
-                    color = p.muted, fontSize = 12.sp, lineHeight = 17.sp)
-            }
-            if (data.pendingSettings && data.running) {
-                Text("设置待生效 · 查看", Modifier.heightIn(min = 48.dp).homeClick(onClick = settings)
-                    .wrapContentHeight(), color = p.blue, fontSize = 12.sp)
-            }
-            Spacer(Modifier.height(14.dp))
-            HorizontalDivider(color = p.line)
-            Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                HomeAction("重载", Modifier.weight(1f).testTag("home-reload"), data.running && !data.busy, false, reload)
-                HomeAction(if (data.running) "停止" else "启动", Modifier.weight(1f).testTag("home-toggle"),
-                    !data.busy, data.running, toggle)
-                HomeAction("重启", Modifier.weight(1f).testTag("home-restart"), data.running && !data.busy, false, restart)
-            }
-        }
-    }
-}
-
-@Composable
-private fun HomeAction(title: String, modifier: Modifier, enabled: Boolean, danger: Boolean, click: () -> Unit) {
-    val p = LocalHomePalette.current
-    Box(modifier.homeClick(enabled, title, click).clip(RoundedCornerShape(12.dp))
-        .background(if (danger) p.red.copy(alpha = .075f) else p.soft)
-        .heightIn(min = 48.dp).padding(horizontal = 4.dp, vertical = 10.dp), contentAlignment = Alignment.Center) {
-        Text(title, color = (if (danger) p.red else p.text).copy(alpha = if (enabled) 1f else .38f),
-            fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
-    }
+    NativeStatusHero(data, toggle, reload, restart, settings, LocalHomeMotion.current)
 }
 
 @Composable
@@ -351,8 +318,8 @@ private fun HomeLatency(data: CompactHomeData, refresh: () -> Unit) {
                                 (fadeIn(tween(if (motion) 200 else 0)) + slideInVertically(tween(if (motion) 200 else 0)) { it / 5 })
                                     .togetherWith(fadeOut(tween(if (motion) 100 else 0)))
                             }, label = "latency-result-$name") { shown ->
-                                HomeNumber(shown, Modifier.graphicsLayer { alpha = if (data.testing) pulse else 1f }
-                                    .padding(top = 4.dp), tint, 21, TextAlign.Center)
+                                if (shown == "···") LoadingWaveDots(motion, p.blue, Modifier.padding(top = 4.dp))
+                                else HomeNumber(shown, Modifier.padding(top = 4.dp), tint, 21, TextAlign.Center)
                             }
                         }
                     }
@@ -401,7 +368,7 @@ private fun HomeNetwork(data: CompactHomeData, modifier: Modifier) {
                     Text((if (page == 0) data.wan else data.lan).ifBlank { "—" }, color = p.text,
                         fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Bold,
                         style = LocalTextStyle.current.copy(fontFeatureSettings = "tnum"),
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(if (page == 0) listOf(CompactHomeFormat.flag(data.countryCode), data.region)
                         .filter { it.isNotBlank() && it != "—" }.joinToString(" ").ifBlank { "地区未知" }
                         else "${data.lanInterface.ifBlank { "本地网络" }} · ${data.connections} 连接",
@@ -411,9 +378,7 @@ private fun HomeNetwork(data: CompactHomeData, modifier: Modifier) {
             }
         }
     }
-    if (details) AlertDialog(onDismissRequest = { details = false }, title = { Text("网络详情") }, text = {
-        Text("WAN\n${data.wan}\n${data.region}\n\nLAN\n${data.lan}\n${data.lanInterface}\n\n活动连接：${data.connections}")
-    }, confirmButton = { TextButton(onClick = { details = false }) { Text("关闭") } })
+    if (details) NativeNetworkDetails(data) { details = false }
 }
 
 @Composable

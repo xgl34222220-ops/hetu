@@ -97,7 +97,7 @@ internal fun ImmersiveUiHost(content: @Composable () -> Unit) {
     val motion = LocalHetuMotionEnabled.current
     val blur by animateDpAsState(if (backdrop.count > 0) 8.dp else 0.dp,
         tween(if (motion) 250 else 0), label = "sheet-background-blur")
-    SideEffect {
+    DisposableEffect(activity, background) {
         activity?.window?.let { window ->
             window.setBackgroundDrawable(ColorDrawable(background.toArgb()))
             if (Build.VERSION.SDK_INT >= 29) window.isNavigationBarContrastEnforced = false
@@ -111,6 +111,7 @@ internal fun ImmersiveUiHost(content: @Composable () -> Unit) {
                 isAppearanceLightNavigationBars = background.luminance() > .5f
             }
         }
+        onDispose { }
     }
     CompositionLocalProvider(LocalSheetBackdrop provides backdrop) {
         Box(Modifier.fillMaxSize().background(background).testTag("immersive-window")) {
@@ -206,15 +207,15 @@ internal fun NativeStatusHero(data: CompactHomeData, toggle: () -> Unit, reload:
                     val blue = if (dark) Color(0xFF8AB4FF) else Color(0xFF2563EB)
                     when (shown) {
                         HomePhase.Running -> {
-                            PillAction("重载", "home-reload", blue, Modifier.weight(1f), !processing, motion, reload)
+                            PillAction("重载", "home-reload", blue, Modifier.weight(1f), !processing && phase == shown, motion, reload)
                             Box(Modifier.width(1.dp).height(18.dp).background(muted.copy(alpha = .12f)))
                             PillAction("停止", "home-toggle", if (dark) Color(0xFFFDA4AF) else Color(0xFFE11D48),
-                                Modifier.weight(1f), !processing, motion, toggle)
+                                Modifier.weight(1f), !processing && phase == shown, motion, toggle)
                             Box(Modifier.width(1.dp).height(18.dp).background(muted.copy(alpha = .12f)))
                             PillAction("重启", "home-restart", if (dark) Color(0xFFFBBF24) else Color(0xFFD97706),
-                                Modifier.weight(1f), !processing, motion, restart)
+                                Modifier.weight(1f), !processing && phase == shown, motion, restart)
                         }
-                        HomePhase.Stopped -> PillAction("启动", "home-toggle", blue, Modifier.weight(1f), !processing, motion, toggle)
+                        HomePhase.Stopped -> PillAction("启动", "home-toggle", blue, Modifier.weight(1f), !processing && phase == shown, motion, toggle)
                         HomePhase.Processing -> Row(Modifier.fillMaxWidth().heightIn(min = 48.dp)
                             .testTag("home-processing").semantics { stateDescription = title; liveRegion = LiveRegionMode.Polite },
                             horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {

@@ -242,6 +242,7 @@ private fun RefProxyShell(resumeRevision: Int, requestedStartPage: String?, star
     var lastDown by remember { mutableLongStateOf(0L) }
     var lastAt by remember { mutableLongStateOf(0L) }
     var operation by remember { mutableStateOf("") }
+    var homeOperation by remember { mutableStateOf<HomeOperation?>(null) }
     var homeRefreshing by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("") }
     var testing by remember { mutableStateOf(false) }
@@ -356,11 +357,13 @@ private fun RefProxyShell(resumeRevision: Int, requestedStartPage: String?, star
     }
 
     fun toggle() {
-        if (operation.isNotBlank()) return
+        if (operation.isNotBlank() || homeOperation != null) return
+        homeOperation = if (state.running) HomeOperation.Stop else HomeOperation.Start
         scope.launch {
             operation = if (state.running) "正在停止…" else "正在启动…"
             try {
                 if (state.running) controller.stop { operation = it } else controller.start { operation = it }
+                state = controller.state()
                 operation = ""
                 launch { delay(120); refresh() }
             } catch (cancel: CancellationException) {
@@ -396,16 +399,19 @@ private fun RefProxyShell(resumeRevision: Int, requestedStartPage: String?, star
                 }
             } finally {
                 operation = ""
+                homeOperation = null
             }
         }
     }
 
     fun reload() {
-        if (!state.running || operation.isNotBlank()) return
+        if (!state.running || operation.isNotBlank() || homeOperation != null) return
+        homeOperation = HomeOperation.Reload
         scope.launch {
             operation = "正在重载…"
             try {
                 message = controller.reload()
+                state = controller.state()
                 operation = ""
                 launch { delay(100); refresh() }
             } catch (cancel: CancellationException) {
@@ -414,19 +420,21 @@ private fun RefProxyShell(resumeRevision: Int, requestedStartPage: String?, star
                 message = error.message ?: "重载失败"
             } finally {
                 operation = ""
+                homeOperation = null
             }
         }
     }
 
     fun restart() {
-        if (!state.running || operation.isNotBlank()) return
+        if (!state.running || operation.isNotBlank() || homeOperation != null) return
+        homeOperation = HomeOperation.Restart
         scope.launch {
             operation = "正在重启…"
             ProxyRuntimeSettings.beginApply(prefs)
             try {
                 controller.restart { operation = it }
                 prefs.edit().remove("proxyRootRuntimeRefreshPending").remove("proxyRootUpgradeError").apply()
-                state = state.copy(runtimeSettingsPending = false, message = "")
+                state = controller.state().copy(runtimeSettingsPending = false, message = "")
                 message = ""
                 operation = ""
                 launch {
@@ -442,6 +450,7 @@ private fun RefProxyShell(resumeRevision: Int, requestedStartPage: String?, star
                 message = UiFeedback.summary(error.message ?: "重启失败", true)
             } finally {
                 operation = ""
+                homeOperation = null
             }
         }
     }
@@ -573,7 +582,7 @@ private fun RefProxyShell(resumeRevision: Int, requestedStartPage: String?, star
     val shellBackground = if (MaterialTheme.colorScheme.background.luminance() < .5f) {
         LocalHetuTokens.current.pageBackground
     } else {
-        Color(0xFFF4F6F9)
+        Color(0xFFF4F6FB)
     }
     Box(Modifier.fillMaxSize().background(shellBackground)) {
         Box(
@@ -629,6 +638,7 @@ private fun RefProxyShell(resumeRevision: Int, requestedStartPage: String?, star
                     downRate = downRate,
                     cpuPercent = cpuPercent,
                     operation = operation,
+                    action = homeOperation,
                     message = message,
                     testing = testing,
                     refreshing = homeRefreshing,
@@ -738,6 +748,7 @@ private fun RefHome(
     downRate: Long,
     cpuPercent: Float,
     operation: String,
+    action: HomeOperation?,
     message: String,
     testing: Boolean,
     refreshing: Boolean,
@@ -763,7 +774,7 @@ private fun RefHome(
     var webUiOpen by remember { mutableStateOf(false) }
     CompactHomeDashboard(
         data = CompactHomeData(
-            running = state.running, busy = operation.isNotBlank(), refreshing = refreshing,
+            running = state.running, busy = operation.isNotBlank() || action != null, operation = action, refreshing = refreshing,
             testing = testing, uptimeSeconds = runtime.elapsedSeconds,
             core = state.core, mode = state.mode, config = state.config,
             message = operation.ifBlank { message }, pendingSettings = state.runtimeSettingsPending,
@@ -799,7 +810,7 @@ private fun RefActionText(
     val source = remember(text) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        if (pressed) .95f else 1f,
+        if (pressed) .975f else 1f,
         spring(dampingRatio = .68f, stiffness = 650f),
         label = "heroAction$text",
     )
@@ -820,7 +831,7 @@ private fun RefActionText(
     Row(
         modifier
             .heightIn(min = 48.dp)
-            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .86f else if (enabled) 1f else .50f }
+            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (enabled) 1f else .50f }
             .shadow(7.dp, shape, clip = false, ambientColor = shadowColor, spotColor = shadowColor)
             .background(background, shape)
             .border(.7.dp, borderColor, shape)
@@ -865,12 +876,12 @@ private fun RefSmallTool(title: String, subtitle: String, icon: ImageVector, onC
     val t = LocalHetuTokens.current
     val source = remember(title) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .96f else 1f, spring(dampingRatio = .74f, stiffness = 560f), label = "smallTool$title")
+    val scale by animateFloatAsState(if (pressed) .975f else 1f, spring(dampingRatio = .74f, stiffness = 560f), label = "smallTool$title")
     val shape = RoundedCornerShape(18.dp)
     Surface(
         modifier = modifier
             .height(58.dp)
-            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .92f else 1f }
+            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = 1f }
             .clip(shape)
             .clickable(interactionSource = source, indication = null, onClick = onClick),
         shape = shape,
@@ -1647,7 +1658,7 @@ private fun RefGroupDetailPage(
         delay != null && delay > 0L
     }
     val anyTesting = group.nodes.any { testing[it.name] == true }
-    val pageBackground = if (dark) t.pageBackground else Color(0xFFF4F6F9)
+    val pageBackground = if (dark) t.pageBackground else Color(0xFFF4F6FB)
 
     Column(
         Modifier.fillMaxSize().offset(x = enterX).background(pageBackground).navigationBarsPadding(),
@@ -1835,7 +1846,7 @@ private fun RefDetailNodeCard(
     val dark = scheme.background.luminance() < .5f
     val source = remember(node.name) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .96f else 1f, spring(dampingRatio = .72f, stiffness = 580f), label = "detailNode${node.name}")
+    val scale by animateFloatAsState(if (pressed) .975f else 1f, spring(dampingRatio = .72f, stiffness = 580f), label = "detailNode${node.name}")
     val shape = RoundedCornerShape(16.dp)
     val premiumBrush = if (dark) {
         Brush.verticalGradient(
@@ -2106,7 +2117,7 @@ private fun RefPanelTabs(
                 val source = remember(tab) { MutableInteractionSource() }
                 val pressed by source.collectIsPressedAsState()
                 val scale by animateFloatAsState(
-                    if (pressed) .96f else 1f,
+                    if (pressed) .975f else 1f,
                     spring(dampingRatio = .76f, stiffness = 560f),
                     label = "tab${tab.name}",
                 )
@@ -2202,7 +2213,7 @@ private fun RefGroupCard(
         modifier
             .height(96.dp)
             .zIndex(1f)
-            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .95f else 1f }
+            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .975f else 1f }
             .shadow(
                 if (expanded) 7.dp else 4.dp,
                 shape,
@@ -2923,7 +2934,7 @@ private fun RefProviderRow(item: DashboardProviderUi, refreshing: Boolean, succe
     val progress by animateFloatAsState(usedRatio, spring(dampingRatio = .82f, stiffness = 300f), label = "providerProgress${item.name}")
     val remainingPercent = if (item.hasSubscriptionInfo && item.total > 0L) ((1f - usedRatio) * 100f).toInt() else 0
     Surface(
-        modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .92f else 1f }
+        modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale; alpha = 1f }
             .clip(shape)
             .clickable(interactionSource = source, indication = null, onClick = onClick),
         shape = shape,
@@ -3932,7 +3943,7 @@ internal fun RefToolRow(
     val t = LocalHetuTokens.current
     val source = remember(title) { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .96f else 1f, spring(dampingRatio = .78f, stiffness = 560f), label = "tool$title")
+    val scale by animateFloatAsState(if (pressed) .975f else 1f, spring(dampingRatio = .78f, stiffness = 560f), label = "tool$title")
     Row(
         Modifier.fillMaxWidth()
             .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .91f else 1f }
@@ -4062,7 +4073,7 @@ internal fun RefDivider() {
     HorizontalDivider(
         modifier = Modifier.padding(start = 58.dp, end = 14.dp),
         thickness = 1.dp,
-        color = if (MaterialTheme.colorScheme.background.luminance() < .5f) LocalHetuTokens.current.outline else Color(0xFFF4F6F9),
+        color = if (MaterialTheme.colorScheme.background.luminance() < .5f) LocalHetuTokens.current.outline else Color(0xFFF4F6FB),
     )
 }
 

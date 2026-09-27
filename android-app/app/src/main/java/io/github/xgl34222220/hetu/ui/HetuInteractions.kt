@@ -36,8 +36,8 @@ internal fun Modifier.hetuTap(enabled: Boolean = true, role: Role = Role.Button,
     val source = remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val motion = LocalHetuMotionEnabled.current
-    val scale by animateFloatAsState(if (pressed && enabled) .975f else 1f,
-        if (motion) spring(dampingRatio = .82f, stiffness = 650f) else snap(), label = "hetuPress")
+    val scale by animateFloatAsState(if (pressed && enabled && motion) .975f else 1f,
+        if (!motion) snap() else if (pressed) tween(150, easing = androidx.compose.animation.core.CubicBezierEasing(.2f, 0f, 0f, 1f)) else spring(dampingRatio = .82f, stiffness = 650f), label = "hetuPress")
     return graphicsLayer { scaleX = scale; scaleY = scale }
         .clickable(source, indication = null, enabled = enabled, onClickLabel = onClickLabel,
             role = role, onClick = onClick)
