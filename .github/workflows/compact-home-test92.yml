@@ -1,144 +1,20 @@
-name: Test.92 compact home validation
+name: Test.92 compact home validation (retired)
 
+# Historical runs and their artifacts remain available.
+# Do not automatically rewrite the approved UI92/runtime146 application back to
+# the obsolete test.92 runtime or version1001 on future source pushes.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'android-app/**'
-      - 'tools/apply_compact_home.py'
-      - '.github/workflows/compact-home-test92.yml'
   workflow_dispatch:
 
 permissions:
-  contents: write
-  actions: read
-
-concurrency:
-  group: test92-compact-home
-  cancel-in-progress: true
+  contents: read
 
 jobs:
-  validate:
+  retired:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 1
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Verify ancestry and integrate only the approved home
+      - name: Use the current integration workflow
         run: |
-          set -euo pipefail
-          git merge-base --is-ancestor 92707c5850e0b3eb3cea05f868a4cfa6694ad48e HEAD
-          python3 tools/apply_compact_home.py
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-      - name: Prepare SDK
-        run: |
-          set -euo pipefail
-          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort | tail -n 1)
-          yes | "$SDKMANAGER" --licenses >/dev/null || true
-          "$SDKMANAGER" 'platforms;android-37.0' 'build-tools;37.0.0' 'platform-tools'
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '9.5.0'
-      - name: Retrieve the user-approved test.92 binary payload
-        uses: actions/download-artifact@v4
-        with:
-          name: Hetu-Debug
-          run-id: 35480549553
-          github-token: ${{ github.token }}
-          path: .baseline-test92
-      - name: Reuse original JNI and Mihomo bytes without rebuilding or upgrading
-        shell: python
-        run: |
-          from pathlib import Path
-          import hashlib, json, zipfile
-          apks = list(Path('.baseline-test92').rglob('*.apk'))
-          assert len(apks) == 1, 'Expected exactly one original test.92 APK'
-          original = apks[0]
-          with zipfile.ZipFile(original) as archive:
-              assert archive.testzip() is None
-              selected = [name for name in archive.namelist() if
-                  (name.startswith('lib/') and name.endswith('/libhetu_core.so')) or
-                  (name.startswith('assets/mihomo-root/') and not name.endswith('/')) or
-                  name in ('assets/mihomo-revision.txt', 'assets/MIHOMO-LICENSE')]
-              assert 'lib/arm64-v8a/libhetu_core.so' in selected
-              assert 'assets/mihomo-root/arm64-v8a/mihomo' in selected
-              manifest = {}
-              for name in selected:
-                  raw = archive.read(name)
-                  destination = Path('android-app/app/src/main') / (name.replace('lib/', 'jniLibs/', 1) if name.startswith('lib/') else name)
-                  destination.parent.mkdir(parents=True, exist_ok=True)
-                  destination.write_bytes(raw)
-                  manifest[name] = hashlib.sha256(raw).hexdigest()
-          Path('baseline-core-sha256.json').write_text(json.dumps(manifest, indent=2))
-          print('Reused exact test.92 entries:', len(manifest))
-      - name: Compile, assemble and run rendered UI tests
-        working-directory: android-app
-        run: gradle --no-daemon --max-workers=2 :app:assembleDebug :app:testDebugUnitTest --tests 'io.github.xgl34222220.hetu.CompactHomeDashboardTest' --stacktrace
-      - name: Verify actual APK identity, signature and protected binary contents
-        shell: bash
-        run: |
-          set -euo pipefail
-          APK=android-app/app/build/outputs/apk/debug/app-debug.apk
-          "$ANDROID_HOME/build-tools/37.0.0/aapt" dump badging "$APK" > apk-identity.txt
-          grep -q "versionCode='1001'" apk-identity.txt
-          grep -q "versionName='0.4.0-test.92-ui.1-preview'" apk-identity.txt
-          grep -q "name='io.github.xgl34222220.hetu.preview'" apk-identity.txt
-          "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --verbose --print-certs "$APK" > apk-signature.txt
-          python3 - <<'PY'
-          import hashlib,json,zipfile
-          from pathlib import Path
-          expected=json.loads(Path('baseline-core-sha256.json').read_text())
-          apk=Path('android-app/app/build/outputs/apk/debug/app-debug.apk')
-          with zipfile.ZipFile(apk) as z:
-              assert z.testzip() is None
-              for name,digest in expected.items():
-                  assert hashlib.sha256(z.read(name)).hexdigest()==digest, name
-          Path('apk-sha256.txt').write_text(hashlib.sha256(apk.read_bytes()).hexdigest()+'  Hetu-test92-ui1-preview.apk\n')
-          print('All protected binary entries are byte-for-byte identical to approved test.92')
-          PY
-      - name: Commit validated presentation adapter to main without rewriting history
-        if: github.ref == 'refs/heads/main'
-        run: |
-          set -euo pipefail
-          git fetch origin main
-          test "$(git rev-parse origin/main)" = "${{ github.sha }}"
-          git add android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt android-app/app/build.gradle.kts
-          if ! git diff --cached --quiet; then
-            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'feat(ui): connect validated compact home to test.92 main [skip ci]'
-            git push origin HEAD:main
-          fi
-          git rev-parse HEAD > validated-source-commit.txt
-      - name: Package actual source tree and verification records
-        if: always()
-        shell: python
-        run: |
-          from pathlib import Path
-          import subprocess, zipfile
-          files=subprocess.check_output(['git','ls-files']).decode().splitlines()
-          with zipfile.ZipFile('Hetu-test92-ui1-source.zip','w',zipfile.ZIP_DEFLATED) as z:
-              for name in files:
-                  p=Path(name)
-                  if p.is_file(): z.write(p, 'hetu-test92-ui1/'+name)
-              for name in ('compact-home-validation.json','baseline-core-sha256.json','apk-identity.txt','apk-signature.txt','apk-sha256.txt','validated-source-commit.txt'):
-                  if Path(name).exists(): z.write(name,'verification/'+name)
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: Hetu-test92-ui1-source-and-reports
-          path: |
-            Hetu-test92-ui1-source.zip
-            android-app/app/build/reports/tests/testDebugUnitTest/
-            android-app/app/build/test-results/testDebugUnitTest/
-            android-app/app/build/outputs/compact-home/
-          if-no-files-found: error
-          retention-days: 14
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Hetu-test92-ui1-preview
-          path: android-app/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-          retention-days: 14
+          echo '::error::This test.92-only workflow is retired. Run UI92 + original146 integration (ui92-runtime146-build.yml). No source or APK was modified.'
+          exit 1
