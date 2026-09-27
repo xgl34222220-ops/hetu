@@ -27,6 +27,8 @@ internal data class ProxyNodeUi(
     val type: String = "",
     val udp: Boolean = false,
     val lastDelay: Long? = null,
+    val provider: String = "",
+    val lastDelayAt: Long = 0L,
 )
 
 internal data class ProxyGroupUi(
@@ -36,6 +38,7 @@ internal data class ProxyGroupUi(
     val nodes: List<ProxyNodeUi>,
     val iconUrl: String = "",
     val iconPath: String = "",
+    val hidden: Boolean = false,
 )
 
 internal data class ProxyConnectionUi(
@@ -106,6 +109,7 @@ internal data class ProxyComposeState(
     val dnsListenerReady: Boolean = false,
     val watchdog: Boolean = false,
     val dataPlaneHealthy: Boolean = false,
+    val trafficMode: String = "",
 )
 
 internal class ProxyComposeController(context: Context) {
@@ -114,9 +118,20 @@ internal class ProxyComposeController(context: Context) {
     private val root = RootProxyManager(app)
     private val configs = ProxyConfigLibrary(app)
     private val api = MihomoControllerClient(app)
-    private val icons = ProxyIconStore(app)
+    private val icons = ProxyGroupIconRepository.get(app)
     private val appIconCache = android.util.LruCache<String, Bitmap>(96)
     private val appIdentityCache = android.util.LruCache<String, AppIdentity>(192)
+
+    private fun userSafeRuntimeMessage(raw: String?): String {
+        val text = raw.orEmpty().trim()
+        if (text.isBlank()) return "运行状态暂时无法确认"
+        if (text.contains("/data/adb/hetu/") || text.contains("hetu-root.sh[")) {
+            return "Root 运行状态暂时无法确认，请稍后自动重试"
+        }
+        return DiagnosticReport.redact(text, prefs.getString("proxyControllerSecret", ""))
+            .replace(Regex("""/data/adb/hetu/\S+"""), "Root 运行组件")
+            .take(180)
+    }
 
     suspend fun state(): ProxyComposeState = withContext(Dispatchers.IO) {
         val profile = ProxyRuntimeProfile.load(prefs)
@@ -127,8 +142,15 @@ internal class ProxyComposeController(context: Context) {
 
         val fastRunning = ProxyStatusBridge.rootProxyRunning(app)
         val nowElapsed = android.os.SystemClock.elapsedRealtime()
+        val lastStartupAt = prefs.getLong("proxyRootLastStartupAt", 0L)
+        val sinceStartup = System.currentTimeMillis() - lastStartupAt
+        val startupGrace = fastRunning && lastStartupAt > 0L && sinceStartup in 0..8_000L
         val lastHealth = prefs.getLong("proxyRootHealthProbeElapsed", 0L)
-        val shouldProbeHealth = !fastRunning || nowElapsed - lastHealth >= 10_000L
+        val probeInterval = if (startupGrace) 1_000L else 10_000L
+        // elapsedRealtime resets on reboot; a persisted timestamp from the previous
+        // boot must never suppress the first real status verification.
+        val shouldProbeHealth = !fastRunning || lastHealth <= 0L || nowElapsed < lastHealth ||
+            nowElapsed - lastHealth >= probeInterval
         val status = if (shouldProbeHealth) {
             try {
                 root.status().also { live ->
@@ -152,7 +174,7 @@ internal class ProxyComposeController(context: Context) {
                 if (fastRunning) JSONObject()
                     .put("running", true)
                     .put("healthProbeFailed", true)
-                    .put("message", "运行状态暂时无法确认：${error.message ?: "请稍后重试"}")
+                    .put("message", userSafeRuntimeMessage(error.message))
                     .put("runtimeSchema", prefs.getInt("proxyRootRuntimeSchema", 0))
                     .put("ipv4Rules", prefs.getBoolean("proxyRootIpv4Rules", false))
                     .put("ipv6Rules", prefs.getBoolean("proxyRootIpv6Rules", false))
@@ -165,7 +187,7 @@ internal class ProxyComposeController(context: Context) {
                     .put("dnsListenerReady", prefs.getBoolean("proxyRootDnsListenerReady", false))
                     .put("watchdog", prefs.getBoolean("proxyRootWatchdog", false))
                     .put("dataPlaneHealthy", prefs.getBoolean("proxyRootDataPlaneHealthy", false))
-                else JSONObject().put("running", false).put("message", error.message ?: "状态读取失败")
+                else JSONObject().put("running", false).put("message", userSafeRuntimeMessage(error.message))
             }
         } else {
             JSONObject()
@@ -191,10 +213,12 @@ internal class ProxyComposeController(context: Context) {
         var down = 0L
         var up = 0L
         var memory = 0L
+        var trafficMode = ""
 
         if (running) {
+            try { trafficMode = api.configs().optString("mode", "") } catch (_: Exception) { }
             try {
-                groups = parseGroups(api.proxies(), iconMap)
+                groups = parseGroups(mergeProxySnapshots(api.proxies(), api.proxyProviders()), iconMap)
                 panelReady = true
             } catch (_: Exception) { }
             try {
@@ -217,15 +241,16 @@ internal class ProxyComposeController(context: Context) {
             ipv6ProtectionActive = running && !status.optBoolean("healthProbeFailed", false) &&
                 if (status.optString("ipv6Mode", "") == "strict") status.optBoolean("ipv6Rules", false)
                 else status.optBoolean("ipv6DisableGuard", false),
-            runtimeSettingsPending = ProxyRuntimeSettings.pending(running, ProxyRuntimeSettings.signature(prefs), prefs.getString("proxyRootAppliedSettings", "")),
+            runtimeSettingsPending = ProxyRuntimeSettings.pending(running, prefs),
             autoOverwrite = profile.autoOverwrite,
             config = selected?.name ?: "尚未选择配置",
             message = when {
                 !running -> listOf(
-                    status.optString("message", ""),
+                    userSafeRuntimeMessage(status.optString("message", "")),
                     prefs.getString("proxyAutoRecoveryError", "").orEmpty(),
                 ).filter { it.isNotBlank() }.distinct().joinToString("；")
-                status.optBoolean("healthProbeFailed", false) -> status.optString("message", "运行状态暂时无法确认")
+                startupGrace && (status.optBoolean("healthProbeFailed", false) || !status.optBoolean("dataPlaneHealthy", false)) -> ""
+                status.optBoolean("healthProbeFailed", false) -> userSafeRuntimeMessage(status.optString("message", ""))
                 !status.optBoolean("dataPlaneHealthy", false) ->
                     "核心仍在运行，但透明代理/DNS 数据面健康检查未完整通过"
                 else -> ""
@@ -250,6 +275,7 @@ internal class ProxyComposeController(context: Context) {
             dnsListenerReady = status.optBoolean("dnsListenerReady", false),
             watchdog = status.optBoolean("watchdog", false),
             dataPlaneHealthy = !status.optBoolean("healthProbeFailed", false) && status.optBoolean("dataPlaneHealthy", false),
+            trafficMode = trafficMode,
         )
     }
 
@@ -279,6 +305,8 @@ internal class ProxyComposeController(context: Context) {
         if (!configs.hasConfiguredSubscription(selected)) {
             error("当前是河图内置占位配置，尚未填写真实订阅。请打开「面板 → 订阅」添加订阅，或导入一份完整可运行的 YAML 配置。")
         }
+        onProgress("执行服务启动前脚本…")
+        ProxyScriptHooks.run(app, "pre-start", profile.mode.id, selected.name)
         root.startManual(profile) { onProgress(it) }
     }
 
@@ -289,20 +317,26 @@ internal class ProxyComposeController(context: Context) {
     suspend fun restart(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
         LegacyAppMigrator.migrateIfNeeded(app)
         val profile = ProxyRuntimeProfile.load(prefs)
+        val selected = configs.selected(profile.core)
+        onProgress("执行服务启动前脚本…")
+        ProxyScriptHooks.run(app, "pre-start", profile.mode.id, selected?.name ?: "")
         val result = root.replaceRunningManually(profile, onProgress)
-        prefs.edit()
-            .remove("proxyRootRuntimeRefreshPending")
-            .remove("proxyRootUpgradeError")
-            .apply()
+        val replaced = result.optBoolean("ok", false) && !result.optBoolean("cancelled", false) && !result.optBoolean("alreadyRunning", false)
+        check(replaced) { "重启未完成，请等待当前操作结束后重试" }
+        check(ProxyRuntimeSettings.acknowledgeApplied(prefs, replaced)) { "重启已完成，但应用状态未能保存" }
         result
     }
 
     suspend fun stop(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
+        val profile = ProxyRuntimeProfile.load(prefs)
+        val selected = configs.selected(profile.core)
         val result = root.stop { onProgress(it) }
+        onProgress("执行服务停止后脚本…")
+        ProxyScriptHooks.run(app, "post-stop", profile.mode.id, selected?.name ?: "")
         result
     }
     suspend fun select(group: String, node: String) = withContext(Dispatchers.IO) { api.select(group, node) }
-    suspend fun delay(node: String): Long = withContext(Dispatchers.IO) { api.delay(node) }
+    suspend fun delay(node: String): Long = ProxyDashboardRepository(app).delay(node)
     suspend fun closeAll() = withContext(Dispatchers.IO) { api.closeAll() }
     suspend fun closeConnection(id: String) = withContext(Dispatchers.IO) { api.closeConnection(id) }
     suspend fun diagnostics(): String = withContext(Dispatchers.IO) { root.diagnostics() }
@@ -320,82 +354,9 @@ internal class ProxyComposeController(context: Context) {
         api.updateRuleProvider(name)
     }
 
-    /** Prefer Mihomo's native group URLTest, then fill only uncovered leaf nodes individually. */
-    suspend fun globalDelay(): Map<String, Long> = withContext(Dispatchers.IO) {
-        val raw = api.proxies()
-        val leaves = LinkedHashSet<String>()
-        val iterator = raw.keys()
-        while (iterator.hasNext()) {
-            val name = iterator.next()
-            if (name == "GLOBAL") continue
-            val item = raw.optJSONObject(name) ?: continue
-            if (item.optJSONArray("all") != null) continue
-            val type = item.optString("type", "").lowercase(Locale.ROOT)
-            if (type in setOf("direct", "reject", "rejectdrop", "pass", "compatible")) continue
-            leaves += name
-        }
+    /** Share provider routing and failure semantics with the native strategy panel. */
+    suspend fun globalDelay(): Map<String, Long> = ProxyDashboardRepository(app).globalDelay()
 
-        val result = LinkedHashMap<String, Long>()
-        val pending = LinkedHashSet(leaves)
-        val testedGroups = HashSet<String>()
-
-        while (pending.size > 1) {
-            var bestGroup: String? = null
-            var bestCoverage = 0
-            val groups = raw.keys()
-            while (groups.hasNext()) {
-                val groupName = groups.next()
-                if (groupName in testedGroups) continue
-                val all = raw.optJSONObject(groupName)?.optJSONArray("all") ?: continue
-                var coverage = 0
-                for (i in 0 until all.length()) if (all.optString(i) in pending) coverage++
-                if (coverage > bestCoverage) {
-                    bestCoverage = coverage
-                    bestGroup = groupName
-                }
-            }
-            if (bestGroup == null || bestCoverage < 2) break
-            testedGroups += bestGroup
-            val before = pending.size
-            try {
-                val measured = api.groupDelay(bestGroup)
-                val names = measured.keys()
-                while (names.hasNext()) {
-                    val name = names.next()
-                    val value = measured.optLong(name, -1L)
-                    if (value > 0L && name in leaves) {
-                        result[name] = value
-                        pending.remove(name)
-                    }
-                }
-            } catch (cancel: CancellationException) {
-                throw cancel
-            } catch (_: Exception) { }
-            if (pending.size == before && testedGroups.size > 6) break
-        }
-
-        for (chunk in pending.toList().chunked(3)) {
-            val part = coroutineScope {
-                chunk.map { node ->
-                    async {
-                        val value = try {
-                            api.delay(node)
-                        } catch (cancel: CancellationException) {
-                            throw cancel
-                        } catch (_: Exception) {
-                            -1L
-                        }
-                        node to value
-                    }
-                }.awaitAll()
-            }
-            for ((name, value) in part) result[name] = value
-        }
-        for (name in leaves) if (name !in result) result[name] = -1L
-        result
-    }
-
-    /** Cache config-declared group icons; ordinary refresh only downloads files that are absent. */
     suspend fun ensureIcons(): Int = withContext(Dispatchers.IO) {
         val profile = ProxyRuntimeProfile.load(prefs)
         val entry = configs.selected(profile.core) ?: return@withContext 0
@@ -405,9 +366,9 @@ internal class ProxyComposeController(context: Context) {
             val part = coroutineScope {
                 chunk.map { url ->
                     async {
-                        if (icons.cached(url) != null) return@async false
+                        if (icons.peek(url) != null) return@async false
                         try {
-                            icons.fetchMissing(url) != null
+                            icons.load(url, icons.diskPath(url)) is GroupIconLoad.Ready
                         } catch (cancel: CancellationException) {
                             throw cancel
                         } catch (_: Exception) {
@@ -519,7 +480,7 @@ internal class ProxyComposeController(context: Context) {
         configs.write(entry, text)
     }
 
-    private fun parseGroups(root: JSONObject, iconMap: Map<String, String>): List<ProxyGroupUi> {
+    internal fun parseGroups(root: JSONObject, iconMap: Map<String, String>): List<ProxyGroupUi> {
         val result = ArrayList<ProxyGroupUi>()
         val iterator = root.keys()
         while (iterator.hasNext()) {
@@ -532,19 +493,16 @@ internal class ProxyComposeController(context: Context) {
                 val node = all.optString(i)
                 if (node.isBlank()) continue
                 val nodeInfo = root.optJSONObject(node)
-                val history = nodeInfo?.optJSONArray("history")
-                var lastDelay: Long? = null
-                if (history != null) {
-                    for (historyIndex in history.length() - 1 downTo 0) {
-                        val value = history.optJSONObject(historyIndex)?.optLong("delay", -1L) ?: -1L
-                        if (value > 0L) { lastDelay = value; break }
-                    }
-                }
+                val preferredUrl = if (prefs.getBoolean("proxyCustomDelayUrlEnabled", false))
+                    prefs.getString("proxyCustomDelayUrl", "").orEmpty() else ""
+                val sample = resolvedCoreLatency(root, node, preferredUrl)
                 nodes += ProxyNodeUi(
                     name = node,
                     type = nodeInfo?.optString("type", "") ?: "",
                     udp = nodeInfo?.optBoolean("udp", false) ?: false,
-                    lastDelay = lastDelay,
+                    lastDelay = sample?.delay,
+                    lastDelayAt = sample?.timestamp ?: 0L,
+                    provider = nodeInfo?.optString("provider-name").orEmpty(),
                 )
             }
             val iconUrl = iconMap[name].orEmpty()
@@ -554,10 +512,14 @@ internal class ProxyComposeController(context: Context) {
                 now = group.optString("now", "未选择"),
                 nodes = nodes,
                 iconUrl = iconUrl,
-                iconPath = icons.cached(iconUrl)?.absolutePath.orEmpty(),
+                iconPath = icons.diskPath(iconUrl),
+                hidden = group.optBoolean("hidden", false),
             )
         }
-        return result.sortedBy { it.name.lowercase(Locale.ROOT) }
+        // GLOBAL.all carries configuration order; JSON object key order does not.
+        val order = root.optJSONObject("GLOBAL")?.optJSONArray("all")
+        val positions = (0 until (order?.length() ?: 0)).associate { order!!.optString(it) to it }
+        return result.sortedBy { positions[it.name] ?: Int.MAX_VALUE }
     }
 
     private fun parseConnections(root: JSONObject, socketUids: Map<String, Int> = emptyMap()): List<ProxyConnectionUi> {
@@ -727,26 +689,15 @@ internal class ProxyComposeController(context: Context) {
         return out.sortedBy { it.name.lowercase(Locale.ROOT) }
     }
 
+    private var lastIconSource: String? = null
+    private var lastIconMap: Map<String, String> = emptyMap()
+    @Synchronized
     private fun parseGroupIcons(text: String): Map<String, String> {
-        val out = LinkedHashMap<String, String>()
-        var inGroups = false
-        var name: String? = null
-        for (raw in text.replace("\r\n", "\n").replace('\r', '\n').lines()) {
-            val trimmed = raw.trim()
-            val indent = raw.indexOfFirst { !it.isWhitespace() }.let { if (it < 0) raw.length else it }
-            if (!inGroups) {
-                if (indent == 0 && trimmed.startsWith("proxy-groups:")) inGroups = true
-                continue
-            }
-            if (trimmed.isEmpty() || trimmed.startsWith("#")) continue
-            if (indent == 0) break
-            if (trimmed.startsWith("- name:")) name = yamlScalar(trimmed.substringAfter("- name:"))
-            else if (name != null && trimmed.startsWith("icon:")) {
-                val value = yamlScalar(trimmed.substringAfter("icon:"))
-                if (value.startsWith("https://")) out[name] = value
-            }
-        }
-        return out
+        if (lastIconSource == text) return lastIconMap
+        val parsed = ProxyGroupIcons.parse(text)
+        lastIconMap = parsed
+        lastIconSource = text
+        return parsed
     }
 
     private fun yamlScalar(value: String): String {
@@ -764,66 +715,4 @@ internal class ProxyComposeController(context: Context) {
         if (out.length >= 2 && ((out.first() == '\'' && out.last() == '\'') || (out.first() == '"' && out.last() == '"'))) out = out.substring(1, out.length - 1)
         return out.replace("''", "'")
     }
-}
-
-private class ProxyIconStore(context: Context) {
-    private val dir = File(context.cacheDir, "proxy/group-icons").apply { mkdirs() }
-
-    fun cached(url: String): File? {
-        if (!url.startsWith("https://")) return null
-        val file = File(dir, key(url) + ".img")
-        return file.takeIf { it.isFile && it.length() in 1..MAX_BYTES && BitmapFactory.decodeFile(it.absolutePath) != null }
-    }
-
-    fun fetchMissing(url: String): File? {
-        if (!url.startsWith("https://")) return null
-        val target = File(dir, key(url) + ".img")
-        cached(url)?.let { return it }
-        val tmp = File(dir, target.name + ".new")
-        val connection = (URL(url).openConnection() as? HttpsURLConnection) ?: return null
-        connection.connectTimeout = 5_000
-        connection.readTimeout = 7_000
-        connection.instanceFollowRedirects = true
-        connection.setRequestProperty("User-Agent", "Hetu/Android")
-        try {
-            connection.connect()
-            if (connection.responseCode !in 200..299) return cached(url)
-            val declared = connection.contentLengthLong
-            if (declared > MAX_BYTES) return cached(url)
-            connection.inputStream.use { input ->
-                FileOutputStream(tmp, false).use { output ->
-                    val buffer = ByteArray(16 * 1024)
-                    var total = 0L
-                    while (true) {
-                        val n = input.read(buffer)
-                        if (n < 0) break
-                        total += n
-                        if (total > MAX_BYTES) throw IOException("图标文件过大")
-                        output.write(buffer, 0, n)
-                    }
-                    output.fd.sync()
-                }
-            }
-            if (BitmapFactory.decodeFile(tmp.absolutePath) == null) throw IOException("图标格式无效")
-            if (target.exists()) target.delete()
-            if (!tmp.renameTo(target)) {
-                tmp.copyTo(target, overwrite = true)
-                tmp.delete()
-            }
-            return target
-        } catch (cancel: CancellationException) {
-            tmp.delete(); throw cancel
-        } catch (_: Exception) {
-            tmp.delete(); return cached(url)
-        } finally {
-            connection.disconnect()
-        }
-    }
-
-    private fun key(url: String): String {
-        val digest = MessageDigest.getInstance("SHA-256").digest(url.toByteArray(Charsets.UTF_8))
-        return digest.joinToString("") { "%02x".format(it) }
-    }
-
-    private companion object { const val MAX_BYTES = 1_572_864L }
 }

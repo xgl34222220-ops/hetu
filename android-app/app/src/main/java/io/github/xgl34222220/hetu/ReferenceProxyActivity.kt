@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu
 
+import io.github.xgl34222220.hetu.ui.*
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.os.Bundle
@@ -110,18 +111,29 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 class ReferenceProxyActivity : ComponentActivity() {
     private var resumeRevision by mutableIntStateOf(0)
+    private var requestedStartPage by mutableStateOf<String?>(null)
+    private var startPageRevision by mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        requestedStartPage = intent?.getStringExtra(EXTRA_START_PAGE)
         enableEdgeToEdge()
         setContent {
             // Re-read theme preferences on resume without destroying the Compose tree.
             // The previous forced wrapper recreated RefProxyShell and briefly exposed
             // default/empty runtime state before the async refresh completed.
             val revision = resumeRevision
-            HetuTheme { RefProxyShell(resumeRevision = revision) { finish() } }
+            HetuTheme { RefProxyShell(resumeRevision = revision, requestedStartPage = requestedStartPage, startPageRevision = startPageRevision) { finish() } }
         }
     }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        requestedStartPage = intent.getStringExtra(EXTRA_START_PAGE)
+        startPageRevision++
+    }
+    companion object { const val EXTRA_START_PAGE = "io.github.xgl34222220.hetu.START_PAGE" }
 
     override fun onResume() {
         super.onResume()
@@ -131,14 +143,15 @@ class ReferenceProxyActivity : ComponentActivity() {
 
 private enum class RefProxyPage { Home, Panel, Tools, Settings }
 private data class RefSubscriptionCache(val used: Long = 0L, val total: Long = 0L, val count: Int = 0)
-private enum class RefPanelTab(val label: String) {
+internal enum class RefPanelTab(val label: String) {
     Groups("节点"), Overview("概览"), Subscriptions("订阅"), Connections("连接"), Rules("规则"), RuleSets("规则集")
 }
 
 @Composable
-private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
+private fun RefProxyShell(resumeRevision: Int, requestedStartPage: String?, startPageRevision: Int, onBack: () -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(resumeRevision) { ProxyStatusNotificationService.refresh(context) }
     val controller = remember { ProxyComposeController(context) }
     val repo = remember { ProxyDashboardRepository(context) }
     val inspector = remember { ProxyRuntimeInspector(context) }
@@ -169,6 +182,18 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
     var panelTab by rememberSaveable { mutableStateOf(RefPanelTab.Groups) }
     var panelSearchRequest by rememberSaveable { mutableIntStateOf(0) }
     var panelDetailVisible by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(startPageRevision) {
+        when (requestedStartPage?.lowercase()) {
+            "settings" -> page = RefProxyPage.Settings
+            "tools" -> page = RefProxyPage.Tools
+            "panel", "strategy" -> { page = RefProxyPage.Panel; panelTab = RefPanelTab.Groups }
+            "home" -> page = RefProxyPage.Home
+            else -> if (prefs.getBoolean("startOnPanel", false)) {
+                page = RefProxyPage.Panel
+                panelTab = runCatching { RefPanelTab.valueOf(prefs.getString("defaultPanelTab", "Groups").orEmpty()) }.getOrDefault(RefPanelTab.Groups)
+            }
+        }
+    }
     val pageStateHolder = rememberSaveableStateHolder()
     BackHandler(enabled = page != RefProxyPage.Home && !panelDetailVisible) { page = RefProxyPage.Home }
     var state by remember {
@@ -193,6 +218,8 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
         wanAddress = if (cachedWanViaCore) prefs.getString("proxyUiLastWan", "—") ?: "—" else "—",
         wanCountryCode = if (cachedWanViaCore) prefs.getString("proxyUiLastWanCountry", "") ?: "" else "",
         wanRegion = if (cachedWanViaCore) prefs.getString("proxyUiLastWanRegion", "—") ?: "—" else "—",
+        wanState = if (cachedWanViaCore) "stale" else "idle",
+        wanCheckedAt = if (cachedWanViaCore) prefs.getLong("proxyUiLastWanCheckedAt", 0L) else 0L,
     )) }
     var providers by remember { mutableStateOf<List<DashboardProviderUi>>(emptyList()) }
     var cachedSubscription by remember { mutableStateOf(RefSubscriptionCache(
@@ -203,12 +230,9 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
     var cachedConnectionCount by remember { mutableIntStateOf(prefs.getInt("proxyUiLastConnectionCount", 0)) }
     var lastProviderRefreshAt by remember { mutableLongStateOf(0L) }
     val coldStartAt = remember { SystemClock.elapsedRealtime() }
-    var siteDelays by remember { mutableStateOf(mapOf(
-        "Baidu" to prefs.getLong("proxyUiLastDelayBaidu", -2L),
-        "Cloudflare" to prefs.getLong("proxyUiLastDelayCloudflare", -2L),
-        "Google" to prefs.getLong("proxyUiLastDelayGoogle", -2L),
-    ).filterValues { it != -2L }) }
+    var siteDelays by remember { mutableStateOf(ProxyLatencyTargets.lastResults(prefs)) }
     val delays = remember { mutableStateMapOf<String, Long>() }
+    val latencyMeasuredAt = remember { mutableMapOf<String, Long>() }
     var cpuPercent by remember { mutableFloatStateOf(prefs.getFloat("proxyUiLastCpu", 0f)) }
     var lastProcessTicks by remember { mutableLongStateOf(0L) }
     var lastSystemTicks by remember { mutableLongStateOf(0L) }
@@ -228,6 +252,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
 
     suspend fun refresh() {
         try {
+            val snapshotStartedAt = SystemClock.elapsedRealtime()
             val next = repo.state()
             val now = SystemClock.elapsedRealtime()
             val transientColdGap = state.running && !next.running &&
@@ -241,9 +266,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                 upRate = ((next.uploadTotal - lastUp) * 1000L / elapsed).coerceAtLeast(0L)
                 downRate = ((next.downloadTotal - lastDown) * 1000L / elapsed).coerceAtLeast(0L)
             }
-            next.groups.flatMap { it.nodes }.forEach { node ->
-                node.lastDelay?.takeIf { it > 0L }?.let { delays.putIfAbsent(node.name, it) }
-            }
+            syncCoreLatencyResults(next.groups, delays, latencyMeasuredAt, snapshotStartedAt)
             val sampled = if (next.running) runCatching { inspector.sample() }.getOrDefault(runtime) else ProxyRuntimeSnapshot()
             if (next.running && lastSystemTicks > 0L && sampled.systemTicks > lastSystemTicks && sampled.processTicks >= lastProcessTicks) {
                 val deltaProcess = sampled.processTicks - lastProcessTicks
@@ -278,6 +301,9 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                     memoryBytes = if (state.memoryBytes > 0L) state.memoryBytes else next.memoryBytes,
                 )
             } else next
+            // A previous/transient start exception must not keep an error sheet alive
+            // after the authoritative runtime state has already converged to running.
+            if (next.running) startupError = null
             prefs.edit()
                 .putBoolean("proxyUiLastRunning", next.running)
                 .putString("proxyUiLastCore", next.core)
@@ -290,7 +316,8 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                 .putString("proxyUiLastWan", sampled.wanAddress)
                 .putString("proxyUiLastWanCountry", sampled.wanCountryCode)
                 .putString("proxyUiLastWanRegion", sampled.wanRegion)
-                .putBoolean("proxyUiLastWanViaCore", true)
+                .putBoolean("proxyUiLastWanViaCore", sampled.wanState == "success" || sampled.wanState == "stale")
+                .putLong("proxyUiLastWanCheckedAt", sampled.wanCheckedAt)
                 .putFloat("proxyUiLastCpu", cpuPercent)
                 .putLong("proxyUiLastUpRate", upRate)
                 .putLong("proxyUiLastDownRate", downRate)
@@ -305,12 +332,27 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                 lastAt = now
                 lastUp = next.uploadTotal
                 lastDown = next.downloadTotal
+                ProxyApiHistoryStore.record(context, upRate, downRate, next.connections)
             }
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (error: Exception) {
             message = error.message ?: "状态读取失败"
         }
+    }
+
+    suspend fun settleStartFailure(): ProxyComposeState? {
+        // A concurrent boot/network recovery can win immediately after a manual start
+        // attempt reports an exception. Do not flash a stale failure sheet while the
+        // same runtime is still converging. Confirm the authoritative Root state at
+        // points that span the normal ~2-3s shell startup transaction.
+        val waits = longArrayOf(350L, 1_050L, 1_800L)
+        for (waitMs in waits) {
+            delay(waitMs)
+            val confirmed = runCatching { controller.state() }.getOrNull()
+            if (confirmed?.running == true) return confirmed
+        }
+        return null
     }
 
     fun toggle() {
@@ -325,14 +367,30 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                 throw cancel
             } catch (error: Exception) {
                 val reason = error.message ?: "操作失败"
-                message = reason
-                if (!state.running) {
-                    val diagnostics = runCatching { controller.diagnostics() }.getOrDefault("").trim()
-                    startupError = buildString {
-                        append(reason)
-                        if (diagnostics.isNotBlank()) {
-                            append("\n\n--- Root / Mihomo 诊断 ---\n")
-                            append(diagnostics)
+                val whitelistSelectionError = reason.contains("仅所选应用代理")
+                operation = "确认最终运行状态…"
+                val recovered = settleStartFailure()
+                if (recovered != null) {
+                    state = recovered
+                    message = recovered.message
+                    startupError = null
+                } else {
+                    message = reason
+                    if (!state.running) {
+                        if (whitelistSelectionError) {
+                            startupError =
+                                "当前使用“仅所选应用代理”，但没有可用的已选应用。\n\n" +
+                                    "请打开「工具 → 应用管理」，至少勾选一个已安装的普通应用；" +
+                                    "或者把应用范围改为“核心配置 / 所选应用直连”后再启动。"
+                        } else {
+                            val diagnostics = runCatching { controller.diagnostics() }.getOrDefault("").trim()
+                            startupError = buildString {
+                                append(reason)
+                                if (diagnostics.isNotBlank()) {
+                                    append("\n\n--- Root / Mihomo 诊断 ---\n")
+                                    append(diagnostics)
+                                }
+                            }
                         }
                     }
                 }
@@ -364,14 +422,24 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
         if (!state.running || operation.isNotBlank()) return
         scope.launch {
             operation = "正在重启…"
+            ProxyRuntimeSettings.beginApply(prefs)
             try {
                 controller.restart { operation = it }
+                prefs.edit().remove("proxyRootRuntimeRefreshPending").remove("proxyRootUpgradeError").apply()
+                state = state.copy(runtimeSettingsPending = false, message = "")
+                message = ""
                 operation = ""
-                launch { delay(120); refresh() }
+                launch {
+                    delay(350)
+                    refresh()
+                    delay(1_100)
+                    refresh()
+                }
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                message = error.message ?: "重启失败"
+                ProxyRuntimeSettings.recordFailure(prefs, error)
+                message = UiFeedback.summary(error.message ?: "重启失败", true)
             } finally {
                 operation = ""
             }
@@ -385,11 +453,7 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
             val measured = repo.siteLatencies()
             if (measured.isNotEmpty()) {
                 siteDelays = measured
-                prefs.edit()
-                    .putLong("proxyUiLastDelayBaidu", measured["Baidu"] ?: -2L)
-                    .putLong("proxyUiLastDelayCloudflare", measured["Cloudflare"] ?: -2L)
-                    .putLong("proxyUiLastDelayGoogle", measured["Google"] ?: -2L)
-                    .apply()
+                ProxyLatencyTargets.persistLast(prefs, measured)
             }
             if (reportError && measured.values.none { it > 0L }) {
                 message = "关键站点测速失败，请检查当前网络"
@@ -428,15 +492,14 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                 catch (_: Exception) { emptyList() }
             }
             val quick = quickTask.await()
-            if (quick.isNotEmpty()) delays.putAll(quick)
+            if (quick.isNotEmpty()) {
+                quick.keys.forEach { latencyMeasuredAt[it] = SystemClock.elapsedRealtime() }
+                delays.putAll(quick)
+            }
             val sites = siteTask.await()
             if (sites.isNotEmpty()) {
                 siteDelays = sites
-                prefs.edit()
-                    .putLong("proxyUiLastDelayBaidu", sites["Baidu"] ?: -2L)
-                    .putLong("proxyUiLastDelayCloudflare", sites["Cloudflare"] ?: -2L)
-                    .putLong("proxyUiLastDelayGoogle", sites["Google"] ?: -2L)
-                    .apply()
+                ProxyLatencyTargets.persistLast(prefs, sites)
             }
             val freshProviders = providerTask.await()
             if (freshProviders.isNotEmpty()) {
@@ -462,14 +525,18 @@ private fun RefProxyShell(resumeRevision: Int, onBack: () -> Unit) {
                 catch (cancel: CancellationException) { throw cancel }
                 catch (_: Exception) { }
             }
-            // Paint the persisted snapshot before issuing Root/controller queries.
-            delay(320)
+            // The persisted snapshot is already painted synchronously above.
+            // Start live reconciliation immediately so returning to Hetu never sits on
+            // a stale "waiting/stopped" card until the first polling interval.
             while (true) {
                 if (operation.isBlank()) refresh()
                 delay(3000)
             }
         }
     }
+
+    // Rendering/returning to a page must never restart or redeploy a running core.
+    // Pending runtime upgrades are surfaced by the existing manual restart action.
 
     // Auto site probes are opt-in. The default is off; manual refresh remains available.
     // This prevents Hetu itself from constantly adding probe traffic to Mihomo.
@@ -700,7 +767,7 @@ private fun RefHome(
             testing = testing, uptimeSeconds = runtime.elapsedSeconds,
             core = state.core, mode = state.mode, config = state.config,
             message = operation.ifBlank { message }, pendingSettings = state.runtimeSettingsPending,
-            delays = siteDelays, wan = runtime.wanAddress, lan = runtime.lanAddress,
+            delays = siteDelays, latencyTargets = ProxyLatencyTargets.load(context).map { it.name }, wan = runtime.wanAddress, lan = runtime.lanAddress,
             countryCode = runtime.wanCountryCode, region = runtime.wanRegion, lanInterface = runtime.lanInterface,
             up = upRate, down = downRate, used = used, total = total,
             memory = runtime.rssBytes.takeIf { it > 0L } ?: state.memoryBytes,
@@ -708,7 +775,7 @@ private fun RefHome(
             diagnosticLoading = diagnosticLoading,
         ),
         onRefresh = onRefresh, onToggle = onToggle, onReload = onReload, onRestart = onRestart,
-        onDelay = onDelay, onWebUi = { webUiOpen = true }, onLog = onLog,
+        onDelay = onDelay, onWebUi = { HetuWebPanels.openSelected(context) }, onLog = onLog,
         onSubscription = onSubscription, onConnections = onConnections, onSettings = onSettings,
         onDiagnostics = onDiagnostics,
         onAdblock = { context.startActivity(Intent(context, ProxyAdblockChainActivity::class.java)) },
@@ -843,7 +910,7 @@ private fun RefSubscriptionCard(items: List<DashboardProviderUi>) {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalHazeMaterialsApi::class)
 @Composable
-private fun RefPanel(
+internal fun RefPanel(
     state: ProxyComposeState,
     repo: ProxyDashboardRepository,
     delays: MutableMap<String, Long>,
@@ -1286,7 +1353,7 @@ private fun RefPanel(
                                             view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                                             scope.launch {
                                                 try {
-                                                    repo.select(group.name, node)
+                                                    repo.select(group.name, node, context.getSharedPreferences("hetu", 0).getBoolean("proxySelectorDisconnectOnSelect", false))
                                                     onRefreshState()
                                                 } catch (_: Exception) {
                                                     if (previous.isBlank()) selectedLocal.remove(group.name) else selectedLocal[group.name] = previous
@@ -2524,7 +2591,7 @@ private fun RefLeafNodeCard(node: ProxyNodeUi, delay: Long?, modifier: Modifier,
     }
 }
 
-private fun refScenarioIcon(name: String, type: String): ImageVector = when {
+internal fun refScenarioIcon(name: String, type: String): ImageVector = when {
     name.contains("chatgpt", true) || name.contains("openai", true) || name.contains("ai", true) -> Icons.Rounded.SmartToy
     name.contains("youtube", true) -> Icons.Rounded.PlayCircle
     name.contains("tiktok", true) -> Icons.Rounded.MusicNote
@@ -2556,7 +2623,7 @@ private fun refGroupTypeCompact(type: String): String = when (type.lowercase()) 
     else -> type.ifBlank { "Group" }
 }
 
-private fun refNodeFlag(name: String): String {
+internal fun refNodeFlag(name: String): String {
     val value = name.trim()
     if (listOf("🇭🇰", "🇹🇼", "🇯🇵", "🇸🇬", "🇰🇷", "🇺🇸", "🇬🇧", "🇩🇪", "🇫🇷").any(value::contains)) return ""
     val upper = value.uppercase(java.util.Locale.ROOT)
@@ -3302,7 +3369,7 @@ private fun RefRuleSetRow(item: DashboardRuleSetUi, refreshing: Boolean, success
 }
 
 @Composable
-private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
+internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
     val context = LocalContext.current
     val inspector = remember { ProxyRuntimeInspector(context) }
     val scope = rememberCoroutineScope()
@@ -3387,7 +3454,7 @@ private fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
 }
 
 @Composable
-private fun RefSettings(state: ProxyComposeState, operation: String, onApplySettings: () -> Unit, onChanged: () -> Unit) {
+internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySettings: () -> Unit, onChanged: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("hetu", 0) }
     var modePicker by remember { mutableStateOf(false) }
@@ -3411,6 +3478,13 @@ private fun RefSettings(state: ProxyComposeState, operation: String, onApplySett
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item { RefTitleBar("设置") }
+        item {
+            RefGroup {
+                RefToolRow(Icons.Rounded.Tune, Color(0xFF2563EB), "更多功能设置", "通知、Web 面板、脚本、备份与接口管理") {
+                    context.startActivity(Intent(context, Runtime146FeaturesActivity::class.java))
+                }
+            }
+        }
         if (state.running) {
             item {
                 RefGroup {
@@ -3531,7 +3605,7 @@ private fun RefSettings(state: ProxyComposeState, operation: String, onApplySett
             onDismiss = { modePicker = false },
             onSelect = { index ->
                 val mode = choices[index]
-                prefs.edit().putString("proxyBaseMode", mode.id).apply()
+                prefs.edit().putString("proxyBaseMode", mode.id).apply(); ProxyRuntimeSettings.markDirty(prefs, "proxyBaseMode")
                 modePicker = false
                 android.widget.Toast.makeText(
                     context,
@@ -3557,7 +3631,7 @@ private fun RefSettings(state: ProxyComposeState, operation: String, onApplySett
             onDismiss = { ipv6Picker = false },
             onSelect = { index ->
                 val value = values[index].first
-                prefs.edit().putString("proxyBaseIpv6", value.id).apply()
+                prefs.edit().putString("proxyBaseIpv6", value.id).apply(); ProxyRuntimeSettings.markDirty(prefs, "proxyBaseIpv6")
                 ipv6Picker = false
                 android.widget.Toast.makeText(
                     context,
@@ -3794,7 +3868,7 @@ private fun RefSheetDragHandle() {
 }
 
 @Composable
-private fun RefGroup(content: @Composable ColumnScope.() -> Unit) {
+internal fun RefGroup(content: @Composable ColumnScope.() -> Unit) {
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val shape = RoundedCornerShape(22.dp)
@@ -3813,7 +3887,7 @@ private fun RefGroup(content: @Composable ColumnScope.() -> Unit) {
 }
 
 @Composable
-private fun RefSectionLabel(text: String) {
+internal fun RefSectionLabel(text: String) {
     Text(
         text,
         color = LocalHetuTokens.current.textSecondary,
@@ -3845,7 +3919,7 @@ private fun RefGradientIcon(icon: ImageVector, accent: Color) {
 }
 
 @Composable
-private fun RefToolRow(
+internal fun RefToolRow(
     icon: ImageVector,
     accent: Color,
     title: String,
@@ -3945,7 +4019,7 @@ private fun RefValueRow(
 }
 
 @Composable
-private fun RefSwitchRow(
+internal fun RefSwitchRow(
     icon: ImageVector,
     accent: Color,
     title: String,
@@ -3984,7 +4058,7 @@ private fun RefSwitchRow(
 }
 
 @Composable
-private fun RefDivider() {
+internal fun RefDivider() {
     HorizontalDivider(
         modifier = Modifier.padding(start = 58.dp, end = 14.dp),
         thickness = 1.dp,
@@ -4060,13 +4134,13 @@ private fun refUpdatedAt(value: String): String {
     return "更新于 $compact"
 }
 
-private fun refDelay(value: Long?): String = when {
+internal fun refDelay(value: Long?): String = when {
     value == null -> "--"
     value <= 0L -> "超时"
     else -> "$value ms"
 }
 
-private fun refBytes(value: Long): String {
+internal fun refBytes(value: Long): String {
     if (value <= 0L) return "0 B"
     val units = arrayOf("B", "KB", "MB", "GB", "TB")
     var v = value.toDouble()
@@ -4078,9 +4152,9 @@ private fun refBytes(value: Long): String {
     return if (i == 0) "${v.toLong()} ${units[i]}" else String.format(java.util.Locale.US, "%.1f %s", v, units[i])
 }
 
-private fun refSpeed(value: Long): String = "${refBytes(value)}/s"
+internal fun refSpeed(value: Long): String = "${refBytes(value)}/s"
 
-private fun refDuration(seconds: Long): String {
+internal fun refDuration(seconds: Long): String {
     if (seconds <= 0L) return "0s"
     val days = seconds / 86_400
     val hours = (seconds % 86_400) / 3_600

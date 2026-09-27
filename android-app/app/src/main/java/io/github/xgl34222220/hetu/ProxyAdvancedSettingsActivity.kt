@@ -86,7 +86,7 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
     val pageBg = if (dark) t.pageBackground else Color(0xFFF1F5F9)
     val running = runtimeStatus?.optBoolean("running", false) ?: prefs.getBoolean("proxyRootRuntimeRunning", false)
     val effectiveIpv6 = runtimeStatus?.optString("ipv6Mode", "").orEmpty()
-    val settingsPending = ProxyRuntimeSettings.pending(running, ProxyRuntimeSettings.signature(prefs), prefs.getString("proxyRootAppliedSettings", ""))
+    val settingsPending = ProxyRuntimeSettings.pending(running, prefs)
 
     fun refresh() { revision++ }
     fun putBool(key: String, value: Boolean) { prefs.edit().putBoolean(key, value).apply(); refresh() }

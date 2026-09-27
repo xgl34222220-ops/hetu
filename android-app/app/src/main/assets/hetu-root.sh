@@ -77,6 +77,7 @@ release_lock(){
 trap 'release_lock' EXIT
 
 acquire_lock(){
+  [ "$LOCK_HELD" != 1 ] || return 0
   mkdir -p "$RUN" || return 1
   N=0
   while ! mkdir "$LOCK_DIR" >/dev/null 2>&1; do
@@ -132,15 +133,23 @@ allocnet(){
 # Only our private chains are removed. One table snapshot avoids three separate
 # iptables processes for every absent current/legacy chain on each start/stop.
 # A failed snapshot is unknown, never evidence that a chain is absent.
+cleanup_snapshot_read(){
+  CS_RAW=$("$1" -t "$2" -S 2>&1); CS_RC=$?
+  if [ "$CS_RC" = 0 ]; then printf '%s\n' "$CS_RAW"; return 0; fi
+  case "$CS_RAW" in
+    *"can't initialize"*"Table does not exist"*) return 0;;
+    *) return 1;;
+  esac
+}
 cleanup_snapshot_begin(){
-  CLEAN4_MANGLE=$(xt4 -t mangle -S 2>/dev/null) || CLEAN4_MANGLE='?'
-  CLEAN4_NAT=$(xt4 -t nat -S 2>/dev/null) || CLEAN4_NAT='?'
-  CLEAN4_FILTER=$(xt4 -t filter -S 2>/dev/null) || CLEAN4_FILTER='?'
+  CLEAN4_MANGLE=$(cleanup_snapshot_read xt4 mangle) || CLEAN4_MANGLE='?'
+  CLEAN4_NAT=$(cleanup_snapshot_read xt4 nat) || CLEAN4_NAT='?'
+  CLEAN4_FILTER=$(cleanup_snapshot_read xt4 filter) || CLEAN4_FILTER='?'
   CLEAN6_MANGLE='?'; CLEAN6_NAT='?'; CLEAN6_FILTER='?'
   if has ip6tables; then
-    CLEAN6_MANGLE=$(xt6 -t mangle -S 2>/dev/null) || CLEAN6_MANGLE='?'
-    CLEAN6_NAT=$(xt6 -t nat -S 2>/dev/null) || CLEAN6_NAT='?'
-    CLEAN6_FILTER=$(xt6 -t filter -S 2>/dev/null) || CLEAN6_FILTER='?'
+    CLEAN6_MANGLE=$(cleanup_snapshot_read xt6 mangle) || CLEAN6_MANGLE='?'
+    CLEAN6_NAT=$(cleanup_snapshot_read xt6 nat) || CLEAN6_NAT='?'
+    CLEAN6_FILTER=$(cleanup_snapshot_read xt6 filter) || CLEAN6_FILTER='?'
   fi
   CLEAN_SNAPSHOT_ACTIVE=1
 }
@@ -228,7 +237,18 @@ cleanup6(){
 }
 cleanup(){ MARK=""; MASK=""; TABLE=""; PREF=""; loadnet >/dev/null 2>&1 || true; cleanup_snapshot_begin; cleanup4; cleanup6; cleanlegacy; CLEAN_SNAPSHOT_ACTIVE=0; ip link del hetu0 >/dev/null 2>&1 || true; rm -f "$NET_STATE"; MARK=""; MASK=""; TABLE=""; PREF=""; }
 
+# Cheap built-in prefilter: do not fork readlink for every Android process.
+# Same-inode catches renamed comm; tracked PIDs always bypass this prefilter.
+core_candidate(){
+  case "$1" in ''|*[!0-9]*) return 1;; esac
+  [ "$BASE/bin/core" -ef "${CORE_PROCFS:-/proc}/$1/exe" ] && return 0
+  CORE_COMM=''
+  # Redirect stderr before opening procfs: processes can exit between operations.
+  read -r CORE_COMM 2>/dev/null < "${CORE_PROCFS:-/proc}/$1/comm" || return 1
+  case "$CORE_COMM" in core|mihomo|mihomo-*) return 0;; *) return 1;; esac
+}
 pidcore(){
+  case "$1" in ''|*[!0-9]*) return 1;; esac
   P="$1"; [ -d "/proc/$P" ] || return 1
   EXE=$(readlink "/proc/$P/exe" 2>/dev/null) || { [ -d "/proc/$P" ] && return 2; return 1; }
   # A su/timeout/shell command line may contain the core path as an argument.
@@ -241,7 +261,7 @@ core_maybe_alive(){ pidcore "$1"; case "$?" in 0|2) return 0;; *) return 1;; esa
 findcorepid(){
   for PROC in /proc/[0-9]*; do
     CAND=${PROC#/proc/}; case "$CAND" in ''|*[!0-9]*) continue;; esac
-    if pidcore "$CAND" && kill -0 "$CAND" >/dev/null 2>&1; then printf '%s\n' "$CAND"; return 0; fi
+    if core_candidate "$CAND" && pidcore "$CAND" && kill -0 "$CAND" >/dev/null 2>&1; then printf '%s\n' "$CAND"; return 0; fi
   done
   return 1
 }
@@ -262,11 +282,13 @@ stopcore(){
   # Recover orphaned Hetu cores left by a killed/reinstalled app. Match only the
   # private executable path so unrelated Mihomo/Clash processes are untouched.
   for PROC in /proc/[0-9]*; do
-    OPID=${PROC#/proc/}; [ "$OPID" != "$" ] || continue
-    if pidcore "$OPID" && kill -0 "$OPID" >/dev/null 2>&1; then
+    OPID=${PROC#/proc/}; case "$OPID" in ''|*[!0-9]*) continue;; esac
+    [ "$OPID" != "$$" ] || continue
+    if core_candidate "$OPID" && pidcore "$OPID" && kill -0 "$OPID" >/dev/null 2>&1; then
       case " $STOP_PIDS " in *" $OPID "*) ;; *) STOP_PIDS="$STOP_PIDS $OPID";; esac
     fi
   done
+  if [ -d "$RUN" ]; then start_stage "stop-core-signals"; fi
   for P in $STOP_PIDS; do kill "$P" >/dev/null 2>&1 || true; done
   N=0
   while [ "$N" -lt 10 ]; do
@@ -288,19 +310,6 @@ stopcore(){
 # in per-interface tables, so neither stat size nor the main default route can
 # decide whether IPv6 traffic needs interception/protection.
 v6supported(){ [ -r /proc/net/if_inet6 ]; }
-savev6(){
-  # Never replace an earlier session's baseline with values already set by us.
-  [ ! -f "$IPV6_STATE" ] || return 0
-  mkdir -p "$RUN" || return 1; V6_TMP="$IPV6_STATE.new.$$"; : > "$V6_TMP" || return 1; V6_FOUND=0
-  for V6_P in "$V6_CONF"/*/disable_ipv6; do
-    [ -r "$V6_P" ] || continue
-    read -r V6_V < "$V6_P" || { rm -f "$V6_TMP"; return 1; }
-    case "$V6_V" in 0|1) ;; *) rm -f "$V6_TMP"; return 1;; esac
-    printf '%s\t%s\n' "$V6_P" "$V6_V" >> "$V6_TMP" || { rm -f "$V6_TMP"; return 1; }; V6_FOUND=1
-  done
-  [ "$V6_FOUND" = 1 ] || { rm -f "$V6_TMP"; return 1; }
-  mv -f "$V6_TMP" "$IPV6_STATE"
-}
 restorev6(){
   [ -f "$IPV6_STATE" ] || return 0
   V6_TAB=$(printf '\t'); V6_DEFAULT=0; V6_FAILED=0
@@ -333,34 +342,6 @@ v6disabled(){
   done
   [ "$V6_FOUND" = 1 ]
 }
-enforcev6(){
-  [ -f "$IPV6_STATE" ] || return 1
-  V6_SAVED=$(cat "$IPV6_STATE") || return 1; V6_TAB=$(printf '\t'); V6_DEFAULT=0
-  while IFS="$V6_TAB" read -r V6_P V6_V; do
-    [ "$V6_P" != "$V6_CONF/default/disable_ipv6" ] || V6_DEFAULT="$V6_V"
-  done < "$IPV6_STATE"
-  case "$V6_DEFAULT" in 0|1) ;; *) return 1;; esac
-  # Journal late interfaces before any write to all, which otherwise destroys
-  # their prior state. A new interface's inherited 1 came from our default=1;
-  # restore the original default on stop, not Hetu's temporary value.
-  for V6_P in "$V6_CONF"/*/disable_ipv6; do
-    [ -e "$V6_P" ] || continue
-    case "
-$V6_SAVED
-" in *"
-$V6_P$V6_TAB"*) continue;; esac
-    read -r V6_V < "$V6_P" || return 1
-    case "$V6_V" in 0) ;; 1) V6_V="$V6_DEFAULT";; *) return 1;; esac
-    printf '%s\t%s\n' "$V6_P" "$V6_V" >> "$IPV6_STATE" || return 1
-  done
-  for V6_P in "$V6_CONF"/*/disable_ipv6; do
-    [ -e "$V6_P" ] || continue
-    read -r V6_V < "$V6_P" || return 1
-    [ "$V6_V" = 1 ] || printf '1\n' > "$V6_P" 2>/dev/null || return 1
-  done
-  v6disabled
-}
-disablev6(){ savev6 && enforcev6 && return 0; restorev6; return 1; }
 
 split_safe_uids(){
   LIST="$1"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS
@@ -374,12 +355,23 @@ split_safe_ifaces(){
   LIST="$1"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS
   for X in "$@"; do case "$X" in ''|*[!A-Za-z0-9_.:@+-]*) return 1;; esac; [ "$X" != lo ] && [ "$X" != 'lo+' ] || return 1; done
 }
+split_safe_macs(){
+  LIST="$1"; [ -z "$LIST" ] && return 0
+  OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS
+  for X in "$@"; do
+    printf '%s\n' "$X" | grep -Eiq '^[0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]:[0-9a-f][0-9a-f]$' || return 1
+    case "$X" in 00:00:00:00:00:00|ff:ff:ff:ff:ff:ff|FF:FF:FF:FF:FF:FF) return 1;; esac
+  done
+}
 first_uid(){ LIST="$1"; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; printf '%s' "${1:-}"; }
+first_mac(){ LIST="$1"; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; printf '%s' "${1:-}"; }
 
 iface_out(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -o "$X" -j RETURN || return 1; done; }
 iface_in(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -i "$X" -j RETURN || return 1; done; }
+shared_mac_returns(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -m mac --mac-source "$X" -j RETURN || return 1; done; }
 blacklist_returns(){ BIN="$1"; T="$2"; C="$3"; S="$4"; LIST="$5"; [ "$S" = blacklist ] || return 0; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for U in "$@"; do "$BIN" -t "$T" -A "$C" -m owner --uid-owner "$U" -j RETURN || return 1; done; }
 direct_uid_returns(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for U in "$@"; do "$BIN" -t "$T" -A "$C" -m owner --uid-owner "$U" -j RETURN || return 1; done; }
+direct_gid_returns(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for G in "$@"; do "$BIN" -t "$T" -A "$C" -m owner --gid-owner "$G" -j RETURN || return 1; done; }
 system_uid_return(){ BIN="$1"; T="$2"; C="$3"; S="$4"; [ "$S" = whitelist ] && return 0; "$BIN" -t "$T" -A "$C" -m owner --uid-owner 0-9999 -j RETURN || return 1; }
 append_scoped(){
   BIN="$1"; T="$2"; C="$3"; S="$4"; LIST="$5"; shift 5
@@ -397,10 +389,13 @@ scoped_redirect(){
   if [ "$S" = whitelist ]; then OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for U in "$@"; do if [ -n "$DPORT" ]; then "$BIN" -t "$T" -A "$C" -m owner --uid-owner "$U" -p "$PROTO" --dport "$DPORT" -j REDIRECT --to-ports "$TO" || return 1; else "$BIN" -t "$T" -A "$C" -m owner --uid-owner "$U" -p "$PROTO" -j REDIRECT --to-ports "$TO" || return 1; fi; done
   else if [ -n "$DPORT" ]; then "$BIN" -t "$T" -A "$C" -p "$PROTO" --dport "$DPORT" -j REDIRECT --to-ports "$TO" || return 1; else "$BIN" -t "$T" -A "$C" -p "$PROTO" -j REDIRECT --to-ports "$TO" || return 1; fi; fi
 }
-scoped_drop_quic(){
+# Explicit protocol disabling should report an unavailable UDP path immediately.
+# Silent DROP leaves clients retrying a blocked QUIC path until their own timeout;
+# REJECT (the default ICMP/ICMPv6 port-unreachable) permits prompt error handling.
+scoped_reject_quic(){
   BIN="$1"; C="$2"; S="$3"; LIST="$4"
-  if [ "$S" = whitelist ]; then OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for U in "$@"; do "$BIN" -t filter -A "$C" -m owner --uid-owner "$U" -p udp --dport 443 -j DROP || return 1; done
-  else "$BIN" -t filter -A "$C" -p udp --dport 443 -j DROP || return 1; fi
+  if [ "$S" = whitelist ]; then OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for U in "$@"; do "$BIN" -t filter -A "$C" -m owner --uid-owner "$U" -p udp --dport 443 -j REJECT || return 1; done
+  else "$BIN" -t filter -A "$C" -p udp --dport 443 -j REJECT || return 1; fi
 }
 scoped_reject_all(){
   BIN="$1"; C="$2"; S="$3"; LIST="$4"
@@ -430,12 +425,33 @@ bypass6(){
 
 probetp4(){ P="$1"; xt4 -t mangle -N HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -A HETU_PROBE -p udp -j TPROXY --on-port "$P" --tproxy-mark "$PROBE_MARK/$PROBE_MASK" >/dev/null 2>&1; R=$?; xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"; }
 probetp6(){ P="$1"; has ip6tables || return 1; xt6 -t mangle -N HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -A HETU_PROBE -p udp -j TPROXY --on-port "$P" --tproxy-mark "$PROBE_MARK/$PROBE_MASK" >/dev/null 2>&1; R=$?; xt6 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"; }
+probe_tcp_ownership(){
+  TCP_PROBE_BIN="$1"; TCP_PROBE_RESULT=0
+  "$TCP_PROBE_BIN" -t mangle -N HETU_TCP_PROBE >/dev/null 2>&1 || return 1
+  "$TCP_PROBE_BIN" -t mangle -A HETU_TCP_PROBE -p tcp -m conntrack --ctstate ESTABLISHED -m connmark ! --mark "$PROBE_MARK/$PROBE_MASK" -j RETURN >/dev/null 2>&1 || TCP_PROBE_RESULT=1
+  "$TCP_PROBE_BIN" -t mangle -A HETU_TCP_PROBE -p tcp -j CONNMARK --set-xmark "$PROBE_MARK/$PROBE_MASK" >/dev/null 2>&1 || TCP_PROBE_RESULT=1
+  "$TCP_PROBE_BIN" -t mangle -F HETU_TCP_PROBE >/dev/null 2>&1 || true
+  "$TCP_PROBE_BIN" -t mangle -X HETU_TCP_PROBE >/dev/null 2>&1 || true
+  return "$TCP_PROBE_RESULT"
+}
 probered4(){ P="$1"; PROTO="${2:-tcp}"; xt4 -t nat -N HETU_PROBE >/dev/null 2>&1 || true; xt4 -t nat -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t nat -A HETU_PROBE -p "$PROTO" -j REDIRECT --to-ports "$P" >/dev/null 2>&1; R=$?; xt4 -t nat -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t nat -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"; }
 probered6(){ P="$1"; PROTO="${2:-tcp}"; has ip6tables || return 1; xt6 -t nat -N HETU_PROBE >/dev/null 2>&1 || true; xt6 -t nat -F HETU_PROBE >/dev/null 2>&1 || true; xt6 -t nat -A HETU_PROBE -p "$PROTO" -j REDIRECT --to-ports "$P" >/dev/null 2>&1; R=$?; xt6 -t nat -F HETU_PROBE >/dev/null 2>&1 || true; xt6 -t nat -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"; }
 probeowner(){
   U="$1"; [ -n "$U" ] || return 0
   xt4 -t mangle -N HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true
   xt4 -t mangle -A HETU_PROBE -m owner --uid-owner "$U" -j RETURN >/dev/null 2>&1; R=$?
+  xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"
+}
+probegid(){
+  G="$1"; [ -n "$G" ] || return 0
+  xt4 -t mangle -N HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true
+  xt4 -t mangle -A HETU_PROBE -m owner --gid-owner "$G" -j RETURN >/dev/null 2>&1; R=$?
+  xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"
+}
+probemac(){
+  M="$1"; [ -n "$M" ] || return 0
+  xt4 -t mangle -N HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true
+  xt4 -t mangle -A HETU_PROBE -m mac --mac-source "$M" -j RETURN >/dev/null 2>&1; R=$?
   xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"
 }
 probecidrs(){
@@ -458,6 +474,7 @@ probe_ingress(){
     probered4 "$DP" udp || fail "当前 iptables 不支持 UDP DNS REDIRECT"
   fi
   [ "$NEED_TP" = 1 ] && { port "$TP" || fail "TPROXY 端口无效"; probetp4 "$TP" || fail "当前内核或 iptables 不支持 TPROXY"; }
+  if [ "$M" = tproxy ] && [ "$TCP" = 1 ]; then probe_tcp_ownership xt4 || fail "当前内核缺少 TCP 连接跟踪支持，无法安全接管已有网络"; fi
   [ "$NEED_RP" = 1 ] && { port "$RP" || fail "Redirect 端口无效"; probered4 "$RP" tcp || fail "当前 iptables 不支持 REDIRECT"; }
   if [ "$M" != tun ] && [ "$M" != ebpf ] && [ "$NEED_TP" = 0 ] && [ "$NEED_RP" = 0 ] && [ "$DNS" = off ]; then fail "TCP、UDP 与 DNS 接管均已关闭，代理没有可接管流量"; fi
 
@@ -466,23 +483,67 @@ probe_ingress(){
       has ip6tables || fail "当前 IPv6 接管或过滤策略需要 ip6tables"
     fi
     [ "$NEED_TP" = 0 ] || probetp6 "$TP" || fail "IPv6 TPROXY 不可用，可改用严格 IPv4 或 IPv6 不进核心"
+    if [ "$M" = tproxy ] && [ "$TCP" = 1 ]; then probe_tcp_ownership xt6 || fail "IPv6 TCP 连接跟踪不可用，可改用 IPv6 不进核心"; fi
     [ "$NEED_RP" = 0 ] || probered6 "$RP" tcp || fail "IPv6 REDIRECT 不可用，可改用严格 IPv4 或 IPv6 不进核心"
     if [ "$NEED_DNS_REDIRECT" = 1 ]; then probered6 "$DP" tcp || fail "IPv6 TCP DNS REDIRECT 不可用"; probered6 "$DP" udp || fail "IPv6 UDP DNS REDIRECT 不可用"; fi
+  fi
+  if [ "$V6" = disable ] && v6supported && [ "$NEED_DNS_REDIRECT" = 1 ]; then
+    has ip6tables || fail "IPv6 DNS 防泄漏需要 ip6tables"
+    # DNS redirection is optional in disable mode; filter REJECT remains mandatory.
+    # Re-evaluate the optional NAT capability in start(), even with cached preflight.
   fi
   if v6supported && { [ "$V6" = strict ] || [ "$V6" = disable ] || [ "$KILL" = 1 ]; }; then
     has ip6tables || fail "IPv6 禁用/严格 IPv4 或 Kill Switch 需要 ip6tables"
   fi
 }
 
+# This decision is deliberately outside the cached preflight fast path.
+# Never load kernel modules or change netd's DNS/IPv6 settings to obtain NAT.
+select_dns6_policy(){
+  START_DNS6=off
+  [ "$START_DNS" != off ] && v6supported || return 0
+  case "$START_MODE" in tun|ebpf) START_DNS6=core; return 0;; esac
+  case "$START_V6" in enable) START_DNS6=redirect; return 0;; disable) ;; *) return 0;; esac
+  has ip6tables || fail "IPv6 DNS 防泄漏需要 ip6tables"
+  DNS6_PROBE=$(xt6q -t nat -S 2>&1); DNS6_PROBE_RC=$?
+  if [ "$DNS6_PROBE_RC" != 0 ]; then
+    case "$DNS6_PROBE" in
+      *"Table does not exist"*|*"table does not exist"*) START_DNS6=blocked-no-nat; return 0;;
+      *) fail "IPv6 DNS 能力读取失败，未改动当前代理；请查看 Root 权限或防火墙锁";;
+    esac
+  fi
+  if probered6 "$START_DP" tcp && probered6 "$START_DP" udp; then
+    START_DNS6=redirect
+  else
+    START_DNS6=blocked-no-redirect
+  fi
+}
+install_disabled_dns6(){
+  case "$START_DNS6" in
+    redirect) install_dns_redirect6 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" "${START_SHARED_MACS:-}";;
+    blocked-no-nat|blocked-no-redirect)
+      # Verify the actual fail-closed guard; do not treat optional NAT failure as
+      # permission to send system/app IPv6 DNS directly to an external resolver.
+      v6_disable_guard_ready "$START_SHARE" || return 1
+      xt6q -t filter -C "$V6OUT" -p udp --dport 53 -j REJECT >/dev/null 2>&1 || return 1
+      xt6q -t filter -C "$V6OUT" -p tcp --dport 53 -j REJECT >/dev/null 2>&1 || return 1
+      ;;
+    off|core) return 0;;
+    *) return 1;;
+  esac
+}
+
 preflight(){
-  M="$1"; TP="$2"; RP="$3"; V6="$4"; TCP="$5"; UDP="$6"; DNS="$7"; QUIC="$8"; DP="$9"; CP="${10}"; SCOPE="${11}"; UIDS="${12}"; SHARE="${13}"; KILL="${14}"; CIDRS="${15}"; IFACES="${16}"; DIRECT_UIDS="${17}"
-  root; mode "$M" || fail "运行模式无效"; ipv6mode "$V6" || fail "IPv6 模式无效"; dnsmode "$DNS" || fail "DNS 劫持模式无效"; scope "$SCOPE" || fail "应用范围无效"
+  M="$1"; TP="$2"; RP="$3"; V6="$4"; TCP="$5"; UDP="$6"; DNS="$7"; QUIC="$8"; DP="$9"; CP="${10}"; SCOPE="${11}"; UIDS="${12}"; SHARE="${13}"; KILL="${14}"; CIDRS="${15}"; IFACES="${16}"; DIRECT_UIDS="${17}"; DIRECT_GIDS="${18:-}"; SHARED_MACS="${19:-}"
+  root; acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"; mode "$M" || fail "运行模式无效"; ipv6mode "$V6" || fail "IPv6 模式无效"; dnsmode "$DNS" || fail "DNS 劫持模式无效"; scope "$SCOPE" || fail "应用范围无效"
   bool "$TCP" || fail "TCP 开关无效"; bool "$UDP" || fail "UDP 开关无效"; bool "$QUIC" || fail "QUIC 开关无效"; bool "$SHARE" || fail "共享网络开关无效"; bool "$KILL" || fail "Kill Switch 开关无效"
   port "$DP" || fail "DNS 监听端口无效"; port "$CP" || fail "控制接口端口无效"; has ip || fail "系统缺少 ip 命令"; has iptables || fail "系统缺少 iptables"
-  split_safe_uids "$UIDS" || fail "应用 UID 列表无效"; split_safe_uids "$DIRECT_UIDS" || fail "DIRECT UID 列表无效"; split_safe_cidrs "$CIDRS" || fail "CIDR 绕过列表无效"; split_safe_ifaces "$IFACES" || fail "接口绕过列表无效"
+  split_safe_uids "$UIDS" || fail "应用 UID 列表无效"; split_safe_uids "$DIRECT_UIDS" || fail "DIRECT UID 列表无效"; split_safe_uids "$DIRECT_GIDS" || fail "DIRECT GID 列表无效"; split_safe_cidrs "$CIDRS" || fail "CIDR 绕过列表无效"; split_safe_ifaces "$IFACES" || fail "接口绕过列表无效"; split_safe_macs "$SHARED_MACS" || fail "共享网络 MAC 直连列表无效"
   [ "$SCOPE" != whitelist ] || [ -n "$UIDS" ] || fail "仅所选应用代理模式没有可用 UID"
   if [ "$SCOPE" != core ] && [ -n "$UIDS" ]; then U=$(first_uid "$UIDS"); probeowner "$U" || fail "当前 iptables 不支持 owner UID 匹配"; fi
   if [ -n "$DIRECT_UIDS" ]; then DU=$(first_uid "$DIRECT_UIDS"); probeowner "$DU" || fail "当前 iptables 不支持 DIRECT UID 直连"; fi
+  if [ -n "$DIRECT_GIDS" ]; then DG=$(first_uid "$DIRECT_GIDS"); probegid "$DG" || fail "当前 iptables 不支持 DIRECT GID 直连"; fi
+  if [ "$SHARE" = 1 ] && [ -n "$SHARED_MACS" ]; then SM=$(first_mac "$SHARED_MACS"); probemac "$SM" || fail "当前 iptables 不支持按 MAC 匹配共享设备"; fi
   [ "$SCOPE" = whitelist ] || probeowner "0-9999" || fail "当前 iptables 不支持系统 UID 范围绕过"
   probecidrs "$CIDRS" || fail "CIDR 绕过列表包含当前系统不支持的地址"
   if [ "$M" = tun ] || [ "$M" = ebpf ]; then
@@ -494,9 +555,8 @@ preflight(){
   fi
 
   probe_ingress "$M" "$TP" "$RP" "$V6" "$TCP" "$UDP" "$DNS" "$QUIC" "$KILL" "$DP"
-  # Device-wide sysctl writes are best-effort on Android. Some OEM/netd stacks
-  # keep cellular/IMS IPv6 enabled or recreate it after handover. The ip6tables
-  # disable guard above is the authoritative no-leak requirement.
+  # Interface IPv6 is owned by Android/netd. Native app IPv6 is blocked by
+  # the filter guard, while DNS is redirected to the core in both families.
   ok "Root 代理预检通过"
 }
 
@@ -525,79 +585,110 @@ local_destination_return(){
   done
 }
 
+# A TCP session established before interception belongs to its original remote
+# socket. Sending its ACK/data to a fresh transparent listener cannot migrate
+# that session: it drops/resets the stream until the app reconnects. Remember
+# only Hetu-selected TCP flows in our private conntrack bit and preserve older
+# unowned streams. Never return every ESTABLISHED flow: proxied ACK/data must
+# continue through TPROXY. DNS NAT and UDP keep their independent policies.
+preserve_existing_tcp(){
+  "$1" -t mangle -A "$2" -p tcp -m conntrack --ctstate ESTABLISHED -m connmark ! --mark "$MARK/$MASK" -j RETURN
+}
+remember_local_tcp(){
+  "$1" -t mangle -A "$2" -p tcp -m mark --mark "$MARK/$MASK" -j CONNMARK --set-xmark "$MARK/$MASK"
+}
+remember_shared_tcp(){
+  "$1" -t mangle -A "$2" -p tcp -j CONNMARK --set-xmark "$MARK/$MASK"
+}
+
 install_mangle4(){
-  P="$1"; M="$2"; TCP="$3"; UDP="$4"; DNS="$5"; S="$6"; UIDS="$7"; SHARE="$8"; CIDRS="$9"; IFACES="${10}"; DUIDS="${11}"
+  P="$1"; M="$2"; TCP="$3"; UDP="$4"; DNS="$5"; S="$6"; UIDS="$7"; SHARE="$8"; CIDRS="$9"; IFACES="${10}"; DUIDS="${11}"; DGIDS="${12:-}"; MACS="${13:-}"
   NEED=0; case "$M" in tproxy) if [ "$TCP" = 1 ] || [ "$UDP" = 1 ]; then NEED=1; fi;; enhance) [ "$UDP" = 1 ] && NEED=1;; esac; [ "$NEED" = 1 ] || return 0
   route4 || return 1; xt4 -t mangle -N "$MOUT" || return 1; xt4 -t mangle -N "$MPRE" || return 1
   xt4 -t mangle -A "$MOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1
   system_uid_return xt4 mangle "$MOUT" "$S" || return 1
   direct_uid_returns xt4 mangle "$MOUT" "$DUIDS" || return 1
+  direct_gid_returns xt4 mangle "$MOUT" "$DGIDS" || return 1
   iface_out xt4 mangle "$MOUT" "$IFACES" || return 1; blacklist_returns xt4 mangle "$MOUT" "$S" "$UIDS" || return 1
   xt4 -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt4 mangle "$MPRE" "$IFACES" || return 1
+  [ "$SHARE" = 0 ] || shared_mac_returns xt4 mangle "$MPRE" "$MACS" || return 1
   [ "$SHARE" = 0 ] || local_destination_return xt4 "$MPRE" -4 || return 1
   if [ "$DNS" = tproxy ] || [ "$DNS" = redirect ]; then
     xt4 -t mangle -A "$MOUT" -p tcp --dport 53 -j RETURN || return 1
     xt4 -t mangle -A "$MOUT" -p udp --dport 53 -j RETURN || return 1
   fi
   bypass4 "$MOUT" mangle "$CIDRS" || return 1; bypass4 "$MPRE" mangle "$CIDRS" || return 1
+  if [ "$M" = tproxy ] && [ "$TCP" = 1 ]; then
+    preserve_existing_tcp xt4 "$MOUT" || return 1
+    if [ "$SHARE" = 1 ]; then preserve_existing_tcp xt4 "$MPRE" || return 1; remember_shared_tcp xt4 "$MPRE" || return 1; fi
+  fi
   if [ "$M" = tproxy ]; then
     [ "$TCP" = 0 ] || { scoped_mark xt4 mangle "$MOUT" "$S" "$UIDS" tcp "" "$MARK/$MASK" || return 1; if [ "$SHARE" = 1 ]; then xt4 -t mangle -A "$MPRE" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt4 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
     [ "$UDP" = 0 ] || { scoped_mark xt4 mangle "$MOUT" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; if [ "$SHARE" = 1 ]; then xt4 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt4 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
   elif [ "$M" = enhance ] && [ "$UDP" = 1 ]; then scoped_mark xt4 mangle "$MOUT" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; if [ "$SHARE" = 1 ]; then xt4 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt4 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; fi
+  if [ "$M" = tproxy ] && [ "$TCP" = 1 ]; then remember_local_tcp xt4 "$MOUT" || return 1; fi
   xt4 -t mangle -A OUTPUT -j "$MOUT" || return 1; xt4 -t mangle -A PREROUTING -j "$MPRE" || return 1
 }
 
 install_mangle6(){
-  P="$1"; M="$2"; TCP="$3"; UDP="$4"; DNS="$5"; S="$6"; UIDS="$7"; SHARE="$8"; CIDRS="$9"; IFACES="${10}"; DUIDS="${11}"; v6supported || return 0
+  P="$1"; M="$2"; TCP="$3"; UDP="$4"; DNS="$5"; S="$6"; UIDS="$7"; SHARE="$8"; CIDRS="$9"; IFACES="${10}"; DUIDS="${11}"; DGIDS="${12:-}"; MACS="${13:-}"; v6supported || return 0
   NEED=0; case "$M" in tproxy) if [ "$TCP" = 1 ] || [ "$UDP" = 1 ]; then NEED=1; fi;; enhance) [ "$UDP" = 1 ] && NEED=1;; esac; [ "$NEED" = 1 ] || return 0
   route6 || return 1; xt6 -t mangle -N "$MOUT" || return 1; xt6 -t mangle -N "$MPRE" || return 1
   xt6 -t mangle -A "$MOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1
   system_uid_return xt6 mangle "$MOUT" "$S" || return 1
   direct_uid_returns xt6 mangle "$MOUT" "$DUIDS" || return 1
+  direct_gid_returns xt6 mangle "$MOUT" "$DGIDS" || return 1
   iface_out xt6 mangle "$MOUT" "$IFACES" || return 1; blacklist_returns xt6 mangle "$MOUT" "$S" "$UIDS" || return 1
   xt6 -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt6 mangle "$MPRE" "$IFACES" || return 1
+  [ "$SHARE" = 0 ] || shared_mac_returns xt6 mangle "$MPRE" "$MACS" || return 1
   [ "$SHARE" = 0 ] || local_destination_return xt6 "$MPRE" -6 || return 1
   if [ "$DNS" = tproxy ] || [ "$DNS" = redirect ]; then
     xt6 -t mangle -A "$MOUT" -p tcp --dport 53 -j RETURN || return 1
     xt6 -t mangle -A "$MOUT" -p udp --dport 53 -j RETURN || return 1
   fi
   bypass6 "$MOUT" mangle "$CIDRS" || return 1; bypass6 "$MPRE" mangle "$CIDRS" || return 1
+  if [ "$M" = tproxy ] && [ "$TCP" = 1 ]; then
+    preserve_existing_tcp xt6 "$MOUT" || return 1
+    if [ "$SHARE" = 1 ]; then preserve_existing_tcp xt6 "$MPRE" || return 1; remember_shared_tcp xt6 "$MPRE" || return 1; fi
+  fi
   if [ "$M" = tproxy ]; then
     [ "$TCP" = 0 ] || { scoped_mark xt6 mangle "$MOUT" "$S" "$UIDS" tcp "" "$MARK/$MASK" || return 1; if [ "$SHARE" = 1 ]; then xt6 -t mangle -A "$MPRE" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt6 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
     [ "$UDP" = 0 ] || { scoped_mark xt6 mangle "$MOUT" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; if [ "$SHARE" = 1 ]; then xt6 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt6 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
   elif [ "$M" = enhance ] && [ "$UDP" = 1 ]; then scoped_mark xt6 mangle "$MOUT" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; if [ "$SHARE" = 1 ]; then xt6 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt6 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; fi
+  if [ "$M" = tproxy ] && [ "$TCP" = 1 ]; then remember_local_tcp xt6 "$MOUT" || return 1; fi
   xt6 -t mangle -A OUTPUT -j "$MOUT" || return 1; xt6 -t mangle -A PREROUTING -j "$MPRE" || return 1
 }
 
 install_redirect4(){
-  P="$1"; M="$2"; TCP="$3"; S="$4"; UIDS="$5"; SHARE="$6"; CIDRS="$7"; IFACES="$8"; DUIDS="$9"; [ "$TCP" = 1 ] || return 0; case "$M" in redirect|enhance) ;; *) return 0;; esac
-  xt4 -t nat -N "$NOUT" || return 1; xt4 -t nat -A "$NOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; system_uid_return xt4 nat "$NOUT" "$S" || return 1; direct_uid_returns xt4 nat "$NOUT" "$DUIDS" || return 1; iface_out xt4 nat "$NOUT" "$IFACES" || return 1; blacklist_returns xt4 nat "$NOUT" "$S" "$UIDS" || return 1; bypass4 "$NOUT" nat "$CIDRS" || return 1; scoped_redirect xt4 nat "$NOUT" "$S" "$UIDS" tcp "" "$P" || return 1; xt4 -t nat -A OUTPUT -j "$NOUT" || return 1
-  if [ "$SHARE" = 1 ]; then xt4 -t nat -N "$NPRE" || return 1; xt4 -t nat -A "$NPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt4 nat "$NPRE" "$IFACES" || return 1; bypass4 "$NPRE" nat "$CIDRS" || return 1; xt4 -t nat -A "$NPRE" -p tcp -j REDIRECT --to-ports "$P" || return 1; xt4 -t nat -A PREROUTING -j "$NPRE" || return 1; fi
+  P="$1"; M="$2"; TCP="$3"; S="$4"; UIDS="$5"; SHARE="$6"; CIDRS="$7"; IFACES="$8"; DUIDS="$9"; DGIDS="${10:-}"; MACS="${11:-}"; [ "$TCP" = 1 ] || return 0; case "$M" in redirect|enhance) ;; *) return 0;; esac
+  xt4 -t nat -N "$NOUT" || return 1; xt4 -t nat -A "$NOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; system_uid_return xt4 nat "$NOUT" "$S" || return 1; direct_uid_returns xt4 nat "$NOUT" "$DUIDS" || return 1; direct_gid_returns xt4 nat "$NOUT" "$DGIDS" || return 1; iface_out xt4 nat "$NOUT" "$IFACES" || return 1; blacklist_returns xt4 nat "$NOUT" "$S" "$UIDS" || return 1; bypass4 "$NOUT" nat "$CIDRS" || return 1; scoped_redirect xt4 nat "$NOUT" "$S" "$UIDS" tcp "" "$P" || return 1; xt4 -t nat -A OUTPUT -j "$NOUT" || return 1
+  if [ "$SHARE" = 1 ]; then xt4 -t nat -N "$NPRE" || return 1; xt4 -t nat -A "$NPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt4 nat "$NPRE" "$IFACES" || return 1; shared_mac_returns xt4 nat "$NPRE" "$MACS" || return 1; bypass4 "$NPRE" nat "$CIDRS" || return 1; xt4 -t nat -A "$NPRE" -p tcp -j REDIRECT --to-ports "$P" || return 1; xt4 -t nat -A PREROUTING -j "$NPRE" || return 1; fi
 }
 install_redirect6(){
-  P="$1"; M="$2"; TCP="$3"; S="$4"; UIDS="$5"; SHARE="$6"; CIDRS="$7"; IFACES="$8"; DUIDS="$9"; v6supported || return 0; [ "$TCP" = 1 ] || return 0; case "$M" in redirect|enhance) ;; *) return 0;; esac
-  xt6 -t nat -N "$NOUT" || return 1; xt6 -t nat -A "$NOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; system_uid_return xt6 nat "$NOUT" "$S" || return 1; direct_uid_returns xt6 nat "$NOUT" "$DUIDS" || return 1; iface_out xt6 nat "$NOUT" "$IFACES" || return 1; blacklist_returns xt6 nat "$NOUT" "$S" "$UIDS" || return 1; bypass6 "$NOUT" nat "$CIDRS" || return 1; scoped_redirect xt6 nat "$NOUT" "$S" "$UIDS" tcp "" "$P" || return 1; xt6 -t nat -A OUTPUT -j "$NOUT" || return 1
-  if [ "$SHARE" = 1 ]; then xt6 -t nat -N "$NPRE" || return 1; xt6 -t nat -A "$NPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt6 nat "$NPRE" "$IFACES" || return 1; bypass6 "$NPRE" nat "$CIDRS" || return 1; xt6 -t nat -A "$NPRE" -p tcp -j REDIRECT --to-ports "$P" || return 1; xt6 -t nat -A PREROUTING -j "$NPRE" || return 1; fi
+  P="$1"; M="$2"; TCP="$3"; S="$4"; UIDS="$5"; SHARE="$6"; CIDRS="$7"; IFACES="$8"; DUIDS="$9"; DGIDS="${10:-}"; MACS="${11:-}"; v6supported || return 0; [ "$TCP" = 1 ] || return 0; case "$M" in redirect|enhance) ;; *) return 0;; esac
+  xt6 -t nat -N "$NOUT" || return 1; xt6 -t nat -A "$NOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; system_uid_return xt6 nat "$NOUT" "$S" || return 1; direct_uid_returns xt6 nat "$NOUT" "$DUIDS" || return 1; direct_gid_returns xt6 nat "$NOUT" "$DGIDS" || return 1; iface_out xt6 nat "$NOUT" "$IFACES" || return 1; blacklist_returns xt6 nat "$NOUT" "$S" "$UIDS" || return 1; bypass6 "$NOUT" nat "$CIDRS" || return 1; scoped_redirect xt6 nat "$NOUT" "$S" "$UIDS" tcp "" "$P" || return 1; xt6 -t nat -A OUTPUT -j "$NOUT" || return 1
+  if [ "$SHARE" = 1 ]; then xt6 -t nat -N "$NPRE" || return 1; xt6 -t nat -A "$NPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt6 nat "$NPRE" "$IFACES" || return 1; shared_mac_returns xt6 nat "$NPRE" "$MACS" || return 1; bypass6 "$NPRE" nat "$CIDRS" || return 1; xt6 -t nat -A "$NPRE" -p tcp -j REDIRECT --to-ports "$P" || return 1; xt6 -t nat -A PREROUTING -j "$NPRE" || return 1; fi
 }
 
 install_dns_redirect4(){
-  P="$1"; S="$2"; UIDS="$3"; SHARE="$4"; IFACES="$5"; xt4 -t nat -N "$DNSOUT" || return 1; xt4 -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; xt4 -t nat -A "$DNSOUT" -m owner --uid-owner 0 -j RETURN || return 1; iface_out xt4 nat "$DNSOUT" "$IFACES" || return 1; blacklist_returns xt4 nat "$DNSOUT" "$S" "$UIDS" || return 1
+  P="$1"; S="$2"; UIDS="$3"; SHARE="$4"; IFACES="$5"; MACS="${6:-}"; xt4 -t nat -N "$DNSOUT" || return 1; xt4 -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; xt4 -t nat -A "$DNSOUT" -m owner --uid-owner 0 -j RETURN || return 1; iface_out xt4 nat "$DNSOUT" "$IFACES" || return 1; blacklist_returns xt4 nat "$DNSOUT" "$S" "$UIDS" || return 1
   for X in tcp udp; do scoped_redirect xt4 nat "$DNSOUT" "$S" "$UIDS" "$X" 53 "$P" || return 1; done; xt4 -t nat -I OUTPUT 1 -j "$DNSOUT" || return 1
-  if [ "$SHARE" = 1 ]; then xt4 -t nat -N "$DNSPRE" || return 1; iface_in xt4 nat "$DNSPRE" "$IFACES" || return 1; for X in tcp udp; do xt4 -t nat -A "$DNSPRE" -p "$X" --dport 53 -j REDIRECT --to-ports "$P" || return 1; done; xt4 -t nat -I PREROUTING 1 -j "$DNSPRE" || return 1; fi
+  if [ "$SHARE" = 1 ]; then xt4 -t nat -N "$DNSPRE" || return 1; iface_in xt4 nat "$DNSPRE" "$IFACES" || return 1; shared_mac_returns xt4 nat "$DNSPRE" "$MACS" || return 1; for X in tcp udp; do xt4 -t nat -A "$DNSPRE" -p "$X" --dport 53 -j REDIRECT --to-ports "$P" || return 1; done; xt4 -t nat -I PREROUTING 1 -j "$DNSPRE" || return 1; fi
 }
 install_dns_redirect6(){
-  P="$1"; S="$2"; UIDS="$3"; SHARE="$4"; IFACES="$5"; v6supported || return 0; xt6 -t nat -N "$DNSOUT" || return 1; xt6 -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; xt6 -t nat -A "$DNSOUT" -m owner --uid-owner 0 -j RETURN || return 1; iface_out xt6 nat "$DNSOUT" "$IFACES" || return 1; blacklist_returns xt6 nat "$DNSOUT" "$S" "$UIDS" || return 1
+  P="$1"; S="$2"; UIDS="$3"; SHARE="$4"; IFACES="$5"; MACS="${6:-}"; v6supported || return 0; xt6 -t nat -N "$DNSOUT" || return 1; xt6 -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; xt6 -t nat -A "$DNSOUT" -m owner --uid-owner 0 -j RETURN || return 1; iface_out xt6 nat "$DNSOUT" "$IFACES" || return 1; blacklist_returns xt6 nat "$DNSOUT" "$S" "$UIDS" || return 1
   for X in tcp udp; do scoped_redirect xt6 nat "$DNSOUT" "$S" "$UIDS" "$X" 53 "$P" || return 1; done; xt6 -t nat -I OUTPUT 1 -j "$DNSOUT" || return 1
-  if [ "$SHARE" = 1 ]; then xt6 -t nat -N "$DNSPRE" || return 1; iface_in xt6 nat "$DNSPRE" "$IFACES" || return 1; for X in tcp udp; do xt6 -t nat -A "$DNSPRE" -p "$X" --dport 53 -j REDIRECT --to-ports "$P" || return 1; done; xt6 -t nat -I PREROUTING 1 -j "$DNSPRE" || return 1; fi
+  if [ "$SHARE" = 1 ]; then xt6 -t nat -N "$DNSPRE" || return 1; iface_in xt6 nat "$DNSPRE" "$IFACES" || return 1; shared_mac_returns xt6 nat "$DNSPRE" "$MACS" || return 1; for X in tcp udp; do xt6 -t nat -A "$DNSPRE" -p "$X" --dport 53 -j REDIRECT --to-ports "$P" || return 1; done; xt6 -t nat -I PREROUTING 1 -j "$DNSPRE" || return 1; fi
 }
 
 install_udp_leak_guard4(){
-  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"
+  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"
   xt4 -t filter -N "$WROUT" || return 1
   xt4 -t filter -A "$WROUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1
   if [ -n "$MARK" ]; then xt4 -t filter -A "$WROUT" -m mark --mark "$MARK/$MASK" -j RETURN || return 1; fi
   system_uid_return xt4 filter "$WROUT" "$S" || return 1
   direct_uid_returns xt4 filter "$WROUT" "$DUIDS" || return 1
+  direct_gid_returns xt4 filter "$WROUT" "$DGIDS" || return 1
   iface_out xt4 filter "$WROUT" "$IFACES" || return 1
   blacklist_returns xt4 filter "$WROUT" "$S" "$UIDS" || return 1
   bypass4 "$WROUT" filter "$CIDRS" || return 1
@@ -607,18 +698,20 @@ install_udp_leak_guard4(){
     xt4 -t filter -N "$WRFWD" || return 1
     if [ -n "$MARK" ]; then xt4 -t filter -A "$WRFWD" -m mark --mark "$MARK/$MASK" -j RETURN || return 1; fi
     iface_in xt4 filter "$WRFWD" "$IFACES" || return 1
+    shared_mac_returns xt4 filter "$WRFWD" "$MACS" || return 1
     bypass4 "$WRFWD" filter "$CIDRS" || return 1
     xt4 -t filter -A "$WRFWD" -p udp -j REJECT || return 1
     xt4 -t filter -I FORWARD 1 -j "$WRFWD" || return 1
   fi
 }
 install_udp_leak_guard6(){
-  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; v6supported || return 0
+  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; v6supported || return 0
   xt6 -t filter -N "$WROUT" || return 1
   xt6 -t filter -A "$WROUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1
   if [ -n "$MARK" ]; then xt6 -t filter -A "$WROUT" -m mark --mark "$MARK/$MASK" -j RETURN || return 1; fi
   system_uid_return xt6 filter "$WROUT" "$S" || return 1
   direct_uid_returns xt6 filter "$WROUT" "$DUIDS" || return 1
+  direct_gid_returns xt6 filter "$WROUT" "$DGIDS" || return 1
   iface_out xt6 filter "$WROUT" "$IFACES" || return 1
   blacklist_returns xt6 filter "$WROUT" "$S" "$UIDS" || return 1
   bypass6 "$WROUT" filter "$CIDRS" || return 1
@@ -628,6 +721,7 @@ install_udp_leak_guard6(){
     xt6 -t filter -N "$WRFWD" || return 1
     if [ -n "$MARK" ]; then xt6 -t filter -A "$WRFWD" -m mark --mark "$MARK/$MASK" -j RETURN || return 1; fi
     iface_in xt6 filter "$WRFWD" "$IFACES" || return 1
+    shared_mac_returns xt6 filter "$WRFWD" "$MACS" || return 1
     bypass6 "$WRFWD" filter "$CIDRS" || return 1
     xt6 -t filter -A "$WRFWD" -p udp -j REJECT || return 1
     xt6 -t filter -I FORWARD 1 -j "$WRFWD" || return 1
@@ -635,27 +729,30 @@ install_udp_leak_guard6(){
 }
 
 install_quic4(){
-  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; xt4 -t filter -N "$QUICOUT" || return 1; xt4 -t filter -A "$QUICOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; system_uid_return xt4 filter "$QUICOUT" "$S" || return 1; direct_uid_returns xt4 filter "$QUICOUT" "$DUIDS" || return 1; iface_out xt4 filter "$QUICOUT" "$IFACES" || return 1; blacklist_returns xt4 filter "$QUICOUT" "$S" "$UIDS" || return 1; bypass4 "$QUICOUT" filter "$CIDRS" || return 1; scoped_drop_quic xt4 "$QUICOUT" "$S" "$UIDS" || return 1; xt4 -t filter -A OUTPUT -j "$QUICOUT" || return 1
-  if [ "$SHARE" = 1 ]; then xt4 -t filter -N "$QUICFWD" || return 1; iface_in xt4 filter "$QUICFWD" "$IFACES" || return 1; bypass4 "$QUICFWD" filter "$CIDRS" || return 1; xt4 -t filter -A "$QUICFWD" -p udp --dport 443 -j DROP || return 1; xt4 -t filter -A FORWARD -j "$QUICFWD" || return 1; fi
+  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; xt4 -t filter -N "$QUICOUT" || return 1; xt4 -t filter -A "$QUICOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; system_uid_return xt4 filter "$QUICOUT" "$S" || return 1; direct_uid_returns xt4 filter "$QUICOUT" "$DUIDS" || return 1; direct_gid_returns xt4 filter "$QUICOUT" "$DGIDS" || return 1; iface_out xt4 filter "$QUICOUT" "$IFACES" || return 1; blacklist_returns xt4 filter "$QUICOUT" "$S" "$UIDS" || return 1; bypass4 "$QUICOUT" filter "$CIDRS" || return 1; scoped_reject_quic xt4 "$QUICOUT" "$S" "$UIDS" || return 1; xt4 -t filter -A OUTPUT -j "$QUICOUT" || return 1
+  if [ "$SHARE" = 1 ]; then xt4 -t filter -N "$QUICFWD" || return 1; iface_in xt4 filter "$QUICFWD" "$IFACES" || return 1; shared_mac_returns xt4 filter "$QUICFWD" "$MACS" || return 1; bypass4 "$QUICFWD" filter "$CIDRS" || return 1; xt4 -t filter -A "$QUICFWD" -p udp --dport 443 -j REJECT || return 1; xt4 -t filter -A FORWARD -j "$QUICFWD" || return 1; fi
 }
 install_quic6(){
-  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; v6supported || return 0; xt6 -t filter -N "$QUICOUT" || return 1; xt6 -t filter -A "$QUICOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; system_uid_return xt6 filter "$QUICOUT" "$S" || return 1; direct_uid_returns xt6 filter "$QUICOUT" "$DUIDS" || return 1; iface_out xt6 filter "$QUICOUT" "$IFACES" || return 1; blacklist_returns xt6 filter "$QUICOUT" "$S" "$UIDS" || return 1; bypass6 "$QUICOUT" filter "$CIDRS" || return 1; scoped_drop_quic xt6 "$QUICOUT" "$S" "$UIDS" || return 1; xt6 -t filter -A OUTPUT -j "$QUICOUT" || return 1
-  if [ "$SHARE" = 1 ]; then xt6 -t filter -N "$QUICFWD" || return 1; iface_in xt6 filter "$QUICFWD" "$IFACES" || return 1; bypass6 "$QUICFWD" filter "$CIDRS" || return 1; xt6 -t filter -A "$QUICFWD" -p udp --dport 443 -j DROP || return 1; xt6 -t filter -A FORWARD -j "$QUICFWD" || return 1; fi
+  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; v6supported || return 0; xt6 -t filter -N "$QUICOUT" || return 1; xt6 -t filter -A "$QUICOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; system_uid_return xt6 filter "$QUICOUT" "$S" || return 1; direct_uid_returns xt6 filter "$QUICOUT" "$DUIDS" || return 1; direct_gid_returns xt6 filter "$QUICOUT" "$DGIDS" || return 1; iface_out xt6 filter "$QUICOUT" "$IFACES" || return 1; blacklist_returns xt6 filter "$QUICOUT" "$S" "$UIDS" || return 1; bypass6 "$QUICOUT" filter "$CIDRS" || return 1; scoped_reject_quic xt6 "$QUICOUT" "$S" "$UIDS" || return 1; xt6 -t filter -A OUTPUT -j "$QUICOUT" || return 1
+  if [ "$SHARE" = 1 ]; then xt6 -t filter -N "$QUICFWD" || return 1; iface_in xt6 filter "$QUICFWD" "$IFACES" || return 1; shared_mac_returns xt6 filter "$QUICFWD" "$MACS" || return 1; bypass6 "$QUICFWD" filter "$CIDRS" || return 1; xt6 -t filter -A "$QUICFWD" -p udp --dport 443 -j REJECT || return 1; xt6 -t filter -A FORWARD -j "$QUICFWD" || return 1; fi
 }
 
 install_v6_strict(){
-  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; v6supported || return 0; xt6 -t filter -N "$V6OUT" || return 1; xt6 -t filter -A "$V6OUT" -o lo -j RETURN || return 1; xt6 -t filter -A "$V6OUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_out xt6 filter "$V6OUT" "$IFACES" || return 1; direct_uid_returns xt6 filter "$V6OUT" "$DUIDS" || return 1; blacklist_returns xt6 filter "$V6OUT" "$S" "$UIDS" || return 1; bypass6 "$V6OUT" filter "$CIDRS" || return 1; scoped_reject_all xt6 "$V6OUT" "$S" "$UIDS" || return 1; xt6 -t filter -A OUTPUT -j "$V6OUT" || return 1
-  if [ "$SHARE" = 1 ]; then xt6 -t filter -N "$V6FWD" || return 1; iface_in xt6 filter "$V6FWD" "$IFACES" || return 1; bypass6 "$V6FWD" filter "$CIDRS" || return 1; xt6 -t filter -A "$V6FWD" -j REJECT || return 1; xt6 -t filter -A FORWARD -j "$V6FWD" || return 1; fi
+  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; v6supported || return 0; xt6 -t filter -N "$V6OUT" || return 1; xt6 -t filter -A "$V6OUT" -o lo -j RETURN || return 1; xt6 -t filter -A "$V6OUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_out xt6 filter "$V6OUT" "$IFACES" || return 1; direct_uid_returns xt6 filter "$V6OUT" "$DUIDS" || return 1; direct_gid_returns xt6 filter "$V6OUT" "$DGIDS" || return 1; blacklist_returns xt6 filter "$V6OUT" "$S" "$UIDS" || return 1; bypass6 "$V6OUT" filter "$CIDRS" || return 1; scoped_reject_all xt6 "$V6OUT" "$S" "$UIDS" || return 1; xt6 -t filter -A OUTPUT -j "$V6OUT" || return 1
+  if [ "$SHARE" = 1 ]; then xt6 -t filter -N "$V6FWD" || return 1; iface_in xt6 filter "$V6FWD" "$IFACES" || return 1; shared_mac_returns xt6 filter "$V6FWD" "$MACS" || return 1; bypass6 "$V6FWD" filter "$CIDRS" || return 1; xt6 -t filter -A "$V6FWD" -j REJECT || return 1; xt6 -t filter -A FORWARD -j "$V6FWD" || return 1; fi
 }
 
-# "Disable IPv6" is a device-wide policy, unlike the scoped strict mode. A
-# network handover/netd can turn interface IPv6 back on after the sysctl write.
-# Keep a guard that covers root/core sockets, bypass apps, and new interfaces;
-# never exempt marks, UIDs or public CIDRs here. The guard permits local-only loopback.
+# Disable native IPv6 for applications, not the underlying Android network.
+# Keep NDP/PMTU and system CLAT/IMS transport alive; DNS must terminate locally.
+# No application UID, public CIDR, or bypass selection escapes this guard.
 install_v6_disable(){
   V6_SHARE="$1"; v6supported || return 0
   xt6 -t filter -N "$V6OUT" || return 1
   xt6 -t filter -A "$V6OUT" -o lo -j RETURN || return 1
+  xt6 -t filter -A "$V6OUT" -p ipv6-icmp -j RETURN || return 1
+  xt6 -t filter -A "$V6OUT" -p udp --dport 53 -j REJECT || return 1
+  xt6 -t filter -A "$V6OUT" -p tcp --dport 53 -j REJECT || return 1
+  xt6 -t filter -A "$V6OUT" -m owner --uid-owner 0-9999 -j RETURN || return 1
   xt6 -t filter -A "$V6OUT" -j REJECT || return 1
   xt6 -t filter -I OUTPUT 1 -j "$V6OUT" || return 1
   if [ "$V6_SHARE" = 1 ]; then
@@ -674,37 +771,53 @@ v6_disable_guard_ready(){
     xt6q -t filter -C "$V6FWD" -j REJECT >/dev/null 2>&1 || return 1
   fi
 }
-maintainv6(){
-  # Only the active disable session owns this journal. Recheck after taking the
-  # transaction lock so a stop/mode change cannot be undone by the watchdog.
-  [ -f "$IPV6_STATE" ] || return 0
-  v6disabled && return 0
-  acquire_lock || return 1
-  if [ -f "$IPV6_STATE" ] && grep -qx 'IPV6=disable' "$SESSION" 2>/dev/null; then
-    enforcev6 || { release_lock; return 1; }
-  fi
-  release_lock
-}
 
 install_kill4(){
-  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; xt4 -t filter -N "$KOUT" >/dev/null 2>&1 || true; xt4 -t filter -F "$KOUT" || return 1; xt4 -t filter -A "$KOUT" -o lo -j RETURN || return 1; iface_out xt4 filter "$KOUT" "$IFACES" || return 1; direct_uid_returns xt4 filter "$KOUT" "$DUIDS" || return 1; blacklist_returns xt4 filter "$KOUT" "$S" "$UIDS" || return 1; bypass4 "$KOUT" filter "$CIDRS" || return 1; scoped_reject_all xt4 "$KOUT" "$S" "$UIDS" || return 1; xt4 -t filter -I OUTPUT 1 -j "$KOUT" || return 1
-  if [ "$SHARE" = 1 ]; then xt4 -t filter -N "$KFWD" >/dev/null 2>&1 || true; xt4 -t filter -F "$KFWD" || return 1; iface_in xt4 filter "$KFWD" "$IFACES" || return 1; bypass4 "$KFWD" filter "$CIDRS" || return 1; xt4 -t filter -A "$KFWD" -j REJECT || return 1; xt4 -t filter -I FORWARD 1 -j "$KFWD" || return 1; fi
+  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; xt4 -t filter -N "$KOUT" >/dev/null 2>&1 || true; xt4 -t filter -F "$KOUT" || return 1; xt4 -t filter -A "$KOUT" -o lo -j RETURN || return 1; iface_out xt4 filter "$KOUT" "$IFACES" || return 1; direct_uid_returns xt4 filter "$KOUT" "$DUIDS" || return 1; direct_gid_returns xt4 filter "$KOUT" "$DGIDS" || return 1; blacklist_returns xt4 filter "$KOUT" "$S" "$UIDS" || return 1; bypass4 "$KOUT" filter "$CIDRS" || return 1; scoped_reject_all xt4 "$KOUT" "$S" "$UIDS" || return 1; xt4 -t filter -I OUTPUT 1 -j "$KOUT" || return 1
+  if [ "$SHARE" = 1 ]; then xt4 -t filter -N "$KFWD" >/dev/null 2>&1 || true; xt4 -t filter -F "$KFWD" || return 1; iface_in xt4 filter "$KFWD" "$IFACES" || return 1; shared_mac_returns xt4 filter "$KFWD" "$MACS" || return 1; bypass4 "$KFWD" filter "$CIDRS" || return 1; xt4 -t filter -A "$KFWD" -j REJECT || return 1; xt4 -t filter -I FORWARD 1 -j "$KFWD" || return 1; fi
 }
 install_kill6(){
-  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; v6supported || return 0; has ip6tables || return 1; xt6 -t filter -N "$KOUT" >/dev/null 2>&1 || true; xt6 -t filter -F "$KOUT" || return 1; xt6 -t filter -A "$KOUT" -o lo -j RETURN || return 1; iface_out xt6 filter "$KOUT" "$IFACES" || return 1; direct_uid_returns xt6 filter "$KOUT" "$DUIDS" || return 1; blacklist_returns xt6 filter "$KOUT" "$S" "$UIDS" || return 1; bypass6 "$KOUT" filter "$CIDRS" || return 1; scoped_reject_all xt6 "$KOUT" "$S" "$UIDS" || return 1; xt6 -t filter -I OUTPUT 1 -j "$KOUT" || return 1
-  if [ "$SHARE" = 1 ]; then xt6 -t filter -N "$KFWD" >/dev/null 2>&1 || true; xt6 -t filter -F "$KFWD" || return 1; iface_in xt6 filter "$KFWD" "$IFACES" || return 1; bypass6 "$KFWD" filter "$CIDRS" || return 1; xt6 -t filter -A "$KFWD" -j REJECT || return 1; xt6 -t filter -I FORWARD 1 -j "$KFWD" || return 1; fi
+  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; v6supported || return 0; has ip6tables || return 1; xt6 -t filter -N "$KOUT" >/dev/null 2>&1 || true; xt6 -t filter -F "$KOUT" || return 1; xt6 -t filter -A "$KOUT" -o lo -j RETURN || return 1; iface_out xt6 filter "$KOUT" "$IFACES" || return 1; direct_uid_returns xt6 filter "$KOUT" "$DUIDS" || return 1; direct_gid_returns xt6 filter "$KOUT" "$DGIDS" || return 1; blacklist_returns xt6 filter "$KOUT" "$S" "$UIDS" || return 1; bypass6 "$KOUT" filter "$CIDRS" || return 1; scoped_reject_all xt6 "$KOUT" "$S" "$UIDS" || return 1; xt6 -t filter -I OUTPUT 1 -j "$KOUT" || return 1
+  if [ "$SHARE" = 1 ]; then xt6 -t filter -N "$KFWD" >/dev/null 2>&1 || true; xt6 -t filter -F "$KFWD" || return 1; iface_in xt6 filter "$KFWD" "$IFACES" || return 1; shared_mac_returns xt6 filter "$KFWD" "$MACS" || return 1; bypass6 "$KFWD" filter "$CIDRS" || return 1; xt6 -t filter -A "$KFWD" -j REJECT || return 1; xt6 -t filter -I FORWARD 1 -j "$KFWD" || return 1; fi
 }
 
 validatecfg(){ BIN="$1"; CFG="$2"; : > "$CHECKLOG"; "$BIN" -t -d "$RUN" -f "$CFG" >>"$CHECKLOG" 2>&1; }
 hexport(){ printf '%04X' "$1" 2>/dev/null; }
-tcp_listen(){ P="$1"; if has ss && ss -lnt 2>/dev/null | grep -Eq "[:.]${P}([[:space:]]|$)"; then return 0; fi; if has netstat && netstat -lnt 2>/dev/null | grep -Eq "[:.]${P}([[:space:]]|$)"; then return 0; fi; H=$(hexport "$P") || return 1; awk -v x=":$H" '$2 ~ x"$" && $4=="0A" {found=1} END{exit(found?0:1)}' /proc/net/tcp /proc/net/tcp6 2>/dev/null; }
-udp_listen(){ P="$1"; if has ss && ss -lnu 2>/dev/null | grep -Eq "[:.]${P}([[:space:]]|$)"; then return 0; fi; if has netstat && netstat -lnu 2>/dev/null | grep -Eq "[:.]${P}([[:space:]]|$)"; then return 0; fi; H=$(hexport "$P") || return 1; awk -v x=":$H" '$2 ~ x"$" {found=1} END{exit(found?0:1)}' /proc/net/udp /proc/net/udp6 2>/dev/null; }
+# One ss invocation per readiness/port-check sample. /proc is a bounded fallback.
+LISTEN_SNAPSHOT_VALID=0
+LISTEN_PORTS=''
+listen_snapshot(){
+  LISTEN_SNAPSHOT_VALID=0; LISTEN_PORTS=''
+  if has ss; then
+    LS_RAW=$(ss -lnut 2>/dev/null); LS_RC=$?
+    if [ "$LS_RC" = 0 ]; then
+      LISTEN_PORTS=$(printf '%s\n' "$LS_RAW" | awk '
+        ($1=="tcp" || $1=="udp" || $1=="tcp6" || $1=="udp6") && NF>=5 {
+          proto=substr($1,1,3); n=split($5,a,":"); p=a[n];
+          if(p ~ /^[0-9]+$/) printf " %s:%s ",proto,p
+        }')
+      LISTEN_SNAPSHOT_VALID=1; return 0
+    fi
+  fi
+  [ -r /proc/net/tcp ] && [ -r /proc/net/udp ] || return 1
+  LISTEN_PORTS=$(awk '
+    function dec(h, i,n,c) {n=0; for(i=1;i<=length(h);i++){c=index("0123456789ABCDEF",toupper(substr(h,i,1)))-1; if(c<0)return -1; n=n*16+c} return n}
+    FNR>1 && (FILENAME ~ /udp/ || $4=="0A") {
+      n=split($2,a,":");p=dec(a[n]);if(p>=0)printf " %s:%s ",(FILENAME ~ /udp/?"udp":"tcp"),p
+    }' /proc/net/tcp /proc/net/tcp6 /proc/net/udp /proc/net/udp6 2>/dev/null) || return 1
+  LISTEN_SNAPSHOT_VALID=1
+}
+tcp_listen(){ [ "$LISTEN_SNAPSHOT_VALID" = 1 ] || listen_snapshot || return 1; case "$LISTEN_PORTS" in *" tcp:$1 "*) return 0;; *) return 1;; esac; }
+udp_listen(){ [ "$LISTEN_SNAPSHOT_VALID" = 1 ] || listen_snapshot || return 1; case "$LISTEN_PORTS" in *" udp:$1 "*) return 0;; *) return 1;; esac; }
+
 ready(){
+  listen_snapshot || return 1
   PID="$1"; M="$2"; TP="$3"; RP="$4"; TCP="$5"; UDP="$6"; DNS="$7"; DP="$8"; CP="$9"; core_maybe_alive "$PID" && kill -0 "$PID" >/dev/null 2>&1 || return 1; tcp_listen "$CP" || return 1
   case "$M" in tproxy) [ "$TCP" = 0 ] || tcp_listen "$TP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; redirect) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1;; enhance) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; tun|ebpf) ip link show hetu0 >/dev/null 2>&1 || return 1;; esac
   if [ "$DNS" = tproxy ] || [ "$DNS" = redirect ]; then tcp_listen "$DP" || return 1; udp_listen "$DP" || return 1; fi; return 0
 }
 check_start_ports(){
+  listen_snapshot || fail "无法读取端口状态，未盲目启动核心"
   M="$1"; TP="$2"; RP="$3"; TCP="$4"; UDP="$5"; DNS="$6"; DP="$7"; CP="$8"
   tcp_listen "$CP" && fail "控制接口端口 $CP 已被其他程序占用，请关闭冲突进程后重试"
   case "$M" in
@@ -726,47 +839,62 @@ check_start_ports(){
   fi
 }
 
+monotonic_seconds(){
+  read -r MONO_RAW MONO_UNUSED < /proc/uptime || return 1
+  MONO_SECONDS=${MONO_RAW%%.*}
+  case "$MONO_SECONDS" in ''|*[!0-9]*) return 1;; esac
+}
 wait_ready(){
   PID="$1"; M="$2"; TP="$3"; RP="$4"; TCP="$5"; UDP="$6"; DNS="$7"; DP="$8"; CP="$9"
-  # A real user config may have dozens of remote proxy/rule providers. On the first
-  # run inside Hetu's private HomeDir their caches are cold; Mihomo keeps the process
-  # alive while initial configuration is still loading. Do not mistake that for a dead
-  # listener after only 8 seconds. Keep network rules detached until every required
-  # listener is actually ready, so a slow cold start cannot black-hole traffic.
-  N=0
-  while [ "$N" -lt 900 ]; do
+  monotonic_seconds || return 3
+  READY_DEADLINE=$((MONO_SECONDS+90))
+  # 900 sleeps did NOT mean 90s: every old iteration performed several process
+  # launches and socket queries. The outer timeout could kill startup before rollback.
+  while :; do
     ready "$PID" "$M" "$TP" "$RP" "$TCP" "$UDP" "$DNS" "$DP" "$CP" && return 0
     core_maybe_alive "$PID" && kill -0 "$PID" >/dev/null 2>&1 || return 2
+    monotonic_seconds || return 3
+    [ "$MONO_SECONDS" -lt "$READY_DEADLINE" ] || return 3
     sleep 0.1
-    N=$((N+1))
   done
-  return 3
 }
 
-write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$7"; CP="$8"; DUIDS="$9"; { printf 'MODE=%s\n' "$M"; printf 'IPV6=%s\n' "$V6"; printf 'DNS=%s\n' "$DNS"; printf 'DNS_PORT=%s\n' "$DP"; printf 'APP_SCOPE=%s\n' "$S"; printf 'SHARE=%s\n' "$SHARE"; printf 'KILL=%s\n' "$KILL"; printf 'CONTROLLER_PORT=%s\n' "$CP"; printf 'DIRECT_UIDS=%s\n' "$DUIDS"; } > "$SESSION.new.$" && mv -f "$SESSION.new.$" "$SESSION"; }
+write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$7"; CP="$8"; DUIDS="$9"; DGIDS="${10:-}"; MACS="${11:-}"; { printf 'MODE=%s\n' "$M"; printf 'IPV6=%s\n' "$V6"; printf 'DNS=%s\n' "$DNS"; printf 'DNS_PORT=%s\n' "$DP"; printf 'APP_SCOPE=%s\n' "$S"; printf 'SHARE=%s\n' "$SHARE"; printf 'KILL=%s\n' "$KILL"; printf 'CONTROLLER_PORT=%s\n' "$CP"; printf 'DIRECT_UIDS=%s\n' "$DUIDS"; printf 'DIRECT_GIDS=%s\n' "$DGIDS"; printf 'SHARED_BYPASS_MACS=%s\n' "$MACS";
+    printf 'DNS6_POLICY=%s\n' "${START_DNS6:-redirect}"
+    printf 'TCP=%s\nUDP=%s\n' "$START_TCP" "$START_UDP"
+    L_TCP=0; L_UDP=0; L_DNS=0
+    case "$M" in tproxy) [ "$START_TCP" != 1 ] || L_TCP="$START_TP"; [ "$START_UDP" != 1 ] || L_UDP="$START_TP";;
+      enhance) [ "$START_TCP" != 1 ] || L_TCP="$START_RP"; [ "$START_UDP" != 1 ] || L_UDP="$START_TP";;
+      redirect) [ "$START_TCP" != 1 ] || L_TCP="$START_RP";; esac
+    [ "$DNS" = off ] || L_DNS="$DP"
+    printf 'LISTENER_TCP_PORT=%s\nLISTENER_UDP_PORT=%s\nACTIVE_DNS_PORT=%s\n' "$L_TCP" "$L_UDP" "$L_DNS"
+  } > "$SESSION.new.$$" && mv -f "$SESSION.new.$$" "$SESSION"; }
 watchdog(){
-  COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS="$6"; IFACES="$7"; DUIDS="$8"
-  mkdir -p "$RUN" || exit 0; printf '%s\n' "$$" > "$WATCHDOG_PID"; MISS=0; while [ "$MISS" -lt 3 ]; do if core_maybe_alive "$COREPID" && kill -0 "$COREPID" >/dev/null 2>&1; then MISS=0; maintainv6 || true; sleep 2; else MISS=$((MISS+1)); sleep 0.20; fi; done; acquire_lock || exit 0
+  COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS="$6"; IFACES="$7"; DUIDS="$8"; DGIDS="${9:-}"; MACS="${10:-}"
+  mkdir -p "$RUN" || exit 0; printf '%s\n' "$$" > "$WATCHDOG_PID"; MISS=0; H_TICK=0; while [ "$MISS" -lt 3 ]; do if core_maybe_alive "$COREPID" && kill -0 "$COREPID" >/dev/null 2>&1; then MISS=0; H_TICK=$((H_TICK+1)); if [ "$H_TICK" -ge 6 ]; then H_TICK=0; "$0" repair-network "$COREPID" >/dev/null 2>&1 || true; fi; sleep 2; else MISS=$((MISS+1)); sleep 0.20; fi; done; acquire_lock || exit 0
   REC=$(cat "$PIDFILE" 2>/dev/null || true)
   if [ "$REC" = "$COREPID" ]; then
     cleanup; restorev6; rm -f "$PIDFILE"
     RESULT="network-restored"
-    if [ "$KILL" = 1 ]; then if install_kill4 "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" "$DUIDS" && install_kill6 "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" "$DUIDS"; then RESULT="killswitch-active"; else RESULT="killswitch-failed"; fi; else rm -f "$MODEFILE" "$SESSION"; fi
+    if [ "$KILL" = 1 ]; then if install_kill4 "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" "$DUIDS" "$DGIDS" "$MACS" && install_kill6 "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" "$DUIDS" "$DGIDS" "$MACS"; then RESULT="killswitch-active"; else RESULT="killswitch-failed"; fi; else rm -f "$MODEFILE" "$SESSION"; fi
     date '+%Y-%m-%dT%H:%M:%S%z core exited; '"$RESULT" > "$CRASH_STATE" 2>/dev/null || true; printf '%s core=%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$COREPID" "$RESULT" >> "$WATCHDOG_LOG" 2>/dev/null || true
   fi
   rm -f "$WATCHDOG_PID"
 }
-start_watchdog(){ COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS="$6"; IFACES="$7"; DUIDS="$8"; stopwatchdog; "$0" watchdog "$COREPID" "$KILL" "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" "$DUIDS" >/dev/null 2>&1 & }
+start_watchdog(){ COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS="$6"; IFACES="$7"; DUIDS="$8"; DGIDS="${9:-}"; MACS="${10:-}"; stopwatchdog; "$0" watchdog "$COREPID" "$KILL" "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" "$DUIDS" "$DGIDS" "$MACS" >/dev/null 2>&1 & }
 
 start(){
-  START_BIN="$1"; START_CFG="$2"; START_MODE="$3"; START_TP="$4"; START_RP="$5"; START_V6="$6"; START_TCP="$7"; START_UDP="$8"; START_DNS="$9"; START_QUIC="${10}"; START_DP="${11}"; START_CP="${12}"; START_SCOPE="${13}"; START_UIDS="${14}"; START_SHARE="${15}"; START_KILL="${16}"; START_CIDRS="${17}"; START_IFACES="${18}"; START_DIRECT_UIDS="${19}"; START_PREVALIDATED="${20:-0}"; START_FAST_CAPS="${21:-0}"
+  START_BIN="$1"; START_CFG="$2"; START_MODE="$3"; START_TP="$4"; START_RP="$5"; START_V6="$6"; START_TCP="$7"; START_UDP="$8"; START_DNS="$9"; START_QUIC="${10}"; START_DP="${11}"; START_CP="${12}"; START_SCOPE="${13}"; START_UIDS="${14}"; START_SHARE="${15}"; START_KILL="${16}"; START_CIDRS="${17}"; START_IFACES="${18}"; START_DIRECT_UIDS="${19}"; START_PREVALIDATED="${20:-0}"; START_FAST_CAPS="${21:-0}"; START_DIRECT_GIDS="${22:-}"; START_SHARED_MACS="${23:-}"
   mkdir -p "$RUN" || fail "无法创建运行目录"; : > "$START_TIMING"
+  acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
   rm -f "$START_ERROR"; start_stage "preflight"
   if [ "$START_FAST_CAPS" != 1 ]; then
-    preflight "$START_MODE" "$START_TP" "$START_RP" "$START_V6" "$START_TCP" "$START_UDP" "$START_DNS" "$START_QUIC" "$START_DP" "$START_CP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_KILL" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" >/dev/null
+    preflight "$START_MODE" "$START_TP" "$START_RP" "$START_V6" "$START_TCP" "$START_UDP" "$START_DNS" "$START_QUIC" "$START_DP" "$START_CP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_KILL" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" >/dev/null
   else
     start_stage "preflight-cached"
   fi
+  start_stage "ipv6-dns-capability"
+  select_dns6_policy
   [ -x "$START_BIN" ] || fail "核心文件不存在或不可执行"; [ -r "$START_CFG" ] || fail "启动配置不存在"; mkdir -p "$RUN" || fail "无法创建运行目录"; if [ "$START_PREVALIDATED" != 1 ]; then validatecfg "$START_BIN" "$START_CFG" || fail "Mihomo 配置校验失败，当前网络未被接管"; fi; acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
   start_stage "cleanup-network"
   stopwatchdog; cleanup; restorev6 || fail "上次 IPv6 状态尚未恢复，请重试停止后再启动"
@@ -779,15 +907,12 @@ start(){
   if [ "$NEED_TP" = 1 ]; then allocnet || { cleanup; fail "找不到安全的 fwmark/路由表/规则优先级，已保持直连"; }; fi
   if [ "$START_V6" = disable ] && v6supported; then
     install_v6_disable "$START_SHARE" || { cleanup; fail "IPv6 禁用保护安装失败，未启动代理"; }
-    # The firewall guard is already active, so a vendor kernel/netd refusing the
-    # sysctl must not tear down a healthy proxy. Keep trying via the watchdog
-    # when a recovery journal exists; otherwise run safely in guard-only mode.
-    disablev6 || true
+    # No all/default/rmnet sysctl writes: netd owns the physical network.
   fi
 
   mkdir -p "$RUN/rules" "$RUN/proxy_provider" "$RUN/ruleset" "$RUN/ui" || { cleanup; restorev6; rm -f "$SESSION"; fail "无法创建 Mihomo 运行缓存目录"; }
   start_stage "launch-core"
-  : > "$LOG"; "$START_BIN" -d "$RUN" -f "$START_CFG" >>"$LOG" 2>&1 & START_PID=$!; printf '%s\n' "$START_PID" > "$PIDFILE"; printf '%s\n' "$START_MODE" > "$MODEFILE"; write_session "$START_MODE" "$START_V6" "$START_DNS" "$START_DP" "$START_SCOPE" "$START_SHARE" "$START_KILL" "$START_CP" "$START_DIRECT_UIDS"
+  : > "$LOG"; "$START_BIN" -d "$RUN" -f "$START_CFG" >>"$LOG" 2>&1 & START_PID=$!; printf '%s\n' "$START_PID" > "$PIDFILE"; printf '%s\n' "$START_MODE" > "$MODEFILE"; write_session "$START_MODE" "$START_V6" "$START_DNS" "$START_DP" "$START_SCOPE" "$START_SHARE" "$START_KILL" "$START_CP" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS"
   start_stage "wait-listeners"
   wait_ready "$START_PID" "$START_MODE" "$START_TP" "$START_RP" "$START_TCP" "$START_UDP" "$START_DNS" "$START_DP" "$START_CP"; READY_RC=$?
   if [ "$READY_RC" -ne 0 ]; then
@@ -803,34 +928,39 @@ start(){
   fi
 
   start_stage "install-ipv4-tproxy"
-  install_mangle4 "$START_TP" "$START_MODE" "$START_TCP" "$START_UDP" "$START_DNS" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 TPROXY 规则安装失败，已回滚"; }
+  install_mangle4 "$START_TP" "$START_MODE" "$START_TCP" "$START_UDP" "$START_DNS" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 TPROXY 规则安装失败，已回滚"; }
   start_stage "install-ipv4-redirect"
-  install_redirect4 "$START_RP" "$START_MODE" "$START_TCP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 Redirect 规则安装失败，已回滚"; }
+  install_redirect4 "$START_RP" "$START_MODE" "$START_TCP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 Redirect 规则安装失败，已回滚"; }
   start_stage "install-ipv4-dns"
-  if [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ] && [ "$START_DNS" != off ]; then install_dns_redirect4 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 DNS 劫持安装失败，已回滚"; }; fi
+  if [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ] && [ "$START_DNS" != off ]; then install_dns_redirect4 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 DNS 劫持安装失败，已回滚"; }; fi
   start_stage "install-udp-leak-guard"
   if [ "$START_UDP" = 1 ]; then
     case "$START_MODE" in
       tproxy|enhance)
-        install_udp_leak_guard4 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 UDP 防裸连规则安装失败，已回滚"; }
-        if [ "$START_V6" = enable ]; then install_udp_leak_guard6 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 UDP 防裸连规则安装失败，已回滚"; }; fi
+        install_udp_leak_guard4 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 UDP 防裸连规则安装失败，已回滚"; }
+        if [ "$START_V6" = enable ]; then install_udp_leak_guard6 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 UDP 防裸连规则安装失败，已回滚"; }; fi
         ;;
     esac
   fi
   start_stage "install-ipv4-quic"
-  [ "$START_QUIC" = 0 ] || install_quic4 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 QUIC 策略安装失败，已回滚"; }
+  [ "$START_QUIC" = 0 ] || install_quic4 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 QUIC 策略安装失败，已回滚"; }
   start_stage "install-ipv6"
   if [ "$START_V6" = enable ]; then
-    install_mangle6 "$START_TP" "$START_MODE" "$START_TCP" "$START_UDP" "$START_DNS" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 TPROXY 规则安装失败，已回滚"; }
-    install_redirect6 "$START_RP" "$START_MODE" "$START_TCP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 Redirect 规则安装失败，已回滚"; }
+    install_mangle6 "$START_TP" "$START_MODE" "$START_TCP" "$START_UDP" "$START_DNS" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 TPROXY 规则安装失败，已回滚"; }
+    install_redirect6 "$START_RP" "$START_MODE" "$START_TCP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 Redirect 规则安装失败，已回滚"; }
     if [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ] && [ "$START_DNS" != off ]; then install_dns_redirect6 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 DNS 劫持安装失败，已回滚"; }; fi
-    [ "$START_QUIC" = 0 ] || install_quic6 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 QUIC 策略安装失败，已回滚"; }
-  elif [ "$START_V6" = strict ]; then install_v6_strict "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "严格 IPv4 防泄漏规则安装失败，已回滚"; }; fi
+    [ "$START_QUIC" = 0 ] || install_quic6 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 QUIC 策略安装失败，已回滚"; }
+  elif [ "$START_V6" = strict ]; then install_v6_strict "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "严格 IPv4 防泄漏规则安装失败，已回滚"; }; fi
 
+  if [ "$START_V6" = disable ] && v6supported && [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ] && [ "$START_DNS" != off ]; then
+    install_disabled_dns6 || { cleanup; stopcore; rm -f "$SESSION"; fail "IPv6 DNS 防泄漏安装失败，未放行直连 DNS"; }
+  fi
+  # Record exactly what this session installed, not mutable app preferences.
+  health_record || { cleanup; stopcore; rm -f "$SESSION"; fail "无法记录网络完整性基线，已停止本次启动"; }
   start_stage "start-watchdog"
-  start_watchdog "$START_PID" "$START_KILL" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS"
+  start_watchdog "$START_PID" "$START_KILL" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS"
   rm -f "$START_ERROR"; start_stage "running"
-  DESC="tcp=$START_TCP,udp=$START_UDP,dns=$START_DNS,ipv6=$START_V6,scope=$START_SCOPE,share=$START_SHARE,kill=$START_KILL,quicBlock=$START_QUIC,directUids=$START_DIRECT_UIDS"
+  DESC="tcp=$START_TCP,udp=$START_UDP,dns=$START_DNS,ipv6=$START_V6,scope=$START_SCOPE,share=$START_SHARE,kill=$START_KILL,quicBlock=$START_QUIC,directUids=$START_DIRECT_UIDS,directGids=$START_DIRECT_GIDS,sharedMacs=$START_SHARED_MACS"
   if [ -n "$MARK" ]; then ok "Root $START_MODE 已启动（$DESC，mark=$MARK，table=$TABLE）"; else ok "Root $START_MODE 已启动（$DESC）"; fi
 }
 
@@ -849,9 +979,13 @@ status(){
   STATUS_MODE=$(cat "$MODEFILE" 2>/dev/null || echo none)
   SCOPEV=$(sed -n 's/^APP_SCOPE=//p' "$SESSION" 2>/dev/null | head -n 1)
   DIRECTV=$(sed -n 's/^DIRECT_UIDS=//p' "$SESSION" 2>/dev/null | head -n 1)
+  DIRECTGIDV=$(sed -n 's/^DIRECT_GIDS=//p' "$SESSION" 2>/dev/null | head -n 1)
+  SHAREMACV=$(sed -n 's/^SHARED_BYPASS_MACS=//p' "$SESSION" 2>/dev/null | head -n 1)
   SHAREV=$(sed -n 's/^SHARE=//p' "$SESSION" 2>/dev/null | head -n 1)
   KILLV=$(sed -n 's/^KILL=//p' "$SESSION" 2>/dev/null | head -n 1)
   DNSV=$(sed -n 's/^DNS=//p' "$SESSION" 2>/dev/null | head -n 1); [ -n "$DNSV" ] || DNSV=off
+  DNS6POLICY=$(sed -n 's/^DNS6_POLICY=//p' "$SESSION" 2>/dev/null | head -n 1)
+  case "$DNS6POLICY" in redirect|blocked-no-nat|blocked-no-redirect|off|core) ;; *) DNS6POLICY=unknown;; esac
   DPV=$(sed -n 's/^DNS_PORT=//p' "$SESSION" 2>/dev/null | head -n 1); case "$DPV" in ''|*[!0-9]*) DPV=1053;; esac
   IPV6V=$(sed -n 's/^IPV6=//p' "$SESSION" 2>/dev/null | head -n 1); [ -n "$IPV6V" ] || IPV6V=enable
   CPV=$(sed -n 's/^CONTROLLER_PORT=//p' "$SESSION" 2>/dev/null | head -n 1)
@@ -888,7 +1022,11 @@ status(){
 
   MODE4=false; MODE6=false
   case "$STATUS_MODE" in
-    tproxy|enhance) [ "$M4O" = true ] && MODE4=true; [ "$M6O" = true ] && MODE6=true;;
+    tproxy) [ "$M4O" = true ] && [ "$M4P" = true ] && MODE4=true; [ "$M6O" = true ] && [ "$M6P" = true ] && MODE6=true;;
+    enhance)
+      MODE4=true; MODE6=true
+      if grep -qx 'UDP=1' "$SESSION"; then [ "$M4O" = true ] && [ "$M4P" = true ] || MODE4=false; [ "$M6O" = true ] && [ "$M6P" = true ] || MODE6=false; fi
+      if grep -qx 'TCP=1' "$SESSION"; then [ "$N4O" = true ] || MODE4=false; [ "$N6O" = true ] || MODE6=false; fi;;
     redirect) [ "$N4O" = true ] && MODE4=true; [ "$N6O" = true ] && MODE6=true;;
     tun|ebpf)
       if ip link show hetu0 >/dev/null 2>&1; then MODE4=true; MODE6=true; fi
@@ -910,9 +1048,15 @@ status(){
       *)
         DNS4=$D4O
         [ "$SHAREV" != 1 ] || [ "$D4P" = true ] || DNS4=false
-        if v6supported && [ "$IPV6V" = enable ]; then
-          DNS6=$D6O
-          [ "$SHAREV" != 1 ] || [ "$D6P" = true ] || DNS6=false
+        if v6supported && { [ "$IPV6V" = enable ] || [ "$IPV6V" = disable ]; }; then
+          case "$DNS6POLICY" in
+            blocked-no-nat|blocked-no-redirect)
+              DNS6=false
+              if v6_disable_guard_ready "$SHAREV" &&
+                 xt6q -t filter -C "$V6OUT" -p tcp --dport 53 -j REJECT >/dev/null 2>&1 &&
+                 xt6q -t filter -C "$V6OUT" -p udp --dport 53 -j REJECT >/dev/null 2>&1; then DNS6=true; fi;;
+            *) DNS6=$D6O; [ "$SHAREV" != 1 ] || [ "$D6P" = true ] || DNS6=false;;
+          esac
         fi
         ;;
     esac
@@ -950,18 +1094,216 @@ status(){
   STALE=false
   if [ "$STATUS_RUNNING" = false ] && { [ "$M4O" = true ] || [ "$N4O" = true ] || [ "$D4O" = true ] || [ "$M6O" = true ] || [ "$N6O" = true ] || [ "$D6O" = true ] || [ "$K4" = true ] || [ "$K6" = true ] || [ "$STRICT6" = true ] || [ -f "$IPV6_STATE" ]; }; then STALE=true; fi
 
+  health_collect
   HEALTH=false
-  if [ "$STATUS_RUNNING" = true ] && [ "$IPV4OK" = true ] && [ "$IPV6OK" = true ] && [ "$DNS4" = true ] && [ "$DNS6" = true ] && [ "$DNSREADY" = true ] && [ "$WD" = true ]; then HEALTH=true; fi
+  if [ "$STATUS_RUNNING" = true ] && [ "$H_STATE" = healthy ] && [ "$WD" = true ]; then HEALTH=true; fi
   SM=""; ST=""; if loadnet >/dev/null 2>&1; then SM="$MARK"; ST="$TABLE"; fi
   SP=$(state_value PREF 2>/dev/null || true)
-  printf '{"ok":true,"runtimeSchema":3,"running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":false,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","log":"%s","configCheckLog":"%s"}\n' "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$SHAREV" "$KILLV" "$LOG" "$CHECKLOG"
+  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":false,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","log":"%s","configCheckLog":"%s"}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$LOG" "$CHECKLOG"
 }
 
+# Session-bound network integrity. No remote reachability failure restarts the core.
+# iptables-restore --noflush commits only the named Hetu chains, never netd tables.
+health_owned(){
+  awk '($1=="-N" || $1=="-A") && $2 ~ /^HETU_(MOUT|MPRE|NOUT|NPRE|DNSOUT|DNSPRE|QUICOUT|QUICFWD|WROUT|WRFWD|V6OUT|V6FWD)$/ {print;next}
+       $1=="-A" && $2 ~ /^(OUTPUT|PREROUTING|FORWARD)$/ && NF==4 && $3=="-j" && $4 ~ /^HETU_(MOUT|MPRE|NOUT|NPRE|DNSOUT|DNSPRE|QUICOUT|QUICFWD|WROUT|WRFWD|V6OUT|V6FWD)$/ {print}'
+}
+health_record(){ (
+  H_DIR="$RUN/network-manifest"; H_TMP="$H_DIR.new.$$"
+  rm -rf "$H_TMP"; mkdir -p "$H_TMP" || exit 1
+  cp "$SESSION" "$H_TMP/session" || exit 1
+  cat "$PIDFILE" > "$H_TMP/pid" || exit 1
+  [ ! -r "$NET_STATE" ] || cp "$NET_STATE" "$H_TMP/net" || exit 1
+  H_IPV6=$(sed -n 's/^IPV6=//p' "$SESSION")
+  H_DNS6=$(sed -n 's/^DNS6_POLICY=//p' "$SESSION")
+  for H_F in 4 6; do
+    [ "$H_F" != 6 ] || has ip6tables || continue
+    for H_T in mangle nat filter; do
+      # Missing optional IPv6 tables are not a failed session. Required tables
+      # still fail closed on ANY read error and remain checked by the watchdog.
+      if [ "$H_F" = 6 ]; then
+        [ "$H_IPV6" != bypass ] || continue
+        [ "$H_T" != mangle ] || [ "$H_IPV6" = enable ] || continue
+        [ "$H_T" != nat ] || [ "$H_IPV6" = enable ] || [ "$H_DNS6" = redirect ] || continue
+      fi
+      H_RAW=$("xt${H_F}" -t "$H_T" -S 2>/dev/null) || { rm -rf "$H_TMP"; exit 1; }
+      printf '%s\n' "$H_RAW" | health_owned > "$H_TMP/$H_F-$H_T"
+    done
+  done
+  # Never record an incomplete successful start as a healthy baseline.
+  case "$START_MODE" in
+    tproxy|enhance)
+      if [ "$START_UDP" = 1 ] || { [ "$START_MODE" = tproxy ] && [ "$START_TCP" = 1 ]; }; then
+        grep -q -- '^-A PREROUTING -j HETU_MPRE$' "$H_TMP/4-mangle" || { rm -rf "$H_TMP"; exit 1; }
+        [ -s "$H_TMP/net" ] || { rm -rf "$H_TMP"; exit 1; }
+      fi;;
+  esac
+  (cd "$H_TMP" && { cksum [46]-* session pid; [ ! -f net ] || cksum net; }) > "$H_TMP/checksums" || { rm -rf "$H_TMP"; exit 1; }
+  rm -rf "$H_DIR"; mv "$H_TMP" "$H_DIR"
+); }
+health_session_current(){
+  [ -r "$RUN/network-manifest/session" ] && [ -r "$RUN/network-manifest/pid" ] || return 1
+  cmp -s "$RUN/network-manifest/session" "$SESSION" && cmp -s "$RUN/network-manifest/pid" "$PIDFILE" || return 1
+  H_SUM=$(cd "$RUN/network-manifest" && { cksum [46]-* session pid; [ ! -f net ] || cksum net; }) || return 1
+  [ "$H_SUM" = "$(cat "$RUN/network-manifest/checksums" 2>/dev/null)" ]
+}
+health_fault(){ H_STATE=degraded; H_REASON="${H_REASON:+$H_REASON,}$1"; }
+health_unknown(){ H_UNKNOWN=1; H_REASON="${H_REASON:+$H_REASON,}$1"; }
+health_routes(){
+  H_F="$1"; H_RULES=$(ip -"$H_F" rule show 2>/dev/null) || { health_unknown "ipv$H_F-rule-read"; return; }
+  H_RULE_OK=$(printf '%s\n' "$H_RULES" | awk -v p="$PREF:" -v m="$MARK/$MASK" -v t="$TABLE" '$1==p && $2=="from" && $3=="all" && $4=="fwmark" && $5==m && ($6=="lookup" || $6=="table") && $7==t {print "yes"}')
+  [ "$H_RULE_OK" = yes ] || health_fault "ipv$H_F-policy-rule"
+  # A removed table is a confirmed absence. Other netlink failures are unknown.
+  H_ROUTES=$(ip -"$H_F" route show table "$TABLE" 2>&1); H_RC=$?
+  if [ "$H_RC" != 0 ]; then
+    case "$H_ROUTES" in *'FIB table does not exist'*|*'No such file'*) H_ROUTES='';; *) health_unknown "ipv$H_F-route-read"; return;; esac
+  fi
+  H_ROUTE_OK=$(printf '%s\n' "$H_ROUTES" | awk '$1=="local" && ($2=="default" || $2=="0.0.0.0/0" || $2=="::/0") && $3=="dev" && $4=="lo" {print "yes"}')
+  [ "$H_ROUTE_OK" = yes ] || health_fault "ipv$H_F-local-route"
+}
+health_collect(){
+  H_STATE=healthy; H_REASON=''; H_UNKNOWN=0
+  if [ ! -r "$SESSION" ] && [ ! -r "$PIDFILE" ]; then H_STATE=stopped; H_REASON=not-running; return; fi
+  if ! health_session_current; then H_STATE=upgrade-required; H_REASON=session-manifest-missing; return; fi
+  if [ -d "$LOCK_DIR" ] && [ "$LOCK_HELD" != 1 ]; then H_STATE=unknown; H_REASON=transaction-in-progress; return; fi
+  for H_E in "$RUN/network-manifest"/[46]-*; do
+    [ -s "$H_E" ] || continue
+    H_KEY=${H_E##*/}; H_F=${H_KEY%%-*}; H_T=${H_KEY#*-}
+    H_RAW=$("xt${H_F}q" -t "$H_T" -S 2>/dev/null) || { health_unknown "$H_KEY-read"; continue; }
+    for H_C in $(awk '$1=="-N" {print $2}' "$H_E"); do
+      H_EXPECTED=$(awk -v c="$H_C" '($1=="-N" || $1=="-A") && $2==c' "$H_E")
+      H_ACTUAL=$(printf '%s\n' "$H_RAW" | awk -v c="$H_C" '($1=="-N" || $1=="-A") && $2==c')
+      [ "$H_EXPECTED" = "$H_ACTUAL" ] || health_fault "$H_KEY-$H_C"
+    done
+    while IFS= read -r H_LINE; do
+      case "$H_LINE" in '-A OUTPUT '*|'-A PREROUTING '*|'-A FORWARD '*)
+        H_COUNT=$(printf '%s\n' "$H_RAW" | grep -Fxc -- "$H_LINE")
+        [ "$H_COUNT" = 1 ] || health_fault "$H_KEY-hook";;
+      esac
+    done < "$H_E"
+  done
+  if [ -s "$RUN/network-manifest/net" ]; then
+    if ! cmp -s "$NET_STATE" "$RUN/network-manifest/net" || ! loadnet; then
+      health_fault routing-journal
+    else
+      [ ! -s "$RUN/network-manifest/4-mangle" ] || health_routes 4
+      [ ! -s "$RUN/network-manifest/6-mangle" ] || health_routes 6
+    fi
+  fi
+  H_MODE=$(sed -n 's/^MODE=//p' "$SESSION")
+  case "$H_MODE" in tun|ebpf) ip link show hetu0 >/dev/null 2>&1 || health_fault native-device;; esac
+  H_SOCKETS=$(ss -lnut 2>/dev/null); H_SS=$?
+  if [ "$H_SS" != 0 ]; then health_unknown socket-read
+  else
+    for H_SPEC in CONTROLLER_PORT:tcp LISTENER_TCP_PORT:tcp LISTENER_UDP_PORT:udp ACTIVE_DNS_PORT:tcp ACTIVE_DNS_PORT:udp; do
+      H_P=$(sed -n "s/^${H_SPEC%:*}=//p" "$SESSION"); H_PROTO=${H_SPEC#*:}
+      case "$H_P" in ''|0) continue;; esac
+      printf '%s\n' "$H_SOCKETS" | awk -v p="$H_P" -v proto="$H_PROTO" '$1 ~ ("^"proto) && $5 ~ (":"p"$") {found=1} END {exit !found}' || health_fault "listener-$H_P-$H_PROTO"
+    done
+  fi
+  # Never mutate after an incomplete observation, even if another check failed.
+  [ "$H_UNKNOWN" = 0 ] || H_STATE=unknown
+}
+health_restore_table(){
+  H_E="$1"; H_KEY=${H_E##*/}; H_F=${H_KEY%%-*}; H_T=${H_KEY#*-}
+  H_RAW=$("xt${H_F}q" -t "$H_T" -S 2>/dev/null) || return 1
+  H_BATCH="$RUN/.repair-$H_KEY.$$"; printf '*%s\n' "$H_T" > "$H_BATCH" || return 1
+  H_CHANGED=0
+  for H_C in $(awk '$1=="-N" {print $2}' "$H_E"); do
+    H_EXPECTED=$(awk -v c="$H_C" '($1=="-N" || $1=="-A") && $2==c' "$H_E")
+    H_ACTUAL=$(printf '%s\n' "$H_RAW" | awk -v c="$H_C" '($1=="-N" || $1=="-A") && $2==c')
+    [ "$H_EXPECTED" != "$H_ACTUAL" ] || continue
+    if printf '%s\n' "$H_RAW" | grep -Fqx -- "-N $H_C"; then printf -- '-F %s\n' "$H_C" >> "$H_BATCH"
+    else printf -- '-N %s\n' "$H_C" >> "$H_BATCH"; fi
+    awk -v c="$H_C" '$1=="-A" && $2==c' "$H_E" >> "$H_BATCH"
+    H_CHANGED=1
+  done
+  while IFS= read -r H_LINE; do
+    case "$H_LINE" in '-A OUTPUT '*|'-A PREROUTING '*|'-A FORWARD '*)
+      H_COUNT=$(printf '%s\n' "$H_RAW" | grep -Fxc -- "$H_LINE")
+      [ "$H_COUNT" != 1 ] || continue
+      while [ "$H_COUNT" -gt 0 ]; do printf '%s\n' "$H_LINE" | sed 's/^-A /-D /' >> "$H_BATCH"; H_COUNT=$((H_COUNT-1)); done
+      # DNS/IPv6/UDP guards were installed at the front; preserve that contract.
+      case "$H_LINE" in *HETU_DNS*|*HETU_V6*|*HETU_WR*) printf '%s\n' "$H_LINE" | sed 's/^-A /-I /' >> "$H_BATCH";; *) printf '%s\n' "$H_LINE" >> "$H_BATCH";; esac
+      H_CHANGED=1;;
+    esac
+  done < "$H_E"
+  printf 'COMMIT\n' >> "$H_BATCH"
+  if [ "$H_CHANGED" = 1 ]; then
+    H_RESTORE=iptables-restore; [ "$H_F" != 6 ] || H_RESTORE=ip6tables-restore
+    # No unsafe line-by-line fallback: a failed commit must leave the table intact.
+    "$H_RESTORE" -w 2 --noflush < "$H_BATCH" >> "$RUN/network-repair.log" 2>&1; H_RC=$?
+  else H_RC=0; fi
+  rm -f "$H_BATCH"; return "$H_RC"
+}
+health_repair_due(){
+  monotonic_seconds || return 1
+  H_NOW="$MONO_SECONDS"
+  # Missing history is NOT a repair at boot time zero. A new session can fail
+  # within the first 30 seconds of boot, especially during network creation.
+  [ -r "$RUN/network-repair-at" ] || return 0
+  read -r H_LAST < "$RUN/network-repair-at" || return 0
+  case "$H_LAST" in ''|*[!0-9]*) return 0;; esac
+  [ "$H_NOW" -ge "$H_LAST" ] || return 0
+  [ $((H_NOW-H_LAST)) -ge 30 ]
+}
+health_repair(){ (
+  trap 'release_lock' EXIT
+  H_PID="${1:-}"; H_CURRENT=$(cat "$PIDFILE" 2>/dev/null || true)
+  [ -n "$H_PID" ] && [ "$H_PID" = "$H_CURRENT" ] && pidcore "$H_PID" && kill -0 "$H_PID" 2>/dev/null || exit 0
+  health_collect
+  [ "$H_STATE" = degraded ] || exit 0
+  H_FIRST="$H_REASON"
+  health_repair_due || exit 0
+  acquire_lock || exit 0
+  # Another repair may have finished while this one waited for the lock.
+  health_repair_due || exit 0
+  [ "$H_PID" = "$(cat "$PIDFILE" 2>/dev/null)" ] && health_session_current || exit 0
+  sleep 0.25; health_collect
+  [ "$H_STATE" = degraded ] && [ "$H_REASON" = "$H_FIRST" ] || exit 0
+  pidcore "$H_PID" && kill -0 "$H_PID" 2>/dev/null || exit 0
+  # Missing metadata or listeners cannot safely be reconstructed from preferences.
+  # Keep the core and its existing connections; report instead of restart-looping.
+  case "$H_REASON" in *routing-journal*|*listener-*|*native-device*) exit 0;; esac
+  printf '%s\n' "$H_NOW" > "$RUN/network-repair-at"
+  printf '%s pid=%s before=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$H_PID" "$H_REASON" >> "$RUN/network-repair.log"
+  if [ -s "$RUN/network-manifest/net" ]; then
+    loadnet || exit 0
+    for H_F in 4 6; do
+      [ -s "$RUN/network-manifest/$H_F-mangle" ] || continue
+      H_RULES=$(ip -"$H_F" rule show 2>/dev/null) || exit 0
+      # If a different owner occupies our exact priority, do not overwrite it.
+      H_AT_PREF=$(printf '%s\n' "$H_RULES" | awk -v p="$PREF:" '$1==p')
+      H_RULE_OK=$(printf '%s\n' "$H_AT_PREF" | awk -v m="$MARK/$MASK" -v t="$TABLE" '$4=="fwmark" && $5==m && ($6=="lookup" || $6=="table") && $7==t {print "yes"}')
+      [ -z "$H_AT_PREF" ] || [ "$H_RULE_OK" = yes ] || exit 0
+      H_DEFAULT=0.0.0.0/0; [ "$H_F" != 6 ] || H_DEFAULT=::/0
+      ip -"$H_F" route replace local "$H_DEFAULT" dev lo table "$TABLE" || exit 0
+      [ "$H_RULE_OK" = yes ] || ip -"$H_F" rule add pref "$PREF" fwmark "$MARK/$MASK" table "$TABLE" || exit 0
+    done
+  fi
+  # Guards and DNS first, OUTPUT marking last; never clear a global firewall table.
+  for H_T in filter nat mangle; do for H_F in 4 6; do
+    H_E="$RUN/network-manifest/$H_F-$H_T"; [ ! -s "$H_E" ] || health_restore_table "$H_E" || exit 0
+  done; done
+  health_collect
+  printf '%s pid=%s after=%s faults=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$H_PID" "$H_STATE" "$H_REASON" >> "$RUN/network-repair.log"
+  # Bound this diagnostic file without touching the Mihomo connection log.
+  tail -n 60 "$RUN/network-repair.log" > "$RUN/network-repair.log.new.$$" && mv "$RUN/network-repair.log.new.$$" "$RUN/network-repair.log"
+); }
+health_json(){ (
+  root; health_collect
+  H_DNS6=$(sed -n 's/^DNS6_POLICY=//p' "$SESSION" 2>/dev/null || true)
+  case "$H_DNS6" in redirect|blocked-no-nat|blocked-no-redirect|off|core) ;; *) H_DNS6=unknown;; esac
+  printf '{"ok":true,"networkIntegrity":"%s","networkFault":"%s","ipv6DnsPolicy":"%s","dataPlaneHealthy":%s}\n' "$H_STATE" "$H_REASON" "$H_DNS6" "$([ "$H_STATE" = healthy ] && echo true || echo false)"
+); }
+
 case "${1:-status}" in
-  preflight) [ "$#" = 18 ] || fail "参数错误"; preflight "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}" "${18}";;
-  start) [ "$#" = 22 ] || fail "参数错误"; root; start "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}" "${18}" "${19}" "${20}" "${21}" "${22}";;
+  preflight) { [ "$#" = 19 ] || [ "$#" = 20 ]; } || fail "参数错误"; preflight "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}" "${18}" "${19}" "${20:-}";;
+  start) { [ "$#" = 23 ] || [ "$#" = 24 ]; } || fail "参数错误"; root; start "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}" "${18}" "${19}" "${20}" "${21}" "${22}" "${23}" "${24:-}";;
   stop) root; acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"; stopwatchdog; cleanup; stopcore; restorev6 || fail "核心已停止，但 IPv6 原状态恢复失败，请重试停止"; rm -f "$SESSION"; ok "Root 代理已停止并恢复网络状态";;
   status) status;;
-  watchdog) [ "$#" = 9 ] || exit 0; root; watchdog "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9";;
+  network-health) health_json;;
+  repair-network) [ "$#" = 2 ] || exit 1; root; health_repair "$2";;
+  watchdog) { [ "$#" = 10 ] || [ "$#" = 11 ]; } || exit 0; root; watchdog "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11:-}";;
   *) fail "未知 Root 代理操作";;
 esac

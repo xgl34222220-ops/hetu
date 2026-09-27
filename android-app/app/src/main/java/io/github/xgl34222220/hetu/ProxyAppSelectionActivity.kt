@@ -67,7 +67,7 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
     fun setProxyApp(packageName: String, enabled: Boolean) {
         val next = proxyApps().toMutableSet()
         if (enabled) next.add(packageName) else next.remove(packageName)
-        prefs.edit().putStringSet("proxyAppPackages", next).apply()
+        prefs.edit().putStringSet("proxyAppPackages", next).apply(); ProxyRuntimeSettings.markDirty(prefs, "proxyAppPackages")
     }
     var query by rememberSaveable { mutableStateOf("") }
     var showSystem by rememberSaveable { mutableStateOf(false) }

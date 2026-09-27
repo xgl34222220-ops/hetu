@@ -1,0 +1,101 @@
+package io.github.xgl34222220.hetu
+
+import io.github.xgl34222220.hetu.ui.CrystalSurface as Surface
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.*
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import android.view.HapticFeedbackConstants
+import io.github.xgl34222220.hetu.ui.*
+import kotlinx.coroutines.delay
+
+internal fun delayBand(value: Long?): String = when {
+    value == null -> "unknown"
+    value <= 0 -> "failed"
+    value < 100 -> "good"
+    value <= 300 -> "fair"
+    else -> "slow"
+}
+
+/** Selection and latency are independent: selected 96ms remains green. */
+@Composable
+internal fun LatencyChip(value: Long?, testing: Boolean, onClick: (() -> Unit)? = null, modifier: Modifier = Modifier, compact: Boolean = false, prominent: Boolean = false) {
+    val t = LocalHetuTokens.current
+    val band = delayBand(value)
+    val foreground = when (band) { "failed" -> t.danger; "unknown" -> t.textSecondary; "good" -> t.success; "fair" -> MaterialTheme.colorScheme.primary; else -> t.warning }
+    val background = when (band) { "failed" -> t.dangerContainer; "good", "fair" -> MaterialTheme.colorScheme.primary.copy(alpha = .08f); "slow" -> t.warningContainer; else -> t.controlBackground }
+    var showBusy by remember { mutableStateOf(false) }
+    LaunchedEffect(testing) { if (testing) { delay(150); showBusy = true } else showBusy = false }
+    val target = if (showBusy) "测速中" else when { value == null -> "— ms"; value == -1L -> "超时"; value <= 0L -> "失败"; else -> "$value ms" }
+    Box(modifier.then(if (onClick != null) Modifier.sizeIn(minWidth = if (compact) 48.dp else 72.dp, minHeight = 48.dp)
+        .clickable(enabled = !testing, role = Role.Button, onClickLabel = "测速", onClick = onClick) else Modifier),
+        contentAlignment = Alignment.Center) {
+        Surface(shape = CircleShape, color = if (prominent || showBusy || value == null) Color.Transparent else background,
+            modifier = Modifier.semantics { stateDescription = if (showBusy) "正在测速" else "$band $target" }) {
+            Row(Modifier.padding(horizontal = if (compact) 6.dp else 9.dp, vertical = if (compact) 2.dp else 5.dp), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (showBusy) HetuBusyIndicator(Modifier.size(12.dp), t.textSecondary)
+                // Changing text must not animate through a clipped intermediate size.
+                HetuNumber(target, monospaced = true,
+                    modifier = Modifier.testTag("latency-text:$target"),
+                    color = if (showBusy || value == null) t.textSecondary else foreground,
+                    style = MaterialTheme.typography.labelMedium.copy(fontSize = if (prominent) 16.sp else if (compact) 11.sp else 13.sp, lineHeight = if (prominent) 23.sp else if (compact) 16.sp else 19.sp, fontWeight = if (prominent) FontWeight.SemiBold else FontWeight.Medium))
+            }
+        }
+    }
+}
+
+@Composable
+internal fun StrategyGroupCard(group: ProxyGroupUi, selected: String, expanded: Boolean, value: Long?, testing: Boolean,
+    modifier: Modifier = Modifier, onExpand: () -> Unit, onDelay: () -> Unit,
+    hazeState: dev.chrisbanes.haze.HazeState? = null, glassEnabled: Boolean = false) {
+    LiquidStrategyCard(group, selected, expanded, value, testing, modifier, onExpand, onDelay, hazeState, glassEnabled)
+}
+
+@Composable
+internal fun NodeChoiceCard(node: ProxyNodeUi, active: Boolean, value: Long?, testing: Boolean,
+    modifier: Modifier = Modifier, onSelect: () -> Unit, onDelay: () -> Unit) {
+    LiquidNodeCard(node, active, value, testing, modifier, onSelect, onDelay)
+}
+
+@Composable
+internal fun WorkspaceBento(runtime: ProxyRuntimeSnapshot, connections: Int, up: Long, down: Long,
+    used: Long, total: Long, count: Int, memory: Long, cpu: Float, onSubscription: () -> Unit) {
+    AlignedInstrumentPanel(runtime, connections, up, down, used, total, count, memory, cpu, onSubscription)
+}
+
+@Composable
+internal fun RuleMetricSummary(rules: Int, sources: Int, hits: Long?, modifier: Modifier = Modifier) {
+    val t = LocalHetuTokens.current
+    val nf = remember { java.text.NumberFormat.getIntegerInstance(java.util.Locale.US) }
+    Column(modifier.fillMaxWidth().testTag("rule-metrics"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("有效规则", color = t.textSecondary, fontSize = 12.sp)
+        HetuNumber(nf.format(rules), Modifier.fillMaxWidth().heightIn(min = with(LocalDensity.current) { 28.sp.toDp() }).testTag("rule-count"), style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, lineHeight = 26.sp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(Modifier.weight(1f)) { Text("已启用规则源", color = t.textSecondary, fontSize = 12.sp); HetuNumber(nf.format(sources)) }
+            Column(Modifier.weight(1f)) { Text("域名命中", color = t.textSecondary, fontSize = 12.sp); HetuNumber(hits?.let { nf.format(it) } ?: "—") }
+        }
+    }
+}

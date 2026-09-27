@@ -31,7 +31,9 @@ public final class ProxyAsyncValueTest {
         check(cache.get("wifi:enabled", true).equals("unknown") && calls[0] == 0, "dashboard returns before WAN fetch runs");
         for (int i = 0; i < 1000; i++) cache.get("wifi:enabled", true);
         check(queue.tasks.size() == 1, "refresh bursts share one request");
+        check(cache.view().state.equals("loading"), "loading is explicit before a result");
         queue.runNext();
+        check(cache.view().state.equals("success"), "success has a measured timestamp");
         check(cache.get("wifi:enabled", true).equals("IPv6-old") && queue.tasks.isEmpty(), "successful lookup is cached");
         check(cache.get("wifi:disabled", true).equals("unknown") && queue.tasks.size() == 1, "applied IPv6 settings immediately invalidate old address");
         check(cache.get("cellular:disabled", true).equals("unknown") && queue.tasks.size() == 1, "handover coalesces with existing lookup");
@@ -44,6 +46,7 @@ public final class ProxyAsyncValueTest {
         response[0] = null;
         cache.get("wifi:disabled", true);
         queue.runNext();
+        check(cache.view().state.equals("failed"), "failure is not an endless spinner");
         int failedCalls = calls[0];
         for (int i = 0; i < 1000; i++) cache.get("wifi:disabled", true);
         check(queue.tasks.isEmpty() && calls[0] == failedCalls, "failed lookup backs off instead of blocking every dashboard refresh");
@@ -57,6 +60,7 @@ public final class ProxyAsyncValueTest {
         now[0]++;
         cache.get("wifi:disabled", true);
         check(queue.tasks.size() == 1, "expired cache refreshes asynchronously");
+        check(cache.view().state.equals("stale"), "old result is marked stale during refresh");
         queue.runNext();
         queue.reject = true;
         check(cache.get("new-network", true).equals("unknown"), "executor rejection does not break dashboard sampling");

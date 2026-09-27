@@ -383,7 +383,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                             checked = chainEnabled,
                             onCheckedChange = {
                                 chainEnabled = it
-                                prefs.edit().putBoolean("proxyAdblockChain", it).apply()
+                                prefs.edit().putBoolean("proxyAdblockChain", it).apply(); ProxyRuntimeSettings.markDirty(prefs, "proxyAdblockChain")
                                 notice = if (snapshot.running) "设置已保存，重启 Root 代理后生效" else "设置已保存"
                                 revision++
                             },

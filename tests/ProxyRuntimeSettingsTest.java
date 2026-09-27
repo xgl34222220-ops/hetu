@@ -27,8 +27,19 @@ public final class ProxyRuntimeSettingsTest {
         check(selected.equals(ProxyRuntimeSettings.signature(profile(ProxyRuntimeProfile.Ipv6.ENABLE),values)),"set ordering cannot manufacture pending settings");
         values.put("proxyAppPackages",Collections.singleton("example.b"));
         check(!selected.equals(ProxyRuntimeSettings.signature(profile(ProxyRuntimeProfile.Ipv6.ENABLE),values)),"changed app selection stays pending");
+        String beforeMac=ProxyRuntimeSettings.signature(profile(ProxyRuntimeProfile.Ipv6.ENABLE),values);
+        values.put("proxySharedBypassMacs",new LinkedHashSet<>(Arrays.asList("aa:bb:cc:dd:ee:ff","11:22:33:44:55:66")));
+        String macPolicy=ProxyRuntimeSettings.signature(profile(ProxyRuntimeProfile.Ipv6.ENABLE),values);
+        check(!beforeMac.equals(macPolicy),"shared MAC bypass needs network transaction");
+        values.put("proxySharedBypassMacs",new LinkedHashSet<>(Arrays.asList("11:22:33:44:55:66","aa:bb:cc:dd:ee:ff")));
+        check(macPolicy.equals(ProxyRuntimeSettings.signature(profile(ProxyRuntimeProfile.Ipv6.ENABLE),values)),"MAC set ordering cannot manufacture pending settings");
         check(ProxyRuntimeSettings.ipv6Label("disable").contains("本机"),"label distinguishes local policy from remote node egress");
         check(ProxyRuntimeSettings.ipv6Label("").contains("确认"),"unknown is not advertised as enabled or disabled");
+        check(!ProxyRuntimeSettings.runtimeUpgradePending(true,0,false),"missing revision does not manufacture a repair request");
+        check(!ProxyRuntimeSettings.runtimeUpgradePending(false,0,true),"stopped runtime applies upgrade on next start");
+        check(!ProxyRuntimeSettings.runtimeUpgradePending(true,ProxyRuntimeSettings.RUNTIME_REVISION,false),"UI-only APK updates do not require runtime restart");
+        check(!ProxyRuntimeSettings.runtimeUpgradePending(true,ProxyRuntimeSettings.RUNTIME_REVISION,true),"retired upgrade flag cannot revive the old repair loop");
+        check(!ProxyRuntimeSettings.runtimeUpgradePending(true,ProxyRuntimeSettings.RUNTIME_REVISION+1,false),"downgrade does not treat a newer runtime as missing files");
         System.out.println("ProxyRuntimeSettingsTest passed: "+checks);
     }
 }

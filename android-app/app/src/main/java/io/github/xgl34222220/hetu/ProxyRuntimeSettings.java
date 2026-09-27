@@ -7,8 +7,96 @@ import java.util.*;
 
 /** Compares saved network settings with the snapshot of a completed transaction. */
 final class ProxyRuntimeSettings {
+    static final String DIRTY_KEY = "proxyRootSettingsDirty";
+    // Bump only when deployed Root scripts/core behavior changes, never for UI-only APKs.
+    static final int RUNTIME_REVISION = 145;
+    static final String APPLIED_RUNTIME_REVISION_KEY = "proxyRootAppliedRuntimeRevision";
+    private static final Set<String> RESTART_KEYS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
+            "proxyBaseCore","proxyBaseMode","proxyBaseIpv6","proxyAppScope","proxyDnsHijack",
+            "proxyBaseAutoOverwrite","proxyTcp","proxyUdp","proxyQuicBlocked","proxyCnIpDirect",
+            "proxyAdblockChain","proxySharedNetwork","proxyKillSwitch","proxyAppPackages",
+            "proxyDirectGids","proxyBypassCidrs","proxyBypassInterfaces","proxySharedBypassMacs"
+    )));
+
+    static final String APPLIED_SETTINGS_KEY = "proxyRootAppliedSettings";
+    static final String APPLY_ERROR_KEY = "proxyRootSettingsApplyError";
+    // SharedPreferences is application-scoped and does not retain an Activity.
+    // The existing settings composable calls pending before rendering this notice.
+    private static volatile SharedPreferences noticePreferences;
+
+    static void markDirty(SharedPreferences prefs, String key) {
+        if (prefs != null && RESTART_KEYS.contains(key)) {
+            String applied = prefs.getString(APPLIED_SETTINGS_KEY, "");
+            boolean changed = applied == null || applied.isEmpty() || !applied.equals(signature(prefs));
+            prefs.edit().putBoolean(DIRTY_KEY, changed).remove(APPLY_ERROR_KEY).apply();
+        }
+    }
+
+    static void clearDirty(SharedPreferences prefs) {
+        if (prefs != null) prefs.edit().remove(DIRTY_KEY).apply();
+    }
+
+    static boolean pending(boolean running, SharedPreferences prefs) {
+        noticePreferences = prefs;
+        if (!running || prefs == null) return false;
+        String applied = prefs.getString(APPLIED_SETTINGS_KEY, "");
+        // A real applied snapshot is authoritative. A leftover boolean cannot
+        // require another restart when the settings already match that snapshot.
+        return applied == null || applied.isEmpty() ? prefs.getBoolean(DIRTY_KEY, false)
+                : !applied.equals(signature(prefs));
+    }
+
+    static boolean runtimeUpgradePending(boolean running, SharedPreferences prefs) { return false; }
+    static boolean runtimeUpgradePending(boolean running, int revision, boolean recordedPending) { return false; }
+
+    static boolean acknowledgeApplied(SharedPreferences prefs, boolean completedReplacement) {
+        if (prefs == null || !completedReplacement) return false;
+        String applied = prefs.getString(APPLIED_SETTINGS_KEY, "");
+        if (applied == null || applied.isEmpty()) return false;
+        // RootProxyManager records the captured request after success. Never
+        // overwrite it with settings the user changed while restart was running.
+        return prefs.edit().putInt(APPLIED_RUNTIME_REVISION_KEY, RUNTIME_REVISION)
+                .putBoolean(DIRTY_KEY, !applied.equals(signature(prefs)))
+                .remove("proxyRootRuntimeRefreshPending").remove("proxyRootRuntimeRefreshPendingAt")
+                .remove("proxyRootUpgradeError").remove(APPLY_ERROR_KEY).commit();
+    }
+
+    static void beginApply(SharedPreferences prefs) {
+        noticePreferences = prefs;
+        if (prefs != null) prefs.edit().remove(APPLY_ERROR_KEY).apply();
+    }
+
+    static void recordFailure(SharedPreferences prefs, Exception error) {
+        noticePreferences = prefs;
+        if (prefs == null) return;
+        String message = error == null ? "未返回错误原因" : error.getMessage();
+        if (message == null || message.trim().isEmpty()) message = error == null ? "未知错误" : error.getClass().getSimpleName();
+        prefs.edit().putString(APPLY_ERROR_KEY, message).apply();
+    }
+
+    static String applyDescription() {
+        SharedPreferences prefs = noticePreferences;
+        if (prefs == null) return "应用后会短暂重连代理。";
+        String error = prefs.getString(APPLY_ERROR_KEY, "");
+        if (error != null && !error.isEmpty()) {
+            // Previous versions stored mixed stderr and JSON as one giant error.
+            if (error.contains("/proc/") && error.contains("\"ok\":true"))
+                return "上次控制响应混入进程扫描警告。应用一次以同步状态。";
+            String readable = error.replace('\n', ' ').replace('\r', ' ').trim();
+            return "应用失败：" + (readable.length() > 140 ? readable.substring(0, 140) + "…" : readable);
+        }
+        String fallback = prefs.getString("proxyAdblockLastError", "");
+        if (fallback != null && !fallback.isEmpty() && prefs.getBoolean("proxyAdblockChain", true))
+            return "广告串联尚未生效：" + fallback;
+        return "应用后会短暂重连代理。";
+    }
+
     static String signature(SharedPreferences prefs) {
         return signature(ProxyRuntimeProfile.load(prefs), prefs.getAll());
+    }
+
+    static String captureRequest(ProxyRuntimeProfile profile, SharedPreferences prefs) {
+        return signature(profile, prefs.getAll());
     }
 
     static String signature(ProxyRuntimeProfile p, Map<String, ?> values) {
@@ -18,7 +106,7 @@ final class ProxyRuntimeSettings {
                 String.valueOf(p.cnIpDirect),String.valueOf(p.adblockChain)}) append(state,value);
         for(String key:new String[]{"proxySharedNetwork","proxyKillSwitch"})
             append(state,String.valueOf(Boolean.TRUE.equals(values.get(key))));
-        for(String key:new String[]{"proxyAppPackages","proxyBypassCidrs","proxyBypassInterfaces"}) {
+        for(String key:new String[]{"proxyAppPackages","proxyDirectGids","proxyBypassCidrs","proxyBypassInterfaces","proxySharedBypassMacs"}) {
             append(state,key);
             TreeSet<String> sorted=new TreeSet<>();
             Object raw=values.get(key);

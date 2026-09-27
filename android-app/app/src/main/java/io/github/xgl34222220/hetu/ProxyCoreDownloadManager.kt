@@ -1,6 +1,7 @@
 package io.github.xgl34222220.hetu
 
 import android.content.Context
+import android.net.Uri
 import android.os.Build
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -40,6 +41,7 @@ internal data class ProxyCoreRemoteStatus(
 internal class ProxyCoreDownloadManager(context: Context) {
     private val app = context.applicationContext
     private val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private val uiPrefs = app.getSharedPreferences("hetu", Context.MODE_PRIVATE)
     private val store = ProxyCoreStore(app)
 
     private data class Source(
@@ -197,6 +199,29 @@ internal class ProxyCoreDownloadManager(context: Context) {
         )
     }
 
+    suspend fun importFromUri(
+        core: ProxyRuntimeProfile.Core,
+        uri: Uri,
+        displayName: String,
+    ): ProxyCoreRemoteStatus = withContext(Dispatchers.IO) {
+        val temp = File(app.cacheDir, "proxy-core-import-${core.id}-${System.nanoTime()}.bin")
+        try {
+            val input = app.contentResolver.openInputStream(uri) ?: throw IOException("无法读取核心文件")
+            input.use { writeLimited(it, temp) }
+            verifyElf(temp)
+            FileInputStream(temp).use { store.importCore(core, it) }
+            prefs.edit()
+                .putString("version_${core.id}", "本地导入")
+                .putString("source_${core.id}", "local")
+                .putString("asset_${core.id}", displayName.ifBlank { uri.lastPathSegment ?: "本地文件" })
+                .putLong("updated_${core.id}", System.currentTimeMillis())
+                .apply()
+            localStatus(core, "已从文件导入")
+        } finally {
+            temp.delete()
+        }
+    }
+
     suspend fun removeDownloaded(core: ProxyRuntimeProfile.Core): ProxyCoreRemoteStatus = withContext(Dispatchers.IO) {
         if (store.installed(core)) store.remove(core)
         prefs.edit()
@@ -351,7 +376,7 @@ internal class ProxyCoreDownloadManager(context: Context) {
     private fun download(asset: Asset, progress: (Long, Long) -> Unit): File {
         if (asset.size > MAX_DOWNLOAD) throw IOException("核心文件过大")
         val target = File(app.cacheDir, "proxy-core-${asset.source.core.id}-${System.nanoTime()}.pkg")
-        val connection = open(asset.url)
+        val connection = open(assetDownloadUrl(asset.url))
         try {
             connection.connectTimeout = 10_000
             connection.readTimeout = 45_000
@@ -537,6 +562,19 @@ internal class ProxyCoreDownloadManager(context: Context) {
             if (n < 0) throw IOException("压缩包提前结束")
             remaining -= n
         }
+    }
+
+    private fun assetDownloadUrl(url: String): String {
+        if (!uiPrefs.getBoolean("downloadMirrorEnabled", false)) return url
+        if (!url.startsWith("https://github.com/")) return url
+        val prefix = uiPrefs.getString("downloadMirrorPrefix", "").orEmpty().trim()
+        if (!prefix.startsWith("https://") || prefix.length > 512) return url
+        val candidate = if ("{url}" in prefix) {
+            prefix.replace("{url}", url)
+        } else {
+            prefix.trimEnd('/') + "/" + url
+        }
+        return candidate.takeIf { it.startsWith("https://") && it.length <= 4096 } ?: url
     }
 
     private fun open(url: String): HttpsURLConnection {

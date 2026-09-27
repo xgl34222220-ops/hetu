@@ -59,6 +59,7 @@ internal data class CompactHomeData(
     val message: String = "",
     val pendingSettings: Boolean = false,
     val delays: Map<String, Long> = emptyMap(),
+    val latencyTargets: List<String> = CompactHomeFormat.sites,
     val wan: String = "—",
     val lan: String = "—",
     val countryCode: String = "",
@@ -76,10 +77,10 @@ internal data class CompactHomeData(
 
 internal object CompactHomeFormat {
     val sites = listOf("Baidu", "Cloudflare", "Google")
-    fun ordered(delays: Map<String, Long>, ascending: Boolean): List<String> =
-        if (!ascending) sites else sites.sortedWith(compareBy<String> {
+    fun ordered(delays: Map<String, Long>, ascending: Boolean, targets: List<String> = sites): List<String> =
+        if (!ascending) targets else targets.sortedWith(compareBy<String> {
             delays[it]?.takeIf { value -> value > 0 } ?: Long.MAX_VALUE
-        }.thenBy { sites.indexOf(it) })
+        }.thenBy { targets.indexOf(it) })
     fun remaining(used: Long, total: Long): Int? = if (total <= 0) null else
         ((1.0 - used.coerceAtLeast(0).toDouble() / total) * 100).toInt().coerceIn(0, 100)
     fun bytes(value: Long): String {
@@ -322,7 +323,7 @@ private fun HomeLatency(data: CompactHomeData, refresh: () -> Unit) {
     val p = LocalHomePalette.current
     val motion = LocalHomeMotion.current
     var ascending by rememberSaveable { mutableStateOf(false) }
-    val names = CompactHomeFormat.ordered(data.delays, ascending)
+    val names = CompactHomeFormat.ordered(data.delays, ascending, data.latencyTargets)
     HomeCard(Modifier.fillMaxWidth().testTag("home-latency")) {
         Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -343,7 +344,7 @@ private fun HomeLatency(data: CompactHomeData, refresh: () -> Unit) {
                         Column(Modifier.weight(1f).testTag("latency-$name"), horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(name, color = p.muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             val value = data.delays[name]
-                            val text = when { data.testing -> "···"; value == null -> "—"; value <= 0 -> "超时"; else -> "$value ms" }
+                            val text = when { data.testing -> "···"; value == null -> "—"; value == -1L -> "超时"; value <= 0 -> "失败"; else -> "$value ms" }
                             val tint = when { value == null || data.testing -> p.muted; value <= 0 || value >= 1000 -> p.red
                                 value >= 300 -> Color(0xFFD97706); else -> p.blue }
                             AnimatedContent(text, transitionSpec = {

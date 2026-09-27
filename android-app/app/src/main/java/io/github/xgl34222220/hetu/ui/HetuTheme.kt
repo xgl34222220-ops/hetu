@@ -10,6 +10,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
@@ -41,6 +42,10 @@ data class HetuTokens(
     val outline: Color = Color.Unspecified,
     val controlBackground: Color = Color.Unspecified,
     val selectionBackground: Color = Color.Unspecified,
+    val textOnPage: Color = textSecondary,
+    val successContainer: Color = success.copy(alpha = .10f),
+    val warningContainer: Color = warning.copy(alpha = .10f),
+    val dangerContainer: Color = danger.copy(alpha = .10f),
 )
 
 val LocalHetuTokens = staticCompositionLocalOf {
@@ -123,7 +128,17 @@ private fun accentColor(raw: String, dark: Boolean): Color {
 @Composable
 fun HetuTheme(content: @Composable () -> Unit) {
     val context = LocalContext.current
-    val prefs = context.getSharedPreferences("hetu", 0)
+    val prefs = remember(context) { context.getSharedPreferences("hetu", 0) }
+    var themeRevision by remember { mutableIntStateOf(0) }
+    DisposableEffect(prefs) {
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key in setOf("appearance", "appLanguage", "pureBlackDark", "enableMonet", "uiStyle", "colorStandard", "colorPalette", "uiScale", "accentHex", "enableAnimations")) themeRevision++
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+    themeRevision
+    val motionEnabled = rememberHetuMotionEnabled()
     val appearance = prefs.getString("appearance", "system") ?: "system"
     val dark = appearance == "dark" || (appearance == "system" && isSystemInDarkTheme())
     val pureBlack = dark && prefs.getBoolean("pureBlackDark", false)
@@ -203,6 +218,8 @@ fun HetuTheme(content: @Composable () -> Unit) {
         }
         CompositionLocalProvider(
             LocalHetuTokens provides tokens,
+            LocalHetuLanguage provides prefs.getString("appLanguage", "system").orEmpty(),
+            LocalHetuMotionEnabled provides motionEnabled,
             LocalDensity provides scaledDensity,
             content = inner,
         )
