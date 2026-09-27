@@ -1,0 +1,53 @@
+name: Export existing public toolchain parts
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/export-ui92-runtime146-tools.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: Hetu-UI146-Offline-Toolchain
+          run-id: 36323592026
+          github-token: ${{ github.token }}
+          path: kit
+      - name: Verify and split the existing dependency archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd kit
+          sha256sum -c hetu-ui146-toolchain.sha256
+          split -b 400M -d -a 2 hetu-ui146-toolchain.tar.zst toolchain.part.
+          sha256sum toolchain.part.* > parts.sha256
+          ls -lh toolchain.part.*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ui92-runtime146-tools-00
+          path: |
+            kit/toolchain.part.00
+            kit/parts.sha256
+            kit/hetu-ui146-toolchain.sha256
+          compression-level: 0
+          retention-days: 2
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ui92-runtime146-tools-01
+          path: kit/toolchain.part.01
+          compression-level: 0
+          retention-days: 2
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ui92-runtime146-tools-02
+          path: kit/toolchain.part.02
+          compression-level: 0
+          retention-days: 2
+          if-no-files-found: error
