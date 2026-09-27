@@ -25,6 +25,8 @@ jobs:
           git cat-file --batch-all-objects --batch-check='%(objectname) %(objecttype)' | awk '$2 == "blob" { print $1 }' > inventory/blob-ids.txt
           git archive --format=zip HEAD -o inventory/main-source.zip
           git ls-tree -r HEAD > inventory/main-files.txt
+          git archive --format=zip refs/remotes/origin/fix/ui146-polish-20260927 -o inventory/reference-source.zip
+          git rev-parse refs/remotes/origin/fix/ui146-polish-20260927 > inventory/reference-commit.txt
       - uses: actions/upload-artifact@v4
         with:
           name: UI92-runtime146-source-inventory
