@@ -59,7 +59,7 @@ internal fun StrategyPanel11(
     refresh: suspend () -> Unit, select: suspend (String, String) -> String,
     measure: suspend (String) -> Long, onDetailVisible: (Boolean) -> Unit = {},
 ) {
-    StrategyPanel13(state, delays, prefs, searchRequest, onTab, refresh, select, measure, onDetailVisible)
+    BoxProxyExactStrategy17(state, delays, prefs, searchRequest, onTab, refresh, select, measure, onDetailVisible)
 }
 
 @OptIn(ExperimentalFoundationApi::class)
