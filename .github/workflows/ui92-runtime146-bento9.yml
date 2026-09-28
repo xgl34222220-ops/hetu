@@ -1,0 +1,240 @@
+name: UI92 Runtime146 Bento UI9
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/ui92-runtime146-bento9.yml'
+      - 'tools/apply_ui92_runtime146_bento9.py'
+      - 'tools/fix_ui9_layout.py'
+      - 'android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeUi9BentoTest.kt'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: ui92-runtime146-bento9
+  cancel-in-progress: false
+jobs:
+  bento:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply exact UI8 based presentation changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor c7dc243376586481aae39b3e665e7ab92271d95f HEAD
+          mkdir -p integration-evidence
+          git rev-parse HEAD > integration-evidence/input-commit.txt
+          if grep -q '0.4.0-ui92-r146.8' android-app/app/build.gradle.kts; then
+            python3 tools/apply_ui92_runtime146_bento9.py
+          else
+            grep -q '0.4.0-ui92-r146.9' android-app/app/build.gradle.kts
+          fi
+          if test -f tools/fix_ui9_layout.py; then python3 tools/fix_ui9_layout.py; fi
+          git diff --check
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Prepare unchanged SDK and tools
+        run: |
+          set -euo pipefail
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort | tail -n 1)
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" 'platforms;android-37.0' 'build-tools;37.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+      - name: Reuse UI9 test signing identity on subsequent runs
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: hetu-ui9-debug-signing-v1
+      - name: Restore exact original146 runtime assets from verified UI8
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release download ui92-r146.8-test --repo "$GITHUB_REPOSITORY" --pattern 'Hetu-UI92-Runtime146-UI8.apk' --dir .reference-ui8
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,zipfile
+          apk=Path('.reference-ui8/Hetu-UI92-Runtime146-UI8.apk')
+          assert hashlib.sha256(apk.read_bytes()).hexdigest()=='540a952df6f3a87e07f7e031cf6dfb68c9f6e1d0ac570a549034544c1eb9e0d2'
+          expected=json.load(open('UI92_RUNTIME146_INPUTS.json'))['original146_payload']
+          with zipfile.ZipFile(apk) as z:
+              assert z.testzip() is None
+              for name,digest in expected.items():
+                  data=z.read(name)
+                  assert hashlib.sha256(data).hexdigest()==digest,name
+                  if name.startswith('lib/'): out=Path('android-app/app/src/main/jniLibs')/name.removeprefix('lib/')
+                  elif name.startswith('assets/'): out=Path('android-app/app/src/main')/name
+                  else: raise AssertionError(name)
+                  out.parent.mkdir(parents=True,exist_ok=True)
+                  if out.exists(): assert out.read_bytes()==data,name
+                  else: out.write_bytes(data)
+          print('Restored verified original146 entries:',len(expected))
+          PY
+      - name: Compile actual APK and run eleven regression suites
+        working-directory: android-app
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:assembleDebug :app:testDebugUnitTest --tests '*CompactHomeDashboardTest' --tests '*Runtime146ContractTest' --tests '*Ui92IntegrationTest' --tests '*NodeSelectionContinuityTest' --tests '*ProxyLatencyRegressionTest' --tests '*NativeDockUi4Test' --tests '*HomeUi5RegressionTest' --tests '*HomeUi6RegressionTest' --tests '*HomeUi7InteractionTest' --tests '*HomeUi8ExperienceTest' --tests '*HomeUi9BentoTest' --stacktrace 2>&1 | tee ../integration-evidence/build.log
+      - name: Report actual outcomes including failures
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET,json
+          Path('integration-evidence').mkdir(exist_ok=True)
+          suites=[]
+          for p in Path('android-app/app/build/test-results/testDebugUnitTest').glob('TEST-*.xml'):
+              root=ET.parse(p).getroot()
+              row={k:root.get(k) for k in ['name','tests','failures','errors','skipped']}
+              suites.append(row);print(row)
+              for c in root.findall('testcase'):
+                  for e in list(c.findall('failure'))+list(c.findall('error')):
+                      print('FAILURE',c.get('name'),e.get('message'),(e.text or '')[:2400])
+          Path('integration-evidence/test-suites.json').write_text(json.dumps(suites,indent=2))
+          PY
+      - name: Verify identity signature runtime payload and protected sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=android-app/app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/37.0.0/aapt" dump badging "$APK" > integration-evidence/apk-identity.txt
+          grep -q "package: name='io.github.xgl34222220.hetu'" integration-evidence/apk-identity.txt
+          grep -q "versionCode='1010'" integration-evidence/apk-identity.txt
+          grep -q "versionName='0.4.0-ui92-r146.9'" integration-evidence/apk-identity.txt
+          "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --verbose --print-certs "$APK" > integration-evidence/apk-signature.txt
+          "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs .reference-ui8/Hetu-UI92-Runtime146-UI8.apk > integration-evidence/ui8-signature.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess,json,hashlib,zipfile,re
+          base='c7dc243376586481aae39b3e665e7ab92271d95f'
+          root='android-app/app/src/main/java/io/github/xgl34222220/hetu/'
+          allowed={root+'CompactHomeDashboard.kt',root+'ReferenceProxyActivity.kt',root+'ui/HetuTheme.kt','android-app/app/src/main/res/values/styles.xml'}
+          protected=[]
+          for p in subprocess.check_output(['git','ls-tree','-r','--name-only',base]).decode().splitlines():
+              if (p.startswith('android-app/app/src/main/') or p.startswith('native/')) and p not in allowed:
+                  assert Path(p).read_bytes()==subprocess.check_output(['git','show',base+':'+p]),p
+                  protected.append(p)
+          p=root+'ReferenceProxyActivity.kt'
+          assert Path(p).read_text()==subprocess.check_output(['git','show',base+':'+p]).decode().replace('F6F8FD','F4F6FC'), 'Non-palette runtime/page adapter modification'
+          home=Path(root+'CompactHomeDashboard.kt').read_text()
+          assert 'ipv4Width > halfAddressPx' not in home
+          assert 'HomeNetworkGroup(' not in home
+          assert home.count('HomeFeedbackPill(')==1
+          assert 'testTag("home-notice-lane")' in home
+          suites=json.load(open('integration-evidence/test-suites.json'))
+          totals={k:sum(int(s[k]) for s in suites) for k in ['tests','failures','errors','skipped']}
+          assert len(suites)==11,suites
+          assert totals==dict(tests=131,failures=0,errors=0,skipped=0),totals
+          expected=json.load(open('UI92_RUNTIME146_INPUTS.json'))['original146_payload']
+          apk=Path('android-app/app/build/outputs/apk/debug/app-debug.apk')
+          with zipfile.ZipFile(apk) as z:
+              assert z.testzip() is None
+              for name,digest in expected.items(): assert hashlib.sha256(z.read(name)).hexdigest()==digest,name
+          def signer(path):
+              digests=set(re.findall(r'certificate SHA-256 digest:\s*([0-9a-fA-F]{64})',Path(path).read_text()))
+              assert len(digests)==1,(path,digests)
+              return next(iter(digests)).lower()
+          current=signer('integration-evidence/apk-signature.txt');old=signer('integration-evidence/ui8-signature.txt')
+          result=dict(totals,base=base,protected_source_files=len(protected),runtime_payload_entries=len(expected),
+              version='0.4.0-ui92-r146.9',versionCode=1010,device_tested=False,
+              same_signer_as_ui8=current==old,signer_sha256=current,ui8_signer_sha256=old,
+              apk_bytes=apk.stat().st_size,apk_sha256=hashlib.sha256(apk.read_bytes()).hexdigest())
+          Path('integration-evidence/result.json').write_text(json.dumps(result,indent=2))
+          Path('integration-evidence/protected-source-paths.json').write_text(json.dumps(protected,indent=2))
+          Path('Hetu-UI92-Runtime146-UI9.apk').write_bytes(apk.read_bytes())
+          print(json.dumps(result,indent=2))
+          PY
+      - name: Commit only validated application changes and delivery record
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,subprocess,os
+          r=json.load(open('integration-evidence/result.json'))
+          doc='''# 河图 UI9：两张双联复合卡与通知避让
+
+          依据用户最新附件「粘贴的 markdown (1)。md(7)」的Bento双联布局和通知遮挡诊断，在已验证UI8上继续，不声称看过文稿所引用的录屏。
+
+          ## 实际变更
+          - 网络/速率与订阅/资源各用一个连续24dp圆角材质面板，中间1dp细分隔。四个区域始终两两并排，取消IP变长就把整个网格切为四张通栏的判断。
+          - 地址仍是系统字体16sp、单行无省略、有限固有宽度。特别长的地址可在左半区横滑，不能再把页面拉长；不宣称窄屏大字体能同时显示任意长度地址。
+          - 大字体在各半区内部将标签与数值上下排布，较长数值支持本区横滑；页面仍可正常上下滚动，不以锁死滚动或缩小用户字体伪造首屏完整。
+          - 订阅和CPU的6dp完整底轨同高，按真实流量与CPU比例绘制。未知值仍未知，不照抄模板的71%或CPU4.7%却画16%的静态数据。
+          - 上/下行加入小传输点，呼吸只在实际有流量且动效允许时运行；停服和零流量不冒充正在传输。
+          - 通知放入安全区内、标题上方的独立实测布局槽。进入/退出时槽位平滑伸缩并裁切自身动画，列表和标题在其下方布局，绝不将Pill覆盖在主卡/停止键上。无消息不保留固定空白通知栏。
+          - 按新模板将WebUI/日志放为主卡之后的一排紧凑磁贴，均连接原有真实入口。延迟、双联网络、双联配额按新稿顺序排列。
+          - 浅色窗口/主题/首页同步为#F4F6FC。保留UI8折叠吸顶标题、真实非线性刷新、0.97按压回弹、原生可拖拽日志/网络抽屉、系统字族与实际Dock安全避让。
+          - 不是将Vue示例作为网页塞进APK，亦未引入假刷新、空按钮、模拟服务、静态IP/流量/地区。
+
+          ## 验证
+          '''
+          doc+=f"Actions {os.environ['GITHUB_RUN_ID']}：11组{r['tests']}项通过，0失败、0错误、0跳过。\n"
+          doc+=f"原113项保留，更新最新布局明确取代的单列预期、通知位置、快捷入口归属和背景色；新增18项检查，包含393×852首屏、xxhdpi、320dp大字体、通知动画边界及真实停止键触摸。\n"
+          doc+=f"{r['runtime_payload_entries']}项原146运行资源哈希不变，{r['protected_source_files']}个范围外生产/原生文件与UI8逐字节一致。ReferenceProxyActivity全文件除配色字符串外完全一致。\n"
+          doc+=f"APK {r['apk_bytes']}字节；SHA-256 {r['apk_sha256']}。版本{r['version']}，versionCode1010。\n"
+          doc+=f"与UI8签名相同：{r['same_signer_as_ui8']}；本次证书SHA-256 {r['signer_sha256']}。\n"
+          doc+='''
+          ## 安装及验证边界
+          这是Debug测试版。没有旧UI8签名私钥，不能声称可覆盖旧版；签名冲突保留旧应用/配置，不卸载、不清数据，也不更改包名掩盖冲突。UI9测试签名使用专用Actions缓存供后续构建复用，缓存丢失仍需重新核验；私钥不进入源码或发布附件。
+          自动化不等于用户真机安装、Root联网、微信消息、GPU毛玻璃或高刷帧率验收。截图是生产组件在明确fixture数据下的自动渲染，不是用户手机实拍。极小屏幕、大字体、长配置名或通知出现时允许正常滚动；不承诺所有尺寸都无滚动。
+          146核心、Root、DNS、路由、配置存储和其他页面业务不变；没有清理历史分支或标签。
+          '''
+          Path('docs/UI92_RUNTIME146_UI9.md').write_text('\n'.join(line.lstrip() for line in doc.splitlines())+'\n')
+          paths=json.load(open('integration-evidence/ui9-changed-paths.json')) if Path('integration-evidence/ui9-changed-paths.json').exists() else []
+          subprocess.run(['git','add','--',*paths,'docs/UI92_RUNTIME146_UI9.md'],check=True)
+          PY
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix(ui): validated UI9 Bento pairs and notification hit safety [skip ci]'
+            git push origin HEAD:main
+          fi
+          git rev-parse HEAD > integration-evidence/source-commit.txt
+      - name: Export exact source and evidence including failed runs
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess,zipfile,json
+          names=set(subprocess.check_output(['git','ls-files']).decode().splitlines())
+          p=Path('integration-evidence/ui9-changed-paths.json')
+          if p.exists(): names.update(json.loads(p.read_text()))
+          with zipfile.ZipFile('Hetu-UI92-Runtime146-UI9-source.zip','w',zipfile.ZIP_DEFLATED) as z:
+              for name in sorted(names):
+                  if Path(name).is_file(): z.write(name,name)
+          with zipfile.ZipFile('Hetu-UI92-Runtime146-UI9-verification.zip','w',zipfile.ZIP_DEFLATED) as z:
+              for root in ['integration-evidence','android-app/app/build/outputs/compact-home','android-app/app/build/test-results/testDebugUnitTest','android-app/app/build/reports/tests/testDebugUnitTest']:
+                  for p in Path(root).rglob('*'):
+                      if p.is_file(): z.write(p,str(p))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Hetu-UI92-Runtime146-UI9
+          path: Hetu-UI92-Runtime146-UI9.apk
+          retention-days: 14
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Hetu-UI92-Runtime146-UI9-evidence
+          path: |
+            Hetu-UI92-Runtime146-UI9-source.zip
+            Hetu-UI92-Runtime146-UI9-verification.zip
+            integration-evidence/
+          retention-days: 14
+          if-no-files-found: error
+      - name: Publish only the fully validated test package
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create ui92-r146.9-test Hetu-UI92-Runtime146-UI9.apk Hetu-UI92-Runtime146-UI9-source.zip Hetu-UI92-Runtime146-UI9-verification.zip integration-evidence/result.json --target "$(git rev-parse HEAD)" --prerelease --title '河图 UI9 测试版 · 双联复合卡与通知避让' --notes-file docs/UI92_RUNTIME146_UI9.md
