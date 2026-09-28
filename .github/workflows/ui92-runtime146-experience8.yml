@@ -95,6 +95,8 @@ jobs:
               r=ET.parse(p).getroot()
               row={k:r.get(k) for k in ('name','tests','failures','errors','skipped')}
               suites.append(row);print(row)
+              for line in (r.findtext('system-out') or '').splitlines():
+                  if line.startswith('ADDRESS_LAYOUT'): print(line)
               for case in r.findall('testcase'):
                   for e in list(case.findall('failure'))+list(case.findall('error')):
                       print('FAILURE',case.get('name'),e.get('message'),(e.text or '')[:1800])
@@ -166,7 +168,7 @@ jobs:
           从UI7继续，保留分组主卡、网络双栏、玻璃Dock、原生详情/日志抽屉和原146运行逻辑。本轮以用户最新文件中的五项诊断为范围，不把Vue样例整体覆盖为模拟应用。
 
           ## 实际改动
-          - 首页地址强制单行，无省略号。用实际系统字体测量IPv4，半栏不够则使用单列；IPv6保持单行并可横向查看，详情保留完整复制。没有将IP尾部隐藏来冒充修复。
+          - 首页地址强制单行，无省略号。用实际系统字体测量IPv4，半栏不够则使用单列；IPv6保持单行并可横向查看，详情保留完整复制。单行文字在滚动层内仍使用有限的实际字宽布局，没有将IP尾部隐藏来冒充修复。
           - 移除首页外层默认PullToRefreshBox和内部旧装饰弹性，统一原生nested-scroll手势；位移为110*(1-exp(-raw/190))dp，非线性有界阻力、65dp触发阈值、46dp真实刷新停留、弹簧复位。
           - 水滴展开为双环刷新指示，不再出现默认灰底圆形Loading。刷新只调用原refreshHomeAll；结束由实际refreshing状态控制，不设假网络计时器。
           - 移除首页底部Snackbar，改为安全区固定顶栏下方的半透明炭色小胶囊。成功绿点、错误粉红点、普通信息蓝点；点击可读原始详情，显示时间尊重无障碍设置。通知计时不改变运行状态。
@@ -178,7 +180,8 @@ jobs:
           '''
           doc+=f"Actions：{os.environ['GITHUB_RUN_ID']}。十组{r['tests']}项检查通过，0失败、0错误、0跳过。\n"
           doc+=f"{r['runtime_payload_entries']}项原146核心资源校验一致；{r['protected_source_files']}个范围外生产文件与UI7字节一致。混合页面文件中的运行函数和其他页面也另做精确比较。\n"
-          doc+='新增18项检查覆盖报告中的123.193.18.254、窄屏大字体、高密度、IPv6横滚和详情隔离、非线性阻力、真实长短下拉、反向取消、重复刷新、真实完成、忙碌禁用、30dp吸顶、顶部反馈位置/错误详情和实际按压形变。旧95项继续运行，只有明确被新稿替代的背景色断言更新。\n'
+          doc+='新增18项检查覆盖报告中的123.193.18.254、窄屏大字体、高密度、IPv6横滚和详情隔离、非线性阻力、真实长短下拉、反向取消、重复刷新、真实完成、忙碌禁用、30dp吸顶、顶部反馈位置/错误详情和实际按压形变。旧95项全部保留；更新新稿的背景色预期，并把旧顶栏测试明确为下拉与点击各触发一次刷新，两次分别断言，没有删除或跳过检查。\n'
+          doc+='此前三轮未发布：首两轮103/113通过，第三轮104/113通过。保存的段落诊断显示无限宽滚动约束导致段落宽度为2.1474836E9、但实际文字盒仅124px；本轮改为有限固有宽度，保留所有地址溢出断言。失败证据保留在各次Actions中。\n'
           doc+=f"APK：{r['apk_bytes']}字节；SHA-256：{r['apk_sha256']}。版本{r['version']}，versionCode1009，包名io.github.xgl34222220.hetu。\n与UI7签名相同：{r['same_signer_as_ui7']}。\n"
           doc+='''
           ## 边界
