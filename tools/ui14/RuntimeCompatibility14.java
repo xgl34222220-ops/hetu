@@ -1,7 +1,6 @@
 package io.github.xgl34222220.hetu;
 
 import java.io.*;
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.*;
 import org.yaml.snakeyaml.Yaml;
@@ -55,7 +54,6 @@ final class RuntimeCompatibility14 {
     }
 
     static String migrateFingerprint(String source) throws IOException {
-        // No parser/reformat cost for the overwhelmingly common modern configurations.
         if (!source.contains("global-client-fingerprint")) return source;
         Node root = tree(source);
         String fingerprint = scalar(field(root, "global-client-fingerprint")).trim();
@@ -69,7 +67,6 @@ final class RuntimeCompatibility14 {
         if (providers instanceof MappingNode) for (NodeTuple provider : ((MappingNode)providers).getValue())
             migrateList(source, field(provider.getValueNode(), "payload"), fingerprint, edits, visited);
         // Remote provider overrides overwrite explicit per-node values, so do NOT inject one.
-        // Those subscriptions must supply their own per-node client-fingerprint.
         StringBuilder result = new StringBuilder(source);
         for (Map.Entry<Integer,String> edit : edits.entrySet()) result.insert(edit.getKey(), edit.getValue());
         return result.toString();
@@ -87,7 +84,12 @@ final class RuntimeCompatibility14 {
             if (mapping.getFlowStyle() == DumperOptions.FlowStyle.FLOW) {
                 int end = source.offsetByCodePoints(0, mapping.getEndMark().getIndex());
                 if (end < 1 || source.charAt(end - 1) != '}') throw new IOException("无法定位节点指纹迁移位置");
-                edits.put(end - 1, ", " + entry);
+                Node lastValue = mapping.getValue().get(mapping.getValue().size()-1).getValueNode();
+                int lastEnd = source.offsetByCodePoints(0, lastValue.getEndMark().getIndex());
+                // Only the suffix after the final value is inspected: commas inside
+                // quoted fields and comments cannot be mistaken for separators.
+                String tail = lastEnd <= end-1 ? source.substring(lastEnd,end-1).replaceAll("(?m)#.*$","").trim() : "";
+                edits.put(end - 1, (tail.equals(",") ? " " : ", ") + entry);
             } else {
                 NodeTuple anchor = null;
                 for (NodeTuple tuple : mapping.getValue()) {
