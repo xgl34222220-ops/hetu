@@ -3062,7 +3062,140 @@ private fun RefOverviewMetricStrip18(state: ProxyComposeState, ruleCount: Int) {
 }
 
 @Composable
-private fun RefTrafficOverview(state: ProxyComposeState, ruleCount: Int) {
+private fun RefOverviewSubscription19(items: List<DashboardProviderUi>) {
+    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
+    val t = LocalHetuTokens.current
+    val tracked = items.filter { it.hasSubscriptionInfo && it.total > 0L }
+    val used = tracked.sumOf { it.used }
+    val total = tracked.sumOf { it.total }
+    val remain = (total - used).coerceAtLeast(0L)
+    val ratio = if (total > 0L) (used.toDouble() / total.toDouble()).toFloat().coerceIn(0f, 1f) else 0f
+    val nodes = items.flatMap { it.nodes }.toSet().size
+    val updateText = tracked.map { it.updatedAt }.filter { it.isNotBlank() }.maxOrNull().orEmpty()
+    val expire = tracked.map { it.expire }.filter { it > 0L }.minOrNull()
+    val expireText = expire?.let {
+        runCatching {
+            java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                .format(java.util.Date(if (it < 10_000_000_000L) it * 1000L else it))
+        }.getOrDefault("")
+    }.orEmpty()
+    val bg = if (dark) t.cardBackground else Color(0xFFF9F7FF)
+    Surface(
+        shape = RoundedCornerShape(15.dp),
+        color = bg,
+        shadowElevation = 1.dp,
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("订阅", color = t.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                if (expireText.isNotBlank()) {
+                    Text("到期 $expireText", color = Color(0xFF8E8A9B), fontSize = 9.sp, fontWeight = FontWeight.Medium)
+                } else if (updateText.isNotBlank()) {
+                    Text(refUpdatedAt(updateText), color = Color(0xFF8E8A9B), fontSize = 9.sp, fontWeight = FontWeight.Medium)
+                }
+            }
+            Row(Modifier.fillMaxWidth()) {
+                RefOverviewSubMetric19("已用", refBytes(used), Modifier.weight(1f))
+                RefOverviewSubMetric19("剩余", refBytes(remain), Modifier.weight(1f))
+                RefOverviewSubMetric19("总量", refBytes(total), Modifier.weight(1f))
+            }
+            Box(
+                Modifier.fillMaxWidth().height(3.dp).background(
+                    if (dark) Color.White.copy(alpha = .08f) else Color(0xFFD9D7E7),
+                    CircleShape,
+                ),
+            ) {
+                if (ratio > 0f) {
+                    Box(
+                        Modifier.fillMaxHeight().fillMaxWidth(ratio)
+                            .background(Color(0xFF2E6FDB), CircleShape),
+                    )
+                }
+            }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("${items.size} 个订阅", color = Color(0xFF8E8A9B), fontSize = 9.5.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.weight(1f))
+                Text("$nodes 个节点", color = Color(0xFF8E8A9B), fontSize = 9.5.sp, fontWeight = FontWeight.Medium)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RefOverviewSubMetric19(label: String, value: String, modifier: Modifier) {
+    val t = LocalHetuTokens.current
+    Column(modifier, horizontalAlignment = Alignment.Start) {
+        Text(value, color = t.textPrimary, fontSize = 14.sp, lineHeight = 17.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+        Text(label, color = Color(0xFF8E8A9B), fontSize = 9.sp, lineHeight = 11.sp, fontWeight = FontWeight.Medium)
+    }
+}
+
+private data class RefOverviewRank19(
+    val name: String,
+    val count: Int,
+    val upload: Long,
+    val download: Long,
+)
+
+@Composable
+private fun RefOverviewRanking19(state: ProxyComposeState) {
+    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
+    val t = LocalHetuTokens.current
+    val rows = remember(state.connections) {
+        state.connections.groupBy { item ->
+            item.chain.substringBefore(" > ").trim().ifBlank {
+                item.rule.trim().ifBlank { if (item.inbound.isNotBlank()) item.inbound else "DIRECT" }
+            }
+        }.map { (name, items) ->
+            RefOverviewRank19(
+                name = name.ifBlank { "DIRECT" },
+                count = items.size,
+                upload = items.sumOf { it.upload },
+                download = items.sumOf { it.download },
+            )
+        }.sortedWith(compareByDescending<RefOverviewRank19> { it.count }.thenByDescending { it.download + it.upload })
+            .take(5)
+    }
+    val bg = if (dark) t.cardBackground else Color(0xFFF9F7FF)
+    Surface(shape = RoundedCornerShape(15.dp), color = bg, shadowElevation = 1.dp) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("实时排行", color = t.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Text("按连接数", color = Color(0xFF8E8A9B), fontSize = 9.sp, fontWeight = FontWeight.Medium)
+            }
+            if (rows.isEmpty()) {
+                Text("暂无活动连接", color = Color(0xFF8E8A9B), fontSize = 10.sp)
+            } else {
+                rows.forEachIndexed { index, row ->
+                    val accent = when (index) {
+                        0 -> Color(0xFF7C5CE7)
+                        1 -> Color(0xFF2E9F72)
+                        2 -> Color(0xFF4B82E6)
+                        else -> Color(0xFFB086D5)
+                    }
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(8.dp).background(accent, RoundedCornerShape(3.dp)))
+                        Spacer(Modifier.width(7.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(row.name, color = t.textPrimary, fontSize = 10.5.sp, lineHeight = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text("下行 ${refBytes(row.download)} · 上行 ${refBytes(row.upload)}", color = Color(0xFF8E8A9B), fontSize = 8.5.sp, lineHeight = 10.sp, maxLines = 1)
+                        }
+                        Text("${row.count} 条连接", color = Color(0xFF686477), fontSize = 9.sp, fontWeight = FontWeight.Medium)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RefTrafficOverview(state: ProxyComposeState, ruleCount: Int, providers: List<DashboardProviderUi>) {
     val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val history = remember { mutableStateListOf<Triple<Long, Long, Long>>() }
@@ -3103,9 +3236,10 @@ private fun RefTrafficOverview(state: ProxyComposeState, ruleCount: Int) {
         }
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
         RefOverviewMetricStrip18(state, ruleCount)
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        RefOverviewSubscription19(providers)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             RefRateCard("上行速度", upRate, Icons.Rounded.ArrowUpward, t.success, Modifier.weight(1f))
             RefRateCard("下行速度", downRate, Icons.Rounded.ArrowDownward, scheme.primary, Modifier.weight(1f))
         }
@@ -3195,47 +3329,8 @@ private fun RefTrafficOverview(state: ProxyComposeState, ruleCount: Int) {
                 }
             }
         }
-        val tcpCount = state.connections.count { it.network.contains("tcp", ignoreCase = true) }
-        val udpCount = state.connections.count { it.network.contains("udp", ignoreCase = true) }
-        val protocolCount = tcpCount + udpCount
-        val tcpPercent = if (protocolCount > 0) (tcpCount * 100 / protocolCount) else 0
-        val udpPercent = if (protocolCount > 0) (udpCount * 100 / protocolCount) else 0
-        val tcpRatio = if (protocolCount > 0) tcpCount.toFloat() / protocolCount.toFloat() else 0f
-        val inboundCount = state.connections.count { it.inbound.isNotBlank() }
-        val routedHits = state.connections.count { it.rule.isNotBlank() || it.chain.isNotBlank() }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Surface(
-                modifier = Modifier.weight(1f).height(92.dp),
-                shape = RoundedCornerShape(18.dp),
-                color = t.cardBackground,
-                shadowElevation = 1.dp,
-            ) {
-                Column(Modifier.fillMaxSize().padding(13.dp), verticalArrangement = Arrangement.SpaceBetween) {
-                    Text("连接协议", color = Color(0xFF94A3B8), fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                    Text("TCP $tcpPercent%  ·  UDP $udpPercent%", color = t.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
-                    Box(Modifier.fillMaxWidth().height(4.dp).background(Color(0xFFE2E8F0), CircleShape)) {
-                        if (protocolCount > 0) {
-                            Row(Modifier.fillMaxSize().clip(CircleShape)) {
-                                if (tcpCount > 0) Box(Modifier.weight(tcpRatio.coerceAtLeast(.01f)).fillMaxHeight().background(Color(0xFF2563EB)))
-                                if (udpCount > 0) Box(Modifier.weight((1f - tcpRatio).coerceAtLeast(.01f)).fillMaxHeight().background(Color(0xFFF59E0B)))
-                            }
-                        }
-                    }
-                }
-            }
-            Surface(
-                modifier = Modifier.weight(1f).height(92.dp),
-                shape = RoundedCornerShape(18.dp),
-                color = t.cardBackground,
-                shadowElevation = 1.dp,
-            ) {
-                Column(Modifier.fillMaxSize().padding(13.dp), verticalArrangement = Arrangement.SpaceBetween) {
-                    Text("活动会话", color = Color(0xFF94A3B8), fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                    Text(state.connections.size.toString(), color = Color(0xFF002FA7), fontSize = 22.sp, lineHeight = 25.sp, fontWeight = FontWeight.Black)
-                    Text("入站 $inboundCount  ·  分流命中 $routedHits", color = Color(0xFF64748B), fontSize = 10.sp, lineHeight = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1)
-                }
-            }
-        }
+        RefOverviewRanking19(state)
+
 
     }
 }
