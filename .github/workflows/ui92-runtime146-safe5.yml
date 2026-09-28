@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/ui92-runtime146-safe5.yml'
       - 'tools/apply_ui92_runtime146_safe5.py'
+      - 'tools/synchronize_ui5_animation_tests.py'
   workflow_dispatch:
 permissions:
   contents: write
@@ -20,7 +21,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Apply only the reviewed UI4 to UI5 presentation changes
+      - name: Apply reviewed UI5 changes and synchronize test clock delivery
         shell: bash
         run: |
           set -euo pipefail
@@ -32,6 +33,7 @@ jobs:
           else
             grep -q '0.4.0-ui92-r146.5' android-app/app/build.gradle.kts
           fi
+          python3 tools/synchronize_ui5_animation_tests.py
           git diff --check
       - uses: actions/setup-java@v4
         with:
@@ -78,7 +80,7 @@ jobs:
                   else: out.write_bytes(data)
           print('Original146 payload restored and verified:',len(expected))
           PY
-      - name: Compile APK and run 72 selected regression tests
+      - name: Compile APK and rerun all 72 regression tests
         working-directory: android-app
         shell: bash
         run: |
@@ -168,6 +170,7 @@ jobs:
           doc+=f"{r['tests']}项自动化测试通过，0失败、0错误、0跳过。\n"
           doc+=f"{r['runtime_payload_entries']}项原146核心及运行资源SHA-256一致；{r['protected_source_files']}个非本轮UI范围的生产/原生源码和资源与UI4逐字节一致。\n"
           doc+='新增检查覆盖固定顶栏与安全区变化、滚动/越界手势、系统字体tnum、完整IPv4、浅深色底轨实际像素、未知进度、先退后进、连续打断与减少动效。旧62项回归原样保留。\n'
+          doc+='首轮运行36396232478编译通过、70/72项检查通过。两项手动动画时钟测试在状态通知与重组同步前断言；补充Snapshot通知和退出阶段同步后完整重跑，未删除、跳过测试或改为直接断言最终状态。产品动画没有为通过测试而取消。首轮证据保留在该运行的evidence产物中。\n'
           doc+=f"APK：{r['apk_bytes']}字节；SHA-256：{r['apk_sha256']}。\n"
           doc+='版本0.4.0-ui92-r146.5，versionCode1006，包名io.github.xgl34222220.hetu。\n'
           doc+='''
