@@ -38,7 +38,14 @@ class Ui92IntegrationTest {
                 {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, motionEnabled = false)
         } }
         names.forEach { rule.onNodeWithText(it).assertIsDisplayed() }
-        val widths = names.map { rule.onNodeWithTag("latency-$it").fetchSemanticsNode().boundsInRoot.width }
-        assertEquals(widths[0], widths[1], .5f); assertEquals(widths[1], widths[2], .5f)
+        val bounds = names.map { rule.onNodeWithTag("latency-$it").fetchSemanticsNode().boundsInRoot }
+        val widths = bounds.map { it.width }
+        // Equal Row weights distribute integer pixels. A remainder of 1 or 2 pixels
+        // cannot be divided into three equal integers, so allow at most one pixel.
+        println("Latency column physical widths: $widths")
+        assertTrue("All three columns must retain positive width", widths.all { it > 0f })
+        assertTrue("Equal-weight columns differ by no more than one physical pixel: $widths",
+            widths.max() - widths.min() <= 1f)
+        assertTrue("Columns must not overlap", bounds.zipWithNext().all { (a, b) -> a.right <= b.left })
     }
 }
