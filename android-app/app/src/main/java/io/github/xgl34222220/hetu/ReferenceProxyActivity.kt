@@ -1957,76 +1957,17 @@ private fun RefPanelGlassHeader(
     hazeState: HazeState,
     backdrop: LayerBackdrop?,
 ) {
-    val t = LocalHetuTokens.current
-    val scheme = MaterialTheme.colorScheme
-    val dark = scheme.background.luminance() < .5f
-
-    // Keep the header structurally transparent. Previous full-width glass shells created
-    // an oversized white slab on some OEM renderers. Only the compact controls carry glass.
-    Column(
-        Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(0.dp),
-    ) {
-        Row(
-            Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                "面板",
-                color = t.textPrimary,
-                fontSize = 22.sp,
-                lineHeight = 29.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f),
-            )
-            if (selected != RefPanelTab.Overview) RefPanelHeaderAction(
-                icon = if (searchOpen) Icons.Rounded.Close else Icons.Rounded.Search,
-                contentDescription = if (searchOpen) "关闭搜索" else "搜索",
-                active = searchOpen,
-                onClick = onSearchToggle,
-            )
-        }
-        RefPanelTabs(
-            selected = selected,
-            liquidGlass = true,
-            onSelect = onSelect,
-        )
-        androidx.compose.animation.AnimatedVisibility(
-            visible = searchOpen && selected != RefPanelTab.Overview,
-            enter = androidx.compose.animation.expandVertically(
-                expandFrom = Alignment.Top,
-                animationSpec = androidx.compose.animation.core.tween(240),
-            ) + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(180)) +
-                androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(220)) { -it / 4 },
-            exit = androidx.compose.animation.shrinkVertically(
-                shrinkTowards = Alignment.Top,
-                animationSpec = androidx.compose.animation.core.tween(190),
-            ) + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(140)),
-        ) {
-            TextField(
-                value = query,
-                onValueChange = onQueryChange,
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                placeholder = { Text(when (selected) {
-                    RefPanelTab.Connections -> "搜索应用、域名或分流规则"
-                    RefPanelTab.Subscriptions -> "搜索订阅名称"
-                    RefPanelTab.Rules -> "搜索规则、目标或策略"
-                    RefPanelTab.RuleSets -> "搜索规则集"
-                    else -> "搜索策略组或节点"
-                }) },
-                leadingIcon = { Icon(Icons.Rounded.Search, null, Modifier.size(18.dp)) },
-                shape = RoundedCornerShape(18.dp),
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = if (dark) Color.White.copy(alpha = .07f) else Color.White.copy(alpha = .82f),
-                    unfocusedContainerColor = if (dark) Color.White.copy(alpha = .05f) else Color.White.copy(alpha = .72f),
-                    disabledContainerColor = Color.Transparent,
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                ),
-            )
-        }
-    }
+    // BoxProxy APK Miuix panel shell. Haze/backdrop are intentionally unused here:
+    // the original panel uses Miuix surfaces rather than Hetu's custom glass header.
+    BoxProxyPanelHeader17(
+        selected = selected,
+        onSelect = onSelect,
+        searchOpen = searchOpen,
+        query = query,
+        onQueryChange = onQueryChange,
+        onSearchToggle = onSearchToggle,
+        onOpenSettings = onOpenSettings,
+    )
 }
 
 @Composable
