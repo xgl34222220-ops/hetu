@@ -1533,6 +1533,7 @@ internal fun RefPanel(
                             }
                         }
                     }
+                }
                 RefPanelTab.Logs -> item(key = "${tab.name}-runtime-log", contentType = "runtime-log") {
                     if (filteredPanelLog.isBlank()) {
                         RefEmptyState("暂无运行日志", "核心产生运行记录后会显示在这里。", Icons.Rounded.ReceiptLong)
