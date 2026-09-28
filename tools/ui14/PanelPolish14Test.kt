@@ -7,6 +7,7 @@ import android.graphics.Canvas
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -28,6 +29,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
+@OptIn(ExperimentalMaterial3Api::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], qualifiers = "w393dp-h852dp-mdpi", application = Application::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -37,10 +39,11 @@ class PanelPolish14Test {
     private val prefs get()=context.getSharedPreferences("hetu",0)
     private val delays=mutableStateMapOf<String,Long>()
     private val calls=mutableListOf<String>()
+    private var actualBackdrop: ModalBackdrop12?=null
     private val longName="[IPLC-移动优化-新加坡-VLESS] 2x [永久]"
     private fun group(name: String="节点选择")=ProxyGroupUi(name,"Selector","Alpha",listOf(
         ProxyNodeUi("Alpha","VLESS",true,80,"P1"),ProxyNodeUi("Beta","Trojan",true,160,"P1")))
-    @Before fun reset() { prefs.edit().clear().commit();delays.clear();calls.clear() }
+    @Before fun reset() { prefs.edit().clear().commit();delays.clear();calls.clear();actualBackdrop=null }
     private fun render(groups: List<ProxyGroupUi> = listOf(group(),group("YouTube")), running: Boolean=true,
         motion: Boolean=false, fontScale: Float=1f,
         select: suspend(String,String)->String={g,n->calls+="select:$g:$n";n},
@@ -49,6 +52,8 @@ class PanelPolish14Test {
             CompositionLocalProvider(LocalHetuMotionEnabled provides motion,LocalHomeDockClearance provides 96.dp,
                 LocalDensity provides Density(density.density,fontScale)) {
                 MaterialTheme { ModalBackdropHost12 {
+                    val measuredBackdrop=LocalModalBackdrop12.current
+                    SideEffect { actualBackdrop=measuredBackdrop }
                     StrategyPanel11(ProxyComposeState(running=running,trafficMode="rule",groups=groups),delays,prefs,
                         onTab={calls+="tab:${it.label}"},refresh={calls+="refresh"},select=select,measure=measure)
                 } }
@@ -88,7 +93,19 @@ class PanelPolish14Test {
         val height=with(rule.density) { rule.activity.window.decorView.height.toDp() }
         assertTrue("sheet occupies ${bounds.height}/$height",bounds.height>=height*.70f)
         assertTrue("sheet occupies ${bounds.height}/$height",bounds.height<=height*.85f)
-        assertTrue(bounds.top>=height*.15f)
+        // Modal Surface local layout coordinates precede anchored translation. Compare
+        // the real SheetState offset and measured anchor viewport, not local top=0.
+        rule.runOnIdle {
+            val layer=requireNotNull(actualBackdrop).layers.single()
+            val viewport=layer.anchorViewport
+            val top=layer.state.requireOffset()
+            val ratio=(viewport-top)/viewport
+            assertTrue("native coverage=$ratio, top=$top, viewport=$viewport",ratio in .70f..85f/100f)
+            assertTrue("visible background=$top",top>=viewport*.15f)
+            assertEquals(viewport,top+layer.height,1.1f)
+            val file=File("build/outputs/ui14/sheet-geometry.json");file.parentFile!!.mkdirs()
+            file.writeText("{\"viewport\":$viewport,\"top\":$top,\"height\":${layer.height},\"coverage\":$ratio}")
+        }
         node("panel13-detail-header").assertIsDisplayed()
         screenshot("contextual-node-sheet")
     }
