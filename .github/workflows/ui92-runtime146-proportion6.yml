@@ -1,0 +1,226 @@
+name: UI92 Runtime146 proportions UI6
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/ui92-runtime146-proportion6.yml'
+      - 'tools/apply_ui92_runtime146_proportion6.py'
+      - 'tools/fix_ui6_layout.py'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: ui92-runtime146-proportion6
+  cancel-in-progress: false
+jobs:
+  proportions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply exact-base UI6 presentation changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor 60e5d1a18a288d1df1fc14a61918f6771c941eb2 HEAD
+          mkdir -p integration-evidence
+          git rev-parse HEAD > integration-evidence/input-commit.txt
+          if grep -q '0.4.0-ui92-r146.5' android-app/app/build.gradle.kts; then
+            python3 tools/apply_ui92_runtime146_proportion6.py
+          else
+            grep -q '0.4.0-ui92-r146.6' android-app/app/build.gradle.kts
+          fi
+          if test -f tools/fix_ui6_layout.py; then python3 tools/fix_ui6_layout.py; fi
+          git diff --check
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Prepare Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort | tail -n 1)
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" 'platforms;android-37.0' 'build-tools;37.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+      - name: Retrieve verified original146 payload from published UI5
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release download ui92-r146.5-test --repo "$GITHUB_REPOSITORY" --pattern 'Hetu-UI92-Runtime146-UI5.apk' --dir .reference-ui5
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,hashlib,zipfile
+          apk=Path('.reference-ui5/Hetu-UI92-Runtime146-UI5.apk')
+          assert hashlib.sha256(apk.read_bytes()).hexdigest()=='aa57fd990695e850ae8cb0e326871f5740127c3199febe67afddc80467836395'
+          expected=json.load(open('UI92_RUNTIME146_INPUTS.json'))['original146_payload']
+          with zipfile.ZipFile(apk) as z:
+              assert z.testzip() is None
+              for name,digest in expected.items():
+                  data=z.read(name)
+                  assert hashlib.sha256(data).hexdigest()==digest,name
+                  if name.startswith('lib/'): out=Path('android-app/app/src/main/jniLibs')/name.removeprefix('lib/')
+                  elif name.startswith('assets/'): out=Path('android-app/app/src/main')/name
+                  else: raise AssertionError(name)
+                  out.parent.mkdir(parents=True,exist_ok=True)
+                  if out.exists(): assert out.read_bytes()==data,name
+                  else: out.write_bytes(data)
+          print('Original146 entries verified:',len(expected))
+          PY
+      - name: Compile APK and run all 83 regression tests
+        working-directory: android-app
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:assembleDebug :app:testDebugUnitTest --tests '*CompactHomeDashboardTest' --tests '*Runtime146ContractTest' --tests '*Ui92IntegrationTest' --tests '*NodeSelectionContinuityTest' --tests '*ProxyLatencyRegressionTest' --tests '*NativeDockUi4Test' --tests '*HomeUi5RegressionTest' --tests '*HomeUi6RegressionTest' --stacktrace 2>&1 | tee ../integration-evidence/build.log
+      - name: Report actual outcomes including failures
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET,json
+          suites=[]
+          for p in Path('android-app/app/build/test-results/testDebugUnitTest').glob('TEST-*.xml'):
+              r=ET.parse(p).getroot()
+              row={k:r.get(k) for k in ('name','tests','failures','errors','skipped')}
+              suites.append(row);print(row)
+              for case in r.findall('testcase'):
+                  for error in list(case.findall('failure'))+list(case.findall('error')):
+                      print('FAILURE',case.get('name'),error.get('message'),(error.text or '')[:2200])
+          Path('integration-evidence/test-suites.json').write_text(json.dumps(suites,indent=2))
+          PY
+      - name: Verify APK identity signature and unchanged functionality
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=android-app/app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/37.0.0/aapt" dump badging "$APK" > integration-evidence/apk-identity.txt
+          grep -q "package: name='io.github.xgl34222220.hetu'" integration-evidence/apk-identity.txt
+          grep -q "versionCode='1007'" integration-evidence/apk-identity.txt
+          grep -q "versionName='0.4.0-ui92-r146.6'" integration-evidence/apk-identity.txt
+          "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --verbose --print-certs "$APK" > integration-evidence/apk-signature.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,hashlib,zipfile,subprocess
+          base='60e5d1a18a288d1df1fc14a61918f6771c941eb2'
+          root='android-app/app/src/main/java/io/github/xgl34222220/hetu/'
+          allowed={root+n for n in ['CompactHomeDashboard.kt','NativeHomePolish.kt','ReferenceProxyActivity.kt','ui/HetuTheme.kt','ui/HetuGlassDock.kt']}
+          allowed.add('android-app/app/src/main/res/values/styles.xml')
+          protected=[]
+          for name in subprocess.check_output(['git','ls-tree','-r','--name-only',base]).decode().splitlines():
+              if (name.startswith('android-app/app/src/main/') or name.startswith('native/')) and name not in allowed:
+                  assert Path(name).read_bytes()==subprocess.check_output(['git','show',base+':'+name]),name
+                  protected.append(name)
+          suites=json.load(open('integration-evidence/test-suites.json'))
+          total={k:sum(int(s[k]) for s in suites) for k in ['tests','failures','errors','skipped']}
+          assert total==dict(tests=83,failures=0,errors=0,skipped=0),total
+          assert len(suites)==8,suites
+          apk=Path('android-app/app/build/outputs/apk/debug/app-debug.apk')
+          expected=json.load(open('UI92_RUNTIME146_INPUTS.json'))['original146_payload']
+          with zipfile.ZipFile(apk) as z:
+              assert z.testzip() is None
+              for name,digest in expected.items(): assert hashlib.sha256(z.read(name)).hexdigest()==digest,name
+          result=dict(total,base=base,protected_source_files=len(protected),runtime_payload_entries=len(expected),
+              apk_bytes=apk.stat().st_size,apk_sha256=hashlib.sha256(apk.read_bytes()).hexdigest(),
+              version='0.4.0-ui92-r146.6',versionCode=1007,device_tested=False)
+          Path('integration-evidence/result.json').write_text(json.dumps(result,indent=2))
+          Path('integration-evidence/protected-source-paths.json').write_text(json.dumps(protected,indent=2))
+          Path('Hetu-UI92-Runtime146-UI6.apk').write_bytes(apk.read_bytes())
+          print(json.dumps(result,indent=2))
+          PY
+      - name: Push tested application changes to main without rewriting history
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,os,subprocess
+          r=json.load(open('integration-evidence/result.json'))
+          doc='''# 河图 UI6：薰衣草底色、比例与首屏对齐
+
+          基线为已发布UI5。保留系统字体、146运行逻辑和既有功能入口。用户最新文字/代码稿优先于之前的冷灰色规范。
+
+          ## 实际修改
+          - 浅色页面、窗口、主题统一#EFEBF8；运行态主卡丁香蓝渐变#E6E1FF到#ECE7FE，处理/停止状态仍由真实生命周期驱动。
+          - 普通卡片和主卡28dp连续圆角，使用AndroidX graphics-shapes矢量轮廓和双层灰紫轻阴影，不依赖圆角RuntimeShader。
+          - 84dp厚描边徽标与左侧信息纵向居中；胶囊20dp连续圆角、6dp内边距，保留48dp按钮触摸高度和真实启停回调。
+          - 延迟两条24dp低对比竖线明确绘制，保留排序、刷新与异常胶囊。
+          - 四张数据卡共用同一组测量后的行高/卡高，12dp等距；IP与上行、订阅与资源指标基线对齐。长地址/大字体按实际可用宽度扩展，绝不截断或缩小用户字体。
+          - Dock完整占用高度由实际测量反馈到首页；首页滚动视口截止在Dock上方10dp，而不是只给滚动内容尾部加空白。
+          - 常规屏幕压缩间距以显示完整首屏；小屏、大字体或较长内容保留正常滚动，不承诺任意屏幕都能塞进一屏。
+          - 选中Dock项在毛玻璃层之外绘制轮廓清晰的浅蓝实色药丸，不用放射状光晕模拟选中。
+          - 订阅/CPU底轨、WAN/LAN先退后进、详情点击隔离、原生抽屉、固定安全区顶栏继续保留。
+
+          ## 验证
+          '''
+          doc+='GitHub Actions: '+os.environ['GITHUB_RUN_ID']+'。\n'
+          doc+=f"{r['tests']}项测试通过，0失败、0错误、0跳过；{r['runtime_payload_entries']}项原146核心/资源SHA-256一致；{r['protected_source_files']}个非本轮范围的生产/原生文件与UI5字节一致。\n"
+          doc+='完整首页+Dock布局测试包含393×900、393×852和320×640大字体窗口；验证整张末排卡片边界、10dp隔离带、四卡同高、实际文本基线、最长IPv4、蓝色药丸实际像素。\n'
+          doc+='UI4的80dp徽标断言按新要求更新为84dp，其余旧回归继续运行，不跳过失败检查。\n'
+          doc+=f"APK: {r['apk_bytes']} bytes; SHA-256: {r['apk_sha256']}。\n"
+          doc+='版本0.4.0-ui92-r146.6，versionCode1007，包名io.github.xgl34222220.hetu。\n'
+          doc+='''
+          ## 边界
+          这是Debug预发布测试包。截图为生产组件在Robolectric中用明确测试数据绘制，不是用户手机实拍；软件截图未验证毛玻璃GPU质量。
+          当前用户提供的是文字诊断与Vue代码，不是本轮可逐帧核验的新录屏。没有把样例中的BoxProxy名称、IP、CPU 2.6%配26%进度、空回调或setTimeout假测速写入产品。
+          未完成用户真机安装、Root联网、微信消息、动画帧率与长期稳定性验收。测试签名不保证覆盖之前安装包；遇到冲突保留旧应用和配置，不卸载、不清数据。
+          未升级内核，未改变包名，未执行历史分支清理。工具脚本是一次性精确基线迁移，不应重复应用覆盖后续改动。
+          '''
+          Path('docs/UI92_RUNTIME146_UI6.md').write_text('\n'.join(x.lstrip() for x in doc.splitlines())+'\n')
+          paths=json.load(open('integration-evidence/ui6-changed-paths.json'))
+          paths+=['docs/UI92_RUNTIME146_UI6.md']
+          subprocess.run(['git','add','--',*paths],check=True)
+          PY
+          git diff --cached --check
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'feat(ui): ship verified UI6 lavender proportions and dock-safe grid [skip ci]'
+            git push origin HEAD:main
+          fi
+          git rev-parse HEAD > integration-evidence/source-commit.txt
+      - name: Export exact source and evidence even on failure
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess,zipfile,json
+          names=set(subprocess.check_output(['git','ls-files']).decode().splitlines())
+          manifest=Path('integration-evidence/ui6-changed-paths.json')
+          if manifest.exists(): names.update(json.loads(manifest.read_text()))
+          with zipfile.ZipFile('Hetu-UI92-Runtime146-UI6-source.zip','w',zipfile.ZIP_DEFLATED) as z:
+              for name in sorted(names):
+                  if Path(name).is_file(): z.write(name,name)
+          with zipfile.ZipFile('Hetu-UI92-Runtime146-UI6-verification.zip','w',zipfile.ZIP_DEFLATED) as z:
+              for root in ['integration-evidence','android-app/app/build/outputs/compact-home','android-app/app/build/test-results/testDebugUnitTest','android-app/app/build/reports/tests/testDebugUnitTest']:
+                  for p in Path(root).rglob('*'):
+                      if p.is_file(): z.write(p,str(p))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Hetu-UI92-Runtime146-UI6
+          path: Hetu-UI92-Runtime146-UI6.apk
+          retention-days: 14
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Hetu-UI92-Runtime146-UI6-evidence
+          path: |
+            Hetu-UI92-Runtime146-UI6-source.zip
+            Hetu-UI92-Runtime146-UI6-verification.zip
+            integration-evidence/
+            android-app/app/build/outputs/compact-home/
+          retention-days: 14
+          if-no-files-found: error
+      - name: Publish verified APK as test prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create ui92-r146.6-test --repo "$GITHUB_REPOSITORY" --target "$(git rev-parse HEAD)" --prerelease --title '河图 UI6 测试版 · 薰衣草比例与无遮挡首屏' --notes-file docs/UI92_RUNTIME146_UI6.md Hetu-UI92-Runtime146-UI6.apk Hetu-UI92-Runtime146-UI6-source.zip Hetu-UI92-Runtime146-UI6-verification.zip integration-evidence/result.json android-app/app/build/outputs/compact-home/ui6-*.png
