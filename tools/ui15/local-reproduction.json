@@ -1,0 +1,26 @@
+{
+  "source_bytes": 58379,
+  "source_sha256": "158f9664950a96135d1ea707eefc7d942ea000d82b88e2433069d36978e6ad65",
+  "ui14_alias_limit_failure_reproduced": true,
+  "ui15_production_parser_pass": true,
+  "ui15_fingerprint_migration_pass": true,
+  "production_generator_cases": 4,
+  "provider_group_proxy_source_spans_unchanged": true,
+  "private_source_unchanged": true,
+  "core_or_device_tested": false,
+  "collection_aliases": 88,
+  "total_aliases": 99,
+  "old_limit": 50,
+  "new_limit": 4096,
+  "original_production_generator_failure_reproduced": true,
+  "local_added_tests": 27,
+  "local_added_test_failures": 0,
+  "compiled_production_sources": {
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeYaml15.java": "9ef9bfe6dd516d578fde1e5e1fc39f5afcc90dc9cb52fb1bfeb04689103fb90a",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeCompatibility14.java": "a9c74d897c715b7c1df42d3a015abe080d926f73dfeaf665265511de8eab4554",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java": "a77482b1e6cc28bc2401f216236b02cd1ded18e64fb8fe597639feba7f88a4d0",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeProfile.java": "b565c85afc225d6510d252e83fbce521932a54f70b43cfc230d0858d6d3a3cc9"
+  },
+  "snakeyaml_version": "2.3",
+  "snakeyaml_jar_sha256": "63a76fe66b652360bd4c2c107e6f0258daa7d4bb492008ba8c26fcd230ff9146"
+}
