@@ -1370,7 +1370,7 @@ internal fun RefPanel(
             onSearchToggle = { searchOpen = !searchOpen; if (!searchOpen) query = "" },
             onOpenSettings = onOpenSettings, hazeState = hazeState, backdrop = backdrop)
         Box(Modifier.weight(1f).fillMaxWidth().clipToBounds()) {
-            PullToRefreshBox(
+            HetuRefreshBox(
                 isRefreshing = refreshing,
                 onRefresh = ::refresh,
                 modifier = Modifier.fillMaxSize().graphicsLayer {
