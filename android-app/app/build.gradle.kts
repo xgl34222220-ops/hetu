@@ -16,8 +16,8 @@ android {
         applicationId = "io.github.xgl34222220.hetu"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1016
-        versionName = "0.4.0-ui92-r146.15"
+        versionCode = 1017
+        versionName = "0.4.0-boxproxy-panel-preview1"
     }
 
     // Explicit CI debug identity. No private key is committed or exported.
