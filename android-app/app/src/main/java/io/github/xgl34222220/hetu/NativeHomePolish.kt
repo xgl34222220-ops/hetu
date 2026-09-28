@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import io.github.xgl34222220.hetu.ui.LocalHetuMotionEnabled
 import io.github.xgl34222220.hetu.ui.LocalHetuTokens
+import io.github.xgl34222220.hetu.ui.hetuPressScale
 import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.cos
@@ -116,14 +117,11 @@ internal fun ImmersiveUiHost(content: @Composable () -> Unit) {
 internal fun Modifier.nativePress(enabled: Boolean = true, label: String? = null,
     motion: Boolean = LocalHetuMotionEnabled.current, onClick: () -> Unit): Modifier {
     val source = remember { MutableInteractionSource() }
-    val pressed by source.collectIsPressedAsState()
-    val view = LocalView.current
-    val scale by animateFloatAsState(if (enabled && pressed && motion) .97f else 1f,
-        if (!motion) snap() else if (pressed) tween(80, easing = CubicBezierEasing(.2f, 0f, 0f, 1f))
-        else spring(dampingRatio = .84f, stiffness = 650f), label = "native-press")
-    return graphicsLayer { scaleX = scale; scaleY = scale }
+    val haptics = io.github.xgl34222220.hetu.ui.rememberHetuHaptics()
+    // V18.3: interaction-driven dip (.97) with a soft rubber return; quick taps stay visible.
+    return hetuPressScale(source, enabled, pressedScale = .97f, motion = motion)
         .clickable(source, indication = null, enabled = enabled, role = Role.Button, onClickLabel = label) {
-            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+            haptics.perform(io.github.xgl34222220.hetu.ui.HetuHaptic.Tick)
             onClick()
         }
 }
@@ -140,6 +138,20 @@ internal fun NativeStatusHero(data: CompactHomeData, toggle: () -> Unit, reload:
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val phase = HomeLifecyclePresentation.phase(data)
     val processing = phase == HomePhase.Processing
+    // V18.3: haptics describe the OUTCOME of a start/stop/reload, not just the tap.
+    val haptics = io.github.xgl34222220.hetu.ui.rememberHetuHaptics()
+    var previousPhase by remember { mutableStateOf(phase) }
+    LaunchedEffect(phase) {
+        if (previousPhase == HomePhase.Processing && phase != HomePhase.Processing) {
+            val failed = HomeLifecyclePresentation.feedback(data.message) == "操作未完成，请查看详情"
+            haptics.perform(when {
+                failed -> io.github.xgl34222220.hetu.ui.HetuHaptic.Reject
+                phase == HomePhase.Running -> io.github.xgl34222220.hetu.ui.HetuHaptic.Confirm
+                else -> io.github.xgl34222220.hetu.ui.HetuHaptic.ToggleOff
+            })
+        }
+        previousPhase = phase
+    }
     val title = when (phase) {
         HomePhase.Running -> "运行中"
         HomePhase.Stopped -> "已停止"
@@ -172,7 +184,7 @@ internal fun NativeStatusHero(data: CompactHomeData, toggle: () -> Unit, reload:
             Row(Modifier.fillMaxWidth().testTag("hero-information"), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f).testTag("hero-information-text"), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Box(Modifier.size(12.dp).background(accent, CircleShape))
+                        HeroLiveDot(accent, live = phase == HomePhase.Running && motion)
                         Text(title, color = accent, fontSize = 21.sp, lineHeight = 28.sp,
                             fontWeight = FontWeight.Black, modifier = Modifier.testTag("hero-status-title")
                                 .semantics { liveRegion = LiveRegionMode.Polite })
@@ -258,19 +270,55 @@ private fun PillAction(label: String, tag: String, tint: Color, modifier: Modifi
 private fun HeroStatusGlyph(phase: HomePhase, color: Color, motion: Boolean) {
     // Normal density follows the reference; accessibility text gets space before decoration.
     val sizeDp = if (androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f) 56.dp else 76.dp
+    // V18.3: the ring sweeps and the check / dash is drawn in whenever the state settles.
+    val draw = remember { Animatable(1f) }
+    var firstPhase by remember { mutableStateOf(true) }
+    LaunchedEffect(phase, motion) {
+        if (phase == HomePhase.Processing) return@LaunchedEffect
+        if (!motion || firstPhase) { draw.snapTo(1f); firstPhase = false; return@LaunchedEffect }
+        draw.snapTo(0f)
+        draw.animateTo(1f, tween(560, easing = io.github.xgl34222220.hetu.ui.HetuMotion.EmphasizedDecelerate))
+    }
     Box(Modifier.size(sizeDp).testTag("hero-status-glyph"), contentAlignment = Alignment.Center) {
         if (phase == HomePhase.Processing) NativeSpinner(color, motion, Modifier.fillMaxSize().padding(8.dp))
         else Canvas(Modifier.fillMaxSize()) {
             val w = size.width
+            val p = draw.value.coerceIn(0f, 1f)
             drawCircle(color.copy(alpha = .18f), radius = w * .4f, style = Stroke(w * .1f))
             if (phase == HomePhase.Running) {
-                drawArc(color, -90f, 270f, false, Offset(w * .1f, w * .1f), Size(w * .8f, w * .8f),
+                val sweep = (p / .6f).coerceIn(0f, 1f)
+                drawArc(color, -90f, 270f * sweep, false, Offset(w * .1f, w * .1f), Size(w * .8f, w * .8f),
                     style = Stroke(w * .1f, cap = StrokeCap.Round))
-                drawPath(Path().apply { moveTo(w * .32f, w * .5f); lineTo(w * .45f, w * .63f); lineTo(w * .70f, w * .36f) },
-                    color, style = Stroke(w * .11f, cap = StrokeCap.Round, join = StrokeJoin.Round))
-            } else drawLine(color, Offset(w * .35f, w * .5f), Offset(w * .65f, w * .5f), w * .08f, StrokeCap.Round)
+                val check = ((p - .35f) / .65f).coerceIn(0f, 1f)
+                if (check > 0f) {
+                    val full = Path().apply { moveTo(w * .32f, w * .5f); lineTo(w * .45f, w * .63f); lineTo(w * .70f, w * .36f) }
+                    val measure = PathMeasure().apply { setPath(full, false) }
+                    val partial = Path()
+                    measure.getSegment(0f, measure.length * check, partial, true)
+                    drawPath(partial, color, style = Stroke(w * .11f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                }
+            } else {
+                val half = w * .15f * p
+                drawLine(color, Offset(w * .5f - half, w * .5f), Offset(w * .5f + half, w * .5f), w * .08f, StrokeCap.Round)
+            }
         }
     }
+}
+
+/** Running state "heartbeat": a ring expands from the status dot and fades. Draw-phase only. */
+@Composable
+private fun HeroLiveDot(color: Color, live: Boolean) {
+    val ripple = if (live) {
+        val transition = rememberInfiniteTransition(label = "hero-live")
+        transition.animateFloat(0f, 1f, infiniteRepeatable(tween(1800, easing = LinearOutSlowInEasing)), label = "hero-live-ripple").value
+    } else 0f
+    Box(Modifier.size(12.dp).drawBehind {
+        if (live) {
+            val r = size.minDimension / 2f
+            drawCircle(color.copy(alpha = .38f * (1f - ripple)), radius = r + r * 1.1f * ripple)
+        }
+        drawCircle(color, radius = size.minDimension / 2f)
+    })
 }
 
 @Composable
