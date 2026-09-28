@@ -134,8 +134,8 @@ internal fun BoxProxyMiuixTheme17(content: @Composable () -> Unit) {
 internal val BoxProxyTabs17 = listOf(
     RefPanelTab.Overview,
     RefPanelTab.Groups,
-    RefPanelTab.Connections,
     RefPanelTab.Subscriptions,
+    RefPanelTab.Connections,
     RefPanelTab.Rules,
     RefPanelTab.RuleSets,
 )
@@ -157,11 +157,11 @@ internal fun BoxProxyPanelTabs17(selected: RefPanelTab, onSelect: (RefPanelTab) 
             selectedTabIndex = BoxProxyTabs17.indexOf(selected).coerceAtLeast(0),
             onTabSelected = { BoxProxyTabs17.getOrNull(it)?.let(onSelect) },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).testTag("boxproxy17-tabs"),
-            height = 38.dp,
-            minWidth = 56.dp,
-            maxWidth = 92.dp,
-            cornerRadius = 12.dp,
-            itemSpacing = 5.dp,
+            height = 34.dp,
+            minWidth = 54.dp,
+            maxWidth = 86.dp,
+            cornerRadius = 11.dp,
+            itemSpacing = 6.dp,
         )
     }
 }
@@ -177,30 +177,56 @@ internal fun BoxProxyPanelHeader17(
     onOpenSettings: () -> Unit,
 ) {
     BoxProxyMiuixTheme17 {
-        Column(Modifier.fillMaxWidth()) {
-            MiuixTopAppBar(
-                title = boxProxyTabLabel17(selected),
-                largeTitle = boxProxyTabLabel17(selected),
-                defaultWindowInsetsPadding = false,
-                actions = {
-                    if (selected != RefPanelTab.Overview) {
-                        MiuixIconButton(onClick = onSearchToggle, minWidth = 44.dp, minHeight = 44.dp) {
-                            Icon(MiuixIcons.Search, if (searchOpen) "关闭搜索" else "搜索",
-                                Modifier.size(20.dp), tint = MiuixTheme.colorScheme.onSurface)
-                        }
-                    }
-                    if (selected == RefPanelTab.Groups) {
-                        ReferenceStrategyFilterMenu()
-                        ReferenceStrategyMenu()
-                    } else {
-                        MiuixIconButton(onClick = onOpenSettings, minWidth = 44.dp, minHeight = 44.dp) {
-                            Icon(MiuixIcons.Settings, "面板设置", Modifier.size(20.dp),
-                                tint = MiuixTheme.colorScheme.onSurface)
-                        }
-                    }
-                },
-                bottomContent = { BoxProxyPanelTabs17(selected, onSelect) },
+        Column(
+            Modifier.fillMaxWidth().background(
+                if (MaterialTheme.colorScheme.background.luminance() < .5f)
+                    MiuixTheme.colorScheme.surface else Color(0xFFECEBFA)
             )
+        ) {
+            Row(
+                Modifier.fillMaxWidth().height(40.dp).padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (selected != RefPanelTab.Overview) {
+                    MiuixIconButton(onClick = onSearchToggle, minWidth = 38.dp, minHeight = 38.dp) {
+                        Icon(
+                            MiuixIcons.Search,
+                            if (searchOpen) "关闭搜索" else "搜索",
+                            Modifier.size(19.dp),
+                            tint = MiuixTheme.colorScheme.onSurface,
+                        )
+                    }
+                } else {
+                    Spacer(Modifier.width(38.dp))
+                }
+                if (selected == RefPanelTab.Groups) {
+                    ReferenceStrategyFilterMenu()
+                }
+                Spacer(Modifier.weight(1f))
+                if (selected == RefPanelTab.Groups) {
+                    ReferenceStrategyMenu()
+                }
+                MiuixIconButton(onClick = onOpenSettings, minWidth = 38.dp, minHeight = 38.dp) {
+                    Icon(
+                        MiuixIcons.Settings,
+                        "面板设置",
+                        Modifier.size(19.dp),
+                        tint = MiuixTheme.colorScheme.onSurface,
+                    )
+                }
+            }
+
+            Text(
+                "面板",
+                color = MiuixTheme.colorScheme.onSurface,
+                fontSize = 27.sp,
+                lineHeight = 31.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(start = 14.dp, top = 1.dp, bottom = 5.dp),
+            )
+
+            BoxProxyPanelTabs17(selected, onSelect)
+
             AnimatedVisibility(searchOpen && selected != RefPanelTab.Overview) {
                 MiuixSearchBar(
                     inputField = {
@@ -222,7 +248,7 @@ internal fun BoxProxyPanelHeader17(
                     },
                     onExpandedChange = { if (!it) onSearchToggle() },
                     modifier = Modifier.fillMaxWidth(),
-                    insideMargin = DpSize(12.dp, 8.dp),
+                    insideMargin = DpSize(12.dp, 6.dp),
                     expanded = true,
                     outsideEndAction = {
                         TextButton(onClick = onSearchToggle) { Text("取消") }
