@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""UI6 review follow-up: common baselines and unclipped (not partially-visible) geometry."""
+"""UI6 follow-up: common baselines, full unclipped geometry, separate capsule semantics."""
 from pathlib import Path
 import json
 root='android-app/app/src/main/java/io/github/xgl34222220/hetu/'
@@ -41,6 +41,24 @@ edit(p,'Modifier.weight(1f), color = p.text.copy(alpha = .82f)', 'Modifier.weigh
 p=root+'NativeHomePolish.kt'
 edit(p,'.padding(if (compact) 16.dp else 20.dp)', '.padding(if (compact) 14.dp else 20.dp)')
 edit(p,'Spacer(Modifier.height(if (compact) 12.dp else 16.dp))','Spacer(Modifier.height(if (compact) 10.dp else 16.dp))')
+# Do not assign two test tags to one layout node: keep the established inner control tag.
+pth=Path(p);s=pth.read_text()
+old='''                Row(Modifier.fillMaxWidth().testTag("hero-capsule-surface").clip(HomeContinuousShape(20.dp))'''
+if old in s:
+    assert s.count(old)==1
+    s=s.replace(old,'''                Box(Modifier.fillMaxWidth().testTag("hero-capsule-surface")) {
+                Row(Modifier.fillMaxWidth().clip(HomeContinuousShape(20.dp))''')
+    ending='''            }
+        }
+        if (processing) ProcessingShimmer'''
+    assert s.count(ending)==1
+    s=s.replace(ending,'''            }
+            }
+        }
+        if (processing) ProcessingShimmer''')
+    pth.write_text(s)
+else:
+    assert 'Box(Modifier.fillMaxWidth().testTag("hero-capsule-surface")) {' in s
 p=test+'HomeUi6RegressionTest.kt'
 edit(p,'''    private fun bounds(tag:String)=rule.onNodeWithTag(tag,useUnmergedTree=true).fetchSemanticsNode().boundsInRoot''', '''    private fun bounds(tag:String):androidx.compose.ui.geometry.Rect {
         // assertIsDisplayed/boundsInRoot alone can accept an only-partially-visible card.
@@ -61,4 +79,5 @@ edit(p,'''        tags.forEach {rule.onNodeWithTag(it).assertIsDisplayed()}
         snapshot("ui6-medium-before-assertions")
         println("UNCLIPPED medium viewport=${bounds("compact-home")} cards=${tags.map(::bounds)} dock=${bounds("hetu-dock")}")
         assertTrue("Full card ${bounds("home-resources")} must clear dock ${bounds("hetu-dock")}",bounds("home-resources").bottom<=bounds("hetu-dock").top-9f)''')
-print('UI6: second-row baselines, compact spacing and full unclipped-bound checks applied')
+edit(p,'rule.onNodeWithTag("dock-active-label").assertTextEquals("工具")','rule.onNodeWithTag("dock-active-label",useUnmergedTree=true).assertTextEquals("工具")')
+print('UI6: second-row baselines, compact spacing, complete bounds and separate control tags applied')
