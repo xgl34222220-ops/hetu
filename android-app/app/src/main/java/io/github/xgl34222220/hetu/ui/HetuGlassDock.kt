@@ -231,23 +231,32 @@ private fun DockItems(
 ) {
     val motion = LocalHetuMotionEnabled.current && android.animation.ValueAnimator.areAnimatorsEnabled()
     val target = selected.coerceIn(0, items.lastIndex)
+    val haptics = rememberHetuHaptics()
     Row(modifier.selectableGroup(), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(2.dp)) {
         items.forEachIndexed { index, item ->
             key(item.label) {
                 val active = index == target
                 val interaction = remember { MutableInteractionSource() }
-                val pressed by interaction.collectIsPressedAsState()
                 val weight by animateFloatAsState(if (active) 1.65f else 1f,
                     if (motion) spring(dampingRatio = .84f, stiffness = 300f) else snap(), label = "dock-weight-$index")
-                val scale by animateFloatAsState(if (pressed && motion) .97f else 1f,
-                    if (motion) spring(dampingRatio = .82f, stiffness = 550f) else snap(), label = "dock-press-$index")
+                // V18.3: icon "pop" when a tab becomes active (not on first composition).
+                val iconPop = remember { Animatable(1f) }
+                var wasActive by remember { mutableStateOf(active) }
+                LaunchedEffect(active) {
+                    if (active && !wasActive && motion) {
+                        iconPop.snapTo(1f)
+                        iconPop.animateTo(1.16f, tween(110, easing = HetuMotion.Standard))
+                        iconPop.animateTo(1f, spring(dampingRatio = .45f, stiffness = 420f))
+                    }
+                    wasActive = active
+                }
                 val fill by animateColorAsState(if (active) indicatorColor else Color.Transparent,
                     if (motion) tween(220) else snap(), label = "dock-fill-$index")
                 val color by animateColorAsState(if (active) selectedColor else unselectedColor,
                     if (motion) tween(180) else snap(), label = "dock-tint-$index")
                 Row(Modifier.weight(weight).height(itemHeight).testTag("dock-tab-$index")
-                    .graphicsLayer { scaleX = scale; scaleY = scale }
+                    .hetuPressScale(interaction, pressedScale = .97f, motion = motion)
                     .clip(RoundedCornerShape(26.dp))
                     // Fill is on the foreground sibling, outside every backdrop/shader layer.
                     .drawBehind {
@@ -257,16 +266,26 @@ private fun DockItems(
                             size = androidx.compose.ui.geometry.Size(size.width,h), cornerRadius = CornerRadius(h/2f))
                     }
                     .selectable(active, role = Role.Tab, interactionSource = interaction, indication = null,
-                        onClick = { if (!active) onSelect(index) })
+                        onClick = { if (!active) { haptics.perform(HetuHaptic.Tick); onSelect(index) } })
                     .semantics { contentDescription = item.label }
                     .padding(horizontal = 6.dp), horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically) {
                     Icon(item.icon, null, Modifier.size(21.dp).graphicsLayer {
-                        scaleX = item.opticalScale; scaleY = item.opticalScale
+                        scaleX = item.opticalScale * iconPop.value; scaleY = item.opticalScale * iconPop.value
                     }, tint = color)
                     if (active) {
+                        // V18.3: the label slides out of the icon while the capsule widens,
+                        // instead of popping in at full opacity. Still exactly one label node.
+                        val labelIn = remember { Animatable(if (motion) 0f else 1f) }
+                        LaunchedEffect(Unit) {
+                            if (motion) labelIn.animateTo(1f, tween(240, delayMillis = 40, easing = HetuMotion.EmphasizedDecelerate))
+                        }
                         Spacer(Modifier.width(6.dp))
-                        Text(item.label, Modifier.testTag("dock-active-label"), color = color,
+                        Text(item.label, Modifier.testTag("dock-active-label").graphicsLayer {
+                            val p = labelIn.value.coerceIn(0f, 1f)
+                            alpha = p
+                            translationX = (1f - p) * -8.dp.toPx()
+                        }, color = color,
                             fontSize = 12.sp, lineHeight = 17.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                     }
                 }
