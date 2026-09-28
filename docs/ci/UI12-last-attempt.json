@@ -1,0 +1,17 @@
+{
+  "run": "https://github.com/xgl34222220-ops/hetu/actions/runs/36429557553",
+  "suites": [],
+  "failures": [],
+  "compile_errors": [
+    "e: file:///home/runner/work/hetu/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/MotionMaterials12.kt:1:100 Cannot access 'annotation class ExperimentalMaterial3ExpressiveApi : Annotation': it is internal in file.",
+    "e: file:///home/runner/work/hetu/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/MotionMaterials12.kt:50:67 Cannot access 'interface MotionScheme : Any': it is internal in file.",
+    "e: file:///home/runner/work/hetu/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/MotionMaterials12.kt:70:5 Cannot access 'fun MaterialExpressiveTheme(colorScheme: ColorScheme? = ..., motionScheme: MotionScheme? = ..., shapes: Shapes? = ..., typography: Typography? = ..., content: ComposableFunction0<Unit>): Unit': it is internal in file.",
+    "* What went wrong:"
+  ],
+  "totals": {
+    "tests": 0,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  }
+}
