@@ -34,11 +34,8 @@ import androidx.compose.ui.unit.sp
 internal fun Modifier.hetuTap(enabled: Boolean = true, role: Role = Role.Button,
     onClickLabel: String? = null, onClick: () -> Unit): Modifier {
     val source = remember { MutableInteractionSource() }
-    val pressed by source.collectIsPressedAsState()
-    val motion = LocalHetuMotionEnabled.current
-    val scale by animateFloatAsState(if (pressed && enabled && motion) .975f else 1f,
-        if (!motion) snap() else if (pressed) tween(150, easing = androidx.compose.animation.core.CubicBezierEasing(.2f, 0f, 0f, 1f)) else spring(dampingRatio = .82f, stiffness = 650f), label = "hetuPress")
-    return graphicsLayer { scaleX = scale; scaleY = scale }
+    // V18.3: shared interaction-driven dip, so even a very quick tap is visible.
+    return hetuPressScale(source, enabled, pressedScale = .975f)
         .clickable(source, indication = null, enabled = enabled, onClickLabel = onClickLabel,
             role = role, onClick = onClick)
 }
@@ -49,6 +46,7 @@ internal fun HetuFilterTabs(labels: List<String>, selected: Int, onSelect: (Int)
     modifier: Modifier = Modifier) {
     val state = rememberLazyListState()
     val motion = LocalHetuMotionEnabled.current
+    val haptics = rememberHetuHaptics()
     LaunchedEffect(selected, labels.size) {
         if (selected in labels.indices) {
             if (motion) state.animateScrollToItem(selected) else state.scrollToItem(selected)
@@ -60,16 +58,13 @@ internal fun HetuFilterTabs(labels: List<String>, selected: Int, onSelect: (Int)
         itemsIndexed(labels, key = { index, label -> "$index:$label" }) { index, label ->
             val active = index == selected
             val source = remember { MutableInteractionSource() }
-            val pressed by source.collectIsPressedAsState()
-            val scale by animateFloatAsState(if (pressed) .96f else 1f,
-                if (motion) spring(dampingRatio = .84f, stiffness = 650f) else snap(), label = "tabPress")
             val fill by animateColorAsState(
                 if (active) LocalHetuTokens.current.selectionBackground else LocalHetuTokens.current.controlBackground.copy(alpha = .55f),
-                tween(if (motion) 160 else 0), label = "tabFill")
-            Box(Modifier.graphicsLayer { scaleX = scale; scaleY = scale }.heightIn(min = 48.dp)
+                HetuMotion.fade(motion), label = "tabFill")
+            Box(Modifier.hetuPressScale(source, pressedScale = .96f).heightIn(min = 48.dp)
                 .clip(RoundedCornerShape(16.dp)).background(fill)
                 .selectable(active, interactionSource = source, indication = null, role = Role.Tab,
-                    onClick = { if (!active) onSelect(index) })
+                    onClick = { if (!active) { haptics.perform(HetuHaptic.Tick); onSelect(index) } })
                 .padding(horizontal = 18.dp, vertical = 10.dp), contentAlignment = Alignment.Center) {
                 Text(ht(label), fontFamily = HetuSystemFontFamily, fontSize = 14.sp, lineHeight = 20.sp,
                     fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
