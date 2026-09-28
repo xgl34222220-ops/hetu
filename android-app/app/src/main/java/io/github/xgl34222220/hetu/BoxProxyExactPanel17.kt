@@ -4,6 +4,8 @@ import android.content.SharedPreferences
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.*
@@ -15,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalAccessibilityManager
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.font.FontWeight
@@ -56,7 +59,9 @@ private data class BoxProxyPrefs17(
     val disconnectOnSelect: Boolean,
     val collapsePrevious: Boolean,
     val expandInSheet: Boolean,
+    val groupColumnMode: String,
     val groupColumns: Int,
+    val nodeColumnMode: String,
     val nodeColumns: Int,
     val groupDensity: String,
     val nodeDensity: String,
@@ -74,8 +79,10 @@ private data class BoxProxyPrefs17(
             // V18 removes inline accordion expansion entirely. Strategy cards always open
             // the secondary node surface so a large provider can never push the parent grid.
             expandInSheet = true,
-            groupColumns = p.getInt("group_column_count", 1).coerceIn(1, 3),
-            nodeColumns = p.getInt("node_column_count", 1).coerceIn(1, 3),
+            groupColumnMode = p.getString("group_column_mode", "auto").orEmpty().ifBlank { "auto" },
+            groupColumns = p.getInt("group_column_count", 1).coerceIn(1, 12),
+            nodeColumnMode = p.getString("node_column_mode", "auto").orEmpty().ifBlank { "auto" },
+            nodeColumns = p.getInt("node_column_count", 1).coerceIn(1, 12),
             groupDensity = p.getString("group_density", "standard").orEmpty().ifBlank { "standard" },
             nodeDensity = p.getString("node_density", "standard").orEmpty().ifBlank { "standard" },
             nodeSort = p.getString("node_sort_mode", "defaultsort").orEmpty().ifBlank { "defaultsort" },
@@ -95,6 +102,10 @@ private data class BoxProxyPrefs17(
         compact = nodeDensity == "compact",
     )
 }
+
+private fun boxProxyAutoColumns18(screenWidthDp: Float, horizontalPaddingDp: Float, mode: String, fixed: Int): Int =
+    if (mode == "fixed") fixed.coerceIn(1, 12)
+    else (((screenWidthDp - horizontalPaddingDp) / 180f).toInt()).coerceIn(2, 12)
 
 @Composable
 private fun rememberBoxProxyPrefs17(prefs: SharedPreferences): BoxProxyPrefs17 {
@@ -474,27 +485,19 @@ internal fun BoxProxyExactStrategy17(
                                         }
                                         members.chunked(nodeColumns).forEachIndexed { nodeRow, nodes ->
                                             item("nodes:${group.name}:$provider:$nodeRow") {
-                                                Row(
-                                                    Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                                ) {
-                                                    nodes.forEach { node ->
-                                                        BoxProxyNodeCard17(
-                                                            node = node,
-                                                            active = node.name == selection.current(group),
-                                                            pending = selection.pending[group.name] == node.name,
-                                                            delay = delays[node.name] ?: node.lastDelay,
-                                                            testing = testing[node.name] == true,
-                                                            compact = options.nodeDensity == "compact",
-                                                            overflowMode = options.nameOverflow,
-                                                            modifier = Modifier.weight(1f).fillMaxHeight(),
-                                                            onClick = { choose(group, node.name) },
-                                                            onDelay = { scope.launch { testNode(node.name) } },
-                                                            onLong = { detail = node.name },
-                                                        )
-                                                    }
-                                                    repeat(nodeColumns - nodes.size) { Spacer(Modifier.weight(1f)) }
-                                                }
+                                                BoxProxyNodeGridRow18(
+                                                    nodes = nodes,
+                                                    columns = nodeColumns,
+                                                    current = selection.current(group),
+                                                    pending = selection.pending[group.name],
+                                                    delays = delays,
+                                                    testing = testing,
+                                                    compact = options.nodeDensity == "compact",
+                                                    overflowMode = options.nameOverflow,
+                                                    onSelect = { choose(group, it) },
+                                                    onDelay = { scope.launch { testNode(it) } },
+                                                    onLong = { detail = it },
+                                                )
                                             }
                                         }
                                     }
@@ -626,7 +629,60 @@ private fun BoxProxyGroupCard17(
 }
 
 @Composable
-private fun BoxProxyNodeCard17(
+private fun BoxProxyNodeGridRow18(
+    nodes: List<ProxyNodeUi>,
+    columns: Int,
+    current: String,
+    pending: String?,
+    delays: Map<String, Long>,
+    testing: Map<String, Boolean>,
+    compact: Boolean,
+    overflowMode: String,
+    onSelect: (String) -> Unit,
+    onDelay: (String) -> Unit,
+    onLong: (String) -> Unit,
+) {
+    val radius = 12.dp
+    MiuixCard(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = radius,
+        colors = MiuixCardDefaults.defaultColors(
+            color = MiuixTheme.colorScheme.surfaceContainer,
+            contentColor = MiuixTheme.colorScheme.onSurfaceContainer,
+        ),
+    ) {
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            nodes.forEachIndexed { index, node ->
+                BoxProxyNodeCell18(
+                    node = node,
+                    active = node.name == current,
+                    pending = pending == node.name,
+                    delay = delays[node.name] ?: node.lastDelay,
+                    testing = testing[node.name] == true,
+                    compact = compact,
+                    overflowMode = overflowMode,
+                    modifier = Modifier.weight(1f),
+                    onClick = { onSelect(node.name) },
+                    onDelay = { onDelay(node.name) },
+                    onLong = { onLong(node.name) },
+                )
+                if (index != nodes.lastIndex) {
+                    Box(
+                        Modifier.width(1.dp).fillMaxHeight()
+                            .background(MiuixTheme.colorScheme.dividerLine.copy(alpha = .55f))
+                    )
+                }
+            }
+            repeat((columns - nodes.size).coerceAtLeast(0)) {
+                Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+private fun BoxProxyNodeCell18(
     node: ProxyNodeUi,
     active: Boolean,
     pending: Boolean,
@@ -639,62 +695,80 @@ private fun BoxProxyNodeCard17(
     onDelay: () -> Unit,
     onLong: () -> Unit,
 ) {
-    MiuixCard(
-        modifier = modifier.heightIn(min = if (compact) 64.dp else 82.dp)
+    val selectedBg = if (active) MiuixTheme.colorScheme.tertiaryContainer else androidx.compose.ui.graphics.Color.Transparent
+    Column(
+        modifier
+            .heightIn(min = if (compact) 64.dp else 82.dp)
+            .background(selectedBg)
+            .combinedClickable(onClick = onClick, onLongClick = onLong)
+            .padding(horizontal = 10.dp, vertical = 7.dp)
             .semantics {
                 selected = active
                 stateDescription = if (pending) "切换中" else if (active) "已选择" else "未选择"
             },
-        cornerRadius = 12.dp,
-        colors = MiuixCardDefaults.defaultColors(
-            color = if (active) MiuixTheme.colorScheme.tertiaryContainer else MiuixTheme.colorScheme.surfaceContainer,
-            contentColor = MiuixTheme.colorScheme.onSurfaceContainer,
-        ),
-        pressFeedbackType = PressFeedbackType.Sink,
-        onClick = onClick,
-        onLongPress = onLong,
+        verticalArrangement = Arrangement.SpaceBetween,
     ) {
-        Column(
-            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = if (compact) 8.dp else 11.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Row(verticalAlignment = Alignment.Top) {
-                Text(
-                    node.name,
-                    Modifier.weight(1f),
-                    color = MiuixTheme.colorScheme.onSurfaceContainer,
-                    fontSize = 13.sp,
-                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
-                    maxLines = if (overflowMode == "wrap") 2 else 1,
-                    overflow = if (overflowMode == "clip") TextOverflow.Clip else TextOverflow.Ellipsis
-                )
-                if (active && !pending) {
-                    Text("✓", color = MiuixTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.padding(start = 6.dp))
-                } else if (pending) {
-                    Text("…", color = MiuixTheme.colorScheme.primary, modifier = Modifier.padding(start = 6.dp))
-                }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            val flag = boxProxyExplicitFlag18(node.name)
+            if (flag != null) {
+                Text(flag, fontSize = 22.sp, modifier = Modifier.width(28.dp))
+                Spacer(Modifier.width(8.dp))
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    listOf(node.type.uppercase(), if (node.udp) "UDP" else "")
-                        .filter { it.isNotBlank() }.joinToString(" · "),
-                    Modifier.weight(1f),
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    fontSize = 10.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Box(
-                    Modifier.heightIn(min = 34.dp).padding(start = 6.dp)
-                        .clickable(enabled = !testing, onClick = onDelay),
-                    contentAlignment = Alignment.CenterEnd
-                ) {
-                    BoxProxyDelay17(delay, testing)
-                }
+            Text(
+                node.name,
+                Modifier.weight(1f),
+                color = MiuixTheme.colorScheme.onSurfaceContainer,
+                fontSize = 14.sp,
+                fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
+                maxLines = if (overflowMode == "wrap") 2 else 1,
+                overflow = if (overflowMode == "clip") TextOverflow.Clip else TextOverflow.Ellipsis,
+            )
+            if (pending) {
+                Text("…", color = MiuixTheme.colorScheme.primary, fontSize = 14.sp,
+                    modifier = Modifier.padding(start = 6.dp))
+            } else if (active) {
+                Text("✓", color = MiuixTheme.colorScheme.primary, fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 6.dp))
             }
         }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                listOf(node.type.uppercase(), if (node.udp) "UDP" else "")
+                    .filter { it.isNotBlank() }.joinToString(" · "),
+                Modifier.weight(1f),
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Box(
+                Modifier.heightIn(min = 32.dp).padding(start = 6.dp)
+                    .clickable(enabled = !testing, onClick = onDelay),
+                contentAlignment = Alignment.CenterEnd,
+            ) {
+                BoxProxyDelay17(delay, testing)
+            }
+        }
+        if (active && !compact) {
+            Text(
+                "已选择",
+                color = MiuixTheme.colorScheme.primary,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+            )
+        }
     }
+}
+
+private fun boxProxyExplicitFlag18(name: String): String? {
+    val points = name.codePoints().toArray()
+    for (i in 0 until points.size - 1) {
+        if (points[i] in 0x1F1E6..0x1F1FF && points[i + 1] in 0x1F1E6..0x1F1FF) {
+            return String(Character.toChars(points[i])) + String(Character.toChars(points[i + 1]))
+        }
+    }
+    return null
 }
 
 @Composable
@@ -802,27 +876,19 @@ private fun BoxProxyPolicySheet17(
                     }
                     members.chunked(nodeColumns).forEachIndexed { rowIndex, row ->
                         item("sheet-row:$provider:$rowIndex") {
-                            Row(
-                                Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                row.forEach { node ->
-                                    BoxProxyNodeCard17(
-                                        node = node,
-                                        active = node.name == current,
-                                        pending = pending == node.name,
-                                        delay = delays[node.name] ?: node.lastDelay,
-                                        testing = testing[node.name] == true,
-                                        compact = options.nodeDensity == "compact",
-                                        overflowMode = options.nameOverflow,
-                                        modifier = Modifier.weight(1f).fillMaxHeight(),
-                                        onClick = { onSelect(node.name) },
-                                        onDelay = { onDelay(node.name) },
-                                        onLong = {},
-                                    )
-                                }
-                                repeat(nodeColumns - row.size) { Spacer(Modifier.weight(1f)) }
-                            }
+                            BoxProxyNodeGridRow18(
+                                nodes = row,
+                                columns = nodeColumns,
+                                current = current,
+                                pending = pending,
+                                delays = delays,
+                                testing = testing,
+                                compact = options.nodeDensity == "compact",
+                                overflowMode = options.nameOverflow,
+                                onSelect = onSelect,
+                                onDelay = onDelay,
+                                onLong = {},
+                            )
                         }
                     }
                 }
