@@ -31,6 +31,13 @@ jobs:
           text = p.read_text()
           assert text.count('.assertAny(isDisplayed())') == 1
           p.write_text(text.replace('.assertAny(isDisplayed())', '.onLast().assertIsDisplayed()'))
+          p = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/CompactHomeDashboard.kt')
+          text = p.read_text()
+          old = 'HomeLabel("IP", Modifier.width(22.dp))\n                        Spacer(Modifier.width(6.dp))'
+          new = 'HomeLabel("IP", Modifier.width(26.dp))\n                        Spacer(Modifier.width(4.dp))'
+          assert text.count(old) == 1
+          p.write_text(text.replace(old,new))
+          Path('integration-evidence/first-attempt.txt').write_text('Run 36376110126: compile/APK assembly succeeded, 51 of 52 tests passed. All 23 home tests passed. Ui92IntegrationTest latency equal-width check observed 111px versus 110px. Equal-width assertions now allow only the unavoidable one-physical-pixel remainder and additionally reject overlap. No test was deleted or skipped.\n')
           PY
           git diff --check
       - uses: actions/setup-java@v4
@@ -161,6 +168,7 @@ jobs:
           doc += f"\nGitHub Actions {r['run_id']}：{r['tests']}项测试全部通过，0失败、0错误、0跳过。\n"
           doc += f"原146核心及运行资源{r['runtime_payload_entries']}项SHA-256一致。与UI2比较，生产源码仅修改CompactHomeDashboard.kt；服务、控制器、Root/DNS/路由等未改动。\n"
           doc += "测试包含真实触摸事件的父子点击隔离、空白点击、横滑和纵滑、动态流量更新、未知值/越界、字号与单位、等高/边距/进度条、大字体和IPv6。\n"
+          doc += "首次运行36376110126为51/52通过；剩余一项延迟列宽测出111px与110px。保留等宽检查，容许三等分不可避免的1个物理像素余数，并增加正宽度与不重叠断言；没有删除或跳过测试。\n"
           doc += f"APK：{r['apk_bytes']}字节；SHA-256：{r['apk_sha256']}。\n"
           doc += "版本0.4.0-ui92-r146.3；versionCode1004；包名io.github.xgl34222220.hetu。\n"
           doc += "\n## 验证边界\n测试截图由显式测试数据驱动，不是用户手机实拍。没有把模板里的示例IP、地区、流量、ISP/ASN或定时模拟启停写入应用。\n这是Debug测试版，不是正式版；未完成真机联网、微信消息、动画帧率和长期稳定性测试。新Debug证书可能与已安装版本不同；安装冲突时保留原应用和配置，不要卸载或清数据。\n"
@@ -172,6 +180,14 @@ jobs:
           git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'feat(ui): compact four-card grid, real usage bar and isolated network gestures [skip ci]'
           git push origin HEAD:main
           git rev-parse HEAD > integration-evidence/source-commit.txt
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('integration-evidence/result.json')
+          result = json.loads(p.read_text())
+          result['source_commit'] = Path('integration-evidence/source-commit.txt').read_text().strip()
+          p.write_text(json.dumps(result,indent=2))
+          PY
       - name: Export exact source and verification bundle
         if: always()
         shell: bash
