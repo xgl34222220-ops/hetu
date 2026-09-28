@@ -35,36 +35,12 @@ import androidx.compose.ui.unit.sp
 import io.github.xgl34222220.hetu.ui.*
 import kotlinx.coroutines.*
 
-/** A single immutable source for every panel page. Enum declaration order is not UI order. */
-internal val PanelTabs13 = listOf(RefPanelTab.Overview, RefPanelTab.Groups, RefPanelTab.Subscriptions,
-    RefPanelTab.Connections, RefPanelTab.Rules, RefPanelTab.RuleSets)
+/** BoxProxy APK tab order: 概览 / 策略 / 连接 / 订阅 / 规则 / 规则集. */
+internal val PanelTabs13 = BoxProxyTabs17
 
 @Composable
 internal fun FixedPanelTabs13(selected: RefPanelTab, change: (RefPanelTab) -> Unit) {
-    val t = LocalHetuTokens.current
-    val fontScale = LocalDensity.current.fontScale
-    BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
-        .testTag("panel11-subtabs")) {
-        val minimum = maxOf(48f, 36f * fontScale + 16f).dp
-        val scrollable = maxWidth < minimum * PanelTabs13.size
-        val width = if (scrollable) minimum else maxWidth / PanelTabs13.size
-        Row(Modifier.then(if (scrollable) Modifier.horizontalScroll(rememberScrollState()) else Modifier.fillMaxWidth())) {
-            PanelTabs13.forEach { tab ->
-                key(tab.name) {
-                    val active = selected == tab
-                    Box(Modifier.width(width).heightIn(min = 48.dp).clip(CircleShape)
-                        .background(if (active) t.cardBackground else Color.Transparent)
-                        .semantics { this.selected = active; role = Role.Tab }
-                        .nativePress(label = tab.label, onClick = { if (!active) change(tab) })
-                        .testTag("panel11-tab-${tab.name}"),
-                        contentAlignment = Alignment.Center) {
-                        Text(tab.label, color = if (active) Color(0xFF2563EB) else t.textSecondary,
-                            fontSize = 12.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                    }
-                }
-            }
-        }
-    }
+    BoxProxyPanelTabs17(selected, change)
 }
 
 /** Presentation-only back stack, independent of primary navigation and acknowledged core state. */
