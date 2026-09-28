@@ -1,0 +1,767 @@
+package io.github.xgl34222220.hetu
+
+import android.content.SharedPreferences
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalAccessibilityManager
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.*
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.Icon
+import androidx.compose.material3.TextButton
+import io.github.xgl34222220.hetu.ui.LocalHomeDockClearance
+import kotlinx.coroutines.*
+import top.yukonga.miuix.kmp.basic.Card as MiuixCard
+import top.yukonga.miuix.kmp.basic.CardDefaults as MiuixCardDefaults
+import top.yukonga.miuix.kmp.basic.FloatingActionButton as MiuixFab
+import top.yukonga.miuix.kmp.basic.IconButton as MiuixIconButton
+import top.yukonga.miuix.kmp.basic.InputField as MiuixInputField
+import top.yukonga.miuix.kmp.basic.SearchBar as MiuixSearchBar
+import top.yukonga.miuix.kmp.basic.TabRow as MiuixTabRow
+import top.yukonga.miuix.kmp.basic.TopAppBar as MiuixTopAppBar
+import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
+import top.yukonga.miuix.kmp.theme.MiuixTheme as MiuixThemeHost
+import top.yukonga.miuix.kmp.theme.darkColorScheme as miuixDarkColors
+import top.yukonga.miuix.kmp.theme.lightColorScheme as miuixLightColors
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.utils.PressFeedbackType
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Search
+import top.yukonga.miuix.kmp.icon.extended.Settings
+
+/**
+ * Reconstructed only from the user's BoxProxy APK resources/bytecode.
+ * Runtime actions stay on Hetu's real repository callbacks.
+ */
+private data class BoxProxyPrefs17(
+    val showHidden: Boolean,
+    val globalByMode: Boolean,
+    val groupByProvider: Boolean,
+    val disconnectOnSelect: Boolean,
+    val collapsePrevious: Boolean,
+    val expandInSheet: Boolean,
+    val groupColumns: Int,
+    val nodeColumns: Int,
+    val groupDensity: String,
+    val nodeDensity: String,
+    val nodeSort: String,
+    val descending: Boolean,
+    val nameOverflow: String,
+) {
+    companion object {
+        fun read(p: SharedPreferences) = BoxProxyPrefs17(
+            showHidden = p.getBoolean("show_hidden_groups", true),
+            globalByMode = p.getBoolean("display_global_by_mode", false),
+            groupByProvider = p.getBoolean("group_by_provider", false),
+            disconnectOnSelect = p.getBoolean("disconnect_on_select", false),
+            collapsePrevious = p.getBoolean("collapse_previous_group_on_expand", false),
+            expandInSheet = p.getBoolean("expand_selected_policy_in_bottom_sheet", false),
+            groupColumns = p.getInt("group_column_count", 1).coerceIn(1, 3),
+            nodeColumns = p.getInt("node_column_count", 1).coerceIn(1, 3),
+            groupDensity = p.getString("group_density", "standard").orEmpty().ifBlank { "standard" },
+            nodeDensity = p.getString("node_density", "standard").orEmpty().ifBlank { "standard" },
+            nodeSort = p.getString("node_sort_mode", "defaultsort").orEmpty().ifBlank { "defaultsort" },
+            descending = p.getBoolean("node_sort_descending", false),
+            nameOverflow = p.getString("name_overflow_mode", "clip").orEmpty().ifBlank { "clip" },
+        )
+    }
+
+    fun legacy() = PanelOptions11(
+        showHidden = showHidden,
+        globalByMode = globalByMode,
+        providers = groupByProvider,
+        collapsePrevious = collapsePrevious,
+        sort = when (nodeSort) { "name" -> "name"; "latency" -> "latency"; else -> "config" },
+        descending = descending,
+        columns = nodeColumns.coerceIn(1, 2),
+        compact = nodeDensity == "compact",
+    )
+}
+
+@Composable
+private fun rememberBoxProxyPrefs17(prefs: SharedPreferences): BoxProxyPrefs17 {
+    var value by remember(prefs) { mutableStateOf(BoxProxyPrefs17.read(prefs)) }
+    DisposableEffect(prefs) {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { p, _ ->
+            value = BoxProxyPrefs17.read(p)
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+    return value
+}
+
+@Composable
+internal fun BoxProxyMiuixTheme17(content: @Composable () -> Unit) {
+    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
+    MiuixThemeHost(colors = if (dark) miuixDarkColors() else miuixLightColors(), content = content)
+}
+
+internal val BoxProxyTabs17 = listOf(
+    RefPanelTab.Overview,
+    RefPanelTab.Groups,
+    RefPanelTab.Connections,
+    RefPanelTab.Subscriptions,
+    RefPanelTab.Rules,
+    RefPanelTab.RuleSets,
+)
+
+internal fun boxProxyTabLabel17(tab: RefPanelTab): String = when (tab) {
+    RefPanelTab.Overview -> "概览"
+    RefPanelTab.Groups -> "策略"
+    RefPanelTab.Connections -> "连接"
+    RefPanelTab.Subscriptions -> "订阅"
+    RefPanelTab.Rules -> "规则"
+    RefPanelTab.RuleSets -> "规则集"
+}
+
+@Composable
+internal fun BoxProxyPanelTabs17(selected: RefPanelTab, onSelect: (RefPanelTab) -> Unit) {
+    BoxProxyMiuixTheme17 {
+        MiuixTabRow(
+            tabs = BoxProxyTabs17.map(::boxProxyTabLabel17),
+            selectedTabIndex = BoxProxyTabs17.indexOf(selected).coerceAtLeast(0),
+            onTabSelected = { BoxProxyTabs17.getOrNull(it)?.let(onSelect) },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).testTag("boxproxy17-tabs"),
+            height = 38.dp,
+            minWidth = 56.dp,
+            maxWidth = 92.dp,
+            cornerRadius = 12.dp,
+            itemSpacing = 5.dp,
+        )
+    }
+}
+
+@Composable
+internal fun BoxProxyPanelHeader17(
+    selected: RefPanelTab,
+    onSelect: (RefPanelTab) -> Unit,
+    searchOpen: Boolean,
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onSearchToggle: () -> Unit,
+    onOpenSettings: () -> Unit,
+) {
+    BoxProxyMiuixTheme17 {
+        Column(Modifier.fillMaxWidth()) {
+            MiuixTopAppBar(
+                title = boxProxyTabLabel17(selected),
+                largeTitle = boxProxyTabLabel17(selected),
+                defaultWindowInsetsPadding = false,
+                actions = {
+                    if (selected != RefPanelTab.Overview) {
+                        MiuixIconButton(onClick = onSearchToggle, minWidth = 44.dp, minHeight = 44.dp) {
+                            Icon(MiuixIcons.Search, if (searchOpen) "关闭搜索" else "搜索",
+                                Modifier.size(20.dp), tint = MiuixTheme.colorScheme.onSurface)
+                        }
+                    }
+                    if (selected == RefPanelTab.Groups) {
+                        ReferenceStrategyFilterMenu()
+                        ReferenceStrategyMenu()
+                    } else {
+                        MiuixIconButton(onClick = onOpenSettings, minWidth = 44.dp, minHeight = 44.dp) {
+                            Icon(MiuixIcons.Settings, "面板设置", Modifier.size(20.dp),
+                                tint = MiuixTheme.colorScheme.onSurface)
+                        }
+                    }
+                },
+                bottomContent = { BoxProxyPanelTabs17(selected, onSelect) },
+            )
+            AnimatedVisibility(searchOpen && selected != RefPanelTab.Overview) {
+                MiuixSearchBar(
+                    inputField = {
+                        MiuixInputField(
+                            query = query,
+                            onQueryChange = onQueryChange,
+                            onSearch = {},
+                            expanded = true,
+                            onExpandedChange = {},
+                            label = when (selected) {
+                                RefPanelTab.Groups -> "搜索策略组或节点"
+                                RefPanelTab.Connections -> "搜索应用、域名或分流规则"
+                                RefPanelTab.Subscriptions -> "搜索订阅"
+                                RefPanelTab.Rules -> "搜索规则"
+                                RefPanelTab.RuleSets -> "搜索规则集"
+                                else -> "搜索"
+                            },
+                        )
+                    },
+                    onExpandedChange = { if (!it) onSearchToggle() },
+                    modifier = Modifier.fillMaxWidth(),
+                    insideMargin = DpSize(12.dp, 8.dp),
+                    expanded = true,
+                    outsideEndAction = {
+                        TextButton(onClick = onSearchToggle) { Text("取消") }
+                    },
+                ) {}
+            }
+        }
+    }
+}
+
+@Composable
+internal fun BoxProxyExactStrategy17(
+    state: ProxyComposeState,
+    delays: MutableMap<String, Long>,
+    legacyPrefs: SharedPreferences,
+    searchRequest: Int,
+    onTab: (RefPanelTab) -> Unit,
+    refresh: suspend () -> Unit,
+    select: suspend (String, String) -> String,
+    measure: suspend (String) -> Long,
+    onDetailVisible: (Boolean) -> Unit,
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val prefs = remember(context) { context.getSharedPreferences("proxy_selector_preferences", 0) }
+    val options = rememberBoxProxyPrefs17(prefs)
+    val legacy = options.legacy()
+    val selection = remember { PanelSelection11() }
+    val scope = rememberCoroutineScope()
+    val accessibility = LocalAccessibilityManager.current
+    val listState = rememberLazyListState()
+    val testing = remember { mutableStateMapOf<String, Boolean>() }
+    val batchTesting = remember { mutableStateMapOf<String, Boolean>() }
+    val batchDone = remember { mutableStateMapOf<String, Int>() }
+    var query by rememberSaveable { mutableStateOf("") }
+    var searchOpen by rememberSaveable { mutableStateOf(false) }
+    var expanded by rememberSaveable { mutableStateOf(setOf<String>()) }
+    var sheetGroup by rememberSaveable { mutableStateOf<String?>(null) }
+    var detail by remember { mutableStateOf<String?>(null) }
+    var notice by remember { mutableStateOf("") }
+    var noticeError by remember { mutableStateOf(false) }
+    var refreshing by remember { mutableStateOf(false) }
+
+    val currentState by rememberUpdatedState(state)
+    val selectLatest by rememberUpdatedState(select)
+    val measureLatest by rememberUpdatedState(measure)
+    val refreshLatest by rememberUpdatedState(refresh)
+    val fontScale = LocalDensity.current.fontScale
+    val groupColumns = if (fontScale >= 1.45f) 1 else options.groupColumns.coerceIn(1, 3)
+    val nodeColumns = if (fontScale >= 1.45f) 1 else options.nodeColumns.coerceIn(1, 3)
+    val allGroups = remember(state.groups) { state.groups.associateBy { it.name } }
+    val groups = remember(state.groups, query, state.trafficMode, options) {
+        panelGroups11(state.groups, query, state.trafficMode, legacy).map { allGroups.getValue(it.name) }
+    }
+
+    LaunchedEffect(state.groups) {
+        selection.reconcile(state.groups)
+        expanded = expanded.filterTo(mutableSetOf()) { it in allGroups }
+        if (sheetGroup !in allGroups) sheetGroup = null
+    }
+    LaunchedEffect(searchRequest) { if (searchRequest > 0) searchOpen = true }
+    LaunchedEffect(sheetGroup, detail) { onDetailVisible(sheetGroup != null || detail != null) }
+    DisposableEffect(Unit) { onDispose { onDetailVisible(false) } }
+    LaunchedEffect(notice) {
+        if (notice.isNotBlank()) {
+            val old = notice
+            delay(accessibility?.calculateRecommendedTimeoutMillis(4000, true, true, true) ?: 4000)
+            if (notice == old) notice = ""
+        }
+    }
+
+    fun notify(text: String, failed: Boolean = false) { notice = text; noticeError = failed }
+    fun requestRefresh() {
+        if (refreshing) return
+        refreshing = true
+        scope.launch {
+            try { refreshLatest(); notify("刷新完成") }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) { notify(e.message ?: "刷新失败", true) }
+            finally { refreshing = false }
+        }
+    }
+    suspend fun testNode(name: String) {
+        if (testing[name] == true || !currentState.running) return
+        testing[name] = true
+        try {
+            val value = measureLatest(name)
+            if (value > 0) delays[name] = value
+        } catch (e: MihomoControllerClient.DelayFailure) {
+            delays[name] = if (e.timedOut) -1L else -2L
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            notify(e.message ?: "测速失败", true)
+        } finally {
+            testing.remove(name)
+        }
+    }
+    fun testAll(group: ProxyGroupUi) {
+        if (batchTesting[group.name] == true || !state.running) return
+        batchTesting[group.name] = true
+        batchDone[group.name] = 0
+        scope.launch {
+            try {
+                group.nodes.map { it.name }.distinct().chunked(4).forEach { chunk ->
+                    coroutineScope {
+                        chunk.map { name -> async {
+                            try { testNode(name) }
+                            finally { batchDone[group.name] = (batchDone[group.name] ?: 0) + 1 }
+                        } }.awaitAll()
+                    }
+                }
+            } finally {
+                batchTesting.remove(group.name)
+            }
+        }
+    }
+    fun choose(group: ProxyGroupUi, node: String) {
+        if (!state.running || selection.pending[group.name] != null) return
+        legacyPrefs.edit().putBoolean("proxySelectorDisconnectOnSelect", options.disconnectOnSelect).apply()
+        scope.launch {
+            try {
+                if (selection.select(group, node, selectLatest)) notify("已选择 $node")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                notify(e.message ?: "操作失败", true)
+            }
+        }
+    }
+
+    BoxProxyMiuixTheme17 {
+        top.yukonga.miuix.kmp.basic.Scaffold(
+            modifier = Modifier.fillMaxSize().testTag("boxproxy17-strategy"),
+            topBar = {
+                BoxProxyPanelHeader17(
+                    selected = RefPanelTab.Groups,
+                    onSelect = onTab,
+                    searchOpen = searchOpen,
+                    query = query,
+                    onQueryChange = { query = it },
+                    onSearchToggle = { searchOpen = !searchOpen; if (!searchOpen) query = "" },
+                    onOpenSettings = {},
+                )
+            },
+            floatingActionButton = {
+                if (state.running && groups.isNotEmpty() && !options.expandInSheet) {
+                    MiuixFab(
+                        onClick = {
+                            val target = groups.firstOrNull { it.name == "节点选择" }
+                                ?: groups.firstOrNull { it.type.equals("Selector", true) && !it.name.equals("GLOBAL", true) }
+                                ?: groups.first()
+                            expanded = if (options.collapsePrevious) setOf(target.name) else expanded + target.name
+                            scope.launch {
+                                val index = groups.indexOfFirst { it.name == target.name }
+                                if (index >= 0) listState.animateScrollToItem(index)
+                            }
+                        },
+                        minWidth = 60.dp,
+                        minHeight = 48.dp,
+                    ) {
+                        Text("当前策略组", color = MiuixTheme.colorScheme.onPrimary, fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 14.dp))
+                    }
+                }
+            },
+            containerColor = MiuixTheme.colorScheme.surface,
+        ) { padding ->
+            Column(Modifier.fillMaxSize().padding(padding)) {
+                if (notice.isNotBlank()) {
+                    Text(
+                        notice,
+                        color = if (noticeError) MiuixTheme.colorScheme.error else MiuixTheme.colorScheme.onSurface,
+                        fontSize = 12.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)
+                            .testTag("boxproxy17-notice"),
+                    )
+                }
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(
+                        start = 12.dp, end = 12.dp, top = 8.dp,
+                        bottom = (LocalHomeDockClearance.current ?: 86.dp) + 18.dp
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    if (!state.running || groups.isEmpty()) item("empty") {
+                        Column(
+                            Modifier.fillMaxWidth().padding(vertical = 36.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(if (!state.running) "代理未运行" else "没有匹配的策略",
+                                color = MiuixTheme.colorScheme.onSurface)
+                            TextButton(onClick = ::requestRefresh, enabled = !refreshing) {
+                                Text(if (refreshing) "刷新中…" else "刷新")
+                            }
+                        }
+                    }
+                    groups.chunked(groupColumns).forEachIndexed { rowIndex, row ->
+                        item("group-row:$rowIndex") {
+                            Row(
+                                Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                row.forEach { group ->
+                                    val current = selection.current(group)
+                                    BoxProxyGroupCard17(
+                                        group = group,
+                                        selected = current,
+                                        delay = delays[current] ?: group.nodes.firstOrNull { it.name == current }?.lastDelay,
+                                        compact = options.groupDensity == "compact",
+                                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                                    ) {
+                                        if (options.expandInSheet) sheetGroup = group.name
+                                        else expanded = panelExpanded11(expanded, group.name, options.collapsePrevious)
+                                    }
+                                }
+                                repeat(groupColumns - row.size) { Spacer(Modifier.weight(1f)) }
+                            }
+                        }
+                        if (!options.expandInSheet) {
+                            row.forEach { group ->
+                                if (group.name in expanded || query.isNotBlank()) {
+                                    item("tools:${group.name}") {
+                                        Row(
+                                            Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                "${group.name} · ${group.nodes.size} 个节点",
+                                                Modifier.weight(1f),
+                                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                                fontSize = 11.sp
+                                            )
+                                            TextButton(
+                                                onClick = { testAll(group) },
+                                                enabled = batchTesting[group.name] != true && state.running
+                                            ) {
+                                                Text(
+                                                    if (batchTesting[group.name] == true)
+                                                        "${batchDone[group.name] ?: 0}/${group.nodes.size}"
+                                                    else "组测速"
+                                                )
+                                            }
+                                        }
+                                    }
+                                    val projected = projectStrategyNodes(group.nodes, legacy.sort, legacy.descending, delays)
+                                    val sections = if (options.groupByProvider) {
+                                        projected.groupBy { it.provider.ifBlank { "配置内节点" } }
+                                    } else linkedMapOf("" to projected)
+                                    sections.forEach { (provider, members) ->
+                                        if (provider.isNotBlank()) item("provider:${group.name}:$provider") {
+                                            Text(
+                                                provider,
+                                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                                fontSize = 11.sp,
+                                                modifier = Modifier.padding(start = 6.dp, top = 4.dp)
+                                            )
+                                        }
+                                        members.chunked(nodeColumns).forEachIndexed { nodeRow, nodes ->
+                                            item("nodes:${group.name}:$provider:$nodeRow") {
+                                                Row(
+                                                    Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                ) {
+                                                    nodes.forEach { node ->
+                                                        BoxProxyNodeCard17(
+                                                            node = node,
+                                                            active = node.name == selection.current(group),
+                                                            pending = selection.pending[group.name] == node.name,
+                                                            delay = delays[node.name] ?: node.lastDelay,
+                                                            testing = testing[node.name] == true,
+                                                            compact = options.nodeDensity == "compact",
+                                                            overflowMode = options.nameOverflow,
+                                                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                                                            onClick = { choose(group, node.name) },
+                                                            onDelay = { scope.launch { testNode(node.name) } },
+                                                            onLong = { detail = node.name },
+                                                        )
+                                                    }
+                                                    repeat(nodeColumns - nodes.size) { Spacer(Modifier.weight(1f)) }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        sheetGroup?.let(allGroups::get)?.let { group ->
+            BoxProxyPolicySheet17(
+                group = group,
+                current = selection.current(group),
+                pending = selection.pending[group.name],
+                delays = delays,
+                testing = testing,
+                running = state.running,
+                options = options,
+                onDismiss = { sheetGroup = null },
+                onSelect = { choose(group, it) },
+                onDelay = { scope.launch { testNode(it) } },
+                onTestAll = { testAll(group) },
+            )
+        }
+    }
+
+    detail?.let { value ->
+        NativeDetailsSheet("详细信息", { detail = null }) {
+            Text(value, color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp)
+        }
+    }
+}
+
+@Composable
+private fun BoxProxyGroupCard17(
+    group: ProxyGroupUi,
+    selected: String,
+    delay: Long?,
+    compact: Boolean,
+    modifier: Modifier,
+    onClick: () -> Unit,
+) {
+    MiuixCard(
+        modifier = modifier.heightIn(min = if (compact) 66.dp else 78.dp)
+            .testTag("boxproxy17-group:${group.name}"),
+        cornerRadius = 16.dp,
+        colors = MiuixCardDefaults.defaultColors(),
+        pressFeedbackType = PressFeedbackType.Sink,
+        onClick = onClick,
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = if (compact) 9.dp else 12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    group.name,
+                    Modifier.weight(1f),
+                    color = MiuixTheme.colorScheme.onSurfaceContainer,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                ConfiguredGroupIcon(group, Modifier.size(22.dp))
+            }
+            Text(
+                "${group.type} · ${group.nodes.size}",
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                fontSize = 10.sp,
+                maxLines = 1
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    selected.ifBlank { "未选择" },
+                    Modifier.weight(1f),
+                    color = MiuixTheme.colorScheme.onSurfaceSecondary,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                BoxProxyDelay17(delay, false)
+            }
+        }
+    }
+}
+
+@Composable
+private fun BoxProxyNodeCard17(
+    node: ProxyNodeUi,
+    active: Boolean,
+    pending: Boolean,
+    delay: Long?,
+    testing: Boolean,
+    compact: Boolean,
+    overflowMode: String,
+    modifier: Modifier,
+    onClick: () -> Unit,
+    onDelay: () -> Unit,
+    onLong: () -> Unit,
+) {
+    MiuixCard(
+        modifier = modifier.heightIn(min = if (compact) 64.dp else 82.dp)
+            .semantics {
+                selected = active
+                stateDescription = if (pending) "切换中" else if (active) "已选择" else "未选择"
+            },
+        cornerRadius = 12.dp,
+        colors = MiuixCardDefaults.defaultColors(
+            color = if (active) MiuixTheme.colorScheme.tertiaryContainer else MiuixTheme.colorScheme.surfaceContainer,
+            contentColor = MiuixTheme.colorScheme.onSurfaceContainer,
+        ),
+        pressFeedbackType = PressFeedbackType.Sink,
+        onClick = onClick,
+        onLongPress = onLong,
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = if (compact) 8.dp else 11.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Row(verticalAlignment = Alignment.Top) {
+                Text(
+                    node.name,
+                    Modifier.weight(1f),
+                    color = MiuixTheme.colorScheme.onSurfaceContainer,
+                    fontSize = 13.sp,
+                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
+                    maxLines = if (overflowMode == "wrap") 2 else 1,
+                    overflow = if (overflowMode == "clip") TextOverflow.Clip else TextOverflow.Ellipsis
+                )
+                if (active && !pending) {
+                    Text("✓", color = MiuixTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.padding(start = 6.dp))
+                } else if (pending) {
+                    Text("…", color = MiuixTheme.colorScheme.primary, modifier = Modifier.padding(start = 6.dp))
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    listOf(node.type.uppercase(), if (node.udp) "UDP" else "")
+                        .filter { it.isNotBlank() }.joinToString(" · "),
+                    Modifier.weight(1f),
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    fontSize = 10.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Box(
+                    Modifier.heightIn(min = 34.dp).padding(start = 6.dp)
+                        .clickable(enabled = !testing, onClick = onDelay),
+                    contentAlignment = Alignment.CenterEnd
+                ) {
+                    BoxProxyDelay17(delay, testing)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BoxProxyDelay17(value: Long?, testing: Boolean) {
+    val text = when {
+        testing -> "…"
+        value == null -> "—"
+        value == -1L -> "超时"
+        value <= -2L -> "失败"
+        else -> "$value ms"
+    }
+    val color = when {
+        value == null || testing -> MiuixTheme.colorScheme.onSurfaceVariantSummary
+        value <= 0L -> MiuixTheme.colorScheme.error
+        value < 150L -> MiuixTheme.colorScheme.primary
+        value < 300L -> MiuixTheme.colorScheme.onTertiaryContainer
+        else -> MiuixTheme.colorScheme.error
+    }
+    Text(text, color = color, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+}
+
+@Composable
+private fun BoxProxyPolicySheet17(
+    group: ProxyGroupUi,
+    current: String,
+    pending: String?,
+    delays: Map<String, Long>,
+    testing: Map<String, Boolean>,
+    running: Boolean,
+    options: BoxProxyPrefs17,
+    onDismiss: () -> Unit,
+    onSelect: (String) -> Unit,
+    onDelay: (String) -> Unit,
+    onTestAll: () -> Unit,
+) {
+    var query by rememberSaveable(group.name) { mutableStateOf("") }
+    val nodeColumns = if (LocalDensity.current.fontScale >= 1.45f) 1 else options.nodeColumns.coerceIn(1, 3)
+    val legacy = options.legacy()
+    val nodes = remember(group.nodes, query, options, delays) {
+        val filtered = if (query.isBlank()) group.nodes else group.nodes.filter {
+            it.name.contains(query, true) || it.provider.contains(query, true) || it.type.contains(query, true)
+        }
+        projectStrategyNodes(filtered, legacy.sort, legacy.descending, delays)
+    }
+
+    OverlayBottomSheet(
+        show = true,
+        title = group.name,
+        backgroundColor = MiuixTheme.colorScheme.surface.copy(alpha = .86f),
+        sheetMaxWidth = 720.dp,
+        onDismissRequest = onDismiss,
+        endAction = {
+            TextButton(onClick = onTestAll, enabled = running) { Text("组测速") }
+        },
+    ) {
+        Column(Modifier.fillMaxWidth().fillMaxHeight(.82f)) {
+            MiuixSearchBar(
+                inputField = {
+                    MiuixInputField(
+                        query = query,
+                        onQueryChange = { query = it },
+                        onSearch = {},
+                        expanded = true,
+                        onExpandedChange = {},
+                        label = "搜索策略组或节点"
+                    )
+                },
+                onExpandedChange = {},
+                modifier = Modifier.fillMaxWidth(),
+                insideMargin = DpSize(12.dp, 8.dp),
+                expanded = true,
+            ) {}
+            LazyColumn(
+                Modifier.fillMaxWidth().weight(1f),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                val sections = if (options.groupByProvider) {
+                    nodes.groupBy { it.provider.ifBlank { "配置内节点" } }
+                } else linkedMapOf("" to nodes)
+                sections.forEach { (provider, members) ->
+                    if (provider.isNotBlank()) item("sheet-provider:$provider") {
+                        Text(
+                            provider,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 3.dp)
+                        )
+                    }
+                    members.chunked(nodeColumns).forEachIndexed { rowIndex, row ->
+                        item("sheet-row:$provider:$rowIndex") {
+                            Row(
+                                Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                row.forEach { node ->
+                                    BoxProxyNodeCard17(
+                                        node = node,
+                                        active = node.name == current,
+                                        pending = pending == node.name,
+                                        delay = delays[node.name] ?: node.lastDelay,
+                                        testing = testing[node.name] == true,
+                                        compact = options.nodeDensity == "compact",
+                                        overflowMode = options.nameOverflow,
+                                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                                        onClick = { onSelect(node.name) },
+                                        onDelay = { onDelay(node.name) },
+                                        onLong = {},
+                                    )
+                                }
+                                repeat(nodeColumns - row.size) { Spacer(Modifier.weight(1f)) }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
