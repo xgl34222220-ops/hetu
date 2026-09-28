@@ -4,17 +4,21 @@ import android.content.SharedPreferences
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.*
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalAccessibilityManager
 import androidx.compose.ui.platform.LocalDensity
@@ -266,12 +270,8 @@ internal fun BoxProxyExactStrategy17(
     val measureLatest by rememberUpdatedState(measure)
     val refreshLatest by rememberUpdatedState(refresh)
     val fontScale = LocalDensity.current.fontScale
-    val screenWidthDp = LocalConfiguration.current.screenWidthDp.toFloat()
-    // BoxProxy px3.x(): auto = ((width - padding) / 180).toInt().coerceIn(2, 12).
-    val groupColumns = if (fontScale >= 1.45f) 1 else
-        boxProxyAutoColumns18(screenWidthDp, 24f, options.groupColumnMode, options.groupColumns)
-    val nodeColumns = if (fontScale >= 1.45f) 1 else
-        boxProxyAutoColumns18(screenWidthDp, 24f, options.nodeColumnMode, options.nodeColumns)
+    val groupColumns = if (fontScale >= 1.45f) 1 else 2
+    val nodeColumns = if (fontScale >= 1.45f) 1 else 2
     val allGroups = remember(state.groups) { state.groups.associateBy { it.name } }
     val groups = remember(state.groups, query, state.trafficMode, options) {
         panelGroups11(state.groups, query, state.trafficMode, legacy).map { allGroups.getValue(it.name) }
@@ -406,10 +406,10 @@ internal fun BoxProxyExactStrategy17(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(
-                        start = 12.dp, end = 12.dp, top = 8.dp,
+                        start = 14.dp, end = 14.dp, top = 12.dp,
                         bottom = (LocalHomeDockClearance.current ?: 86.dp) + 18.dp
                     ),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     if (!state.running || groups.isEmpty()) item("empty") {
                         Column(
@@ -426,8 +426,8 @@ internal fun BoxProxyExactStrategy17(
                     groups.chunked(groupColumns).forEachIndexed { rowIndex, row ->
                         item("group-row:$rowIndex") {
                             Row(
-                                Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 row.forEach { group ->
                                     val current = selection.current(group)
@@ -439,7 +439,7 @@ internal fun BoxProxyExactStrategy17(
                                             ((delays[node.name] ?: node.lastDelay) ?: 0L) > 0L
                                         },
                                         compact = options.groupDensity == "compact",
-                                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                                        modifier = Modifier.weight(1f).aspectRatio(1.50f),
                                     ) {
                                         sheetGroup = group.name
                                     }
@@ -575,57 +575,83 @@ private fun BoxProxyGroupCard17(
     onClick: () -> Unit,
 ) {
     val accent = boxProxyGroupAccent17(group)
-    MiuixCard(
-        modifier = modifier.heightIn(min = if (compact) 96.dp else 112.dp)
-            .testTag("boxproxy17-group:${group.name}"),
-        cornerRadius = 16.dp,
-        colors = MiuixCardDefaults.defaultColors(),
-        pressFeedbackType = PressFeedbackType.Sink,
-        onClick = onClick,
-    ) {
-        Column(
-            Modifier.fillMaxWidth().padding(start = 14.dp, top = 13.dp, end = 12.dp, bottom = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(7.dp)
-        ) {
-            Row(verticalAlignment = Alignment.Top) {
-                Text(
-                    group.name,
-                    Modifier.weight(1f).padding(top = 2.dp),
-                    color = MiuixTheme.colorScheme.onSurfaceContainer,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Box(
-                    Modifier.size(30.dp).background(accent.copy(alpha = .12f), RoundedCornerShape(10.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    ConfiguredGroupIcon(group, Modifier.size(21.dp))
-                }
+    val interaction = remember(group.name) { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) .97f else 1f,
+        animationSpec = spring(dampingRatio = .72f, stiffness = 520f),
+        label = "strategy-card-${group.name}",
+    )
+    Box(
+        modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                alpha = if (pressed) .965f else 1f
             }
-            Text(
-                "${group.type.ifBlank { "Selector" }}  ${online}/${group.nodes.size}",
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                onClick = onClick,
             )
-            Spacer(Modifier.weight(1f))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(boxProxyFlag17(selected), fontSize = 14.sp)
-                Spacer(Modifier.width(5.dp))
-                Text(
-                    selected.ifBlank { "未选择" },
-                    Modifier.weight(1f),
-                    color = MiuixTheme.colorScheme.onSurfaceSecondary,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(Modifier.width(6.dp))
-                BoxProxyDelay17(delay, false)
+            .testTag("boxproxy17-group:${group.name}"),
+    ) {
+        MiuixCard(
+            modifier = Modifier.fillMaxSize(),
+            cornerRadius = 13.dp,
+            colors = MiuixCardDefaults.defaultColors(),
+        ) {
+            Column(
+                Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(0.dp),
+            ) {
+                Row(verticalAlignment = Alignment.Top) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            group.name,
+                            color = MiuixTheme.colorScheme.onSurfaceContainer,
+                            fontSize = 14.sp,
+                            lineHeight = 15.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            "${group.type.ifBlank { "Selector" }}  ${online}/${group.nodes.size}",
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            fontSize = 10.5.sp,
+                            lineHeight = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Spacer(Modifier.width(6.dp))
+                    Box(
+                        Modifier.size(26.dp).background(accent.copy(alpha = .12f), RoundedCornerShape(8.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        ConfiguredGroupIcon(group, Modifier.size(19.dp))
+                    }
+                }
+                Spacer(Modifier.weight(1f))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(boxProxyFlag17(selected), fontSize = 13.sp, lineHeight = 15.sp)
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        selected.ifBlank { "未选择" },
+                        Modifier.weight(1f),
+                        color = MiuixTheme.colorScheme.onSurfaceSecondary,
+                        fontSize = 11.5.sp,
+                        lineHeight = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    BoxProxyDelay17(delay, false)
+                }
             }
         }
     }
@@ -645,40 +671,27 @@ private fun BoxProxyNodeGridRow18(
     onDelay: (String) -> Unit,
     onLong: (String) -> Unit,
 ) {
-    val radius = 12.dp
-    MiuixCard(
-        modifier = Modifier.fillMaxWidth(),
-        cornerRadius = radius,
-        colors = MiuixCardDefaults.defaultColors(
-            color = MiuixTheme.colorScheme.surfaceContainer,
-            contentColor = MiuixTheme.colorScheme.onSurfaceContainer,
-        ),
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-            nodes.forEachIndexed { index, node ->
-                BoxProxyNodeCell18(
-                    node = node,
-                    active = node.name == current,
-                    pending = pending == node.name,
-                    delay = delays[node.name] ?: node.lastDelay,
-                    testing = testing[node.name] == true,
-                    compact = compact,
-                    overflowMode = overflowMode,
-                    modifier = Modifier.weight(1f),
-                    onClick = { onSelect(node.name) },
-                    onDelay = { onDelay(node.name) },
-                    onLong = { onLong(node.name) },
-                )
-                if (index != nodes.lastIndex) {
-                    Box(
-                        Modifier.width(1.dp).fillMaxHeight()
-                            .background(MiuixTheme.colorScheme.dividerLine.copy(alpha = .55f))
-                    )
-                }
-            }
-            repeat((columns - nodes.size).coerceAtLeast(0)) {
-                Spacer(Modifier.weight(1f))
-            }
+        nodes.forEach { node ->
+            BoxProxyNodeCell18(
+                node = node,
+                active = node.name == current,
+                pending = pending == node.name,
+                delay = delays[node.name] ?: node.lastDelay,
+                testing = testing[node.name] == true,
+                compact = compact,
+                overflowMode = overflowMode,
+                modifier = Modifier.weight(1f),
+                onClick = { onSelect(node.name) },
+                onDelay = { onDelay(node.name) },
+                onLong = { onLong(node.name) },
+            )
+        }
+        repeat((columns - nodes.size).coerceAtLeast(0)) {
+            Spacer(Modifier.weight(1f))
         }
     }
 }
@@ -698,18 +711,26 @@ private fun BoxProxyNodeCell18(
     onDelay: () -> Unit,
     onLong: () -> Unit,
 ) {
-    val selectedBg = if (active) MiuixTheme.colorScheme.tertiaryContainer else androidx.compose.ui.graphics.Color.Transparent
-    Column(
-        modifier
-            .heightIn(min = if (compact) 64.dp else 82.dp)
-            .background(selectedBg)
-            .combinedClickable(onClick = onClick, onLongClick = onLong)
-            .padding(horizontal = 10.dp, vertical = 7.dp)
+    val selectedBg = if (active) MiuixTheme.colorScheme.tertiaryContainer else MiuixTheme.colorScheme.surfaceContainer
+    MiuixCard(
+        modifier = modifier
+            .height(if (compact) 62.dp else 72.dp)
             .semantics {
                 selected = active
                 stateDescription = if (pending) "切换中" else if (active) "已选择" else "未选择"
             },
-        verticalArrangement = Arrangement.SpaceBetween,
+        cornerRadius = 12.dp,
+        colors = MiuixCardDefaults.defaultColors(
+            color = selectedBg,
+            contentColor = MiuixTheme.colorScheme.onSurfaceContainer,
+        ),
+        pressFeedbackType = PressFeedbackType.Sink,
+        onClick = onClick,
+        onLongPress = onLong,
+    ) {
+    Column(
+        Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 7.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             val flag = boxProxyExplicitFlag18(node.name)
@@ -721,7 +742,7 @@ private fun BoxProxyNodeCell18(
                 node.name,
                 Modifier.weight(1f),
                 color = MiuixTheme.colorScheme.onSurfaceContainer,
-                fontSize = 14.sp,
+                fontSize = 12.sp,
                 fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
                 maxLines = if (overflowMode == "wrap") 2 else 1,
                 overflow = if (overflowMode == "clip") TextOverflow.Clip else TextOverflow.Ellipsis,
@@ -740,26 +761,18 @@ private fun BoxProxyNodeCell18(
                     .filter { it.isNotBlank() }.joinToString(" · "),
                 Modifier.weight(1f),
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                fontSize = 12.sp,
+                fontSize = 10.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Box(
-                Modifier.heightIn(min = 32.dp).padding(start = 6.dp)
+                Modifier.heightIn(min = 24.dp).padding(start = 5.dp)
                     .clickable(enabled = !testing, onClick = onDelay),
                 contentAlignment = Alignment.CenterEnd,
             ) {
                 BoxProxyDelay17(delay, testing)
             }
         }
-        if (active && !compact) {
-            Text(
-                "已选择",
-                color = MiuixTheme.colorScheme.primary,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-            )
         }
     }
 }
@@ -803,10 +816,10 @@ private fun BoxProxyDelay17(value: Long?, testing: Boolean) {
     }
     Box(
         Modifier.background(background, RoundedCornerShape(999.dp))
-            .padding(horizontal = 8.dp, vertical = 3.dp),
+            .padding(horizontal = 6.dp, vertical = 2.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(text, color = foreground, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        Text(text, color = foreground, fontSize = 10.sp, lineHeight = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 
@@ -825,9 +838,7 @@ private fun BoxProxyPolicySheet17(
     onTestAll: () -> Unit,
 ) {
     var query by rememberSaveable(group.name) { mutableStateOf("") }
-    val sheetWidthDp = LocalConfiguration.current.screenWidthDp.toFloat()
-    val nodeColumns = if (LocalDensity.current.fontScale >= 1.45f) 1 else
-        boxProxyAutoColumns18(sheetWidthDp, 32f, options.nodeColumnMode, options.nodeColumns)
+    val nodeColumns = if (LocalDensity.current.fontScale >= 1.45f) 1 else 2
     val legacy = options.legacy()
     val nodes = remember(group.nodes, query, options, delays) {
         val filtered = if (query.isBlank()) group.nodes else group.nodes.filter {
@@ -838,11 +849,14 @@ private fun BoxProxyPolicySheet17(
 
     OverlayBottomSheet(
         show = true,
-        title = group.name,
-        backgroundColor = MiuixTheme.colorScheme.surface.copy(alpha = .86f),
+        title = "${group.name} · 子节点选择",
+        backgroundColor = if (MaterialTheme.colorScheme.background.luminance() < .5f)
+            MiuixTheme.colorScheme.surface.copy(alpha = .94f) else Color(0xFFF6F8FA),
         sheetMaxWidth = 720.dp,
         onDismissRequest = onDismiss,
-        endAction = {},
+        endAction = {
+            TextButton(onClick = onDismiss) { Text("完成") }
+        },
     ) {
         Box(Modifier.fillMaxWidth().fillMaxHeight(.82f)) {
             Column(Modifier.fillMaxSize().padding(bottom = 68.dp)) {
@@ -864,8 +878,8 @@ private fun BoxProxyPolicySheet17(
             ) {}
             LazyColumn(
                 Modifier.fillMaxWidth().weight(1f),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 val sections = if (options.groupByProvider) {
                     nodes.groupBy { it.provider.ifBlank { "配置内节点" } }
@@ -903,9 +917,9 @@ private fun BoxProxyPolicySheet17(
                 onClick = onTestAll,
                 minWidth = 64.dp,
                 minHeight = 48.dp,
-                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 10.dp),
+                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 24.dp),
             ) {
-                Text("测速", color = MiuixTheme.colorScheme.onPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                Text("组测速", color = MiuixTheme.colorScheme.onPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }
