@@ -183,7 +183,7 @@ fun HetuGlassDock(
             .background(Color.Transparent)
             .then(if (floating) Modifier.padding(horizontal = 24.dp).padding(bottom = bottomInset + 12.dp) else Modifier)
             .fillMaxWidth()
-            .height(64.dp + if (floating) 0.dp else bottomInset).testTag("hetu-dock"),
+            .height(60.dp + if (floating) 0.dp else bottomInset).testTag("hetu-dock"),
     ) {
         Box(
             modifier = Modifier
@@ -204,7 +204,7 @@ fun HetuGlassDock(
             items = items,
             selected = selected,
             onSelect = onSelect,
-            itemHeight = 52.dp,
+            itemHeight = 48.dp,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(start = 6.dp, top = 6.dp, end = 6.dp, bottom = if (floating) 6.dp else bottomInset + 6.dp),

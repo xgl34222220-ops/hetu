@@ -78,7 +78,7 @@ class NativeDockUi4Test {
         bounds.forEach { assertTrue(it.width >= 48f); assertTrue(it.height >= 48f) }
         bounds.zipWithNext().forEach { (a,b) -> assertTrue(a.right <= b.left) }
         assertTrue(bounds.first().width > bounds.last().width)
-        rule.onNodeWithTag("dock-tab-0").assertHeightIsEqualTo(52.dp)
+        rule.onNodeWithTag("dock-tab-0").assertHeightIsEqualTo(48.dp)
     }
 
     @Test fun hiddenPanelPreferenceKeepsThreeUsableDestinations() {

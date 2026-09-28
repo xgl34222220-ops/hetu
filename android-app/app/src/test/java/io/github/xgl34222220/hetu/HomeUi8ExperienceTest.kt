@@ -72,10 +72,10 @@ class HomeUi8ExperienceTest {
         assertEquals("123.193.18.254", l.layoutInput.text.text)
         assertEquals(1, l.lineCount); assertFalse(l.hasVisualOverflow)
         assertFalse(l.layoutInput.softWrap); assertEquals(1, l.layoutInput.maxLines)
-        assertEquals(16.sp, l.layoutInput.style.fontSize)
+        assertEquals(14.sp, l.layoutInput.style.fontSize)
         val ip = node("home-network-ip").getUnclippedBoundsInRoot()
         val card = node("home-network").getUnclippedBoundsInRoot()
-        assertTrue(ip.right <= card.right - 13.dp)
+        assertTrue(ip.right <= card.right - 12.dp) // UI10 explicitly uses 12dp inner padding.
     }
     @Test @Config(qualifiers = "w320dp-h640dp-mdpi") fun narrowLargeTextKeepsBentoHalvesAndScrollableAddress() {
         render(scale = 1.3f); showNetwork()
@@ -171,7 +171,7 @@ class HomeUi8ExperienceTest {
         rule.onNodeWithContentDescription("刷新状态").assertIsDisplayed()
         rule.onNodeWithContentDescription("更多首页功能").assertIsDisplayed()
         node("compact-home").performScrollToIndex(0)
-        assertEquals(28.sp, text("home-brand").layoutInput.style.fontSize)
+        assertEquals(20.sp, text("home-brand").layoutInput.style.fontSize)
     }
     @Test fun successFeedbackIsAboveHeaderAndOutsideTheContent() {
         render(mutableStateOf(fixture().copy(message = "全部刷新完成")))

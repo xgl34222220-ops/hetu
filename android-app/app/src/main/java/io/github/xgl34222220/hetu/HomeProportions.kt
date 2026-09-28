@@ -16,8 +16,9 @@ import androidx.graphics.shapes.toPath
 /** Actual dock occupancy, including its gesture inset and external bottom margin. */
 internal val LocalHomeDockClearance = staticCompositionLocalOf<Dp?> { null }
 internal val LocalHomeCompactSpacing = staticCompositionLocalOf { false }
-internal data class HomeGridRows(val heading: Dp, val gap: Dp, val first: Dp, val second: Dp, val baseline: Dp = 17.dp) {
-    val height: Dp get() = 28.dp + heading + gap + first + 4.dp + second + 14.dp
+internal val LocalHomeShortSpacing = staticCompositionLocalOf { false }
+internal data class HomeGridRows(val heading: Dp, val gap: Dp, val first: Dp, val second: Dp, val baseline: Dp = 17.dp, val footer: Dp = 14.dp) {
+    val height: Dp get() = 24.dp + heading + gap + first + 4.dp + second + footer
 }
 internal val LocalHomeGridRows = staticCompositionLocalOf { HomeGridRows(32.dp, 8.dp, 22.dp, 22.dp) }
 

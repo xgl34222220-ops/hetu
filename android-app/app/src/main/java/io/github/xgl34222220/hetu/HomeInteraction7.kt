@@ -43,9 +43,11 @@ internal fun HomeCollapsingHeader(
     haze: HazeState,
     color: Color,
     stretch: Float = 0f,
+    centered: Boolean = false,
     modifier: Modifier = Modifier,
     actions: @Composable RowScope.() -> Unit,
 ) {
+    val fixedCenter = centered
     val fraction by animateFloatAsState(collapse.coerceIn(0f, 1f),
         if (motion) tween(160, easing = FastOutSlowInEasing) else snap(), label = "header-collapse")
     val prefs = LocalContext.current.getSharedPreferences("hetu", 0)
@@ -74,7 +76,7 @@ internal fun HomeCollapsingHeader(
                 val amount = if (motion) stretch.coerceIn(0f, 48f) else 0f
                 scaleX = 1f + amount / 2000f
                 scaleY = scaleX
-            }, color = color, fontSize = (28f - 8f * fraction).sp,
+            }, color = color, fontSize = (if (centered) 20f else 28f - 8f * fraction).sp,
                 lineHeight = 36.sp, fontWeight = FontWeight.Black, letterSpacing = .4.sp,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
             Row(content = actions)
@@ -84,11 +86,11 @@ internal fun HomeCollapsingHeader(
             val buttons = measurables[1].measure(constraints.copy(minWidth = 0, minHeight = 0))
             val title = measurables[0].measure(constraints.copy(minWidth = 0, minHeight = 0,
                 maxWidth = (width - 2 * side - buttons.width * (1f + fraction)).toInt().coerceAtLeast(1)))
-            val height = constraints.constrainHeight(maxOf(56.dp.roundToPx(), title.height, buttons.height))
+            val height = constraints.constrainHeight(maxOf((if (centered) 48.dp else 56.dp).roundToPx(), title.height, buttons.height))
             layout(width, height) {
                 val leading = side.toFloat()
                 val centered = (width - title.width) / 2f
-                title.placeRelative((leading + (centered - leading) * fraction).toInt(), (height - title.height) / 2)
+                title.placeRelative((leading + (centered - leading) * (if (fixedCenter) 1f else fraction)).toInt(), (height - title.height) / 2)
                 buttons.placeRelative(width - side - buttons.width, (height - buttons.height) / 2)
             }
         }

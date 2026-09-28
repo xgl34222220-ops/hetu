@@ -72,7 +72,8 @@ class HomeUi9BentoTest {
         assertEquals(a.width.value, b.width.value, 1f)
         assertTrue(a.right <= b.left)
         assertTrue(a.width < whole.width * .51f)
-        node("$group-divider").assertExists()
+        node("$group-divider").assertDoesNotExist()
+        assertEquals(10f, (b.left - a.right).value, 1f)
     }
     private fun assertNoticeSeparated() {
         val p = bounds("home-feedback-pill")
@@ -98,7 +99,7 @@ class HomeUi9BentoTest {
         render()
         assertPair("home-network-group", "home-network", "home-speed")
         assertPair("home-health-group", "home-subscription", "home-resources")
-        assertEquals(12f, (bounds("home-health-group").top - bounds("home-network-group").bottom).value, 1f)
+        assertEquals(10f, (bounds("home-health-group").top - bounds("home-network-group").bottom).value, 1f)
     }
     @Test fun widestIpv4CannotTurnAllMetricsIntoAFullWidthStack() {
         render(mutableStateOf(fixture().copy(wan = "255.255.255.255")))

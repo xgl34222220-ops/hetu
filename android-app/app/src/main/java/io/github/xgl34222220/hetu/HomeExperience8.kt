@@ -200,7 +200,7 @@ internal fun HomeSingleLineAddress(raw: String, color: Color, modifier: Modifier
     LaunchedEffect(raw) { scroll.scrollTo(0) }
     Text(raw.ifBlank { "—" }, modifier.horizontalScroll(scroll).width(IntrinsicSize.Max),
         color = color, fontFamily = FontFamily.Default, fontWeight = FontWeight.Bold,
-        fontSize = 16.sp, lineHeight = 22.sp, letterSpacing = (-.5).sp,
+        fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = (-.2).sp,
         maxLines = 1, softWrap = false, overflow = TextOverflow.Clip,
         style = LocalTextStyle.current.copy(fontFeatureSettings = "tnum"))
 }

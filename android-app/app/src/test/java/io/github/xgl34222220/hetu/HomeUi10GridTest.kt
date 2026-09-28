@@ -90,6 +90,7 @@ class HomeUi10GridTest {
         assertEquals(14.sp,l.layoutInput.style.fontSize)
     }
     private fun firstScreen() {
+        snapshot("ui10-pre-assert-${bounds("home-viewport").width.value.toInt()}")
         cards.forEach{node(it).assertIsDisplayed()}
         val dock=bounds("hetu-dock");val view=bounds("compact-home")
         cards.forEach{assertTrue("$it ${bounds(it)} / $dock / $view",bounds(it).bottom<=view.bottom)}
@@ -145,7 +146,7 @@ class HomeUi10GridTest {
         render()
         val h=bounds("home-header");val brand=bounds("home-brand")
         assertEquals(20.sp,text("home-brand").layoutInput.style.fontSize)
-        assertEquals(h.center.x.value,brand.center.x.value,1f)
+        assertEquals(((h.left + h.right) / 2).value, ((brand.left + brand.right) / 2).value, 1f)
         assertEquals(44.dp,h.top)
         rule.onNodeWithContentDescription("刷新状态").performTouchInput{click()}
         assertEquals(listOf("refresh"),calls)

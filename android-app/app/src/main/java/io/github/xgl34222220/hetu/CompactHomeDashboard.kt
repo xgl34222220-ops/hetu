@@ -123,7 +123,7 @@ internal object CompactHomeFormat {
 private data class HomePalette(val page: Color, val card: Color, val text: Color,
     val muted: Color, val soft: Color, val blue: Color, val red: Color, val line: Color)
 private val LocalHomePalette = staticCompositionLocalOf {
-    HomePalette(Color(0xFFF4F6FC), Color.White, Color(0xFF1E293B), Color(0xFF64748B),
+    HomePalette(Color(0xFFF4F6FB), Color.White, Color(0xFF1E293B), Color(0xFF64748B),
         Color(0xFFF8FAFC), Color(0xFF2563EB), Color(0xFFEF4444), Color(0xFFF1F5F9))
 }
 private val LocalHomeMotion = staticCompositionLocalOf { false }
@@ -151,7 +151,7 @@ private fun Modifier.homeClick(enabled: Boolean = true, label: String? = null, o
 private fun HomeCard(modifier: Modifier = Modifier, onClick: (() -> Unit)? = null,
     enabled: Boolean = true, clickLabel: String? = null, content: @Composable BoxScope.() -> Unit) {
     val p = LocalHomePalette.current
-    val shape = HomeContinuousShape(24.dp)
+    val shape = HomeContinuousShape(20.dp)
     val interactive = if (onClick == null) modifier else modifier.homeClick(enabled, clickLabel, onClick)
     if (LocalHomeGroupedSurface.current) {
         Box(interactive, propagateMinConstraints = true, content = content)
@@ -167,7 +167,7 @@ private fun HomeLabel(value: String, modifier: Modifier = Modifier) {
 
 @Composable
 private fun HomeNumber(value: String, modifier: Modifier = Modifier, color: Color = LocalHomePalette.current.text,
-    size: Int = 16, align: TextAlign = TextAlign.End) {
+    size: Int = 15, align: TextAlign = TextAlign.End) {
     val motion = LocalHomeMotion.current
     val roll = rememberMetricRoll(value, motion)
     val shown = if (motion) roll.displayed else value
@@ -256,13 +256,13 @@ internal fun CompactHomeDashboard(
                 animationSpec = if (motion) spring(dampingRatio = 1f, stiffness = 700f) else snap()
             ).clipToBounds().testTag("home-notice-lane")) {
                 HomeFeedbackPill(notice.value, motion, headerHaze,
-                    Modifier.align(Alignment.TopCenter).padding(top = 10.dp, bottom = 8.dp,
+                    Modifier.align(Alignment.TopCenter).padding(top = 8.dp, bottom = 8.dp,
                         start = 16.dp, end = 16.dp)) { raw ->
                     feedbackDetails = raw
                     notice.value = null
                 }
             }
-            HomeCollapsingHeader(collapse, motion, headerHaze, palette.text,
+            HomeCollapsingHeader(collapse, motion, headerHaze, palette.text, centered = true,
                 modifier = Modifier.zIndex(2f)) {
                 HomeIcon(Icons.Rounded.Refresh, "刷新状态", !data.refreshing && !data.busy, data.refreshing,
                     onClick = onRefresh)
@@ -280,13 +280,14 @@ internal fun CompactHomeDashboard(
         BoxWithConstraints(Modifier.fillMaxWidth().weight(1f).clipToBounds()) {
         // Short windows reduce spacing, never the user's font size or address content.
         val compact = maxHeight < 710.dp
-        CompositionLocalProvider(LocalHomeCompactSpacing provides compact) {
+        CompositionLocalProvider(LocalHomeCompactSpacing provides compact,
+            LocalHomeShortSpacing provides (maxHeight < 650.dp)) {
         LazyColumn(Modifier.fillMaxSize().graphicsLayer { translationY = pull.offsetPx }
             .nestedScroll(pullConnection)
             .hazeSource(headerHaze).testTag("compact-home"), state = listState,
             overscrollEffect = null,
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = if (compact) 2.dp else 4.dp, bottom = 0.dp),
-            verticalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 12.dp)) {
+            verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 10.dp)) {
             item("hero") { HomeHero(data, onToggle, onReload, onRestart, onSettings) }
             item("shortcuts") { HomeShortcutStrip(onWebUi, onLog) }
             item("latency") { HomeLatency(data, onDelay) }
@@ -314,7 +315,7 @@ private fun HomeHero(data: CompactHomeData, toggle: () -> Unit, reload: () -> Un
 
 @Composable
 private fun HomeShortcutStrip(webUi: () -> Unit, log: () -> Unit) {
-    Row(Modifier.fillMaxWidth().testTag("home-shortcut-strip"), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Row(Modifier.fillMaxWidth().testTag("home-shortcut-strip"), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         HomeHeroShortcut("WebUI", "Web 界面", Modifier.weight(1f).testTag("home-webui"), webUi)
         HomeHeroShortcut("日志", "查看记录", Modifier.weight(1f).testTag("home-log"), log)
     }
@@ -323,14 +324,10 @@ private fun HomeShortcutStrip(webUi: () -> Unit, log: () -> Unit) {
 @Composable
 private fun HomeHeroShortcut(title: String, subtitle: String, modifier: Modifier, click: () -> Unit) {
     val p = LocalHomePalette.current
-    HomeCard(modifier.heightIn(min = 52.dp), onClick = click, clickLabel = title) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 7.dp),
-            verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(title, color = p.text, fontSize = 15.sp, lineHeight = 21.sp, fontWeight = FontWeight.Bold)
-                Text(subtitle, color = p.muted, fontSize = 11.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium)
-            }
-            Icon(Icons.Rounded.ChevronRight, null, Modifier.size(18.dp), tint = p.muted)
+    HomeCard(modifier.heightIn(min = 60.dp), onClick = click, clickLabel = title) {
+        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.Center) {
+            Text(title, color = p.text, fontSize = 15.sp, lineHeight = 21.sp, fontWeight = FontWeight.Bold)
+            Text(subtitle, color = p.muted, fontSize = 11.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium)
         }
     }
 }
@@ -342,9 +339,9 @@ private fun HomeLatency(data: CompactHomeData, refresh: () -> Unit) {
     var ascending by rememberSaveable { mutableStateOf(false) }
     val names = CompactHomeFormat.ordered(data.delays, ascending, data.latencyTargets)
     HomeCard(Modifier.fillMaxWidth().testTag("home-latency")) {
-        Column(Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, bottom = if (LocalHomeCompactSpacing.current) 4.dp else 14.dp)) {
+        Column(Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, bottom = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("延迟", Modifier.weight(1f), color = p.text, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                Text("网络延迟", Modifier.weight(1f), color = p.text, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 HomeIcon(Icons.Rounded.Sort, if (ascending) "恢复站点顺序" else "按延迟升序", !data.testing,
                     modifier = Modifier.testTag("home-latency-sort"), onClick = { ascending = !ascending })
                 HomeIcon(Icons.Rounded.Refresh, if (data.testing) "正在测量延迟" else "刷新延迟", data.running && !data.testing,
@@ -373,7 +370,7 @@ private fun HomeLatency(data: CompactHomeData, refresh: () -> Unit) {
                                             .clip(CircleShape).background(p.red.copy(alpha = .08f))
                                             .padding(horizontal = 10.dp, vertical = 3.dp),
                                         color = p.red, fontSize = 12.sp, lineHeight = 17.sp, fontWeight = FontWeight.Bold)
-                                    else -> HomeNumber(shown, Modifier.padding(top = 4.dp), tint, 19, TextAlign.Center)
+                                    else -> HomeNumber(shown, Modifier.padding(top = 4.dp), tint, 18, TextAlign.Center)
                                 }
                             }
                         }
@@ -385,26 +382,33 @@ private fun HomeLatency(data: CompactHomeData, refresh: () -> Unit) {
 }
 
 /** One shared grid: every tile uses the same measured row geometry, not independent heights. */
-private val LocalBentoStackedMetrics = staticCompositionLocalOf { false }
+private val LocalGridStackedMetrics = staticCompositionLocalOf { false }
 
-/** Two material surfaces with independent halves. Address content NEVER changes column count. */
+/** Four independent surfaces, two equal columns. Address length never changes column count. */
 @Composable
 private fun HomeTelemetryGrid(data: CompactHomeData, connections: () -> Unit, subscription: () -> Unit) {
     val density = LocalDensity.current
     val measurer = androidx.compose.ui.text.rememberTextMeasurer()
     val textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Default, fontWeight = FontWeight.Bold,
-        fontSize = 16.sp, lineHeight = 22.sp, letterSpacing = (-.5).sp, fontFeatureSettings = "tnum")
+        fontSize = 15.sp, lineHeight = 21.sp, letterSpacing = 0.sp, fontFeatureSettings = "tnum")
     BoxWithConstraints(Modifier.fillMaxWidth().testTag("home-telemetry-grid")) {
-        val cellWidth = (maxWidth - 1.dp) / 2
+        val cellWidth = (maxWidth - 10.dp) / 2
         // Accessibility reflows labels within each half, never four empty full-width cards.
-        val stacked = (cellWidth - 28.dp) / density.fontScale < 110.dp
-        val regionWidth = with(density) { (cellWidth - 28.dp - 54.dp).roundToPx() }.coerceAtLeast(1)
+        val addressStyle = textStyle.copy(fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = (-.2).sp)
+        val addressPixels = listOf(data.wan, data.lan).filterNot { it.contains(':') }.maxOfOrNull {
+            measurer.measure(androidx.compose.ui.text.AnnotatedString(it.ifBlank { "—" }),
+                style = addressStyle, softWrap = false, maxLines = 1).size.width
+        } ?: 0
+        val inlinePixels = with(density) { (cellWidth - 24.dp - 22.dp).roundToPx() }
+        // Reclaim label space inside the card instead of clipping the IPv4 tail.
+        val stacked = (cellWidth - 24.dp) / density.fontScale < 104.dp || addressPixels + 2 > inlinePixels
+        val regionWidth = with(density) { (cellWidth - 24.dp - 54.dp).roundToPx() }.coerceAtLeast(1)
         fun measuredHeight(value: String, width: Int, style: androidx.compose.ui.text.TextStyle, maxLines: Int): androidx.compose.ui.unit.Dp {
             val result = measurer.measure(androidx.compose.ui.text.AnnotatedString(value.ifBlank { "—" }),
                 style = style, constraints = androidx.compose.ui.unit.Constraints(maxWidth = width), maxLines = maxLines)
             return with(density) { kotlin.math.ceil(result.multiParagraph.height).toInt().toDp() }
         }
-        val line = with(density) { 22.sp.toDp() }
+        val line = with(density) { 21.sp.toDp() }
         val metricHeight = if (stacked) {
             val labelStyle = LocalTextStyle.current.copy(fontSize = 12.sp, lineHeight = 17.sp,
                 fontWeight = FontWeight.Medium)
@@ -417,7 +421,7 @@ private fun HomeTelemetryGrid(data: CompactHomeData, connections: () -> Unit, su
                 maxLines = 1, softWrap = false).multiParagraph.height).toInt()
             with(density) { (labelPixels + numberPixels).toDp() } + 2.dp
         } else line
-        val heading = maxOf(32.dp, with(density) { 21.sp.toDp() })
+        val heading = maxOf(if (LocalHomeShortSpacing.current) 24.dp else 32.dp, with(density) { 21.sp.toDp() })
         val first = maxOf(metricHeight, with(density) {
             listOf(data.wan, data.lan).maxOf { address ->
                 val result = measurer.measure(androidx.compose.ui.text.AnnotatedString(address.ifBlank { "—" }),
@@ -425,7 +429,7 @@ private fun HomeTelemetryGrid(data: CompactHomeData, connections: () -> Unit, su
                 kotlin.math.ceil(result.multiParagraph.height).toInt()
             }.toDp()
         })
-        val regionStyle = textStyle.copy(fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = 0.sp)
+        val regionStyle = textStyle.copy(fontSize = 13.sp, lineHeight = 19.sp, letterSpacing = 0.sp)
         val anchor = measurer.measure(androidx.compose.ui.text.AnnotatedString("0"), style = textStyle).firstBaseline
         val smallAnchor = measurer.measure(androidx.compose.ui.text.AnnotatedString("0"), style = regionStyle).firstBaseline
         val baseline = with(density) { anchor.toDp() }
@@ -433,28 +437,18 @@ private fun HomeTelemetryGrid(data: CompactHomeData, connections: () -> Unit, su
         val second = maxOf(metricHeight,
             measuredHeight(data.region, regionWidth, regionStyle, 2) + baselineExtra,
             measuredHeight(data.lanInterface, regionWidth, regionStyle, 2) + baselineExtra)
-        val rows = HomeGridRows(heading, maxOf(0.dp, (48.dp - heading) / 2), first, second, baseline)
-        CompositionLocalProvider(LocalHomeGridRows provides rows, LocalBentoStackedMetrics provides stacked) {
-            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                HomeBentoPair(rows, "home-network-group",
-                    left = { HomeNetwork(data, it) }, right = { HomeSpeed(data, it, connections) })
-                HomeBentoPair(rows, "home-health-group",
-                    left = { HomeSubscription(data, it, subscription) }, right = { HomeResources(data, it) })
-            }
-        }
-    }
-}
-
-@Composable
-private fun HomeBentoPair(rows: HomeGridRows, tag: String,
-    left: @Composable (Modifier) -> Unit, right: @Composable (Modifier) -> Unit) {
-    val p = LocalHomePalette.current
-    HomeCard(Modifier.fillMaxWidth().testTag(tag)) {
-        CompositionLocalProvider(LocalHomeGroupedSurface provides true) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                left(Modifier.weight(1f).height(rows.height))
-                Box(Modifier.width(1.dp).height(rows.height * .62f).background(p.line).testTag("$tag-divider"))
-                right(Modifier.weight(1f).height(rows.height))
+        val rows = HomeGridRows(heading, maxOf(0.dp, (48.dp - heading) / 2), first, second, baseline,
+            footer = if (LocalHomeShortSpacing.current) 10.dp else 14.dp)
+        CompositionLocalProvider(LocalHomeGridRows provides rows, LocalGridStackedMetrics provides stacked) {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(Modifier.fillMaxWidth().testTag("home-network-group"), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    HomeNetwork(data, Modifier.weight(1f).height(rows.height))
+                    HomeSpeed(data, Modifier.weight(1f).height(rows.height), connections)
+                }
+                Row(Modifier.fillMaxWidth().testTag("home-health-group"), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    HomeSubscription(data, Modifier.weight(1f).height(rows.height), subscription)
+                    HomeResources(data, Modifier.weight(1f).height(rows.height))
+                }
             }
         }
     }
@@ -465,7 +459,7 @@ private fun HomeDataHeading(title: String, modifier: Modifier = Modifier,
     trailing: (@Composable () -> Unit)? = null) {
     val p = LocalHomePalette.current
     Row(modifier.fillMaxWidth().height(LocalHomeGridRows.current.heading), verticalAlignment = Alignment.CenterVertically) {
-        Text(title, Modifier.weight(1f), color = p.text, fontSize = 15.sp, lineHeight = 21.sp,
+        Text(title, Modifier.weight(1f), color = p.text, fontSize = 14.sp, lineHeight = 20.sp,
             fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
         trailing?.invoke()
     }
@@ -491,7 +485,7 @@ private fun HomeNetwork(data: CompactHomeData, modifier: Modifier) {
                 else if (dragDistance > threshold) isLan = false
                 dragDistance = 0f
             }), onClick = { isLan = !isLan }, clickLabel = "切换 WAN 和 LAN") {
-        Column(Modifier.fillMaxSize().padding(14.dp)) {
+        Column(Modifier.fillMaxSize().padding(12.dp)) {
             HomeDataHeading(if (shownLan) "LAN" else "WAN", Modifier.testTag("home-network-switch")) {
                 Box(Modifier.requiredSize(48.dp)
                     .testTag("home-network-details").homeClick(label = "网络详情", onClick = { details = true }),
@@ -513,7 +507,16 @@ private fun HomeNetwork(data: CompactHomeData, modifier: Modifier) {
                     scaleY = scaleX
                     translationY = (1f - progress) * (if (transition.leaving) -6f else 6f) * density
                 }, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(Modifier.fillMaxWidth().height(LocalHomeGridRows.current.first)) {
+                    if (LocalGridStackedMetrics.current) {
+                        Column(Modifier.fillMaxWidth().height(LocalHomeGridRows.current.first)) {
+                            HomeLabel("IP", Modifier.testTag("home-label-IP"))
+                            Spacer(Modifier.height(2.dp))
+                            HomeSingleLineAddress(if (shownLan) data.lan else data.wan, p.text,
+                                Modifier.fillMaxWidth().testTag("home-network-ip"))
+                        }
+                    } else Row(Modifier.fillMaxWidth().height(LocalHomeGridRows.current.first)) {
+                        val anchor = with(LocalDensity.current) { LocalHomeGridRows.current.baseline.roundToPx() }
+                        Spacer(Modifier.width(0.dp).height(LocalHomeGridRows.current.first).alignBy { anchor })
                         HomeLabel("IP", Modifier.width(18.dp).alignByBaseline().testTag("home-label-IP"))
                         Spacer(Modifier.width(4.dp))
                         HomeSingleLineAddress(if (shownLan) data.lan else data.wan, p.text,
@@ -536,12 +539,12 @@ private fun HomeNetwork(data: CompactHomeData, modifier: Modifier) {
                         Text((if (shownLan) data.lanInterface else data.region)
                             .takeUnless { it.isBlank() || it == "—" } ?: if (shownLan) "接口未知" else "地区未知",
                             Modifier.weight(1f).alignByBaseline().testTag("home-value-network-region"), color = p.text.copy(alpha = .82f),
-                            fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp, lineHeight = 19.sp, fontWeight = FontWeight.SemiBold,
                             maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(LocalHomeGridRows.current.footer))
         }
     }
     if (details) NativeNetworkDetails(data) { details = false }
@@ -570,7 +573,7 @@ private fun MetricLine(label: String, value: String, color: Color = LocalHomePal
             HomeLabel(label, Modifier.alignByBaseline().testTag("home-label-$label"))
         }
     }
-    if (LocalBentoStackedMetrics.current) {
+    if (LocalGridStackedMetrics.current) {
         Column(modifier) {
             Label()
             // Keep even large units available inside their own scroll viewport.
@@ -591,13 +594,13 @@ private fun HomeSpeed(data: CompactHomeData, modifier: Modifier, click: () -> Un
     val up = data.up
     val down = data.down
     HomeCard(modifier.testTag("home-speed"), click) {
-        Column(Modifier.fillMaxSize().padding(14.dp)) {
-            HomeDataHeading("实时速率")
+        Column(Modifier.fillMaxSize().padding(12.dp)) {
+            HomeDataHeading("网速")
             Spacer(Modifier.height(LocalHomeGridRows.current.gap))
             Column {
                 MetricLine("上行", if (data.running) CompactHomeFormat.bytes(up) + "/s" else "—", transmitting = data.running && up > 0L)
                 MetricLine("下行", if (data.running) CompactHomeFormat.bytes(down) + "/s" else "—", transmitting = data.running && down > 0L)
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(LocalHomeGridRows.current.footer))
             }
         }
     }
@@ -614,7 +617,7 @@ internal fun HomeUsageBar(fraction: Float?, tag: String, description: String,
     val progress by animateFloatAsState(target ?: 0f,
         if (motion) tween(500, easing = FastOutSlowInEasing) else snap(), label = "$tag-progress")
     val color by animateColorAsState(tint, if (motion) tween(300) else snap(), label = "$tag-color")
-    Box(Modifier.fillMaxWidth().padding(top = 8.dp).height(6.dp).clip(CircleShape)
+    Box(Modifier.fillMaxWidth().padding(top = LocalHomeGridRows.current.footer - 6.dp).height(6.dp).clip(CircleShape)
         .background(track).testTag(tag).semantics {
             if (target != null) progressBarRangeInfo = ProgressBarRangeInfo(target, 0f..1f)
             stateDescription = description
@@ -633,8 +636,8 @@ private fun HomeSubscription(data: CompactHomeData, modifier: Modifier, click: (
     val remaining = CompactHomeFormat.remaining(data.used, data.total)
     val fraction = CompactHomeFormat.usedFraction(data.used, data.total)
     HomeCard(modifier.testTag("home-subscription"), click) {
-        Column(Modifier.fillMaxSize().padding(14.dp)) {
-            HomeDataHeading(if (LocalBentoStackedMetrics.current) "订阅" else "套餐订阅") {
+        Column(Modifier.fillMaxSize().padding(12.dp)) {
+            HomeDataHeading("订阅") {
                 if (remaining != null) Text("剩余 $remaining%",
                     Modifier.clip(CircleShape).background(p.blue.copy(alpha = .07f))
                         .padding(horizontal = 6.dp, vertical = 3.dp),
@@ -661,8 +664,8 @@ private fun HomeResources(data: CompactHomeData, modifier: Modifier) {
     val tint = when { !known -> p.muted; data.cpu >= 100 -> p.red
         data.cpu >= 80 -> Color(0xFFD97706); else -> p.blue }
     HomeCard(modifier.testTag("home-resources")) {
-        Column(Modifier.fillMaxSize().padding(14.dp)) {
-            HomeDataHeading("系统负载")
+        Column(Modifier.fillMaxSize().padding(12.dp)) {
+            HomeDataHeading("资源占用")
             Spacer(Modifier.height(LocalHomeGridRows.current.gap))
             Column {
                 MetricLine("内存", if (data.running && data.memory > 0) CompactHomeFormat.bytes(data.memory) else "—")

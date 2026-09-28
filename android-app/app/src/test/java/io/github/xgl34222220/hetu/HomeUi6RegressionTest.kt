@@ -54,7 +54,7 @@ class HomeUi6RegressionTest {
                     val density=LocalDensity.current
                     var dockHeight by remember { mutableStateOf(76.dp) }
                     var selected by remember { mutableIntStateOf(0) }
-                    Box(Modifier.fillMaxSize().background(if(dark) Color(0xFF121212) else Color(0xFFF4F6FC))) {
+                    Box(Modifier.fillMaxSize().background(if(dark) Color(0xFF121212) else Color(0xFFF4F6FB))) {
                         CompositionLocalProvider(LocalHomeDockClearance provides (dockHeight+10.dp)) {
                             CompactHomeDashboard(data,{calls+="refresh"},{calls+="toggle"},{calls+="reload"},{calls+="restart"},
                                 {calls+="delay"},{calls+="webui"},{calls+="log"},{calls+="subscription"},{calls+="connections"},
@@ -120,7 +120,7 @@ class HomeUi6RegressionTest {
         val b=tags.map(::bounds)
         b.forEach {assertEquals(b.first().height,it.height,1f);assertEquals(b.first().width,it.width,1f)}
         assertEquals(b[0].top,b[1].top,1f);assertEquals(b[2].top,b[3].top,1f)
-        assertEquals(1f,b[1].left-b[0].right,1f);assertEquals(12f,b[2].top-b[0].bottom,1f)
+        assertEquals(10f,b[1].left-b[0].right,1f);assertEquals(10f,b[2].top-b[0].bottom,1f)
     }
     @Test fun ipAndUploadShareTheSameActualTextBaseline() {
         render()
@@ -135,15 +135,15 @@ class HomeUi6RegressionTest {
         render(fixture().copy(wan="255.255.255.255"))
         val l=text("home-network-ip")
         assertEquals("255.255.255.255",l.layoutInput.text.text);assertFalse(l.hasVisualOverflow)
-        assertEquals(1,l.lineCount);assertEquals(16.sp,l.layoutInput.style.fontSize)
+        assertEquals(1,l.lineCount);assertEquals(14.sp,l.layoutInput.style.fontSize)
         assertEquals(baseline("home-network-ip"),baseline("home-value-上行"),1f)
         snapshot("ui6-long-ipv4")
     }
     @Test fun balancedHeroUses84DpGlyphAndSubstantialCapsule() {
         render()
-        rule.onNodeWithTag("hero-status-glyph").assertWidthIsEqualTo(84.dp).assertHeightIsEqualTo(84.dp)
+        rule.onNodeWithTag("hero-status-glyph").assertWidthIsEqualTo(76.dp).assertHeightIsEqualTo(76.dp)
         assertEquals(bounds("hero-information-text").center.y,bounds("hero-status-glyph").center.y,1f)
-        assertTrue(bounds("hero-capsule-surface").height>=60f)
+        assertTrue(bounds("hero-capsule-surface").height>=56f)
         for(tag in listOf("home-reload","home-toggle","home-restart")) rule.onNodeWithTag(tag).assertHeightIsAtLeast(48.dp)
     }
     @Test fun dividersAreVisible24DpLinesAndDoNotShiftColumns() {
@@ -160,7 +160,7 @@ class HomeUi6RegressionTest {
         render()
         val b=bitmap();val pixels=IntArray(b.width*b.height)
         b.getPixels(pixels,0,b.width,0,0,b.width,b.height)
-        assertTrue(pixels.count {it==0xFFF4F6FC.toInt()}>3000)
+        assertTrue(pixels.count {it==0xFFF4F6FB.toInt()}>3000)
         assertTrue("Solid blue pill must not be a radial halo",pixels.count {it==0xFFE7F1FF.toInt()}>1000)
         b.recycle()
         rule.onNodeWithTag("dock-tab-2").performTouchInput{click()}

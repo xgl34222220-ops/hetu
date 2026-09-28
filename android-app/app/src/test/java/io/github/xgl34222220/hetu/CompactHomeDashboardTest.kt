@@ -328,9 +328,9 @@ class CompactHomeDashboardTest {
         val cpuBar = rule.onNodeWithTag("home-cpu-bar", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         assertEquals(sub.height, resource.height, 1f)
         assertEquals(sub.top, resource.top, 1f)
-        assertEquals(1f, resource.left - sub.right, 1f)
-        assertEquals(14f, subBar.left - sub.left, 1f)
-        assertEquals(14f, sub.right - subBar.right, 1f)
+        assertEquals(10f, resource.left - sub.right, 1f)
+        assertEquals(12f, subBar.left - sub.left, 1f)
+        assertEquals(12f, sub.right - subBar.right, 1f)
         assertEquals(subBar.bottom, cpuBar.bottom, 1f)
         assertEquals(subBar.width, cpuBar.width, 1f)
         rule.onNodeWithTag("home-subscription-bar", useUnmergedTree = true).assertHeightIsEqualTo(6.dp)
@@ -345,7 +345,7 @@ class CompactHomeDashboardTest {
             val layouts = mutableListOf<TextLayoutResult>()
             rule.onNodeWithTag(tag, useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
             assertTrue(layouts.isNotEmpty())
-            assertEquals(16.sp, layouts.first().layoutInput.style.fontSize)
+            assertEquals(15.sp, layouts.first().layoutInput.style.fontSize)
             assertTrue("Units must remain smaller than data", layouts.first().layoutInput.text.spanStyles.any { it.item.fontSize == 11.sp })
         }
     }
@@ -377,8 +377,8 @@ class CompactHomeDashboardTest {
         render()
         val header = rule.onNodeWithTag("home-header").fetchSemanticsNode().boundsInRoot
         val brand = rule.onNodeWithTag("home-brand").fetchSemanticsNode().boundsInRoot
-        assertEquals(header.left + 16f, brand.left, 1f)
-        assertEquals(28.sp, textLayout("home-brand").layoutInput.style.fontSize)
+        assertEquals(header.center.x, brand.center.x, 1f)
+        assertEquals(20.sp, textLayout("home-brand").layoutInput.style.fontSize)
         rule.onNodeWithText("BoxProxy").assertDoesNotExist()
         rule.onNodeWithContentDescription("刷新状态").performClick()
         assertEquals(listOf("refresh"), calls)
@@ -387,11 +387,11 @@ class CompactHomeDashboardTest {
 
     @Test fun ui4HeroTypographyAndGlyphAreLargerWithoutFakeUptime() {
         render()
-        assertEquals(22.sp, textLayout("hero-status-title").layoutInput.style.fontSize)
-        assertEquals(15.sp, textLayout("hero-uptime").layoutInput.style.fontSize)
-        assertEquals(13.sp, textLayout("hero-core").layoutInput.style.fontSize)
-        assertEquals(15.sp, textLayout("hero-config").layoutInput.style.fontSize)
-        rule.onNodeWithTag("hero-status-glyph").assertWidthIsEqualTo(84.dp).assertHeightIsEqualTo(84.dp)
+        assertEquals(21.sp, textLayout("hero-status-title").layoutInput.style.fontSize)
+        assertEquals(14.sp, textLayout("hero-uptime").layoutInput.style.fontSize)
+        assertEquals(12.sp, textLayout("hero-core").layoutInput.style.fontSize)
+        assertEquals(14.sp, textLayout("hero-config").layoutInput.style.fontSize)
+        rule.onNodeWithTag("hero-status-glyph").assertWidthIsEqualTo(76.dp).assertHeightIsEqualTo(76.dp)
         rule.onNodeWithText("少于 1 分钟").assertIsDisplayed()
         rule.onNodeWithText("7 小时 37 分钟").assertDoesNotExist()
     }
@@ -414,7 +414,7 @@ class CompactHomeDashboardTest {
         render(fixture().copy(wan = ip), scale = 1.6f)
         rule.onNodeWithTag("compact-home").performScrollToNode(hasTestTag("home-network"))
         val result = textLayout("home-network-ip")
-        assertEquals(16.sp, result.layoutInput.style.fontSize)
+        assertEquals(14.sp, result.layoutInput.style.fontSize)
         assertEquals(ip, result.layoutInput.text.text)
         assertFalse(result.hasVisualOverflow)
         assertEquals(ip.length, result.getLineEnd(result.lineCount - 1))

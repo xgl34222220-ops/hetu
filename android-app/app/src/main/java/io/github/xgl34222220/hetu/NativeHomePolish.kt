@@ -157,7 +157,7 @@ internal fun NativeStatusHero(data: CompactHomeData, toggle: () -> Unit, reload:
     }
     val colors = when (phase) {
         HomePhase.Running -> if (dark) listOf(Color(0xFF17243F), Color(0xFF262C4E), Color(0xFF8AB4FF))
-            else listOf(Color(0xFFEEF2FF), Color(0xFFDDE7FD), Color(0xFF2563EB))
+            else listOf(Color(0xFFEEF2FF), Color(0xFFDCE6FC), Color(0xFF2563EB))
         HomePhase.Processing -> if (dark) listOf(Color(0xFF392B16), Color(0xFF483515), Color(0xFFFBBF24))
             else listOf(Color(0xFFFEF3C7), Color(0xFFFDE68A), Color(0xFFD97706))
         HomePhase.Stopped -> if (dark) listOf(Color(0xFF1B2330), Color(0xFF222C3A), Color(0xFF9AA9BD))
@@ -168,7 +168,7 @@ internal fun NativeStatusHero(data: CompactHomeData, toggle: () -> Unit, reload:
     val accent by animateColorAsState(colors[2], tween(if (motion) 400 else 0), label = "hero-accent")
     val text = if (dark) Color(0xFFE2E8F0) else Color(0xFF1E293B)
     val muted = if (dark) Color(0xFFACB7CA) else Color(0xFF64748B)
-    val shape = HomeContinuousShape(28.dp)
+    val shape = HomeContinuousShape(26.dp)
     val compact = LocalHomeCompactSpacing.current
     Box(Modifier.fillMaxWidth().testTag("home-hero").semantics { stateDescription = title }
         .diffuseCardShadow(shape).clip(shape).background(Brush.linearGradient(listOf(top, lerp(top, bottom, .45f), bottom)))
@@ -178,12 +178,12 @@ internal fun NativeStatusHero(data: CompactHomeData, toggle: () -> Unit, reload:
             drawRect(Brush.radialGradient(listOf(top.copy(alpha = .60f), Color.Transparent),
                 center = Offset(size.width * .15f, size.height * .9f), radius = size.width * .8f))
         }) {
-        Column(Modifier.fillMaxWidth().padding(if (compact) 14.dp else 20.dp)) {
+        Column(Modifier.fillMaxWidth().padding(if (LocalHomeShortSpacing.current) 14.dp else if (compact) 16.dp else 18.dp)) {
             Row(Modifier.fillMaxWidth().testTag("hero-information"), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f).testTag("hero-information-text"), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Box(Modifier.size(12.dp).background(accent, CircleShape))
-                        Text(title, color = accent, fontSize = 22.sp, lineHeight = 29.sp,
+                        Text(title, color = accent, fontSize = 21.sp, lineHeight = 28.sp,
                             fontWeight = FontWeight.Black, modifier = Modifier.testTag("hero-status-title")
                                 .semantics { liveRegion = LiveRegionMode.Polite })
                     }
@@ -192,14 +192,14 @@ internal fun NativeStatusHero(data: CompactHomeData, toggle: () -> Unit, reload:
                         data.running -> CompactHomeFormat.uptime(data.uptimeSeconds)
                         else -> "服务未启动"
                     }, Modifier.padding(start = 22.dp).testTag("hero-uptime"),
-                        color = if (dark) muted else Color(0xFF334155), fontSize = 15.sp,
-                        lineHeight = 21.sp, fontWeight = FontWeight.Bold)
+                        color = if (dark) muted else Color(0xFF334155), fontSize = 14.sp,
+                        lineHeight = 20.sp, fontWeight = FontWeight.Bold)
                     Text(listOf(data.core, data.mode).filter(String::isNotBlank).joinToString(" · "),
                         Modifier.padding(start = 22.dp, top = 3.dp).testTag("hero-core"),
-                        color = muted, fontSize = 13.sp, lineHeight = 19.sp, fontWeight = FontWeight.Bold)
+                        color = muted, fontSize = 12.sp, lineHeight = 18.sp, fontWeight = FontWeight.Bold)
                     Text(data.config.ifBlank { "尚未选择配置" },
                         Modifier.padding(start = 22.dp).testTag("hero-config"),
-                        color = text, fontSize = 15.sp, lineHeight = 21.sp, fontWeight = FontWeight.Bold,
+                        color = text, fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Default, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
                 Spacer(Modifier.width(10.dp))
@@ -209,7 +209,7 @@ internal fun NativeStatusHero(data: CompactHomeData, toggle: () -> Unit, reload:
                 Text("设置待生效 · 查看", Modifier.heightIn(min = 48.dp).nativePress(onClick = settings)
                     .wrapContentHeight(), color = accent, fontSize = 12.sp)
             }
-            Spacer(Modifier.height(if (compact) 10.dp else 16.dp))
+            Spacer(Modifier.height(if (LocalHomeShortSpacing.current) 8.dp else if (compact) 10.dp else 16.dp))
             // Key the whole controller by lifecycle, not by raw progress messages.
             AnimatedContent(phase, transitionSpec = {
                 (fadeIn(tween(if (motion) 250 else 0)) + slideInVertically(tween(if (motion) 250 else 0)) { it / 8 })
@@ -220,7 +220,7 @@ internal fun NativeStatusHero(data: CompactHomeData, toggle: () -> Unit, reload:
                 Box(Modifier.fillMaxWidth().testTag("hero-capsule-surface")) {
                 Row(Modifier.fillMaxWidth().clip(HomeContinuousShape(20.dp))
                     .background(if (dark) Color.White.copy(alpha = .09f) else Color.White.copy(alpha = .95f))
-                    .padding(6.dp).heightIn(min = 48.dp).testTag("home-control-pill"),
+                    .padding(4.dp).heightIn(min = 48.dp).testTag("home-control-pill"),
                     verticalAlignment = Alignment.CenterVertically) {
                     val blue = if (dark) Color(0xFF8AB4FF) else Color(0xFF2563EB)
                     when (shown) {
@@ -260,14 +260,14 @@ private fun PillAction(label: String, tag: String, tint: Color, modifier: Modifi
     Box(modifier.heightIn(min = 48.dp).testTag(tag).clip(CircleShape)
         .nativePress(enabled, label, motion, click).padding(horizontal = 4.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center) {
-        Text(label, color = tint, fontSize = 15.sp, lineHeight = 21.sp, fontWeight = FontWeight.Bold)
+        Text(label, color = tint, fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Bold)
     }
 }
 
 @Composable
 private fun HeroStatusGlyph(phase: HomePhase, color: Color, motion: Boolean) {
     // Normal density follows the reference; accessibility text gets space before decoration.
-    val sizeDp = if (androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f) 56.dp else 84.dp
+    val sizeDp = if (androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f) 56.dp else 76.dp
     Box(Modifier.size(sizeDp).testTag("hero-status-glyph"), contentAlignment = Alignment.Center) {
         if (phase == HomePhase.Processing) NativeSpinner(color, motion, Modifier.fillMaxSize().padding(8.dp))
         else Canvas(Modifier.fillMaxSize()) {

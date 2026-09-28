@@ -16,8 +16,20 @@ android {
         applicationId = "io.github.xgl34222220.hetu"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1010
-        versionName = "0.4.0-ui92-r146.9"
+        versionCode = 1011
+        versionName = "0.4.0-ui92-r146.10"
+    }
+
+    // Explicit CI debug identity. No private key is committed or exported.
+    signingConfigs {
+        getByName("debug") {
+            System.getenv("HETU_TEST_KEYSTORE")?.takeIf { it.isNotBlank() }?.let {
+                storeFile = file(it)
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
     }
 
     testOptions {
