@@ -6,6 +6,7 @@ on:
       - '.github/workflows/ui92-runtime146-motion12.yml'
       - 'tools/apply_ui12_motion.py'
       - 'tools/fix_ui12.py'
+      - 'tools/finish_ui12.py'
       - 'android-app/app/src/main/java/io/github/xgl34222220/hetu/MotionMaterials12.kt'
       - 'android-app/app/src/test/java/io/github/xgl34222220/hetu/Motion*12Test.kt'
   workflow_dispatch:
@@ -21,6 +22,8 @@ jobs:
     timeout-minutes: 25
     env:
       HETU_TEST_KEYSTORE: /home/runner/.android/hetu-ui10-debug.jks
+      RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      RUN_ID: ${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -31,6 +34,7 @@ jobs:
           mkdir -p integration-evidence
           git merge-base --is-ancestor 621e4f22fce4e9c5f5c717eab1147fad20dab950 HEAD
           git rev-parse HEAD > integration-evidence/input-commit.txt
+          python3 -m py_compile tools/apply_ui12_motion.py tools/fix_ui12.py tools/finish_ui12.py
           python3 tools/apply_ui12_motion.py 2>&1 | tee integration-evidence/migration.log
           python3 tools/fix_ui12.py 2>&1 | tee -a integration-evidence/migration.log
           git diff --check
@@ -74,7 +78,8 @@ jobs:
           with zipfile.ZipFile(apk) as z:
               assert z.testzip() is None
               for name,digest in expected.items():
-                  data=z.read(name);assert hashlib.sha256(data).hexdigest()==digest,name
+                  data=z.read(name)
+                  assert hashlib.sha256(data).hexdigest()==digest,name
                   if name.startswith('lib/'):out=Path('android-app/app/src/main/jniLibs')/name.removeprefix('lib/')
                   elif name.startswith('assets/'):out=Path('android-app/app/src/main')/name
                   else:raise AssertionError(name)
@@ -83,52 +88,20 @@ jobs:
                   else:out.write_bytes(data)
           print('Verified original146 assets:',len(expected))
           PY
-      - name: Record resolved UI dependency graph
+      - name: Record actual resolved UI dependency graph
         working-directory: android-app
         run: |
           set -euo pipefail
           gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:dependencies --configuration debugRuntimeClasspath > ../integration-evidence/dependencies.txt
-          grep 'material3.*1.5.0-alpha16' ../integration-evidence/dependencies.txt
+          grep 'material3-android:1.5.0-alpha22' ../integration-evidence/dependencies.txt
       - name: Compile APK and run all seventeen suites without exclusions
         working-directory: android-app
         run: |
           set -euo pipefail
           gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:assembleDebug :app:testDebugUnitTest --tests '*CompactHomeDashboardTest' --tests '*Runtime146ContractTest' --tests '*Ui92IntegrationTest' --tests '*NodeSelectionContinuityTest' --tests '*ProxyLatencyRegressionTest' --tests '*NativeDockUi4Test' --tests '*HomeUi5RegressionTest' --tests '*HomeUi6RegressionTest' --tests '*HomeUi7InteractionTest' --tests '*HomeUi8ExperienceTest' --tests '*HomeUi9BentoTest' --tests '*HomeUi10GridTest' --tests '*HomeUi11Test' --tests '*PanelModel11Test' --tests '*PanelUi11Test' --tests '*MotionModel12Test' --tests '*MotionUi12Test' --stacktrace 2>&1 | tee ../integration-evidence/build.log
-      - name: Record actual test and compiler outcomes
+      - name: Record all actual compiler and test outcomes
         if: always()
-        env:
-          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import xml.etree.ElementTree as ET,json,os
-          out=Path('integration-evidence');out.mkdir(exist_ok=True)
-          suites=[];failures=[]
-          for p in Path('android-app/app/build/test-results/testDebugUnitTest').glob('TEST-*.xml'):
-              root=ET.parse(p).getroot()
-              suites.append({k:root.get(k) for k in ['name','tests','failures','errors','skipped']})
-              for c in root.findall('testcase'):
-                  for e in list(c.findall('failure'))+list(c.findall('error')):
-                      failures.append({'suite':root.get('name'),'test':c.get('name'),'message':e.get('message'),'stack':(e.text or '')[:2200]})
-          log='\n'.join(p.read_text(errors='replace') for p in [out/'migration.log',out/'build.log'] if p.exists())
-          errors=[line for line in log.splitlines() if line.startswith('e:') or 'AssertionError' in line or 'What went wrong' in line]
-          report=dict(run=os.environ['RUN_URL'],suites=suites,failures=failures,compile_errors=errors,
-              totals={k:sum(int(s[k]) for s in suites) for k in ['tests','failures','errors','skipped']})
-          (out/'attempt.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
-          (out/'test-suites.json').write_text(json.dumps(suites,indent=2))
-          print(json.dumps(report,ensure_ascii=False,indent=2))
-          PY
-      - name: Preserve failures without committing untested application changes
-        if: failure()
-        run: |
-          set -euo pipefail
-          mkdir -p docs/ci
-          cp integration-evidence/attempt.json docs/ci/UI12-last-attempt.json
-          git add -- docs/ci/UI12-last-attempt.json
-          if ! git diff --cached --quiet; then
-            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'docs: retain actual UI12 failure evidence [skip ci]'
-            git push origin HEAD:main
-          fi
+        run: python3 tools/finish_ui12.py record
       - name: Verify package signer runtime assets and protected source
         run: |
           set -euo pipefail
@@ -136,126 +109,30 @@ jobs:
           "$ANDROID_HOME/build-tools/37.0.0/aapt" dump badging "$APK" > integration-evidence/apk-identity.txt
           "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --verbose --print-certs "$APK" > integration-evidence/apk-signature.txt
           "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs .reference-ui11/Hetu-UI92-Runtime146-UI11.apk > integration-evidence/ui11-signature.txt
-          python3 - <<'PY'
-          from pathlib import Path
-          import subprocess,json,re,hashlib,zipfile
-          base='621e4f22fce4e9c5f5c717eab1147fad20dab950'
-          root='android-app/app/src/main/java/io/github/xgl34222220/hetu/'
-          allowed={root+x for x in ['NativeHomePolish.kt','HomeExperience8.kt','CompactHomeDashboard.kt','PanelControls11.kt','PanelStrategy11.kt','ReferenceProxyActivity.kt','ui/HetuGlassDock.kt']}
-          protected=[]
-          for p in subprocess.check_output(['git','ls-tree','-r','--name-only',base]).decode().splitlines():
-              if (p.startswith('android-app/app/src/main/') or p.startswith('native/')) and p not in allowed:
-                  assert Path(p).read_bytes()==subprocess.check_output(['git','show',base+':'+p]),p
-                  protected.append(p)
-          old=subprocess.check_output(['git','show',base+':'+root+'ReferenceProxyActivity.kt']).decode()
-          new=Path(root+'ReferenceProxyActivity.kt').read_text()
-          start='internal fun RefInfoBottomSheet(';end='@Composable\nprivate fun RefSheetDragHandle()'
-          assert new.split(start)[0]==old.split(start)[0], 'Runtime or routing changed before log UI'
-          assert new.split(end)[1]==old.split(end)[1], 'Unexpected code after log UI'
-          gradle=Path('android-app/app/build.gradle.kts').read_text()
-          restored=gradle.replace('versionCode = 1013','versionCode = 1012').replace('0.4.0-ui92-r146.12','0.4.0-ui92-r146.11').replace('implementation("androidx.compose.material3:material3:1.5.0-alpha16")','implementation("androidx.compose.material3:material3")')
-          assert restored==subprocess.check_output(['git','show',base+':android-app/app/build.gradle.kts']).decode()
-          assert 'material3:material3:1.5.0-alpha16' in gradle
-          helper=Path(root+'MotionMaterials12.kt').read_text()
-          assert 'INVISIBLE_MEMBER' not in helper and 'getDeclaredField' not in helper and 'DismissVelocityDp' not in helper
-          suites=json.load(open('integration-evidence/test-suites.json'))
-          totals={k:sum(int(s[k]) for s in suites) for k in ['tests','failures','errors','skipped']}
-          assert len(suites)==17 and totals['tests']>=203,(len(suites),totals)
-          assert totals['failures']==totals['errors']==totals['skipped']==0,totals
-          apk=Path('android-app/app/build/outputs/apk/debug/app-debug.apk')
-          expected=json.load(open('UI92_RUNTIME146_INPUTS.json'))['original146_payload']
-          with zipfile.ZipFile(apk) as z:
-              assert z.testzip() is None
-              for name,digest in expected.items():assert hashlib.sha256(z.read(name)).hexdigest()==digest,name
-          identity=Path('integration-evidence/apk-identity.txt').read_text()
-          assert "name='io.github.xgl34222220.hetu'" in identity and "versionCode='1013'" in identity and "versionName='0.4.0-ui92-r146.12'" in identity
-          def cert(path):return re.search(r'Signer #1 certificate SHA-256 digest: ([0-9a-f]+)',Path(path).read_text()).group(1)
-          certificate=cert('integration-evidence/apk-signature.txt')
-          assert certificate==cert('integration-evidence/ui11-signature.txt')=='701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad'
-          result=dict(version='0.4.0-ui92-r146.12',versionCode=1013,package='io.github.xgl34222220.hetu',tests=totals,suites=len(suites),size=apk.stat().st_size,sha256=hashlib.sha256(apk.read_bytes()).hexdigest(),certificate_sha256=certificate,same_signer_as_ui11=True,runtime_assets=len(expected),protected_files=len(protected),base=base,material3='1.5.0-alpha16',fling_policy='native AnchoredDraggableDefaults; no custom velocity threshold override')
-          Path('integration-evidence/result.json').write_text(json.dumps(result,ensure_ascii=False,indent=2))
-          Path('integration-evidence/protected-files.json').write_text(json.dumps(protected,indent=2))
-          changes=Path('integration-evidence/ui12-source-changes.json')
-          if changes.exists():
-              entries=json.loads(changes.read_text())
-              for path,value in entries.items():value['after']=Path(path).read_text()
-              changes.write_text(json.dumps(entries,ensure_ascii=False))
-          print(json.dumps(result,ensure_ascii=False,indent=2))
-          PY
-      - name: Commit tested production code and exact delivery notes
-        env:
-          RUN_ID: ${{ github.run_id }}
+          python3 tools/finish_ui12.py verify 2>&1 | tee integration-evidence/verification.log
+      - name: Preserve actual failures including post-build verification failures
+        if: failure()
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-          import json,os,textwrap
-          r=json.load(open('integration-evidence/result.json'))
-          notes=textwrap.dedent('''\
-          # 河图 UI12：弹簧、材质与跟手交互
-
-          ## 实际修改
-          依据用户2026-09-28T13:07:09Z的文字诊断，不宣称看过两个视频。只精修UI11原生界面，不加入阅读器、章节或Vue模拟功能。
-          - 网络详情、日志、API配置抽屉使用公开运动主题：空间弹簧阻尼0.84、刚度280；关闭为临界阻尼。保留原生速度跟踪、内部滚动、返回和焦点，不反射私有API、不叠加抢占手势。
-          - 背景模糊与0.96最小缩放由原生抽屉实际偏移、实际锚点视口和尺寸驱动，拖动中连续还原，关闭后释放；可跟随键盘/窗口尺寸变化。SDK31+、硬件加速、开启模糊时才启用背景RenderEffect；否则正常降级，抽屉文字不模糊。
-          - 日志关闭先播放hide动画再移除弹窗。内容与操作区35/70ms错峰淡入，仅改变绘制，不延迟网络、保存或重启操作。
-          - 筛选/布局浮层采用原生焦点Popup、锚点定位及0.94到1弹簧，退出保留内容直至动画完成。支持窄屏、RTL和长菜单；浮层本体是轻半透材质，不虚称独立Popup新增背景采样。
-          - 首页与策略列表仅在底部越界时增加有界阻尼、带松手速度的回弹；不替换正常惯性。顶部保留真实下拉刷新，可重新接住正在回弹的内容。
-          - Dock沿用Miuix/Haze真实材质，降低过强高光、折射与饱和度，指示胶囊使用0.84/300弹簧；布局高度、触摸范围不改。
-          - 首页四宫格、系统字体、已删除的两个顶栏按钮、IP完整显示、安全区和通知避让不推翻。节点仍原位展开、等待真实核心确认、实际测速，其他标签功能与原146运行层不改。
-
-          ## 真实手势行为与失败记录
-          当前原生AnchoredDraggableDefaults使用125dp/s作为甩动边界。SheetState旧velocityThreshold参数不控制这条新路径，所以已撤销无效的1100dp/s修改，HomeInteraction7.kt恢复为UI11原字节；不声称调低旧参数便改变了手感。
-          36429557553生产编译失败：Material3 1.4.0把Expressive API设为internal，零测试、无发布。
-          36430846940完成202项，201通过；测试将90px/600ms（150dp/s）误称低速，其实原生会按甩动关闭。本轮保留这条原始手势并明确测试其关闭结果，同时新增90px/1200ms（75dp/s）的低速回弹，另有90px/65ms快速关闭及拖住后停顿松手复位。没有删掉原失败场景、调用回调代替触摸或虚报自定义速度门槛。
-
-          ## 界面依赖
-          显式采用Material3 1.5.0-alpha16公开MotionScheme；不是原1.4.0稳定版。官方alpha16修复BottomSheet拖拽/嵌套滚动不遵循运动主题的问题。其他显式依赖及Android SDK/工具链未升级，实际传递依赖图在验证包dependencies.txt。Alpha界面依赖存在兼容风险，此包不称正式稳定版。
-
-          ## 自动化与交付
-          ''')
-          notes+=f"Actions {os.environ['RUN_ID']}；{r['suites']}组{r['tests']['tests']}项，失败0、错误0、跳过0。\n"
-          notes+=f"{r['runtime_assets']}项原146运行资产哈希一致；{r['protected_files']}个范围外生产/原生文件与UI11逐字节一致。ReferenceProxyActivity除日志弹窗函数外逐字节一致。\n"
-          notes+=f"版本{r['version']}，内部号{r['versionCode']}，包名{r['package']}。APK {r['size']}字节；SHA256 {r['sha256']}。\n与发布UI10/UI11同签名：{r['certificate_sha256']}。未创建或导出私钥。\n"
-          notes+=textwrap.dedent('''
-          ## 验收边界
-          Debug测试版。自动化不代表用户手机Root联网、微信消息、GPU毛玻璃、60/120fps或长期稳定性实测，也不是视频逐帧对比。此轮没有新增整页侧滑返回或阅读器翻页。UI9/原146等不同签名旧包不能据此覆盖，不要卸载或清数据。签名缓存不是长期生产密钥托管，丢失时构建失败，不静默替换身份。
-          ''')
-          Path('docs/UI92_RUNTIME146_UI12.md').write_text(notes)
-          agents=Path('AGENTS.md').read_text().replace('## 当前已交付：UI11','## UI11历史交付（UI12在此基础上继续）',1)
-          marker='## UI11历史交付（UI12在此基础上继续）'
-          latest=f"## 当前已交付：UI12\n\n版本{r['version']} / {r['versionCode']}；Actions {os.environ['RUN_ID']}；{r['suites']}套{r['tests']['tests']}项全部通过。APK SHA256 `{r['sha256']}`。发布`ui92-r146.12-test`，与UI10/UI11同证书，详见docs/UI92_RUNTIME146_UI12.md和发布result.json。\n\n只精修动效与材质：MotionMaterials12.kt统一公开运动主题、实际原生偏移驱动的缩放/模糊、弹性Popup与底部回弹。日志先hide再移除。Material3显式为1.5.0-alpha16，不能称正式稳定依赖。速度使用原生125dp/s路径，1100dp/s无效旧参数改动已撤销；HomeInteraction7.kt与UI11一致。未观看视频，未声称真机帧率；不加入阅读器和整页侧滑。\n\n后续直接编译当前生产源码，不重放UI11或更早迁移。签名沿用原路径、缓存、固定指纹，缺失失败。UI12-last-attempt若存在是历史失败，不等同最终交付状态。\n\n"
-          if '## 当前已交付：UI12' not in agents:
-              if marker in agents:agents=agents.replace(marker,latest+marker,1)
-              else:agents=latest+agents
-          Path('AGENTS.md').write_text(agents)
-          PY
+          python3 tools/finish_ui12.py record
+          mkdir -p docs/ci
+          cp integration-evidence/attempt.json docs/ci/UI12-last-attempt.json
+          git add -- docs/ci/UI12-last-attempt.json
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'docs: retain actual UI12 failure evidence [skip ci]'
+            git push origin HEAD:main
+          fi
+      - name: Commit tested production code and exact delivery notes
+        run: |
+          set -euo pipefail
+          python3 tools/finish_ui12.py notes
           git add -- android-app/app/src/main/java android-app/app/src/test/java android-app/app/build.gradle.kts docs/UI92_RUNTIME146_UI12.md AGENTS.md
           git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'feat: deliver tested UI12 native motion and materials [skip ci]'
           git push origin HEAD:main
           git rev-parse HEAD > integration-evidence/app-commit.txt
-      - name: Export source and complete evidence without signing files
+      - name: Export exact source and complete evidence without signing files
         if: always()
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import subprocess,zipfile,json
-          out=Path('delivery');out.mkdir(exist_ok=True)
-          if Path('integration-evidence/app-commit.txt').exists():
-              apk=Path('android-app/app/build/outputs/apk/debug/app-debug.apk')
-              (out/'Hetu-UI92-Runtime146-UI12.apk').write_bytes(apk.read_bytes())
-              r=json.load(open('integration-evidence/result.json'));r['app_commit']=Path('integration-evidence/app-commit.txt').read_text().strip()
-              (out/'result.json').write_text(json.dumps(r,ensure_ascii=False,indent=2))
-              tracked=subprocess.check_output(['git','ls-files','-z']).decode().split('\0')
-              with zipfile.ZipFile(out/'Hetu-UI92-Runtime146-UI12-source.zip','w',zipfile.ZIP_DEFLATED) as z:
-                  for name in tracked:
-                      p=Path(name)
-                      if name and p.is_file() and p.suffix.lower() not in {'.jks','.keystore','.p12','.pfx','.key'}:z.write(p,name)
-          with zipfile.ZipFile(out/'Hetu-UI92-Runtime146-UI12-verification.zip','w',zipfile.ZIP_DEFLATED) as z:
-              for directory in ['integration-evidence','android-app/app/build/test-results/testDebugUnitTest','android-app/app/build/reports/tests/testDebugUnitTest']:
-                  for p in Path(directory).rglob('*'):
-                      if p.is_file():z.write(p,str(p))
-          PY
+        run: python3 tools/finish_ui12.py export
       - uses: actions/upload-artifact@v4
         if: success()
         with:
