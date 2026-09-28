@@ -893,6 +893,7 @@ private fun BoxProxyPolicySheet17(
                     }
                 }
             }
+            }
             MiuixFab(
                 onClick = onTestAll,
                 minWidth = 64.dp,
