@@ -1585,6 +1585,426 @@ internal fun RefPanel(
 
 
 @Composable
+private fun RefVideoStrategyPlane19(
+    groups: List<ProxyGroupUi>,
+    selectedGroupName: String?,
+    selectedNode: (ProxyGroupUi) -> String,
+    delays: Map<String, Long>,
+    testing: Map<String, Boolean>,
+    onGroup: (ProxyGroupUi) -> Unit,
+    onCollapse: () -> Unit,
+    onNode: (ProxyGroupUi, String) -> Unit,
+    onDelay: (String) -> Unit,
+) {
+    val active = groups.firstOrNull { it.name == selectedGroupName }
+    androidx.compose.animation.AnimatedContent(
+        targetState = active?.name,
+        transitionSpec = {
+            val enteringDetail = targetState != null
+            val enter = androidx.compose.animation.fadeIn(
+                androidx.compose.animation.core.tween(170)
+            ) + androidx.compose.animation.slideInHorizontally(
+                animationSpec = spring(dampingRatio = .82f, stiffness = 430f),
+            ) { width -> if (enteringDetail) width / 14 else -width / 14 }
+            val exit = androidx.compose.animation.fadeOut(
+                androidx.compose.animation.core.tween(120)
+            ) + androidx.compose.animation.slideOutHorizontally(
+                animationSpec = androidx.compose.animation.core.tween(
+                    150,
+                    easing = androidx.compose.animation.core.CubicBezierEasing(.16f, 1f, .30f, 1f),
+                ),
+            ) { width -> if (enteringDetail) -width / 22 else width / 22 }
+            enter togetherWith exit
+        },
+        label = "videoStrategyPlane",
+    ) { activeName ->
+        if (activeName == null) {
+            if (groups.isEmpty()) {
+                RefEmptyState("没有匹配的节点", "试试其他节点或策略组名称。", Icons.Rounded.Search)
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    groups.chunked(2).forEach { pair ->
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            pair.forEach { group ->
+                                val selected = selectedNode(group)
+                                RefVideoGroupCard19(
+                                    group = group,
+                                    selected = selected,
+                                    delay = delays[selected] ?: group.nodes.firstOrNull { it.name == selected }?.lastDelay,
+                                    testing = selected.isNotBlank() && testing[selected] == true,
+                                    active = false,
+                                    modifier = Modifier.weight(1f),
+                                    onClick = { onGroup(group) },
+                                    onDelay = { if (selected.isNotBlank()) onDelay(selected) },
+                                )
+                            }
+                            if (pair.size == 1) Spacer(Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        } else {
+            val group = groups.firstOrNull { it.name == activeName }
+            if (group == null) {
+                Spacer(Modifier.height(1.dp))
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    val pinned = groups.take(2)
+                    if (pinned.isNotEmpty()) {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            pinned.forEach { parent ->
+                                val selected = selectedNode(parent)
+                                RefVideoGroupCard19(
+                                    group = parent,
+                                    selected = selected,
+                                    delay = delays[selected] ?: parent.nodes.firstOrNull { it.name == selected }?.lastDelay,
+                                    testing = selected.isNotBlank() && testing[selected] == true,
+                                    active = parent.name == activeName,
+                                    modifier = Modifier.weight(1f),
+                                    onClick = {
+                                        if (parent.name == activeName) onCollapse() else onGroup(parent)
+                                    },
+                                    onDelay = { if (selected.isNotBlank()) onDelay(selected) },
+                                )
+                            }
+                            if (pinned.size == 1) Spacer(Modifier.weight(1f))
+                        }
+                    }
+
+                    group.nodes.withIndex().toList().chunked(2).forEach { pair ->
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            pair.forEach { indexed ->
+                                val node = indexed.value
+                                RefVideoNodeCard19(
+                                    index = indexed.index,
+                                    node = node,
+                                    active = node.name == selectedNode(group),
+                                    delay = delays[node.name] ?: node.lastDelay,
+                                    testing = testing[node.name] == true,
+                                    modifier = Modifier.weight(1f),
+                                    onSelect = { onNode(group, node.name) },
+                                    onDelay = { onDelay(node.name) },
+                                )
+                            }
+                            if (pair.size == 1) Spacer(Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RefVideoGroupCard19(
+    group: ProxyGroupUi,
+    selected: String,
+    delay: Long?,
+    testing: Boolean,
+    active: Boolean,
+    modifier: Modifier,
+    onClick: () -> Unit,
+    onDelay: () -> Unit,
+) {
+    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
+    val t = LocalHetuTokens.current
+    val interaction = remember(group.name, active) { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        if (pressed) .965f else 1f,
+        spring(dampingRatio = .70f, stiffness = 610f),
+        label = "videoGroupPress${group.name}",
+    )
+    val shape = RoundedCornerShape(14.dp)
+    val bg = when {
+        dark && active -> Color(0xFF172554)
+        dark -> t.cardBackground
+        active -> Color(0xFFF3F7FF)
+        else -> Color(0xFFF9F7FF)
+    }
+    val tested = group.nodes.count { node -> ((delay.takeIf { node.name == selected } ?: node.lastDelay) ?: 0L) > 0L }
+    Column(
+        modifier.height(70.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                alpha = if (pressed) .94f else 1f
+            }
+            .shadow(
+                if (active) 4.dp else 2.dp,
+                shape,
+                clip = false,
+                ambientColor = Color(0xFF3B2E7E).copy(alpha = if (dark) .12f else .035f),
+                spotColor = Color(0xFF3B2E7E).copy(alpha = if (dark) .14f else .045f),
+            )
+            .background(bg, shape)
+            .border(
+                if (active) 1.dp else .6.dp,
+                if (active) Color(0xFF8CB7FF) else Color.White.copy(alpha = if (dark) .08f else .72f),
+                shape,
+            )
+            .clip(shape)
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+        verticalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    group.name,
+                    color = t.textPrimary,
+                    fontSize = 12.5.sp,
+                    lineHeight = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    "${refGroupTypeCompact(group.type)}  $tested/${group.nodes.size}",
+                    color = Color(0xFF8D8AA0),
+                    fontSize = 9.sp,
+                    lineHeight = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                )
+            }
+            RefGroupCornerVisual(group, Modifier.size(25.dp))
+        }
+
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            val flag = refNodeFlag(selected)
+            if (flag.isNotBlank()) {
+                Text(flag, fontSize = 10.5.sp)
+                Spacer(Modifier.width(3.dp))
+            }
+            Text(
+                selected.ifBlank { "未选择" },
+                modifier = Modifier.weight(1f),
+                color = if (dark) t.textSecondary else Color(0xFF454255),
+                fontSize = 10.sp,
+                lineHeight = 12.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.width(4.dp))
+            RefVideoDelayPill19(delay, testing, onDelay)
+        }
+    }
+}
+
+@Composable
+private fun RefVideoNodeCard19(
+    index: Int,
+    node: ProxyNodeUi,
+    active: Boolean,
+    delay: Long?,
+    testing: Boolean,
+    modifier: Modifier,
+    onSelect: () -> Unit,
+    onDelay: () -> Unit,
+) {
+    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
+    val t = LocalHetuTokens.current
+    val source = remember(node.name) { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        if (pressed) .97f else 1f,
+        spring(dampingRatio = .70f, stiffness = 600f),
+        label = "videoNodePress${node.name}",
+    )
+    var visible by remember(node.name) { mutableStateOf(false) }
+    LaunchedEffect(node.name) {
+        delay((index * 12L).coerceAtMost(160L))
+        visible = true
+    }
+    androidx.compose.animation.AnimatedVisibility(
+        visible = visible,
+        enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(150)) +
+            androidx.compose.animation.slideInVertically(
+                animationSpec = spring(dampingRatio = .82f, stiffness = 470f),
+            ) { it / 5 },
+    ) {
+        val shape = RoundedCornerShape(11.dp)
+        val bg = when {
+            dark && active -> Color(0xFF172554)
+            dark -> Color(0xFF202635)
+            active -> Color(0xFFDCE9FF)
+            else -> Color(0xFFE7E6F3)
+        }
+        Column(
+            modifier.height(64.dp)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    alpha = if (pressed) .93f else 1f
+                }
+                .background(bg, shape)
+                .border(
+                    if (active) 1.2.dp else .5.dp,
+                    if (active) Color(0xFF5F96F7) else Color.White.copy(alpha = if (dark) .06f else .42f),
+                    shape,
+                )
+                .clip(shape)
+                .clickable(interactionSource = source, indication = null, onClick = onSelect)
+                .padding(horizontal = 9.dp, vertical = 7.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                val flag = refNodeFlag(node.name)
+                if (flag.isNotBlank()) {
+                    Text(flag, fontSize = 11.sp)
+                    Spacer(Modifier.width(3.dp))
+                }
+                Text(
+                    node.name,
+                    modifier = Modifier.weight(1f),
+                    color = t.textPrimary,
+                    fontSize = 11.5.sp,
+                    lineHeight = 13.sp,
+                    fontWeight = if (active) FontWeight.ExtraBold else FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (active) {
+                    Box(
+                        Modifier.size(14.dp).background(Color(0xFF2474F3), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Rounded.Check, "已选择", tint = Color.White, modifier = Modifier.size(9.dp))
+                    }
+                }
+            }
+
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    refNodeProtocol(node),
+                    color = if (active) Color(0xFF3C78DA) else Color(0xFF7D7990),
+                    fontSize = 9.sp,
+                    lineHeight = 10.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                )
+                Spacer(Modifier.weight(1f))
+                RefVideoDelayPill19(delay, testing, onDelay)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RefVideoDelayPill19(value: Long?, testing: Boolean, onClick: (() -> Unit)? = null) {
+    val (bg, fg) = when {
+        testing || value == null || value <= 0L -> Color(0xFFEDECF3) to Color(0xFF8E8A9B)
+        value < 100L -> Color(0xFFE4EEFF) to Color(0xFF3472D6)
+        value < 180L -> Color(0xFFE3F5EA) to Color(0xFF159268)
+        else -> Color(0xFFFFEDD9) to Color(0xFFC67811)
+    }
+    val source = remember(value, testing, onClick) { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) .92f else 1f, label = "videoDelay")
+    Box(
+        Modifier.graphicsLayer { scaleX = scale; scaleY = scale }
+            .background(bg, CircleShape)
+            .then(
+                if (onClick != null) Modifier.clickable(
+                    enabled = !testing,
+                    interactionSource = source,
+                    indication = null,
+                    onClick = onClick,
+                ) else Modifier
+            )
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            when {
+                testing -> "…"
+                value == null || value <= 0L -> "--"
+                else -> "$value ms"
+            },
+            color = fg,
+            fontSize = 9.sp,
+            lineHeight = 10.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun RefVideoStrategyActions19(
+    label: String,
+    onTestAll: () -> Unit,
+    onCollapse: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val haptic = LocalHapticFeedback.current
+    val blue = Color(0xFF1675F2)
+    Column(
+        modifier,
+        horizontalAlignment = Alignment.End,
+        verticalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
+        val testSource = remember { MutableInteractionSource() }
+        val testPressed by testSource.collectIsPressedAsState()
+        val testScale by animateFloatAsState(
+            if (testPressed) .92f else 1f,
+            spring(dampingRatio = .64f, stiffness = 700f),
+            label = "videoTestFab",
+        )
+        Box(
+            Modifier.size(42.dp)
+                .graphicsLayer { scaleX = testScale; scaleY = testScale }
+                .shadow(9.dp, CircleShape, clip = false, ambientColor = blue.copy(alpha = .18f), spotColor = blue.copy(alpha = .22f))
+                .background(blue, CircleShape)
+                .clip(CircleShape)
+                .clickable(interactionSource = testSource, indication = null) {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onTestAll()
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Rounded.MyLocation, "测速全部节点", tint = Color.White, modifier = Modifier.size(19.dp))
+        }
+
+        val collapseSource = remember(label) { MutableInteractionSource() }
+        val collapsePressed by collapseSource.collectIsPressedAsState()
+        val collapseScale by animateFloatAsState(
+            if (collapsePressed) .95f else 1f,
+            spring(dampingRatio = .66f, stiffness = 680f),
+            label = "videoCollapseFab",
+        )
+        Row(
+            Modifier.height(42.dp)
+                .graphicsLayer { scaleX = collapseScale; scaleY = collapseScale }
+                .shadow(10.dp, RoundedCornerShape(22.dp), clip = false, ambientColor = blue.copy(alpha = .18f), spotColor = blue.copy(alpha = .20f))
+                .background(blue, RoundedCornerShape(22.dp))
+                .clip(RoundedCornerShape(22.dp))
+                .clickable(interactionSource = collapseSource, indication = null) {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onCollapse()
+                }
+                .padding(horizontal = 13.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+            Icon(Icons.Rounded.KeyboardArrowDown, null, tint = Color.White, modifier = Modifier.size(16.dp))
+            Text(label, color = Color.White, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+        }
+    }
+}
+
+@Composable
 private fun RefFloatingCapsule(text: String, error: Boolean) {
     val pulse = androidx.compose.animation.core.rememberInfiniteTransition(label = "capsulePulse")
     val dotAlpha by pulse.animateFloat(
