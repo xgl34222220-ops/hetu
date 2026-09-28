@@ -62,7 +62,7 @@ class PanelNavigation13Test {
         view.draw(Canvas(image)); val file = File("build/outputs/panel13/$name.png"); file.parentFile!!.mkdirs()
         file.outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }; image.recycle()
     } }
-    @Test fun actualSixPageRoutesKeepIdenticalLabelsOrderAndBounds() {
+    @Test fun actualSevenPageRoutesKeepIdenticalLabelsOrderAndBounds() {
         rule.setContent { CompositionLocalProvider(LocalHetuMotionEnabled provides false, LocalHomeDockClearance provides 96.dp) {
             MaterialTheme {
                 var tab by remember { mutableStateOf(RefPanelTab.Overview) }
@@ -70,7 +70,7 @@ class PanelNavigation13Test {
                     0, remember { HazeState() }, null, false, {}, {}, {})
             }
         } }
-        val labels = listOf("概览", "节点", "订阅", "连接", "规则", "规则集")
+        val labels = listOf("概览", "节点", "订阅", "连接", "规则", "规则集", "日志")
         val bounds = PanelTabs13.map { node("panel11-tab-${it.name}").getUnclippedBoundsInRoot() }
         repeat(2) { PanelTabs13.forEach { selected ->
             node("panel11-tab-${selected.name}").performTouchInput { click() }
