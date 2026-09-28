@@ -1,4 +1,4 @@
-name: Inspect UI8 saved layout evidence
+name: Inspect UI8 saved certificate evidence
 on:
   push:
     branches: [main]
@@ -15,20 +15,16 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: Hetu-UI92-Runtime146-UI8-evidence
-          run-id: 36408545627
+          run-id: 36409234584
           github-token: ${{ github.token }}
           path: evidence
-      - name: Print actual paragraph and box dimensions from saved test XML
+      - name: Read already verified public certificate output
         run: |
           python3 - <<'PY'
-          import zipfile,xml.etree.ElementTree as ET
           from pathlib import Path
-          path=next(Path('evidence').rglob('Hetu-UI92-Runtime146-UI8-verification.zip'))
-          with zipfile.ZipFile(path) as z:
-              for name in z.namelist():
-                  if name.endswith('.xml') and 'HomeUi8ExperienceTest' in name:
-                      r=ET.fromstring(z.read(name))
-                      print('SUITE',r.attrib)
-                      for e in r.iter('system-out'):
-                          print(e.text or '')
+          for name in ['apk-signature.txt','ui7-signature.txt','apk-identity.txt']:
+              path=next(Path('evidence').rglob(name))
+              print('PUBLIC_APK_METADATA',name)
+              text=path.read_text()
+              print(text if 'signature' in name else text.splitlines()[0])
           PY
