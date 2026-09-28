@@ -3,26 +3,14 @@ package io.github.xgl34222220.hetu;
 import java.io.*;
 import java.security.MessageDigest;
 import java.util.*;
-import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.DumperOptions;
-import org.yaml.snakeyaml.constructor.SafeConstructor;
 import org.yaml.snakeyaml.nodes.*;
 
 /** Narrow migrations in the private startup copy; source YAML is never saved or reserialized. */
 final class RuntimeCompatibility14 {
     private RuntimeCompatibility14() {}
     private static Node tree(String text) throws IOException {
-        try {
-            LoaderOptions options = new LoaderOptions();
-            options.setCodePointLimit(4 * 1024 * 1024);
-            options.setNestingDepthLimit(50);
-            options.setMaxAliasesForCollections(50);
-            options.setAllowDuplicateKeys(false);
-            return new Yaml(new SafeConstructor(options)).compose(new StringReader(text));
-        } catch (Exception failure) {
-            throw new IOException("启动配置结构解析失败，请检查 YAML；未修改源文件", failure);
-        }
+        return RuntimeYaml15.compose(text);
     }
     private static Node field(Node node, String key) {
         if (!(node instanceof MappingNode)) return null;
@@ -32,22 +20,8 @@ final class RuntimeCompatibility14 {
         return null;
     }
     private static String scalar(Node node) { return node instanceof ScalarNode ? ((ScalarNode) node).getValue() : ""; }
-    private static Node inherited(Node node, String key, Set<Node> visited) {
-        if (node == null || !visited.add(node)) return null;
-        Node own = field(node, key);
-        if (own != null) return own;
-        Node merge = field(node, "<<");
-        if (merge instanceof SequenceNode) {
-            for (Node part : ((SequenceNode) merge).getValue()) {
-                Node result = inherited(part, key, visited);
-                if (result != null) return result;
-            }
-            return null;
-        }
-        return inherited(merge, key, visited);
-    }
     private static Node inherited(Node node, String key) {
-        return inherited(node, key, Collections.newSetFromMap(new IdentityHashMap<>()));
+        return RuntimeYaml15.inherited(node, key);
     }
     static boolean ruleFakeIpFilter(String source) throws IOException {
         return "rule".equalsIgnoreCase(scalar(field(field(tree(source), "dns"), "fake-ip-filter-mode")));
@@ -151,6 +125,6 @@ final class RuntimeCompatibility14 {
             if ("true".equalsIgnoreCase(scalar(field(root,"disable-keep-alive"))))
                 result.append("注意：源配置明确禁用了 TCP 保活，河图未擅自改写；长连接问题需结合计时器排查。\n");
             return result.toString();
-        } catch (IOException error) { return "配置结构不可解析；未输出配置或凭据。"; }
+        } catch (IOException error) { return error.getMessage() + "\n未输出配置或凭据。"; }
     }
 }
