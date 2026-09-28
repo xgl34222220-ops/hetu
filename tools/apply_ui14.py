@@ -72,7 +72,8 @@ s=s[:a]+'                CompactNodeSearch14(query) { query = it }\n'+s[b:]
 save(p,s)
 
 p=ROOT+'MihomoStartupConfig.java';s=read_base(p)
-s=once(s,'        String yaml=normalize(source);','        String yaml=normalize(source);\n        yaml=RuntimeCompatibility14.migrateFingerprint(yaml);')
+s=once(s,'        String yaml=normalize(source);\n        yaml=sanitizeStrictDomainCompatibility(yaml);',
+    '        String yaml=normalize(source);\n        yaml=RuntimeCompatibility14.migrateFingerprint(yaml);\n        yaml=sanitizeStrictDomainCompatibility(yaml);')
 s=once(s,'private static String sanitizeStrictDomainCompatibility(String source){',
     'private static String sanitizeStrictDomainCompatibility(String source)throws IOException{\n        boolean ruleFilter=source.contains("fake-ip-filter-mode")&&RuntimeCompatibility14.ruleFakeIpFilter(source);')
 s=once(s,'||("dns".equals(top)&&"fake-ip-filter".equals(child));','||(!ruleFilter&&"dns".equals(top)&&"fake-ip-filter".equals(child));')
