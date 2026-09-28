@@ -1,0 +1,34 @@
+name: Inspect UI8 saved layout evidence
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/ui8-evidence-inspect.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: Hetu-UI92-Runtime146-UI8-evidence
+          run-id: 36408545627
+          github-token: ${{ github.token }}
+          path: evidence
+      - name: Print actual paragraph and box dimensions from saved test XML
+        run: |
+          python3 - <<'PY'
+          import zipfile,xml.etree.ElementTree as ET
+          from pathlib import Path
+          path=next(Path('evidence').rglob('Hetu-UI92-Runtime146-UI8-verification.zip'))
+          with zipfile.ZipFile(path) as z:
+              for name in z.namelist():
+                  if name.endswith('.xml') and 'HomeUi8ExperienceTest' in name:
+                      r=ET.fromstring(z.read(name))
+                      print('SUITE',r.attrib)
+                      for e in r.iter('system-out'):
+                          print(e.text or '')
+          PY
