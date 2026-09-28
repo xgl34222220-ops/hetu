@@ -151,11 +151,17 @@ internal fun boxProxyTabLabel17(tab: RefPanelTab): String = when (tab) {
 
 @Composable
 internal fun BoxProxyPanelTabs17(selected: RefPanelTab, onSelect: (RefPanelTab) -> Unit) {
+    val haptics = io.github.xgl34222220.hetu.ui.rememberHetuHaptics()
     BoxProxyMiuixTheme17 {
         MiuixTabRow(
             tabs = BoxProxyTabs17.map(::boxProxyTabLabel17),
             selectedTabIndex = BoxProxyTabs17.indexOf(selected).coerceAtLeast(0),
-            onTabSelected = { BoxProxyTabs17.getOrNull(it)?.let(onSelect) },
+            onTabSelected = { index ->
+                BoxProxyTabs17.getOrNull(index)?.let { tab ->
+                    if (tab != selected) haptics.perform(io.github.xgl34222220.hetu.ui.HetuHaptic.Tick)
+                    onSelect(tab)
+                }
+            },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).testTag("boxproxy17-tabs"),
             height = 34.dp,
             minWidth = 54.dp,
