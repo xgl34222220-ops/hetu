@@ -87,3 +87,5 @@ jobs:
           path: android-app/app/build/outputs/apk/debug/app-debug.apk
           compression-level: 0
           if-no-files-found: error
+
+# final V18 head trigger
