@@ -945,6 +945,13 @@ internal fun RefPanel(
     onOpenSettings: () -> Unit,
     onDetailVisibleChanged: (Boolean) -> Unit,
 ) {
+    // The strategy tab now owns one inline lazy list; all other panel tabs stay unchanged.
+    if (selectedTab == RefPanelTab.Groups) {
+        PanelStrategyRoute11(state, repo, delays, searchRequest, onSelectedTabChange,
+            onRefreshState, onDetailVisibleChanged)
+        return
+    }
+
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val t = LocalHetuTokens.current
@@ -3424,6 +3431,14 @@ internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
                 RefDivider()
                 RefToolRow(Icons.Rounded.Article, Color(0xFF9333EA), "日志查看", "查看运行记录与排查问题") {
                     scope.launch { onLog(runCatching { inspector.runtimeLog() }.getOrElse { it.message ?: "日志读取失败" }) }
+                }
+                RefDivider()
+                RefToolRow(Icons.Rounded.NetworkCheck, Color(0xFF2563EB), "网络诊断", "消息与网络连通性诊断") {
+                    scope.launch {
+                        try { onLog(ProxyComposeController(context).diagnostics()) }
+                        catch (cancel: CancellationException) { throw cancel }
+                        catch (error: Exception) { onLog(error.message ?: "诊断读取失败") }
+                    }
                 }
                 RefDivider()
                 RefToolRow(Icons.Rounded.Apps, Color(0xFFF97316), "应用名单", "选择需要代理的应用", trailingText = "管理", trailingColor = Color(0xFF2563EB)) {

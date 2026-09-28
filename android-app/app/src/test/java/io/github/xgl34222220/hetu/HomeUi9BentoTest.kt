@@ -187,7 +187,7 @@ class HomeUi9BentoTest {
         node("compact-home").performTouchInput { swipeUp() }
         rule.runOnIdle { data.value = data.value.copy(message = "全部刷新完成") }
         assertNoticeSeparated()
-        rule.onNodeWithContentDescription("刷新状态").performTouchInput { click() }
+        rule.onNodeWithTag("compact-home").refreshHome11()
         assertEquals(listOf("refresh"), calls)
     }
     @Test fun errorCapsuleStillOpensTheUnmodifiedDiagnosticText() {

@@ -114,10 +114,10 @@ class HomeUi7InteractionTest {
         rule.onNodeWithTag("compact-home").performTouchInput{swipeUp()}
         rule.onNodeWithTag("home-header").assert(SemanticsMatcher.expectValue(HomeHeaderCollapse,1f))
         assertEquals(before,rule.onNodeWithTag("home-header").fetchSemanticsNode().boundsInRoot)
-        rule.onNodeWithContentDescription("刷新状态").performClick()
-        rule.onNodeWithContentDescription("更多首页功能").performClick()
-        rule.onNodeWithText("代理设置").performClick()
-        assertEquals(listOf("refresh","settings"),calls)
+        rule.onNodeWithContentDescription("刷新状态").assertDoesNotExist()
+        rule.onNodeWithContentDescription("更多首页功能").assertDoesNotExist()
+        rule.onNodeWithTag("compact-home").refreshHome11()
+        assertEquals(listOf("refresh"),calls)
         snapshot("ui7-collapsed-header")
     }
     @Test fun interruptedNumberRollSettlesToLatestRealValue() {

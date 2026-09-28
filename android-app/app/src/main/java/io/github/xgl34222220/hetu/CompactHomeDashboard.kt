@@ -129,7 +129,7 @@ private val LocalHomePalette = staticCompositionLocalOf {
 private val LocalHomeMotion = staticCompositionLocalOf { false }
 
 @Composable
-private fun homeMotionAvailable(requested: Boolean): Boolean {
+internal fun homeMotionAvailable(requested: Boolean): Boolean {
     val owner = LocalLifecycleOwner.current
     var available by remember(owner) { mutableStateOf(false) }
     DisposableEffect(owner, requested) {
@@ -241,7 +241,6 @@ internal fun CompactHomeDashboard(
             if (listState.firstVisibleItemIndex > 0) 1f
             else (listState.firstVisibleItemScrollOffset / collapseDistance).coerceIn(0f, 1f)
         } }
-        var more by remember { mutableStateOf(false) }
         var feedbackDetails by remember { mutableStateOf<String?>(null) }
         val notice = rememberHomeNotice(data)
         // The header is a sibling of the scroll viewport, never a lazy item.
@@ -262,21 +261,9 @@ internal fun CompactHomeDashboard(
                     notice.value = null
                 }
             }
+            // UI11: a clean centered title; refresh remains a real pull/accessibility action.
             HomeCollapsingHeader(collapse, motion, headerHaze, palette.text, centered = true,
-                modifier = Modifier.zIndex(2f)) {
-                HomeIcon(Icons.Rounded.Refresh, "刷新状态", !data.refreshing && !data.busy, data.refreshing,
-                    onClick = onRefresh)
-                Box {
-                    HomeIcon(Icons.Rounded.MoreVert, "更多首页功能", onClick = { more = true })
-                    DropdownMenu(expanded = more, onDismissRequest = { more = false }) {
-                        listOf("应用连接" to onConnections, "广告过滤" to onAdblock,
-                            "网络诊断" to onDiagnostics, "代理设置" to onSettings).forEach { (title, callback) ->
-                            DropdownMenuItem(text = { Text(title) }, enabled = title != "网络诊断" || !data.diagnosticLoading,
-                                onClick = { more = false; callback() })
-                        }
-                    }
-                }
-            }
+                modifier = Modifier.zIndex(2f)) { }
         BoxWithConstraints(Modifier.fillMaxWidth().weight(1f).clipToBounds()) {
         // Short windows reduce spacing, never the user's font size or address content.
         val compact = maxHeight < 710.dp
@@ -284,7 +271,11 @@ internal fun CompactHomeDashboard(
             LocalHomeShortSpacing provides (maxHeight < 650.dp)) {
         LazyColumn(Modifier.fillMaxSize().graphicsLayer { translationY = pull.offsetPx }
             .nestedScroll(pullConnection)
-            .hazeSource(headerHaze).testTag("compact-home"), state = listState,
+            .hazeSource(headerHaze).testTag("compact-home").semantics {
+                if (!data.busy && !data.refreshing && data.operation == null) {
+                    customActions = listOf(CustomAccessibilityAction("刷新首页状态") { onPullRefresh(); true })
+                }
+            }, state = listState,
             overscrollEffect = null,
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = if (compact) 2.dp else 4.dp, bottom = 0.dp),
             verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 10.dp)) {

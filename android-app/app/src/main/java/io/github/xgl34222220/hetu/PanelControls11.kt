@@ -99,14 +99,16 @@ internal fun PanelSubTabs11(selected: RefPanelTab, change: (RefPanelTab) -> Unit
     val t = LocalHetuTokens.current
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 4.dp)
         .testTag("panel11-subtabs"), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-        RefPanelTab.entries.forEach { tab ->
+        listOf(RefPanelTab.Overview, RefPanelTab.Groups, RefPanelTab.Subscriptions,
+            RefPanelTab.Connections, RefPanelTab.Rules, RefPanelTab.RuleSets).forEach { tab ->
+            val label = if (tab == RefPanelTab.Groups) "策略" else tab.label
             val active = tab == selected
             Box(Modifier.heightIn(min = 48.dp).clip(CircleShape)
                 .background(if (active) t.cardBackground else Color.Transparent)
-                .nativePress(label = tab.title, onClick = { change(tab) })
+                .nativePress(label = label, onClick = { change(tab) })
                 .semantics { this.selected = active; role = Role.Tab }
                 .testTag("panel11-tab-${tab.name}").padding(horizontal = 15.dp), contentAlignment = Alignment.Center) {
-                Text(tab.title, color = if (active) Color(0xFF2563EB) else t.textSecondary,
+                Text(label, color = if (active) Color(0xFF2563EB) else t.textSecondary,
                     fontSize = 13.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold)
             }
         }
@@ -121,13 +123,8 @@ internal fun PanelApiSheet11(prefs: SharedPreferences, localPort: Int, onDismiss
     val t = LocalHetuTokens.current
     val state = rememberInteractiveSheetState()
     val scope = rememberCoroutineScope()
-    val backdrop = LocalSheetBackdrop.current
     var draft by remember { mutableStateOf(PanelApiDraft11.read(prefs)) }
     var error by remember { mutableStateOf<String?>(null) }
-    DisposableEffect(backdrop) {
-        backdrop?.let { it.count++ }
-        onDispose { backdrop?.let { it.count = (it.count - 1).coerceAtLeast(0) } }
-    }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = state,
         shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
         containerColor = t.cardBackground, contentColor = t.textPrimary,

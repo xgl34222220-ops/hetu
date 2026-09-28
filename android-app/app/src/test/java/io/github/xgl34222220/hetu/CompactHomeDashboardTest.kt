@@ -155,9 +155,8 @@ class CompactHomeDashboardTest {
         render()
         rule.onNodeWithTag("home-webui").performClick()
         rule.onNodeWithTag("home-log").performClick()
-        rule.onNodeWithContentDescription("更多首页功能").performClick()
-        rule.onNodeWithText("网络诊断").performClick()
-        assertEquals(listOf("webui", "log", "diagnostics"), calls)
+        rule.onNodeWithContentDescription("更多首页功能").assertDoesNotExist()
+        assertEquals(listOf("webui", "log"), calls)
     }
 
     @Test fun cpuHasBoundedProgressAndUnknownSubscriptionHasNoFakeRemainder() {
@@ -380,7 +379,7 @@ class CompactHomeDashboardTest {
         assertEquals(header.center.x, brand.center.x, 1f)
         assertEquals(20.sp, textLayout("home-brand").layoutInput.style.fontSize)
         rule.onNodeWithText("BoxProxy").assertDoesNotExist()
-        rule.onNodeWithContentDescription("刷新状态").performClick()
+        rule.onNodeWithTag("compact-home").refreshHome11()
         assertEquals(listOf("refresh"), calls)
         snapshot("ui4-centered-header")
     }

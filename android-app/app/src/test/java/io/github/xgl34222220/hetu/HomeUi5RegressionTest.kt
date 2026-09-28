@@ -72,8 +72,8 @@ class HomeUi5RegressionTest {
         rule.onNodeWithTag("compact-home").performTouchInput { swipeDown() }
         assertEquals(before, rule.onNodeWithTag("home-header").fetchSemanticsNode().boundsInRoot)
         assertEquals("The completed top-edge pull now dispatches a real refresh", listOf("refresh"), calls)
-        rule.onNodeWithContentDescription("刷新状态").performClick()
-        assertEquals("Toolbar refresh remains independently reachable", listOf("refresh", "refresh"), calls)
+        rule.onNodeWithTag("compact-home").refreshHome11()
+        assertEquals("Accessible refresh remains independently reachable", listOf("refresh", "refresh"), calls)
     }
 
     @Test fun changedSafeInsetsDoNotLoseSelectedNetworkMode() {

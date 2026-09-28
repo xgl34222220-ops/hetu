@@ -148,7 +148,7 @@ class HomeUi10GridTest {
         assertEquals(20.sp,text("home-brand").layoutInput.style.fontSize)
         assertEquals(((h.left + h.right) / 2).value, ((brand.left + brand.right) / 2).value, 1f)
         assertEquals(44.dp,h.top)
-        rule.onNodeWithContentDescription("刷新状态").performTouchInput{click()}
+        rule.onNodeWithTag("compact-home").refreshHome11()
         assertEquals(listOf("refresh"),calls)
     }
     @Test fun noticeStartsEightDpBelowSafeAreaAndDoesNotBlockStop() {

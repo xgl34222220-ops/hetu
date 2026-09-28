@@ -77,6 +77,15 @@ internal fun StrategyPanel11(
     val testing = remember { mutableStateMapOf<String, Boolean>() }
     val batchTesting = remember { mutableStateMapOf<String, Boolean>() }
     val fontScale = LocalDensity.current.fontScale
+    val hardware = androidx.compose.ui.platform.LocalView.current.isHardwareAccelerated
+    var blurEnabled by remember(prefs) { mutableStateOf(prefs.getBoolean("enableBlur", true)) }
+    DisposableEffect(prefs) {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { p, key ->
+            if (key == "enableBlur") blurEnabled = p.getBoolean(key, true)
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
     val columns = if (fontScale >= 1.5f) 1 else options.columns
     val delaySnapshot = delays.toMap()
     val groups = remember(state.groups, query, state.trafficMode, options) {
@@ -159,7 +168,11 @@ internal fun StrategyPanel11(
     val (pull, connection) = rememberHomePull(list, refreshing, true, motion, ::requestRefresh)
     val clearance = LocalHomeDockClearance.current ?:
         (86.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding())
-    Column(Modifier.fillMaxSize().background(t.pageBackground).padding(bottom = clearance)
+    Column(Modifier.fillMaxSize().graphicsLayer {
+        // Blur only this page behind its API sheet; existing detail sheets keep their own backdrop.
+        renderEffect = if (settings && blurEnabled && hardware && android.os.Build.VERSION.SDK_INT >= 31)
+            androidx.compose.ui.graphics.BlurEffect(8.dp.toPx(), 8.dp.toPx()) else null
+    }.background(t.pageBackground).padding(bottom = clearance)
         .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
         .testTag("panel11-root")) {
         PanelToolbar11(searchOpen, options, onSearch = {
@@ -293,6 +306,8 @@ private fun PanelGroupHeader11(group: ProxyGroupUi, current: String, open: Boole
             Text(group.name, Modifier.weight(1f), color = t.textPrimary, fontSize = 15.sp,
                 lineHeight = 21.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.width(8.dp))
+            ConfiguredGroupIcon(group, Modifier.size(24.dp))
+            Spacer(Modifier.width(6.dp))
             Icon(Icons.Rounded.ExpandMore, null, Modifier.size(20.dp).graphicsLayer { rotationZ = rotation }, tint = if (open) Color(0xFF2563EB) else t.textSecondary)
         }
         val tested = group.nodes.count { (delays[it.name] ?: it.lastDelay ?: 0) > 0 }
@@ -318,7 +333,7 @@ private fun PanelNode11(group: String, node: ProxyNodeUi, active: Boolean, delay
     // nativePress owns the main click; a separate info action exposes untruncated names.
     Column(modifier.clip(RoundedCornerShape(14.dp)).background(fill)
         .border(1.dp, if (active) Color(0xFF93C5FD).copy(alpha = .65f) else t.textMuted.copy(alpha = .1f), RoundedCornerShape(14.dp))
-        .nativePress(enabled = enabled, label = "选择${node.name}", onClick = onSelect)
+        .panelNodePress11(enabled = enabled, onClick = onSelect, onLongClick = onName)
         .semantics { selected = active; role = Role.RadioButton; stateDescription = if (pending) "等待核心确认" else if (active) "当前节点" else "未选择" }
         .testTag("panel11-node:$group:${node.name}").padding(start = 10.dp, end = 6.dp, top = if (compact) 7.dp else 11.dp, bottom = if (compact) 3.dp else 7.dp)) {
         Row(verticalAlignment = Alignment.Top) {
@@ -334,10 +349,6 @@ private fun PanelNode11(group: String, node: ProxyNodeUi, active: Boolean, delay
                 .testTag("panel11-protocol:$group:${node.name}"), color = t.textSecondary,
             fontSize = 10.sp, lineHeight = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End) {
-            Box(Modifier.size(48.dp).clip(CircleShape).nativePress(label = "查看完整节点名称", onClick = onName)
-                .testTag("panel11-info:$group:${node.name}"), contentAlignment = Alignment.Center) {
-                Icon(Icons.Rounded.Info, null, Modifier.size(15.dp), tint = t.textMuted)
-            }
             if (onNested != null) Box(Modifier.size(48.dp).clip(CircleShape)
                 .nativePress(label = "展开子策略${node.name}", onClick = onNested), contentAlignment = Alignment.Center) {
                 Icon(Icons.Rounded.ChevronRight, null, Modifier.size(17.dp), tint = t.textSecondary)

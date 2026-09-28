@@ -168,8 +168,8 @@ class HomeUi8ExperienceTest {
         assertEquals(before, node("home-header").getUnclippedBoundsInRoot())
         assertEquals(20.sp, text("home-brand").layoutInput.style.fontSize)
         rule.onAllNodesWithTag("home-brand").assertCountEquals(1)
-        rule.onNodeWithContentDescription("刷新状态").assertIsDisplayed()
-        rule.onNodeWithContentDescription("更多首页功能").assertIsDisplayed()
+        rule.onNodeWithContentDescription("刷新状态").assertDoesNotExist()
+        rule.onNodeWithContentDescription("更多首页功能").assertDoesNotExist()
         node("compact-home").performScrollToIndex(0)
         assertEquals(20.sp, text("home-brand").layoutInput.style.fontSize)
     }

@@ -157,7 +157,8 @@ internal data class PanelApiDraft11(
         }
         if (customApi && (!host.trim().matches(Regex("[A-Za-z0-9.-]{1,253}")) ||
             host.trim().startsWith('.') || host.trim().endsWith('.'))) return "后端主机只填写 IPv4 或域名，不含协议和端口"
-        if (customApi && port.toIntOrNull() !in 1024..65535) return "端口范围为 1024–65535"
+        val parsedPort = port.toIntOrNull()
+        if (customApi && (parsedPort == null || parsedPort !in 1024..65535)) return "端口范围为 1024–65535"
         if ('\r' in secret || '\n' in secret) return "Secret 不能包含换行"
         return null
     }
