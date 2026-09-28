@@ -1,8 +1,15 @@
 {
-  "run": "https://github.com/xgl34222220-ops/hetu/actions/runs/36498028482",
+  "run": "https://github.com/xgl34222220-ops/hetu/actions/runs/36424117790",
   "suites": [],
   "failures": [],
-  "compile_errors": [],
+  "compile_errors": [
+    "e: file:///home/runner/work/hetu/hetu/android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeUi11Test.kt:24:57 Cannot infer type for type parameter 'T'. Specify it explicitly.",
+    "e: file:///home/runner/work/hetu/hetu/android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeUi11Test.kt:24:80 Argument type mismatch: actual type is 'SemanticsPropertyKey<List<CustomAccessibilityAction>>', but 'SemanticsPropertyKey<AccessibilityAction<uninferred T (of fun <T : Function<Boolean>> SemanticsNodeInteraction.performSemanticsAction)>>' was expected.",
+    "e: file:///home/runner/work/hetu/hetu/android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeUi11Test.kt:24:114 Cannot infer type for type parameter 'T'. Specify it explicitly.",
+    "e: file:///home/runner/work/hetu/hetu/android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeUi11Test.kt:25:33 Unresolved reference 'it'.",
+    "e: file:///home/runner/work/hetu/hetu/android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeUi11Test.kt:25:56 Unresolved reference 'action'.",
+    "* What went wrong:"
+  ],
   "totals": {
     "tests": 0,
     "failures": 0,
