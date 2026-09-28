@@ -160,7 +160,7 @@ internal fun HomePullIndicator(state: HomePullState, motion: Boolean, modifier: 
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val color = if (dark) Color(0xFF93C5FD) else Color(0xFF2563EB)
     val title = if (active) "正在同步状态…" else if (state.armed) "松开立即刷新" else "下拉同步状态"
-    Box(modifier.fillMaxWidth().height(state.offsetDp.dp).clip(androidx.compose.foundation.shape.RectangleShape)
+    Box(modifier.fillMaxWidth().height(state.offsetDp.dp).clip(RectangleShape)
         .testTag("home-pull-indicator").semantics {
             stateDescription = title
             this[HomePullOffset] = state.offsetDp
@@ -198,7 +198,7 @@ internal fun HomePullIndicator(state: HomePullState, motion: Boolean, modifier: 
 internal fun HomeSingleLineAddress(raw: String, color: Color, modifier: Modifier = Modifier) {
     val scroll = rememberScrollState()
     LaunchedEffect(raw) { scroll.scrollTo(0) }
-    Text(raw.ifBlank { "—" }, modifier.horizontalScroll(scroll),
+    Text(raw.ifBlank { "—" }, modifier.horizontalScroll(scroll).width(IntrinsicSize.Max),
         color = color, fontFamily = FontFamily.Default, fontWeight = FontWeight.Bold,
         fontSize = 16.sp, lineHeight = 22.sp, letterSpacing = (-.5).sp,
         maxLines = 1, softWrap = false, overflow = TextOverflow.Clip,
@@ -269,6 +269,11 @@ internal fun HomeFeedbackPill(notice: HomeNotice?, motion: Boolean, haze: HazeSt
                 HomeNoticeKind.Error -> Color(0xFFFDA4AF)
                 HomeNoticeKind.Information -> Color(0xFF93C5FD)
             }
+            val glow = if (motion && value.kind == HomeNoticeKind.Success) {
+                val pulse = rememberInfiniteTransition(label = "feedback-glow")
+                pulse.animateFloat(.6f, 1f, infiniteRepeatable(tween(850, easing = FastOutSlowInEasing),
+                    repeatMode = RepeatMode.Reverse), label = "feedback-glow-alpha").value
+            } else 1f
             Row(Modifier.widthIn(max = 320.dp).heightIn(min = 40.dp).clip(CircleShape)
                 .then(if (hardware && blur) Modifier.hazeEffect(haze, HazeMaterials.ultraThin()) {
                     blurRadius = 14.dp; noiseFactor = 0f
@@ -280,7 +285,7 @@ internal fun HomeFeedbackPill(notice: HomeNotice?, motion: Boolean, haze: HazeSt
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Canvas(Modifier.size(12.dp).testTag("home-feedback-dot")) {
-                    drawCircle(dot.copy(alpha = .17f), size.minDimension / 2)
+                    drawCircle(dot.copy(alpha = .17f * glow), size.minDimension / 2)
                     drawCircle(dot, size.minDimension / 3)
                 }
                 Text(value.summary, color = Color.White, fontSize = 12.sp, lineHeight = 18.sp,

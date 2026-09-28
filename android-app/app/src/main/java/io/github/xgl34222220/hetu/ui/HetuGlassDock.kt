@@ -240,7 +240,7 @@ private fun DockItems(
                 val pressed by interaction.collectIsPressedAsState()
                 val weight by animateFloatAsState(if (active) 1.65f else 1f,
                     if (motion) spring(dampingRatio = .88f, stiffness = 420f) else snap(), label = "dock-weight-$index")
-                val scale by animateFloatAsState(if (pressed && motion) .975f else 1f,
+                val scale by animateFloatAsState(if (pressed && motion) .97f else 1f,
                     if (motion) spring(dampingRatio = .82f, stiffness = 550f) else snap(), label = "dock-press-$index")
                 val fill by animateColorAsState(if (active) indicatorColor else Color.Transparent,
                     if (motion) tween(220) else snap(), label = "dock-fill-$index")

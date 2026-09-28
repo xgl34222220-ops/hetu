@@ -36,6 +36,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -119,7 +121,7 @@ internal object CompactHomeFormat {
 private data class HomePalette(val page: Color, val card: Color, val text: Color,
     val muted: Color, val soft: Color, val blue: Color, val red: Color, val line: Color)
 private val LocalHomePalette = staticCompositionLocalOf {
-    HomePalette(Color(0xFFF8FAFC), Color.White, Color(0xFF1E293B), Color(0xFF64748B),
+    HomePalette(Color(0xFFF6F8FD), Color.White, Color(0xFF1E293B), Color(0xFF64748B),
         Color(0xFFF8FAFC), Color(0xFF2563EB), Color(0xFFEF4444), Color(0xFFF1F5F9))
 }
 private val LocalHomeMotion = staticCompositionLocalOf { false }
@@ -219,6 +221,7 @@ internal fun CompactHomeDashboard(
     modifier: Modifier = Modifier,
     motionEnabled: Boolean = true,
     contentInsets: WindowInsets = WindowInsets.safeDrawing,
+    onPullRefresh: () -> Unit = onRefresh,
 ) {
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val light = LocalHomePalette.current
@@ -229,32 +232,26 @@ internal fun CompactHomeDashboard(
     CompositionLocalProvider(LocalHomePalette provides palette, LocalHomeMotion provides motion) {
         val listState = rememberLazyListState()
         val headerHaze = remember { HazeState() }
-        val (elastic, elasticConnection) = rememberHomeElasticity(listState, motion)
-        val collapseDistance = with(LocalDensity.current) { 40.dp.toPx() }
+        val (pull, pullConnection) = rememberHomePull(listState, data.refreshing,
+            !data.busy && data.operation == null, motion, onPullRefresh)
+        val collapseDistance = with(LocalDensity.current) { 30.dp.toPx() }
         val collapse by remember(listState, collapseDistance) { derivedStateOf {
             if (listState.firstVisibleItemIndex > 0) 1f
             else (listState.firstVisibleItemScrollOffset / collapseDistance).coerceIn(0f, 1f)
         } }
         var more by remember { mutableStateOf(false) }
         var feedbackDetails by remember { mutableStateOf<String?>(null) }
-        val snackbar = remember { SnackbarHostState() }
-        LaunchedEffect(data.message, data.busy, data.operation) {
-            if (data.busy || data.operation != null) {
-                snackbar.currentSnackbarData?.dismiss()
-            } else {
-                HomeLifecyclePresentation.feedback(data.message)?.let { summary ->
-                    if (snackbar.showSnackbar(summary, actionLabel = "详情", withDismissAction = true,
-                        duration = SnackbarDuration.Short) == SnackbarResult.ActionPerformed) feedbackDetails = data.message
-                }
-            }
-        }
+        val notice = rememberHomeNotice(data)
+        val density = LocalDensity.current
+        var headerPx by remember(density.density) { mutableIntStateOf(with(density) { 56.dp.roundToPx() }) }
         // The header is a sibling of the scroll viewport, never a lazy item.
         // Insets are applied outside the clipped viewport and consumed exactly once.
         Box(modifier.fillMaxSize().background(palette.page).testTag("home-viewport")) {
         val clearance = LocalHomeDockClearance.current ?: (86.dp + contentInsets.asPaddingValues().calculateBottomPadding())
         Column(Modifier.fillMaxSize().padding(bottom = clearance).windowInsetsPadding(
             contentInsets.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))) {
-            HomeCollapsingHeader(collapse, motion, headerHaze, palette.text, elastic.offset) {
+            HomeCollapsingHeader(collapse, motion, headerHaze, palette.text,
+                modifier = Modifier.zIndex(2f).onSizeChanged { headerPx = it.height }) {
                 HomeIcon(Icons.Rounded.Refresh, "刷新状态", !data.refreshing && !data.busy, data.refreshing,
                     onClick = onRefresh)
                 Box {
@@ -268,29 +265,31 @@ internal fun CompactHomeDashboard(
                     }
                 }
             }
-        BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
+        BoxWithConstraints(Modifier.fillMaxWidth().weight(1f).clipToBounds()) {
         // Short windows reduce spacing, never the user's font size or address content.
         val compact = maxHeight < 710.dp
         CompositionLocalProvider(LocalHomeCompactSpacing provides compact) {
-        LazyColumn(Modifier.fillMaxSize().clipToBounds().nestedScroll(elasticConnection)
+        LazyColumn(Modifier.fillMaxSize().graphicsLayer { translationY = pull.offsetPx }
+            .nestedScroll(pullConnection)
             .hazeSource(headerHaze).testTag("compact-home"), state = listState,
             overscrollEffect = null,
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = if (compact) 2.dp else 4.dp, bottom = 0.dp),
             verticalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 12.dp)) {
-            item("hero") {
-                Box(Modifier.graphicsLayer {
-                    translationY = elastic.offset * .15f
-                    scaleY = 1f + elastic.offset / 2000f
-                }) { HomeHero(data, onToggle, onReload, onRestart, onSettings, onWebUi, onLog) }
-            }
+            item("hero") { HomeHero(data, onToggle, onReload, onRestart, onSettings, onWebUi, onLog) }
             item("latency") { HomeLatency(data, onDelay) }
             item("telemetry") { HomeTelemetryGrid(data, onConnections, onSubscription) }
         }
+        HomePullIndicator(pull, motion, Modifier.align(Alignment.TopCenter))
         }
         }
         }
-        SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding()
-            .padding(start = 16.dp, end = 16.dp, bottom = 96.dp))
+        HomeFeedbackPill(notice.value, motion, headerHaze,
+            Modifier.align(Alignment.TopCenter)
+                .windowInsetsPadding(contentInsets.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+                .padding(top = with(density) { headerPx.toDp() } + 8.dp, start = 16.dp, end = 16.dp)) { raw ->
+            feedbackDetails = raw
+            notice.value = null
+        }
         }
         feedbackDetails?.let { detail -> NativeDetailsSheet("操作详情", { feedbackDetails = null }) {
             androidx.compose.foundation.text.selection.SelectionContainer {
@@ -381,7 +380,13 @@ private fun HomeTelemetryGrid(data: CompactHomeData, connections: () -> Unit, su
     val textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Default, fontWeight = FontWeight.Bold,
         fontSize = 16.sp, lineHeight = 22.sp, letterSpacing = (-.5).sp, fontFeatureSettings = "tnum")
     BoxWithConstraints(Modifier.fillMaxWidth().testTag("home-telemetry-grid")) {
-        val single = maxWidth / density.fontScale < 290.dp
+        // Measure the actual resolved system font and actual IPv4s, not a hard-coded device width.
+        val halfAddressPx = with(density) { ((maxWidth - 12.dp) / 2 - 50.dp).roundToPx() }
+        val ipv4Width = listOf(data.wan, data.lan).filter { !it.contains(':') }.maxOfOrNull {
+            measurer.measure(androidx.compose.ui.text.AnnotatedString(it.ifBlank { "—" }),
+                style = textStyle, softWrap = false, maxLines = 1).size.width
+        } ?: 0
+        val single = maxWidth / density.fontScale < 290.dp || ipv4Width > halfAddressPx
         val cellWidth = if (single) maxWidth else (maxWidth - 12.dp) / 2
         val addressWidth = with(density) { (cellWidth - 28.dp - 22.dp).roundToPx() }.coerceAtLeast(1)
         val regionWidth = with(density) { (cellWidth - 28.dp - 54.dp).roundToPx() }.coerceAtLeast(1)
@@ -392,7 +397,15 @@ private fun HomeTelemetryGrid(data: CompactHomeData, connections: () -> Unit, su
         }
         val line = with(density) { 22.sp.toDp() }
         val heading = maxOf(32.dp, with(density) { 21.sp.toDp() })
-        val first = maxOf(line, measuredHeight(data.wan,addressWidth,textStyle), measuredHeight(data.lan,addressWidth,textStyle))
+        // LineHeight is not necessarily the physical glyph paragraph height with OEM fonts.
+        // Measure the entire unwrapped address; never constrain it to a guessed 22-dp box.
+        val first = maxOf(line, with(density) {
+            listOf(data.wan, data.lan).maxOf { address ->
+                val result = measurer.measure(androidx.compose.ui.text.AnnotatedString(address.ifBlank { "—" }),
+                    style = textStyle, softWrap = false, maxLines = 1)
+                kotlin.math.ceil(result.multiParagraph.height).toInt()
+            }.toDp()
+        })
         val regionStyle = textStyle.copy(fontSize=14.sp,lineHeight=20.sp,letterSpacing=0.sp)
         val anchor = measurer.measure(androidx.compose.ui.text.AnnotatedString("0"),style=textStyle).firstBaseline
         val smallAnchor = measurer.measure(androidx.compose.ui.text.AnnotatedString("0"),style=regionStyle).firstBaseline
@@ -493,12 +506,8 @@ private fun HomeNetwork(data: CompactHomeData, modifier: Modifier) {
                     Row(Modifier.fillMaxWidth().height(LocalHomeGridRows.current.first)) {
                         HomeLabel("IP", Modifier.width(18.dp).alignByBaseline().testTag("home-label-IP"))
                         Spacer(Modifier.width(4.dp))
-                        Text((if (shownLan) data.lan else data.wan).ifBlank { "—" },
-                            Modifier.weight(1f).alignByBaseline().testTag("home-network-ip"), color = p.text,
-                            fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Default, letterSpacing = (-.5).sp,
-                            softWrap = true, overflow = TextOverflow.Clip,
-                            style = LocalTextStyle.current.copy(fontFeatureSettings = "tnum"))
+                        HomeSingleLineAddress(if (shownLan) data.lan else data.wan, p.text,
+                            Modifier.weight(1f).alignByBaseline().testTag("home-network-ip"))
                     }
                     Row(Modifier.fillMaxWidth().height(LocalHomeGridRows.current.second), verticalAlignment = Alignment.Top) {
                         val base = LocalHomeGridRows.current.baseline

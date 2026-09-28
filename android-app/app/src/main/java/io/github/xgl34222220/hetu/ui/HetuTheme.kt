@@ -50,7 +50,7 @@ data class HetuTokens(
 
 val LocalHetuTokens = staticCompositionLocalOf {
     HetuTokens(
-        pageBackground = Color(0xFFF8FAFC),
+        pageBackground = Color(0xFFF6F8FD),
         cardBackground = Color(0xFFFFFFFF),
         elevatedCardBackground = Color(0xFFF1F5F9),
         heroBackground = Color(0xFFEDF4FF),
@@ -157,7 +157,7 @@ fun HetuTheme(content: @Composable () -> Unit) {
         primary = fixedPrimary,
         primaryContainer = Color(0xFFDBEAFE),
         secondary = Color(0xFF2563EB),
-        background = Color(0xFFF8FAFC),
+        background = Color(0xFFF6F8FD),
         surface = Color.White,
         error = Color(0xFFEF4444),
         onBackground = Color(0xFF0F172A),
@@ -170,8 +170,8 @@ fun HetuTheme(content: @Composable () -> Unit) {
         background = if (pureBlack) Color.Black else Color(0xFF121212),
         surface = Color(0xFF1E1E1E),
         error = Color(0xFFF87171),
-        onBackground = Color(0xFFF8FAFC),
-        onSurface = Color(0xFFF8FAFC),
+        onBackground = Color(0xFFF6F8FD),
+        onSurface = Color(0xFFF6F8FD),
     )
 
     val density = LocalDensity.current
@@ -189,7 +189,7 @@ fun HetuTheme(content: @Composable () -> Unit) {
                 cardBackground = Color(0xFF1E1E1E),
                 elevatedCardBackground = Color(0xFF242424),
                 heroBackground = Color(0xFF172338),
-                textPrimary = Color(0xFFF8FAFC),
+                textPrimary = Color(0xFFF6F8FD),
                 textSecondary = Color(0xFF94A3B8),
                 textMuted = Color(0xFF64748B),
                 success = Color(0xFF34D399),
@@ -201,7 +201,7 @@ fun HetuTheme(content: @Composable () -> Unit) {
             )
         } else {
             HetuTokens(
-                pageBackground = Color(0xFFF8FAFC),
+                pageBackground = Color(0xFFF6F8FD),
                 cardBackground = Color(0xFFFFFFFF),
                 elevatedCardBackground = Color(0xFFF1F5F9),
                 heroBackground = Color(0xFFEDF4FF),

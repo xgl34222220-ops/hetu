@@ -43,6 +43,7 @@ internal fun HomeCollapsingHeader(
     haze: HazeState,
     color: Color,
     stretch: Float = 0f,
+    modifier: Modifier = Modifier,
     actions: @Composable RowScope.() -> Unit,
 ) {
     val fraction by animateFloatAsState(collapse.coerceIn(0f, 1f),
@@ -58,7 +59,7 @@ internal fun HomeCollapsingHeader(
     }
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val hardware = LocalView.current.isHardwareAccelerated
-    Box(Modifier.fillMaxWidth().testTag("home-header").semantics {
+    Box(modifier.fillMaxWidth().testTag("home-header").semantics {
         this[HomeHeaderCollapse] = fraction
         stateDescription = if (fraction >= .99f) "折叠标题" else "展开标题"
     }) {

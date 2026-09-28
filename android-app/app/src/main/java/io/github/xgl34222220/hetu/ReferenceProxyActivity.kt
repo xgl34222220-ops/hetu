@@ -587,7 +587,7 @@ private fun RefProxyShell(resumeRevision: Int, requestedStartPage: String?, star
     val shellBackground = if (MaterialTheme.colorScheme.background.luminance() < .5f) {
         LocalHetuTokens.current.pageBackground
     } else {
-        Color(0xFFF8FAFC)
+        Color(0xFFF6F8FD)
     }
     val dockDensity = LocalDensity.current
     val initialDockHeight = 76.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -621,23 +621,7 @@ private fun RefProxyShell(resumeRevision: Int, requestedStartPage: String?, star
                         },
                 ) {
             when (page) {
-                RefProxyPage.Home -> PullToRefreshBox(
-                    isRefreshing = homeRefreshing,
-                    onRefresh = {
-                        if (!homeRefreshing) scope.launch {
-                            homeRefreshing = true
-                            try {
-                                refreshHomeAll()
-                                if (message.isBlank()) message = "全部刷新完成"
-                            } finally {
-                                homeRefreshing = false
-                            }
-                        }
-                    },
-                    modifier = Modifier.fillMaxSize()
-                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
-                        .clipToBounds(),
-                ) {
+                RefProxyPage.Home -> Box(Modifier.fillMaxSize()) {
                     RefHome(
                     state = state,
                     runtime = runtime,
@@ -659,6 +643,17 @@ private fun RefProxyShell(resumeRevision: Int, requestedStartPage: String?, star
                         if (!homeRefreshing) scope.launch {
                             homeRefreshing = true
                             try { refresh() } finally { homeRefreshing = false }
+                        }
+                    },
+                    onPullRefresh = {
+                        if (!homeRefreshing) scope.launch {
+                            homeRefreshing = true
+                            try {
+                                refreshHomeAll()
+                                if (message.isBlank()) message = "全部刷新完成"
+                            } finally {
+                                homeRefreshing = false
+                            }
                         }
                     },
                     onToggle = ::toggle,
@@ -769,6 +764,7 @@ private fun RefHome(
     hazeState: HazeState,
     glassEnabled: Boolean,
     onRefresh: () -> Unit,
+    onPullRefresh: () -> Unit,
     onToggle: () -> Unit,
     onReload: () -> Unit,
     onRestart: () -> Unit,
@@ -799,7 +795,7 @@ private fun RefHome(
             cpu = cpuPercent, connections = if (state.panelReady) state.connections.size else cachedConnections,
             diagnosticLoading = diagnosticLoading,
         ),
-        onRefresh = onRefresh, onToggle = onToggle, onReload = onReload, onRestart = onRestart,
+        onRefresh = onRefresh, onPullRefresh = onPullRefresh, onToggle = onToggle, onReload = onReload, onRestart = onRestart,
         onDelay = onDelay, onWebUi = { HetuWebPanels.openSelected(context) }, onLog = onLog,
         onSubscription = onSubscription, onConnections = onConnections, onSettings = onSettings,
         onDiagnostics = onDiagnostics,

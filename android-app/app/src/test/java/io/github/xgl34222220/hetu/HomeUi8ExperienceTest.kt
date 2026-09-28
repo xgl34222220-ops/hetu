@@ -56,7 +56,9 @@ class HomeUi8ExperienceTest {
     private fun text(tag: String): TextLayoutResult {
         val out = mutableListOf<TextLayoutResult>()
         node(tag).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(out) }
-        return out.single()
+        val result = out.single()
+        if (tag == "home-network-ip") println("ADDRESS_LAYOUT size=${result.size} paragraph=${result.multiParagraph.width}x${result.multiParagraph.height} constraints=${result.layoutInput.constraints} widthOverflow=${result.didOverflowWidth} heightOverflow=${result.didOverflowHeight} exceeded=${result.multiParagraph.didExceedMaxLines} baseline=${result.firstBaseline} lineEnd=${result.getLineEnd(0)}")
+        return result
     }
     private fun pullOffset(): Float = node("home-pull-indicator").fetchSemanticsNode().config[HomePullOffset]
     private fun longPull() = node("compact-home").performTouchInput {
@@ -199,7 +201,8 @@ class HomeUi8ExperienceTest {
     }
     @Test fun realPressScalesToPoint97ThenSpringsBack() {
         rule.setContent { MaterialTheme {
-            Box(Modifier.size(100.dp).testTag("press-target").nativePress(motion = true) { calls += "tap" })
+            // Locate inside the graphics layer so its transformed bounds are measured.
+            Box(Modifier.size(100.dp).nativePress(motion = true) { calls += "tap" }.testTag("press-target"))
         } }
         val initial = node("press-target").fetchSemanticsNode().boundsInRoot.width
         rule.mainClock.autoAdvance = false

@@ -128,7 +128,7 @@ internal fun Modifier.nativePress(enabled: Boolean = true, label: String? = null
     val source = remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val view = LocalView.current
-    val scale by animateFloatAsState(if (enabled && pressed && motion) .965f else 1f,
+    val scale by animateFloatAsState(if (enabled && pressed && motion) .97f else 1f,
         if (!motion) snap() else if (pressed) tween(150, easing = CubicBezierEasing(.2f, 0f, 0f, 1f))
         else spring(dampingRatio = .78f, stiffness = 750f), label = "native-press")
     return graphicsLayer { scaleX = scale; scaleY = scale }
