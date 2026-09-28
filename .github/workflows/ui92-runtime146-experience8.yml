@@ -145,11 +145,19 @@ jobs:
               assert z.testzip() is None
               for name,digest in expected.items(): assert hashlib.sha256(z.read(name)).hexdigest()==digest,name
           def signer(p):
-              return re.search(r'Signer #1 certificate SHA-256 digest: (\S+)',Path(p).read_text()).group(1)
+              # Build-tools 37 prints 'V2 Signer:' rather than the old 'Signer #1'.
+              # Both APKs have already passed apksigner verification. Extract only certificates,
+              # not public-key hashes; fail closed on zero or multiple distinct certificates.
+              fingerprints=set(re.findall(r'(?im)^.*\bcertificate SHA-256 digest:\s*([0-9a-f]{64})\s*$',Path(p).read_text()))
+              assert len(fingerprints)==1, ('Expected one verified certificate fingerprint',p,sorted(fingerprints))
+              return next(iter(fingerprints)).lower()
+          current_signer=signer('integration-evidence/apk-signature.txt')
+          previous_signer=signer('integration-evidence/ui7-signature.txt')
           result=dict(totals,base=base,protected_source_files=len(protected),runtime_payload_entries=len(expected),
               apk_bytes=apk.stat().st_size,apk_sha256=hashlib.sha256(apk.read_bytes()).hexdigest(),
               version='0.4.0-ui92-r146.8',versionCode=1009,device_tested=False,
-              same_signer_as_ui7=signer('integration-evidence/apk-signature.txt')==signer('integration-evidence/ui7-signature.txt'))
+              apk_certificate_sha256=current_signer,ui7_certificate_sha256=previous_signer,
+              same_signer_as_ui7=current_signer==previous_signer)
           Path('integration-evidence/result.json').write_text(json.dumps(result,indent=2))
           Path('integration-evidence/protected-source-paths.json').write_text(json.dumps(protected,indent=2))
           Path('Hetu-UI92-Runtime146-UI8.apk').write_bytes(apk.read_bytes())
@@ -181,7 +189,7 @@ jobs:
           doc+=f"Actions：{os.environ['GITHUB_RUN_ID']}。十组{r['tests']}项检查通过，0失败、0错误、0跳过。\n"
           doc+=f"{r['runtime_payload_entries']}项原146核心资源校验一致；{r['protected_source_files']}个范围外生产文件与UI7字节一致。混合页面文件中的运行函数和其他页面也另做精确比较。\n"
           doc+='新增18项检查覆盖报告中的123.193.18.254、窄屏大字体、高密度、IPv6横滚和详情隔离、非线性阻力、真实长短下拉、反向取消、重复刷新、真实完成、忙碌禁用、30dp吸顶、顶部反馈位置/错误详情和实际按压形变。旧95项全部保留；更新新稿的背景色预期，并把旧顶栏测试明确为下拉与点击各触发一次刷新，两次分别断言，没有删除或跳过检查。\n'
-          doc+='此前三轮未发布：首两轮103/113通过，第三轮104/113通过。保存的段落诊断显示无限宽滚动约束导致段落宽度为2.1474836E9、但实际文字盒仅124px；本轮改为有限固有宽度，保留所有地址溢出断言。失败证据保留在各次Actions中。\n'
+          doc+='此前三轮未发布：首两轮103/113通过，第三轮104/113通过。保存的段落诊断显示无限宽滚动约束导致段落宽度为2.1474836E9、但实际文字盒仅124px；改为有限固有宽度，保留所有地址溢出断言。第四轮36409234584已113/113通过，实际签名验证也通过，但CI仍按旧版Signer #1格式提取证书，遇到V2 Signer格式而报错；本轮只修正证书报告解析后完整重跑，不修改应用与测试。失败证据保留在各次Actions中。\n'
           doc+=f"APK：{r['apk_bytes']}字节；SHA-256：{r['apk_sha256']}。版本{r['version']}，versionCode1009，包名io.github.xgl34222220.hetu。\n与UI7签名相同：{r['same_signer_as_ui7']}。\n"
           doc+='''
           ## 边界
