@@ -1,0 +1,21 @@
+{
+  "run": "https://github.com/xgl34222220-ops/hetu/actions/runs/36423666791",
+  "suites": [],
+  "failures": [],
+  "compile_errors": [
+    "e: file:///home/runner/work/hetu/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/PanelControls11.kt:106:42 Unresolved reference 'title'.",
+    "e: file:///home/runner/work/hetu/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/PanelControls11.kt:109:26 Unresolved reference 'title'.",
+    "e: file:///home/runner/work/hetu/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/PanelControls11.kt:124:20 Cannot access 'val LocalSheetBackdrop: ProvidableCompositionLocal<SheetBackdrop?>': it is private in file.",
+    "e: file:///home/runner/work/hetu/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/PanelControls11.kt:128:28 Cannot access 'class SheetBackdrop : Any': it is private in file.",
+    "e: file:///home/runner/work/hetu/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/PanelControls11.kt:129:40 Cannot access 'class SheetBackdrop : Any': it is private in file.",
+    "e: file:///home/runner/work/hetu/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/PanelControls11.kt:129:52 Cannot access 'class SheetBackdrop : Any': it is private in file.",
+    "e: file:///home/runner/work/hetu/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/PanelStrategy11.kt:63:18 Cannot access 'fun homeMotionAvailable(requested: Boolean): Boolean': it is private in file.",
+    "* What went wrong:"
+  ],
+  "totals": {
+    "tests": 0,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  }
+}
