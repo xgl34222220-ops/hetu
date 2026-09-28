@@ -3,12 +3,15 @@ package io.github.xgl34222220.hetu
 import android.content.SharedPreferences
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalAccessibilityManager
 import androidx.compose.ui.platform.LocalDensity
@@ -68,7 +71,9 @@ private data class BoxProxyPrefs17(
             groupByProvider = p.getBoolean("group_by_provider", false),
             disconnectOnSelect = p.getBoolean("disconnect_on_select", false),
             collapsePrevious = p.getBoolean("collapse_previous_group_on_expand", false),
-            expandInSheet = p.getBoolean("expand_selected_policy_in_bottom_sheet", false),
+            // V18 removes inline accordion expansion entirely. Strategy cards always open
+            // the secondary node surface so a large provider can never push the parent grid.
+            expandInSheet = true,
             groupColumns = p.getInt("group_column_count", 1).coerceIn(1, 3),
             nodeColumns = p.getInt("node_column_count", 1).coerceIn(1, 3),
             groupDensity = p.getString("group_density", "standard").orEmpty().ifBlank { "standard" },
@@ -249,8 +254,10 @@ internal fun BoxProxyExactStrategy17(
     val measureLatest by rememberUpdatedState(measure)
     val refreshLatest by rememberUpdatedState(refresh)
     val fontScale = LocalDensity.current.fontScale
-    val groupColumns = if (fontScale >= 1.45f) 1 else options.groupColumns.coerceIn(1, 3)
-    val nodeColumns = if (fontScale >= 1.45f) 1 else options.nodeColumns.coerceIn(1, 3)
+    // Reference layout is a two-column Bento grid. Keep one-column only as an
+    // accessibility escape hatch for very large font scaling.
+    val groupColumns = if (fontScale >= 1.45f) 1 else 2
+    val nodeColumns = if (fontScale >= 1.45f) 1 else 2
     val allGroups = remember(state.groups) { state.groups.associateBy { it.name } }
     val groups = remember(state.groups, query, state.trafficMode, options) {
         panelGroups11(state.groups, query, state.trafficMode, legacy).map { allGroups.getValue(it.name) }
@@ -414,11 +421,13 @@ internal fun BoxProxyExactStrategy17(
                                         group = group,
                                         selected = current,
                                         delay = delays[current] ?: group.nodes.firstOrNull { it.name == current }?.lastDelay,
+                                        online = group.nodes.count { node ->
+                                            ((delays[node.name] ?: node.lastDelay) ?: 0L) > 0L
+                                        },
                                         compact = options.groupDensity == "compact",
                                         modifier = Modifier.weight(1f).fillMaxHeight(),
                                     ) {
-                                        if (options.expandInSheet) sheetGroup = group.name
-                                        else expanded = panelExpanded11(expanded, group.name, options.collapsePrevious)
+                                        sheetGroup = group.name
                                     }
                                 }
                                 repeat(groupColumns - row.size) { Spacer(Modifier.weight(1f)) }
@@ -521,17 +530,47 @@ internal fun BoxProxyExactStrategy17(
     }
 }
 
+private fun boxProxyFlag17(value: String): String {
+    val name = value.lowercase()
+    return when {
+        listOf("新加坡", "singapore", " sg ", "🇸🇬").any(name::contains) -> "🇸🇬"
+        listOf("日本", "japan", "tokyo", "osaka", " jp ", "🇯🇵").any(name::contains) -> "🇯🇵"
+        listOf("香港", "hong kong", " hk ", "🇭🇰").any(name::contains) -> "🇭🇰"
+        listOf("台湾", "taiwan", "taipei", " tw ", "🇹🇼").any(name::contains) -> "🇹🇼"
+        listOf("韩国", "korea", "seoul", " kr ", "🇰🇷").any(name::contains) -> "🇰🇷"
+        listOf("美国", "united states", "los angeles", "san jose", " us ", "🇺🇸").any(name::contains) -> "🇺🇸"
+        listOf("英国", "united kingdom", "london", " uk ", "🇬🇧").any(name::contains) -> "🇬🇧"
+        listOf("德国", "germany", "frankfurt", " de ", "🇩🇪").any(name::contains) -> "🇩🇪"
+        else -> "◉"
+    }
+}
+
+private fun boxProxyGroupAccent17(group: ProxyGroupUi): Color {
+    val key = (group.name + " " + group.type).lowercase()
+    return when {
+        "urltest" in key || "url-test" in key || "自动" in key -> Color(0xFFFF9F43)
+        "fallback" in key || "故障" in key -> Color(0xFF4ACB86)
+        "youtube" in key -> Color(0xFFFF334B)
+        "google" in key -> Color(0xFF4285F4)
+        "openai" in key || "chatgpt" in key -> Color(0xFF10A37F)
+        "telegram" in key -> Color(0xFF229ED9)
+        else -> Color(0xFF4F8CFF)
+    }
+}
+
 @Composable
 private fun BoxProxyGroupCard17(
     group: ProxyGroupUi,
     selected: String,
     delay: Long?,
+    online: Int,
     compact: Boolean,
     modifier: Modifier,
     onClick: () -> Unit,
 ) {
+    val accent = boxProxyGroupAccent17(group)
     MiuixCard(
-        modifier = modifier.heightIn(min = if (compact) 66.dp else 78.dp)
+        modifier = modifier.heightIn(min = if (compact) 96.dp else 112.dp)
             .testTag("boxproxy17-group:${group.name}"),
         cornerRadius = 16.dp,
         colors = MiuixCardDefaults.defaultColors(),
@@ -539,36 +578,47 @@ private fun BoxProxyGroupCard17(
         onClick = onClick,
     ) {
         Column(
-            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = if (compact) 9.dp else 12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            Modifier.fillMaxWidth().padding(start = 14.dp, top = 13.dp, end = 12.dp, bottom = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.Top) {
                 Text(
                     group.name,
-                    Modifier.weight(1f),
+                    Modifier.weight(1f).padding(top = 2.dp),
                     color = MiuixTheme.colorScheme.onSurfaceContainer,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                ConfiguredGroupIcon(group, Modifier.size(22.dp))
+                Box(
+                    Modifier.size(30.dp).background(accent.copy(alpha = .12f), RoundedCornerShape(10.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    ConfiguredGroupIcon(group, Modifier.size(21.dp))
+                }
             }
             Text(
-                "${group.type} · ${group.nodes.size}",
+                "${group.type.ifBlank { "Selector" }}  ${online}/${group.nodes.size}",
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                fontSize = 10.sp,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
                 maxLines = 1
             )
+            Spacer(Modifier.weight(1f))
             Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(boxProxyFlag17(selected), fontSize = 14.sp)
+                Spacer(Modifier.width(5.dp))
                 Text(
                     selected.ifBlank { "未选择" },
                     Modifier.weight(1f),
                     color = MiuixTheme.colorScheme.onSurfaceSecondary,
                     fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                Spacer(Modifier.width(6.dp))
                 BoxProxyDelay17(delay, false)
             }
         }
@@ -651,19 +701,36 @@ private fun BoxProxyNodeCard17(
 private fun BoxProxyDelay17(value: Long?, testing: Boolean) {
     val text = when {
         testing -> "…"
-        value == null -> "—"
-        value == -1L -> "超时"
-        value <= -2L -> "失败"
+        value == null || value <= 0L -> "--"
         else -> "$value ms"
     }
-    val color = when {
-        value == null || testing -> MiuixTheme.colorScheme.onSurfaceVariantSummary
-        value <= 0L -> MiuixTheme.colorScheme.error
-        value < 150L -> MiuixTheme.colorScheme.primary
-        value < 300L -> MiuixTheme.colorScheme.onTertiaryContainer
-        else -> MiuixTheme.colorScheme.error
+    val foreground: Color
+    val background: Color
+    when {
+        testing || value == null || value <= 0L -> {
+            foreground = Color(0xFF9CA3AF)
+            background = Color(0xFFF3F4F6)
+        }
+        value < 100L -> {
+            foreground = Color(0xFF00B578)
+            background = Color(0xFFE8F8F0)
+        }
+        value < 200L -> {
+            foreground = Color(0xFF1E6FFF)
+            background = Color(0xFFEBF3FF)
+        }
+        else -> {
+            foreground = Color(0xFFFF8F1F)
+            background = Color(0xFFFFF4E6)
+        }
     }
-    Text(text, color = color, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    Box(
+        Modifier.background(background, RoundedCornerShape(999.dp))
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text, color = foreground, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    }
 }
 
 @Composable
@@ -681,7 +748,7 @@ private fun BoxProxyPolicySheet17(
     onTestAll: () -> Unit,
 ) {
     var query by rememberSaveable(group.name) { mutableStateOf("") }
-    val nodeColumns = if (LocalDensity.current.fontScale >= 1.45f) 1 else options.nodeColumns.coerceIn(1, 3)
+    val nodeColumns = if (LocalDensity.current.fontScale >= 1.45f) 1 else 2
     val legacy = options.legacy()
     val nodes = remember(group.nodes, query, options, delays) {
         val filtered = if (query.isBlank()) group.nodes else group.nodes.filter {
@@ -696,11 +763,10 @@ private fun BoxProxyPolicySheet17(
         backgroundColor = MiuixTheme.colorScheme.surface.copy(alpha = .86f),
         sheetMaxWidth = 720.dp,
         onDismissRequest = onDismiss,
-        endAction = {
-            TextButton(onClick = onTestAll, enabled = running) { Text("组测速") }
-        },
+        endAction = {},
     ) {
-        Column(Modifier.fillMaxWidth().fillMaxHeight(.82f)) {
+        Box(Modifier.fillMaxWidth().fillMaxHeight(.82f)) {
+            Column(Modifier.fillMaxSize().padding(bottom = 68.dp)) {
             MiuixSearchBar(
                 inputField = {
                     MiuixInputField(
@@ -760,6 +826,14 @@ private fun BoxProxyPolicySheet17(
                         }
                     }
                 }
+            }
+            MiuixFab(
+                onClick = onTestAll,
+                minWidth = 64.dp,
+                minHeight = 48.dp,
+                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 10.dp),
+            ) {
+                Text("测速", color = MiuixTheme.colorScheme.onPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }
