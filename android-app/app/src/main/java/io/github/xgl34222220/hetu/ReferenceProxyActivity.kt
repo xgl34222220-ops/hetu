@@ -2598,6 +2598,18 @@ private fun RefDelayBadge(value: Long?, testing: Boolean, onClick: (() -> Unit)?
 }
 
 @Composable
+private fun RefOverviewMetricCell18(label: String, value: String, modifier: Modifier) {
+    val t = LocalHetuTokens.current
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, color = t.textPrimary, fontSize = 20.sp, lineHeight = 24.sp,
+            fontWeight = FontWeight.Bold, maxLines = 1)
+        Spacer(Modifier.height(2.dp))
+        Text(label, color = t.textSecondary, fontSize = 11.sp, lineHeight = 15.sp,
+            fontWeight = FontWeight.Medium, maxLines = 1)
+    }
+}
+
+@Composable
 private fun RefOverviewMetricStrip18(state: ProxyComposeState, ruleCount: Int) {
     val t = LocalHetuTokens.current
     Surface(
@@ -2609,33 +2621,11 @@ private fun RefOverviewMetricStrip18(state: ProxyComposeState, ruleCount: Int) {
             Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 13.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            @Composable
-            fun cell(label: String, value: String, modifier: Modifier) {
-                Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        value,
-                        color = t.textPrimary,
-                        fontSize = 20.sp,
-                        lineHeight = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        label,
-                        color = t.textSecondary,
-                        fontSize = 11.sp,
-                        lineHeight = 15.sp,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                    )
-                }
-            }
-            cell("策略", state.groups.size.toString(), Modifier.weight(1f))
+            RefOverviewMetricCell18("策略", state.groups.size.toString(), Modifier.weight(1f))
             Box(Modifier.width(1.dp).height(34.dp).background(t.textMuted.copy(alpha = .14f)))
-            cell("规则", ruleCount.toString(), Modifier.weight(1f))
+            RefOverviewMetricCell18("规则", ruleCount.toString(), Modifier.weight(1f))
             Box(Modifier.width(1.dp).height(34.dp).background(t.textMuted.copy(alpha = .14f)))
-            cell("当前连接", state.connections.size.toString(), Modifier.weight(1f))
+            RefOverviewMetricCell18("当前连接", state.connections.size.toString(), Modifier.weight(1f))
         }
     }
 }
