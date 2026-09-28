@@ -41,6 +41,11 @@ edit(R+'CompactHomeDashboard.kt',
                 kotlin.math.ceil(result.multiParagraph.height).toInt()
             }.toDp()
         })''')
+# Horizontal scroll needs an unbounded viewport measurement, not an infinite text paragraph.
+# Intrinsic width keeps every glyph in the paragraph, while the outer scroll retains the card width.
+edit(R+'HomeExperience8.kt',
+'''    Text(raw.ifBlank { "—" }, modifier.horizontalScroll(scroll),''',
+'''    Text(raw.ifBlank { "—" }, modifier.horizontalScroll(scroll).width(IntrinsicSize.Max),''')
 # The original header test swipes down and then presses Refresh. Now both are real entry points.
 edit(T+'HomeUi5RegressionTest.kt',
 '''        rule.onNodeWithContentDescription("刷新状态").performClick()
