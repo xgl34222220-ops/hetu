@@ -1,16 +1,141 @@
 {
-  "run": "https://github.com/xgl34222220-ops/hetu/actions/runs/36429557553",
-  "suites": [],
-  "failures": [],
+  "run": "https://github.com/xgl34222220-ops/hetu/actions/runs/36430846940",
+  "suites": [
+    {
+      "name": "io.github.xgl34222220.hetu.HomeUi7InteractionTest",
+      "tests": "12",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.ProxyLatencyRegressionTest",
+      "tests": "16",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.Runtime146ContractTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.HomeUi5RegressionTest",
+      "tests": "10",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.NativeDockUi4Test",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.HomeUi6RegressionTest",
+      "tests": "11",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.PanelUi11Test",
+      "tests": "21",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.NodeSelectionContinuityTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.HomeUi9BentoTest",
+      "tests": "18",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.MotionUi12Test",
+      "tests": "11",
+      "failures": "1",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.CompactHomeDashboardTest",
+      "tests": "29",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.HomeUi11Test",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.PanelModel11Test",
+      "tests": "12",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.HomeUi8ExperienceTest",
+      "tests": "18",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.MotionModel12Test",
+      "tests": "10",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.Ui92IntegrationTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.HomeUi10GridTest",
+      "tests": "14",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    }
+  ],
+  "failures": [
+    {
+      "suite": "io.github.xgl34222220.hetu.MotionUi12Test",
+      "test": "shortSlowDragReturnsToSameAnchor",
+      "message": "java.lang.AssertionError: Assert failed: The component with TestTag = 'native-details-sheet' is not displayed!",
+      "stack": "java.lang.AssertionError: Assert failed: The component with TestTag = 'native-details-sheet' is not displayed!\n\tat androidx.compose.ui.test.AssertionsKt.assertIsDisplayed(Assertions.kt:34)\n\tat io.github.xgl34222220.hetu.MotionUi12Test.shortSlowDragReturnsToSameAnchor(MotionUi12Test.kt:90)\n\tat java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)\n\tat org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)\n\tat org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)\n\tat org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)\n\tat org.junit.internal.runners.statements.RunBefores.evaluate(RunBefores.java:26)\n\tat androidx.compose.ui.test.junit4.AndroidComposeTestRule$apply$testWithDisposal$1.evaluate(AndroidComposeTestRule.android.kt:426)\n\tat org.junit.rules.ExternalResource$1.evaluate(ExternalResource.java:54)\n\tat androidx.compose.ui.test.junit4.AndroidComposeTestRule$apply$1$evaluate$1.invokeSuspend(AndroidComposeTestRule.android.kt:448)\n\tat androidx.compose.ui.test.junit4.AndroidComposeTestRule$apply$1$evaluate$1.invoke(AndroidComposeTestRule.android.kt)\n\tat androidx.compose.ui.test.junit4.AndroidComposeTestRule$apply$1$evaluate$1.invoke(AndroidComposeTestRule.android.kt)\n\tat androidx.compose.ui.test.AndroidComposeUiTestEnvironment$runTest$1$1$1$1$1.invokeSuspend(ComposeUiTest.android.kt:689)\n\tat androidx.compose.ui.test.AndroidComposeUiTestEnvironment$runTest$1$1$1$1$1.invoke(ComposeUiTest.android.kt)\n\tat androidx.compose.ui.test.AndroidComposeUiTestEnvironment$runTest$1$1$1$1$1.invoke(ComposeUiTest.android.kt)\n\tat androidx.compose.ui.test.IdlingStrategy.withStrategy$suspendImpl(IdlingStrategy.android.kt:55)\n\tat androidx.compose.ui.test.IdlingStrategy.withStrategy(IdlingStrategy.android.kt)\n\tat androidx.compose.ui.test.AndroidComposeUiTestEnvironment$runTest$1$1.invokeSuspend(ComposeUiTest.android.kt:686)\n\tat androidx.compose.ui.test.AndroidComposeUiTestEnvironment$runTest$1$1.invoke(Compo"
+    }
+  ],
   "compile_errors": [
-    "e: file:///home/runner/work/hetu/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/MotionMaterials12.kt:1:100 Cannot access 'annotation class ExperimentalMaterial3ExpressiveApi : Annotation': it is internal in file.",
-    "e: file:///home/runner/work/hetu/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/MotionMaterials12.kt:50:67 Cannot access 'interface MotionScheme : Any': it is internal in file.",
-    "e: file:///home/runner/work/hetu/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/MotionMaterials12.kt:70:5 Cannot access 'fun MaterialExpressiveTheme(colorScheme: ColorScheme? = ..., motionScheme: MotionScheme? = ..., shapes: Shapes? = ..., typography: Typography? = ..., content: ComposableFunction0<Unit>): Unit': it is internal in file.",
+    "    java.lang.AssertionError at MotionUi12Test.kt:90",
     "* What went wrong:"
   ],
   "totals": {
-    "tests": 0,
-    "failures": 0,
+    "tests": 202,
+    "failures": 1,
     "errors": 0,
     "skipped": 0
   }
