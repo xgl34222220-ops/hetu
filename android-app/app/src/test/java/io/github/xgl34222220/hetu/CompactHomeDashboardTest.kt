@@ -7,6 +7,12 @@ import androidx.activity.ComponentActivity
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
@@ -39,12 +45,12 @@ class CompactHomeDashboardTest {
         used = 201863462666, total = 743491825336, memory = 97517568, cpu = 100f, connections = 12,
     )
 
-    private fun render(data: CompactHomeData = fixture(), dark: Boolean = false, scale: Float = 1f) {
+    private fun render(data: CompactHomeData = fixture(), dark: Boolean = false, scale: Float = 1f, provider: (() -> CompactHomeData)? = null) {
         rule.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density, scale)) {
                 MaterialTheme(colorScheme = if (dark) darkColorScheme(background = Color(0xFF121212)) else lightColorScheme()) {
-                    CompactHomeDashboard(data, { calls += "refresh" }, { calls += "toggle" },
+                    CompactHomeDashboard(provider?.invoke() ?: data, { calls += "refresh" }, { calls += "toggle" },
                         { calls += "reload" }, { calls += "restart" }, { calls += "delay" },
                         { calls += "webui" }, { calls += "log" }, { calls += "subscription" },
                         { calls += "connections" }, { calls += "settings" }, { calls += "diagnostics" },
@@ -129,10 +135,10 @@ class CompactHomeDashboardTest {
         assertTrue(cf < google && google < baidu)
     }
 
-    @Test fun wanIsDefaultAndInlineSwitchShowsLan() {
+    @Test fun wanIsDefaultAndWholeCardShowsLan() {
         render()
         rule.onNodeWithText("WAN").assertIsDisplayed()
-        rule.onNodeWithTag("home-network-switch").performClick()
+        rule.onNodeWithTag("home-network").performClick()
         rule.waitForIdle()
         rule.onNodeWithText("LAN").assertIsDisplayed()
         rule.onNodeWithText("192.168.1.8").assertIsDisplayed()
@@ -218,4 +224,145 @@ class CompactHomeDashboardTest {
         rule.onNodeWithTag("home-reload").assertDoesNotExist()
         rule.onNodeWithTag("home-restart").assertDoesNotExist()
     }
+
+    private fun assertNetworkMode(mode: String) {
+        rule.onNodeWithTag("home-network", useUnmergedTree = true)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, mode))
+    }
+    private fun revealGrid() {
+        rule.onNodeWithTag("compact-home").performScrollToNode(hasTestTag("home-resources"))
+    }
+    private fun progress(tag: String): Float = rule.onNodeWithTag(tag, useUnmergedTree = true)
+        .fetchSemanticsNode().config[SemanticsProperties.ProgressBarRangeInfo].current
+
+    @Test fun wholeCardBlankSpaceTogglesExactlyOnce() {
+        render()
+        assertNetworkMode("WAN")
+        rule.onNodeWithTag("home-network").performTouchInput { click(Offset(centerX, height - 7f)) }
+        assertNetworkMode("LAN")
+        rule.onNodeWithTag("home-network").performTouchInput { click(Offset(centerX, height - 7f)) }
+        assertNetworkMode("WAN")
+        assertTrue("Network display changes must not call proxy operations", calls.isEmpty())
+    }
+
+    @Test fun detailsPhysicalTouchDoesNotBubbleToNetworkCard() {
+        render()
+        repeat(2) { index ->
+            val before = if (index == 0) "WAN" else "LAN"
+            assertNetworkMode(before)
+            rule.onNodeWithTag("home-network-details").performTouchInput { click() }
+            rule.onNodeWithTag("native-details-sheet").assertIsDisplayed()
+            rule.onNodeWithTag("sheet-confirm").performClick()
+            rule.waitForIdle()
+            assertNetworkMode(before)
+            rule.onNodeWithTag("home-network").performClick()
+        }
+        assertTrue(calls.isEmpty())
+    }
+
+    @Test fun titleAndIpTouchesUseTheSingleParentToggle() {
+        render()
+        rule.onNodeWithTag("home-network-switch", useUnmergedTree = true).performTouchInput { click(Offset(12f, centerY)) }
+        assertNetworkMode("LAN")
+        rule.onNodeWithTag("home-network-ip", useUnmergedTree = true).performTouchInput { click() }
+        assertNetworkMode("WAN")
+        rule.onNodeWithTag("native-details-sheet").assertDoesNotExist()
+        assertTrue(calls.isEmpty())
+    }
+
+    @Test fun horizontalSwipesKeepDirectionAndDoNotOpenDetails() {
+        render()
+        rule.onNodeWithTag("home-network").performTouchInput { swipeLeft() }
+        assertNetworkMode("LAN")
+        rule.onNodeWithTag("home-network").performTouchInput { swipeRight() }
+        assertNetworkMode("WAN")
+        rule.onNodeWithTag("native-details-sheet").assertDoesNotExist()
+        assertTrue(calls.isEmpty())
+    }
+
+    @Test fun verticalScrollAcrossNetworkDoesNotToggleOrOpenDetails() {
+        render()
+        rule.onNodeWithTag("home-network").performTouchInput { swipeUp() }
+        assertNetworkMode("WAN")
+        rule.onNodeWithTag("native-details-sheet").assertDoesNotExist()
+        assertTrue(calls.isEmpty())
+    }
+
+    @Test fun subscriptionBarUsesActualUsageAndUpdatesWithItsInput() {
+        val live = mutableStateOf(fixture().copy(used = 25L, total = 100L))
+        render(provider = { live.value })
+        revealGrid()
+        assertEquals(.25f, progress("home-subscription-bar"), .0001f)
+        rule.onNodeWithText("剩余 75%", useUnmergedTree = true).assertIsDisplayed()
+        rule.runOnIdle { live.value = live.value.copy(used = 60L) }
+        assertEquals(.60f, progress("home-subscription-bar"), .0001f)
+        rule.onNodeWithText("剩余 40%", useUnmergedTree = true).assertIsDisplayed()
+        snapshot("grid-usage-rebound")
+    }
+
+    @Test fun unknownAndOverQuotaSubscriptionsHaveTruthfulBoundedTracks() {
+        assertNull(CompactHomeFormat.usedFraction(12L, 0L))
+        assertNull(CompactHomeFormat.usedFraction(12L, -1L))
+        assertEquals(0f, CompactHomeFormat.usedFraction(-1L, 100L)!!, 0f)
+        assertEquals(1f, CompactHomeFormat.usedFraction(Long.MAX_VALUE, 1L)!!, 0f)
+        val live = mutableStateOf(fixture().copy(total = 0L, cpu = Float.NaN))
+        render(provider = { live.value })
+        revealGrid()
+        for (tag in listOf("home-subscription-bar", "home-cpu-bar")) {
+            val config = rule.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().config
+            assertFalse("Unknown data is not a real zero-percent measurement", config.contains(SemanticsProperties.ProgressBarRangeInfo))
+        }
+        rule.onNodeWithText("剩余", substring = true).assertDoesNotExist()
+        snapshot("grid-unknown")
+        rule.runOnIdle { live.value = live.value.copy(used = 200L, total = 100L) }
+        assertEquals(1f, progress("home-subscription-bar"), 0f)
+        rule.onNodeWithText("剩余 0%", useUnmergedTree = true).assertIsDisplayed()
+    }
+
+    @Test fun compactGridPairsAndBottomBarsAlignAtFourteenDpInsets() {
+        render()
+        revealGrid()
+        val sub = rule.onNodeWithTag("home-subscription").fetchSemanticsNode().boundsInRoot
+        val resource = rule.onNodeWithTag("home-resources").fetchSemanticsNode().boundsInRoot
+        val subBar = rule.onNodeWithTag("home-subscription-bar", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val cpuBar = rule.onNodeWithTag("home-cpu-bar", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertEquals(sub.height, resource.height, 1f)
+        assertEquals(sub.top, resource.top, 1f)
+        assertEquals(10f, resource.left - sub.right, 1f)
+        assertEquals(14f, subBar.left - sub.left, 1f)
+        assertEquals(14f, sub.right - subBar.right, 1f)
+        assertEquals(subBar.bottom, cpuBar.bottom, 1f)
+        assertEquals(subBar.width, cpuBar.width, 1f)
+        rule.onNodeWithTag("home-subscription-bar", useUnmergedTree = true).assertHeightIsEqualTo(6.dp)
+        rule.onNodeWithTag("home-cpu-bar", useUnmergedTree = true).assertHeightIsEqualTo(6.dp)
+        snapshot("grid-aligned")
+    }
+
+    @Test fun metricTextIsSixteenSpWithSmallerSeparateUnits() {
+        render()
+        revealGrid()
+        for (tag in listOf("home-value-上行", "home-value-下行", "home-value-已用", "home-value-总量", "home-value-内存")) {
+            val layouts = mutableListOf<TextLayoutResult>()
+            rule.onNodeWithTag(tag, useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+            assertTrue(layouts.isNotEmpty())
+            assertEquals(16.sp, layouts.first().layoutInput.style.fontSize)
+            assertTrue("Units must remain smaller than data", layouts.first().layoutInput.text.spanStyles.any { it.item.fontSize == 11.sp })
+        }
+    }
+
+    @Test fun largeFontRetainsFullIpv6InDetailsAndUsesOneColumn() {
+        val ip = "2001:db8:1234:5678:90ab:cdef:1234:5678"
+        render(fixture().copy(wan = ip, region = "测试用的很长的地区名称"), scale = 1.6f)
+        rule.onNodeWithTag("compact-home").performScrollToNode(hasTestTag("home-network"))
+        rule.onNodeWithTag("home-network-details").performTouchInput { click() }
+        rule.onNodeWithText("IPv6").assertIsDisplayed()
+        rule.onAllNodesWithText(ip, useUnmergedTree = true).onLast().assertIsDisplayed()
+        snapshot("network-details-large-font")
+        rule.onNodeWithTag("sheet-confirm").performClick()
+        rule.waitForIdle()
+        revealGrid()
+        rule.onNodeWithTag("home-cpu-bar", useUnmergedTree = true).assertIsDisplayed()
+        snapshot("grid-large-font")
+    }
+
 }

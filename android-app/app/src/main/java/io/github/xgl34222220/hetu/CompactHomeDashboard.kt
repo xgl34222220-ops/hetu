@@ -6,12 +6,13 @@ import android.net.Uri
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -86,6 +87,9 @@ internal object CompactHomeFormat {
         }.thenBy { targets.indexOf(it) })
     fun remaining(used: Long, total: Long): Int? = if (total <= 0) null else
         ((1.0 - used.coerceAtLeast(0).toDouble() / total) * 100).toInt().coerceIn(0, 100)
+    /** Unknown totals have no determinate progress; ratios never overflow Long arithmetic. */
+    fun usedFraction(used: Long, total: Long): Float? = if (total <= 0L) null else
+        (used.coerceAtLeast(0L).toDouble() / total.toDouble()).coerceIn(0.0, 1.0).toFloat()
     fun bytes(value: Long): String {
         if (value < 0) return "—"
         val units = arrayOf("B", "KB", "MB", "GB", "TB", "PB", "EB")
@@ -136,11 +140,12 @@ private fun Modifier.homeClick(enabled: Boolean = true, label: String? = null, o
 
 @Composable
 private fun HomeCard(modifier: Modifier = Modifier, onClick: (() -> Unit)? = null,
-    enabled: Boolean = true, content: @Composable BoxScope.() -> Unit) {
+    enabled: Boolean = true, clickLabel: String? = null, content: @Composable BoxScope.() -> Unit) {
     val p = LocalHomePalette.current
-    val shape = RoundedCornerShape(24.dp)
-    val interactive = if (onClick == null) modifier else modifier.homeClick(enabled, onClick = onClick)
-    Box(interactive.diffuseCardShadow(shape).clip(shape).background(p.card), content = content)
+    val shape = RoundedCornerShape(20.dp)
+    val interactive = if (onClick == null) modifier else modifier.homeClick(enabled, clickLabel, onClick)
+    Box(interactive.diffuseCardShadow(shape).clip(shape).background(p.card),
+        propagateMinConstraints = true, content = content)
 }
 
 @Composable
@@ -151,7 +156,7 @@ private fun HomeLabel(value: String, modifier: Modifier = Modifier) {
 
 @Composable
 private fun HomeNumber(value: String, modifier: Modifier = Modifier, color: Color = LocalHomePalette.current.text,
-    size: Int = 14, align: TextAlign = TextAlign.End) {
+    size: Int = 16, align: TextAlign = TextAlign.End) {
     val split = value.lastIndexOf(' ')
     val annotated = buildAnnotatedString {
         if (split > 0) {
@@ -223,7 +228,7 @@ internal fun CompactHomeDashboard(
             .testTag("compact-home"), contentPadding = PaddingValues(
                 start = 16.dp, end = 16.dp, top = 8.dp,
                 bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 94.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            verticalArrangement = Arrangement.spacedBy(10.dp)) {
             item("title") {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text("河图", Modifier.weight(1f), color = palette.text, fontSize = 27.sp,
@@ -244,7 +249,7 @@ internal fun CompactHomeDashboard(
             }
             item("hero") { HomeHero(data, onToggle, onReload, onRestart, onSettings) }
             item("shortcuts") {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     HomeShortcut("WebUI", "Web 界面", Modifier.weight(1f).testTag("home-webui"), onWebUi)
                     HomeShortcut("日志", "查看", Modifier.weight(1f).testTag("home-log"), onLog)
                 }
@@ -278,8 +283,8 @@ private fun HomeHero(data: CompactHomeData, toggle: () -> Unit, reload: () -> Un
 @Composable
 private fun HomeShortcut(title: String, subtitle: String, modifier: Modifier, click: () -> Unit) {
     HomeCard(modifier, click) {
-        Column(Modifier.fillMaxWidth().heightIn(min = 72.dp).padding(16.dp), verticalArrangement = Arrangement.Center) {
-            Text(title, color = LocalHomePalette.current.text, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        Column(Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(14.dp), verticalArrangement = Arrangement.Center) {
+            Text(title, color = LocalHomePalette.current.text, fontSize = 15.sp, fontWeight = FontWeight.Bold)
             HomeLabel(subtitle)
         }
     }
@@ -292,24 +297,20 @@ private fun HomeLatency(data: CompactHomeData, refresh: () -> Unit) {
     var ascending by rememberSaveable { mutableStateOf(false) }
     val names = CompactHomeFormat.ordered(data.delays, ascending, data.latencyTargets)
     HomeCard(Modifier.fillMaxWidth().testTag("home-latency")) {
-        Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
+        Column(Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, bottom = 14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("延迟", Modifier.weight(1f), color = p.text, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Text("延迟", Modifier.weight(1f), color = p.text, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 HomeIcon(Icons.Rounded.Sort, if (ascending) "恢复站点顺序" else "按延迟升序", !data.testing,
                     modifier = Modifier.testTag("home-latency-sort"), onClick = { ascending = !ascending })
                 HomeIcon(Icons.Rounded.Refresh, if (data.testing) "正在测量延迟" else "刷新延迟", data.running && !data.testing,
                     data.testing, Modifier.testTag("home-latency-refresh"), refresh)
             }
-            val pulse = if (data.testing && motion) {
-                val transition = rememberInfiniteTransition(label = "latency-pulse")
-                transition.animateFloat(.35f, 1f, infiniteRepeatable(tween(600), RepeatMode.Reverse), label = "pulse").value
-            } else 1f
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 names.forEachIndexed { index, name ->
                     if (index > 0) Box(Modifier.width(1.dp).height(34.dp).background(p.line))
                     key(name) {
                         Column(Modifier.weight(1f).testTag("latency-$name"), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(name, color = p.muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(name, color = p.muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             val value = data.delays[name]
                             val text = when { data.testing -> "···"; value == null -> "—"; value == -1L -> "超时"; value <= 0 -> "失败"; else -> "$value ms" }
                             val tint = when { value == null || data.testing -> p.muted; value <= 0 || value >= 1000 -> p.red
@@ -319,7 +320,7 @@ private fun HomeLatency(data: CompactHomeData, refresh: () -> Unit) {
                                     .togetherWith(fadeOut(tween(if (motion) 100 else 0)))
                             }, label = "latency-result-$name") { shown ->
                                 if (shown == "···") LoadingWaveDots(motion, p.blue, Modifier.padding(top = 4.dp))
-                                else HomeNumber(shown, Modifier.padding(top = 4.dp), tint, 21, TextAlign.Center)
+                                else HomeNumber(shown, Modifier.padding(top = 4.dp), tint, 18, TextAlign.Center)
                             }
                         }
                     }
@@ -329,51 +330,91 @@ private fun HomeLatency(data: CompactHomeData, refresh: () -> Unit) {
     }
 }
 
+/** Equal-height pairs without fixed text heights. Large system fonts use one column. */
 @Composable
 private fun HomePair(left: @Composable (Modifier) -> Unit, right: @Composable (Modifier) -> Unit) {
     val scale = LocalDensity.current.fontScale
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         if (maxWidth / scale < 290.dp) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { left(Modifier.fillMaxWidth()); right(Modifier.fillMaxWidth()) }
-        } else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            left(Modifier.weight(1f)); right(Modifier.weight(1f))
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                left(Modifier.fillMaxWidth()); right(Modifier.fillMaxWidth())
+            }
+        } else Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            left(Modifier.weight(1f).fillMaxHeight())
+            right(Modifier.weight(1f).fillMaxHeight())
         }
+    }
+}
+
+@Composable
+private fun HomeDataHeading(title: String, modifier: Modifier = Modifier,
+    trailing: (@Composable () -> Unit)? = null) {
+    val p = LocalHomePalette.current
+    Row(modifier.fillMaxWidth().heightIn(min = 32.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(title, Modifier.weight(1f), color = p.text, fontSize = 15.sp, lineHeight = 21.sp,
+            fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        trailing?.invoke()
     }
 }
 
 @Composable
 private fun HomeNetwork(data: CompactHomeData, modifier: Modifier) {
     val p = LocalHomePalette.current
-    val pager = rememberPagerState { 2 }
-    val scope = rememberCoroutineScope()
     val motion = LocalHomeMotion.current
+    var isLan by rememberSaveable { mutableStateOf(false) }
     var details by remember { mutableStateOf(false) }
-    HomeCard(modifier.testTag("home-network")) {
-        Column(Modifier.fillMaxWidth().heightIn(min = 132.dp).padding(horizontal = 14.dp, vertical = 8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Row(Modifier.weight(1f).heightIn(min = 48.dp).testTag("home-network-switch").homeClick(label = "切换 WAN 和 LAN") {
-                    scope.launch { if (motion) pager.animateScrollToPage(1 - pager.currentPage) else pager.scrollToPage(1 - pager.currentPage) }
-                }, verticalAlignment = Alignment.CenterVertically) {
-                    HomeLabel(if (pager.currentPage == 0) "WAN" else "LAN")
-                    Icon(Icons.Rounded.UnfoldMore, null, Modifier.size(14.dp), tint = p.muted)
-                }
-                Box(Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp).homeClick(onClick = { details = true })
-                    .testTag("home-network-details"), contentAlignment = Alignment.Center) {
-                    Text("详情", Modifier.background(p.blue.copy(alpha = .07f), RoundedCornerShape(8.dp))
-                        .padding(horizontal = 7.dp, vertical = 3.dp), color = p.blue, fontSize = 11.sp)
+    var dragDistance by remember { mutableFloatStateOf(0f) }
+    val threshold = with(LocalDensity.current) { 36.dp.toPx() }
+    // Native clickable consumes the child Details click; no parent Initial-pass interception.
+    // A horizontal drag cancels the press, while vertical drags remain owned by LazyColumn.
+    HomeCard(modifier.testTag("home-network").semantics { stateDescription = if (isLan) "LAN" else "WAN" }
+        .draggable(state = rememberDraggableState { dragDistance += it }, orientation = Orientation.Horizontal,
+            onDragStarted = { dragDistance = 0f }, onDragStopped = {
+                if (dragDistance < -threshold) isLan = true
+                else if (dragDistance > threshold) isLan = false
+                dragDistance = 0f
+            }), onClick = { isLan = !isLan }, clickLabel = "切换 WAN 和 LAN") {
+        Column(Modifier.fillMaxSize().padding(14.dp), verticalArrangement = Arrangement.SpaceBetween) {
+            HomeDataHeading(if (isLan) "LAN" else "WAN", Modifier.testTag("home-network-switch")) {
+                Box(Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                    .testTag("home-network-details").homeClick(label = "网络详情", onClick = { details = true }),
+                    contentAlignment = Alignment.Center) {
+                    Text("详情", Modifier.clip(CircleShape).background(p.blue.copy(alpha = .07f))
+                        .padding(horizontal = 9.dp, vertical = 3.dp), color = p.blue,
+                        fontSize = 11.sp, lineHeight = 16.sp, fontWeight = FontWeight.Bold)
                 }
             }
-            HorizontalPager(pager, Modifier.fillMaxWidth().testTag("home-network-pager")) { page ->
-                Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-                    Text((if (page == 0) data.wan else data.lan).ifBlank { "—" }, color = p.text,
-                        fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Bold,
-                        style = LocalTextStyle.current.copy(fontFeatureSettings = "tnum"),
-                        fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(if (page == 0) listOf(CompactHomeFormat.flag(data.countryCode), data.region)
-                        .filter { it.isNotBlank() && it != "—" }.joinToString(" ").ifBlank { "地区未知" }
-                        else "${data.lanInterface.ifBlank { "本地网络" }} · ${data.connections} 连接",
-                        Modifier.padding(top = 4.dp), color = p.muted, fontSize = 11.sp, lineHeight = 16.sp,
-                        maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Crossfade(targetState = isLan, animationSpec = tween(if (motion) 140 else 0),
+                modifier = Modifier.fillMaxWidth().testTag("home-network-body"), label = "network-mode") { lan ->
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        HomeLabel("IP", Modifier.width(26.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text((if (lan) data.lan else data.wan).ifBlank { "—" },
+                            Modifier.weight(1f).testTag("home-network-ip"), color = p.text,
+                            fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace, letterSpacing = (-.5).sp,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            style = LocalTextStyle.current.copy(fontFeatureSettings = "tnum"))
+                    }
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        HomeLabel(if (lan) "接口" else "地区", Modifier.width(26.dp))
+                        Spacer(Modifier.width(4.dp))
+                        val flag = if (lan) "" else CompactHomeFormat.flag(data.countryCode)
+                        if (flag.isNotBlank()) {
+                            Box(Modifier.clip(RoundedCornerShape(4.dp)).background(p.blue.copy(alpha = .06f))
+                                .padding(horizontal = 2.dp), contentAlignment = Alignment.Center) {
+                                Text(flag, fontSize = 13.sp, lineHeight = 18.sp)
+                            }
+                            Spacer(Modifier.width(4.dp))
+                        }
+                        Text((if (lan) data.lanInterface else data.region)
+                            .takeUnless { it.isBlank() || it == "—" } ?: if (lan) "接口未知" else "地区未知",
+                            Modifier.weight(1f), color = p.text.copy(alpha = .82f),
+                            fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
                 }
             }
         }
@@ -391,10 +432,10 @@ private fun animatedMetric(value: Long): Long {
 
 @Composable
 private fun MetricLine(label: String, value: String, color: Color = LocalHomePalette.current.text) {
-    Row(Modifier.fillMaxWidth().padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-        HomeLabel(label)
+    Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+        HomeLabel(label, Modifier.alignByBaseline())
         Spacer(Modifier.width(6.dp))
-        HomeNumber(value, Modifier.weight(1f), color)
+        HomeNumber(value, Modifier.weight(1f).alignByBaseline().testTag("home-value-$label"), color)
     }
 }
 
@@ -403,12 +444,35 @@ private fun HomeSpeed(data: CompactHomeData, modifier: Modifier, click: () -> Un
     val up = animatedMetric(data.up)
     val down = animatedMetric(data.down)
     HomeCard(modifier.testTag("home-speed"), click) {
-        Column(Modifier.fillMaxWidth().heightIn(min = 132.dp).padding(16.dp)) {
-            HomeLabel("网速")
-            Spacer(Modifier.height(7.dp))
-            MetricLine("上行", if (data.running) CompactHomeFormat.bytes(up) + "/s" else "—")
-            MetricLine("下行", if (data.running) CompactHomeFormat.bytes(down) + "/s" else "—")
+        Column(Modifier.fillMaxSize().padding(14.dp), verticalArrangement = Arrangement.SpaceBetween) {
+            HomeDataHeading("网速", Modifier.heightIn(min = 48.dp))
+            Column {
+                MetricLine("上行", if (data.running) CompactHomeFormat.bytes(up) + "/s" else "—")
+                MetricLine("下行", if (data.running) CompactHomeFormat.bytes(down) + "/s" else "—")
+            }
         }
+    }
+}
+
+/** Common six-dp tracks align the subscription and resource cards, including unknown data. */
+@Composable
+private fun HomeUsageBar(fraction: Float?, tag: String, description: String,
+    tint: Color = LocalHomePalette.current.blue) {
+    val p = LocalHomePalette.current
+    val motion = LocalHomeMotion.current
+    val target = fraction?.coerceIn(0f, 1f)
+    val progress by animateFloatAsState(target ?: 0f,
+        if (motion) tween(500, easing = FastOutSlowInEasing) else snap(), label = "$tag-progress")
+    val color by animateColorAsState(tint, if (motion) tween(300) else snap(), label = "$tag-color")
+    Canvas(Modifier.fillMaxWidth().padding(top = 8.dp).height(6.dp).clip(CircleShape)
+        .testTag(tag).semantics {
+            if (target != null) progressBarRangeInfo = ProgressBarRangeInfo(target, 0f..1f)
+            stateDescription = description
+        }) {
+        drawRoundRect(p.line, cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height))
+        if (target != null && progress > 0f) drawRoundRect(color,
+            size = androidx.compose.ui.geometry.Size(size.width * progress, size.height),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height))
     }
 }
 
@@ -416,16 +480,22 @@ private fun HomeSpeed(data: CompactHomeData, modifier: Modifier, click: () -> Un
 private fun HomeSubscription(data: CompactHomeData, modifier: Modifier, click: () -> Unit) {
     val p = LocalHomePalette.current
     val remaining = CompactHomeFormat.remaining(data.used, data.total)
+    val fraction = CompactHomeFormat.usedFraction(data.used, data.total)
     HomeCard(modifier.testTag("home-subscription"), click) {
-        Column(Modifier.fillMaxWidth().heightIn(min = 132.dp).padding(16.dp)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                HomeLabel("订阅", Modifier.weight(1f))
-                if (remaining != null) Text("剩余 $remaining%", Modifier.background(p.blue.copy(alpha = .07f), RoundedCornerShape(6.dp))
-                    .padding(horizontal = 5.dp, vertical = 2.dp), color = p.blue, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+        Column(Modifier.fillMaxSize().padding(14.dp), verticalArrangement = Arrangement.SpaceBetween) {
+            HomeDataHeading("订阅") {
+                if (remaining != null) Text("剩余 $remaining%",
+                    Modifier.clip(CircleShape).background(p.blue.copy(alpha = .07f))
+                        .padding(horizontal = 6.dp, vertical = 3.dp),
+                    color = p.blue, fontSize = 11.sp, lineHeight = 16.sp,
+                    fontWeight = FontWeight.Bold, maxLines = 1)
             }
-            Spacer(Modifier.height(7.dp))
-            MetricLine("已用", if (data.total > 0) CompactHomeFormat.bytes(data.used) else "—")
-            MetricLine("总量", if (data.total > 0) CompactHomeFormat.bytes(data.total) else "—")
+            Column {
+                MetricLine("已用", if (data.total > 0) CompactHomeFormat.bytes(data.used.coerceAtLeast(0)) else "—")
+                MetricLine("总量", if (data.total > 0) CompactHomeFormat.bytes(data.total) else "—")
+                HomeUsageBar(fraction, "home-subscription-bar",
+                    if (fraction == null) "订阅总量未知" else "流量已用 ${String.format(Locale.US, "%.1f", fraction * 100)}%")
+            }
         }
     }
 }
@@ -435,29 +505,19 @@ private fun HomeResources(data: CompactHomeData, modifier: Modifier) {
     val p = LocalHomePalette.current
     val motion = LocalHomeMotion.current
     val known = data.running && data.cpu.isFinite() && data.cpu >= 0
-    val cpu by animateFloatAsState(if (known) data.cpu else 0f, if (motion) tween(400) else snap(), label = "cpu-number")
-    val progress by animateFloatAsState(if (known) (data.cpu / 100).coerceIn(0f, 1f) else 0f,
-        if (motion) tween(400) else snap(), label = "cpu-progress")
-    val targetColor = when { !known -> p.muted; data.cpu >= 100 -> p.red; data.cpu >= 80 -> Color(0xFFD97706); else -> p.blue }
-    val color by animateColorAsState(targetColor, if (motion) tween(300) else snap(), label = "cpu-color")
-    val alpha by animateFloatAsState(if (known && data.cpu >= 80) 1f else .2f,
-        if (motion) tween(300) else snap(), label = "cpu-emphasis")
+    val cpu by animateFloatAsState(if (known) data.cpu else 0f,
+        if (motion) tween(400) else snap(), label = "cpu-number")
+    val tint = when { !known -> p.muted; data.cpu >= 100 -> p.red
+        data.cpu >= 80 -> Color(0xFFD97706); else -> p.blue }
     HomeCard(modifier.testTag("home-resources")) {
-        Column(Modifier.fillMaxWidth().heightIn(min = 132.dp).padding(16.dp)) {
-            HomeLabel("资源占用")
-            Spacer(Modifier.height(7.dp))
-            MetricLine("内存", if (data.running && data.memory > 0) CompactHomeFormat.bytes(data.memory) else "—")
-            MetricLine("CPU", if (known) String.format(Locale.US, "%.1f%%", cpu) else "—",
-                if (known && data.cpu >= 80) color else p.text)
-            Canvas(Modifier.fillMaxWidth().padding(top = 6.dp).height(4.dp).clip(CircleShape)
-                .testTag("home-cpu-bar").semantics {
-                    progressBarRangeInfo = ProgressBarRangeInfo(if (known) (data.cpu / 100).coerceIn(0f, 1f) else 0f, 0f..1f)
-                    stateDescription = if (known) "CPU ${data.cpu}%" else "CPU 未知"
-                }) {
-                drawRoundRect(p.line, cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height))
-                if (progress > 0f) drawRoundRect(color.copy(alpha = alpha),
-                    size = androidx.compose.ui.geometry.Size(size.width * progress, size.height),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height))
+        Column(Modifier.fillMaxSize().padding(14.dp), verticalArrangement = Arrangement.SpaceBetween) {
+            HomeDataHeading("资源占用")
+            Column {
+                MetricLine("内存", if (data.running && data.memory > 0) CompactHomeFormat.bytes(data.memory) else "—")
+                MetricLine("CPU", if (known) String.format(Locale.US, "%.1f%%", cpu) else "—",
+                    if (known && data.cpu >= 80) tint else p.text)
+                HomeUsageBar(if (known) (data.cpu / 100).coerceIn(0f, 1f) else null, "home-cpu-bar",
+                    if (known) "CPU ${data.cpu}%" else "CPU 未知", tint)
             }
         }
     }
@@ -472,7 +532,7 @@ internal fun CompactHomeWebUiDialog(onDismiss: () -> Unit) {
     var address by rememberSaveable { mutableStateOf(prefs.getString("homeWebUiAddress", "http://127.0.0.1:$port/ui/").orEmpty()) }
     var error by remember { mutableStateOf("") }
     AlertDialog(onDismissRequest = onDismiss, title = { Text("WebUI 地址") }, text = {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("此基线不内置 Web 面板。填写已经部署的面板地址后打开；本地 /ui/ 需要核心配置 external-ui。不会向面板地址附加控制器密钥。")
             OutlinedTextField(address, { address = it; error = "" }, label = { Text("面板地址") },
                 singleLine = true, isError = error.isNotBlank())
