@@ -1,0 +1,170 @@
+{
+  "run": "https://github.com/xgl34222220-ops/hetu/actions/runs/36439433971",
+  "suites": [
+    {
+      "name": "io.github.xgl34222220.hetu.PanelNavigation13Test",
+      "tests": "16",
+      "failures": "4",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.HomeUi7InteractionTest",
+      "tests": "12",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.ProxyLatencyRegressionTest",
+      "tests": "16",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.Runtime146ContractTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.HomeUi5RegressionTest",
+      "tests": "10",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.NativeDockUi4Test",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.HomeUi6RegressionTest",
+      "tests": "11",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.PanelUi11Test",
+      "tests": "21",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.NodeSelectionContinuityTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.HomeUi9BentoTest",
+      "tests": "18",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.MotionUi12Test",
+      "tests": "12",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.CompactHomeDashboardTest",
+      "tests": "29",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.HomeUi11Test",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.PanelModel11Test",
+      "tests": "12",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.HomeUi8ExperienceTest",
+      "tests": "18",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.MotionModel12Test",
+      "tests": "10",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.Ui92IntegrationTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.HomeUi10GridTest",
+      "tests": "14",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    }
+  ],
+  "failures": [
+    {
+      "suite": "io.github.xgl34222220.hetu.PanelNavigation13Test",
+      "test": "actualSixPageRoutesKeepIdenticalLabelsOrderAndBounds",
+      "message": "java.lang.AssertionError: Failed to assert the following: (Text + EditableText = [概览])\nSemantics of the node:\nNode #18261 at (l=16.0, t=60.0, r=76.0, b=108.0)px, Tag: 'panel11-tab-Overview'\nFocused = 'false'\nRole = 'Button'\nSelected = 'true'\nShape = 'RoundedCornerShape(topStart = CornerSize(size = 50.0%), topEnd = CornerSize(size = 50.0%), bottomEnd = CornerSize(size = 50.0%), bottomStart = CornerSize(size = 50.0%))'\nActions = [OnClick, RequestFocus]\nMergeDescendants = 'true'\nHas 1 child, 5 siblings\nSelector used: (TestTag = 'panel11-tab-Overview')\n",
+      "stack": "java.lang.AssertionError: Failed to assert the following: (Text + EditableText = [概览])\nSemantics of the node:\nNode #18261 at (l=16.0, t=60.0, r=76.0, b=108.0)px, Tag: 'panel11-tab-Overview'\nFocused = 'false'\nRole = 'Button'\nSelected = 'true'\nShape = 'RoundedCornerShape(topStart = CornerSize(size = 50.0%), topEnd = CornerSize(size = 50.0%), bottomEnd = CornerSize(size = 50.0%), bottomStart = CornerSize(size = 50.0%))'\nActions = [OnClick, RequestFocus]\nMergeDescendants = 'true'\nHas 1 child, 5 siblings\nSelector used: (TestTag = 'panel11-tab-Overview')\n\n\tat androidx.compose.ui.test.AssertionsKt.assert(Assertions.kt:293)\n\tat androidx.compose.ui.test.AssertionsKt.assert$default(Assertions.kt:283)\n\tat androidx.compose.ui.test.AssertionsKt.assertTextEquals(Assertions.kt:207)\n\tat androidx.compose.ui.test.AssertionsKt.assertTextEquals$default(Assertions.kt:203)\n\tat io.github.xgl34222220.hetu.PanelNavigation13Test.actualSixPageRoutesKeepIdenticalLabelsOrderAndBounds(PanelNavigation13Test.kt:78)\n\tat java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)\n\tat org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)\n\tat org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)\n\tat org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)\n\tat org.junit.internal.runners.statements.RunBefores.evaluate(RunBefores.java:26)\n\tat androidx.compose.ui.test.junit4.AndroidComposeTestRule$apply$testWithDisposal$1.evaluate(AndroidComposeTestRule.android.kt:426)\n\tat org.junit.rules.ExternalResource$1.evaluate(ExternalResource.java:54)\n\tat androidx.compose.ui.test.junit4.AndroidComposeTestRule$apply$1$evaluate$1.invokeSuspend(AndroidComposeTestRule.android.kt:448)\n\tat androidx.compose.ui.test.junit4.AndroidComposeTestRule$apply$1$evaluate$1.invoke(AndroidComposeTestRule.android.kt)\n\tat androidx.compose.ui.test.junit4.AndroidComposeTestRule$apply$1$evaluate$1.invoke(AndroidComposeTestRule.android.kt)\n\tat androidx.compose.ui"
+    },
+    {
+      "suite": "io.github.xgl34222220.hetu.PanelNavigation13Test",
+      "test": "nestedGroupBackStackIsIndependentAndCycleBounded",
+      "message": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: (ContentDescription = '展开子策略TikTok' (ignoreCase: false))\n",
+      "stack": "java.lang.AssertionError: Failed to inject touch input.\nReason: Expected exactly '1' node but could not find any node that satisfies: (ContentDescription = '展开子策略TikTok' (ignoreCase: false))\n\n\tat androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow(SemanticsNodeInteraction.kt:178)\n\tat androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow$default(SemanticsNodeInteraction.kt:150)\n\tat androidx.compose.ui.test.SemanticsNodeInteraction.fetchSemanticsNode(SemanticsNodeInteraction.kt:84)\n\tat androidx.compose.ui.test.ActionsKt.performTouchInput(Actions.kt:403)\n\tat io.github.xgl34222220.hetu.PanelNavigation13Test.nestedGroupBackStackIsIndependentAndCycleBounded(PanelNavigation13Test.kt:151)\n\tat java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)\n\tat org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)\n\tat org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)\n\tat org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)\n\tat org.junit.internal.runners.statements.RunBefores.evaluate(RunBefores.java:26)\n\tat androidx.compose.ui.test.junit4.AndroidComposeTestRule$apply$testWithDisposal$1.evaluate(AndroidComposeTestRule.android.kt:426)\n\tat org.junit.rules.ExternalResource$1.evaluate(ExternalResource.java:54)\n\tat androidx.compose.ui.test.junit4.AndroidComposeTestRule$apply$1$evaluate$1.invokeSuspend(AndroidComposeTestRule.android.kt:448)\n\tat androidx.compose.ui.test.junit4.AndroidComposeTestRule$apply$1$evaluate$1.invoke(AndroidComposeTestRule.android.kt)\n\tat androidx.compose.ui.test.junit4.AndroidComposeTestRule$apply$1$evaluate$1.invoke(AndroidComposeTestRule.android.kt)\n\tat androidx.compose.ui.test.AndroidComposeUiTestEnvironment$runTest$1$1$1$1$1.invokeSuspend(ComposeUiTest.android.kt:689)\n\tat androidx.compose.ui.test.AndroidComposeUiTestEnvironment$runTest$1$1$1$1$1.invoke(ComposeUiTest.android.kt)\n\tat androidx.compose.ui.test.AndroidComposeUiTestEnvironment$runTest$1$"
+    },
+    {
+      "suite": "io.github.xgl34222220.hetu.PanelNavigation13Test",
+      "test": "smallWindowKeepsAllPrimaryLabelsAccessible",
+      "message": "java.lang.AssertionError: Failed to assert the following: (Text + EditableText = [概览])\nSemantics of the node:\nNode #27663 at (l=16.0, t=4.0, r=93.0, b=52.0)px, Tag: 'panel11-tab-Overview'\nFocused = 'false'\nRole = 'Button'\nSelected = 'false'\nShape = 'RoundedCornerShape(topStart = CornerSize(size = 50.0%), topEnd = CornerSize(size = 50.0%), bottomEnd = CornerSize(size = 50.0%), bottomStart = CornerSize(size = 50.0%))'\nActions = [OnClick, RequestFocus]\nMergeDescendants = 'true'\nHas 1 child, 5 siblings\nSelector used: (TestTag = 'panel11-tab-Overview')\n",
+      "stack": "java.lang.AssertionError: Failed to assert the following: (Text + EditableText = [概览])\nSemantics of the node:\nNode #27663 at (l=16.0, t=4.0, r=93.0, b=52.0)px, Tag: 'panel11-tab-Overview'\nFocused = 'false'\nRole = 'Button'\nSelected = 'false'\nShape = 'RoundedCornerShape(topStart = CornerSize(size = 50.0%), topEnd = CornerSize(size = 50.0%), bottomEnd = CornerSize(size = 50.0%), bottomStart = CornerSize(size = 50.0%))'\nActions = [OnClick, RequestFocus]\nMergeDescendants = 'true'\nHas 1 child, 5 siblings\nSelector used: (TestTag = 'panel11-tab-Overview')\n\n\tat androidx.compose.ui.test.AssertionsKt.assert(Assertions.kt:293)\n\tat androidx.compose.ui.test.AssertionsKt.assert$default(Assertions.kt:283)\n\tat androidx.compose.ui.test.AssertionsKt.assertTextEquals(Assertions.kt:207)\n\tat androidx.compose.ui.test.AssertionsKt.assertTextEquals$default(Assertions.kt:203)\n\tat io.github.xgl34222220.hetu.PanelNavigation13Test.smallWindowKeepsAllPrimaryLabelsAccessible(PanelNavigation13Test.kt:191)\n\tat java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)\n\tat org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)\n\tat org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)\n\tat org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)\n\tat org.junit.internal.runners.statements.RunBefores.evaluate(RunBefores.java:26)\n\tat androidx.compose.ui.test.junit4.AndroidComposeTestRule$apply$testWithDisposal$1.evaluate(AndroidComposeTestRule.android.kt:426)\n\tat org.junit.rules.ExternalResource$1.evaluate(ExternalResource.java:54)\n\tat androidx.compose.ui.test.junit4.AndroidComposeTestRule$apply$1$evaluate$1.invokeSuspend(AndroidComposeTestRule.android.kt:448)\n\tat androidx.compose.ui.test.junit4.AndroidComposeTestRule$apply$1$evaluate$1.invoke(AndroidComposeTestRule.android.kt)\n\tat androidx.compose.ui.test.junit4.AndroidComposeTestRule$apply$1$evaluate$1.invoke(AndroidComposeTestRule.android.kt)\n\tat androidx.compose.ui.test.Andr"
+    },
+    {
+      "suite": "io.github.xgl34222220.hetu.PanelNavigation13Test",
+      "test": "secondarySearchDoesNotChangePrimaryTabOrParentSearch",
+      "message": "java.lang.AssertionError: Failed to assert the following: (Text + EditableText = [节点])\nSemantics of the node:\nNode #28093 at (l=76.0, t=60.0, r=136.0, b=108.0)px, Tag: 'panel11-tab-Groups'\nFocused = 'false'\nRole = 'Button'\nSelected = 'true'\nShape = 'RoundedCornerShape(topStart = CornerSize(size = 50.0%), topEnd = CornerSize(size = 50.0%), bottomEnd = CornerSize(size = 50.0%), bottomStart = CornerSize(size = 50.0%))'\nActions = [OnClick, RequestFocus]\nMergeDescendants = 'true'\nHas 1 child, 5 siblings\nSelector used: (TestTag = 'panel11-tab-Groups')\n",
+      "stack": "java.lang.AssertionError: Failed to assert the following: (Text + EditableText = [节点])\nSemantics of the node:\nNode #28093 at (l=76.0, t=60.0, r=136.0, b=108.0)px, Tag: 'panel11-tab-Groups'\nFocused = 'false'\nRole = 'Button'\nSelected = 'true'\nShape = 'RoundedCornerShape(topStart = CornerSize(size = 50.0%), topEnd = CornerSize(size = 50.0%), bottomEnd = CornerSize(size = 50.0%), bottomStart = CornerSize(size = 50.0%))'\nActions = [OnClick, RequestFocus]\nMergeDescendants = 'true'\nHas 1 child, 5 siblings\nSelector used: (TestTag = 'panel11-tab-Groups')\n\n\tat androidx.compose.ui.test.AssertionsKt.assert(Assertions.kt:293)\n\tat androidx.compose.ui.test.AssertionsKt.assert$default(Assertions.kt:283)\n\tat androidx.compose.ui.test.AssertionsKt.assertTextEquals(Assertions.kt:207)\n\tat androidx.compose.ui.test.AssertionsKt.assertTextEquals$default(Assertions.kt:203)\n\tat io.github.xgl34222220.hetu.PanelNavigation13Test.secondarySearchDoesNotChangePrimaryTabOrParentSearch(PanelNavigation13Test.kt:143)\n\tat java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)\n\tat org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)\n\tat org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)\n\tat org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)\n\tat org.junit.internal.runners.statements.RunBefores.evaluate(RunBefores.java:26)\n\tat androidx.compose.ui.test.junit4.AndroidComposeTestRule$apply$testWithDisposal$1.evaluate(AndroidComposeTestRule.android.kt:426)\n\tat org.junit.rules.ExternalResource$1.evaluate(ExternalResource.java:54)\n\tat androidx.compose.ui.test.junit4.AndroidComposeTestRule$apply$1$evaluate$1.invokeSuspend(AndroidComposeTestRule.android.kt:448)\n\tat androidx.compose.ui.test.junit4.AndroidComposeTestRule$apply$1$evaluate$1.invoke(AndroidComposeTestRule.android.kt)\n\tat androidx.compose.ui.test.junit4.AndroidComposeTestRule$apply$1$evaluate$1.invoke(AndroidComposeTestRule.android.kt)\n\tat androidx.compose.ui.t"
+    }
+  ],
+  "compile_or_verification_errors": [
+    "    java.lang.AssertionError at PanelNavigation13Test.kt:78",
+    "    java.lang.AssertionError at PanelNavigation13Test.kt:151",
+    "    java.lang.AssertionError at PanelNavigation13Test.kt:191",
+    "    java.lang.AssertionError at PanelNavigation13Test.kt:143",
+    "* What went wrong:"
+  ],
+  "totals": {
+    "tests": 219,
+    "failures": 4,
+    "errors": 0,
+    "skipped": 0
+  }
+}
