@@ -1138,6 +1138,74 @@ internal fun RefPanel(
         view.performHapticFeedback(if (failed == 0) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.CLOCK_TICK)
     }
 
+    fun measureOneNode19(node: String) {
+        if (testing[node] == true || !state.running) return
+        scope.launch {
+            testing[node] = true
+            try {
+                val measured = repo.delay(node)
+                if (measured > 0L) delays[node] = measured
+                else if ((delays[node] ?: 1L) <= 0L) delays.remove(node)
+                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+            } catch (_: Exception) {
+                if ((delays[node] ?: 1L) <= 0L) delays.remove(node)
+            } finally {
+                testing.remove(node)
+            }
+        }
+    }
+
+    fun selectNode19(group: ProxyGroupUi, node: String) {
+        val previous = selectedLocal[group.name] ?: group.now
+        selectedLocal[group.name] = node
+        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+        scope.launch {
+            try {
+                repo.select(
+                    group.name,
+                    node,
+                    context.getSharedPreferences("hetu", 0)
+                        .getBoolean("proxySelectorDisconnectOnSelect", false),
+                )
+                onRefreshState()
+            } catch (_: Exception) {
+                if (previous.isBlank()) selectedLocal.remove(group.name)
+                else selectedLocal[group.name] = previous
+            }
+        }
+    }
+
+    fun testWholeGroup19(group: ProxyGroupUi) {
+        val pending = group.nodes.filter { testing[it.name] != true }
+        if (pending.isEmpty() || !state.running) return
+        scope.launch {
+            capsuleError = false
+            capsuleText = "节点测速 0/${pending.size}"
+            var done = 0
+            try {
+                for (chunk in pending.chunked(4)) {
+                    coroutineScope {
+                        chunk.map { node ->
+                            async {
+                                testing[node.name] = true
+                                val measured = try { repo.delay(node.name) } catch (_: Exception) { -1L }
+                                if (measured > 0L) delays[node.name] = measured
+                                else if ((delays[node.name] ?: 1L) <= 0L) delays.remove(node.name)
+                                testing.remove(node.name)
+                                done += 1
+                                capsuleText = "节点测速 $done/${pending.size}"
+                            }
+                        }.awaitAll()
+                    }
+                }
+                capsuleText = "节点测速完成 · $done/${pending.size}"
+                view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+            } finally {
+                pending.forEach { testing.remove(it.name) }
+            }
+        }
+    }
+
     suspend fun refreshProvidersAnimated() {
         if (providers.isEmpty()) providers = repo.providers()
         val targets = providers
@@ -1273,144 +1341,69 @@ internal fun RefPanel(
 
     LaunchedEffect(tab) {
         if (tab != RefPanelTab.Groups) selectedGroupName = null
-        onDetailVisibleChanged(false)
+    }
+    LaunchedEffect(tab, selectedGroupName) {
+        onDetailVisibleChanged(tab == RefPanelTab.Groups && selectedGroupName != null)
+    }
+    BackHandler(enabled = tab == RefPanelTab.Groups && selectedGroupName != null) {
+        selectedGroupName = null
+        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
     }
 
     val clearance13 = LocalHomeDockClearance.current ?:
         (86.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding())
-    Column(Modifier.fillMaxSize().background(t.pageBackground).padding(bottom = clearance13)
+    val panelCanvas19 = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.pageBackground else Color(0xFFECEBFA)
+    val tabEnter19 = remember(tab) { Animatable(0f) }
+    LaunchedEffect(tab) {
+        tabEnter19.animateTo(
+            1f,
+            androidx.compose.animation.core.tween(
+                180,
+                easing = androidx.compose.animation.core.CubicBezierEasing(.16f, 1f, .30f, 1f),
+            ),
+        )
+    }
+    Column(Modifier.fillMaxSize().background(panelCanvas19).padding(bottom = clearance13)
         .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))) {
         RefPanelGlassHeader(selected = tab, onSelect = onSelectedTabChange,
             searchOpen = searchOpen, query = query, onQueryChange = { query = it },
             onSearchToggle = { searchOpen = !searchOpen; if (!searchOpen) query = "" },
             onOpenSettings = onOpenSettings, hazeState = hazeState, backdrop = backdrop)
         Box(Modifier.weight(1f).fillMaxWidth().clipToBounds()) {
-            PullToRefreshBox(isRefreshing = refreshing, onRefresh = ::refresh, modifier = Modifier.fillMaxSize()) {
+            PullToRefreshBox(
+                isRefreshing = refreshing,
+                onRefresh = ::refresh,
+                modifier = Modifier.fillMaxSize().graphicsLayer {
+                    alpha = .78f + .22f * tabEnter19.value
+                    translationY = (1f - tabEnter19.value) * 6.dp.toPx()
+                },
+            ) {
                 LazyColumn(Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    contentPadding = PaddingValues(start = 8.dp, top = 7.dp, end = 8.dp, bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(7.dp)) {
             if (error.isNotBlank()) item { RefNotice(error) }
             if (!state.running) {
                 item { RefEmptyState("代理未运行", "启动代理后，在这里查看节点、应用连接和分流规则。", Icons.Rounded.PowerSettingsNew) }
             } else when (tab) {
                 RefPanelTab.Groups -> {
-                    if (filteredGroups.isEmpty()) item { RefEmptyState("没有匹配的节点", if (query.isBlank()) "当前配置未提供策略组。" else "试试其他节点或策略组名称。", Icons.Rounded.Search) }
-                    itemsIndexed(filteredGroups.chunked(2), key = { index, _ -> "${tab.name}-groups-$index" }, contentType = { _, _ -> "group-row" }) { _, pair ->
-                        val expandedGroup = pair.firstOrNull { it.name == selectedGroupName }
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                pair.forEach { group ->
-                                    val selected = selectedLocal[group.name] ?: group.now
-                                    RefGroupCard(
-                                        group = group,
-                                        selected = selected,
-                                        expanded = selectedGroupName == group.name,
-                                        delay = delays[selected] ?: group.nodes.firstOrNull { it.name == selected }?.lastDelay,
-                                        testing = selected.isNotBlank() && testing[selected] == true,
-                                        hazeState = hazeState,
-                                        glassEnabled = glassEnabled,
-                                        modifier = Modifier.weight(1f),
-                                        onClick = {
-                                            view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                                            selectedGroupName = if (selectedGroupName == group.name) null else group.name
-                                        },
-                                        onDelay = {
-                                            if (selected.isNotBlank() && testing[selected] != true) scope.launch {
-                                                testing[selected] = true
-                                                try {
-                                                    val measured = repo.delay(selected)
-                                                    if (measured > 0L) delays[selected] = measured
-                                                    view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                                } catch (_: Exception) {
-                                                    if ((delays[selected] ?: 1L) <= 0L) delays.remove(selected)
-                                                } finally {
-                                                    testing.remove(selected)
-                                                }
-                                            }
-                                        },
-                                    )
-                                }
-                                if (pair.size == 1) Spacer(Modifier.weight(1f))
-                            }
-                            androidx.compose.animation.AnimatedVisibility(
-                                visible = expandedGroup != null,
-                                enter = androidx.compose.animation.expandVertically(
-                                    expandFrom = Alignment.Top,
-                                    animationSpec = spring(dampingRatio = .72f, stiffness = 360f),
-                                    clip = false,
-                                ) + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(180)) +
-                                    androidx.compose.animation.slideInVertically(
-                                        animationSpec = spring(dampingRatio = .74f, stiffness = 420f),
-                                    ) { -it / 10 },
-                                exit = androidx.compose.animation.shrinkVertically(
-                                    shrinkTowards = Alignment.Top,
-                                    animationSpec = androidx.compose.animation.core.tween(
-                                        durationMillis = 220,
-                                        easing = androidx.compose.animation.core.CubicBezierEasing(.16f, 1f, .30f, 1f),
-                                    ),
-                                    clip = false,
-                                ) + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(140)),
-                            ) {
-                                expandedGroup?.let { group ->
-                                    val selected = selectedLocal[group.name] ?: group.now
-                                    RefInlineGroupExpansion(
-                                        group = group,
-                                        selected = selected,
-                                        delays = delays,
-                                        testing = testing,
-                                        onSelect = { node ->
-                                            val previous = selectedLocal[group.name] ?: group.now
-                                            selectedLocal[group.name] = node
-                                            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                            scope.launch {
-                                                try {
-                                                    repo.select(group.name, node, context.getSharedPreferences("hetu", 0).getBoolean("proxySelectorDisconnectOnSelect", false))
-                                                    onRefreshState()
-                                                } catch (_: Exception) {
-                                                    if (previous.isBlank()) selectedLocal.remove(group.name) else selectedLocal[group.name] = previous
-                                                }
-                                            }
-                                        },
-                                        onDelay = { node ->
-                                            if (testing[node] != true) scope.launch {
-                                                testing[node] = true
-                                                try {
-                                                    val measured = repo.delay(node)
-                                                    if (measured > 0L) delays[node] = measured
-                                                } catch (_: Exception) {
-                                                    if ((delays[node] ?: 1L) <= 0L) delays.remove(node)
-                                                } finally { testing.remove(node) }
-                                            }
-                                        },
-                                        onTestAll = {
-                                            val pending = group.nodes.filter { testing[it.name] != true }
-                                            if (pending.isNotEmpty()) scope.launch {
-                                                try {
-                                                    val wave = pending.mapIndexed { index, node ->
-                                                        async {
-                                                            delay(index * 30L)
-                                                            testing[node.name] = true
-                                                            try { repo.delay(node.name) }
-                                                            catch (_: Exception) { -1L }
-                                                        }
-                                                    }
-                                                    pending.forEachIndexed { index, node ->
-                                                        val measured = wave[index].await()
-                                                        if (measured > 0L) delays[node.name] = measured
-                                                        else if ((delays[node.name] ?: 1L) <= 0L) delays.remove(node.name)
-                                                        delay(32L)
-                                                        testing.remove(node.name)
-                                                    }
-                                                    view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-                                                } finally {
-                                                    pending.forEach { testing.remove(it.name) }
-                                                }
-                                            }
-                                        },
-                                    )
-                                }
-                            }
-                        }
+                    item(key = "video-strategy-plane", contentType = "video-strategy-plane") {
+                        RefVideoStrategyPlane19(
+                            groups = filteredGroups,
+                            selectedGroupName = selectedGroupName,
+                            selectedNode = { group -> selectedLocal[group.name] ?: group.now },
+                            delays = delays,
+                            testing = testing,
+                            onGroup = { group ->
+                                selectedGroupName = group.name
+                                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                            },
+                            onCollapse = {
+                                selectedGroupName = null
+                                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                            },
+                            onNode = ::selectNode19,
+                            onDelay = ::measureOneNode19,
+                        )
                     }
                 }
                 RefPanelTab.Overview -> item(key = "${tab.name}-traffic-overview", contentType = "traffic-overview") { RefTrafficOverview(state, rules.size, providers) }
@@ -1527,6 +1520,22 @@ internal fun RefPanel(
             }
             }
         }
+        if (tab == RefPanelTab.Groups) {
+            selectedGroupName?.let { name ->
+                filteredGroups.firstOrNull { it.name == name }?.let { group ->
+                    RefVideoStrategyActions19(
+                        label = group.name,
+                        onTestAll = { testWholeGroup19(group) },
+                        onCollapse = {
+                            selectedGroupName = null
+                            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                        },
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(end = 12.dp, bottom = 12.dp),
+                    )
+                }
+            }
+        }
+
         androidx.compose.animation.AnimatedVisibility(
             visible = capsuleText.isNotBlank(),
             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp),
