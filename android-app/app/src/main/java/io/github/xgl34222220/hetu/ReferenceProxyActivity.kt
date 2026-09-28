@@ -2609,6 +2609,7 @@ private fun RefOverviewMetricStrip18(state: ProxyComposeState, ruleCount: Int) {
             Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 13.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            @Composable
             fun cell(label: String, value: String, modifier: Modifier) {
                 Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
