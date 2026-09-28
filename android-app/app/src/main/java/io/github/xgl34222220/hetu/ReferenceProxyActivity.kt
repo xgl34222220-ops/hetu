@@ -61,6 +61,8 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
@@ -583,8 +585,12 @@ private fun RefProxyShell(resumeRevision: Int, requestedStartPage: String?, star
     val shellBackground = if (MaterialTheme.colorScheme.background.luminance() < .5f) {
         LocalHetuTokens.current.pageBackground
     } else {
-        Color(0xFFF6F8FC)
+        Color(0xFFEFEBF8)
     }
+    val dockDensity = LocalDensity.current
+    val initialDockHeight = 76.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    var measuredDockHeight by remember { mutableStateOf(initialDockHeight) }
+    CompositionLocalProvider(LocalHomeDockClearance provides (measuredDockHeight + 10.dp)) {
     Box(Modifier.fillMaxSize().background(shellBackground)) {
         Box(
             Modifier.fillMaxSize()
@@ -716,9 +722,12 @@ private fun RefProxyShell(resumeRevision: Int, requestedStartPage: String?, star
                 onSelect = { page = dockPages[it] },
                 hazeState = haze,
                 backdrop = liquidBackdrop.takeIf { liquid },
-                modifier = Modifier.align(Alignment.BottomCenter),
+                modifier = Modifier.align(Alignment.BottomCenter).onSizeChanged { size ->
+                    measuredDockHeight = with(dockDensity) { size.height.toDp() }
+                },
             )
         }
+    }
     }
 
     logText?.let { text ->
@@ -1661,7 +1670,7 @@ private fun RefGroupDetailPage(
         delay != null && delay > 0L
     }
     val anyTesting = group.nodes.any { testing[it.name] == true }
-    val pageBackground = if (dark) t.pageBackground else Color(0xFFF6F8FC)
+    val pageBackground = if (dark) t.pageBackground else Color(0xFFEFEBF8)
 
     Column(
         Modifier.fillMaxSize().offset(x = enterX).background(pageBackground).navigationBarsPadding(),
@@ -4076,7 +4085,7 @@ internal fun RefDivider() {
     HorizontalDivider(
         modifier = Modifier.padding(start = 58.dp, end = 14.dp),
         thickness = 1.dp,
-        color = if (MaterialTheme.colorScheme.background.luminance() < .5f) LocalHetuTokens.current.outline else Color(0xFFF6F8FC),
+        color = if (MaterialTheme.colorScheme.background.luminance() < .5f) LocalHetuTokens.current.outline else Color(0xFFEFEBF8),
     )
 }
 

@@ -181,7 +181,7 @@ fun HetuGlassDock(
     Box(
         modifier = modifier
             .background(Color.Transparent)
-            .then(if (floating) Modifier.padding(horizontal = 24.dp).padding(bottom = bottomInset + 16.dp) else Modifier)
+            .then(if (floating) Modifier.padding(horizontal = 24.dp).padding(bottom = bottomInset + 12.dp) else Modifier)
             .fillMaxWidth()
             .height(64.dp + if (floating) 0.dp else bottomInset).testTag("hetu-dock"),
     ) {
@@ -208,10 +208,10 @@ fun HetuGlassDock(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(start = 6.dp, top = 6.dp, end = 6.dp, bottom = if (floating) 6.dp else bottomInset + 6.dp),
-            indicatorColor = if (dark) Color(0xFF2563EB).copy(alpha = .18f) else Color(0xFF2563EB).copy(alpha = .08f),
+            indicatorColor = if (dark) Color(0xFF233D64) else Color(0xFFE7F1FF),
             indicatorBorderColor = if (dark) Color(0xFF60A5FA).copy(alpha = .22f) else Color(0xFF2563EB).copy(alpha = .18f),
             indicatorShadow = 0.dp,
-            selectedColor = scheme.primary,
+            selectedColor = if (dark) Color(0xFF8AB4FF) else Color(0xFF2563EB),
             unselectedColor = scheme.onSurfaceVariant.copy(alpha = .90f),
             liquidGlass = renderGlass,
             indicatorBackdrop = dockSurfaceBackdrop.takeIf { runtimeLiquid },
@@ -248,7 +248,14 @@ private fun DockItems(
                     if (motion) tween(180) else snap(), label = "dock-tint-$index")
                 Row(Modifier.weight(weight).height(itemHeight).testTag("dock-tab-$index")
                     .graphicsLayer { scaleX = scale; scaleY = scale }
-                    .clip(RoundedCornerShape(26.dp)).background(fill)
+                    .clip(RoundedCornerShape(26.dp))
+                    // Fill is on the foreground sibling, outside every backdrop/shader layer.
+                    .drawBehind {
+                        val inset = 6.dp.toPx()
+                        val h = (size.height - 2 * inset).coerceAtLeast(0f)
+                        drawRoundRect(fill, topLeft = Offset(0f,inset),
+                            size = androidx.compose.ui.geometry.Size(size.width,h), cornerRadius = CornerRadius(h/2f))
+                    }
                     .selectable(active, role = Role.Tab, interactionSource = interaction, indication = null,
                         onClick = { if (!active) onSelect(index) })
                     .semantics { contentDescription = item.label }

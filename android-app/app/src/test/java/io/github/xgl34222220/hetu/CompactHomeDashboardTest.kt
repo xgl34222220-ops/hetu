@@ -391,7 +391,7 @@ class CompactHomeDashboardTest {
         assertEquals(15.sp, textLayout("hero-uptime").layoutInput.style.fontSize)
         assertEquals(13.sp, textLayout("hero-core").layoutInput.style.fontSize)
         assertEquals(15.sp, textLayout("hero-config").layoutInput.style.fontSize)
-        rule.onNodeWithTag("hero-status-glyph").assertWidthIsEqualTo(80.dp).assertHeightIsEqualTo(80.dp)
+        rule.onNodeWithTag("hero-status-glyph").assertWidthIsEqualTo(84.dp).assertHeightIsEqualTo(84.dp)
         rule.onNodeWithText("少于 1 分钟").assertIsDisplayed()
         rule.onNodeWithText("7 小时 37 分钟").assertDoesNotExist()
     }

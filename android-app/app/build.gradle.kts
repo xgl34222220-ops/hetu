@@ -16,8 +16,8 @@ android {
         applicationId = "io.github.xgl34222220.hetu"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1006
-        versionName = "0.4.0-ui92-r146.5"
+        versionCode = 1007
+        versionName = "0.4.0-ui92-r146.6"
     }
 
     testOptions {
@@ -65,6 +65,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.10.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
     implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.graphics:graphics-shapes:1.0.1")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.ui:ui")

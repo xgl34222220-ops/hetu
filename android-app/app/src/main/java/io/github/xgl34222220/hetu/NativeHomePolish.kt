@@ -138,10 +138,10 @@ internal fun Modifier.nativePress(enabled: Boolean = true, label: String? = null
 }
 
 internal fun Modifier.diffuseCardShadow(shape: Shape): Modifier =
-    shadow(4.dp, shape, clip = false, ambientColor = Color(0xFF0F172A).copy(alpha = .02f),
-        spotColor = Color(0xFF0F172A).copy(alpha = .02f))
-        .shadow(10.dp, shape, clip = false, ambientColor = Color(0xFF1E293B).copy(alpha = .045f),
-            spotColor = Color(0xFF1E293B).copy(alpha = .045f))
+    shadow(4.dp, shape, clip = false, ambientColor = Color(0xFF505AA0).copy(alpha = .02f),
+        spotColor = Color(0xFF505AA0).copy(alpha = .02f))
+        .shadow(10.dp, shape, clip = false, ambientColor = Color(0xFF505AA0).copy(alpha = .05f),
+            spotColor = Color(0xFF505AA0).copy(alpha = .05f))
 
 @Composable
 internal fun NativeStatusHero(data: CompactHomeData, toggle: () -> Unit, reload: () -> Unit,
@@ -156,7 +156,7 @@ internal fun NativeStatusHero(data: CompactHomeData, toggle: () -> Unit, reload:
     }
     val colors = when (phase) {
         HomePhase.Running -> if (dark) listOf(Color(0xFF17243F), Color(0xFF262C4E), Color(0xFF8AB4FF))
-            else listOf(Color(0xFFEEF2FF), Color(0xFFE0E7FE), Color(0xFF2563EB))
+            else listOf(Color(0xFFE6E1FF), Color(0xFFECE7FE), Color(0xFF2563EB))
         HomePhase.Processing -> if (dark) listOf(Color(0xFF392B16), Color(0xFF483515), Color(0xFFFBBF24))
             else listOf(Color(0xFFFEF3C7), Color(0xFFFDE68A), Color(0xFFD97706))
         HomePhase.Stopped -> if (dark) listOf(Color(0xFF1B2330), Color(0xFF222C3A), Color(0xFF9AA9BD))
@@ -167,12 +167,13 @@ internal fun NativeStatusHero(data: CompactHomeData, toggle: () -> Unit, reload:
     val accent by animateColorAsState(colors[2], tween(if (motion) 400 else 0), label = "hero-accent")
     val text = if (dark) Color(0xFFE2E8F0) else Color(0xFF1E293B)
     val muted = if (dark) Color(0xFFACB7CA) else Color(0xFF64748B)
-    val shape = RoundedCornerShape(26.dp)
+    val shape = HomeContinuousShape(28.dp)
+    val compact = LocalHomeCompactSpacing.current
     Box(Modifier.fillMaxWidth().testTag("home-hero").semantics { stateDescription = title }
         .diffuseCardShadow(shape).clip(shape).background(Brush.linearGradient(listOf(top, bottom)))) {
-        Column(Modifier.fillMaxWidth().padding(20.dp)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Column(Modifier.fillMaxWidth().padding(if (compact) 14.dp else 20.dp)) {
+            Row(Modifier.fillMaxWidth().testTag("hero-information"), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f).testTag("hero-information-text"), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Box(Modifier.size(12.dp).background(accent, CircleShape))
                         Text(title, color = accent, fontSize = 22.sp, lineHeight = 29.sp,
@@ -201,7 +202,7 @@ internal fun NativeStatusHero(data: CompactHomeData, toggle: () -> Unit, reload:
                 Text("设置待生效 · 查看", Modifier.heightIn(min = 48.dp).nativePress(onClick = settings)
                     .wrapContentHeight(), color = accent, fontSize = 12.sp)
             }
-            Spacer(Modifier.height(18.dp))
+            Spacer(Modifier.height(if (compact) 10.dp else 16.dp))
             // Key the whole controller by lifecycle, not by raw progress messages.
             AnimatedContent(phase, transitionSpec = {
                 (fadeIn(tween(if (motion) 250 else 0)) + slideInVertically(tween(if (motion) 250 else 0)) { it / 8 })
@@ -209,8 +210,9 @@ internal fun NativeStatusHero(data: CompactHomeData, toggle: () -> Unit, reload:
                         slideOutVertically(tween(if (motion) 150 else 0)) { -it / 8 })
                     .using(SizeTransform(clip = false) { _, _ -> tween(if (motion) 250 else 0) })
             }, modifier = Modifier.fillMaxWidth(), label = "hero-pill-morph") { shown ->
-                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-                    .background(if (dark) Color.White.copy(alpha = .09f) else Color.White.copy(alpha = .88f))
+                Box(Modifier.fillMaxWidth().testTag("hero-capsule-surface")) {
+                Row(Modifier.fillMaxWidth().clip(HomeContinuousShape(20.dp))
+                    .background(if (dark) Color.White.copy(alpha = .09f) else Color.White.copy(alpha = .95f))
                     .padding(6.dp).heightIn(min = 48.dp).testTag("home-control-pill"),
                     verticalAlignment = Alignment.CenterVertically) {
                     val blue = if (dark) Color(0xFF8AB4FF) else Color(0xFF2563EB)
@@ -235,6 +237,7 @@ internal fun NativeStatusHero(data: CompactHomeData, toggle: () -> Unit, reload:
                     }
                 }
             }
+            }
         }
         if (processing) ProcessingShimmer(accent, motion, Modifier.align(Alignment.BottomCenter))
     }
@@ -253,7 +256,7 @@ private fun PillAction(label: String, tag: String, tint: Color, modifier: Modifi
 @Composable
 private fun HeroStatusGlyph(phase: HomePhase, color: Color, motion: Boolean) {
     // Normal density follows the reference; accessibility text gets space before decoration.
-    val sizeDp = if (androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f) 56.dp else 80.dp
+    val sizeDp = if (androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f) 56.dp else 84.dp
     Box(Modifier.size(sizeDp).testTag("hero-status-glyph"), contentAlignment = Alignment.Center) {
         if (phase == HomePhase.Processing) NativeSpinner(color, motion, Modifier.fillMaxSize().padding(8.dp))
         else Canvas(Modifier.fillMaxSize()) {
