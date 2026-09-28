@@ -37,7 +37,7 @@ import kotlinx.coroutines.*
 
 /** A single immutable source for every panel page. Enum declaration order is not UI order. */
 internal val PanelTabs13 = listOf(RefPanelTab.Overview, RefPanelTab.Groups, RefPanelTab.Subscriptions,
-    RefPanelTab.Connections, RefPanelTab.Rules, RefPanelTab.RuleSets)
+    RefPanelTab.Connections, RefPanelTab.Rules, RefPanelTab.RuleSets, RefPanelTab.Logs)
 
 @Composable
 internal fun FixedPanelTabs13(selected: RefPanelTab, change: (RefPanelTab) -> Unit) {
