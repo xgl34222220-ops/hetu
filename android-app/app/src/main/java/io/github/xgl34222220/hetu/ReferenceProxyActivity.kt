@@ -1777,7 +1777,7 @@ private fun RefVideoGroupCard19(
                     maxLines = 1,
                 )
             }
-            RefGroupCornerVisual(group, Modifier.size(25.dp))
+            ConfiguredGroupIcon(group, Modifier.size(25.dp))
         }
 
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
