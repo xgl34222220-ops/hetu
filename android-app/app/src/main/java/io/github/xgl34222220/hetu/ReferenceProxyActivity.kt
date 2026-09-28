@@ -46,6 +46,7 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
@@ -582,7 +583,7 @@ private fun RefProxyShell(resumeRevision: Int, requestedStartPage: String?, star
     val shellBackground = if (MaterialTheme.colorScheme.background.luminance() < .5f) {
         LocalHetuTokens.current.pageBackground
     } else {
-        Color(0xFFEFF2F8)
+        Color(0xFFF6F8FC)
     }
     Box(Modifier.fillMaxSize().background(shellBackground)) {
         Box(
@@ -625,7 +626,9 @@ private fun RefProxyShell(resumeRevision: Int, requestedStartPage: String?, star
                             }
                         }
                     },
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize()
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+                        .clipToBounds(),
                 ) {
                     RefHome(
                     state = state,
@@ -1658,7 +1661,7 @@ private fun RefGroupDetailPage(
         delay != null && delay > 0L
     }
     val anyTesting = group.nodes.any { testing[it.name] == true }
-    val pageBackground = if (dark) t.pageBackground else Color(0xFFEFF2F8)
+    val pageBackground = if (dark) t.pageBackground else Color(0xFFF6F8FC)
 
     Column(
         Modifier.fillMaxSize().offset(x = enterX).background(pageBackground).navigationBarsPadding(),
@@ -4073,7 +4076,7 @@ internal fun RefDivider() {
     HorizontalDivider(
         modifier = Modifier.padding(start = 58.dp, end = 14.dp),
         thickness = 1.dp,
-        color = if (MaterialTheme.colorScheme.background.luminance() < .5f) LocalHetuTokens.current.outline else Color(0xFFEFF2F8),
+        color = if (MaterialTheme.colorScheme.background.luminance() < .5f) LocalHetuTokens.current.outline else Color(0xFFF6F8FC),
     )
 }
 

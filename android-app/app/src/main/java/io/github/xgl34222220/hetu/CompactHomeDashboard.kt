@@ -23,6 +23,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -114,7 +115,7 @@ internal object CompactHomeFormat {
 private data class HomePalette(val page: Color, val card: Color, val text: Color,
     val muted: Color, val soft: Color, val blue: Color, val red: Color, val line: Color)
 private val LocalHomePalette = staticCompositionLocalOf {
-    HomePalette(Color(0xFFEFF2F8), Color.White, Color(0xFF1E293B), Color(0xFF64748B),
+    HomePalette(Color(0xFFF6F8FC), Color.White, Color(0xFF1E293B), Color(0xFF64748B),
         Color(0xFFF8FAFC), Color(0xFF2563EB), Color(0xFFEF4444), Color(0xFFF1F5F9))
 }
 private val LocalHomeMotion = staticCompositionLocalOf { false }
@@ -165,7 +166,7 @@ private fun HomeNumber(value: String, modifier: Modifier = Modifier, color: Colo
         } else append(value)
     }
     Text(annotated, modifier, color = color, fontSize = size.sp, lineHeight = (size + 5).sp,
-        fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, maxLines = 2,
+        fontWeight = FontWeight.Bold, fontFamily = FontFamily.Default, maxLines = 2,
         overflow = TextOverflow.Ellipsis, textAlign = align,
         style = LocalTextStyle.current.copy(fontFeatureSettings = "tnum"))
 }
@@ -202,6 +203,7 @@ internal fun CompactHomeDashboard(
     onAdblock: () -> Unit,
     modifier: Modifier = Modifier,
     motionEnabled: Boolean = true,
+    contentInsets: WindowInsets = WindowInsets.safeDrawing,
 ) {
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val light = LocalHomePalette.current
@@ -223,31 +225,34 @@ internal fun CompactHomeDashboard(
                 }
             }
         }
-        Box(Modifier.fillMaxSize()) {
-        LazyColumn(modifier.fillMaxSize().background(palette.page).windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
-            .testTag("compact-home"), contentPadding = PaddingValues(
-                start = 16.dp, end = 16.dp, top = 8.dp,
-                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 94.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            item("title") {
-                Row(Modifier.fillMaxWidth().testTag("home-header"), verticalAlignment = Alignment.CenterVertically) {
-                    HomeIcon(Icons.Rounded.Refresh, "刷新状态", !data.refreshing && !data.busy, data.refreshing,
-                        onClick = onRefresh)
-                    Text("河图", Modifier.weight(1f).testTag("home-brand"), color = palette.text,
-                        fontSize = 22.sp, lineHeight = 29.sp, fontWeight = FontWeight.Black,
-                        letterSpacing = 1.sp, textAlign = TextAlign.Center)
-                    Box {
-                        HomeIcon(Icons.Rounded.MoreVert, "更多首页功能", onClick = { more = true })
-                        DropdownMenu(expanded = more, onDismissRequest = { more = false }) {
-                            listOf("应用连接" to onConnections, "广告过滤" to onAdblock,
-                                "网络诊断" to onDiagnostics, "代理设置" to onSettings).forEach { (title, callback) ->
-                                DropdownMenuItem(text = { Text(title) }, enabled = title != "网络诊断" || !data.diagnosticLoading,
-                                    onClick = { more = false; callback() })
-                            }
+        // The header is a sibling of the scroll viewport, never a lazy item.
+        // Insets are applied outside the clipped viewport and consumed exactly once.
+        Box(modifier.fillMaxSize().background(palette.page).testTag("home-viewport")) {
+        Column(Modifier.fillMaxSize().windowInsetsPadding(
+            contentInsets.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))) {
+            Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 16.dp)
+                .testTag("home-header"), verticalAlignment = Alignment.CenterVertically) {
+                HomeIcon(Icons.Rounded.Refresh, "刷新状态", !data.refreshing && !data.busy, data.refreshing,
+                    onClick = onRefresh)
+                Text("河图", Modifier.weight(1f).testTag("home-brand"), color = palette.text,
+                    fontSize = 22.sp, lineHeight = 29.sp, fontWeight = FontWeight.Black,
+                    letterSpacing = 1.sp, textAlign = TextAlign.Center)
+                Box {
+                    HomeIcon(Icons.Rounded.MoreVert, "更多首页功能", onClick = { more = true })
+                    DropdownMenu(expanded = more, onDismissRequest = { more = false }) {
+                        listOf("应用连接" to onConnections, "广告过滤" to onAdblock,
+                            "网络诊断" to onDiagnostics, "代理设置" to onSettings).forEach { (title, callback) ->
+                            DropdownMenuItem(text = { Text(title) }, enabled = title != "网络诊断" || !data.diagnosticLoading,
+                                onClick = { more = false; callback() })
                         }
                     }
                 }
             }
+        LazyColumn(Modifier.fillMaxWidth().weight(1f).clipToBounds().testTag("compact-home"),
+            overscrollEffect = null,
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp,
+                bottom = contentInsets.asPaddingValues().calculateBottomPadding() + 94.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item("hero") { HomeHero(data, onToggle, onReload, onRestart, onSettings) }
             item("shortcuts") {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -262,6 +267,7 @@ internal fun CompactHomeDashboard(
             item("resources") { HomePair(
                 left = { HomeSubscription(data, it, onSubscription) },
                 right = { HomeResources(data, it) }) }
+        }
         }
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding()
             .padding(start = 16.dp, end = 16.dp, bottom = 96.dp))
@@ -324,10 +330,10 @@ private fun HomeLatency(data: CompactHomeData, refresh: () -> Unit) {
                                     "···" -> LoadingWaveDots(motion, p.blue, Modifier.padding(top = 4.dp))
                                     "超时", "失败" -> Text(shown,
                                         Modifier.padding(top = 4.dp).testTag("latency-badge-$name")
-                                            .clip(RoundedCornerShape(7.dp)).background(p.red.copy(alpha = .08f))
-                                            .padding(horizontal = 10.dp, vertical = 5.dp),
+                                            .clip(CircleShape).background(p.red.copy(alpha = .08f))
+                                            .padding(horizontal = 10.dp, vertical = 3.dp),
                                         color = p.red, fontSize = 12.sp, lineHeight = 17.sp, fontWeight = FontWeight.Bold)
-                                    else -> HomeNumber(shown, Modifier.padding(top = 4.dp), tint, 18, TextAlign.Center)
+                                    else -> HomeNumber(shown, Modifier.padding(top = 4.dp), tint, 19, TextAlign.Center)
                                 }
                             }
                         }
@@ -373,6 +379,8 @@ private fun HomeNetwork(data: CompactHomeData, modifier: Modifier) {
     val motion = LocalHomeMotion.current
     var isLan by rememberSaveable { mutableStateOf(false) }
     var details by remember { mutableStateOf(false) }
+    val transition = rememberNetworkModeTransition(isLan, motion)
+    val shownLan = if (motion) transition.displayedLan else isLan
     var dragDistance by remember { mutableFloatStateOf(0f) }
     val threshold = with(LocalDensity.current) { 36.dp.toPx() }
     // Native clickable consumes the child Details click; no parent Initial-pass interception.
@@ -385,7 +393,7 @@ private fun HomeNetwork(data: CompactHomeData, modifier: Modifier) {
                 dragDistance = 0f
             }), onClick = { isLan = !isLan }, clickLabel = "切换 WAN 和 LAN") {
         Column(Modifier.fillMaxSize().padding(14.dp), verticalArrangement = Arrangement.SpaceBetween) {
-            HomeDataHeading(if (isLan) "LAN" else "WAN", Modifier.testTag("home-network-switch")) {
+            HomeDataHeading(if (shownLan) "LAN" else "WAN", Modifier.testTag("home-network-switch")) {
                 Box(Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)
                     .testTag("home-network-details").homeClick(label = "网络详情", onClick = { details = true }),
                     contentAlignment = Alignment.Center) {
@@ -394,33 +402,31 @@ private fun HomeNetwork(data: CompactHomeData, modifier: Modifier) {
                         fontSize = 11.sp, lineHeight = 16.sp, fontWeight = FontWeight.Bold)
                 }
             }
-            // Only one mode exists in the tree. No outgoing IP is painted under the new one.
-            key(isLan) {
-                val reveal = remember { Animatable(if (motion) 0f else 1f) }
-                LaunchedEffect(motion) {
-                    if (motion) reveal.animateTo(1f, tween(200, easing = FastOutSlowInEasing))
-                    else reveal.snapTo(1f)
-                }
+            // The same body exits, swaps at zero opacity, then enters. No dual IP layers.
+            key(Unit) {
                 Column(Modifier.fillMaxWidth().testTag("home-network-body").graphicsLayer {
-                    alpha = reveal.value
-                    translationY = (1f - reveal.value) * 4.dp.toPx()
+                    val progress = if (motion) transition.progress.value else 1f
+                    alpha = progress.coerceIn(0f, 1f)
+                    scaleX = .97f + .03f * progress
+                    scaleY = scaleX
+                    translationY = (1f - progress) * (if (transition.leaving) -6f else 6f) * density
                 }, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     // Put the address on its own full-width line. Unlike FlowRow's
                     // remaining-width measurement this has the same intrinsic and actual
                     // height in the equal-height pair; IPv4/IPv6 can never lose a line.
                     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         HomeLabel("IP")
-                        Text((if (isLan) data.lan else data.wan).ifBlank { "—" },
+                        Text((if (shownLan) data.lan else data.wan).ifBlank { "—" },
                             Modifier.fillMaxWidth().testTag("home-network-ip"), color = p.text,
                             fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace, letterSpacing = (-.5).sp,
+                            fontFamily = FontFamily.Default, letterSpacing = (-.5).sp,
                             softWrap = true, overflow = TextOverflow.Clip,
                             style = LocalTextStyle.current.copy(fontFeatureSettings = "tnum"))
                     }
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        HomeLabel(if (isLan) "接口" else "地区", Modifier.width(26.dp))
+                        HomeLabel(if (shownLan) "接口" else "地区", Modifier.width(26.dp))
                         Spacer(Modifier.width(4.dp))
-                        val flag = if (isLan) "" else CompactHomeFormat.flag(data.countryCode)
+                        val flag = if (shownLan) "" else CompactHomeFormat.flag(data.countryCode)
                         if (flag.isNotBlank()) {
                             Box(Modifier.clip(RoundedCornerShape(4.dp)).background(p.blue.copy(alpha = .06f))
                                 .padding(horizontal = 2.dp), contentAlignment = Alignment.Center) {
@@ -428,8 +434,8 @@ private fun HomeNetwork(data: CompactHomeData, modifier: Modifier) {
                             }
                             Spacer(Modifier.width(4.dp))
                         }
-                        Text((if (isLan) data.lanInterface else data.region)
-                            .takeUnless { it.isBlank() || it == "—" } ?: if (isLan) "接口未知" else "地区未知",
+                        Text((if (shownLan) data.lanInterface else data.region)
+                            .takeUnless { it.isBlank() || it == "—" } ?: if (shownLan) "接口未知" else "地区未知",
                             Modifier.weight(1f), color = p.text.copy(alpha = .82f),
                             fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold,
                             maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -475,23 +481,25 @@ private fun HomeSpeed(data: CompactHomeData, modifier: Modifier, click: () -> Un
 
 /** Common six-dp tracks align the subscription and resource cards, including unknown data. */
 @Composable
-private fun HomeUsageBar(fraction: Float?, tag: String, description: String,
+internal fun HomeUsageBar(fraction: Float?, tag: String, description: String,
     tint: Color = LocalHomePalette.current.blue) {
-    val p = LocalHomePalette.current
     val motion = LocalHomeMotion.current
-    val target = fraction?.coerceIn(0f, 1f)
+    val target = fraction?.takeIf { it.isFinite() }?.coerceIn(0f, 1f)
+    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
+    val track = if (dark) Color(0xFF334155) else Color(0xFFE2E8F0)
     val progress by animateFloatAsState(target ?: 0f,
         if (motion) tween(500, easing = FastOutSlowInEasing) else snap(), label = "$tag-progress")
     val color by animateColorAsState(tint, if (motion) tween(300) else snap(), label = "$tag-color")
-    Canvas(Modifier.fillMaxWidth().padding(top = 8.dp).height(6.dp).clip(CircleShape)
-        .testTag(tag).semantics {
+    Box(Modifier.fillMaxWidth().padding(top = 8.dp).height(6.dp).clip(CircleShape)
+        .background(track).testTag(tag).semantics {
             if (target != null) progressBarRangeInfo = ProgressBarRangeInfo(target, 0f..1f)
             stateDescription = description
         }) {
-        drawRoundRect(p.line, cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height))
-        if (target != null && progress > 0f) drawRoundRect(color,
-            size = androidx.compose.ui.geometry.Size(size.width * progress, size.height),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height))
+        Canvas(Modifier.matchParentSize()) {
+            if (target != null && progress > 0f) drawRoundRect(color,
+                size = androidx.compose.ui.geometry.Size(size.width * progress, size.height),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2f))
+        }
     }
 }
 

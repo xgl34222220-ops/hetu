@@ -192,7 +192,7 @@ internal fun NativeStatusHero(data: CompactHomeData, toggle: () -> Unit, reload:
                     Text(data.config.ifBlank { "尚未选择配置" },
                         Modifier.padding(start = 22.dp).testTag("hero-config"),
                         color = text, fontSize = 15.sp, lineHeight = 21.sp, fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        fontFamily = FontFamily.Default, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
                 Spacer(Modifier.width(10.dp))
                 HeroStatusGlyph(phase, accent, motion)
@@ -381,7 +381,46 @@ private fun NetworkDetailRow(label: String, raw: String) {
         Spacer(Modifier.width(12.dp))
         SelectionContainer(Modifier.weight(1f)) {
             Text(value, Modifier.fillMaxWidth(), color = t.textPrimary, textAlign = TextAlign.End,
-                fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 14.sp, lineHeight = 21.sp)
+                fontFamily = FontFamily.Default, fontWeight = FontWeight.Bold, fontSize = 14.sp, lineHeight = 21.sp,
+                style = LocalTextStyle.current.copy(fontFeatureSettings = "tnum"))
         }
     }
+}
+
+
+/** Presentation state only: never invokes proxy, routing or network operations. */
+@Stable
+internal class NetworkModeTransition(initialLan: Boolean) {
+    var displayedLan by mutableStateOf(initialLan)
+        internal set
+    var leaving by mutableStateOf(false)
+        internal set
+    val progress = Animatable(1f)
+}
+
+/**
+ * Sequential out-in, not Crossfade/AnimatedContent. A new target cancels the old coroutine;
+ * the latest target wins, and a stopped lifecycle/reduced-motion request settles immediately.
+ * Exactly one subtree is composed throughout both halves of the transition.
+ */
+@Composable
+internal fun rememberNetworkModeTransition(targetLan: Boolean, motion: Boolean): NetworkModeTransition {
+    val state = remember { NetworkModeTransition(targetLan) }
+    LaunchedEffect(targetLan, motion) {
+        if (!motion) {
+            state.displayedLan = targetLan
+            state.leaving = false
+            state.progress.snapTo(1f)
+        } else {
+            if (state.displayedLan != targetLan) {
+                state.leaving = true
+                state.progress.animateTo(0f, tween(110, easing = FastOutSlowInEasing))
+                state.displayedLan = targetLan
+                state.leaving = false
+                state.progress.snapTo(0f)
+            } else state.leaving = false
+            state.progress.animateTo(1f, tween(220, easing = CubicBezierEasing(.34f, 1.56f, .64f, 1f)))
+        }
+    }
+    return state
 }
