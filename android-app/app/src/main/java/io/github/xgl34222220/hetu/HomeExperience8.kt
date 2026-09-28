@@ -38,6 +38,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.exp
+import kotlin.math.ln
 
 internal val HomePullOffset = SemanticsPropertyKey<Float>("HomePullOffsetDp")
 internal val HomePullActive = SemanticsPropertyKey<Boolean>("HomePullActive")
@@ -81,33 +82,39 @@ internal class HomePullState(private val scope: CoroutineScope, private val dens
     fun drag(deltaPx: Float): Float {
         if (active || !deltaPx.isFinite()) return 0f
         animation?.cancel()
+        // A new drag catches the current spring position instead of snapping to zero.
+        if (rawPx == 0f && offsetPx > 0f) {
+            rawPx = (-190f * ln((1f - offsetDp / 110f).coerceIn(.0025f, 1f))) * density
+        }
         val before = rawPx
         rawPx = (rawPx + deltaPx).coerceIn(0f, 1140f * density)
         offsetPx = homeRubberBand(rawPx / density) * density
         return rawPx - before
     }
 
-    fun release(enabled: Boolean, onRefresh: () -> Unit): Boolean {
+    fun release(enabled: Boolean, onRefresh: () -> Unit, velocityPx: Float = 0f): Boolean {
         if (rawPx <= 0f || active) return false
         val trigger = enabled && armed
+        val derivative = (110f / 190f) * (1f - offsetDp / 110f).coerceIn(0f, 1f)
+        val releaseVelocity = if (velocityPx.isFinite()) (velocityPx * derivative).coerceIn(-600f * density, 600f * density) else 0f
         rawPx = 0f
         if (trigger) {
             requested = true
-            settle(46f * density)
+            settle(46f * density, releaseVelocity)
             try { onRefresh() } catch (error: Exception) {
                 requested = false
                 settle(0f)
                 throw error
             }
-        } else settle(0f)
+        } else settle(0f, releaseVelocity)
         return true
     }
 
-    private fun settle(target: Float) {
+    private fun settle(target: Float, velocity: Float = 0f) {
         animation?.cancel()
         if (!motion) { offsetPx = target; return }
         animation = scope.launch {
-            Animatable(offsetPx).animateTo(target, spring(dampingRatio = .82f, stiffness = 380f)) {
+            Animatable(offsetPx).animateTo(target, spring(dampingRatio = .84f, stiffness = 280f), initialVelocity = velocity) {
                 offsetPx = value.coerceIn(0f, 110f * density)
             }
             offsetPx = target
@@ -140,7 +147,7 @@ internal fun rememberHomePull(
                 return Offset(0f, state.drag(available.y))
             }
             override suspend fun onPreFling(available: Velocity): Velocity {
-                val pulled = state.release(currentEnabled, currentRefresh)
+                val pulled = state.release(currentEnabled, currentRefresh, available.y)
                 return if (pulled && available.y > 0f) Velocity(0f, available.y) else Velocity.Zero
             }
         }

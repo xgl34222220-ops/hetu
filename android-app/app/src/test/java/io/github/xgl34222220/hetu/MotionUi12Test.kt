@@ -86,10 +86,18 @@ class MotionUi12Test {
     @Test fun shortSlowDragReturnsToSameAnchor() {
         renderSheet()
         val top = node("native-details-sheet").fetchSemanticsNode().boundsInRoot.top
-        node("sheet-drag-handle").performTouchInput { swipe(center,center+Offset(0f,90f),600) }
+        // 90px / 1.2s = 75dp/s on this mdpi fixture: below native 125dp/s.
+        node("sheet-drag-handle").performTouchInput { swipe(center,center+Offset(0f,90f),1200) }
         node("native-details-sheet").assertIsDisplayed()
         assertEquals(top,node("native-details-sheet").fetchSemanticsNode().boundsInRoot.top,1f)
         assertEquals(0,closes)
+    }
+    @Test fun unpaused150DpPerSecondGestureFollowsTheNativeFlingContract() {
+        renderSheet()
+        // Preserve the exact failed-attempt gesture, now correctly classified.
+        node("sheet-drag-handle").performTouchInput { swipe(center,center+Offset(0f,90f),600) }
+        node("native-details-sheet").assertDoesNotExist()
+        assertEquals(1,closes); assertEquals(0f,progress(),0f)
     }
     @Test fun shortFastFlingClosesWithoutRequiring120dpTravel() {
         renderSheet()

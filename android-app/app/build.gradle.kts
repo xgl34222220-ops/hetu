@@ -16,8 +16,8 @@ android {
         applicationId = "io.github.xgl34222220.hetu"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1012
-        versionName = "0.4.0-ui92-r146.11"
+        versionCode = 1013
+        versionName = "0.4.0-ui92-r146.12"
     }
 
     // Explicit CI debug identity. No private key is committed or exported.
@@ -78,7 +78,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.graphics:graphics-shapes:1.0.1")
-    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material3:material3") { version { strictly("1.5.0-alpha22") } }
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")

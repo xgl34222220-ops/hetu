@@ -236,6 +236,7 @@ internal fun CompactHomeDashboard(
         val headerHaze = remember { HazeState() }
         val (pull, pullConnection) = rememberHomePull(listState, data.refreshing,
             !data.busy && data.operation == null, motion, onPullRefresh)
+        val (bottomRebound, bottomConnection) = rememberBottomRebound12(listState, motion)
         val collapseDistance = with(LocalDensity.current) { 30.dp.toPx() }
         val collapse by remember(listState, collapseDistance) { derivedStateOf {
             if (listState.firstVisibleItemIndex > 0) 1f
@@ -269,8 +270,8 @@ internal fun CompactHomeDashboard(
         val compact = maxHeight < 710.dp
         CompositionLocalProvider(LocalHomeCompactSpacing provides compact,
             LocalHomeShortSpacing provides (maxHeight < 650.dp)) {
-        LazyColumn(Modifier.fillMaxSize().graphicsLayer { translationY = pull.offsetPx }
-            .nestedScroll(pullConnection)
+        LazyColumn(Modifier.fillMaxSize().graphicsLayer { translationY = pull.offsetPx + bottomRebound.offsetPx }
+            .nestedScroll(pullConnection).nestedScroll(bottomConnection)
             .hazeSource(headerHaze).testTag("compact-home").semantics {
                 if (!data.busy && !data.refreshing && data.operation == null) {
                     customActions = listOf(CustomAccessibilityAction("刷新首页状态") { onPullRefresh(); true })

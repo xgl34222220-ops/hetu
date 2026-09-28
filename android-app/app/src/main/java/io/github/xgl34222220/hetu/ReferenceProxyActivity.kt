@@ -3806,6 +3806,7 @@ internal fun RefInfoBottomSheet(
 ) {
     val t = LocalHetuTokens.current
     val sheet = rememberInteractiveSheetState()
+    val closeScope = rememberCoroutineScope()
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
     var copied by remember(text) { mutableStateOf(false) }
     val terminal = title.contains("日志")
@@ -3833,12 +3834,12 @@ internal fun RefInfoBottomSheet(
             }
         }
     }
-    ModalBottomSheet(
+    MotionModalSheet12(
         onDismissRequest = onDismiss,
         sheetState = sheet,
         sheetGesturesEnabled = true,
         modifier = Modifier.testTag("native-log-sheet"),
-        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
+        shape = SheetShape12(30.dp),
         containerColor = if (terminal) Color(0xFF0B1220) else t.elevatedCardBackground,
         contentColor = if (terminal) Color(0xFFE2E8F0) else t.textPrimary,
         tonalElevation = 0.dp,
@@ -3852,7 +3853,7 @@ internal fun RefInfoBottomSheet(
         },
     ) {
         Column(
-            Modifier.fillMaxWidth().fillMaxHeight(.80f).navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
+            Modifier.sheetReveal12().fillMaxWidth().fillMaxHeight(.80f).navigationBarsPadding().padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -3862,7 +3863,7 @@ internal fun RefInfoBottomSheet(
                     copied = true
                 }) { Text(if (copied) "已复制" else "复制", color = if (terminal) Color(0xFF93C5FD) else MaterialTheme.colorScheme.primary) }
                 IconButton(
-                    onClick = onDismiss,
+                    onClick = { closeScope.launch { sheet.hide(); onDismiss() } },
                     modifier = Modifier.size(48.dp).background(if (terminal) Color.White.copy(alpha = .07f) else t.controlBackground.copy(alpha = .72f), CircleShape),
                 ) {
                     Icon(Icons.Rounded.Close, "关闭", tint = if (terminal) Color(0xFFCBD5E1) else t.textSecondary, modifier = Modifier.size(17.dp))

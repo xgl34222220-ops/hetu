@@ -77,15 +77,6 @@ internal fun StrategyPanel11(
     val testing = remember { mutableStateMapOf<String, Boolean>() }
     val batchTesting = remember { mutableStateMapOf<String, Boolean>() }
     val fontScale = LocalDensity.current.fontScale
-    val hardware = androidx.compose.ui.platform.LocalView.current.isHardwareAccelerated
-    var blurEnabled by remember(prefs) { mutableStateOf(prefs.getBoolean("enableBlur", true)) }
-    DisposableEffect(prefs) {
-        val listener = SharedPreferences.OnSharedPreferenceChangeListener { p, key ->
-            if (key == "enableBlur") blurEnabled = p.getBoolean(key, true)
-        }
-        prefs.registerOnSharedPreferenceChangeListener(listener)
-        onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
-    }
     val columns = if (fontScale >= 1.5f) 1 else options.columns
     val delaySnapshot = delays.toMap()
     val groups = remember(state.groups, query, state.trafficMode, options) {
@@ -166,13 +157,11 @@ internal fun StrategyPanel11(
         }
     }
     val (pull, connection) = rememberHomePull(list, refreshing, true, motion, ::requestRefresh)
+    val (bottomRebound, bottomConnection) = rememberBottomRebound12(list, motion)
+    val pixelDensity = LocalDensity.current.density
     val clearance = LocalHomeDockClearance.current ?:
         (86.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding())
-    Column(Modifier.fillMaxSize().graphicsLayer {
-        // Blur only this page behind its API sheet; existing detail sheets keep their own backdrop.
-        renderEffect = if (settings && blurEnabled && hardware && android.os.Build.VERSION.SDK_INT >= 31)
-            androidx.compose.ui.graphics.BlurEffect(8.dp.toPx(), 8.dp.toPx()) else null
-    }.background(t.pageBackground).padding(bottom = clearance)
+    Column(Modifier.fillMaxSize().background(t.pageBackground).padding(bottom = clearance)
         .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
         .testTag("panel11-root")) {
         PanelToolbar11(searchOpen, options, onSearch = {
@@ -183,8 +172,8 @@ internal fun StrategyPanel11(
             next.save(prefs)
         }, onSettings = { settings = true })
         AnimatedVisibility(searchOpen,
-            enter = expandVertically(tween(if (motion) 220 else 0)) + fadeIn(tween(if (motion) 160 else 0)),
-            exit = shrinkVertically(tween(if (motion) 180 else 0)) + fadeOut(tween(if (motion) 120 else 0))) {
+            enter = expandVertically(HetuMotion12.spatial(motion)) + fadeIn(tween(if (motion) 160 else 0)),
+            exit = shrinkVertically(HetuMotion12.spatial(motion)) + fadeOut(tween(if (motion) 120 else 0))) {
             OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth().padding(horizontal = 16.dp)
                 .testTag("panel11-search-input"), singleLine = true, shape = RoundedCornerShape(18.dp),
                 textStyle = LocalTextStyle.current.copy(fontSize = 13.sp),
@@ -204,8 +193,8 @@ internal fun StrategyPanel11(
             Icon(Icons.Rounded.ChevronRight, null, Modifier.size(16.dp), tint = t.textSecondary)
         }
         Box(Modifier.weight(1f).fillMaxWidth().clipToBounds().testTag("panel11-viewport")) {
-            LazyColumn(Modifier.fillMaxSize().graphicsLayer { translationY = pull.offsetPx }
-                .nestedScroll(connection).testTag("panel11-list"), state = list, overscrollEffect = null,
+            LazyColumn(Modifier.fillMaxSize().graphicsLayer { translationY = pull.offsetPx + bottomRebound.offsetPx }
+                .nestedScroll(connection).nestedScroll(bottomConnection).semantics { this[EdgeOffset12] = bottomRebound.offsetPx / pixelDensity }.testTag("panel11-list"), state = list, overscrollEffect = null,
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 72.dp)) {
                 if (groups.isEmpty()) item("empty") {
                     Column(Modifier.fillMaxWidth().padding(vertical = 32.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -220,7 +209,7 @@ internal fun StrategyPanel11(
                     val group = allGroups[entry.group.name] ?: entry.group
                     val current = selection.current(group)
                     val animation = if (motion) Modifier.animateItem(
-                        fadeInSpec = tween(180), placementSpec = spring(dampingRatio = .86f, stiffness = 500f), fadeOutSpec = tween(120)
+                        fadeInSpec = tween(180), placementSpec = spring(dampingRatio = .84f, stiffness = 280f), fadeOutSpec = tween(120)
                     ) else Modifier
                     when (entry) {
                         is PanelEntry11.Header -> PanelGroupHeader11(group, current, entry.expanded,
@@ -296,7 +285,7 @@ private fun PanelGroupHeader11(group: ProxyGroupUi, current: String, open: Boole
     delays: Map<String, Long>, modifier: Modifier, onClick: () -> Unit) {
     val t = LocalHetuTokens.current
     val motion = LocalHetuMotionEnabled.current
-    val rotation by animateFloatAsState(if (open) 180f else 0f, tween(if (motion) 220 else 0), label = "group-expand")
+    val rotation by animateFloatAsState(if (open) 180f else 0f, HetuMotion12.spatial(motion), label = "group-expand")
     val shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = if (open) 0.dp else 20.dp, bottomEnd = if (open) 0.dp else 20.dp)
     Column(modifier.fillMaxWidth().clip(shape).background(t.cardBackground)
         .nativePress(label = if (open) "折叠${group.name}" else "展开${group.name}", onClick = onClick)

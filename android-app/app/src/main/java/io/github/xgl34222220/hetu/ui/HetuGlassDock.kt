@@ -103,8 +103,8 @@ fun HetuGlassDock(
     val dockSurfaceBackdrop = rememberLayerBackdrop()
     val hazeModifier = if (activeHaze) {
         Modifier.hazeEffect(state = hazeState, style = HazeMaterials.ultraThin()) {
-            blurRadius = 30.dp
-            noiseFactor = .018f
+            blurRadius = 20.dp
+            noiseFactor = .006f
         }
     } else Modifier
     val glassBrush = when {
@@ -129,19 +129,19 @@ fun HetuGlassDock(
                 colorControls(
                     brightness = if (dark) -.015f else .025f,
                     contrast = 1.05f,
-                    saturation = 1.80f,
+                    saturation = 1.15f,
                 )
                 blur(24.dp.toPx(), 24.dp.toPx())
                 liquidGlassLens(
-                    refractionHeight = 17.dp.toPx(),
-                    refractionAmount = 13.dp.toPx(),
+                    refractionHeight = 12.dp.toPx(),
+                    refractionAmount = 8.dp.toPx(),
                     depthEffect = true,
                     chromaticAberration = .045f,
                 )
             },
             highlight = {
                 (if (dark) Highlight.GlassStrokeSmallDark else Highlight.GlassStrokeSmallLight)
-                    .copy(alpha = if (dark) .72f else .86f)
+                    .copy(alpha = if (dark) .16f else .24f)
             },
             onDrawSurface = {
                 drawRect(shellTint)
@@ -239,7 +239,7 @@ private fun DockItems(
                 val interaction = remember { MutableInteractionSource() }
                 val pressed by interaction.collectIsPressedAsState()
                 val weight by animateFloatAsState(if (active) 1.65f else 1f,
-                    if (motion) spring(dampingRatio = .88f, stiffness = 420f) else snap(), label = "dock-weight-$index")
+                    if (motion) spring(dampingRatio = .84f, stiffness = 300f) else snap(), label = "dock-weight-$index")
                 val scale by animateFloatAsState(if (pressed && motion) .97f else 1f,
                     if (motion) spring(dampingRatio = .82f, stiffness = 550f) else snap(), label = "dock-press-$index")
                 val fill by animateColorAsState(if (active) indicatorColor else Color.Transparent,

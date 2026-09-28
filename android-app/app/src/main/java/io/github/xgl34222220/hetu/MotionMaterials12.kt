@@ -18,6 +18,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.input.nestedscroll.*
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -41,8 +42,6 @@ import kotlin.math.roundToInt
 internal object HetuMotion12 {
     const val Damping = .84f
     const val Stiffness = 280f
-    const val DismissVelocityDp = 1100f
-    const val DismissDistanceDp = 120f
     fun <T> spatial(enabled: Boolean = true): FiniteAnimationSpec<T> =
         if (enabled) spring(dampingRatio = Damping, stiffness = Stiffness) else snap()
 }
@@ -89,7 +88,8 @@ internal fun backdropScale12(progress: Float, motion: Boolean): Float =
 
 internal class ModalLayer12(val state: SheetState) {
     var height by mutableFloatStateOf(0f)
-    fun coverage(viewport: Float): Float = sheetCoverage12(viewport, height,
+    var anchorViewport by mutableFloatStateOf(0f)
+    fun coverage(viewport: Float): Float = sheetCoverage12(anchorViewport.takeIf { it > 0f } ?: viewport, height,
         runCatching { state.requireOffset() }.getOrDefault(Float.NaN))
 }
 internal class ModalBackdrop12 {
@@ -194,8 +194,13 @@ internal fun MotionModalSheet12(
                 // The scrim remains independently animated by native Material3. Its
                 // maximum is deliberately lighter; real background blur is above.
                 scrimColor = scrimColor.copy(alpha = if (dark) .32f else .22f), dragHandle = dragHandle,
-                modifier = modifier.onSizeChanged { layer.height = it.height.toFloat() }
-                    .drawWithContent {
+                modifier = modifier.layout { measurable, constraints ->
+                    // The native anchors use these same constraints, including IME resizing.
+                    val placeable = measurable.measure(constraints)
+                    layer.anchorViewport = constraints.maxHeight.toFloat()
+                    layer.height = placeable.height.toFloat()
+                    layout(placeable.width, placeable.height) { placeable.placeRelative(0, 0) }
+                }.drawWithContent {
                         drawContent()
                         val start = 30.dp.toPx().coerceAtMost(size.width / 2)
                         drawLine(Color.White.copy(alpha = if (dark) .08f else .35f),

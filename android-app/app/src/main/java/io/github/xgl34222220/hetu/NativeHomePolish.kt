@@ -80,8 +80,6 @@ internal object HomeLifecyclePresentation {
     }
 }
 
-private class SheetBackdrop { var count by mutableIntStateOf(0) }
-private val LocalSheetBackdrop = staticCompositionLocalOf<SheetBackdrop?> { null }
 private fun Context.activity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.takeUnless { it === this }?.activity()
@@ -91,13 +89,8 @@ private fun Context.activity(): Activity? = when (this) {
 /** Paints the actual window, including system-bar regions. No inset rounded outer frame. */
 @Composable
 internal fun ImmersiveUiHost(content: @Composable () -> Unit) {
-    if (LocalSheetBackdrop.current != null) { content(); return }
-    val backdrop = remember { SheetBackdrop() }
     val background = LocalHetuTokens.current.pageBackground
     val activity = LocalContext.current.activity()
-    val motion = LocalHetuMotionEnabled.current
-    val blur by animateDpAsState(if (backdrop.count > 0) 8.dp else 0.dp,
-        tween(if (motion) 250 else 0), label = "sheet-background-blur")
     DisposableEffect(activity, background) {
         activity?.window?.let { window ->
             window.setBackgroundDrawable(ColorDrawable(background.toArgb()))
@@ -114,11 +107,8 @@ internal fun ImmersiveUiHost(content: @Composable () -> Unit) {
         }
         onDispose { }
     }
-    CompositionLocalProvider(LocalSheetBackdrop provides backdrop) {
-        Box(Modifier.fillMaxSize().background(background).testTag("immersive-window")) {
-            // Compose blur is a no-op on API <31; the readable scrim is always present.
-            Box(Modifier.fillMaxSize().blur(blur, BlurredEdgeTreatment.Unbounded)) { content() }
-        }
+    Box(Modifier.fillMaxSize().background(background).testTag("immersive-window")) {
+        ModalBackdropHost12(content)
     }
 }
 
@@ -129,8 +119,8 @@ internal fun Modifier.nativePress(enabled: Boolean = true, label: String? = null
     val pressed by source.collectIsPressedAsState()
     val view = LocalView.current
     val scale by animateFloatAsState(if (enabled && pressed && motion) .97f else 1f,
-        if (!motion) snap() else if (pressed) tween(150, easing = CubicBezierEasing(.2f, 0f, 0f, 1f))
-        else spring(dampingRatio = .78f, stiffness = 750f), label = "native-press")
+        if (!motion) snap() else if (pressed) tween(80, easing = CubicBezierEasing(.2f, 0f, 0f, 1f))
+        else spring(dampingRatio = .84f, stiffness = 650f), label = "native-press")
     return graphicsLayer { scaleX = scale; scaleY = scale }
         .clickable(source, indication = null, enabled = enabled, role = Role.Button, onClickLabel = label) {
             view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
@@ -333,16 +323,11 @@ internal fun LoadingWaveDots(motion: Boolean, color: Color, modifier: Modifier =
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun NativeDetailsSheet(title: String, onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
-    val backdrop = LocalSheetBackdrop.current
     val sheet = rememberInteractiveSheetState()
     val scope = rememberCoroutineScope()
     val t = LocalHetuTokens.current
-    DisposableEffect(backdrop) {
-        backdrop?.let { it.count++ }
-        onDispose { backdrop?.let { it.count = (it.count - 1).coerceAtLeast(0) } }
-    }
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, sheetGesturesEnabled = true,
-        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
+    MotionModalSheet12(onDismissRequest = onDismiss, sheetState = sheet, sheetGesturesEnabled = true,
+        shape = SheetShape12(32.dp),
         containerColor = t.cardBackground, contentColor = t.textPrimary,
         scrimColor = Color(0xFF0F172A).copy(alpha = .4f), tonalElevation = 0.dp,
         modifier = Modifier.testTag("native-details-sheet"),
@@ -350,14 +335,14 @@ internal fun NativeDetailsSheet(title: String, onDismiss: () -> Unit, content: @
             .semantics { contentDescription = "下拉关闭" }, contentAlignment = Alignment.Center) {
             Box(Modifier.width(40.dp).height(6.dp).background(t.textSecondary.copy(alpha = .28f), CircleShape))
         } }) {
-        Column(Modifier.fillMaxWidth().weight(1f, fill = false).verticalScroll(rememberScrollState())
+        Column(Modifier.sheetReveal12().fillMaxWidth().weight(1f, fill = false).verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text(title, Modifier.fillMaxWidth(), color = t.textPrimary, fontSize = 20.sp, lineHeight = 27.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
             content()
             Spacer(Modifier.height(2.dp))
         }
         Button(onClick = { scope.launch { sheet.hide(); onDismiss() } },
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp).fillMaxWidth().heightIn(min = 52.dp)
+            modifier = Modifier.sheetReveal12(1).padding(horizontal = 24.dp, vertical = 16.dp).fillMaxWidth().heightIn(min = 52.dp)
                 .testTag("sheet-confirm"), shape = RoundedCornerShape(16.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB), contentColor = Color.White)) {
             Text("确定", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)

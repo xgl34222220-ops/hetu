@@ -44,8 +44,8 @@ internal fun PanelToolbar11(searchOpen: Boolean, options: PanelOptions11,
             PanelTool11(Icons.Rounded.FilterList, "筛选策略", "panel11-filter", menu == "filter") {
                 menu = if (menu == "filter") "" else "filter"
             }
-            DropdownMenu(expanded = menu == "filter", onDismissRequest = { menu = "" },
-                shape = RoundedCornerShape(20.dp), containerColor = t.cardBackground,
+            MotionPopover12(expanded = menu == "filter", onDismissRequest = { menu = "" },
+                shape = HomeContinuousShape(20.dp), containerColor = t.cardBackground,
                 modifier = Modifier.widthIn(min = 260.dp).testTag("panel11-filter-menu")) {
                 PanelToggleMenu11("显示隐藏策略", "panel11-hidden", options.showHidden) { onOptions(options.copy(showHidden = !options.showHidden)) }
                 PanelToggleMenu11("根据模式显示 GLOBAL", "panel11-global", options.globalByMode) { onOptions(options.copy(globalByMode = !options.globalByMode)) }
@@ -57,8 +57,8 @@ internal fun PanelToolbar11(searchOpen: Boolean, options: PanelOptions11,
             PanelTool11(Icons.Rounded.Tune, "排序与布局", "panel11-layout", menu == "layout") {
                 menu = if (menu == "layout") "" else "layout"
             }
-            DropdownMenu(expanded = menu == "layout", onDismissRequest = { menu = "" },
-                shape = RoundedCornerShape(20.dp), containerColor = t.cardBackground,
+            MotionPopover12(expanded = menu == "layout", onDismissRequest = { menu = "" },
+                shape = HomeContinuousShape(20.dp), containerColor = t.cardBackground,
                 modifier = Modifier.widthIn(min = 230.dp).testTag("panel11-layout-menu")) {
                 listOf("config" to "配置顺序", "name" to "名称排序", "latency" to "延迟排序").forEach { (key, label) ->
                     DropdownMenuItem(text = { Text(label, fontSize = 13.sp) },
@@ -125,15 +125,15 @@ internal fun PanelApiSheet11(prefs: SharedPreferences, localPort: Int, onDismiss
     val scope = rememberCoroutineScope()
     var draft by remember { mutableStateOf(PanelApiDraft11.read(prefs)) }
     var error by remember { mutableStateOf<String?>(null) }
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = state,
-        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
+    MotionModalSheet12(onDismissRequest = onDismiss, sheetState = state,
+        shape = SheetShape12(30.dp),
         containerColor = t.cardBackground, contentColor = t.textPrimary,
         scrimColor = Color(0xFF0F172A).copy(alpha = .4f), tonalElevation = 0.dp,
         modifier = Modifier.testTag("panel11-api-sheet"),
         dragHandle = { Box(Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.Center) {
             Box(Modifier.width(40.dp).height(5.dp).background(t.textMuted.copy(alpha = .4f), CircleShape))
         } }) {
-        Column(Modifier.fillMaxWidth().weight(1f, fill = false).verticalScroll(rememberScrollState())
+        Column(Modifier.sheetReveal12().fillMaxWidth().weight(1f, fill = false).verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp).imePadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("API 与测速配置", Modifier.fillMaxWidth(), textAlign = TextAlign.Center,
                 fontSize = 18.sp, fontWeight = FontWeight.Bold, color = t.textPrimary)
@@ -170,7 +170,7 @@ internal fun PanelApiSheet11(prefs: SharedPreferences, localPort: Int, onDismiss
                 scope.launch { state.hide(); onDismiss() }
             }
         }, shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp).fillMaxWidth().heightIn(min = 52.dp).testTag("panel11-api-save")) {
+            modifier = Modifier.sheetReveal12(1).padding(horizontal = 20.dp, vertical = 14.dp).fillMaxWidth().heightIn(min = 52.dp).testTag("panel11-api-save")) {
             Text("保存并应用", fontWeight = FontWeight.Bold)
         }
     }
