@@ -69,22 +69,24 @@ internal fun PanelNode11(group: String, node: ProxyNodeUi, active: Boolean, dela
     onSelect: () -> Unit, onDelay: () -> Unit, onName: () -> Unit, onNested: (() -> Unit)?) {
     val t = LocalHetuTokens.current
     val motion = LocalHetuMotionEnabled.current
-    val fill by animateColorAsState(if (active) Color(0xFF2563EB).copy(alpha = .09f) else t.controlBackground.copy(alpha = .26f),
+    val label14 = remember(node.name) { nodeLabel14(node.name) }
+    val fill by animateColorAsState(if (active) Color(0xFF2563EB).copy(alpha = .09f) else t.cardBackground,
         tween(if (motion) 200 else 0), label = "selected-node")
     // nativePress owns the main click; a separate info action exposes untruncated names.
-    Column(modifier.clip(RoundedCornerShape(14.dp)).background(fill)
-        .border(1.dp, if (active) Color(0xFF93C5FD).copy(alpha = .65f) else t.textMuted.copy(alpha = .1f), RoundedCornerShape(14.dp))
+    Column(modifier.diffuseCardShadow(HomeContinuousShape(18.dp)).clip(HomeContinuousShape(18.dp)).background(fill)
+        .border(1.dp, if (active) Color(0xFF93C5FD).copy(alpha = .65f) else t.textMuted.copy(alpha = .07f), HomeContinuousShape(18.dp))
         .panelNodePress11(enabled = enabled, onClick = onSelect, onLongClick = onName)
         .semantics { selected = active; role = Role.RadioButton; stateDescription = if (pending) "等待核心确认" else if (active) "当前节点" else "未选择" }
         .testTag("panel11-node:$group:${node.name}").padding(start = 10.dp, end = 6.dp, top = if (compact) 7.dp else 11.dp, bottom = if (compact) 3.dp else 7.dp)) {
         Row(verticalAlignment = Alignment.Top) {
-            Text(node.name, Modifier.weight(1f).testTag("panel11-node-name:$group:${node.name}"),
-                color = t.textPrimary, fontSize = 12.sp, lineHeight = 18.sp,
+            Text(label14.title, Modifier.weight(1f).testTag("panel11-node-name:$group:${node.name}"),
+                color = t.textPrimary, fontSize = 14.sp, lineHeight = 20.sp,
                 fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
-                maxLines = if (compact) 1 else 2, overflow = TextOverflow.Ellipsis)
+                maxLines = if (compact) 2 else 3, overflow = TextOverflow.Ellipsis)
             if (pending) NativeSpinner(Color(0xFF2563EB), motion, Modifier.size(16.dp))
             else if (active) Icon(Icons.Rounded.Check, "当前正在使用", Modifier.size(17.dp).testTag("panel11-check:$group:${node.name}"), tint = Color(0xFF2563EB))
         }
+        NodeTags14(label14.tags, Modifier.testTag("panel14-node-tags:$group:${node.name}"))
         Text(listOf(node.type.uppercase(Locale.ROOT).ifBlank { "协议未知" }, if (node.udp) "UDP" else "")
             .filter(String::isNotBlank).joinToString(" · "), Modifier.padding(top = 4.dp)
                 .testTag("panel11-protocol:$group:${node.name}"), color = t.textSecondary,
@@ -106,12 +108,5 @@ internal fun PanelNode11(group: String, node: ProxyNodeUi, active: Boolean, dela
 
 @Composable
 internal fun PanelDelayLabel11(value: Long?, loading: Boolean) {
-    val t = LocalHetuTokens.current
-    val color = when { value == -1L || value == -2L -> t.danger; value != null && value >= 300 -> Color(0xFFD97706); value != null && value > 0 -> Color(0xFF2563EB); else -> t.textSecondary }
-    Box(Modifier.clip(CircleShape).background(color.copy(alpha = .07f)).padding(horizontal = 7.dp, vertical = 3.dp)) {
-        if (loading) NativeSpinner(Color(0xFF2563EB), LocalHetuMotionEnabled.current, Modifier.size(14.dp))
-        else Text(when { value == -1L -> "超时"; value == -2L -> "失败"; value != null && value > 0 -> "$value ms"; else -> "未测" },
-            color = color, fontSize = 11.sp, lineHeight = 16.sp, fontWeight = FontWeight.SemiBold,
-            style = LocalTextStyle.current.copy(fontFeatureSettings = "tnum"), maxLines = 1)
-    }
+    QuietDelay14(value, loading)
 }

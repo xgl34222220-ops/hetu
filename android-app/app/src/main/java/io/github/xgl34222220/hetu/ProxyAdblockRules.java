@@ -8,7 +8,7 @@ import java.util.*;
 
 /** Exports Hetu DNS block/allow snapshots for Mihomo local domain providers. */
 final class ProxyAdblockRules {
-    private static final String EXPORT_VERSION = "filter-v3:";
+    private static final String EXPORT_VERSION = "filter-v4-sha256:";
     static final String PROVIDER_NAME = "hetu-adblock";
     static final String ALLOW_PROVIDER_NAME = "hetu-adblock-allow";
     static final String PROVIDER_PATH = "./ruleset/hetu-adblock.txt";
@@ -42,7 +42,7 @@ final class ProxyAdblockRules {
             Properties cached=new Properties();
             try(FileInputStream in=new FileInputStream(meta)){cached.load(in);}
             catch(Exception ignored){cached.clear();}
-            if(persisted.equals(cached.getProperty("revision",""))){
+            if(persisted.equals(cached.getProperty("revision",""))&&RuntimeCompatibility14.cachedPairValid(cached,target,allowTarget)){
                 try{
                     int count=Integer.parseInt(cached.getProperty("count","-1"));
                     int allowCount=Integer.parseInt(cached.getProperty("allowCount","-1"));
@@ -65,6 +65,8 @@ final class ProxyAdblockRules {
 
         Properties saved=new Properties();
         saved.setProperty("revision",revision);
+        saved.setProperty("blockSha256",RuntimeCompatibility14.sha256(target));
+        saved.setProperty("allowSha256",RuntimeCompatibility14.sha256(allowTarget));
         saved.setProperty("count",String.valueOf(domains.size()));
         saved.setProperty("allowCount",String.valueOf(allow.size()));
         File metaTmp=new File(dir,"hetu-adblock.meta.new");

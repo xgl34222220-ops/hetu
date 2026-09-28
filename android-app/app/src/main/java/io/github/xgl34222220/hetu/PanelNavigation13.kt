@@ -102,6 +102,7 @@ internal fun StrategyPanel13(state: ProxyComposeState, delays: MutableMap<String
     var refreshing by remember { mutableStateOf(false) }
     val testing = remember { mutableStateMapOf<String, Boolean>() }
     val batchTesting = remember { mutableStateMapOf<String, Boolean>() }
+    val batchDone14 = remember { mutableStateMapOf<String, Int>() }
     val fontScale = LocalDensity.current.fontScale
     val columns = if (fontScale >= 1.5f) 1 else options.columns
     val outerColumns = if (fontScale >= 1.5f) 1 else 2
@@ -155,10 +156,11 @@ internal fun StrategyPanel13(state: ProxyComposeState, delays: MutableMap<String
     fun testAll(group: ProxyGroupUi) {
         if (batchTesting[group.name] == true || !state.running) return
         batchTesting[group.name] = true
+        batchDone14[group.name] = 0
         scope.launch {
             try {
                 group.nodes.map { it.name }.distinct().chunked(4).forEach { chunk ->
-                    coroutineScope { chunk.map { async { testNode(it) } }.awaitAll() }
+                    coroutineScope { chunk.map { name -> async { try { testNode(name) } finally { batchDone14[group.name] = (batchDone14[group.name] ?: 0) + 1 } } }.awaitAll() }
                 }
             } finally { batchTesting.remove(group.name) }
         }
@@ -221,6 +223,12 @@ internal fun StrategyPanel13(state: ProxyComposeState, delays: MutableMap<String
             }
             HomePullIndicator(pull, motion, Modifier.align(Alignment.TopCenter))
         }
+        PanelShortcut14(state.running && groups.isNotEmpty()) {
+            val target = groups.firstOrNull { it.name == "节点选择" }
+                ?: groups.firstOrNull { it.type.equals("Selector", true) && it.name != "GLOBAL" }
+                ?: groups.firstOrNull()
+            if (target != null) { notice = ""; path = listOf(target.name) }
+        }
     }
     val activeGroup = path.lastOrNull()?.let(allGroups::get)
     if (activeGroup != null) PanelGroupSheet13(activeGroup, path.size, options, columns,
@@ -229,7 +237,8 @@ internal fun StrategyPanel13(state: ProxyComposeState, delays: MutableMap<String
         onDismiss = { path = emptyList() }, onPop = { path = path.dropLast(1) },
         onSelect = { selectNode(activeGroup, it) }, onDelay = { scope.launch { testNode(it) } },
         onTestAll = { testAll(activeGroup) }, onName = { detail = it },
-        nestedNames = allGroups.keys, onNested = { path = panelPush13(path, it); notice = "" })
+        nestedNames = allGroups.keys, onNested = { path = panelPush13(path, it); notice = "" },
+        batchCompleted14 = batchDone14[activeGroup.name] ?: 0)
     if (settings) PanelApiSheet11(prefs, state.controllerPort, { settings = false }) {
         notify("设置已保存，正在读取接口状态"); requestRefresh()
     }
@@ -281,7 +290,8 @@ internal fun PanelGroupSheet13(group: ProxyGroupUi, depth: Int, options: PanelOp
     current: String, pending: String?, delays: Map<String, Long>, testing: Map<String, Boolean>,
     batchTesting: Boolean, running: Boolean, notice: String, noticeError: Boolean,
     onDismiss: () -> Unit, onPop: () -> Unit, onSelect: (String) -> Unit, onDelay: (String) -> Unit,
-    onTestAll: () -> Unit, onName: (String) -> Unit, nestedNames: Set<String>, onNested: (String) -> Unit) {
+    onTestAll: () -> Unit, onName: (String) -> Unit, nestedNames: Set<String>, onNested: (String) -> Unit,
+    batchCompleted14: Int = 0) {
     val t = LocalHetuTokens.current
     val sheet = rememberInteractiveSheetState()
     val scope = rememberCoroutineScope()
@@ -293,7 +303,7 @@ internal fun PanelGroupSheet13(group: ProxyGroupUi, depth: Int, options: PanelOp
             Box(Modifier.width(40.dp).height(5.dp).background(t.textMuted.copy(alpha = .3f), CircleShape))
         } }) {
         BackHandler(enabled = depth > 1 && !closing, onBack = onPop)
-        Column(Modifier.fillMaxWidth().fillMaxHeight(.88f).navigationBarsPadding().imePadding()) {
+        Column(Modifier.fillMaxWidth().fillMaxHeight(.76f).navigationBarsPadding().imePadding()) {
             Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 8.dp)
                 .testTag("panel13-detail-header"), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { if (depth > 1) onPop() else close() }, enabled = !closing,
@@ -308,16 +318,12 @@ internal fun PanelGroupSheet13(group: ProxyGroupUi, depth: Int, options: PanelOp
                 }
                 TextButton(onTestAll, enabled = running && !batchTesting && !closing,
                     modifier = Modifier.heightIn(min = 48.dp).testTag("panel11-test-all:${group.name}")) {
-                    if (batchTesting) NativeSpinner(Color(0xFF2563EB), LocalHetuMotionEnabled.current, Modifier.size(14.dp))
-                    Text(if (batchTesting) " 测速中" else "全部测速", fontSize = 12.sp)
+                    Text(if (batchTesting) "${batchCompleted14}/${group.nodes.map { it.name }.distinct().size}" else "全部测速", fontSize = 12.sp)
                 }
             }
             key(group.name) {
                 var query by rememberSaveable { mutableStateOf("") }
-                OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
-                    .testTag("panel13-node-search"), singleLine = true, shape = HomeContinuousShape(18.dp),
-                    textStyle = LocalTextStyle.current.copy(fontSize = 13.sp),
-                    placeholder = { Text("搜索本组节点", fontSize = 12.sp) }, leadingIcon = { Icon(Icons.Rounded.Search, null, Modifier.size(18.dp)) })
+                CompactNodeSearch14(query) { query = it }
                 PanelNotice13(notice, noticeError, "panel13-detail-notice") { onName(notice) }
                 val filtered = panelGroups11(listOf(group.copy(hidden = false)), query, "global", options.copy(globalByMode = false, showHidden = true))
                 val snapshot = delays.toMap()

@@ -83,13 +83,13 @@ class PanelNavigation13Test {
             rule.onNodeWithText("策略", substring = false).assertDoesNotExist()
         } }
     }
-    @Test fun tenGroupsFitInTwoColumnsWithoutAccordionsOrFloatingControl() {
+    @Test fun tenGroupsFitInTwoColumnsWithoutAccordionsAndWithReservedShortcut() {
         render(mutableStateOf(fixture().copy(groups = (1..10).map { group("策略 $it") })))
         (1..10).forEach { groupNode("策略 $it").assertIsDisplayed() }
         val a = groupNode("策略 1").getUnclippedBoundsInRoot(); val b = groupNode("策略 2").getUnclippedBoundsInRoot()
         assertEquals(a.top, b.top); assertEquals(10.dp, b.left-a.right)
         assertTrue(a.height in 70.dp..84.dp)
-        node("panel11-fab").assertDoesNotExist(); node("panel13-group-sheet").assertDoesNotExist()
+        node("panel11-fab").assertIsDisplayed(); node("panel13-group-sheet").assertDoesNotExist()
         screenshot("ten-groups")
     }
     @Test fun outerNodeCountsRemainRealWhenSearchMatchesOnlyOneChild() {

@@ -56,6 +56,7 @@ final class MihomoStartupConfig {
         int sourceTp=detectScalarPort(source,"tproxy-port");
         int sourceRp=detectScalarPort(source,"redir-port");
         String yaml=normalize(source);
+        yaml=RuntimeCompatibility14.migrateFingerprint(yaml);
         yaml=sanitizeStrictDomainCompatibility(yaml);
         yaml=normalizeDeprecatedEncryptedDns(yaml);
         // Runtime mode is authoritative. The selected source config remains byte-for-byte untouched.
@@ -178,7 +179,8 @@ final class MihomoStartupConfig {
      * domain-only lists. Keep the user's source untouched, but omit invalid legacy
      * entries from Hetu's private runtime copy so one stale item cannot brick startup.
      */
-    private static String sanitizeStrictDomainCompatibility(String source){
+    private static String sanitizeStrictDomainCompatibility(String source)throws IOException{
+        boolean ruleFilter=source.contains("fake-ip-filter-mode")&&RuntimeCompatibility14.ruleFakeIpFilter(source);
         String[] lines=normalize(source).split("\n",-1);
         String top="";
         String child="";
@@ -201,7 +203,7 @@ final class MihomoStartupConfig {
                 child=keyOfMappingLine(trimmed);
                 grandchild="";
                 domainList=("sniffer".equals(top)&&("skip-domain".equals(child)||"force-domain".equals(child)))
-                        ||("dns".equals(top)&&"fake-ip-filter".equals(child));
+                        ||(!ruleFilter&&"dns".equals(top)&&"fake-ip-filter".equals(child));
                 listIndent=domainList?ind:-1;
             }else if(ind==4&&"dns".equals(top)&&"fallback-filter".equals(child)){
                 grandchild=keyOfMappingLine(trimmed);
@@ -293,7 +295,7 @@ final class MihomoStartupConfig {
         }
         if(packageFilter){
             TreeSet<String> selected=new TreeSet<>();
-            if(packages!=null)selected.addAll(packages);
+            if(scope!=ProxyRuntimeProfile.AppScope.CORE&&packages!=null)selected.addAll(packages);
             TreeSet<String> direct=new TreeSet<>();
             if(directPackages!=null)direct.addAll(directPackages);
             if(scope==ProxyRuntimeProfile.AppScope.WHITELIST){

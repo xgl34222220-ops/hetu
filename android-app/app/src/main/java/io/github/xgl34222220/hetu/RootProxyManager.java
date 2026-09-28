@@ -281,14 +281,17 @@ final class RootProxyManager {
                 prefs.edit().putString("proxyAdblockLastError",message).apply();
                 throw new IOException(message,providerError);
             }
+            String actualFilterMode14=controller.configs().optString("mode", "unknown");
             prefs.edit()
+                    .putBoolean("proxyAdblockLastEffective",snapshot.count>0&&AdblockRuleInspection.isRuleMode(actualFilterMode14))
+                    .putString("proxyAdblockActualMode",actualFilterMode14)
                     .putLong("proxyAdblockProviderReloadAt",System.currentTimeMillis())
                     .putInt("proxyAdblockLastRuleCount",snapshot.count)
                     .putString("proxyAdblockLastRevision",snapshot.revision)
                     .putLong("proxyAdblockHotReloadAt",System.currentTimeMillis())
                     .remove("proxyAdblockLastError")
                     .apply();
-            return "已热更新 "+snapshot.count+" 条广告规则";
+            return RuntimeCompatibility14.filterReloadMessage(actualFilterMode14,snapshot.count);
         }finally{
             CONTROL_LOCK.unlock();
         }
@@ -891,6 +894,40 @@ final class RootProxyManager {
             RootBridge.Result logs=RootBridge.rootShell(context,cmd,5000L);
             report.section("最近核心日志",logs.output,10000);
         }catch(Exception e){report.section("最近核心日志",String.valueOf(e),1000);}
+        try {
+            ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
+            ProxyConfigLibrary.Entry source=configs.selected(profile.core);
+            if(source!=null) report.section("DNS/TLS/保活配置（源文件，只含安全标量）",RuntimeCompatibility14.safeConfigSummary(configs.read(source)),2500);
+            String runtime14="awk 'BEGIN{dns=0} /^[^ #]/{dns=($0 ~ /^dns[ ]*:/)} "
+                    +"/^(mode|ipv6|disable-keep-alive|keep-alive-idle|keep-alive-interval):/{print} "
+                    +"dns && /^  (enable|ipv6|enhanced-mode|fake-ip-filter-mode|respect-rules|prefer-h3):/{print}' "+RootBridge.quote(CONFIG)+" 2>/dev/null; true";
+            report.section("实际运行 DNS/保活标量",RootBridge.rootShell(context,runtime14,4000L).output,2500);
+            String privateDns=android.provider.Settings.Global.getString(context.getContentResolver(),"private_dns_mode");
+            android.os.PowerManager power=(android.os.PowerManager)context.getSystemService(Context.POWER_SERVICE);
+            String device="privateDnsMode="+String.valueOf(privateDns)+"\nappScope="+profile.appScope.id
+                    +"\ntcp="+profile.tcp+" udp="+profile.udp+" quicBlocked="+profile.quicBlocked
+                    +"\nappBypassOrIncludeCount="+prefs.getStringSet("proxyAppPackages",Collections.emptySet()).size();
+            if(power!=null)device+="\ndoZe="+power.isDeviceIdleMode()+" powerSave="+power.isPowerSaveMode()
+                    +"\nwechatBatteryExempt="+power.isIgnoringBatteryOptimizations("com.tencent.mm");
+            device+="\n以上是排查线索，不等于已定位微信延迟原因。分应用绕过、私人DNS、配置内置分流可使同一YAML实际走不同路径。";
+            report.section("系统网络与消息排查线索",device,2500);
+            MihomoControllerClient controller=new MihomoControllerClient(context);
+            String mode14=controller.configs().optString("mode","unknown");
+            JSONObject providers14=controller.ruleProviders().optJSONObject("providers");
+            JSONObject block14=providers14==null?null:providers14.optJSONObject(ProxyAdblockRules.PROVIDER_NAME);
+            JSONObject allow14=providers14==null?null:providers14.optJSONObject(ProxyAdblockRules.ALLOW_PROVIDER_NAME);
+            boolean linked14=false;JSONArray rules14=controller.rules().optJSONArray("rules");
+            for(int i=0;rules14!=null&&i<rules14.length();i++){
+                JSONObject r=rules14.optJSONObject(i);if(r==null)continue;
+                JSONObject extra=r.optJSONObject("extra");
+                if(AdblockRuleInspection.isBlockingRule(r.optString("type"),r.optString("payload"),r.optString("proxy"),
+                        r.optBoolean("disabled",false)||(extra!=null&&extra.optBoolean("disabled",false))))linked14=true;
+            }
+            report.section("实际广告过滤链（核心回读）","mode="+mode14+"\nruleLinked="+linked14
+                    +"\nblockRules="+(block14==null?-1:block14.optInt("ruleCount",-1))
+                    +"\nallowRules="+(allow14==null?-1:allow14.optInt("ruleCount",-1))
+                    +"\n本项核对运行模式、规则和provider；不把下载数量当成拦截效果，也不承诺过滤同域广告或HTTPS页面元素。",2500);
+        } catch(Exception error) { report.section("网络/过滤补充诊断","未完成读取："+error.getClass().getSimpleName(),1000); }
         return report.toString();
     }
 
@@ -1080,7 +1117,11 @@ final class RootProxyManager {
             cmd.append("; if [ ! -f ").append(RootBridge.quote(dst))
                     .append(" ] || [ ! -f ").append(RootBridge.quote(allowDst))
                     .append(" ] || [ \"$(cat ").append(RootBridge.quote(revisionFile)).append(" 2>/dev/null)\" != ")
-                    .append(RootBridge.quote(p.adblock.revision)).append(" ]; then")
+                    .append(RootBridge.quote(p.adblock.revision))
+                    .append(" ] || [ \"$(sha256sum ").append(RootBridge.quote(dst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
+                    .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblock)))
+                    .append(" ] || [ \"$(sha256sum ").append(RootBridge.quote(allowDst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
+                    .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblockAllow))).append(" ]; then")
                     .append(" cp ").append(RootBridge.quote(adblock.getAbsolutePath())).append(' ').append(RootBridge.quote(tmp))
                     .append("; chmod 600 ").append(RootBridge.quote(tmp)).append("; chown 0:0 ").append(RootBridge.quote(tmp))
                     .append("; mv -f ").append(RootBridge.quote(tmp)).append(' ').append(RootBridge.quote(dst));

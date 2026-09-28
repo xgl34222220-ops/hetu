@@ -101,7 +101,7 @@ class PanelUi11Test {
         node("panel11-exclusive").assertDoesNotExist()
         node("panel11-filter").performClick()
         expand(); back(); expand("视频"); tile("Alpha", "视频").assertIsDisplayed()
-        node("panel11-fab").assertDoesNotExist()
+        node("panel11-fab").assertIsDisplayed()
     }
     @Test fun searchMatchesActualNodeAndHidesOtherChildren() {
         render(); node("panel11-search-toggle").performTouchInput { click() }
@@ -184,7 +184,7 @@ class PanelUi11Test {
     }
     @Test fun noFloatingControlAndReturningPreservesGridPosition() {
         val many = fixture().copy(groups = (1..30).map { group("策略 $it") } + group("节点选择"))
-        render(many); node("panel11-fab").assertDoesNotExist()
+        render(many); node("panel11-fab").assertIsDisplayed()
         node("panel11-list").performScrollToNode(hasTestTag("panel11-group:节点选择"))
         val before = groupNode().getUnclippedBoundsInRoot()
         expand(); tile("Alpha").assertIsDisplayed(); back()
