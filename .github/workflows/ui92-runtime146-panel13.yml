@@ -1,0 +1,155 @@
+name: UI92 Runtime146 grid navigation UI13
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/ui92-runtime146-panel13.yml', 'tools/prepare_ui13.py', 'tools/ui13-reviewed.part*', 'tools/fix_ui13.py']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: ui92-runtime146-panel13
+  cancel-in-progress: false
+jobs:
+  panel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      HETU_TEST_KEYSTORE: /home/runner/.android/hetu-ui10-debug.jks
+      RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      RUN_ID: ${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply exact reviewed UI13 source on UI12
+        run: |
+          set -euo pipefail
+          mkdir -p integration-evidence
+          git rev-parse HEAD > integration-evidence/input-commit.txt
+          python3 tools/prepare_ui13.py 2>&1 | tee integration-evidence/migration.log
+          if test -f tools/fix_ui13.py; then python3 tools/fix_ui13.py 2>&1 | tee -a integration-evidence/migration.log; fi
+          python3 -m py_compile tools/finish_ui13.py
+          git diff --check
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Restore existing UI10 UI11 UI12 signing identity
+        uses: actions/cache/restore@v4
+        with:
+          path: /home/runner/.android/hetu-ui10-debug.jks
+          key: hetu-ui10-debug-signing-v1
+          fail-on-cache-miss: true
+      - name: Fail closed on missing or different signer
+        run: |
+          set -euo pipefail
+          test -s "$HETU_TEST_KEYSTORE"
+          keytool -exportcert -keystore "$HETU_TEST_KEYSTORE" -alias androiddebugkey -storepass android | openssl dgst -sha256 -r | cut -d ' ' -f1 > integration-evidence/intended-signer.sha256
+          grep -qx '701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad' integration-evidence/intended-signer.sha256
+      - name: Prepare unchanged Android toolchain
+        run: |
+          set -euo pipefail
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort | tail -n 1)
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" 'platforms;android-37.0' 'build-tools;37.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+      - name: Restore and hash-check original146 runtime from verified UI12
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release download ui92-r146.12-test --repo "$GITHUB_REPOSITORY" --pattern 'Hetu-UI92-Runtime146-UI12.apk' --dir .reference-ui12
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,zipfile
+          apk=Path('.reference-ui12/Hetu-UI92-Runtime146-UI12.apk')
+          assert hashlib.sha256(apk.read_bytes()).hexdigest()=='3810da2eaf66b673c26e8e6aaae5423111b9129e7dffd6ec33e96ea05a7caeb8'
+          expected=json.load(open('UI92_RUNTIME146_INPUTS.json'))['original146_payload']
+          with zipfile.ZipFile(apk) as z:
+              assert z.testzip() is None
+              for name,digest in expected.items():
+                  data=z.read(name)
+                  assert hashlib.sha256(data).hexdigest()==digest,name
+                  if name.startswith('lib/'):out=Path('android-app/app/src/main/jniLibs')/name.removeprefix('lib/')
+                  elif name.startswith('assets/'):out=Path('android-app/app/src/main')/name
+                  else:raise AssertionError(name)
+                  out.parent.mkdir(parents=True,exist_ok=True)
+                  if out.exists():assert out.read_bytes()==data,name
+                  else:out.write_bytes(data)
+          print('Verified original146 assets:',len(expected))
+          PY
+      - name: Record actual UI dependency graph
+        working-directory: android-app
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:dependencies --configuration debugRuntimeClasspath > ../integration-evidence/dependencies.txt
+          grep 'material3-android:1.5.0-alpha22' ../integration-evidence/dependencies.txt
+      - name: Compile and run all eighteen regression suites
+        working-directory: android-app
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:assembleDebug :app:testDebugUnitTest --tests '*CompactHomeDashboardTest' --tests '*Runtime146ContractTest' --tests '*Ui92IntegrationTest' --tests '*NodeSelectionContinuityTest' --tests '*ProxyLatencyRegressionTest' --tests '*NativeDockUi4Test' --tests '*HomeUi5RegressionTest' --tests '*HomeUi6RegressionTest' --tests '*HomeUi7InteractionTest' --tests '*HomeUi8ExperienceTest' --tests '*HomeUi9BentoTest' --tests '*HomeUi10GridTest' --tests '*HomeUi11Test' --tests '*PanelModel11Test' --tests '*PanelUi11Test' --tests '*MotionModel12Test' --tests '*MotionUi12Test' --tests '*PanelNavigation13Test' --stacktrace 2>&1 | tee ../integration-evidence/build.log
+      - name: Record actual compiler and test outcomes
+        if: always()
+        run: |
+          if test -f tools/finish_ui13.py; then python3 tools/finish_ui13.py record; fi
+      - name: Verify package signer runtime assets and protected source
+        run: |
+          set -euo pipefail
+          APK=android-app/app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/37.0.0/aapt" dump badging "$APK" > integration-evidence/apk-identity.txt
+          "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --verbose --print-certs "$APK" > integration-evidence/apk-signature.txt
+          "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs .reference-ui12/Hetu-UI92-Runtime146-UI12.apk > integration-evidence/ui12-signature.txt
+          python3 tools/finish_ui13.py verify 2>&1 | tee integration-evidence/verification.log
+      - name: Preserve actual failure evidence
+        if: failure()
+        run: |
+          set -euo pipefail
+          mkdir -p docs/ci
+          if test -f tools/finish_ui13.py; then
+            python3 tools/finish_ui13.py record
+            cp integration-evidence/attempt.json docs/ci/UI13-last-attempt.json
+          else
+            python3 -c 'import json,pathlib; p=pathlib.Path("integration-evidence/migration.log"); pathlib.Path("docs/ci/UI13-last-attempt.json").write_text(json.dumps({"migration":p.read_text() if p.exists() else "failed before migration"}))'
+          fi
+          git add -- docs/ci/UI13-last-attempt.json
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'docs: retain actual UI13 failure evidence [skip ci]'
+            git push origin HEAD:main
+          fi
+      - name: Commit only fully tested production code and delivery notes
+        run: |
+          set -euo pipefail
+          python3 tools/finish_ui13.py notes
+          git add -- android-app/app/src/main/java android-app/app/src/test/java android-app/app/build.gradle.kts docs/UI92_RUNTIME146_UI13.md AGENTS.md tools/finish_ui13.py tools/ui13_contract.json
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'feat: deliver verified UI13 static tabs and secondary node grid [skip ci]'
+          git push origin HEAD:main
+          git rev-parse HEAD > integration-evidence/app-commit.txt
+      - name: Export source and evidence without signing files
+        if: always()
+        run: |
+          if test -f tools/finish_ui13.py; then python3 tools/finish_ui13.py export; fi
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: Hetu-UI13-verified-delivery
+          path: delivery/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Hetu-UI13-actual-build-evidence
+          path: |
+            delivery/Hetu-UI92-Runtime146-UI13-verification.zip
+            integration-evidence/
+            tools/ui13-reviewed.part*
+          if-no-files-found: error
+      - name: Publish only same-signer tested UI13 build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create ui92-r146.13-test delivery/Hetu-UI92-Runtime146-UI13.apk delivery/Hetu-UI92-Runtime146-UI13-source.zip delivery/Hetu-UI92-Runtime146-UI13-verification.zip delivery/result.json --repo "$GITHUB_REPOSITORY" --target "$(cat integration-evidence/app-commit.txt)" --prerelease --title '河图 UI13 测试版 · 固定导航与双列节点' --notes-file docs/UI92_RUNTIME146_UI13.md
