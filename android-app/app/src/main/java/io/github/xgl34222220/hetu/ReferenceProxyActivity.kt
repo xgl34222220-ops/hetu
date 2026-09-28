@@ -1064,6 +1064,7 @@ internal fun RefPanel(
         if (!state.running) return
         try {
             when (tab) {
+                RefPanelTab.Overview -> rules = repo.rules()
                 RefPanelTab.Subscriptions -> providers = repo.providers()
                 RefPanelTab.Rules -> rules = repo.rules()
                 RefPanelTab.RuleSets -> ruleSets = repo.ruleSets()
@@ -1245,8 +1246,9 @@ internal fun RefPanel(
                     }
                     RefPanelTab.Overview -> {
                         onRefreshState()
+                        rules = repo.rules()
                         capsuleError = false
-                        capsuleText = "流量状态已刷新"
+                        capsuleText = "概览状态已刷新"
                     }
                     RefPanelTab.Connections -> {
                         onRefreshState()
@@ -1409,7 +1411,7 @@ internal fun RefPanel(
                         }
                     }
                 }
-                RefPanelTab.Overview -> item(key = "${tab.name}-traffic-overview", contentType = "traffic-overview") { RefTrafficOverview(state) }
+                RefPanelTab.Overview -> item(key = "${tab.name}-traffic-overview", contentType = "traffic-overview") { RefTrafficOverview(state, rules.size) }
                 RefPanelTab.Subscriptions -> items(filteredProviders, key = { "${tab.name}-provider-${it.name}" }, contentType = { "subscription-provider" }) { item ->
                     RefProviderRow(
                         item = item,
@@ -2596,7 +2598,49 @@ private fun RefDelayBadge(value: Long?, testing: Boolean, onClick: (() -> Unit)?
 }
 
 @Composable
-private fun RefTrafficOverview(state: ProxyComposeState) {
+private fun RefOverviewMetricStrip18(state: ProxyComposeState, ruleCount: Int) {
+    val t = LocalHetuTokens.current
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = t.cardBackground,
+        shadowElevation = 1.dp,
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 13.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            fun cell(label: String, value: String, modifier: Modifier) {
+                Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        value,
+                        color = t.textPrimary,
+                        fontSize = 20.sp,
+                        lineHeight = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        label,
+                        color = t.textSecondary,
+                        fontSize = 11.sp,
+                        lineHeight = 15.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                    )
+                }
+            }
+            cell("策略", state.groups.size.toString(), Modifier.weight(1f))
+            Box(Modifier.width(1.dp).height(34.dp).background(t.textMuted.copy(alpha = .14f)))
+            cell("规则", ruleCount.toString(), Modifier.weight(1f))
+            Box(Modifier.width(1.dp).height(34.dp).background(t.textMuted.copy(alpha = .14f)))
+            cell("当前连接", state.connections.size.toString(), Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun RefTrafficOverview(state: ProxyComposeState, ruleCount: Int) {
     val t = LocalHetuTokens.current
     val scheme = MaterialTheme.colorScheme
     val history = remember { mutableStateListOf<Triple<Long, Long, Long>>() }
@@ -2638,6 +2682,7 @@ private fun RefTrafficOverview(state: ProxyComposeState) {
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        RefOverviewMetricStrip18(state, ruleCount)
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             RefRateCard("上行速度", upRate, Icons.Rounded.ArrowUpward, t.success, Modifier.weight(1f))
             RefRateCard("下行速度", downRate, Icons.Rounded.ArrowDownward, scheme.primary, Modifier.weight(1f))
