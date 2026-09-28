@@ -141,7 +141,7 @@ jobs:
           import subprocess,json,re,hashlib,zipfile
           base='621e4f22fce4e9c5f5c717eab1147fad20dab950'
           root='android-app/app/src/main/java/io/github/xgl34222220/hetu/'
-          allowed={root+x for x in ['NativeHomePolish.kt','HomeInteraction7.kt','HomeExperience8.kt','CompactHomeDashboard.kt','PanelControls11.kt','PanelStrategy11.kt','ReferenceProxyActivity.kt','ui/HetuGlassDock.kt']}
+          allowed={root+x for x in ['NativeHomePolish.kt','HomeExperience8.kt','CompactHomeDashboard.kt','PanelControls11.kt','PanelStrategy11.kt','ReferenceProxyActivity.kt','ui/HetuGlassDock.kt']}
           protected=[]
           for p in subprocess.check_output(['git','ls-tree','-r','--name-only',base]).decode().splitlines():
               if (p.startswith('android-app/app/src/main/') or p.startswith('native/')) and p not in allowed:
@@ -152,18 +152,15 @@ jobs:
           start='internal fun RefInfoBottomSheet(';end='@Composable\nprivate fun RefSheetDragHandle()'
           assert new.split(start)[0]==old.split(start)[0], 'Runtime or routing changed before log UI'
           assert new.split(end)[1]==old.split(end)[1], 'Unexpected code after log UI'
-          # Allow exactly one explicit UI dependency change. Everything else in
-          # build configuration, SDK, package and signing must remain unchanged.
           gradle=Path('android-app/app/build.gradle.kts').read_text()
           restored=gradle.replace('versionCode = 1013','versionCode = 1012').replace('0.4.0-ui92-r146.12','0.4.0-ui92-r146.11').replace('implementation("androidx.compose.material3:material3:1.5.0-alpha16")','implementation("androidx.compose.material3:material3")')
           assert restored==subprocess.check_output(['git','show',base+':android-app/app/build.gradle.kts']).decode()
           assert 'material3:material3:1.5.0-alpha16' in gradle
-          assert 'material3' in Path('integration-evidence/dependencies.txt').read_text()
           helper=Path(root+'MotionMaterials12.kt').read_text()
-          assert 'INVISIBLE_MEMBER' not in helper and 'getDeclaredField' not in helper
+          assert 'INVISIBLE_MEMBER' not in helper and 'getDeclaredField' not in helper and 'DismissVelocityDp' not in helper
           suites=json.load(open('integration-evidence/test-suites.json'))
           totals={k:sum(int(s[k]) for s in suites) for k in ['tests','failures','errors','skipped']}
-          assert len(suites)==17 and totals['tests']>=202,(len(suites),totals)
+          assert len(suites)==17 and totals['tests']>=203,(len(suites),totals)
           assert totals['failures']==totals['errors']==totals['skipped']==0,totals
           apk=Path('android-app/app/build/outputs/apk/debug/app-debug.apk')
           expected=json.load(open('UI92_RUNTIME146_INPUTS.json'))['original146_payload']
@@ -175,9 +172,14 @@ jobs:
           def cert(path):return re.search(r'Signer #1 certificate SHA-256 digest: ([0-9a-f]+)',Path(path).read_text()).group(1)
           certificate=cert('integration-evidence/apk-signature.txt')
           assert certificate==cert('integration-evidence/ui11-signature.txt')=='701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad'
-          result=dict(version='0.4.0-ui92-r146.12',versionCode=1013,package='io.github.xgl34222220.hetu',tests=totals,suites=len(suites),size=apk.stat().st_size,sha256=hashlib.sha256(apk.read_bytes()).hexdigest(),certificate_sha256=certificate,same_signer_as_ui11=True,runtime_assets=len(expected),protected_files=len(protected),base=base,material3='1.5.0-alpha16')
+          result=dict(version='0.4.0-ui92-r146.12',versionCode=1013,package='io.github.xgl34222220.hetu',tests=totals,suites=len(suites),size=apk.stat().st_size,sha256=hashlib.sha256(apk.read_bytes()).hexdigest(),certificate_sha256=certificate,same_signer_as_ui11=True,runtime_assets=len(expected),protected_files=len(protected),base=base,material3='1.5.0-alpha16',fling_policy='native AnchoredDraggableDefaults; no custom velocity threshold override')
           Path('integration-evidence/result.json').write_text(json.dumps(result,ensure_ascii=False,indent=2))
           Path('integration-evidence/protected-files.json').write_text(json.dumps(protected,indent=2))
+          changes=Path('integration-evidence/ui12-source-changes.json')
+          if changes.exists():
+              entries=json.loads(changes.read_text())
+              for path,value in entries.items():value['after']=Path(path).read_text()
+              changes.write_text(json.dumps(entries,ensure_ascii=False))
           print(json.dumps(result,ensure_ascii=False,indent=2))
           PY
       - name: Commit tested production code and exact delivery notes
@@ -192,34 +194,40 @@ jobs:
           notes=textwrap.dedent('''\
           # 河图 UI12：弹簧、材质与跟手交互
 
-          ## 实际范围
-          依据用户2026-09-28T13:07:09Z的文字诊断，不宣称看过两个视频。只精修UI11原生界面，不引入阅读器、章节或Vue模拟功能。
-          - 网络详情、日志、API配置抽屉统一空间弹簧阻尼0.84、刚度280；收起采用临界阻尼，避免出屏再弹回来。保留原生拖拽、速度跟踪、内部滚动、返回和焦点，不反射私有API、不叠加第二套抢占手势。
-          - 原有速度门槛1800dp/s调整为1100dp/s，位移门槛仍120dp。短慢拖复位、短快甩关闭分别进行真实触摸测试。
-          - 模态背景模糊与0.96最小缩放由原生抽屉实际偏移和测量尺寸驱动，拖动中连续还原，关闭后释放。SDK31+且硬件加速、开启模糊才设置背景RenderEffect；其他条件正常降级。抽屉文字不模糊。
-          - 日志关闭按钮先播放真实hide动画再销毁。内容/操作区35/70ms错峰淡入，仅改变绘制，不延迟网络或保存操作。
-          - 筛选/布局使用原生焦点Popup、锚点定位和0.94到1弹簧；退出保留内容直至动画结束，窄屏、RTL及长菜单可访问。浮层表面为轻半透材质，不虚称在独立Popup窗口新增背景采样。
-          - 首页和策略列表仅在底部越界时增加有界阻尼和带松手速度的回弹，不替换正常惯性。顶部真实下拉刷新继续保留，可以从回弹当前位置重新接住手势。
-          - Dock沿用真实Miuix/Haze，降低边缘高光、折射、过饱和，指示胶囊弹簧0.84/300；不把纯透明色块当新模糊引擎。
-          - 首页四宫格、系统字体、已删除的两个顶栏按钮、IP、安全区与通知避让保留。策略继续原位展开、真实选择确认和测速，其他面板标签及原146运行层不改。
+          ## 实际修改
+          依据用户2026-09-28T13:07:09Z的文字诊断，不宣称看过两个视频。只精修UI11原生界面，不加入阅读器、章节或Vue模拟功能。
+          - 网络详情、日志、API配置抽屉使用公开运动主题：空间弹簧阻尼0.84、刚度280；关闭为临界阻尼。保留原生速度跟踪、内部滚动、返回和焦点，不反射私有API、不叠加抢占手势。
+          - 背景模糊与0.96最小缩放由原生抽屉实际偏移、实际锚点视口和尺寸驱动，拖动中连续还原，关闭后释放；可跟随键盘/窗口尺寸变化。SDK31+、硬件加速、开启模糊时才启用背景RenderEffect；否则正常降级，抽屉文字不模糊。
+          - 日志关闭先播放hide动画再移除弹窗。内容与操作区35/70ms错峰淡入，仅改变绘制，不延迟网络、保存或重启操作。
+          - 筛选/布局浮层采用原生焦点Popup、锚点定位及0.94到1弹簧，退出保留内容直至动画完成。支持窄屏、RTL和长菜单；浮层本体是轻半透材质，不虚称独立Popup新增背景采样。
+          - 首页与策略列表仅在底部越界时增加有界阻尼、带松手速度的回弹；不替换正常惯性。顶部保留真实下拉刷新，可重新接住正在回弹的内容。
+          - Dock沿用Miuix/Haze真实材质，降低过强高光、折射与饱和度，指示胶囊使用0.84/300弹簧；布局高度、触摸范围不改。
+          - 首页四宫格、系统字体、已删除的两个顶栏按钮、IP完整显示、安全区和通知避让不推翻。节点仍原位展开、等待真实核心确认、实际测速，其他标签功能与原146运行层不改。
 
-          ## UI依赖与风险
-          显式使用Material3 1.5.0-alpha16的公开MotionScheme；不是原来的1.4.0稳定版。第一次尝试36429557553在生产编译阶段发现1.4.0把Expressive API设为internal，未运行测试、未发布。官方alpha16同时修复BottomSheet拖拽/嵌套滚动不遵循运动主题的问题。未抑制私有访问或使用反射。其他显式依赖、Android SDK/工具链未升级；实际传递依赖图保存于验证包dependencies.txt。Alpha界面依赖存在兼容风险，不能把测试包称正式稳定发布。
+          ## 真实手势行为与失败记录
+          当前原生AnchoredDraggableDefaults使用125dp/s作为甩动边界。SheetState旧velocityThreshold参数不控制这条新路径，所以已撤销无效的1100dp/s修改，HomeInteraction7.kt恢复为UI11原字节；不声称调低旧参数便改变了手感。
+          36429557553生产编译失败：Material3 1.4.0把Expressive API设为internal，零测试、无发布。
+          36430846940完成202项，201通过；测试将90px/600ms（150dp/s）误称低速，其实原生会按甩动关闭。本轮保留这条原始手势并明确测试其关闭结果，同时新增90px/1200ms（75dp/s）的低速回弹，另有90px/65ms快速关闭及拖住后停顿松手复位。没有删掉原失败场景、调用回调代替触摸或虚报自定义速度门槛。
+
+          ## 界面依赖
+          显式采用Material3 1.5.0-alpha16公开MotionScheme；不是原1.4.0稳定版。官方alpha16修复BottomSheet拖拽/嵌套滚动不遵循运动主题的问题。其他显式依赖及Android SDK/工具链未升级，实际传递依赖图在验证包dependencies.txt。Alpha界面依赖存在兼容风险，此包不称正式稳定版。
 
           ## 自动化与交付
           ''')
           notes+=f"Actions {os.environ['RUN_ID']}；{r['suites']}组{r['tests']['tests']}项，失败0、错误0、跳过0。\n"
           notes+=f"{r['runtime_assets']}项原146运行资产哈希一致；{r['protected_files']}个范围外生产/原生文件与UI11逐字节一致。ReferenceProxyActivity除日志弹窗函数外逐字节一致。\n"
-          notes+=f"版本{r['version']}，内部号{r['versionCode']}，包名{r['package']}。APK {r['size']}字节；SHA256 {r['sha256']}。\n与UI10/UI11同签名：{r['certificate_sha256']}。未创建或导出私钥。\n"
+          notes+=f"版本{r['version']}，内部号{r['versionCode']}，包名{r['package']}。APK {r['size']}字节；SHA256 {r['sha256']}。\n与发布UI10/UI11同签名：{r['certificate_sha256']}。未创建或导出私钥。\n"
           notes+=textwrap.dedent('''
-          ## 未声称完成的验收
-          本包为Debug测试版。自动化不是用户手机Root联网、微信消息、GPU毛玻璃、60/120fps或长期稳定性实测；未进行视频逐帧验收。不新增整页侧滑返回或阅读器翻页。UI9/原146等不同签名包不能据此覆盖，不要卸载或清数据。签名缓存不是长期生产密钥托管，丢失时构建失败，不静默替换身份。
+          ## 验收边界
+          Debug测试版。自动化不代表用户手机Root联网、微信消息、GPU毛玻璃、60/120fps或长期稳定性实测，也不是视频逐帧对比。此轮没有新增整页侧滑返回或阅读器翻页。UI9/原146等不同签名旧包不能据此覆盖，不要卸载或清数据。签名缓存不是长期生产密钥托管，丢失时构建失败，不静默替换身份。
           ''')
           Path('docs/UI92_RUNTIME146_UI12.md').write_text(notes)
           agents=Path('AGENTS.md').read_text().replace('## 当前已交付：UI11','## UI11历史交付（UI12在此基础上继续）',1)
           marker='## UI11历史交付（UI12在此基础上继续）'
-          latest=f"## 当前已交付：UI12\n\n版本{r['version']} / {r['versionCode']}；Actions {os.environ['RUN_ID']}；{r['suites']}套{r['tests']['tests']}项全部通过。APK SHA256 `{r['sha256']}`。发布`ui92-r146.12-test`，与UI10/UI11同证书。详见docs/UI92_RUNTIME146_UI12.md、发布result.json和完成的发布附件。\n\nUI12只改动效与材质。MotionMaterials12.kt统一抽屉运动主题、实际原生偏移驱动的缩放/模糊、原生速度阈值、弹性Popup与底部回弹。日志关闭先hide。明确使用Material3 1.5.0-alpha16公开API，其他显式依赖不变；传递依赖图在报告中。Alpha不称正式稳定。用户文字中阅读器与整页侧滑不在此轮；未看过两段视频，不把自动化当真机GPU帧率验收。\n\n后续直接编译当前生产源码，不重放UI11或更早迁移。签名沿用原路径、缓存、固定指纹，缺失失败。UI12-last-attempt若存在仅为历史失败，不等同最终交付状态。\n\n"
-          if '## 当前已交付：UI12' not in agents:agents=agents.replace(marker,latest+marker,1)
+          latest=f"## 当前已交付：UI12\n\n版本{r['version']} / {r['versionCode']}；Actions {os.environ['RUN_ID']}；{r['suites']}套{r['tests']['tests']}项全部通过。APK SHA256 `{r['sha256']}`。发布`ui92-r146.12-test`，与UI10/UI11同证书，详见docs/UI92_RUNTIME146_UI12.md和发布result.json。\n\n只精修动效与材质：MotionMaterials12.kt统一公开运动主题、实际原生偏移驱动的缩放/模糊、弹性Popup与底部回弹。日志先hide再移除。Material3显式为1.5.0-alpha16，不能称正式稳定依赖。速度使用原生125dp/s路径，1100dp/s无效旧参数改动已撤销；HomeInteraction7.kt与UI11一致。未观看视频，未声称真机帧率；不加入阅读器和整页侧滑。\n\n后续直接编译当前生产源码，不重放UI11或更早迁移。签名沿用原路径、缓存、固定指纹，缺失失败。UI12-last-attempt若存在是历史失败，不等同最终交付状态。\n\n"
+          if '## 当前已交付：UI12' not in agents:
+              if marker in agents:agents=agents.replace(marker,latest+marker,1)
+              else:agents=latest+agents
           Path('AGENTS.md').write_text(agents)
           PY
           git add -- android-app/app/src/main/java android-app/app/src/test/java android-app/app/build.gradle.kts docs/UI92_RUNTIME146_UI12.md AGENTS.md
