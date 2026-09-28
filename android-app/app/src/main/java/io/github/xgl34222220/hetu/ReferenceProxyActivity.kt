@@ -1538,19 +1538,16 @@ internal fun RefPanel(
                     if (filteredPanelLog.isBlank()) {
                         RefEmptyState("暂无运行日志", "核心产生运行记录后会显示在这里。", Icons.Rounded.ReceiptLong)
                     } else {
-                        SelectionContainer {
-                            Text(
-                                filteredPanelLog,
-                                Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
-                                    .background(t.cardBackground).padding(14.dp)
-                                    .testTag("panel-runtime-log"),
-                                color = t.textPrimary,
-                                fontSize = 11.sp,
-                                lineHeight = 17.sp,
-                            )
-                        }
+                        Text(
+                            filteredPanelLog,
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
+                                .background(t.cardBackground).padding(14.dp)
+                                .testTag("panel-runtime-log"),
+                            color = t.textPrimary,
+                            fontSize = 11.sp,
+                            lineHeight = 17.sp,
+                        )
                     }
-                }
                 }
             }
             }
