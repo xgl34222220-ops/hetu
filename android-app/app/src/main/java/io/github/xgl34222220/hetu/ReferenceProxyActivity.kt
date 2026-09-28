@@ -2610,6 +2610,7 @@ private fun RefOverviewMetricStrip18(state: ProxyComposeState, ruleCount: Int) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             @Composable
+            @Composable
             fun cell(label: String, value: String, modifier: Modifier) {
                 Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
