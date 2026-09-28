@@ -167,25 +167,34 @@ internal fun NativeStatusHero(data: CompactHomeData, toggle: () -> Unit, reload:
     val accent by animateColorAsState(colors[2], tween(if (motion) 400 else 0), label = "hero-accent")
     val text = if (dark) Color(0xFFE2E8F0) else Color(0xFF1E293B)
     val muted = if (dark) Color(0xFFACB7CA) else Color(0xFF64748B)
-    val shape = RoundedCornerShape(24.dp)
+    val shape = RoundedCornerShape(26.dp)
     Box(Modifier.fillMaxWidth().testTag("home-hero").semantics { stateDescription = title }
         .diffuseCardShadow(shape).clip(shape).background(Brush.linearGradient(listOf(top, bottom)))) {
         Column(Modifier.fillMaxWidth().padding(20.dp)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                        Box(Modifier.size(8.dp).background(accent, CircleShape))
-                        Text(title, color = accent, fontSize = 20.sp, lineHeight = 26.sp,
-                            fontWeight = FontWeight.Bold, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Box(Modifier.size(12.dp).background(accent, CircleShape))
+                        Text(title, color = accent, fontSize = 22.sp, lineHeight = 29.sp,
+                            fontWeight = FontWeight.Black, modifier = Modifier.testTag("hero-status-title")
+                                .semantics { liveRegion = LiveRegionMode.Polite })
                     }
-                    if (data.running && !processing) Text(CompactHomeFormat.uptime(data.uptimeSeconds),
-                        color = muted, fontSize = 11.sp, lineHeight = 16.sp)
+                    Text(when {
+                        processing -> "正在与内核通信…"
+                        data.running -> CompactHomeFormat.uptime(data.uptimeSeconds)
+                        else -> "服务未启动"
+                    }, Modifier.padding(start = 22.dp).testTag("hero-uptime"),
+                        color = if (dark) muted else Color(0xFF334155), fontSize = 15.sp,
+                        lineHeight = 21.sp, fontWeight = FontWeight.Bold)
                     Text(listOf(data.core, data.mode).filter(String::isNotBlank).joinToString(" · "),
-                        color = muted, fontSize = 12.sp, lineHeight = 18.sp)
-                    Text(data.config.ifBlank { "尚未选择配置" }, color = text, fontSize = 14.sp,
-                        lineHeight = 20.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Modifier.padding(start = 22.dp, top = 3.dp).testTag("hero-core"),
+                        color = muted, fontSize = 13.sp, lineHeight = 19.sp, fontWeight = FontWeight.Bold)
+                    Text(data.config.ifBlank { "尚未选择配置" },
+                        Modifier.padding(start = 22.dp).testTag("hero-config"),
+                        color = text, fontSize = 15.sp, lineHeight = 21.sp, fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(10.dp))
                 HeroStatusGlyph(phase, accent, motion)
             }
             if (data.pendingSettings && data.running && !processing) {
@@ -200,9 +209,9 @@ internal fun NativeStatusHero(data: CompactHomeData, toggle: () -> Unit, reload:
                         slideOutVertically(tween(if (motion) 150 else 0)) { -it / 8 })
                     .using(SizeTransform(clip = false) { _, _ -> tween(if (motion) 250 else 0) })
             }, modifier = Modifier.fillMaxWidth(), label = "hero-pill-morph") { shown ->
-                Row(Modifier.fillMaxWidth().clip(CircleShape)
+                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
                     .background(if (dark) Color.White.copy(alpha = .09f) else Color.White.copy(alpha = .88f))
-                    .padding(4.dp).heightIn(min = 48.dp).testTag("home-control-pill"),
+                    .padding(6.dp).heightIn(min = 48.dp).testTag("home-control-pill"),
                     verticalAlignment = Alignment.CenterVertically) {
                     val blue = if (dark) Color(0xFF8AB4FF) else Color(0xFF2563EB)
                     when (shown) {
@@ -215,7 +224,7 @@ internal fun NativeStatusHero(data: CompactHomeData, toggle: () -> Unit, reload:
                             PillAction("重启", "home-restart", if (dark) Color(0xFFFBBF24) else Color(0xFFD97706),
                                 Modifier.weight(1f), !processing && phase == shown, motion, restart)
                         }
-                        HomePhase.Stopped -> PillAction("启动", "home-toggle", blue, Modifier.weight(1f), !processing && phase == shown, motion, toggle)
+                        HomePhase.Stopped -> PillAction("启动服务", "home-toggle", blue, Modifier.weight(1f), !processing && phase == shown, motion, toggle)
                         HomePhase.Processing -> Row(Modifier.fillMaxWidth().heightIn(min = 48.dp)
                             .testTag("home-processing").semantics { stateDescription = title; liveRegion = LiveRegionMode.Polite },
                             horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
@@ -237,24 +246,25 @@ private fun PillAction(label: String, tag: String, tint: Color, modifier: Modifi
     Box(modifier.heightIn(min = 48.dp).testTag(tag).clip(CircleShape)
         .nativePress(enabled, label, motion, click).padding(horizontal = 4.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center) {
-        Text(label, color = tint, fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold)
+        Text(label, color = tint, fontSize = 15.sp, lineHeight = 21.sp, fontWeight = FontWeight.Bold)
     }
 }
 
 @Composable
 private fun HeroStatusGlyph(phase: HomePhase, color: Color, motion: Boolean) {
-    Box(Modifier.size(54.dp).background(Brush.radialGradient(listOf(color.copy(alpha = .12f), Color.Transparent)), CircleShape),
-        contentAlignment = Alignment.Center) {
-        if (phase == HomePhase.Processing) NativeSpinner(color, motion, Modifier.size(43.dp))
-        else Canvas(Modifier.size(48.dp)) {
+    // Normal density follows the reference; accessibility text gets space before decoration.
+    val sizeDp = if (androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f) 56.dp else 80.dp
+    Box(Modifier.size(sizeDp).testTag("hero-status-glyph"), contentAlignment = Alignment.Center) {
+        if (phase == HomePhase.Processing) NativeSpinner(color, motion, Modifier.fillMaxSize().padding(8.dp))
+        else Canvas(Modifier.fillMaxSize()) {
             val w = size.width
-            drawCircle(color.copy(alpha = .17f), radius = w * .41f, style = Stroke(w * .065f))
+            drawCircle(color.copy(alpha = .18f), radius = w * .4f, style = Stroke(w * .1f))
             if (phase == HomePhase.Running) {
-                drawArc(color, -90f, 95f, false, Offset(w * .09f, w * .09f), Size(w * .82f, w * .82f),
-                    style = Stroke(w * .065f, cap = StrokeCap.Round))
-                drawPath(Path().apply { moveTo(w * .31f, w * .5f); lineTo(w * .45f, w * .64f); lineTo(w * .7f, w * .37f) },
-                    color, style = Stroke(w * .065f, cap = StrokeCap.Round, join = StrokeJoin.Round))
-            } else drawLine(color, Offset(w * .35f, w * .5f), Offset(w * .65f, w * .5f), w * .065f, StrokeCap.Round)
+                drawArc(color, -90f, 270f, false, Offset(w * .1f, w * .1f), Size(w * .8f, w * .8f),
+                    style = Stroke(w * .1f, cap = StrokeCap.Round))
+                drawPath(Path().apply { moveTo(w * .32f, w * .5f); lineTo(w * .45f, w * .63f); lineTo(w * .70f, w * .36f) },
+                    color, style = Stroke(w * .11f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            } else drawLine(color, Offset(w * .35f, w * .5f), Offset(w * .65f, w * .5f), w * .08f, StrokeCap.Round)
         }
     }
 }
@@ -318,7 +328,7 @@ internal fun NativeDetailsSheet(title: String, onDismiss: () -> Unit, content: @
         onDispose { backdrop?.let { it.count = (it.count - 1).coerceAtLeast(0) } }
     }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet,
-        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
+        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
         containerColor = t.cardBackground, contentColor = t.textPrimary,
         scrimColor = Color(0xFF0F172A).copy(alpha = .4f), tonalElevation = 0.dp,
         modifier = Modifier.testTag("native-details-sheet"),
@@ -327,13 +337,13 @@ internal fun NativeDetailsSheet(title: String, onDismiss: () -> Unit, content: @
         } }) {
         Column(Modifier.fillMaxWidth().weight(1f, fill = false).verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text(title, color = t.textPrimary, fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold)
+            Text(title, Modifier.fillMaxWidth(), color = t.textPrimary, fontSize = 20.sp, lineHeight = 27.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
             content()
             Spacer(Modifier.height(2.dp))
         }
         Button(onClick = { scope.launch { sheet.hide(); onDismiss() } },
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp).fillMaxWidth().heightIn(min = 52.dp)
-                .testTag("sheet-confirm"), shape = CircleShape,
+                .testTag("sheet-confirm"), shape = RoundedCornerShape(16.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB), contentColor = Color.White)) {
             Text("确定", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         }

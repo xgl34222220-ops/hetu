@@ -32,6 +32,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.animation.core.snap
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -90,7 +94,7 @@ fun HetuGlassDock(
         prefs.registerOnSharedPreferenceChangeListener(listener)
         onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
-    val shape = if (floating) RoundedCornerShape(31.dp) else RoundedCornerShape(topStart = 31.dp, topEnd = 31.dp)
+    val shape = if (floating) RoundedCornerShape(32.dp) else RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
     // Never render a translucent glass shell without a real blur/backdrop behind it.
     // That fallback was the source of the opaque white slab when either appearance switch was disabled.
     val renderGlass = activeGlass && enableBlur
@@ -177,9 +181,9 @@ fun HetuGlassDock(
     Box(
         modifier = modifier
             .background(Color.Transparent)
-            .then(if (floating) Modifier.padding(horizontal = 20.dp).padding(bottom = bottomInset + 12.dp) else Modifier)
+            .then(if (floating) Modifier.padding(horizontal = 24.dp).padding(bottom = bottomInset + 16.dp) else Modifier)
             .fillMaxWidth()
-            .height(72.dp + if (floating) 0.dp else bottomInset),
+            .height(64.dp + if (floating) 0.dp else bottomInset).testTag("hetu-dock"),
     ) {
         Box(
             modifier = Modifier
@@ -191,23 +195,16 @@ fun HetuGlassDock(
                     ambientColor = Color(0xFF0F172A).copy(alpha = if (dark) .12f else .035f),
                     spotColor = Color(0xFF0F172A).copy(alpha = if (dark) .16f else .075f),
                 )
-                .then(if (floating) Modifier.squircleClip(31.dp) else Modifier.clip(shape))
+                .clip(shape)
                 .then(if (runtimeLiquid) Modifier.layerBackdrop(dockSurfaceBackdrop) else Modifier)
-                .then(liquidShellModifier)
-                .border(
-                    if (renderGlass) .9.dp else .7.dp,
-                    if (renderGlass) {
-                        if (dark) Color.White.copy(alpha = .13f) else Color.White.copy(alpha = .78f)
-                    } else if (dark) Color.White.copy(alpha = .08f) else Color(0xFFCBD5E1).copy(alpha = .72f),
-                    shape,
-                ),
+                .then(liquidShellModifier),
         )
 
         DockItems(
             items = items,
             selected = selected,
             onSelect = onSelect,
-            itemHeight = 60.dp,
+            itemHeight = 52.dp,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(start = 6.dp, top = 6.dp, end = 6.dp, bottom = if (floating) 6.dp else bottomInset + 6.dp),
@@ -223,146 +220,48 @@ fun HetuGlassDock(
     }
 }
 
+@Suppress("UNUSED_PARAMETER")
 @Composable
 private fun DockItems(
-    items: List<DockItem>,
-    selected: Int,
-    onSelect: (Int) -> Unit,
-    itemHeight: androidx.compose.ui.unit.Dp,
-    modifier: Modifier,
-    indicatorColor: Color,
-    indicatorBorderColor: Color,
-    indicatorShadow: androidx.compose.ui.unit.Dp,
-    selectedColor: Color,
-    unselectedColor: Color,
-    liquidGlass: Boolean,
-    indicatorBackdrop: LayerBackdrop?,
-    dark: Boolean,
+    items: List<DockItem>, selected: Int, onSelect: (Int) -> Unit,
+    itemHeight: androidx.compose.ui.unit.Dp, modifier: Modifier,
+    indicatorColor: Color, indicatorBorderColor: Color, indicatorShadow: androidx.compose.ui.unit.Dp,
+    selectedColor: Color, unselectedColor: Color, liquidGlass: Boolean,
+    indicatorBackdrop: LayerBackdrop?, dark: Boolean,
 ) {
-    BoxWithConstraints(modifier = modifier) {
-        val itemWidth = maxWidth / items.size.toFloat()
-        val targetIndex = selected.coerceIn(0, items.lastIndex)
-        val indicatorInset = 4.dp
-        val liquidStretch = remember { Animatable(0f) }
-        val indicatorPosition = remember { Animatable(targetIndex.toFloat()) }
-        var travelDirection by remember { mutableFloatStateOf(0f) }
-        var previousIndex by remember { mutableIntStateOf(targetIndex) }
-        LaunchedEffect(targetIndex) {
-            if (targetIndex != previousIndex) {
-                travelDirection = if (targetIndex > previousIndex) 1f else -1f
-                previousIndex = targetIndex
-                liquidStretch.snapTo(if (liquidGlass) 1f else 0f)
-                indicatorPosition.animateTo(
-                    targetValue = targetIndex.toFloat(),
-                    animationSpec = spring(
-                        dampingRatio = if (liquidGlass) .66f else .82f,
-                        stiffness = if (liquidGlass) 245f else 420f,
-                    ),
-                )
-                liquidStretch.animateTo(
-                    targetValue = 0f,
-                    animationSpec = spring(dampingRatio = .72f, stiffness = 360f),
-                )
-            } else if (indicatorPosition.value != targetIndex.toFloat()) {
-                indicatorPosition.snapTo(targetIndex.toFloat())
-            }
-        }
-        val indicatorX = itemWidth * indicatorPosition.value
-        val liquidExtra = if (liquidGlass) 16.dp * liquidStretch.value else 0.dp
-        val indicatorStart = indicatorX + indicatorInset - if (travelDirection < 0f) liquidExtra else 0.dp
-        val indicatorShape = RoundedCornerShape(23.dp)
-        // The outer dock keeps the real blur/refraction. The active tab must NOT create
-        // another refractive white lens on top of it; that was the remaining white-patch artifact.
-        val activeLens = false
-        val movingLensModifier = Modifier.drawBehind {
-            val radius = CornerRadius(size.height / 2f)
-            drawRoundRect(
-                color = indicatorColor,
-                cornerRadius = radius,
-            )
-            drawRoundRect(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        Color(0xFF60A5FA).copy(alpha = if (dark) .055f else .045f),
-                        Color.Transparent,
-                    ),
-                    center = Offset(size.width * .24f, size.height * .08f),
-                    radius = size.width * .72f,
-                ),
-                cornerRadius = radius,
-            )
-        }
-
-        Box(
-            modifier = Modifier
-                .offset(x = indicatorStart)
-                .width(itemWidth - (indicatorInset * 2) + liquidExtra)
-                .height(itemHeight)
-                .shadow(indicatorShadow, indicatorShape, clip = false)
-                .squircleClip(23.dp)
-                .then(movingLensModifier)
-                .border(1.dp, indicatorBorderColor, indicatorShape),
-        )
-
-        Row(Modifier.fillMaxWidth().selectableGroup()) {
-            items.forEachIndexed { index, item ->
-                val active = index == targetIndex
-                val interactionSource = remember(item.label) { MutableInteractionSource() }
-                val pressed by interactionSource.collectIsPressedAsState()
-                val baseItemColor = if (active) selectedColor else unselectedColor
-                val itemColor by animateColorAsState(
-                    targetValue = if (pressed) baseItemColor.copy(alpha = .62f) else baseItemColor,
-                    animationSpec = tween(170),
-                    label = "${item.label}DockColor",
-                )
-                val itemScale by animateFloatAsState(
-                    targetValue = when {
-                        pressed -> .92f
-                        active && liquidGlass -> 1.035f
-                        else -> 1f
-                    },
-                    animationSpec = spring(dampingRatio = .66f, stiffness = 520f),
-                    label = "${item.label}DockScale",
-                )
-                Column(
-                    modifier = Modifier
-                        .width(itemWidth)
-                        .height(itemHeight)
-                        .graphicsLayer {
-                            scaleX = itemScale
-                            scaleY = itemScale
-                        }
-                        .clip(RoundedCornerShape(23.dp))
-                        .selectable(
-                            selected = active,
-                            role = Role.Tab,
-                            interactionSource = interactionSource,
-                            indication = null,
-                            onClick = { if (!active) onSelect(index) },
-                        ),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    Icon(
-                        imageVector = item.icon,
-                        contentDescription = item.label,
-                        tint = itemColor,
-                        modifier = Modifier
-                            .size(22.dp)
-                            .graphicsLayer {
-                                scaleX = item.opticalScale
-                                scaleY = item.opticalScale
-                            },
-                    )
-                    Spacer(Modifier.height(3.dp))
-                    Text(
-                        item.label,
-                        color = itemColor,
-                        fontSize = 12.sp,
-                        lineHeight = 17.sp,
-                        fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
-                        maxLines = 1,
-                    )
+    val motion = LocalHetuMotionEnabled.current && android.animation.ValueAnimator.areAnimatorsEnabled()
+    val target = selected.coerceIn(0, items.lastIndex)
+    Row(modifier.selectableGroup(), verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        items.forEachIndexed { index, item ->
+            key(item.label) {
+                val active = index == target
+                val interaction = remember { MutableInteractionSource() }
+                val pressed by interaction.collectIsPressedAsState()
+                val weight by animateFloatAsState(if (active) 1.65f else 1f,
+                    if (motion) spring(dampingRatio = .88f, stiffness = 420f) else snap(), label = "dock-weight-$index")
+                val scale by animateFloatAsState(if (pressed && motion) .975f else 1f,
+                    if (motion) spring(dampingRatio = .82f, stiffness = 550f) else snap(), label = "dock-press-$index")
+                val fill by animateColorAsState(if (active) indicatorColor else Color.Transparent,
+                    if (motion) tween(220) else snap(), label = "dock-fill-$index")
+                val color by animateColorAsState(if (active) selectedColor else unselectedColor,
+                    if (motion) tween(180) else snap(), label = "dock-tint-$index")
+                Row(Modifier.weight(weight).height(itemHeight).testTag("dock-tab-$index")
+                    .graphicsLayer { scaleX = scale; scaleY = scale }
+                    .clip(RoundedCornerShape(26.dp)).background(fill)
+                    .selectable(active, role = Role.Tab, interactionSource = interaction, indication = null,
+                        onClick = { if (!active) onSelect(index) })
+                    .semantics { contentDescription = item.label }
+                    .padding(horizontal = 6.dp), horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Icon(item.icon, null, Modifier.size(21.dp).graphicsLayer {
+                        scaleX = item.opticalScale; scaleY = item.opticalScale
+                    }, tint = color)
+                    if (active) {
+                        Spacer(Modifier.width(6.dp))
+                        Text(item.label, Modifier.testTag("dock-active-label"), color = color,
+                            fontSize = 12.sp, lineHeight = 17.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                    }
                 }
             }
         }

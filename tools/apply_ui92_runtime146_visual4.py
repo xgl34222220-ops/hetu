@@ -200,7 +200,7 @@ s = replace(s, 'Modifier.padding(horizontal = 20.dp).padding(bottom = bottomInse
 s = replace(s, '.height(72.dp + if (floating) 0.dp else bottomInset)', '.height(64.dp + if (floating) 0.dp else bottomInset).testTag("hetu-dock")')
 a = s.index('                .border(\n                    if (renderGlass)')
 b = s.index('\n        )\n\n        DockItems', a)
-s = s[:a] + ',' + s[b:]
+s = s[:a].rstrip() + ',' + s[b:]
 s = replace(s, '.then(liquidShellModifier),', '.then(liquidShellModifier),')
 s = replace(s, 'itemHeight = 60.dp,', 'itemHeight = 52.dp,')
 a = s.index('@Composable\nprivate fun DockItems(')

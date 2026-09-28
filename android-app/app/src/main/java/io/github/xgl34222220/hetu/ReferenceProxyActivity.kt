@@ -582,7 +582,7 @@ private fun RefProxyShell(resumeRevision: Int, requestedStartPage: String?, star
     val shellBackground = if (MaterialTheme.colorScheme.background.luminance() < .5f) {
         LocalHetuTokens.current.pageBackground
     } else {
-        Color(0xFFF4F6FB)
+        Color(0xFFEFF2F8)
     }
     Box(Modifier.fillMaxSize().background(shellBackground)) {
         Box(
@@ -1658,7 +1658,7 @@ private fun RefGroupDetailPage(
         delay != null && delay > 0L
     }
     val anyTesting = group.nodes.any { testing[it.name] == true }
-    val pageBackground = if (dark) t.pageBackground else Color(0xFFF4F6FB)
+    val pageBackground = if (dark) t.pageBackground else Color(0xFFEFF2F8)
 
     Column(
         Modifier.fillMaxSize().offset(x = enterX).background(pageBackground).navigationBarsPadding(),
@@ -4073,7 +4073,7 @@ internal fun RefDivider() {
     HorizontalDivider(
         modifier = Modifier.padding(start = 58.dp, end = 14.dp),
         thickness = 1.dp,
-        color = if (MaterialTheme.colorScheme.background.luminance() < .5f) LocalHetuTokens.current.outline else Color(0xFFF4F6FB),
+        color = if (MaterialTheme.colorScheme.background.luminance() < .5f) LocalHetuTokens.current.outline else Color(0xFFEFF2F8),
     )
 }
 

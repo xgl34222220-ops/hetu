@@ -45,7 +45,7 @@ class CompactHomeDashboardTest {
         used = 201863462666, total = 743491825336, memory = 97517568, cpu = 100f, connections = 12,
     )
 
-    private fun render(data: CompactHomeData = fixture(), dark: Boolean = false, scale: Float = 1f, provider: (() -> CompactHomeData)? = null) {
+    private fun render(data: CompactHomeData = fixture(), dark: Boolean = false, scale: Float = 1f, provider: (() -> CompactHomeData)? = null, motion: Boolean = false) {
         rule.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density, scale)) {
@@ -54,7 +54,7 @@ class CompactHomeDashboardTest {
                         { calls += "reload" }, { calls += "restart" }, { calls += "delay" },
                         { calls += "webui" }, { calls += "log" }, { calls += "subscription" },
                         { calls += "connections" }, { calls += "settings" }, { calls += "diagnostics" },
-                        { calls += "adblock" }, motionEnabled = false)
+                        { calls += "adblock" }, motionEnabled = motion)
                 }
             }
         }
@@ -110,7 +110,7 @@ class CompactHomeDashboardTest {
         rule.onNodeWithTag("home-reload").assertDoesNotExist()
         rule.onNodeWithTag("home-restart").assertDoesNotExist()
         rule.onNodeWithTag("home-latency-refresh").assertIsNotEnabled()
-        rule.onNodeWithText("启动").assertIsDisplayed()
+        rule.onNodeWithText("启动服务").assertIsDisplayed()
         assertEquals(listOf("toggle"), calls)
         snapshot("stopped-unknown")
     }
@@ -220,7 +220,7 @@ class CompactHomeDashboardTest {
         render(CompactHomeData())
         val start = rule.onNodeWithTag("home-toggle").fetchSemanticsNode().boundsInRoot.width
         val pill = rule.onNodeWithTag("home-control-pill").fetchSemanticsNode().boundsInRoot.width
-        assertTrue("Stopped start must fill its capsule", start >= pill - 9f)
+        assertTrue("Stopped start must fill its capsule", start >= pill - 13f)
         rule.onNodeWithTag("home-reload").assertDoesNotExist()
         rule.onNodeWithTag("home-restart").assertDoesNotExist()
     }
@@ -328,7 +328,7 @@ class CompactHomeDashboardTest {
         val cpuBar = rule.onNodeWithTag("home-cpu-bar", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         assertEquals(sub.height, resource.height, 1f)
         assertEquals(sub.top, resource.top, 1f)
-        assertEquals(10f, resource.left - sub.right, 1f)
+        assertEquals(12f, resource.left - sub.right, 1f)
         assertEquals(14f, subBar.left - sub.left, 1f)
         assertEquals(14f, sub.right - subBar.right, 1f)
         assertEquals(subBar.bottom, cpuBar.bottom, 1f)
@@ -363,6 +363,85 @@ class CompactHomeDashboardTest {
         revealGrid()
         rule.onNodeWithTag("home-cpu-bar", useUnmergedTree = true).assertIsDisplayed()
         snapshot("grid-large-font")
+    }
+
+
+    private fun textLayout(tag: String): TextLayoutResult {
+        val result = mutableListOf<TextLayoutResult>()
+        rule.onNodeWithTag(tag, useUnmergedTree = true)
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(result) }
+        return result.single()
+    }
+
+    @Test fun ui4BrandIsCenteredAndRefreshStillWorks() {
+        render()
+        val header = rule.onNodeWithTag("home-header").fetchSemanticsNode().boundsInRoot
+        val brand = rule.onNodeWithTag("home-brand").fetchSemanticsNode().boundsInRoot
+        assertEquals(header.center.x, brand.center.x, 1f)
+        assertEquals(22.sp, textLayout("home-brand").layoutInput.style.fontSize)
+        rule.onNodeWithText("BoxProxy").assertDoesNotExist()
+        rule.onNodeWithContentDescription("刷新状态").performClick()
+        assertEquals(listOf("refresh"), calls)
+        snapshot("ui4-centered-header")
+    }
+
+    @Test fun ui4HeroTypographyAndGlyphAreLargerWithoutFakeUptime() {
+        render()
+        assertEquals(22.sp, textLayout("hero-status-title").layoutInput.style.fontSize)
+        assertEquals(15.sp, textLayout("hero-uptime").layoutInput.style.fontSize)
+        assertEquals(13.sp, textLayout("hero-core").layoutInput.style.fontSize)
+        assertEquals(15.sp, textLayout("hero-config").layoutInput.style.fontSize)
+        rule.onNodeWithTag("hero-status-glyph").assertWidthIsEqualTo(80.dp).assertHeightIsEqualTo(80.dp)
+        rule.onNodeWithText("少于 1 分钟").assertIsDisplayed()
+        rule.onNodeWithText("7 小时 37 分钟").assertDoesNotExist()
+    }
+
+    @Test fun ui4LongestIpv4IsCompleteInTheCard() {
+        val ip = "255.255.255.255"
+        render(fixture().copy(wan = ip))
+        rule.onNodeWithTag("compact-home").performScrollToNode(hasTestTag("home-network"))
+        val result = textLayout("home-network-ip")
+        assertEquals(ip, result.layoutInput.text.text)
+        assertFalse(result.hasVisualOverflow)
+        assertEquals(ip.length, result.getLineEnd(result.lineCount - 1))
+        assertTrue((0 until result.lineCount).none { result.isLineEllipsized(it) })
+        snapshot("ui4-ipv4-complete")
+    }
+
+    @Test @Config(qualifiers = "w320dp-h900dp-mdpi")
+    fun ui4Ipv6AndLargeFontsNeverClipCardAddress() {
+        val ip = "2001:db8:1234:5678:90ab:cdef:1234:5678"
+        render(fixture().copy(wan = ip), scale = 1.6f)
+        rule.onNodeWithTag("compact-home").performScrollToNode(hasTestTag("home-network"))
+        val result = textLayout("home-network-ip")
+        assertEquals(16.sp, result.layoutInput.style.fontSize)
+        assertEquals(ip, result.layoutInput.text.text)
+        assertFalse(result.hasVisualOverflow)
+        assertEquals(ip.length, result.getLineEnd(result.lineCount - 1))
+        snapshot("ui4-narrow-ipv6")
+    }
+
+    @Test fun ui4TimeoutIsABadgeForAnyConfiguredTarget() {
+        render(fixture().copy(delays = mapOf("Baidu" to -1L, "Cloudflare" to 0L, "Google" to 81L)))
+        rule.onNodeWithTag("latency-badge-Baidu").assertTextEquals("超时")
+        rule.onNodeWithTag("latency-badge-Cloudflare").assertTextEquals("失败")
+        rule.onNodeWithText("81 ms").assertIsDisplayed()
+        snapshot("ui4-latency-badges")
+    }
+
+    @Test fun ui4RapidModeChangesHaveOnlyOneIpLayerDuringAnimation() {
+        render(motion = true)
+        rule.mainClock.autoAdvance = false
+        repeat(5) { index ->
+            rule.onNodeWithTag("home-network").performClick()
+            rule.mainClock.advanceTimeBy(32)
+            rule.onAllNodesWithTag("home-network-body", useUnmergedTree = true).assertCountEquals(1)
+            rule.onAllNodesWithTag("home-network-ip", useUnmergedTree = true).assertCountEquals(1)
+            assertNetworkMode(if (index % 2 == 0) "LAN" else "WAN")
+        }
+        rule.mainClock.autoAdvance = true
+        rule.waitForIdle()
+        assertTrue(calls.isEmpty())
     }
 
 }
