@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/ui92-runtime146-visual4.yml'
       - 'tools/apply_ui92_runtime146_visual4.py'
+      - 'tools/fix_ui4_layout_measurement.py'
   workflow_dispatch:
 permissions:
   contents: write
@@ -20,7 +21,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Apply reviewed UI3 to UI4 migration only
+      - name: Apply reviewed UI3 to UI4 changes and production regression fixes
         shell: bash
         run: |
           set -euo pipefail
@@ -41,6 +42,7 @@ jobs:
           PY
           if ! grep -q '0.4.0-ui92-r146.4' android-app/app/build.gradle.kts; then
             python3 tools/apply_ui92_runtime146_visual4.py
+            python3 tools/fix_ui4_layout_measurement.py
           fi
           git diff --check
       - uses: actions/setup-java@v4
@@ -88,7 +90,7 @@ jobs:
                   else: out.write_bytes(data)
           print('Original146 payload entries verified:',len(expected))
           PY
-      - name: Compile native APK and run all 62 selected regression tests
+      - name: Compile native APK and rerun all 62 selected regression tests
         working-directory: android-app
         shell: bash
         run: |
@@ -171,9 +173,10 @@ jobs:
           - 运行/处理/停止三态及真实回调保留，启动胶囊显示“启动服务”，处理中的旧按钮仍不能误触。
           - 无边框22dp卡片、双层轻阴影、16sp快捷入口、12dp网格间距；订阅与CPU条仍由实际数据驱动。
           - WAN/LAN移除Crossfade，任何时刻只组合一份地址内容；整卡点击、详情隔离、横滑和纵向滚动保留。
-          - IP不再单行省略，短地址同行，较长地址移至标签下，IPv6按可用宽度换行；不写假地址，也不缩小系统字体。
+          - 地址独占完整内容宽度，IP标签置于上方；IPv4/IPv6按可用宽度换行，不使用省略号、不缩小系统字体。此处为完整显示而调整模板的同行排版。
           - 延迟超时/失败用小徽章展示，适用于所有自定义测速目标，正常数值和单位继续分级。
           - 悬浮底栏保留真实毛玻璃和页面切换，64dp高度，只有选中项显示文字，所有图标保留无障碍名称和独立触摸目标。
+          - 底栏外壳改用标准原生圆角裁切，不依赖圆角RuntimeShader；启用时的Haze/折射效果保留。
           - 网络详情保留可拖动原生抽屉，32dp顶部圆角、居中标题和确认按钮；未知ISP/ASN仍为未提供。
 
           ## 验证
@@ -181,6 +184,7 @@ jobs:
           doc+='GitHub Actions运行：'+str(__import__('os').environ['GITHUB_RUN_ID'])+'。\n'
           doc+=f"自动化测试：{r['tests']}通过，0失败、0错误、0跳过；{r['runtime_payload_entries']}项原146核心及运行资源SHA-256一致。\n"
           doc+=f"{r['protected_source_files']}个非本轮UI修改范围的生产/原生源码及资源文件与UI3逐字节一致。\n"
+          doc+='首次运行36392630398编译通过、60/62测试通过。长IPv4裁切及软件Canvas不能绘制圆角RuntimeShader这两处失败通过修改生产布局和圆角裁切解决，未删除测试或放宽断言；首次报告保留在该运行的evidence产物中。\n'
           doc+=f"APK：{r['apk_bytes']}字节；SHA-256：{r['apk_sha256']}。\n"
           doc+='版本0.4.0-ui92-r146.4，versionCode1005，包名io.github.xgl34222220.hetu。\n'
           doc+='''
@@ -191,7 +195,7 @@ jobs:
           '''
           Path('docs/UI92_RUNTIME146_UI4.md').write_text('\n'.join(line.lstrip() for line in doc.splitlines())+'\n')
           paths=json.load(open('integration-evidence/ui4-changed-paths.json')) if Path('integration-evidence/ui4-changed-paths.json').exists() else []
-          paths+=['tools/apply_ui92_runtime146_visual4.py','docs/UI92_RUNTIME146_UI4.md']
+          paths+=['tools/apply_ui92_runtime146_visual4.py','tools/fix_ui4_layout_measurement.py','docs/UI92_RUNTIME146_UI4.md']
           subprocess.run(['git','add','--',*paths],check=True)
           PY
           if ! git diff --cached --quiet; then
