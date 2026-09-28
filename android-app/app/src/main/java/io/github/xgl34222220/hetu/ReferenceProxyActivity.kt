@@ -149,7 +149,8 @@ class ReferenceProxyActivity : ComponentActivity() {
 private enum class RefProxyPage { Home, Panel, Tools, Settings }
 private data class RefSubscriptionCache(val used: Long = 0L, val total: Long = 0L, val count: Int = 0)
 internal enum class RefPanelTab(val label: String) {
-    Groups("节点"), Overview("概览"), Subscriptions("订阅"), Connections("连接"), Rules("规则"), RuleSets("规则集")
+    Groups("节点"), Overview("概览"), Subscriptions("订阅"), Connections("连接"),
+    Rules("规则"), RuleSets("规则集"), Logs("日志")
 }
 
 @Composable
@@ -962,6 +963,8 @@ internal fun RefPanel(
     var providers by remember { mutableStateOf<List<DashboardProviderUi>>(emptyList()) }
     var rules by remember { mutableStateOf<List<ProxyRuleUi>>(emptyList()) }
     var ruleSets by remember { mutableStateOf<List<DashboardRuleSetUi>>(emptyList()) }
+    var panelLog by remember { mutableStateOf("") }
+    val panelInspector = remember(context) { ProxyRuntimeInspector(context) }
     var selectedGroupName by rememberSaveable { mutableStateOf<String?>(null) }
     val selectedLocal = remember { mutableStateMapOf<String, String>() }
     val testing = remember { mutableStateMapOf<String, Boolean>() }
@@ -1059,6 +1062,11 @@ internal fun RefPanel(
     val filteredRuleSets = remember(ruleSets, query) { ruleSets.filter {
         query.isBlank() || it.name.contains(query.trim(), true) || it.behavior.contains(query.trim(), true)
     } }
+    val filteredPanelLog = remember(panelLog, query) {
+        if (query.isBlank()) panelLog else panelLog.lineSequence()
+            .filter { it.contains(query.trim(), ignoreCase = true) }
+            .joinToString("\n")
+    }
 
     suspend fun loadTab() {
         if (!state.running) return
@@ -1067,6 +1075,7 @@ internal fun RefPanel(
                 RefPanelTab.Subscriptions -> providers = repo.providers()
                 RefPanelTab.Rules -> rules = repo.rules()
                 RefPanelTab.RuleSets -> ruleSets = repo.ruleSets()
+                RefPanelTab.Logs -> panelLog = panelInspector.runtimeLog()
                 else -> Unit
             }
         } catch (cancel: CancellationException) {
@@ -1252,6 +1261,11 @@ internal fun RefPanel(
                         onRefreshState()
                         capsuleError = false
                         capsuleText = "连接状态已刷新"
+                    }
+                    RefPanelTab.Logs -> {
+                        panelLog = panelInspector.runtimeLog()
+                        capsuleError = false
+                        capsuleText = "运行日志已刷新"
                     }
                 }
             } catch (cancel: CancellationException) {
@@ -1519,6 +1533,23 @@ internal fun RefPanel(
                             }
                         }
                     }
+                RefPanelTab.Logs -> item(key = "${tab.name}-runtime-log", contentType = "runtime-log") {
+                    if (filteredPanelLog.isBlank()) {
+                        RefEmptyState("暂无运行日志", "核心产生运行记录后会显示在这里。", Icons.Rounded.ReceiptLong)
+                    } else {
+                        SelectionContainer {
+                            Text(
+                                filteredPanelLog,
+                                Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
+                                    .background(t.cardBackground).padding(14.dp)
+                                    .testTag("panel-runtime-log"),
+                                color = t.textPrimary,
+                                fontSize = 11.sp,
+                                lineHeight = 17.sp,
+                            )
+                        }
+                    }
+                }
                 }
             }
             }
@@ -2013,6 +2044,7 @@ private fun RefPanelGlassHeader(
                     RefPanelTab.Subscriptions -> "搜索订阅名称"
                     RefPanelTab.Rules -> "搜索规则、目标或策略"
                     RefPanelTab.RuleSets -> "搜索规则集"
+                    RefPanelTab.Logs -> "搜索运行日志"
                     else -> "搜索策略组或节点"
                 }) },
                 leadingIcon = { Icon(Icons.Rounded.Search, null, Modifier.size(18.dp)) },
