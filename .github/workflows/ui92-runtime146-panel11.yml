@@ -1,0 +1,266 @@
+name: UI92 Runtime146 inline panel UI11
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/ui92-runtime146-panel11.yml'
+      - 'tools/apply_ui11_panel.py'
+      - 'tools/fix_ui11.py'
+      - 'android-app/app/src/main/java/io/github/xgl34222220/hetu/Panel*11.kt'
+      - 'android-app/app/src/test/java/io/github/xgl34222220/hetu/*11Test.kt'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: ui92-runtime146-panel11
+  cancel-in-progress: false
+jobs:
+  panel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      HETU_TEST_KEYSTORE: /home/runner/.android/hetu-ui10-debug.jks
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Integrate only the reviewed UI11 changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor 331a0b19ad4ada535c8102e0eeb3657be7e24116 HEAD
+          mkdir -p integration-evidence
+          git rev-parse HEAD > integration-evidence/input-commit.txt
+          python3 tools/apply_ui11_panel.py
+          if test -f tools/fix_ui11.py; then python3 tools/fix_ui11.py; fi
+          git diff --check
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Restore UI10 signer and fail closed if unavailable
+        uses: actions/cache/restore@v4
+        with:
+          path: /home/runner/.android/hetu-ui10-debug.jks
+          key: hetu-ui10-debug-signing-v1
+          fail-on-cache-miss: true
+      - name: Verify the signer before compiling
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s "$HETU_TEST_KEYSTORE"
+          keytool -exportcert -keystore "$HETU_TEST_KEYSTORE" -alias androiddebugkey -storepass android | openssl dgst -sha256 -r | cut -d ' ' -f1 > integration-evidence/intended-signer.sha256
+          grep -qx '701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad' integration-evidence/intended-signer.sha256
+      - name: Prepare unchanged Android tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort | tail -n 1)
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" 'platforms;android-37.0' 'build-tools;37.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+      - name: Restore the exact original146 payload from verified UI10
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release download ui92-r146.10-test --repo "$GITHUB_REPOSITORY" --pattern 'Hetu-UI92-Runtime146-UI10.apk' --dir .reference-ui10
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,zipfile
+          apk=Path('.reference-ui10/Hetu-UI92-Runtime146-UI10.apk')
+          assert hashlib.sha256(apk.read_bytes()).hexdigest()=='757a85ae2c87e189dd43a91f726216d61f2a6a3e86db96c0fcb3e318b9ca980e'
+          expected=json.load(open('UI92_RUNTIME146_INPUTS.json'))['original146_payload']
+          with zipfile.ZipFile(apk) as z:
+              assert z.testzip() is None
+              for name,digest in expected.items():
+                  data=z.read(name);assert hashlib.sha256(data).hexdigest()==digest,name
+                  if name.startswith('lib/'):out=Path('android-app/app/src/main/jniLibs')/name.removeprefix('lib/')
+                  elif name.startswith('assets/'):out=Path('android-app/app/src/main')/name
+                  else:raise AssertionError(name)
+                  out.parent.mkdir(parents=True,exist_ok=True)
+                  if out.exists():assert out.read_bytes()==data,name
+                  else:out.write_bytes(data)
+          print('Restored original146 payload:',len(expected))
+          PY
+      - name: Compile APK and run fifteen full regression suites
+        working-directory: android-app
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:assembleDebug :app:testDebugUnitTest --tests '*CompactHomeDashboardTest' --tests '*Runtime146ContractTest' --tests '*Ui92IntegrationTest' --tests '*NodeSelectionContinuityTest' --tests '*ProxyLatencyRegressionTest' --tests '*NativeDockUi4Test' --tests '*HomeUi5RegressionTest' --tests '*HomeUi6RegressionTest' --tests '*HomeUi7InteractionTest' --tests '*HomeUi8ExperienceTest' --tests '*HomeUi9BentoTest' --tests '*HomeUi10GridTest' --tests '*HomeUi11Test' --tests '*PanelModel11Test' --tests '*PanelUi11Test' --stacktrace 2>&1 | tee ../integration-evidence/build.log
+      - name: Record actual outcomes including compilation or test failures
+        if: always()
+        env:
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET,json,os,re
+          out=Path('integration-evidence');out.mkdir(exist_ok=True)
+          suites=[];failures=[]
+          for p in Path('android-app/app/build/test-results/testDebugUnitTest').glob('TEST-*.xml'):
+              root=ET.parse(p).getroot()
+              suites.append({k:root.get(k) for k in ['name','tests','failures','errors','skipped']})
+              for c in root.findall('testcase'):
+                  for e in list(c.findall('failure'))+list(c.findall('error')):
+                      failures.append({'suite':root.get('name'),'test':c.get('name'),'message':e.get('message'),'stack':(e.text or '')[:2600]})
+          log=(out/'build.log').read_text(errors='replace') if (out/'build.log').exists() else ''
+          compile_errors=[line for line in log.splitlines() if line.startswith('e:') or 'What went wrong' in line]
+          report=dict(run=os.environ['RUN_URL'],suites=suites,failures=failures,compile_errors=compile_errors,
+              totals={k:sum(int(s[k]) for s in suites) for k in ['tests','failures','errors','skipped']})
+          (out/'test-suites.json').write_text(json.dumps(suites,indent=2))
+          (out/'attempt.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
+          print(json.dumps(report,ensure_ascii=False,indent=2))
+          PY
+      - name: Preserve compact failure report without committing untested app changes
+        if: failure()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p docs/ci
+          cp integration-evidence/attempt.json docs/ci/UI11-last-attempt.json
+          git add -- docs/ci/UI11-last-attempt.json
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'docs: preserve actual UI11 build failure evidence [skip ci]'
+            git push origin HEAD:main
+          fi
+      - name: Verify APK signer identity and protected source boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=android-app/app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/37.0.0/aapt" dump badging "$APK" > integration-evidence/apk-identity.txt
+          "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --verbose --print-certs "$APK" > integration-evidence/apk-signature.txt
+          "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs .reference-ui10/Hetu-UI92-Runtime146-UI10.apk > integration-evidence/ui10-signature.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess,json,hashlib,zipfile,re
+          base='331a0b19ad4ada535c8102e0eeb3657be7e24116'
+          root='android-app/app/src/main/java/io/github/xgl34222220/hetu/'
+          allowed={root+'CompactHomeDashboard.kt',root+'ReferenceProxyActivity.kt'}
+          protected=[]
+          for p in subprocess.check_output(['git','ls-tree','-r','--name-only',base]).decode().splitlines():
+              if (p.startswith('android-app/app/src/main/') or p.startswith('native/')) and p not in allowed:
+                  assert Path(p).read_bytes()==subprocess.check_output(['git','show',base+':'+p]),p
+                  protected.append(p)
+          inserts=json.load(open('integration-evidence/ui11-reference-insertions.json'))
+          source=Path(root+'ReferenceProxyActivity.kt').read_text()
+          restored=source.replace(inserts['branch'],'',1).replace(inserts['tool_new'],inserts['tool_old'],1)
+          assert restored==subprocess.check_output(['git','show',base+':'+root+'ReferenceProxyActivity.kt']).decode(),'Unexpected runtime/page edits'
+          home=Path(root+'CompactHomeDashboard.kt').read_text()
+          assert '更多首页功能' not in home and '刷新首页状态' in home
+          assert 'PanelStrategyRoute11' in source
+          suites=json.load(open('integration-evidence/test-suites.json'))
+          totals={k:sum(int(s[k]) for s in suites) for k in ['tests','failures','errors','skipped']}
+          assert len(suites)==15,suites
+          assert totals['tests']>=181 and totals['failures']==totals['errors']==totals['skipped']==0,totals
+          badge=Path('integration-evidence/apk-identity.txt').read_text()
+          for text in ["package: name='io.github.xgl34222220.hetu'","versionCode='1012'","versionName='0.4.0-ui92-r146.11'"]:assert text in badge,text
+          expected=json.load(open('UI92_RUNTIME146_INPUTS.json'))['original146_payload']
+          apk=Path('android-app/app/build/outputs/apk/debug/app-debug.apk')
+          with zipfile.ZipFile(apk) as z:
+              assert z.testzip() is None
+              for name,digest in expected.items():assert hashlib.sha256(z.read(name)).hexdigest()==digest,name
+          def signer(p):
+              values=set(re.findall(r'certificate SHA-256 digest:\s*([a-fA-F0-9]{64})',Path(p).read_text()))
+              assert len(values)==1,values
+              return next(iter(values)).lower()
+          current=signer('integration-evidence/apk-signature.txt');old=signer('integration-evidence/ui10-signature.txt')
+          assert current==old=='701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad','Signing continuity failure'
+          result=dict(totals,base=base,suites=len(suites),version='0.4.0-ui92-r146.11',versionCode=1012,
+              package='io.github.xgl34222220.hetu',same_signer_as_ui10=True,signer_sha256=current,
+              protected_source_files=len(protected),runtime_payload_entries=len(expected),device_tested=False,
+              apk_bytes=apk.stat().st_size,apk_sha256=hashlib.sha256(apk.read_bytes()).hexdigest())
+          Path('integration-evidence/result.json').write_text(json.dumps(result,indent=2))
+          Path('integration-evidence/protected-source-paths.json').write_text(json.dumps(protected,indent=2))
+          Path('Hetu-UI92-Runtime146-UI11.apk').write_bytes(apk.read_bytes())
+          print(json.dumps(result,indent=2))
+          PY
+      - name: Commit only fully tested application code and exact delivery notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,subprocess,os
+          r=json.load(open('integration-evidence/result.json'))
+          doc='''# 河图 UI11：简化首页顶栏，重构面板策略与节点
+
+          ## 范围
+          依据当前首页截图与“粘贴的 markdown (1)。md(9)”。首页只移除右上角刷新/更多，不套用面板的四按钮；面板修改仅针对策略/节点页。没有声称看过文稿提及的两个视频。
+          - 首页保留居中标题、真实下拉刷新、无障碍刷新、状态卡与四宫格。网络诊断移入工具，广告过滤仍在工具，连接仍在面板的连接页，代理设置仍在设置。
+          - 策略页固定顶栏加入搜索、筛选、布局、API配置。搜索即时匹配组/节点/提供商；隐藏策略、按模式显示GLOBAL、提供商分组、互斥展开、排序/倒序、单/双列、密度均接入实际数据和现有偏好设置。
+          - 策略组使用原位展开。组头与节点行共享一条惰性列表，不再由本页打开独立节点选择大抽屉，不把上千节点一次性塞入嵌套网格。保留配置图标与真实协议/UDP信息。
+          - 选中节点为淡蓝底、细蓝边和蓝勾；点击后先显示等待，只有原146接口及回读确认才改变选中态。失败保留原选择，传输错误不伪装成节点超时。
+          - 全测速调用真实节点测速，四个一批，不使用随机数，也不调用会清除自动组固定选择的组测速接口。单节点延迟点击独立，不触发父卡选中；长按可查看完整名称。
+          - 右下角节点选择胶囊定位并展开当前可见主策略，按实际Dock高度避让，列表末项保留可滚动空间。大字号时节点自动单列，不缩小用户系统字体。
+          - API抽屉写入原146客户端实际读取的自定义测速URL、API地址/端口/Secret及历史开关。保存校验URL、端口和Secret换行，不修改Root监听、路由或启动服务。历史开关对应既有本地流量/连接历史，不虚称新增逐节点带宽历史。
+          - 保留原146运行层、服务、DNS、路由和其他面板标签功能。此次不是整个应用其他页面全部重画。
+
+          ## 验证
+          '''
+          doc+=f"Actions {os.environ['GITHUB_RUN_ID']}；{r['suites']}组{r['tests']}项，失败{r['failures']}、错误{r['errors']}、跳过{r['skipped']}。\n"
+          doc+=f"{r['runtime_payload_entries']}项原146运行资源哈希一致；{r['protected_source_files']}个范围外生产/原生文件与UI10逐字节一致。ReferenceProxyActivity仅新增策略页路由和工具诊断入口。\n"
+          doc+=f"版本{r['version']}，versionCode{r['versionCode']}，包名{r['package']}。APK {r['apk_bytes']}字节，SHA256 {r['apk_sha256']}。\n"
+          doc+=f"与已发布UI10同签名：{r['same_signer_as_ui10']}；证书SHA256 {r['signer_sha256']}。从现存UI10缓存恢复，无新建/轮换密钥；私钥不入仓库与附件。\n"
+          doc+='''
+          ## 边界
+          本包为Debug测试版。自动化包含原生触摸、布局、真实HTTP客户端的受控服务端测试及本地数据库测试；不是用户手机Root联网、微信消息、GPU毛玻璃或帧率验收。测试截图为fixture数据，不是手机实拍。与原146/UI9等不同签名包不能覆盖；不要卸载或清除配置。与发布UI10已核对包名/版本/证书兼容，但未在用户设备实装。
+          签名缓存不是长期生产密钥托管，丢失时本工作流直接失败，不悄悄生成替代签名。不清理旧分支，不回退历史基线。
+          '''
+          Path('docs/UI92_RUNTIME146_UI11.md').write_text('\n'.join(line.lstrip() for line in doc.splitlines())+'\n')
+          paths=json.load(open('integration-evidence/ui11-changed-paths.json'))
+          subprocess.run(['git','add','--',*paths,'docs/UI92_RUNTIME146_UI11.md'],check=True)
+          PY
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'feat(ui): validated UI11 inline panel and clean home toolbar [skip ci]'
+            git push origin HEAD:main
+          fi
+          git rev-parse HEAD > integration-evidence/source-commit.txt
+      - name: Export exact source and evidence without signing files
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess,zipfile,json
+          names=set(subprocess.check_output(['git','ls-files']).decode().splitlines())
+          paths=Path('integration-evidence/ui11-changed-paths.json')
+          if paths.exists():names.update(json.loads(paths.read_text()))
+          with zipfile.ZipFile('Hetu-UI92-Runtime146-UI11-source.zip','w',zipfile.ZIP_DEFLATED) as z:
+              for name in sorted(names):
+                  p=Path(name)
+                  if p.is_file() and p.suffix not in ['.jks','.keystore']:z.write(p,name)
+          with zipfile.ZipFile('Hetu-UI92-Runtime146-UI11-verification.zip','w',zipfile.ZIP_DEFLATED) as z:
+              for root in ['integration-evidence','android-app/app/build/outputs/compact-home','android-app/app/build/outputs/panel11','android-app/app/build/test-results/testDebugUnitTest','android-app/app/build/reports/tests/testDebugUnitTest']:
+                  for p in Path(root).rglob('*'):
+                      if p.is_file() and p.suffix not in ['.jks','.keystore']:z.write(p,str(p))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: Hetu-UI92-Runtime146-UI11
+          path: Hetu-UI92-Runtime146-UI11.apk
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Hetu-UI92-Runtime146-UI11-evidence
+          path: |
+            Hetu-UI92-Runtime146-UI11-source.zip
+            Hetu-UI92-Runtime146-UI11-verification.zip
+            integration-evidence/
+          retention-days: 14
+          if-no-files-found: error
+      - name: Publish only verified same-signer test build
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create ui92-r146.11-test Hetu-UI92-Runtime146-UI11.apk Hetu-UI92-Runtime146-UI11-source.zip Hetu-UI92-Runtime146-UI11-verification.zip integration-evidence/result.json --target "$(git rev-parse HEAD)" --prerelease --title '河图 UI11 测试版 · 面板内联节点与简洁首页' --notes-file docs/UI92_RUNTIME146_UI11.md
