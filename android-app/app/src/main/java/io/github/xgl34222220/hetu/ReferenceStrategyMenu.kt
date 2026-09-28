@@ -1,10 +1,10 @@
 package io.github.xgl34222220.hetu
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.FilterList
-import androidx.compose.material.icons.rounded.Sort
-import androidx.compose.material3.Icon\nimport top.yukonga.miuix.kmp.icon.MiuixIcons\nimport top.yukonga.miuix.kmp.icon.extended.Filter\nimport top.yukonga.miuix.kmp.icon.extended.Sort
+import androidx.compose.material3.Icon
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Filter
+import top.yukonga.miuix.kmp.icon.extended.Sort
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
