@@ -137,10 +137,16 @@ save(p,s)
 
 p='android-app/app/build.gradle.kts';s=read_base(p)
 s=once(s,'versionCode = 1014','versionCode = 1015');s=once(s,'0.4.0-ui92-r146.13','0.4.0-ui92-r146.14');save(p,s)
-# Update only the explicit UX expectations superseded by this latest request.
+# Restore FAB assertions only for running fixtures. Stopped/empty core remains absent.
 for name in ['PanelUi11Test.kt','PanelNavigation13Test.kt']:
     p=TEST+name;s=read_base(p)
     s=s.replace('node("panel11-fab").assertDoesNotExist()', 'node("panel11-fab").assertIsDisplayed()')
+    if name=='PanelUi11Test.kt':
+        a=s.index('    @Test fun stoppedPanelHasNoFakeNodesAndCanRequestRealRefresh()')
+        b=s.find('    @Test',a+12)
+        if b<0:b=len(s)
+        part=once(s[a:b],'node("panel11-fab").assertIsDisplayed()','node("panel11-fab").assertDoesNotExist()')
+        s=s[:a]+part+s[b:]
     s=s.replace('WithoutAccordionsOrFloatingControl','WithoutAccordionsAndWithReservedShortcut')
     if s!=Path(p).read_text():save(p,s)
 for name in ['RuntimeCompatibility14Test.kt','PanelPolish14Test.kt']:
