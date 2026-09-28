@@ -54,6 +54,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.launch
+import io.github.xgl34222220.hetu.ui.hetuStaggerIn
 import java.util.Locale
 
 /** Presentation-only input. Unknown values stay unknown; no sample metrics ship in the app. */
@@ -244,6 +245,10 @@ internal fun CompactHomeDashboard(
         } }
         var feedbackDetails by remember { mutableStateOf<String?>(null) }
         val notice = rememberHomeNotice(data)
+        // V18.3: one-shot entrance cascade. Deliberately keyed to the user/system motion
+        // switch rather than the lifecycle gate (which is still false on the first frame).
+        val entranceMotion = motionEnabled && io.github.xgl34222220.hetu.ui.LocalHetuMotionEnabled.current
+        val stagger = io.github.xgl34222220.hetu.ui.rememberHetuStagger(entranceMotion)
         // The header is a sibling of the scroll viewport, never a lazy item.
         // Insets are applied outside the clipped viewport and consumed exactly once.
         Box(modifier.fillMaxSize().background(palette.page).testTag("home-viewport")) {
@@ -280,10 +285,10 @@ internal fun CompactHomeDashboard(
             overscrollEffect = null,
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = if (compact) 2.dp else 4.dp, bottom = 0.dp),
             verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 10.dp)) {
-            item("hero") { HomeHero(data, onToggle, onReload, onRestart, onSettings) }
-            item("shortcuts") { HomeShortcutStrip(onWebUi, onLog) }
-            item("latency") { HomeLatency(data, onDelay) }
-            item("telemetry") { HomeTelemetryGrid(data, onConnections, onSubscription) }
+            item("hero") { Box(Modifier.hetuStaggerIn(stagger, 0, entranceMotion)) { HomeHero(data, onToggle, onReload, onRestart, onSettings) } }
+            item("shortcuts") { Box(Modifier.hetuStaggerIn(stagger, 1, entranceMotion)) { HomeShortcutStrip(onWebUi, onLog) } }
+            item("latency") { Box(Modifier.hetuStaggerIn(stagger, 2, entranceMotion)) { HomeLatency(data, onDelay) } }
+            item("telemetry") { Box(Modifier.hetuStaggerIn(stagger, 3, entranceMotion)) { HomeTelemetryGrid(data, onConnections, onSubscription) } }
         }
         HomePullIndicator(pull, motion, Modifier.align(Alignment.TopCenter))
         }
