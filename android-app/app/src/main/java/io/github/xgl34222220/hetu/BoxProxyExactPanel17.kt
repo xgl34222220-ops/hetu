@@ -4,9 +4,9 @@ import android.content.SharedPreferences
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.*
@@ -266,10 +266,12 @@ internal fun BoxProxyExactStrategy17(
     val measureLatest by rememberUpdatedState(measure)
     val refreshLatest by rememberUpdatedState(refresh)
     val fontScale = LocalDensity.current.fontScale
-    // Reference layout is a two-column Bento grid. Keep one-column only as an
-    // accessibility escape hatch for very large font scaling.
-    val groupColumns = if (fontScale >= 1.45f) 1 else 2
-    val nodeColumns = if (fontScale >= 1.45f) 1 else 2
+    val screenWidthDp = LocalConfiguration.current.screenWidthDp.toFloat()
+    // BoxProxy px3.x(): auto = ((width - padding) / 180).toInt().coerceIn(2, 12).
+    val groupColumns = if (fontScale >= 1.45f) 1 else
+        boxProxyAutoColumns18(screenWidthDp, 24f, options.groupColumnMode, options.groupColumns)
+    val nodeColumns = if (fontScale >= 1.45f) 1 else
+        boxProxyAutoColumns18(screenWidthDp, 24f, options.nodeColumnMode, options.nodeColumns)
     val allGroups = remember(state.groups) { state.groups.associateBy { it.name } }
     val groups = remember(state.groups, query, state.trafficMode, options) {
         panelGroups11(state.groups, query, state.trafficMode, legacy).map { allGroups.getValue(it.name) }
@@ -823,7 +825,9 @@ private fun BoxProxyPolicySheet17(
     onTestAll: () -> Unit,
 ) {
     var query by rememberSaveable(group.name) { mutableStateOf("") }
-    val nodeColumns = if (LocalDensity.current.fontScale >= 1.45f) 1 else 2
+    val sheetWidthDp = LocalConfiguration.current.screenWidthDp.toFloat()
+    val nodeColumns = if (LocalDensity.current.fontScale >= 1.45f) 1 else
+        boxProxyAutoColumns18(sheetWidthDp, 32f, options.nodeColumnMode, options.nodeColumns)
     val legacy = options.legacy()
     val nodes = remember(group.nodes, query, options, delays) {
         val filtered = if (query.isBlank()) group.nodes else group.nodes.filter {
