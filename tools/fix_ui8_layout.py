@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""UI8 review adjustments; never disables regressions or changes runtime code."""
+"""UI8 reviewed corrections; no skipped tests or changed runtime functions."""
 from pathlib import Path
 import json
 R='android-app/app/src/main/java/io/github/xgl34222220/hetu/'
@@ -30,6 +30,34 @@ edit(R+'HomeExperience8.kt',
 edit(R+'HomeExperience8.kt',
 '''                    drawCircle(dot.copy(alpha = .17f), size.minDimension / 2)''',
 '''                    drawCircle(dot.copy(alpha = .17f * glow), size.minDimension / 2)''')
+edit(R+'CompactHomeDashboard.kt',
+'''        val first = line // Addresses never create a second line above the region row.''',
+'''        // LineHeight is not necessarily the physical glyph paragraph height with OEM fonts.
+        // Measure the entire unwrapped address; never constrain it to a guessed 22-dp box.
+        val first = maxOf(line, with(density) {
+            listOf(data.wan, data.lan).maxOf { address ->
+                val result = measurer.measure(androidx.compose.ui.text.AnnotatedString(address.ifBlank { "—" }),
+                    style = textStyle, softWrap = false, maxLines = 1)
+                kotlin.math.ceil(result.multiParagraph.height).toInt()
+            }.toDp()
+        })''')
+# The original header test swipes down and then presses Refresh. Now both are real entry points.
+edit(T+'HomeUi5RegressionTest.kt',
+'''        rule.onNodeWithContentDescription("刷新状态").performClick()
+        assertEquals(listOf("refresh"), calls)''',
+'''        assertEquals("The completed top-edge pull now dispatches a real refresh", listOf("refresh"), calls)
+        rule.onNodeWithContentDescription("刷新状态").performClick()
+        assertEquals("Toolbar refresh remains independently reachable", listOf("refresh", "refresh"), calls)''')
+# Print geometry of explicit fixtures, never production IPs, while retaining all assertions.
+edit(T+'HomeUi8ExperienceTest.kt',
+'''        return out.single()
+    }
+    private fun pullOffset()''',
+'''        val result = out.single()
+        if (tag == "home-network-ip") println("ADDRESS_LAYOUT size=${result.size} paragraph=${result.multiParagraph.width}x${result.multiParagraph.height} constraints=${result.layoutInput.constraints} widthOverflow=${result.didOverflowWidth} heightOverflow=${result.didOverflowHeight} exceeded=${result.multiParagraph.didExceedMaxLines} baseline=${result.firstBaseline} lineEnd=${result.getLineEnd(0)}")
+        return result
+    }
+    private fun pullOffset()''')
 p=Path('integration-evidence/ui8-changed-paths.json')
 paths=json.loads(p.read_text()) if p.exists() else []
 p.parent.mkdir(exist_ok=True)
