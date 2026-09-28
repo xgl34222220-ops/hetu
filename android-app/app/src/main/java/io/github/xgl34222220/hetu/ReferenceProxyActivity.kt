@@ -33,7 +33,9 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
@@ -584,13 +586,23 @@ private fun RefProxyShell(resumeRevision: Int, requestedStartPage: String?, star
         }
     }
 
-    val shellBackground = if (MaterialTheme.colorScheme.background.luminance() < .5f) {
+    val shellMotion = LocalHetuMotionEnabled.current
+    val shellTarget = if (MaterialTheme.colorScheme.background.luminance() < .5f) {
         LocalHetuTokens.current.pageBackground
     } else if (page == RefProxyPage.Panel) {
         Color(0xFFECEBFA)
     } else {
         Color(0xFFF4F6FB)
     }
+    // V18.3: the canvas tint cross-fades with the page instead of snapping lavender <-> gray.
+    val shellBackground by animateColorAsState(shellTarget, HetuMotion.fade(shellMotion, HetuMotion.StandardMs), label = "shell-canvas")
+    // Direction of travel along the dock: pages to the right slide in from the right.
+    val lastShownPage = remember { mutableStateOf(page) }
+    val pageTravel = remember(page) {
+        val delta = page.ordinal - lastShownPage.value.ordinal
+        if (delta > 0) 1f else if (delta < 0) -1f else 0f
+    }
+    SideEffect { lastShownPage.value = page }
     val dockDensity = LocalDensity.current
     val initialDockHeight = 76.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     var measuredDockHeight by remember { mutableStateOf(initialDockHeight) }
@@ -607,19 +619,23 @@ private fun RefProxyShell(resumeRevision: Int, requestedStartPage: String?, star
             Box(Modifier.matchParentSize().background(shellBackground))
             key(page) {
                 pageStateHolder.SaveableStateProvider(page.name) {
-                val pageEnter = remember { Animatable(0f) }
+                // V18.3: direction-aware shared-axis entrance. Opacity starts at .4, never 0,
+                // so the glass dock always samples real page pixels (no blank backdrop frame).
+                val pageEnter = remember { Animatable(if (shellMotion) 0f else 1f) }
                 LaunchedEffect(Unit) {
-                    pageEnter.animateTo(
-                        targetValue = 1f,
-                        animationSpec = spring(dampingRatio = .86f, stiffness = 430f),
-                    )
+                    if (shellMotion) pageEnter.animateTo(1f, HetuMotion.enter(true, durationMs = 300))
                 }
                 Box(
                     Modifier
                         .fillMaxSize()
                         .graphicsLayer {
-                            alpha = 1f
-                            translationY = (1f - pageEnter.value) * 10.dp.toPx()
+                            val p = pageEnter.value.coerceIn(0f, 1f)
+                            alpha = .4f + .6f * p
+                            if (pageTravel == 0f) {
+                                translationY = (1f - p) * 10.dp.toPx()
+                            } else {
+                                translationX = pageTravel * (1f - p) * 28.dp.toPx()
+                            }
                         },
                 ) {
             when (page) {
@@ -1353,15 +1369,17 @@ internal fun RefPanel(
     val clearance13 = LocalHomeDockClearance.current ?:
         (86.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding())
     val panelCanvas19 = if (MaterialTheme.colorScheme.background.luminance() < .5f) t.pageBackground else Color(0xFFECEBFA)
-    val tabEnter19 = remember(tab) { Animatable(0f) }
+    val panelMotion = LocalHetuMotionEnabled.current
+    val tabEnter19 = remember(tab) { Animatable(if (panelMotion) 0f else 1f) }
+    // V18.3: content follows the tab strip's direction (right tab -> slides in from right).
+    val lastPanelTab = remember { mutableStateOf(tab) }
+    val tabTravel19 = remember(tab) {
+        val delta = BoxProxyTabs17.indexOf(tab) - BoxProxyTabs17.indexOf(lastPanelTab.value)
+        if (delta > 0) 1f else if (delta < 0) -1f else 0f
+    }
+    SideEffect { lastPanelTab.value = tab }
     LaunchedEffect(tab) {
-        tabEnter19.animateTo(
-            1f,
-            androidx.compose.animation.core.tween(
-                180,
-                easing = androidx.compose.animation.core.CubicBezierEasing(.16f, 1f, .30f, 1f),
-            ),
-        )
+        if (panelMotion) tabEnter19.animateTo(1f, HetuMotion.enter(true, durationMs = 260))
     }
     Column(Modifier.fillMaxSize().background(panelCanvas19).padding(bottom = clearance13)
         .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))) {
@@ -1374,8 +1392,10 @@ internal fun RefPanel(
                 isRefreshing = refreshing,
                 onRefresh = ::refresh,
                 modifier = Modifier.fillMaxSize().graphicsLayer {
-                    alpha = .78f + .22f * tabEnter19.value
-                    translationY = (1f - tabEnter19.value) * 6.dp.toPx()
+                    val p = tabEnter19.value.coerceIn(0f, 1f)
+                    alpha = .55f + .45f * p
+                    if (tabTravel19 == 0f) translationY = (1f - p) * 6.dp.toPx()
+                    else translationX = tabTravel19 * (1f - p) * 22.dp.toPx()
                 },
             ) {
                 LazyColumn(Modifier.fillMaxSize(),
@@ -1408,6 +1428,7 @@ internal fun RefPanel(
                 }
                 RefPanelTab.Overview -> item(key = "${tab.name}-traffic-overview", contentType = "traffic-overview") { RefTrafficOverview(state, rules.size, providers) }
                 RefPanelTab.Subscriptions -> items(filteredProviders, key = { "${tab.name}-provider-${it.name}" }, contentType = { "subscription-provider" }) { item ->
+                    Box(hetuAnimateItem(panelMotion)) {
                     RefProviderRow(
                         item = item,
                         refreshing = providerRefreshing[item.name] == true,
@@ -1438,6 +1459,7 @@ internal fun RefPanel(
                         },
                         onClick = { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) },
                     )
+                    }
                 }
                 RefPanelTab.Connections -> {
                     item {
@@ -1475,6 +1497,7 @@ internal fun RefPanel(
                         )
                     }
                     items(filteredConnectionGroups, key = { "${tab.name}-app-" + it.key }, contentType = { "connection-app-group" }) { group ->
+                        Box(hetuAnimateItem(panelMotion)) {
                         RefConnectionAppCard(
                             group = group,
                             expanded = expandedConnectionApps[group.key] == true,
@@ -1488,12 +1511,14 @@ internal fun RefPanel(
                                 scope.launch { closeSelectedConnections(listOf(item)) }
                             }) else null,
                         )
+                        }
                     }
                 }
                 RefPanelTab.Rules -> itemsIndexed(filteredRules.chunked(15), key = { index, _ -> "${tab.name}-rule-group-$index" }, contentType = { _, _ -> "rule-group" }) { _, batch ->
                     RefRuleGroupCard(batch)
                 }
                 RefPanelTab.RuleSets -> items(filteredRuleSets, key = { "${tab.name}-ruleset-${it.name}" }, contentType = { "ruleset-row" }) { item ->
+                    Box(hetuAnimateItem(panelMotion)) {
                     RefRuleSetRow(item, refreshing = ruleSetRefreshing[item.name] == true, success = ruleSetSucceeded[item.name] == true) {
                         if (ruleSetRefreshing[item.name] != true) scope.launch {
                             ruleSetRefreshing[item.name] = true
@@ -1515,6 +1540,7 @@ internal fun RefPanel(
                                 ruleSetRefreshing.remove(item.name)
                             }
                         }
+                    }
                     }
                 }
             }
@@ -1717,28 +1743,24 @@ private fun RefVideoGroupCard19(
 ) {
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val t = LocalHetuTokens.current
-    val interaction = remember(group.name, active) { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        if (pressed) .965f else 1f,
-        spring(dampingRatio = .70f, stiffness = 610f),
-        label = "videoGroupPress${group.name}",
-    )
+    val motion = LocalHetuMotionEnabled.current
+    val interaction = remember(group.name) { MutableInteractionSource() }
     val shape = RoundedCornerShape(14.dp)
-    val bg = when {
+    // V18.3: selection tints cross-fade instead of snapping.
+    val bg by animateColorAsState(when {
         dark && active -> Color(0xFF172554)
         dark -> t.cardBackground
         active -> Color(0xFFF3F7FF)
         else -> Color(0xFFF9F7FF)
-    }
+    }, HetuMotion.fade(motion, HetuMotion.StandardMs), label = "videoGroupBg")
+    val borderTint by animateColorAsState(
+        if (active) Color(0xFF8CB7FF) else Color.White.copy(alpha = if (dark) .08f else .72f),
+        HetuMotion.fade(motion, HetuMotion.StandardMs), label = "videoGroupBorder",
+    )
     val tested = group.nodes.count { node -> ((delay.takeIf { node.name == selected } ?: node.lastDelay) ?: 0L) > 0L }
     Column(
         modifier.height(70.dp)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-                alpha = if (pressed) .94f else 1f
-            }
+            .hetuPressScale(interaction, pressedScale = .965f)
             .shadow(
                 if (active) 4.dp else 2.dp,
                 shape,
@@ -1747,12 +1769,9 @@ private fun RefVideoGroupCard19(
                 spotColor = Color(0xFF3B2E7E).copy(alpha = if (dark) .14f else .045f),
             )
             .background(bg, shape)
-            .border(
-                if (active) 1.dp else .6.dp,
-                if (active) Color(0xFF8CB7FF) else Color.White.copy(alpha = if (dark) .08f else .72f),
-                shape,
-            )
+            .border(if (active) 1.dp else .6.dp, borderTint, shape)
             .clip(shape)
+            .hetuPressHighlight(interaction, if (dark) Color.White.copy(alpha = .05f) else Color(0xFF3B2E7E).copy(alpha = .04f))
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 7.dp),
         verticalArrangement = Arrangement.SpaceBetween,
@@ -1815,46 +1834,42 @@ private fun RefVideoNodeCard19(
 ) {
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val t = LocalHetuTokens.current
+    val motion = LocalHetuMotionEnabled.current
     val source = remember(node.name) { MutableInteractionSource() }
-    val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        if (pressed) .97f else 1f,
-        spring(dampingRatio = .70f, stiffness = 600f),
-        label = "videoNodePress${node.name}",
-    )
-    var visible by remember(node.name) { mutableStateOf(false) }
+    var visible by remember(node.name) { mutableStateOf(!motion) }
     LaunchedEffect(node.name) {
         delay((index * 12L).coerceAtMost(160L))
         visible = true
     }
+    // V18.3: the weighted slot is reserved OUTSIDE AnimatedVisibility. Row weight is
+    // parent data of the direct child only; placed inside the animated container it was
+    // ignored and pairs could measure unevenly while cards cascaded in.
+    val bg by animateColorAsState(when {
+        dark && active -> Color(0xFF172554)
+        dark -> Color(0xFF202635)
+        active -> Color(0xFFDCE9FF)
+        else -> Color(0xFFE7E6F3)
+    }, HetuMotion.fade(motion, HetuMotion.StandardMs), label = "videoNodeBg")
+    val borderTint by animateColorAsState(
+        if (active) Color(0xFF5F96F7) else Color.White.copy(alpha = if (dark) .06f else .42f),
+        HetuMotion.fade(motion, HetuMotion.StandardMs), label = "videoNodeBorder",
+    )
+    Box(modifier.height(64.dp)) {
     androidx.compose.animation.AnimatedVisibility(
         visible = visible,
-        enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(150)) +
+        enter = androidx.compose.animation.fadeIn(tween(170, easing = HetuMotion.Standard)) +
             androidx.compose.animation.slideInVertically(
                 animationSpec = spring(dampingRatio = .82f, stiffness = 470f),
             ) { it / 5 },
     ) {
         val shape = RoundedCornerShape(11.dp)
-        val bg = when {
-            dark && active -> Color(0xFF172554)
-            dark -> Color(0xFF202635)
-            active -> Color(0xFFDCE9FF)
-            else -> Color(0xFFE7E6F3)
-        }
         Column(
-            modifier.height(64.dp)
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                    alpha = if (pressed) .93f else 1f
-                }
+            Modifier.fillMaxSize()
+                .hetuPressScale(source, pressedScale = .97f)
                 .background(bg, shape)
-                .border(
-                    if (active) 1.2.dp else .5.dp,
-                    if (active) Color(0xFF5F96F7) else Color.White.copy(alpha = if (dark) .06f else .42f),
-                    shape,
-                )
+                .border(if (active) 1.2.dp else .5.dp, borderTint, shape)
                 .clip(shape)
+                .hetuPressHighlight(source, if (dark) Color.White.copy(alpha = .05f) else Color(0xFF1E3A8A).copy(alpha = .05f))
                 .clickable(interactionSource = source, indication = null, onClick = onSelect)
                 .padding(horizontal = 9.dp, vertical = 7.dp),
             verticalArrangement = Arrangement.SpaceBetween,
@@ -1876,8 +1891,13 @@ private fun RefVideoNodeCard19(
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (active) {
+                    // V18.3: the check badge pops in with a small overshoot when a node is chosen.
+                    val pop = remember { Animatable(if (motion) .4f else 1f) }
+                    LaunchedEffect(Unit) { if (motion) pop.animateTo(1f, spring(dampingRatio = .55f, stiffness = 520f)) }
                     Box(
-                        Modifier.size(14.dp).background(Color(0xFF2474F3), CircleShape),
+                        Modifier.size(14.dp)
+                            .graphicsLayer { scaleX = pop.value; scaleY = pop.value; alpha = (pop.value * 1.6f).coerceIn(0f, 1f) }
+                            .background(Color(0xFF2474F3), CircleShape),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(Icons.Rounded.Check, "已选择", tint = Color.White, modifier = Modifier.size(9.dp))
@@ -1899,45 +1919,79 @@ private fun RefVideoNodeCard19(
             }
         }
     }
+    }
 }
 
 @Composable
 private fun RefVideoDelayPill19(value: Long?, testing: Boolean, onClick: (() -> Unit)? = null) {
-    val (bg, fg) = when {
+    val motion = LocalHetuMotionEnabled.current
+    val (bgTarget, fgTarget) = when {
         testing || value == null || value <= 0L -> Color(0xFFEDECF3) to Color(0xFF8E8A9B)
         value < 100L -> Color(0xFFE4EEFF) to Color(0xFF3472D6)
         value < 180L -> Color(0xFFE3F5EA) to Color(0xFF159268)
         else -> Color(0xFFFFEDD9) to Color(0xFFC67811)
     }
-    val source = remember(value, testing, onClick) { MutableInteractionSource() }
-    val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .92f else 1f, label = "videoDelay")
+    // V18.3: latency grade colours cross-fade, the value rolls, and testing breathes.
+    val bg by animateColorAsState(bgTarget, HetuMotion.fade(motion, HetuMotion.StandardMs), label = "videoDelayBg")
+    val fg by animateColorAsState(fgTarget, HetuMotion.fade(motion, HetuMotion.StandardMs), label = "videoDelayFg")
+    val breathe = if (testing && motion) {
+        val pulse = androidx.compose.animation.core.rememberInfiniteTransition(label = "videoDelayTesting")
+        pulse.animateFloat(
+            initialValue = .45f,
+            targetValue = 1f,
+            animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                animation = tween(560, easing = HetuMotion.Standard),
+                repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
+            ),
+            label = "videoDelayTestingAlpha",
+        ).value
+    } else 1f
+    val source = remember { MutableInteractionSource() }
+    val label = when {
+        testing -> "测速中"
+        value == null || value <= 0L -> "--"
+        else -> "$value ms"
+    }
     Box(
-        Modifier.graphicsLayer { scaleX = scale; scaleY = scale }
+        Modifier.hetuPressScale(source, enabled = !testing, pressedScale = .9f)
             .background(bg, CircleShape)
             .then(
                 if (onClick != null) Modifier.clickable(
                     enabled = !testing,
                     interactionSource = source,
                     indication = null,
+                    onClickLabel = "测速",
                     onClick = onClick,
                 ) else Modifier
             )
             .padding(horizontal = 6.dp, vertical = 2.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            when {
-                testing -> "…"
-                value == null || value <= 0L -> "--"
-                else -> "$value ms"
+        androidx.compose.animation.AnimatedContent(
+            targetState = label,
+            transitionSpec = {
+                if (!motion) {
+                    androidx.compose.animation.EnterTransition.None togetherWith androidx.compose.animation.ExitTransition.None
+                } else {
+                    (androidx.compose.animation.fadeIn(tween(180, easing = HetuMotion.Standard)) +
+                        androidx.compose.animation.slideInVertically(tween(220, easing = HetuMotion.EmphasizedDecelerate)) { it / 2 }) togetherWith
+                        (androidx.compose.animation.fadeOut(tween(110)) +
+                            androidx.compose.animation.slideOutVertically(tween(140, easing = HetuMotion.EmphasizedAccelerate)) { -it / 2 })
+                }
             },
-            color = fg,
-            fontSize = 9.sp,
-            lineHeight = 10.sp,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-        )
+            label = "videoDelayValue",
+        ) { shown ->
+            Text(
+                shown,
+                modifier = Modifier.graphicsLayer { alpha = breathe },
+                color = fg,
+                fontSize = 9.sp,
+                lineHeight = 10.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                style = LocalTextStyle.current.copy(fontFeatureSettings = "tnum"),
+            )
+        }
     }
 }
 
@@ -1950,8 +2004,18 @@ private fun RefVideoStrategyActions19(
 ) {
     val haptic = LocalHapticFeedback.current
     val blue = Color(0xFF1675F2)
+    val motion = LocalHetuMotionEnabled.current
+    // V18.3: the floating actions grow out of the bottom-right corner instead of popping in.
+    val reveal = remember { Animatable(if (motion) 0f else 1f) }
+    LaunchedEffect(Unit) { if (motion) reveal.animateTo(1f, spring(dampingRatio = .72f, stiffness = 420f)) }
     Column(
-        modifier,
+        modifier.graphicsLayer {
+            val p = reveal.value
+            scaleX = .6f + .4f * p
+            scaleY = .6f + .4f * p
+            alpha = p.coerceIn(0f, 1f)
+            transformOrigin = TransformOrigin(1f, 1f)
+        },
         horizontalAlignment = Alignment.End,
         verticalArrangement = Arrangement.spacedBy(7.dp),
     ) {
@@ -3825,7 +3889,7 @@ internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
     val scope = rememberCoroutineScope()
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-
+    val stagger = rememberHetuStagger()
 
     LazyColumn(
         Modifier.fillMaxSize().statusBarsPadding().background(if (dark) t.pageBackground else Color(0xFFF1F5F9)),
@@ -3837,9 +3901,10 @@ internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item { RefTitleBar("工具") }
-        item { RefSectionLabel("系统服务") }
-        item {
+        // V18.3: first-appearance cascade; items scrolled back into view appear instantly.
+        item { Box(Modifier.hetuStaggerIn(stagger, 0)) { RefTitleBar("工具") } }
+        item { Box(Modifier.hetuStaggerIn(stagger, 1)) { RefSectionLabel("系统服务") } }
+        item { Box(Modifier.hetuStaggerIn(stagger, 2)) {
             RefGroup {
                 RefToolRow(
                     Icons.Rounded.Terminal,
@@ -3867,9 +3932,9 @@ internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
                     context.startActivity(Intent(context, ProxyAppSelectionActivity::class.java))
                 }
             }
-        }
-        item { RefSectionLabel("网络与共享") }
-        item {
+        } }
+        item { Box(Modifier.hetuStaggerIn(stagger, 3)) { RefSectionLabel("网络与共享") } }
+        item { Box(Modifier.hetuStaggerIn(stagger, 4)) {
             RefGroup {
                 RefToolRow(Icons.Rounded.Wifi, Color(0xFF0EA5E9), "网络匹配", "Wi‑Fi / SSID / 移动网络自动启停", trailingText = "自动化", trailingColor = Color(0xFF2563EB)) {
                     context.startActivity(Intent(context, ProxyNetworkAutomationActivity::class.java))
@@ -3883,9 +3948,9 @@ internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
                     context.startActivity(Intent(context, ProxyBypassRulesActivity::class.java))
                 }
             }
-        }
-        item { RefSectionLabel("订阅与数据") }
-        item {
+        } }
+        item { Box(Modifier.hetuStaggerIn(stagger, 5)) { RefSectionLabel("订阅与数据") } }
+        item { Box(Modifier.hetuStaggerIn(stagger, 6)) {
             RefGroup {
                 RefToolRow(Icons.Rounded.CloudDownload, Color(0xFF2563EB), "订阅管理", "导入、更新与切换配置", trailingText = "管理", trailingColor = Color(0xFF2563EB)) {
                     context.startActivity(Intent(context, ProxySubscriptionActivity::class.java))
@@ -3899,15 +3964,15 @@ internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
                     context.startActivity(Intent(context, ProxyCnIpSettingsActivity::class.java))
                 }
             }
-        }
-        item { RefSectionLabel("核心与更新") }
-        item {
+        } }
+        item { Box(Modifier.hetuStaggerIn(stagger, 7)) { RefSectionLabel("核心与更新") } }
+        item { Box(Modifier.hetuStaggerIn(stagger, 8)) {
             RefGroup {
                 RefToolRow(Icons.Rounded.Memory, Color(0xFF334155), "内核管理", "下载、更新与维护内核", trailingText = state.core.ifBlank { "Mihomo" }, trailingBadge = true, trailingColor = Color(0xFF2563EB)) {
                     context.startActivity(Intent(context, ProxyCoreActivity::class.java))
                 }
             }
-        }
+        } }
     }
 }
 
@@ -3921,10 +3986,12 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
     var portsInfo by remember { mutableStateOf(false) }
     var autoStart by remember { mutableStateOf(prefs.getBoolean("proxyRootAutoStart", false)) }
     var blurEnabled by remember { mutableStateOf(prefs.getBoolean("enableBlur", true)) }
+    var hapticsEnabled by remember { mutableStateOf(prefs.getBoolean(HetuHaptics.PREF_KEY, true)) }
     var latencyInterval by remember { mutableIntStateOf(prefs.getInt("latencyAutoRefreshSeconds", 0).takeIf { it == 0 || it == 30 || it == 60 } ?: 0) }
 
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
+    val stagger = rememberHetuStagger()
     LazyColumn(
         Modifier.fillMaxSize().statusBarsPadding().background(if (dark) t.pageBackground else Color(0xFFF1F5F9)),
         contentPadding = PaddingValues(
@@ -3935,16 +4002,17 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item { RefTitleBar("设置") }
-        item {
+        // V18.3: first-appearance cascade; items scrolled back into view appear instantly.
+        item { Box(Modifier.hetuStaggerIn(stagger, 0)) { RefTitleBar("设置") } }
+        item { Box(Modifier.hetuStaggerIn(stagger, 1)) {
             RefGroup {
                 RefToolRow(Icons.Rounded.Tune, Color(0xFF2563EB), "更多功能设置", "通知、Web 面板、脚本、备份与接口管理") {
                     context.startActivity(Intent(context, Runtime146FeaturesActivity::class.java))
                 }
             }
-        }
+        } }
         if (state.running) {
-            item {
+            item { Box(Modifier.hetuStaggerIn(stagger, 2)) {
                 RefGroup {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -3982,10 +4050,10 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
                         }
                     }
                 }
-            }
+            } }
         }
-        item { RefSectionLabel("核心与运行") }
-        item {
+        item { Box(Modifier.hetuStaggerIn(stagger, 3)) { RefSectionLabel("核心与运行") } }
+        item { Box(Modifier.hetuStaggerIn(stagger, 4)) {
             RefGroup {
                 RefValueRow("运行核心", state.core, Icons.Rounded.Memory, Color(0xFF334155), highlightValue = true) {
                     context.startActivity(Intent(context, ProxyRuntimeCoreSettingsActivity::class.java))
@@ -4008,9 +4076,9 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
                     prefs.edit().putBoolean("proxyRootAutoStart", enabled).apply()
                 }
             }
-        }
-        item { RefSectionLabel("网络与配置") }
-        item {
+        } }
+        item { Box(Modifier.hetuStaggerIn(stagger, 5)) { RefSectionLabel("网络与配置") } }
+        item { Box(Modifier.hetuStaggerIn(stagger, 6)) {
             RefGroup {
                 RefValueRow(
                     "延迟自动刷新",
@@ -4032,9 +4100,9 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
                     context.startActivity(Intent(context, ProxyAdvancedSettingsActivity::class.java))
                 }
             }
-        }
-        item { RefSectionLabel("界面") }
-        item {
+        } }
+        item { Box(Modifier.hetuStaggerIn(stagger, 7)) { RefSectionLabel("界面") } }
+        item { Box(Modifier.hetuStaggerIn(stagger, 8)) {
             RefGroup {
                 RefSwitchRow(
                     icon = Icons.Rounded.BlurOn,
@@ -4047,11 +4115,23 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
                     prefs.edit().putBoolean("enableBlur", enabled).apply()
                 }
                 RefDivider()
+                RefSwitchRow(
+                    icon = Icons.Rounded.Vibration,
+                    accent = Color(0xFF10B981),
+                    title = "触感反馈",
+                    subtitle = "点按、切换与操作结果的振动反馈",
+                    checked = hapticsEnabled,
+                ) { enabled ->
+                    // Turning off still gives this one last tick; turning on stays silent until the next action.
+                    prefs.edit().putBoolean(HetuHaptics.PREF_KEY, enabled).apply()
+                    hapticsEnabled = enabled
+                }
+                RefDivider()
                 RefValueRow("主题与界面", "主题、色彩与玻璃效果", Icons.Rounded.Palette, Color(0xFFEC4899)) {
                     context.startActivity(Intent(context, ThemeSettingsActivity::class.java))
                 }
             }
-        }
+        } }
     }
 
     if (modePicker) {
@@ -4395,13 +4475,15 @@ internal fun RefToolRow(
 ) {
     val t = LocalHetuTokens.current
     val source = remember(title) { MutableInteractionSource() }
-    val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .975f else 1f, spring(dampingRatio = .78f, stiffness = 560f), label = "tool$title")
+    val haptics = rememberHetuHaptics()
+    // V18.3: grouped rows light up instead of shrinking inside their rounded group.
     Row(
         Modifier.fillMaxWidth()
-            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .91f else 1f }
-            .background(if (pressed) t.controlBackground.copy(alpha = .42f) else Color.Transparent)
-            .clickable(interactionSource = source, indication = null, onClick = onClick)
+            .hetuPressHighlight(source, refRowPressColor())
+            .clickable(interactionSource = source, indication = null) {
+                haptics.perform(HetuHaptic.Tap)
+                onClick()
+            }
             .padding(horizontal = 14.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -4446,12 +4528,13 @@ private fun RefValueRow(
 ) {
     val t = LocalHetuTokens.current
     val source = remember(title) { MutableInteractionSource() }
-    val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed && onClick != null) .96f else 1f, spring(dampingRatio = .80f, stiffness = 560f), label = "value$title")
+    val haptics = rememberHetuHaptics()
     val modifier = if (onClick == null) Modifier.fillMaxWidth() else Modifier.fillMaxWidth()
-        .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .91f else 1f }
-        .background(if (pressed) t.controlBackground.copy(alpha = .42f) else Color.Transparent)
-        .clickable(interactionSource = source, indication = null, onClick = onClick)
+        .hetuPressHighlight(source, refRowPressColor())
+        .clickable(interactionSource = source, indication = null) {
+            haptics.perform(HetuHaptic.Tap)
+            onClick()
+        }
     Row(modifier.padding(horizontal = 14.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
         if (icon != null) {
             RefGradientIcon(icon, accent)
@@ -4492,12 +4575,15 @@ internal fun RefSwitchRow(
     onCheckedChange: (Boolean) -> Unit,
 ) {
     val t = LocalHetuTokens.current
-    val view = LocalView.current
+    val haptics = rememberHetuHaptics()
+    val source = remember(title) { MutableInteractionSource() }
     Row(
-        Modifier.fillMaxWidth().toggleable(checked, role = Role.Switch) { value ->
-            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-            onCheckedChange(value)
-        }.padding(horizontal = 14.dp, vertical = 12.dp),
+        Modifier.fillMaxWidth()
+            .hetuPressHighlight(source, refRowPressColor())
+            .toggleable(checked, interactionSource = source, indication = null, role = Role.Switch) { value ->
+                haptics.perform(if (value) HetuHaptic.ToggleOn else HetuHaptic.ToggleOff)
+                onCheckedChange(value)
+            }.padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RefGradientIcon(icon, accent)
@@ -4520,6 +4606,12 @@ internal fun RefSwitchRow(
         )
     }
 }
+
+/** Shared grouped-row press tint: visible on both white and OLED surfaces, never loud. */
+@Composable
+private fun refRowPressColor(): Color =
+    if (MaterialTheme.colorScheme.background.luminance() < .5f) Color.White.copy(alpha = .06f)
+    else Color(0xFF0F172A).copy(alpha = .045f)
 
 @Composable
 internal fun RefDivider() {
