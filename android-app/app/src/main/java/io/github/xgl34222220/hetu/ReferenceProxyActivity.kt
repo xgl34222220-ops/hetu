@@ -586,6 +586,8 @@ private fun RefProxyShell(resumeRevision: Int, requestedStartPage: String?, star
 
     val shellBackground = if (MaterialTheme.colorScheme.background.luminance() < .5f) {
         LocalHetuTokens.current.pageBackground
+    } else if (page == RefProxyPage.Panel) {
+        Color(0xFFECEBFA)
     } else {
         Color(0xFFF4F6FB)
     }
@@ -712,7 +714,7 @@ private fun RefProxyShell(resumeRevision: Int, requestedStartPage: String?, star
                 }
             }
         }
-        if (!panelDetailVisible) {
+        if (!panelDetailVisible || page == RefProxyPage.Panel) {
             HetuGlassDock(
                 items = dock,
                 selected = dockPages.indexOf(page).coerceAtLeast(0),
@@ -945,12 +947,8 @@ internal fun RefPanel(
     onOpenSettings: () -> Unit,
     onDetailVisibleChanged: (Boolean) -> Unit,
 ) {
-    // Nodes use a compact parent grid and a separate destination; primary tab order is shared.
-    if (selectedTab == RefPanelTab.Groups) {
-        PanelStrategyRoute11(state, repo, delays, searchRequest, onSelectedTabChange,
-            onRefreshState, onDetailVisibleChanged)
-        return
-    }
+    // Strategy stays inside the common panel shell: the reference keeps the title,
+    // tab strip and liquid dock fixed while only the content plane changes.
 
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -1064,7 +1062,10 @@ internal fun RefPanel(
         if (!state.running) return
         try {
             when (tab) {
-                RefPanelTab.Overview -> rules = repo.rules()
+                RefPanelTab.Overview -> {
+                    rules = repo.rules()
+                    providers = repo.providers()
+                }
                 RefPanelTab.Subscriptions -> providers = repo.providers()
                 RefPanelTab.Rules -> rules = repo.rules()
                 RefPanelTab.RuleSets -> ruleSets = repo.ruleSets()
@@ -1247,6 +1248,7 @@ internal fun RefPanel(
                     RefPanelTab.Overview -> {
                         onRefreshState()
                         rules = repo.rules()
+                        providers = repo.providers()
                         capsuleError = false
                         capsuleText = "概览状态已刷新"
                     }
@@ -1411,7 +1413,7 @@ internal fun RefPanel(
                         }
                     }
                 }
-                RefPanelTab.Overview -> item(key = "${tab.name}-traffic-overview", contentType = "traffic-overview") { RefTrafficOverview(state, rules.size) }
+                RefPanelTab.Overview -> item(key = "${tab.name}-traffic-overview", contentType = "traffic-overview") { RefTrafficOverview(state, rules.size, providers) }
                 RefPanelTab.Subscriptions -> items(filteredProviders, key = { "${tab.name}-provider-${it.name}" }, contentType = { "subscription-provider" }) { item ->
                     RefProviderRow(
                         item = item,
