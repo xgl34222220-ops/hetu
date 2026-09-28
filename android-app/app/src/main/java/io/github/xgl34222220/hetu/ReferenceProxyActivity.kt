@@ -66,6 +66,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -585,7 +587,7 @@ private fun RefProxyShell(resumeRevision: Int, requestedStartPage: String?, star
     val shellBackground = if (MaterialTheme.colorScheme.background.luminance() < .5f) {
         LocalHetuTokens.current.pageBackground
     } else {
-        Color(0xFFEFEBF8)
+        Color(0xFFF8FAFC)
     }
     val dockDensity = LocalDensity.current
     val initialDockHeight = 76.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -1670,7 +1672,7 @@ private fun RefGroupDetailPage(
         delay != null && delay > 0L
     }
     val anyTesting = group.nodes.any { testing[it.name] == true }
-    val pageBackground = if (dark) t.pageBackground else Color(0xFFEFEBF8)
+    val pageBackground = if (dark) t.pageBackground else Color(0xFFF8FAFC)
 
     Column(
         Modifier.fillMaxSize().offset(x = enterX).background(pageBackground).navigationBarsPadding(),
@@ -3785,13 +3787,14 @@ private fun RefChoiceBottomSheet(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun RefInfoBottomSheet(
+internal fun RefInfoBottomSheet(
     title: String,
     text: String,
     actionLabel: String,
     onDismiss: () -> Unit,
 ) {
     val t = LocalHetuTokens.current
+    val sheet = rememberInteractiveSheetState()
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
     var copied by remember(text) { mutableStateOf(false) }
     val terminal = title.contains("日志")
@@ -3821,16 +3824,20 @@ private fun RefInfoBottomSheet(
     }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = sheet,
+        sheetGesturesEnabled = true,
+        modifier = Modifier.testTag("native-log-sheet"),
         shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
         containerColor = if (terminal) Color(0xFF0B1220) else t.elevatedCardBackground,
         contentColor = if (terminal) Color(0xFFE2E8F0) else t.textPrimary,
         tonalElevation = 0.dp,
         scrimColor = Color.Black.copy(alpha = if (terminal) .48f else .35f),
         dragHandle = {
-            Box(
-                Modifier.padding(top = 10.dp, bottom = 6.dp).size(width = 36.dp, height = 4.dp)
-                    .background(if (terminal) Color(0xFF334155) else Color(0xFFCBD5E1), CircleShape),
-            )
+            Box(Modifier.fillMaxWidth().height(48.dp).testTag("log-drag-handle").semantics { contentDescription = "下拉关闭日志" },
+                contentAlignment = Alignment.Center) {
+                Box(Modifier.size(width = 40.dp, height = 6.dp)
+                    .background(if (terminal) Color(0xFF334155) else Color(0xFFCBD5E1), CircleShape))
+            }
         },
     ) {
         Column(
@@ -4085,7 +4092,7 @@ internal fun RefDivider() {
     HorizontalDivider(
         modifier = Modifier.padding(start = 58.dp, end = 14.dp),
         thickness = 1.dp,
-        color = if (MaterialTheme.colorScheme.background.luminance() < .5f) LocalHetuTokens.current.outline else Color(0xFFEFEBF8),
+        color = if (MaterialTheme.colorScheme.background.luminance() < .5f) LocalHetuTokens.current.outline else Color(0xFFF8FAFC),
     )
 }
 

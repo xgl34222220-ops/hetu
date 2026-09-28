@@ -54,7 +54,7 @@ class HomeUi6RegressionTest {
                     val density=LocalDensity.current
                     var dockHeight by remember { mutableStateOf(76.dp) }
                     var selected by remember { mutableIntStateOf(0) }
-                    Box(Modifier.fillMaxSize().background(if(dark) Color(0xFF121212) else Color(0xFFEFEBF8))) {
+                    Box(Modifier.fillMaxSize().background(if(dark) Color(0xFF121212) else Color(0xFFF8FAFC))) {
                         CompositionLocalProvider(LocalHomeDockClearance provides (dockHeight+10.dp)) {
                             CompactHomeDashboard(data,{calls+="refresh"},{calls+="toggle"},{calls+="reload"},{calls+="restart"},
                                 {calls+="delay"},{calls+="webui"},{calls+="log"},{calls+="subscription"},{calls+="connections"},
@@ -156,11 +156,11 @@ class HomeUi6RegressionTest {
         assertTrue("Separators must render actual gray pixels",pixels.count {it==0xFFF0F0F0.toInt() || it==0xFFEFEFEF.toInt()}>20)
         image.recycle()
     }
-    @Test fun lavenderAndCrispForegroundPillAreActuallyPainted() {
+    @Test fun clearCanvasAndCrispForegroundPillAreActuallyPainted() {
         render()
         val b=bitmap();val pixels=IntArray(b.width*b.height)
         b.getPixels(pixels,0,b.width,0,0,b.width,b.height)
-        assertTrue(pixels.count {it==0xFFEFEBF8.toInt()}>3000)
+        assertTrue(pixels.count {it==0xFFF8FAFC.toInt()}>3000)
         assertTrue("Solid blue pill must not be a radial halo",pixels.count {it==0xFFE7F1FF.toInt()}>1000)
         b.recycle()
         rule.onNodeWithTag("dock-tab-2").performTouchInput{click()}

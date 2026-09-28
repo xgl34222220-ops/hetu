@@ -7,7 +7,7 @@
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightNavigationBar">true</item>
         <item name="android:windowActionModeOverlay">true</item>
-        <item name="android:windowBackground">#EFEBF8</item>
+        <item name="android:windowBackground">#F8FAFC</item>
         <item name="android:windowAnimationStyle">@style/HetuSharedAxisWindowAnimation</item>
     </style>
     <style name="AppThemeDark" parent="android:style/Theme.Material.NoActionBar">

@@ -373,12 +373,12 @@ class CompactHomeDashboardTest {
         return result.single()
     }
 
-    @Test fun ui4BrandIsCenteredAndRefreshStillWorks() {
+    @Test fun ui7BrandStartsLeadingAndRefreshStillWorks() {
         render()
         val header = rule.onNodeWithTag("home-header").fetchSemanticsNode().boundsInRoot
         val brand = rule.onNodeWithTag("home-brand").fetchSemanticsNode().boundsInRoot
-        assertEquals(header.center.x, brand.center.x, 1f)
-        assertEquals(22.sp, textLayout("home-brand").layoutInput.style.fontSize)
+        assertEquals(header.left + 16f, brand.left, 1f)
+        assertEquals(28.sp, textLayout("home-brand").layoutInput.style.fontSize)
         rule.onNodeWithText("BoxProxy").assertDoesNotExist()
         rule.onNodeWithContentDescription("刷新状态").performClick()
         assertEquals(listOf("refresh"), calls)

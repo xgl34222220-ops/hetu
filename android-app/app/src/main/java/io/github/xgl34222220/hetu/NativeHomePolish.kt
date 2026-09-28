@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -127,9 +128,9 @@ internal fun Modifier.nativePress(enabled: Boolean = true, label: String? = null
     val source = remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val view = LocalView.current
-    val scale by animateFloatAsState(if (enabled && pressed && motion) .975f else 1f,
+    val scale by animateFloatAsState(if (enabled && pressed && motion) .965f else 1f,
         if (!motion) snap() else if (pressed) tween(150, easing = CubicBezierEasing(.2f, 0f, 0f, 1f))
-        else spring(dampingRatio = .8f, stiffness = 550f), label = "native-press")
+        else spring(dampingRatio = .78f, stiffness = 750f), label = "native-press")
     return graphicsLayer { scaleX = scale; scaleY = scale }
         .clickable(source, indication = null, enabled = enabled, role = Role.Button, onClickLabel = label) {
             view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
@@ -138,14 +139,14 @@ internal fun Modifier.nativePress(enabled: Boolean = true, label: String? = null
 }
 
 internal fun Modifier.diffuseCardShadow(shape: Shape): Modifier =
-    shadow(4.dp, shape, clip = false, ambientColor = Color(0xFF505AA0).copy(alpha = .02f),
-        spotColor = Color(0xFF505AA0).copy(alpha = .02f))
-        .shadow(10.dp, shape, clip = false, ambientColor = Color(0xFF505AA0).copy(alpha = .05f),
-            spotColor = Color(0xFF505AA0).copy(alpha = .05f))
+    shadow(4.dp, shape, clip = false, ambientColor = Color(0xFF0F172A).copy(alpha = .02f),
+        spotColor = Color(0xFF0F172A).copy(alpha = .02f))
+        .shadow(10.dp, shape, clip = false, ambientColor = Color(0xFF0F172A).copy(alpha = .05f),
+            spotColor = Color(0xFF0F172A).copy(alpha = .05f))
 
 @Composable
 internal fun NativeStatusHero(data: CompactHomeData, toggle: () -> Unit, reload: () -> Unit,
-    restart: () -> Unit, settings: () -> Unit, motion: Boolean) {
+    restart: () -> Unit, settings: () -> Unit, motion: Boolean, quickActions: (@Composable () -> Unit)? = null) {
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val phase = HomeLifecyclePresentation.phase(data)
     val processing = phase == HomePhase.Processing
@@ -156,7 +157,7 @@ internal fun NativeStatusHero(data: CompactHomeData, toggle: () -> Unit, reload:
     }
     val colors = when (phase) {
         HomePhase.Running -> if (dark) listOf(Color(0xFF17243F), Color(0xFF262C4E), Color(0xFF8AB4FF))
-            else listOf(Color(0xFFE6E1FF), Color(0xFFECE7FE), Color(0xFF2563EB))
+            else listOf(Color(0xFFEEF2FF), Color(0xFFDDE7FD), Color(0xFF2563EB))
         HomePhase.Processing -> if (dark) listOf(Color(0xFF392B16), Color(0xFF483515), Color(0xFFFBBF24))
             else listOf(Color(0xFFFEF3C7), Color(0xFFFDE68A), Color(0xFFD97706))
         HomePhase.Stopped -> if (dark) listOf(Color(0xFF1B2330), Color(0xFF222C3A), Color(0xFF9AA9BD))
@@ -170,7 +171,13 @@ internal fun NativeStatusHero(data: CompactHomeData, toggle: () -> Unit, reload:
     val shape = HomeContinuousShape(28.dp)
     val compact = LocalHomeCompactSpacing.current
     Box(Modifier.fillMaxWidth().testTag("home-hero").semantics { stateDescription = title }
-        .diffuseCardShadow(shape).clip(shape).background(Brush.linearGradient(listOf(top, bottom)))) {
+        .diffuseCardShadow(shape).clip(shape).background(Brush.linearGradient(listOf(top, lerp(top, bottom, .45f), bottom)))
+        .drawBehind {
+            drawRect(Brush.radialGradient(listOf(accent.copy(alpha = .10f), Color.Transparent),
+                center = Offset(size.width * .9f, size.height * .12f), radius = size.width * .65f))
+            drawRect(Brush.radialGradient(listOf(top.copy(alpha = .60f), Color.Transparent),
+                center = Offset(size.width * .15f, size.height * .9f), radius = size.width * .8f))
+        }) {
         Column(Modifier.fillMaxWidth().padding(if (compact) 14.dp else 20.dp)) {
             Row(Modifier.fillMaxWidth().testTag("hero-information"), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f).testTag("hero-information-text"), verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -237,6 +244,10 @@ internal fun NativeStatusHero(data: CompactHomeData, toggle: () -> Unit, reload:
                     }
                 }
             }
+            }
+            if (quickActions != null) {
+                Spacer(Modifier.height(8.dp))
+                quickActions()
             }
         }
         if (processing) ProcessingShimmer(accent, motion, Modifier.align(Alignment.BottomCenter))
@@ -323,19 +334,20 @@ internal fun LoadingWaveDots(motion: Boolean, color: Color, modifier: Modifier =
 @Composable
 internal fun NativeDetailsSheet(title: String, onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
     val backdrop = LocalSheetBackdrop.current
-    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheet = rememberInteractiveSheetState()
     val scope = rememberCoroutineScope()
     val t = LocalHetuTokens.current
     DisposableEffect(backdrop) {
         backdrop?.let { it.count++ }
         onDispose { backdrop?.let { it.count = (it.count - 1).coerceAtLeast(0) } }
     }
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet,
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, sheetGesturesEnabled = true,
         shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
         containerColor = t.cardBackground, contentColor = t.textPrimary,
         scrimColor = Color(0xFF0F172A).copy(alpha = .4f), tonalElevation = 0.dp,
         modifier = Modifier.testTag("native-details-sheet"),
-        dragHandle = { Box(Modifier.fillMaxWidth().height(40.dp), contentAlignment = Alignment.Center) {
+        dragHandle = { Box(Modifier.fillMaxWidth().height(48.dp).testTag("sheet-drag-handle")
+            .semantics { contentDescription = "下拉关闭" }, contentAlignment = Alignment.Center) {
             Box(Modifier.width(40.dp).height(6.dp).background(t.textSecondary.copy(alpha = .28f), CircleShape))
         } }) {
         Column(Modifier.fillMaxWidth().weight(1f, fill = false).verticalScroll(rememberScrollState())

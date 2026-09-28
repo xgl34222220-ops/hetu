@@ -121,12 +121,16 @@ class HomeUi7InteractionTest {
         val target=mutableStateOf("44 ms")
         lateinit var state:MetricRollState
         rule.setContent {state=rememberMetricRoll(target.value,true);Text(state.displayed,Modifier.testTag("rolled-value"))}
+        rule.mainClock.autoAdvance=false
         rule.runOnIdle{target.value="80 ms";Snapshot.sendApplyNotifications()}
+        repeat(4){rule.mainClock.advanceTimeByFrame();rule.waitForIdle()}
+        assertTrue("Interrupt the outgoing phase, not an already finished value",state.leaving && state.progress.value<1f)
         rule.runOnIdle{target.value="114 ms";Snapshot.sendApplyNotifications()}
-        rule.waitForIdle()
+        repeat(32){rule.mainClock.advanceTimeByFrame();rule.waitForIdle()}
         rule.onNodeWithTag("rolled-value").assertTextEquals("114 ms")
         rule.onAllNodesWithTag("rolled-value").assertCountEquals(1)
         assertEquals(1f,state.progress.value,0f)
+        rule.mainClock.autoAdvance=true
     }
     @Test fun reducedMotionNumberDoesNotWaitForAnimation() {
         val target=mutableStateOf("1.1 KB/s")
@@ -151,7 +155,7 @@ class HomeUi7InteractionTest {
     }
     @Test fun networkHandleFollowsLongSlowDragAndDismisses() {
         renderNetworkSheet()
-        rule.onNodeWithTag("sheet-drag-handle").assertHeightIsAtLeast(48.dp)
+        rule.onNodeWithTag("sheet-drag-handle",useUnmergedTree=true).assertHeightIsAtLeast(48.dp)
             .performTouchInput{swipe(center,center+Offset(0f,210f),900)}
         rule.waitForIdle()
         rule.onNodeWithTag("native-details-sheet").assertDoesNotExist()
@@ -160,7 +164,7 @@ class HomeUi7InteractionTest {
     @Test fun shortNetworkDragSpringsBackRatherThanDismissing() {
         renderNetworkSheet()
         val before=rule.onNodeWithTag("native-details-sheet").fetchSemanticsNode().boundsInRoot.top
-        rule.onNodeWithTag("sheet-drag-handle").performTouchInput{swipe(center,center+Offset(0f,32f),1000)}
+        rule.onNodeWithTag("sheet-drag-handle",useUnmergedTree=true).performTouchInput{swipe(center,center+Offset(0f,32f),1000)}
         rule.waitForIdle()
         rule.onNodeWithTag("native-details-sheet").assertIsDisplayed()
         assertEquals(before,rule.onNodeWithTag("native-details-sheet").fetchSemanticsNode().boundsInRoot.top,1f)
@@ -177,7 +181,7 @@ class HomeUi7InteractionTest {
     }
     @Test fun actualLogDrawerUsesTheSameDraggableHandle() {
         renderLog()
-        rule.onNodeWithTag("log-drag-handle").assertHeightIsAtLeast(48.dp)
+        rule.onNodeWithTag("log-drag-handle",useUnmergedTree=true).assertHeightIsAtLeast(48.dp)
             .performTouchInput{swipe(center,center+Offset(0f,210f),900)}
         rule.waitForIdle()
         rule.onNodeWithTag("native-log-sheet").assertDoesNotExist()

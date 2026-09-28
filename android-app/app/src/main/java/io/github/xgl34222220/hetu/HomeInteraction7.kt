@@ -82,7 +82,7 @@ internal fun HomeCollapsingHeader(
             val width = constraints.maxWidth
             val buttons = measurables[1].measure(constraints.copy(minWidth = 0, minHeight = 0))
             val title = measurables[0].measure(constraints.copy(minWidth = 0, minHeight = 0,
-                maxWidth = (width - 2 * side - 2 * buttons.width).coerceAtLeast(1)))
+                maxWidth = (width - 2 * side - buttons.width * (1f + fraction)).toInt().coerceAtLeast(1)))
             val height = constraints.constrainHeight(maxOf(56.dp.roundToPx(), title.height, buttons.height))
             layout(width, height) {
                 val leading = side.toFloat()
