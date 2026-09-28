@@ -77,13 +77,15 @@ class HomeUi8ExperienceTest {
         val card = node("home-network").getUnclippedBoundsInRoot()
         assertTrue(ip.right <= card.right - 13.dp)
     }
-    @Test @Config(qualifiers = "w320dp-h640dp-mdpi") fun narrowLargeTextUsesWideLayoutInsteadOfAnOrphanDigit() {
+    @Test @Config(qualifiers = "w320dp-h640dp-mdpi") fun narrowLargeTextKeepsBentoHalvesAndScrollableAddress() {
         render(scale = 1.3f); showNetwork()
         val l = text("home-network-ip")
         assertEquals("123.193.18.254", l.layoutInput.text.text)
         assertEquals(1, l.lineCount); assertFalse(l.hasVisualOverflow)
-        assertEquals(node("home-telemetry-grid").getUnclippedBoundsInRoot().width,
-            node("home-network").getUnclippedBoundsInRoot().width)
+        assertTrue(node("home-network").getUnclippedBoundsInRoot().width <
+            node("home-telemetry-grid").getUnclippedBoundsInRoot().width * .6f)
+        node("home-network-ip").performTouchInput { swipeLeft() }
+        node("home-network").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "WAN"))
     }
     @Test @Config(qualifiers = "w393dp-h852dp-xxhdpi") fun highDensityDoesNotChangeAddressWrapping() {
         render(); showNetwork()
@@ -153,7 +155,7 @@ class HomeUi8ExperienceTest {
     }
     @Test fun normalDownwardScrollAwayFromTopIsNotRefresh() {
         render(height = 480.dp)
-        node("compact-home").performScrollToIndex(2)
+        node("compact-home").performScrollToIndex(3)
         node("compact-home").performTouchInput { swipe(Offset(center.x, 30f), Offset(center.x, 95f), 900) }
         assertTrue(calls.isEmpty()); assertEquals(0f, pullOffset(), .01f)
     }
@@ -171,12 +173,13 @@ class HomeUi8ExperienceTest {
         node("compact-home").performScrollToIndex(0)
         assertEquals(28.sp, text("home-brand").layoutInput.style.fontSize)
     }
-    @Test fun successFeedbackIsBelowSafeHeaderAndNowhereNearDock() {
+    @Test fun successFeedbackIsAboveHeaderAndOutsideTheContent() {
         render(mutableStateOf(fixture().copy(message = "全部刷新完成")))
         node("home-feedback-pill").assertIsDisplayed()
         val p = node("home-feedback-pill").getUnclippedBoundsInRoot()
         val header = node("home-header").getUnclippedBoundsInRoot()
-        assertTrue(p.top >= header.bottom + 7.dp)
+        assertTrue(p.top >= 24.dp)
+        assertTrue(p.bottom <= header.top - 7.dp)
         assertTrue(p.bottom < 180.dp)
         assertTrue(p.width <= 321.dp)
         rule.onNodeWithText("全部刷新完成").assertIsDisplayed()

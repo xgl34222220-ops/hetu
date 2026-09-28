@@ -328,7 +328,7 @@ class CompactHomeDashboardTest {
         val cpuBar = rule.onNodeWithTag("home-cpu-bar", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         assertEquals(sub.height, resource.height, 1f)
         assertEquals(sub.top, resource.top, 1f)
-        assertEquals(12f, resource.left - sub.right, 1f)
+        assertEquals(1f, resource.left - sub.right, 1f)
         assertEquals(14f, subBar.left - sub.left, 1f)
         assertEquals(14f, sub.right - subBar.right, 1f)
         assertEquals(subBar.bottom, cpuBar.bottom, 1f)

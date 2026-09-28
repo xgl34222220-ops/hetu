@@ -142,7 +142,7 @@ class HomeUi9BentoTest {
         render()
         node("home-cpu-bar").assertIsDisplayed()
         node("home-subscription-bar").assertIsDisplayed()
-        assertTrue(bounds("home-health-group").bottom <= bounds("compact-home").bottom)
+        assertTrue("Full health surface ${bounds("home-health-group")} / viewport ${bounds("compact-home")}", bounds("home-health-group").bottom <= bounds("compact-home").bottom)
         assertTrue(bounds("home-toggle").top >= bounds("home-header").bottom)
         snapshot("ui9-bento-first-screen")
     }
@@ -163,7 +163,8 @@ class HomeUi9BentoTest {
         assertPair("home-health-group", "home-subscription", "home-resources")
         node("home-cpu-bar").assertIsDisplayed()
         for (tag in listOf("home-value-已用", "home-value-总量", "home-value-内存", "home-value-CPU")) {
-            assertFalse(tag, text(tag).hasVisualOverflow)
+            val layout = text(tag)
+            assertFalse("$tag size=${layout.size} paragraph=${layout.multiParagraph.width}x${layout.multiParagraph.height} constraints=${layout.layoutInput.constraints}", layout.hasVisualOverflow)
         }
     }
     @Test fun notificationIsAboveHeaderAndCannotInterceptStop() {

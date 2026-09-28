@@ -54,7 +54,7 @@ class HomeUi6RegressionTest {
                     val density=LocalDensity.current
                     var dockHeight by remember { mutableStateOf(76.dp) }
                     var selected by remember { mutableIntStateOf(0) }
-                    Box(Modifier.fillMaxSize().background(if(dark) Color(0xFF121212) else Color(0xFFF6F8FD))) {
+                    Box(Modifier.fillMaxSize().background(if(dark) Color(0xFF121212) else Color(0xFFF4F6FC))) {
                         CompositionLocalProvider(LocalHomeDockClearance provides (dockHeight+10.dp)) {
                             CompactHomeDashboard(data,{calls+="refresh"},{calls+="toggle"},{calls+="reload"},{calls+="restart"},
                                 {calls+="delay"},{calls+="webui"},{calls+="log"},{calls+="subscription"},{calls+="connections"},
@@ -115,12 +115,12 @@ class HomeUi6RegressionTest {
         assertTrue("Full card ${bounds("home-resources")} must clear dock ${bounds("hetu-dock")}",bounds("home-resources").bottom<=bounds("hetu-dock").top-9f)
         snapshot("ui6-393x852-with-dock")
     }
-    @Test fun allFourCardsHaveIdenticalDimensionsAndTwelveDpGaps() {
+    @Test fun allFourHalvesKeepEqualGeometryWithOneDpDividerAndTwelveDpRows() {
         render()
         val b=tags.map(::bounds)
         b.forEach {assertEquals(b.first().height,it.height,1f);assertEquals(b.first().width,it.width,1f)}
         assertEquals(b[0].top,b[1].top,1f);assertEquals(b[2].top,b[3].top,1f)
-        assertEquals(12f,b[1].left-b[0].right,1f);assertEquals(12f,b[2].top-b[0].bottom,1f)
+        assertEquals(1f,b[1].left-b[0].right,1f);assertEquals(12f,b[2].top-b[0].bottom,1f)
     }
     @Test fun ipAndUploadShareTheSameActualTextBaseline() {
         render()
@@ -160,7 +160,7 @@ class HomeUi6RegressionTest {
         render()
         val b=bitmap();val pixels=IntArray(b.width*b.height)
         b.getPixels(pixels,0,b.width,0,0,b.width,b.height)
-        assertTrue(pixels.count {it==0xFFF6F8FD.toInt()}>3000)
+        assertTrue(pixels.count {it==0xFFF4F6FC.toInt()}>3000)
         assertTrue("Solid blue pill must not be a radial halo",pixels.count {it==0xFFE7F1FF.toInt()}>1000)
         b.recycle()
         rule.onNodeWithTag("dock-tab-2").performTouchInput{click()}

@@ -587,7 +587,7 @@ private fun RefProxyShell(resumeRevision: Int, requestedStartPage: String?, star
     val shellBackground = if (MaterialTheme.colorScheme.background.luminance() < .5f) {
         LocalHetuTokens.current.pageBackground
     } else {
-        Color(0xFFF6F8FD)
+        Color(0xFFF4F6FC)
     }
     val dockDensity = LocalDensity.current
     val initialDockHeight = 76.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()

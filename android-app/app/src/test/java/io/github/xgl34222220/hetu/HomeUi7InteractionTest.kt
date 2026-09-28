@@ -69,9 +69,12 @@ class HomeUi7InteractionTest {
             f.outputStream().use {assertTrue(b.compress(Bitmap.CompressFormat.PNG,100,it))};b.recycle()
         }
     }
-    @Test fun shortcutsAreInsideHeroNotSeparateMaterialCards() {
+    @Test fun shortcutsFollowHeroInTheLatestCompactTileStrip() {
         render()
-        rule.onNodeWithTag("home-webui").assert(hasAnyAncestor(hasTestTag("home-hero")))
+        rule.onNodeWithTag("home-webui").assert(hasAnyAncestor(hasTestTag("home-shortcut-strip")))
+        val strip = rule.onNodeWithTag("home-shortcut-strip").fetchSemanticsNode().boundsInRoot
+        val hero = rule.onNodeWithTag("home-hero").fetchSemanticsNode().boundsInRoot
+        assertTrue(strip.top >= hero.bottom)
         rule.onNodeWithTag("home-log").assert(hasAnyAncestor(hasTestTag("home-shortcut-strip")))
         rule.onNodeWithTag("home-webui").assertHeightIsAtLeast(48.dp).performTouchInput{click()}
         rule.onNodeWithTag("home-log").performTouchInput{click()}
