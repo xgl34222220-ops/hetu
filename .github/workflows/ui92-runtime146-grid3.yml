@@ -1,0 +1,213 @@
+name: UI92 Runtime146 compact grid UI3
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/ui92-runtime146-grid3.yml'
+      - 'tools/apply_ui92_runtime146_grid3.py'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: ui92-runtime146-grid3
+  cancel-in-progress: false
+jobs:
+  grid:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply reviewed native grid changes without touching runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/apply_ui92_runtime146_grid3.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('android-app/app/src/test/java/io/github/xgl34222220/hetu/CompactHomeDashboardTest.kt')
+          text = p.read_text()
+          assert text.count('.assertAny(isDisplayed())') == 1
+          p.write_text(text.replace('.assertAny(isDisplayed())', '.onLast().assertIsDisplayed()'))
+          PY
+          git diff --check
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Prepare exact Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort | tail -n 1)
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" 'platforms;android-37.0' 'build-tools;37.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+      - uses: actions/download-artifact@v4
+        with:
+          name: Hetu-UI92-Runtime146-UI2
+          run-id: 36360338535
+          github-token: ${{ github.token }}
+          path: .reference-ui2
+      - name: Restore exact verified runtime146 payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, json, zipfile
+          from pathlib import Path
+          apks = list(Path('.reference-ui2').rglob('*.apk'))
+          assert len(apks) == 1, apks
+          assert hashlib.sha256(apks[0].read_bytes()).hexdigest() == 'df5d740673d58930e58e2e99133b5d9754598fa6b171dd876743b9c7a4032d68'
+          expected = json.load(open('UI92_RUNTIME146_INPUTS.json'))['original146_payload']
+          with zipfile.ZipFile(apks[0]) as z:
+              assert z.testzip() is None
+              for name, digest in expected.items():
+                  data = z.read(name)
+                  assert hashlib.sha256(data).hexdigest() == digest, name
+                  if name.startswith('lib/'):
+                      out = Path('android-app/app/src/main/jniLibs') / name.removeprefix('lib/')
+                  elif name.startswith('assets/'):
+                      out = Path('android-app/app/src/main') / name
+                  else:
+                      raise AssertionError('Unreviewed payload path: ' + name)
+                  out.parent.mkdir(parents=True, exist_ok=True)
+                  if out.exists(): assert out.read_bytes() == data, name
+                  else: out.write_bytes(data)
+          print('Original146 payload restored and verified:', len(expected))
+          PY
+      - name: Compile APK and run native gesture, layout and integration tests
+        working-directory: android-app
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:assembleDebug :app:testDebugUnitTest --tests '*CompactHomeDashboardTest' --tests '*Runtime146ContractTest' --tests '*Ui92IntegrationTest' --tests '*NodeSelectionContinuityTest' --tests '*ProxyLatencyRegressionTest' --stacktrace 2>&1 | tee ../integration-evidence/build.log
+      - name: Print exact test results including failure messages
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+          for p in Path('android-app/app/build/test-results/testDebugUnitTest').glob('TEST-*.xml'):
+              r = ET.parse(p).getroot()
+              print({k:r.get(k) for k in ('name','tests','failures','errors','skipped')})
+              for case in r.findall('testcase'):
+                  for failure in list(case.findall('failure')) + list(case.findall('error')):
+                      print('FAILURE', case.get('name'), failure.get('message'), (failure.text or '')[:1600])
+          PY
+      - name: Verify new APK identity, payload and all non-UI source invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=android-app/app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/37.0.0/aapt" dump badging "$APK" > integration-evidence/apk-identity.txt
+          grep -q "package: name='io.github.xgl34222220.hetu'" integration-evidence/apk-identity.txt
+          grep -q "versionCode='1004'" integration-evidence/apk-identity.txt
+          grep -q "versionName='0.4.0-ui92-r146.3'" integration-evidence/apk-identity.txt
+          "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --verbose --print-certs "$APK" > integration-evidence/apk-signature.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          import json, hashlib, zipfile, subprocess, xml.etree.ElementTree as ET
+          baseline = 'd24383422897cfa29f267811e33e7e51ad80bae5'
+          production = 'android-app/app/src/main/java/io/github/xgl34222220/hetu/CompactHomeDashboard.kt'
+          changed = subprocess.check_output(['git','diff','--name-only',baseline,'--','android-app/app/src/main','native']).decode().splitlines()
+          assert changed == [production], changed
+          apk = Path('android-app/app/build/outputs/apk/debug/app-debug.apk')
+          expected = json.load(open('UI92_RUNTIME146_INPUTS.json'))['original146_payload']
+          with zipfile.ZipFile(apk) as z:
+              assert z.testzip() is None
+              for name,digest in expected.items(): assert hashlib.sha256(z.read(name)).hexdigest() == digest, name
+          totals = dict(tests=0,failures=0,errors=0,skipped=0)
+          for p in Path('android-app/app/build/test-results/testDebugUnitTest').glob('TEST-*.xml'):
+              r = ET.parse(p).getroot()
+              for k in totals: totals[k] += int(r.get(k,'0'))
+          assert totals == dict(tests=52,failures=0,errors=0,skipped=0), totals
+          result = dict(totals, baseline=baseline, application_source_changes=changed,
+              runtime_payload_entries=len(expected), apk_sha256=hashlib.sha256(apk.read_bytes()).hexdigest(),
+              apk_bytes=apk.stat().st_size, run_id=__import__('os').environ['GITHUB_RUN_ID'], device_tested=False)
+          Path('integration-evidence/result.json').write_text(json.dumps(result,indent=2))
+          Path('Hetu-UI92-Runtime146-UI3.apk').write_bytes(apk.read_bytes())
+          print(json.dumps(result,indent=2))
+          PY
+      - name: Publish verified UI3 source to main without force pushing
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import json, subprocess
+          r = json.load(open('integration-evidence/result.json'))
+          doc = '''# 河图 UI3：整卡切换与紧凑四宫格
+
+          基础：UI2源码 d24383422897cfa29f267811e33e7e51ad80bae5，功能仍为原146。
+          按用户提供的四宫格代码移植为原生Compose；保留河图品牌、真实数据与现有页面、主状态卡、底栏和抽屉。
+
+          ## 本轮修改
+          - WAN/LAN整张卡片可点击，包括标题、IP与空白；详情独立消费点击，不触发父卡切换。
+          - 移除上下箭头，轻点立即改变模式；横向滑动保留，纵向手势仍用于页面滚动。
+          - 订阅底部新增真实已用/总量驱动的6dp蓝色进度条。未知总量只显示底轨；超过限额钳制到100%，不伪造剩余流量。
+          - 四宫格14dp内边距、10dp间隔、20dp圆角；同排等高，下排两条进度条对齐。
+          - 主数值16sp等宽加粗，单位11sp弱化，卡片标题15sp，标签12sp；延迟数值18sp，保留分割线、刷新、排序及异常警告。
+          - 大字体自动单列，不缩小用户系统字号；完整IPv6保留在可复制详情抽屉。
+
+          ## 实际验证
+          '''
+          doc = '\n'.join(line[10:] if line.startswith('          ') else line for line in doc.splitlines())
+          doc += f"\nGitHub Actions {r['run_id']}：{r['tests']}项测试全部通过，0失败、0错误、0跳过。\n"
+          doc += f"原146核心及运行资源{r['runtime_payload_entries']}项SHA-256一致。与UI2比较，生产源码仅修改CompactHomeDashboard.kt；服务、控制器、Root/DNS/路由等未改动。\n"
+          doc += "测试包含真实触摸事件的父子点击隔离、空白点击、横滑和纵滑、动态流量更新、未知值/越界、字号与单位、等高/边距/进度条、大字体和IPv6。\n"
+          doc += f"APK：{r['apk_bytes']}字节；SHA-256：{r['apk_sha256']}。\n"
+          doc += "版本0.4.0-ui92-r146.3；versionCode1004；包名io.github.xgl34222220.hetu。\n"
+          doc += "\n## 验证边界\n测试截图由显式测试数据驱动，不是用户手机实拍。没有把模板里的示例IP、地区、流量、ISP/ASN或定时模拟启停写入应用。\n这是Debug测试版，不是正式版；未完成真机联网、微信消息、动画帧率和长期稳定性测试。新Debug证书可能与已安装版本不同；安装冲突时保留原应用和配置，不要卸载或清数据。\n"
+          Path('docs/UI92_RUNTIME146_UI3.md').write_text(doc)
+          paths = json.load(open('integration-evidence/ui3-changed-paths.json'))
+          subprocess.run(['git','add','--',*paths,'docs/UI92_RUNTIME146_UI3.md'],check=True)
+          subprocess.run(['git','diff','--cached','--check'],check=True)
+          PY
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'feat(ui): compact four-card grid, real usage bar and isolated network gestures [skip ci]'
+          git push origin HEAD:main
+          git rev-parse HEAD > integration-evidence/source-commit.txt
+      - name: Export exact source and verification bundle
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import subprocess,zipfile
+          from pathlib import Path
+          with zipfile.ZipFile('Hetu-UI92-Runtime146-UI3-source.zip','w',zipfile.ZIP_DEFLATED) as z:
+              for name in subprocess.check_output(['git','ls-files']).decode().splitlines():
+                  if Path(name).is_file(): z.write(name,name)
+          with zipfile.ZipFile('Hetu-UI92-Runtime146-UI3-verification.zip','w',zipfile.ZIP_DEFLATED) as z:
+              for root in ['integration-evidence','android-app/app/build/outputs/compact-home','android-app/app/build/test-results/testDebugUnitTest','android-app/app/build/reports/tests/testDebugUnitTest']:
+                  for p in Path(root).rglob('*'):
+                      if p.is_file(): z.write(p,str(p))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Hetu-UI92-Runtime146-UI3
+          path: Hetu-UI92-Runtime146-UI3.apk
+          retention-days: 14
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Hetu-UI92-Runtime146-UI3-evidence
+          path: |
+            Hetu-UI92-Runtime146-UI3-source.zip
+            Hetu-UI92-Runtime146-UI3-verification.zip
+            integration-evidence/
+            android-app/app/build/outputs/compact-home/
+          retention-days: 14
+          if-no-files-found: error
+      - name: Publish APK and evidence as prerelease, not a stable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create ui92-r146.3-test Hetu-UI92-Runtime146-UI3.apk Hetu-UI92-Runtime146-UI3-source.zip Hetu-UI92-Runtime146-UI3-verification.zip integration-evidence/result.json android-app/app/build/outputs/compact-home/light-running.png android-app/app/build/outputs/compact-home/grid-aligned.png --target "$(cat integration-evidence/source-commit.txt)" --prerelease --title '河图 UI3 测试版 · 整卡切换与紧凑四宫格' --notes-file docs/UI92_RUNTIME146_UI3.md
