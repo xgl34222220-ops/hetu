@@ -44,6 +44,7 @@ internal fun builtInBrandKey(name: String): String? {
         "github" in lower -> "github"
         "telegram" in lower || "tg" == lower.trim() || "电报" in lower -> "telegram"
         "youtube" in lower || "油管" in lower -> "youtube"
+        "tiktok" in lower || "抖音" in lower -> "tiktok"
         lower.trim() == "x" || "twitter" in lower || "推特" in lower -> "x"
         "netflix" in lower -> "netflix"
         "emby" in lower -> "emby"
@@ -83,6 +84,18 @@ internal fun BuiltInBrandIcon(brand: String, modifier: Modifier = Modifier) {
                     close()
                 }
                 drawPath(p, Color.White)
+            }
+            "tiktok" -> {
+                // A self-contained vector brand fallback; configured icons still take priority.
+                fun note(dx: Float, color: Color) {
+                    drawCircle(color, s * .13f, Offset(s * .36f + dx, s * .72f))
+                    drawLine(color, Offset(s * .48f + dx, s * .70f), Offset(s * .48f + dx, s * .19f),
+                        strokeWidth = s * .12f, cap = StrokeCap.Round)
+                    drawPath(Path().apply { moveTo(s * .48f + dx, s * .19f)
+                        cubicTo(s * .50f + dx, s * .34f, s * .66f + dx, s * .40f, s * .77f + dx, s * .37f) },
+                        color, style = Stroke(s * .12f, cap = StrokeCap.Round))
+                }
+                note(-s * .035f, Color(0xFF25F4EE)); note(s * .035f, Color(0xFFFE2C55)); note(0f, Color(0xFF161823))
             }
             "telegram" -> {
                 drawCircle(Color(0xFF229ED9), radius = s * .44f, center = Offset(cx, cy))
@@ -156,6 +169,7 @@ internal fun ConfiguredGroupIcon(group: ProxyGroupUi, modifier: Modifier = Modif
     val effectivePath = customIcon?.path ?: group.iconPath
     val configured = effectiveUrl.isNotBlank() || effectivePath.isNotBlank()
     val builtInBrand = remember(group.name) { builtInBrandKey(group.name) }
+    val explicitFlag = remember(group.name) { explicitGroupFlag13(group.name) }
     val key = effectiveUrl.ifBlank {
         if (effectivePath.isBlank()) "" else "local-policy:" + group.name + ":" + effectivePath.hashCode()
     }
@@ -214,6 +228,8 @@ internal fun ConfiguredGroupIcon(group: ProxyGroupUi, modifier: Modifier = Modif
                     tint = LocalHetuTokens.current.textSecondary,
                 )
             }
+            explicitFlag != null -> Text(explicitFlag, fontSize = 20.sp,
+                modifier = Modifier.testTag("group-flag:${group.name}").semantics { contentDescription = "${group.name} 配置名称中的国旗" })
             else -> Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.primary.copy(alpha = .08f),
                 androidx.compose.foundation.shape.CircleShape), contentAlignment = Alignment.Center) {
                 Text(group.name.filter { it.isLetterOrDigit() }.take(1).ifBlank { "?" },

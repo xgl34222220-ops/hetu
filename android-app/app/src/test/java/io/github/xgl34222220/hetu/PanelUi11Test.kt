@@ -59,6 +59,7 @@ class PanelUi11Test {
     private fun groupNode(name: String = "节点选择") = node("panel11-group:$name")
     private fun tile(name: String, group: String = "节点选择") = node("panel11-node:$group:$name")
     private fun expand(name: String = "节点选择") { groupNode(name).performTouchInput { click() } }
+    private fun back() { node("panel13-back").performTouchInput { click() } }
     private fun selectTile(name: String) { tile(name).performTouchInput { click(Offset(18f, 14f)) } }
     private fun snapshot(name: String) {
         rule.waitForIdle()
@@ -79,31 +80,36 @@ class PanelUi11Test {
         assertEquals(listOf("tab:Connections"), calls)
         snapshot("toolbar")
     }
-    @Test fun nodeExpansionStaysInlineWithoutOpeningAModal() {
-        render(); expand()
-        tile("Alpha").assertIsDisplayed(); tile("Beta").assertIsDisplayed()
-        node("native-details-sheet").assertDoesNotExist(); node("strategy-node-panel").assertDoesNotExist()
-        groupNode().assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "已展开"))
+    @Test fun secondarySheetDoesNotExpandOrMoveTheParentGrid() {
+        render()
+        val before = groupNode("视频").getUnclippedBoundsInRoot()
+        expand(); tile("Alpha").assertIsDisplayed(); tile("Beta").assertIsDisplayed()
+        node("panel13-group-sheet").assertIsDisplayed()
         val a = tile("Alpha").getUnclippedBoundsInRoot(); val b = tile("Beta").getUnclippedBoundsInRoot()
         assertEquals(a.top, b.top); assertTrue(a.right < b.left)
-        snapshot("inline-expanded")
+        back(); assertEquals(before, groupNode("视频").getUnclippedBoundsInRoot())
+        node("panel13-group-sheet").assertDoesNotExist(); snapshot("group-grid")
     }
-    @Test fun clickingSecondGroupCollapsesFirstByDefault() {
-        render(); expand()
-        node("panel11-list").performScrollToNode(hasTestTag("panel11-group:视频")); expand("视频")
-        tile("Alpha").assertDoesNotExist(); tile("Alpha", "视频").assertExists()
+    @Test fun differentGroupsHaveIndependentSecondaryDestinations() {
+        render(); expand(); back(); expand("视频")
+        tile("Alpha", "视频").assertIsDisplayed(); tile("Alpha").assertDoesNotExist()
+        node("panel13-group-title").assertTextEquals("视频")
     }
-    @Test fun changingExclusiveFilterAllowsMultipleExpandedGroups() {
+    @Test fun obsoleteAccordionPreferenceCannotChangeNewNavigation() {
         prefs.edit().putBoolean("proxySelectorCollapsePrevious", false).commit()
-        render(); expand(); node("panel11-list").performScrollToNode(hasTestTag("panel11-group:视频")); expand("视频")
-        node("panel11-list").performScrollToNode(hasTestTag("panel11-node:节点选择:Alpha")); tile("Alpha").assertExists()
-        node("panel11-list").performScrollToNode(hasTestTag("panel11-node:视频:Alpha")); tile("Alpha", "视频").assertExists()
+        render(); node("panel11-filter").performTouchInput { click() }
+        node("panel11-exclusive").assertDoesNotExist()
+        node("panel11-filter").performClick()
+        expand(); back(); expand("视频"); tile("Alpha", "视频").assertIsDisplayed()
+        node("panel11-fab").assertDoesNotExist()
     }
     @Test fun searchMatchesActualNodeAndHidesOtherChildren() {
         render(); node("panel11-search-toggle").performTouchInput { click() }
         node("panel11-search-input").performTextInput("Beta")
+        tile("Beta").assertDoesNotExist(); groupNode().assertIsDisplayed()
+        expand(); node("panel13-node-search").performTextInput("Beta")
         tile("Beta").assertExists(); tile("Alpha").assertDoesNotExist()
-        snapshot("search-results")
+        snapshot("secondary-search")
     }
     @Test fun filterButtonActuallyChangesHiddenVisibilityAndStoredPreference() {
         render(); groupNode("隐藏").assertDoesNotExist()
@@ -113,20 +119,21 @@ class PanelUi11Test {
         groupNode("隐藏").assertExists()
     }
     @Test fun layoutColumnAndDensitySwitchesHaveActualGeometricEffects() {
-        render(); expand()
-        val dualHeight = tile("Alpha").getUnclippedBoundsInRoot().height
-        node("panel11-layout").performTouchInput { click() }
+        render(); expand(); val dualHeight = tile("Alpha").getUnclippedBoundsInRoot().height
+        back(); node("panel11-layout").performTouchInput { click() }
         node("panel11-columns").performClick(); node("panel11-density").performClick()
         assertEquals(1, prefs.getInt("proxySelectorNodeColumns", 0))
         assertEquals("compact", prefs.getString("proxySelectorDensity", ""))
+        node("panel11-layout").performClick()
+        expand()
         val a = tile("Alpha").getUnclippedBoundsInRoot(); val b = tile("Beta").getUnclippedBoundsInRoot()
-        assertEquals(a.left, b.left); assertTrue(b.top >= a.bottom)
-        assertTrue(a.height < dualHeight)
+        assertEquals(a.left, b.left); assertTrue(b.top >= a.bottom); assertTrue(a.height < dualHeight)
     }
     @Test fun sortMenuReordersVisibleTilesAndProviderSwitchAddsRealHeadings() {
-        render(); expand(); node("panel11-layout").performTouchInput { click() }
+        render(); node("panel11-layout").performTouchInput { click() }
         node("panel11-sort-latency").performClick()
-        assertTrue(tile("Beta").getUnclippedBoundsInRoot().left < tile("Alpha").getUnclippedBoundsInRoot().left)
+        node("panel11-layout").performClick()
+        expand(); assertTrue(tile("Beta").getUnclippedBoundsInRoot().left < tile("Alpha").getUnclippedBoundsInRoot().left)
         rule.runOnIdle { prefs.edit().putBoolean("proxySelectorGroupByProvider", true).apply() }
         node("panel11-provider:节点选择:P2").assertExists()
     }
@@ -150,7 +157,7 @@ class PanelUi11Test {
         render(select = { _, _ -> error("backend-denied") }); expand(); selectTile("Beta")
         tile("Alpha").assertIsSelected(); tile("Beta").assertIsNotSelected()
         rule.onNodeWithText("backend-denied").assertExists()
-        node("panel11-notice").assertIsDisplayed()
+        node("panel13-detail-notice").assertIsDisplayed()
     }
     @Test fun delayTapDoesNotTriggerParentNodeSelection() {
         render(); expand(); node("panel11-delay:节点选择:Beta").performTouchInput { click() }
@@ -175,25 +182,27 @@ class PanelUi11Test {
         rule.onNodeWithText("Beta\nVMess\n提供商：P2").assertExists()
         assertTrue(calls.isEmpty())
     }
-    @Test fun fabRemainsAboveDockAndScrollsToPrimaryGroup() {
+    @Test fun noFloatingControlAndReturningPreservesGridPosition() {
         val many = fixture().copy(groups = (1..30).map { group("策略 $it") } + group("节点选择"))
-        render(many); node("panel11-fab").performTouchInput { click() }
-        groupNode().assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "已展开"))
-        groupNode().assertIsDisplayed()
-        assertTrue(node("panel11-fab").getUnclippedBoundsInRoot().bottom <= 756.dp)
+        render(many); node("panel11-fab").assertDoesNotExist()
+        node("panel11-list").performScrollToNode(hasTestTag("panel11-group:节点选择"))
+        val before = groupNode().getUnclippedBoundsInRoot()
+        expand(); tile("Alpha").assertIsDisplayed(); back()
+        assertEquals(before, groupNode().getUnclippedBoundsInRoot())
     }
     @Test fun hugeGroupUsesLazyRowsAndKeepsSinglePageScrolling() {
         val large = group("节点选择").copy(nodes = (1..1000).map { ProxyNodeUi("N$it", "VLESS") }, now = "N1")
         render(fixture().copy(groups = listOf(large))); expand()
         rule.onAllNodes(hasTestTag("panel11-node:节点选择:N1000"), useUnmergedTree = true).assertCountEquals(0)
-        node("panel11-list").performScrollToNode(hasTestTag("panel11-node:节点选择:N1000"))
+        node("panel13-node-list").performScrollToNode(hasTestTag("panel11-node:节点选择:N1000"))
         tile("N1000").assertIsDisplayed()
-        node("panel11-toolbar").assertIsDisplayed()
+        node("panel13-detail-header").assertIsDisplayed()
     }
     @Test @Config(qualifiers = "w320dp-h640dp-mdpi") fun largeFontKeepsToolbarAndNodesReachableWithoutNestedGrid() {
-        render(scale = 1.6f); expand()
+        render(scale = 1.6f)
         for (tag in listOf("search-toggle", "filter", "layout", "settings")) node("panel11-$tag").assertIsDisplayed()
-        node("panel11-list").performScrollToNode(hasTestTag("panel11-node:节点选择:Gamma"))
+        expand(); node("panel13-back").assertIsDisplayed()
+        node("panel13-node-list").performScrollToNode(hasTestTag("panel11-node:节点选择:Gamma"))
         tile("Gamma").assertIsDisplayed(); snapshot("320-large-font")
     }
     @Test fun apiSheetRejectsInvalidPortAndDoesNotSave() {

@@ -184,7 +184,7 @@ class MotionUi12Test {
                 }
             }
         }
-        node("panel11-list").performScrollToIndex(29)
+        node("panel11-list").performScrollToNode(hasTestTag("panel11-group:策略 30"))
         node("panel11-list").performTouchInput { swipeUp() }
         node("panel11-list").performTouchInput { down(center);moveBy(Offset(0f,-80f),160) }
         assertTrue(node("panel11-list").fetchSemanticsNode().config[EdgeOffset12] < -1f)

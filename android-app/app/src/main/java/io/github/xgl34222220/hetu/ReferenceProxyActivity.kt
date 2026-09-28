@@ -945,7 +945,7 @@ internal fun RefPanel(
     onOpenSettings: () -> Unit,
     onDetailVisibleChanged: (Boolean) -> Unit,
 ) {
-    // The strategy tab now owns one inline lazy list; all other panel tabs stay unchanged.
+    // Nodes use a compact parent grid and a separate destination; primary tab order is shared.
     if (selectedTab == RefPanelTab.Groups) {
         PanelStrategyRoute11(state, repo, delays, searchRequest, onSelectedTabChange,
             onRefreshState, onDetailVisibleChanged)
@@ -1272,40 +1272,19 @@ internal fun RefPanel(
         onDetailVisibleChanged(false)
     }
 
-    Box(Modifier.fillMaxSize()) {
-            PullToRefreshBox(
-                isRefreshing = refreshing,
-                onRefresh = ::refresh,
-                modifier = Modifier.fillMaxSize(),
-            ) {
-            LazyColumn(
-            Modifier.fillMaxSize().statusBarsPadding(),
-            contentPadding = PaddingValues(
-                start = 16.dp,
-                top = 8.dp,
-                end = 16.dp,
-                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 94.dp,
-            ),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            item {
-                Box(Modifier.padding(top = 14.dp, bottom = 4.dp)) {
-                    RefPanelGlassHeader(
-                        selected = tab,
-                        onSelect = onSelectedTabChange,
-                        searchOpen = searchOpen,
-                        query = query,
-                        onQueryChange = { query = it },
-                        onSearchToggle = {
-                            searchOpen = !searchOpen
-                            if (!searchOpen) query = ""
-                        },
-                        onOpenSettings = onOpenSettings,
-                        hazeState = hazeState,
-                        backdrop = backdrop,
-                    )
-                }
-            }
+    val clearance13 = LocalHomeDockClearance.current ?:
+        (86.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding())
+    Column(Modifier.fillMaxSize().background(t.pageBackground).padding(bottom = clearance13)
+        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))) {
+        RefPanelGlassHeader(selected = tab, onSelect = onSelectedTabChange,
+            searchOpen = searchOpen, query = query, onQueryChange = { query = it },
+            onSearchToggle = { searchOpen = !searchOpen; if (!searchOpen) query = "" },
+            onOpenSettings = onOpenSettings, hazeState = hazeState, backdrop = backdrop)
+        Box(Modifier.weight(1f).fillMaxWidth().clipToBounds()) {
+            PullToRefreshBox(isRefreshing = refreshing, onRefresh = ::refresh, modifier = Modifier.fillMaxSize()) {
+                LazyColumn(Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (error.isNotBlank()) item { RefNotice(error) }
             if (!state.running) {
                 item { RefEmptyState("代理未运行", "启动代理后，在这里查看节点、应用连接和分流规则。", Icons.Rounded.PowerSettingsNew) }
@@ -1556,6 +1535,8 @@ internal fun RefPanel(
         }
     }
 
+
+    }
 
     if (confirmCloseAll) {
         AlertDialog(
@@ -1984,18 +1965,18 @@ private fun RefPanelGlassHeader(
     // an oversized white slab on some OEM renderers. Only the compact controls carry glass.
     Column(
         Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         Row(
-            Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 "面板",
                 color = t.textPrimary,
-                fontSize = 24.sp,
-                lineHeight = 30.sp,
-                fontWeight = FontWeight.ExtraBold,
+                fontSize = 22.sp,
+                lineHeight = 29.sp,
+                fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f),
             )
             if (selected != RefPanelTab.Overview) RefPanelHeaderAction(
@@ -2093,69 +2074,7 @@ private fun RefPanelTabs(
     liquidGlass: Boolean = false,
     onSelect: (RefPanelTab) -> Unit,
 ) {
-    val t = LocalHetuTokens.current
-    val scheme = MaterialTheme.colorScheme
-    val dark = scheme.background.luminance() < .5f
-    val tabs = RefPanelTab.entries
-    val trackBrush = Brush.verticalGradient(
-        if (dark) listOf(Color.White.copy(alpha = .085f), Color.White.copy(alpha = .035f))
-        else listOf(Color(0xFFE2E8F0).copy(alpha = .58f), Color.White.copy(alpha = .46f)),
-    )
-    val trackBorder = if (dark) Color.White.copy(alpha = .08f) else Color.White.copy(alpha = .82f)
-    BoxWithConstraints(
-        Modifier.fillMaxWidth().height(48.dp)
-            .background(trackBrush, CircleShape)
-            .border(.5.dp, trackBorder, CircleShape)
-            .padding(3.dp),
-    ) {
-        val itemWidth = maxWidth / tabs.size.toFloat()
-        val targetIndex = tabs.indexOf(selected).coerceAtLeast(0)
-        val indicatorX by animateDpAsState(
-            targetValue = itemWidth * targetIndex.toFloat(),
-            animationSpec = spring(dampingRatio = .74f, stiffness = 380f),
-            label = "panelTabIndicator",
-        )
-        val indicatorShape = RoundedCornerShape(18.dp)
-        val lensBrush = Brush.verticalGradient(
-            if (dark) listOf(Color.White.copy(alpha = .10f), Color(0xFF2563EB).copy(alpha = .18f))
-            else listOf(Color.White.copy(alpha = .98f), Color(0xFFF8FAFC).copy(alpha = .94f)),
-        )
-        Box(
-            Modifier.offset(x = indicatorX)
-                .width(itemWidth)
-                .fillMaxHeight()
-                .shadow(if (liquidGlass) 3.dp else 1.dp, indicatorShape, clip = false)
-                .background(lensBrush, indicatorShape)
-                .border(.6.dp, Color.White.copy(alpha = if (dark) .14f else .96f), indicatorShape),
-        )
-        Row(Modifier.fillMaxSize()) {
-            tabs.forEach { tab ->
-                val active = tab == selected
-                val source = remember(tab) { MutableInteractionSource() }
-                val pressed by source.collectIsPressedAsState()
-                val scale by animateFloatAsState(
-                    if (pressed) .975f else 1f,
-                    spring(dampingRatio = .76f, stiffness = 560f),
-                    label = "tab${tab.name}",
-                )
-                Box(
-                    Modifier.width(itemWidth).fillMaxHeight()
-                        .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (pressed) .88f else 1f }
-                        .clip(CircleShape)
-                        .clickable(interactionSource = source, indication = null) { if (!active) onSelect(tab) },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        tab.label,
-                        color = if (active) Color(0xFF2563EB) else if (dark) t.textSecondary else Color(0xFF64748B),
-                        fontSize = 12.sp,
-                        fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
-                        maxLines = 1,
-                    )
-                }
-            }
-        }
-    }
+    FixedPanelTabs13(selected, onSelect)
 }
 
 @Composable

@@ -50,7 +50,6 @@ internal fun PanelToolbar11(searchOpen: Boolean, options: PanelOptions11,
                 PanelToggleMenu11("显示隐藏策略", "panel11-hidden", options.showHidden) { onOptions(options.copy(showHidden = !options.showHidden)) }
                 PanelToggleMenu11("根据模式显示 GLOBAL", "panel11-global", options.globalByMode) { onOptions(options.copy(globalByMode = !options.globalByMode)) }
                 PanelToggleMenu11("按提供商分组", "panel11-provider", options.providers) { onOptions(options.copy(providers = !options.providers)) }
-                PanelToggleMenu11("展开时折叠上一个", "panel11-exclusive", options.collapsePrevious) { onOptions(options.copy(collapsePrevious = !options.collapsePrevious)) }
             }
         }
         Box {
@@ -96,23 +95,7 @@ internal fun PanelTool11(icon: androidx.compose.ui.graphics.vector.ImageVector, 
 
 @Composable
 internal fun PanelSubTabs11(selected: RefPanelTab, change: (RefPanelTab) -> Unit) {
-    val t = LocalHetuTokens.current
-    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 4.dp)
-        .testTag("panel11-subtabs"), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-        listOf(RefPanelTab.Overview, RefPanelTab.Groups, RefPanelTab.Subscriptions,
-            RefPanelTab.Connections, RefPanelTab.Rules, RefPanelTab.RuleSets).forEach { tab ->
-            val label = if (tab == RefPanelTab.Groups) "策略" else tab.label
-            val active = tab == selected
-            Box(Modifier.heightIn(min = 48.dp).clip(CircleShape)
-                .background(if (active) t.cardBackground else Color.Transparent)
-                .nativePress(label = label, onClick = { change(tab) })
-                .semantics { this.selected = active; role = Role.Tab }
-                .testTag("panel11-tab-${tab.name}").padding(horizontal = 15.dp), contentAlignment = Alignment.Center) {
-                Text(label, color = if (active) Color(0xFF2563EB) else t.textSecondary,
-                    fontSize = 13.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold)
-            }
-        }
-    }
+    FixedPanelTabs13(selected, change)
 }
 
 /** Edits the exact preferences consumed by the original146 API client and history store. */
