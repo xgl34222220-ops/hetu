@@ -1,0 +1,111 @@
+name: BoxProxy panel preview
+
+on:
+  push:
+    branches: ['feat/boxproxy-panel-v1']
+    paths:
+      - 'android-app/**'
+      - '.github/workflows/boxproxy-panel-preview.yml'
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: boxproxy-panel-preview
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      HETU_TEST_KEYSTORE: /home/runner/.android/hetu-ui10-debug.jks
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Prepare Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort | tail -n 1)
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" 'platforms;android-37.0' 'build-tools;37.0.0'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+
+      - name: Restore preview signing identity
+        uses: actions/cache/restore@v4
+        with:
+          path: /home/runner/.android/hetu-ui10-debug.jks
+          key: hetu-ui10-debug-signing-v1
+          fail-on-cache-miss: true
+
+      - name: Restore verified UI15 runtime payload
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .reference-ui15
+          gh release download ui92-r146.15-test --repo "$GITHUB_REPOSITORY" --pattern 'Hetu-UI92-Runtime146-UI15.apk' --dir .reference-ui15
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          apk=next(Path('.reference-ui15').glob('*.apk'))
+          with ZipFile(apk) as z:
+              for name in z.namelist():
+                  if name.startswith('lib/') and name.endswith('/libhetu_core.so'):
+                      out=Path('android-app/app/src/main/jniLibs')/name.removeprefix('lib/')
+                  elif name.startswith('assets/mihomo-root/') and not name.endswith('/'):
+                      out=Path('android-app/app/src/main')/name
+                  else:
+                      continue
+                  out.parent.mkdir(parents=True,exist_ok=True)
+                  out.write_bytes(z.read(name))
+          PY
+          test -s android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so
+          test -s android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo
+
+      - name: Panel tests and debug APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle -p android-app :app:testDebugUnitTest --tests 'io.github.xgl34222220.hetu.PanelNavigation13Test'
+          gradle -p android-app :app:assembleDebug
+          APK=$(find android-app/app/build/outputs/apk/debug -name '*.apk' -type f | head -n1)
+          test -s "$APK"
+          cp "$APK" Hetu-BoxProxy-Panel-Preview1.apk
+          "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --verbose Hetu-BoxProxy-Panel-Preview1.apk
+          sha256sum Hetu-BoxProxy-Panel-Preview1.apk > Hetu-BoxProxy-Panel-Preview1.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Hetu-BoxProxy-Panel-Preview1
+          path: |
+            Hetu-BoxProxy-Panel-Preview1.apk
+            Hetu-BoxProxy-Panel-Preview1.sha256
+
+      - name: Publish prerelease
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG=boxproxy-panel-preview1
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" Hetu-BoxProxy-Panel-Preview1.apk Hetu-BoxProxy-Panel-Preview1.sha256 --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" Hetu-BoxProxy-Panel-Preview1.apk Hetu-BoxProxy-Panel-Preview1.sha256 \
+              --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
+              --title '河图 BoxProxy 面板移植预览 1' \
+              --notes '基于 UI15/runtime146。面板固定导航加入真实运行日志页；策略/节点仍走真实 Mihomo API、真实测速与核心确认。仅供真机预览。'
+          fi
