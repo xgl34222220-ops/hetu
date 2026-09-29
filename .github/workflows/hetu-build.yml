@@ -83,6 +83,37 @@ jobs:
           echo "V20.16 BoxProxy+ UI layer applied"
           git diff --stat
 
+      - name: Fix V20.16 first-pass compile issues
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          activity = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt')
+          text = activity.read_text()
+          if 'import androidx.compose.animation.core.animateDpAsState\n' not in text:
+              text = text.replace(
+                  'import androidx.compose.animation.core.animateFloat\n',
+                  'import androidx.compose.animation.core.animateFloat\nimport androidx.compose.animation.core.animateDpAsState\n',
+              )
+          if 'import androidx.compose.foundation.layout.offset\n' not in text:
+              text = text.replace(
+                  'import androidx.compose.foundation.layout.navigationBarsPadding\n',
+                  'import androidx.compose.foundation.layout.navigationBarsPadding\nimport androidx.compose.foundation.layout.offset\n',
+              )
+          activity.write_text(text)
+
+          overview = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelOverviewScreen.kt')
+          text = overview.read_text()
+          text = text.replace(
+              'HxBarAction(Icons.Rounded.Refresh, "刷新", busy = vm.refreshing) { scope.launch { vm.refreshNow() } }',
+              'HxBarAction(Icons.Rounded.Refresh, "刷新", onClick = { scope.launch { vm.refreshNow() } }, busy = vm.refreshing)',
+          )
+          overview.write_text(text)
+          PY
+          grep -q 'animateDpAsState' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
+          grep -q 'layout.offset' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
+          grep -q 'onClick = { scope.launch { vm.refreshNow() } }, busy = vm.refreshing' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelOverviewScreen.kt
+
       - name: Export effective V20.16 source
         run: |
           set -euo pipefail
