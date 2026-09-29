@@ -307,15 +307,15 @@ internal fun HxSection(
     trailing: @Composable (RowScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Column(modifier.fillMaxWidth().padding(horizontal = Hx.gutter).padding(bottom = 16.dp)) {
+    Column(modifier.fillMaxWidth().padding(horizontal = Hx.gutter).padding(bottom = 14.dp)) {
         if (title != null || trailing != null) {
             Row(
-                Modifier.fillMaxWidth().padding(start = 3.dp, end = 0.dp, bottom = 7.dp).heightIn(min = 24.dp),
+                Modifier.fillMaxWidth().padding(start = 4.dp, end = 2.dp, bottom = 6.dp).heightIn(min = 20.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     title.orEmpty(),
-                    style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp, letterSpacing = 0.15.sp),
+                    style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp, letterSpacing = 0.18.sp),
                     color = Hx.colors.textMuted,
                     modifier = Modifier.weight(1f),
                 )
@@ -331,31 +331,28 @@ internal fun HxSection(
 internal fun HxGroup(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     val c = Hx.colors
     Surface(
-        modifier = modifier.fillMaxWidth().hxSoftShadow(Hx.cardShape),
-        shape = Hx.cardShape,
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
         color = c.surface,
-        border = if (c.dark) BorderStroke(0.5.dp, c.line) else null,
+        border = BorderStroke(0.5.dp, c.line.copy(alpha = if (c.dark) .72f else .42f)),
+        shadowElevation = 0.dp,
+        tonalElevation = 0.dp,
     ) {
-        Column(Modifier.padding(vertical = 2.dp), content = content)
+        Column(content = content)
     }
 }
 
 @Composable
-internal fun HxDivider(inset: Dp = 60.dp) {
-    HorizontalDivider(Modifier.padding(start = inset), thickness = 0.5.dp, color = Hx.colors.line.copy(alpha = .78f))
+internal fun HxDivider(inset: Dp = 50.dp) {
+    HorizontalDivider(Modifier.padding(start = inset), thickness = 0.5.dp, color = Hx.colors.line.copy(alpha = .58f))
 }
 
 @Composable
-internal fun HxIconBadge(icon: ImageVector, tint: Color = Hx.colors.accent, size: Dp = 38.dp) {
+internal fun HxIconBadge(icon: ImageVector, tint: Color = Hx.colors.accent, size: Dp = 30.dp) {
     val c = Hx.colors
-    val danger = tint == c.bad
-    val foreground = if (danger) c.bad else c.textMuted
-    val background = if (danger) c.badSoft else c.surfaceMuted
-    Box(
-        Modifier.size(size).clip(RoundedCornerShape(size * 0.32f)).background(background),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(icon, contentDescription = null, tint = foreground, modifier = Modifier.size(size * 0.55f))
+    val foreground = if (tint == c.bad) c.bad else c.textMuted
+    Box(Modifier.size(size), contentAlignment = Alignment.Center) {
+        Icon(icon, contentDescription = null, tint = foreground, modifier = Modifier.size(20.dp))
     }
 }
 
@@ -380,19 +377,19 @@ internal fun HxRow(
         modifier
             .fillMaxWidth()
             .then(if (onClick != null && enabled) Modifier.clickable(onClick = onClick) else Modifier)
-            .heightIn(min = 58.dp)
-            .padding(horizontal = 15.dp, vertical = 10.dp)
+            .heightIn(min = 52.dp)
+            .padding(horizontal = 14.dp, vertical = 9.dp)
             .graphicsLayer { alpha = if (enabled) 1f else .45f },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {
             HxIconBadge(icon, if (danger) c.bad else iconTint)
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(8.dp))
         }
         Column(Modifier.weight(1f)) {
             Text(
                 title,
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
                 color = if (danger) c.bad else c.text,
                 maxLines = 2,
@@ -554,30 +551,18 @@ internal fun HxBanner(
 internal fun HxEmpty(icon: ImageVector, title: String, description: String? = null, action: (@Composable () -> Unit)? = null) {
     val c = Hx.colors
     Column(
-        Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 48.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 42.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        val float = androidx.compose.animation.core.rememberInfiniteTransition(label = "emptyFloat")
-        val dy by float.animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = androidx.compose.animation.core.infiniteRepeatable(tween(2200), androidx.compose.animation.core.RepeatMode.Reverse),
-            label = "emptyDy",
-        )
-        Box(
-            Modifier.size(64.dp).graphicsLayer { translationY = -dy * 4.dp.toPx() }.clip(CircleShape).background(c.surfaceMuted),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(icon, null, tint = c.textFaint, modifier = Modifier.size(28.dp))
-        }
-        Spacer(Modifier.height(14.dp))
+        Icon(icon, null, tint = c.textFaint, modifier = Modifier.size(30.dp))
+        Spacer(Modifier.height(12.dp))
         Text(title, style = MaterialTheme.typography.titleSmall, color = c.text, textAlign = TextAlign.Center)
         if (!description.isNullOrBlank()) {
             Spacer(Modifier.height(4.dp))
             Text(description, style = MaterialTheme.typography.bodySmall, color = c.textMuted, textAlign = TextAlign.Center)
         }
         if (action != null) {
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(14.dp))
             action()
         }
     }
@@ -606,10 +591,10 @@ internal fun HxSegmented(
     Box(
         modifier
             .fillMaxWidth()
-            .height(40.dp)
+            .height(36.dp)
             .clip(Hx.pillShape)
             .background(c.surfaceMuted)
-            .padding(3.dp)
+            .padding(2.dp)
             .onSizeChanged { widthPx = it.width },
     ) {
         if (widthPx > 0 && options.isNotEmpty()) {
@@ -617,7 +602,7 @@ internal fun HxSegmented(
                 Modifier
                     .offset(x = offset)
                     .width(segment)
-                    .height(34.dp)
+                    .height(32.dp)
                     .clip(Hx.pillShape)
                     .background(c.surface)
                     .then(if (c.dark) Modifier.border(0.5.dp, c.line, Hx.pillShape) else Modifier),
