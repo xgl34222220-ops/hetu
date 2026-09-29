@@ -265,16 +265,32 @@ jobs:
           echo "V20.24 home video parity applied"
           git diff --stat
 
-      - name: Export effective V20.24 source
+      - name: Apply V20.25 home network/details
         run: |
           set -euo pipefail
-          tar -czf /tmp/Hetu-V20.24-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
-          sha256sum /tmp/Hetu-V20.24-effective-source.tar.gz
+          cat updates/v2025-home-network/p00.b64 | base64 -d > /tmp/v2025.patch.xz
+          echo 'e03f655720d63388c6f6d6f5b9d604b1cac674c775ece429ab6c70b8ee5d7f8b  /tmp/v2025.patch.xz' | sha256sum -c -
+          xz -dc /tmp/v2025.patch.xz > /tmp/v2025.patch
+          git apply --check /tmp/v2025.patch
+          git apply /tmp/v2025.patch
+          grep -q 'versionCode = 2025' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.7.5-v20"' android-app/app/build.gradle.kts
+          ! sed -n '100,170p' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeScreen.kt | grep -q 'HxBarAction(Icons.Rounded.Settings'
+          grep -q '网速数据来源' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeScreen.kt
+          grep -q 'wanCountry' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeInspector.kt
+          echo "V20.25 home network/details applied"
+          git diff --stat
+
+      - name: Export effective V20.25 source
+        run: |
+          set -euo pipefail
+          tar -czf /tmp/Hetu-V20.25-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+          sha256sum /tmp/Hetu-V20.25-effective-source.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.24-effective-source
-          path: /tmp/Hetu-V20.24-effective-source.tar.gz
+          name: Hetu-V20.25-effective-source
+          path: /tmp/Hetu-V20.25-effective-source.tar.gz
           compression-level: 0
           if-no-files-found: error
 
