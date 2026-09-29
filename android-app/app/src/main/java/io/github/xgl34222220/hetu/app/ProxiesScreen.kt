@@ -89,6 +89,9 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
     val fontScale = LocalDensity.current.fontScale
     val columns = if (fontScale > 1.3f) 1 else options.columns
     val groupColumns = if (fontScale > 1.3f) 1 else 2
+    val primaryGroup = visibleGroups.firstOrNull { it.name == "节点选择" }
+        ?: visibleGroups.firstOrNull { it.type.equals("Selector", true) && !it.name.equals("GLOBAL", true) }
+    val secondaryGroups = if (primaryGroup == null) visibleGroups else visibleGroups.filterNot { it.name == primaryGroup.name }
 
     HxPage(
         title = "代理", scrollToTopSignal = vm.reselect,
@@ -124,13 +127,16 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text("策略组", style = MaterialTheme.typography.labelLarge, color = Hx.colors.textMuted, modifier = Modifier.weight(1f))
-                HxButton(
-                    if (vm.testingAll) "测速中" else "测速全部",
-                    onClick = vm::testAll,
-                    icon = Icons.Rounded.Speed,
-                    busy = vm.testingAll,
-                    filled = false,
-                )
+                if (vm.testingAll) {
+                    HxSpinner(14.dp)
+                } else {
+                    Text(
+                        "测速全部",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Hx.colors.accent,
+                        modifier = Modifier.clip(Hx.chipShape).clickable { vm.testAll() }.padding(horizontal = 8.dp, vertical = 5.dp),
+                    )
+                }
             }
         }
         if (visibleGroups.isEmpty()) {
@@ -142,7 +148,72 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
                 }
             }
         }
-        val groupRows = visibleGroups.chunked(groupColumns)
+        primaryGroup?.let { group ->
+            item(key = "primary-group:${group.name}") {
+                GroupHeader(
+                    vm = vm,
+                    group = group,
+                    open = q.isNotBlank() || group.name in expanded,
+                    featured = true,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = Hx.gutter).padding(bottom = 12.dp).hxEnter(stagger, 0),
+                    onToggle = {
+                        expanded = panelExpanded11(expanded.toSet(), group.name, options.collapsePrevious).toList()
+                    },
+                )
+            }
+            if (q.isNotBlank() || group.name in expanded) {
+                val nodes = projectStrategyNodes(group.nodes, options.sort, options.descending, vm.delays)
+                val sections = if (options.providers) nodes.groupBy { it.provider.ifBlank { "配置内节点" } } else linkedMapOf("" to nodes)
+                item(key = "primary-expanded-label:${group.name}") {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = Hx.gutter + 4.dp).padding(top = 3.dp, bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(group.name, style = MaterialTheme.typography.labelLarge, color = Hx.colors.text)
+                        Spacer(Modifier.width(8.dp))
+                        HxPill("${nodes.size} 个节点", HxTone.Neutral)
+                        Spacer(Modifier.weight(1f))
+                        if (vm.testingGroups[group.name] == true) {
+                            HxSpinner(14.dp)
+                        } else {
+                            Text(
+                                "测速本组",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Hx.colors.accent,
+                                modifier = Modifier.clip(Hx.chipShape).clickable { vm.testGroup(group) }.padding(horizontal = 8.dp, vertical = 5.dp),
+                            )
+                        }
+                    }
+                }
+                sections.forEach { (provider, members) ->
+                    if (provider.isNotEmpty()) {
+                        item(key = "primary-p:${group.name}:$provider") {
+                            Text(
+                                provider,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Hx.colors.textMuted,
+                                modifier = Modifier.padding(horizontal = Hx.gutter + 4.dp).padding(top = 4.dp, bottom = 6.dp),
+                            )
+                        }
+                    }
+                    val rows = members.chunked(columns)
+                    items(rows.size, key = { index -> "primary-n:${group.name}:$provider:$index:${rows[index].first().name}" }) { index ->
+                        val row = rows[index]
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = Hx.gutter).padding(bottom = if (options.compact) 6.dp else 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            row.forEach { node -> NodeTile(vm, group, node, options.compact, Modifier.weight(1f)) }
+                            if (row.size < columns) Spacer(Modifier.weight(1f))
+                        }
+                    }
+                }
+                item(key = "primary-gap:${group.name}") { Spacer(Modifier.height(10.dp)) }
+
+            }
+        }
+
+        val groupRows = secondaryGroups.chunked(groupColumns)
         groupRows.forEachIndexed { rowIndex, groupRow ->
             item(key = "group-row:$rowIndex:${groupRow.joinToString("|") { it.name }}") {
                 Row(
@@ -153,8 +224,11 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
                     groupRow.forEachIndexed { columnIndex, group ->
                         val open = q.isNotBlank() || group.name in expanded
                         GroupHeader(
-                            vm = vm, group = group, open = open,
-                            modifier = Modifier.weight(1f).hxEnter(stagger, rowIndex * groupColumns + columnIndex),
+                            vm = vm,
+                            group = group,
+                            open = open,
+                            featured = false,
+                            modifier = Modifier.weight(1f).hxEnter(stagger, rowIndex * groupColumns + columnIndex + 1),
                             onToggle = {
                                 expanded = panelExpanded11(expanded.toSet(), group.name, options.collapsePrevious).toList()
                             },
@@ -165,52 +239,58 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
             }
 
             groupRow.forEach { group ->
-                val open = q.isNotBlank() || group.name in expanded
-                if (open) {
-                    val nodes = projectStrategyNodes(group.nodes, options.sort, options.descending, vm.delays)
-                    val sections = if (options.providers) nodes.groupBy { it.provider.ifBlank { "配置内节点" } } else linkedMapOf("" to nodes)
-                    item(key = "expanded-label:${group.name}") {
+                if (q.isNotBlank() || group.name in expanded) {
+                val nodes = projectStrategyNodes(group.nodes, options.sort, options.descending, vm.delays)
+                val sections = if (options.providers) nodes.groupBy { it.provider.ifBlank { "配置内节点" } } else linkedMapOf("" to nodes)
+                item(key = "secondary-expanded-label:${group.name}") {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = Hx.gutter + 4.dp).padding(top = 3.dp, bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(group.name, style = MaterialTheme.typography.labelLarge, color = Hx.colors.text)
+                        Spacer(Modifier.width(8.dp))
+                        HxPill("${nodes.size} 个节点", HxTone.Neutral)
+                        Spacer(Modifier.weight(1f))
+                        if (vm.testingGroups[group.name] == true) {
+                            HxSpinner(14.dp)
+                        } else {
+                            Text(
+                                "测速本组",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Hx.colors.accent,
+                                modifier = Modifier.clip(Hx.chipShape).clickable { vm.testGroup(group) }.padding(horizontal = 8.dp, vertical = 5.dp),
+                            )
+                        }
+                    }
+                }
+                sections.forEach { (provider, members) ->
+                    if (provider.isNotEmpty()) {
+                        item(key = "secondary-p:${group.name}:$provider") {
+                            Text(
+                                provider,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Hx.colors.textMuted,
+                                modifier = Modifier.padding(horizontal = Hx.gutter + 4.dp).padding(top = 4.dp, bottom = 6.dp),
+                            )
+                        }
+                    }
+                    val rows = members.chunked(columns)
+                    items(rows.size, key = { index -> "secondary-n:${group.name}:$provider:$index:${rows[index].first().name}" }) { index ->
+                        val row = rows[index]
                         Row(
-                            Modifier.fillMaxWidth().padding(horizontal = Hx.gutter + 4.dp).padding(top = 2.dp, bottom = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
+                            Modifier.fillMaxWidth().padding(horizontal = Hx.gutter).padding(bottom = if (options.compact) 6.dp else 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            Text(group.name, style = MaterialTheme.typography.labelLarge, color = Hx.colors.text)
-                            Spacer(Modifier.width(8.dp))
-                            HxPill("${nodes.size} 个节点", HxTone.Neutral)
+                            row.forEach { node -> NodeTile(vm, group, node, options.compact, Modifier.weight(1f)) }
+                            if (row.size < columns) Spacer(Modifier.weight(1f))
                         }
                     }
-                    sections.forEach { (provider, members) ->
-                        if (provider.isNotEmpty()) {
-                            item(key = "p:${group.name}:$provider") {
-                                Text(
-                                    provider,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = Hx.colors.textMuted,
-                                    modifier = Modifier.animateItem(fadeInSpec = tween(HxMotion.Medium), placementSpec = null, fadeOutSpec = null)
-                                        .padding(horizontal = Hx.gutter + 4.dp).padding(top = 4.dp, bottom = 6.dp),
-                                )
-                            }
-                        }
-                        val rows = members.chunked(columns)
-                        items(rows.size, key = { index -> "n:${group.name}:$provider:$index:${rows[index].first().name}" }) { index ->
-                            val row = rows[index]
-                            Row(
-                                Modifier.animateItem(fadeInSpec = tween(HxMotion.Medium), placementSpec = null, fadeOutSpec = null)
-                                    .fillMaxWidth().padding(horizontal = Hx.gutter)
-                                    .padding(bottom = if (options.compact) 6.dp else 8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                row.forEach { node -> NodeTile(vm, group, node, options.compact, Modifier.weight(1f)) }
-                                if (row.size < columns) Spacer(Modifier.weight(1f))
-                            }
-                        }
-                    }
-                    item(key = "gap:${group.name}") { Spacer(Modifier.height(10.dp)) }
+                }
+                item(key = "secondary-gap:${group.name}") { Spacer(Modifier.height(10.dp)) }
+
                 }
             }
         }
-
-    }
 
     if (showOptions) {
         HxSheet(onDismiss = { showOptions = false }, title = "显示与排序") {
@@ -311,116 +391,74 @@ internal fun ApiSettingsSheet(vm: HetuViewModel, onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun GroupHeader(vm: HetuViewModel, group: ProxyGroupUi, open: Boolean, modifier: Modifier, onToggle: () -> Unit) {
+private fun GroupHeader(
+    vm: HetuViewModel,
+    group: ProxyGroupUi,
+    open: Boolean,
+    featured: Boolean,
+    modifier: Modifier,
+    onToggle: () -> Unit,
+) {
     val c = Hx.colors
     val rotation by animateFloatAsState(if (open) 180f else 0f, tween(HxMotion.Medium, easing = HxMotion.Emphasized), label = "chevron")
-    val testing = vm.testingGroups[group.name] == true
     val pending = vm.pendingSelection[group.name]
-    val nowDelay = vm.delays[group.now]
+    val nowDelay = vm.delays[group.now] ?: group.nodes.firstOrNull { it.name == group.now }?.lastDelay
     val source = remember { MutableInteractionSource() }
-    val shape = RoundedCornerShape(20.dp)
+    val shape = RoundedCornerShape(if (featured) 22.dp else 16.dp)
+    val fill = if (featured) c.accentSoft.copy(alpha = if (c.dark) .30f else .50f) else c.surfaceMuted
 
     Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .hxPressScale(source, .975f)
-            .hxSoftShadow(shape, if (open) 8.dp else 4.dp),
+        modifier = modifier.hxPressScale(source, .98f),
         shape = shape,
-        color = if (open) c.accentSoft.copy(alpha = if (c.dark) .34f else .52f) else c.surface,
-        border = if (c.dark) BorderStroke(0.5.dp, c.line.copy(alpha = .72f)) else null,
+        color = fill,
+        border = BorderStroke(0.5.dp, if (featured) c.accent.copy(alpha = .16f) else c.line.copy(alpha = .70f)),
+        shadowElevation = if (featured) 2.dp else 0.dp,
     ) {
         Column(
-            Modifier
-                .clickable(interactionSource = source, indication = LocalIndication.current, onClick = onToggle)
-                .padding(horizontal = 14.dp, vertical = 13.dp),
+            Modifier.clickable(interactionSource = source, indication = LocalIndication.current, onClick = onToggle)
+                .padding(horizontal = if (featured) 16.dp else 13.dp, vertical = if (featured) 15.dp else 12.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier
-                        .size(34.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (open) c.surface.copy(alpha = .86f) else c.surfaceMuted),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    HxGroupIcon(group, Modifier.size(20.dp))
-                }
-                Spacer(Modifier.width(10.dp))
+                HxGroupIcon(group, Modifier.size(if (featured) 28.dp else 22.dp))
+                Spacer(Modifier.width(if (featured) 11.dp else 8.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
                         group.name,
-                        style = MaterialTheme.typography.titleSmall,
+                        style = if (featured) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         color = c.text,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Spacer(Modifier.height(1.dp))
-                    Text(
-                        HxFormat.groupType(group.type),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (open) c.accent else c.textFaint,
-                        maxLines = 1,
-                    )
+                    if (featured) Text("主策略", style = MaterialTheme.typography.labelSmall, color = c.accent, maxLines = 1)
                 }
                 Icon(
                     Icons.Rounded.ExpandMore,
                     contentDescription = if (open) "收起" else "展开",
-                    tint = if (open) c.accent else c.textFaint,
-                    modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = rotation },
+                    tint = c.textFaint,
+                    modifier = Modifier.size(19.dp).graphicsLayer { rotationZ = rotation },
                 )
             }
-
-            Spacer(Modifier.height(12.dp))
-            if (pending != null) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    HxSpinner(11.dp)
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        "切换到 $pending…",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = c.accent,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            } else {
-                Text(
-                    group.now.ifBlank { "未选择节点" },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = c.textMuted,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(if (featured) 11.dp else 9.dp))
+            Text(
+                pending?.let { "切换到 $it…" } ?: group.now.ifBlank { "未选择节点" },
+                style = MaterialTheme.typography.bodySmall,
+                color = if (pending != null) c.accent else c.textMuted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(if (featured) 9.dp else 7.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "${group.nodes.size} 节点",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = c.textFaint,
-                )
-                if (nowDelay != null && pending == null) {
-                    Spacer(Modifier.width(8.dp))
-                    Box(Modifier.size(3.dp).clip(CircleShape).background(c.line))
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        HxFormat.delay(nowDelay) + if (nowDelay > 0) " ms" else "",
-                        style = MaterialTheme.typography.labelSmall.merge(HxNumberStyle),
-                        color = HxFormat.delayColor(nowDelay),
-                    )
-                }
+                Text("${group.nodes.size} 节点", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
                 Spacer(Modifier.weight(1f))
-                Box(
-                    Modifier
-                        .size(28.dp)
-                        .clip(CircleShape)
-                        .background(if (testing) c.accentSoft else Color.Transparent)
-                        .clickable(enabled = !testing) { vm.testGroup(group) },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (testing) HxSpinner(13.dp)
-                    else Icon(Icons.Rounded.Bolt, "测速 ${group.name}", tint = c.textMuted, modifier = Modifier.size(17.dp))
+                if (nowDelay != null && pending == null) {
+                    Box(Modifier.clip(Hx.pillShape).background(c.surface.copy(alpha = .82f)).padding(horizontal = 8.dp, vertical = 3.dp)) {
+                        Text(
+                            HxFormat.delay(nowDelay) + if (nowDelay > 0) " ms" else "",
+                            style = MaterialTheme.typography.labelSmall.merge(HxNumberStyle),
+                            color = HxFormat.delayColor(nowDelay),
+                        )
+                    }
                 }
             }
         }
