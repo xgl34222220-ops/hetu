@@ -1,6 +1,7 @@
 package io.github.xgl34222220.hetu
 
 import android.content.Context
+import android.content.Intent
 import android.graphics.Typeface
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -221,6 +222,14 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
                     HxDivider()
                     HxNavRow("订阅流量与更新", subtitle = "查看已用流量、到期时间并更新节点", icon = Icons.Rounded.Sync, iconTint = c.good, enabled = vm.state.running) {
                         nav.push(HxRoute.Providers)
+                    }
+                    HxDivider()
+                    HxNavRow("订阅工作台", subtitle = "健康检查、YAML 大纲与完整编辑工具", icon = Icons.Rounded.FactCheck) {
+                        context.startActivity(Intent(context, ProxySubscriptionActivity::class.java))
+                    }
+                    HxDivider()
+                    HxNavRow("Sub-Store", subtitle = "订阅处理与配置导入", icon = Icons.Rounded.CloudSync) {
+                        context.startActivity(Intent(context, ProxySubStoreActivity::class.java))
                     }
                 }
             }

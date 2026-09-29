@@ -101,7 +101,6 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
                     if (!searching) query = ""
                 })
                 HxBarAction(Icons.Rounded.Tune, "显示与排序", onClick = { showOptions = true })
-                HxBarAction(Icons.Rounded.Speed, "全部测速", onClick = vm::testAll, busy = vm.testingAll)
             }
             HxBarAction(Icons.Rounded.Settings, "测速与 API", onClick = { showApi = true })
         },
@@ -117,6 +116,21 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
         if (searching) {
             item(key = "search") {
                 HxSearchField(query, { query = it }, "搜索策略组、节点、订阅或协议", Modifier.padding(horizontal = Hx.gutter).padding(bottom = 12.dp))
+            }
+        }
+        item(key = "group-heading") {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = Hx.gutter).padding(bottom = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("策略组", style = MaterialTheme.typography.labelLarge, color = Hx.colors.textMuted, modifier = Modifier.weight(1f))
+                HxButton(
+                    if (vm.testingAll) "测速中" else "测速全部",
+                    onClick = vm::testAll,
+                    icon = Icons.Rounded.Speed,
+                    busy = vm.testingAll,
+                    filled = false,
+                )
             }
         }
         if (visibleGroups.isEmpty()) {
@@ -304,49 +318,109 @@ private fun GroupHeader(vm: HetuViewModel, group: ProxyGroupUi, open: Boolean, m
     val pending = vm.pendingSelection[group.name]
     val nowDelay = vm.delays[group.now]
     val source = remember { MutableInteractionSource() }
+    val shape = RoundedCornerShape(20.dp)
+
     Surface(
-        modifier = modifier.fillMaxWidth().hxPressScale(source, .98f).hxSoftShadow(Hx.cardShape, 6.dp),
-        shape = Hx.cardShape,
-        color = if (open) c.accentSoft.copy(alpha = if (c.dark) .64f else .48f) else c.surface,
-        border = if (c.dark) BorderStroke(0.5.dp, c.line) else null,
+        modifier = modifier
+            .fillMaxWidth()
+            .hxPressScale(source, .975f)
+            .hxSoftShadow(shape, if (open) 8.dp else 4.dp),
+        shape = shape,
+        color = if (open) c.accentSoft.copy(alpha = if (c.dark) .34f else .52f) else c.surface,
+        border = if (c.dark) BorderStroke(0.5.dp, c.line.copy(alpha = .72f)) else null,
     ) {
         Column(
-            Modifier.clickable(interactionSource = source, indication = LocalIndication.current, onClick = onToggle).padding(12.dp),
+            Modifier
+                .clickable(interactionSource = source, indication = LocalIndication.current, onClick = onToggle)
+                .padding(horizontal = 14.dp, vertical = 13.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(34.dp).clip(RoundedCornerShape(11.dp)).background(if (open) c.surface.copy(alpha = .78f) else c.surfaceMuted), contentAlignment = Alignment.Center) {
-                    HxGroupIcon(group, Modifier.size(21.dp))
+                Box(
+                    Modifier
+                        .size(34.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (open) c.surface.copy(alpha = .86f) else c.surfaceMuted),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    HxGroupIcon(group, Modifier.size(20.dp))
                 }
-                Spacer(Modifier.width(9.dp))
-                Text(group.name, style = MaterialTheme.typography.titleSmall, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                Icon(Icons.Rounded.ExpandMore, contentDescription = if (open) "收起" else "展开", tint = c.textFaint, modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = rotation })
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        group.name,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = c.text,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.height(1.dp))
+                    Text(
+                        HxFormat.groupType(group.type),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (open) c.accent else c.textFaint,
+                        maxLines = 1,
+                    )
+                }
+                Icon(
+                    Icons.Rounded.ExpandMore,
+                    contentDescription = if (open) "收起" else "展开",
+                    tint = if (open) c.accent else c.textFaint,
+                    modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = rotation },
+                )
             }
-            Spacer(Modifier.height(9.dp))
+
+            Spacer(Modifier.height(12.dp))
             if (pending != null) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     HxSpinner(11.dp)
                     Spacer(Modifier.width(6.dp))
-                    Text("切换到 $pending…", style = MaterialTheme.typography.bodySmall, color = c.accent, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        "切换到 $pending…",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = c.accent,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             } else {
-                Text(group.now.ifBlank { "未选择" }, style = MaterialTheme.typography.bodySmall, color = c.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    group.now.ifBlank { "未选择节点" },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = c.textMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
-            Spacer(Modifier.height(8.dp))
+
+            Spacer(Modifier.height(10.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                HxPill(HxFormat.groupType(group.type))
-                Spacer(Modifier.width(6.dp))
-                Text("${group.nodes.size} 节点", style = MaterialTheme.typography.labelSmall, color = c.textFaint, maxLines = 1)
-                Spacer(Modifier.weight(1f))
+                Text(
+                    "${group.nodes.size} 节点",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = c.textFaint,
+                )
                 if (nowDelay != null && pending == null) {
-                    Text(HxFormat.delay(nowDelay) + if (nowDelay > 0) "ms" else "", style = MaterialTheme.typography.labelSmall.merge(HxNumberStyle), color = HxFormat.delayColor(nowDelay))
-                    Spacer(Modifier.width(4.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Box(Modifier.size(3.dp).clip(CircleShape).background(c.line))
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        HxFormat.delay(nowDelay) + if (nowDelay > 0) " ms" else "",
+                        style = MaterialTheme.typography.labelSmall.merge(HxNumberStyle),
+                        color = HxFormat.delayColor(nowDelay),
+                    )
                 }
+                Spacer(Modifier.weight(1f))
                 Box(
-                    Modifier.size(30.dp).clip(RoundedCornerShape(10.dp)).background(c.surface.copy(alpha = if (open) .72f else 0f))
+                    Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(if (testing) c.accentSoft else Color.Transparent)
                         .clickable(enabled = !testing) { vm.testGroup(group) },
                     contentAlignment = Alignment.Center,
                 ) {
-                    if (testing) HxSpinner(14.dp) else Icon(Icons.Rounded.Bolt, "测速 ${group.name}", tint = c.textMuted, modifier = Modifier.size(18.dp))
+                    if (testing) HxSpinner(13.dp)
+                    else Icon(Icons.Rounded.Bolt, "测速 ${group.name}", tint = c.textMuted, modifier = Modifier.size(17.dp))
                 }
             }
         }

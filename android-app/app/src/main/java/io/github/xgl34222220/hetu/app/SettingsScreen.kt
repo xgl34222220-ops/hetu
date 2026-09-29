@@ -113,54 +113,40 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp) {
         item(key = "proxy") {
             HxSection("代理与网络", modifier = Modifier.hxEnter(stagger, 0)) {
                 HxGroup {
-                    HxNavRow("网络与分流", subtitle = "运行模式、DNS、IPv6、UDP/QUIC、应用范围", icon = Icons.Rounded.Tune, value = "${profile.core.label} · ${profile.mode.label}") {
-                        nav.push(HxRoute.Network)
-                    }
-                    HxDivider()
-                    HxNavRow("高级代理配置", subtitle = "运行预检、Kill Switch、启动配置、恢复网络", icon = Icons.Rounded.HealthAndSafety, iconTint = c.good) {
-                        open(ProxyAdvancedSettingsActivity::class.java)
-                    }
-                    HxDivider()
-                    HxNavRow("网络匹配", subtitle = "按 Wi‑Fi / SSID / 移动网络自动启停", icon = Icons.Rounded.Wifi) {
-                        open(ProxyNetworkAutomationActivity::class.java)
-                    }
-                    HxDivider()
-                    HxNavRow("共享网络", subtitle = "热点、USB 共享与下游设备 MAC 直连", icon = Icons.Rounded.WifiTethering, iconTint = c.good) {
-                        open(ProxySharedNetworkSettingsActivity::class.java)
-                    }
-                    HxDivider()
-                    HxNavRow("绕过规则", subtitle = "排除指定网段与网络接口", icon = Icons.Rounded.AltRoute, iconTint = c.bad) {
-                        open(ProxyBypassRulesActivity::class.java)
-                    }
-                    HxDivider()
-                    HxNavRow("国内地址分流", subtitle = "国内 IPv4 / IPv6 自动直连", icon = Icons.Rounded.Public, iconTint = c.warn) {
-                        open(ProxyCnIpSettingsActivity::class.java)
-                    }
-                    HxDivider()
-                    HxNavRow("端口细则", subtitle = "透明代理、DNS 与控制器端口", icon = Icons.Rounded.Cable, iconTint = c.textMuted,
-                        value = "${MihomoStartupConfig.TPROXY_PORT} / ${MihomoStartupConfig.REDIRECT_PORT}") { choice = "ports" }
+                    HxNavRow(
+                        "网络与分流",
+                        subtitle = "核心模式、DNS、IPv6、应用范围、网络自动化与高级运行控制",
+                        icon = Icons.Rounded.Tune,
+                        value = "${profile.core.label} · ${profile.mode.label}",
+                    ) { nav.push(HxRoute.Network) }
                 }
             }
         }
         item(key = "data") {
             HxSection("订阅与数据", modifier = Modifier.hxEnter(stagger, 1)) {
                 HxGroup {
-                    HxNavRow("配置与订阅", subtitle = "导入 YAML、订阅链接、编辑配置", icon = Icons.Rounded.Description, iconTint = c.good,
-                        value = vm.state.config) { nav.push(HxRoute.Configs) }
+                    HxNavRow(
+                        "配置与订阅",
+                        subtitle = "配置文件、订阅链接、YAML 编辑与高级订阅工具",
+                        icon = Icons.Rounded.Description,
+                        iconTint = c.good,
+                        value = vm.state.config,
+                    ) { nav.push(HxRoute.Configs) }
                     HxDivider()
-                    HxNavRow("订阅工作台", subtitle = "订阅健康检查、YAML 大纲与完整编辑工具", icon = Icons.Rounded.CloudDownload) {
-                        open(ProxySubscriptionActivity::class.java)
-                    }
+                    HxNavRow(
+                        "广告过滤",
+                        subtitle = "规则源、黑白名单与拦截统计",
+                        icon = Icons.Rounded.Shield,
+                        value = if (prefs.getBoolean("proxyAdblockChain", true)) "开启" else "关闭",
+                    ) { nav.push(HxRoute.Adblock) }
                     HxDivider()
-                    HxNavRow("Sub-Store", subtitle = "订阅处理与配置导入", icon = Icons.Rounded.CloudSync) {
-                        open(ProxySubStoreActivity::class.java)
-                    }
-                    HxDivider()
-                    HxNavRow("广告过滤", subtitle = "规则源、黑白名单与拦截统计", icon = Icons.Rounded.Shield,
-                        value = if (prefs.getBoolean("proxyAdblockChain", true)) "开启" else "关闭") { nav.push(HxRoute.Adblock) }
-                    HxDivider()
-                    HxNavRow("内核管理", subtitle = "下载、更新、导入与删除各核心", icon = Icons.Rounded.Memory, iconTint = c.textMuted,
-                        value = vm.coreVersion.ifBlank { profile.core.label }) { nav.push(HxRoute.Cores) }
+                    HxNavRow(
+                        "内核管理",
+                        subtitle = "下载、更新、导入与删除各核心",
+                        icon = Icons.Rounded.Memory,
+                        iconTint = c.textMuted,
+                        value = vm.coreVersion.ifBlank { profile.core.label },
+                    ) { nav.push(HxRoute.Cores) }
                 }
             }
         }
@@ -216,10 +202,6 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp) {
                         open(ProxyLogViewerActivity::class.java)
                     }
                     HxDivider()
-                    HxNavRow("启动配置", subtitle = "查看和校验当前运行配置", icon = Icons.Rounded.Description, iconTint = c.textMuted) {
-                        open(ProxyStartupConfigActivity::class.java)
-                    }
-                    HxDivider()
                     HxNavRow("运行文件", subtitle = "浏览和编辑 Root 运行目录", icon = Icons.Rounded.Inventory2, iconTint = c.textMuted) {
                         open(ReferenceFileManagerActivity::class.java)
                     }
@@ -229,24 +211,11 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp) {
         item(key = "panels") {
             HxSection("Web 面板", modifier = Modifier.hxEnter(stagger, 4)) {
                 HxGroup {
-                    HxNavRow("Web 面板管理", subtitle = "管理本地与远程面板", icon = Icons.Rounded.Web) {
-                        open(ProxyWebPanelsActivity::class.java)
-                    }
-                    HxDivider()
-                    HxNavRow("本地 WebUI", subtitle = "在应用内打开 Mihomo 管理面板", icon = Icons.Rounded.OpenInBrowser, enabled = vm.state.running) {
-                        open(ProxyLocalWebUiActivity::class.java)
-                    }
-                    HxDivider()
-                    HxNavRow("在浏览器打开 metacubexd", subtitle = "使用系统浏览器管理当前核心", icon = Icons.Rounded.OpenInNew, iconTint = c.textMuted, enabled = vm.state.running) {
-                        val port = vm.state.controllerPort
-                        val secret = Uri.encode(prefs.getString("proxyControllerSecret", "").orEmpty())
-                        val url = "https://metacubex.github.io/metacubexd/#/setup?hostname=127.0.0.1&port=$port&secret=$secret"
-                        try {
-                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                        } catch (_: Exception) {
-                            vm.toast("没有可用的浏览器")
-                        }
-                    }
+                    HxNavRow(
+                        "Web 面板",
+                        subtitle = "本地 WebUI、Zashboard 与远程面板统一在这里管理",
+                        icon = Icons.Rounded.Web,
+                    ) { open(ProxyWebPanelsActivity::class.java) }
                 }
             }
         }
@@ -291,10 +260,6 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp) {
                     HxDivider()
                     HxNavRow("恢复备份", subtitle = "恢复前确认，不会卸载或清除数据", icon = Icons.Rounded.Restore, iconTint = c.good) {
                         importer.launch(arrayOf("application/json", "text/plain", "application/octet-stream"))
-                    }
-                    HxDivider()
-                    HxNavRow("恢复网络", subtitle = "停止代理并清理河图写入的网络规则", icon = Icons.Rounded.LinkOff, danger = true) {
-                        confirmRecover = true
                     }
                 }
             }
@@ -532,6 +497,32 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
                 }
             }
         }
+        item(key = "automation") {
+            HxSection("自动化与高级", modifier = Modifier.hxEnter(stagger, 4)) {
+                HxGroup {
+                    HxNavRow(
+                        "网络匹配",
+                        subtitle = "按 Wi‑Fi / SSID / 移动网络自动启停",
+                        icon = Icons.Rounded.Wifi,
+                    ) { context.startActivity(Intent(context, ProxyNetworkAutomationActivity::class.java)) }
+                    HxDivider()
+                    HxNavRow(
+                        "高级运行控制",
+                        subtitle = "运行预检、Kill Switch、启动配置与恢复网络",
+                        icon = Icons.Rounded.HealthAndSafety,
+                        iconTint = Hx.colors.good,
+                    ) { context.startActivity(Intent(context, ProxyAdvancedSettingsActivity::class.java)) }
+                    HxDivider()
+                    HxNavRow(
+                        "端口细则",
+                        subtitle = "透明代理、DNS 与控制器端口",
+                        icon = Icons.Rounded.Cable,
+                        iconTint = Hx.colors.textMuted,
+                        value = "${MihomoStartupConfig.TPROXY_PORT} / ${MihomoStartupConfig.REDIRECT_PORT}",
+                    ) { choice = "ports" }
+                }
+            }
+        }
         if (!capability.available && capability.reason.isNotBlank()) {
             item(key = "cap") {
                 Column(Modifier.padding(horizontal = Hx.gutter)) { HxBanner(capability.reason, tone = HxTone.Warn) }
@@ -580,6 +571,17 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
             ),
             selected = profile.ipv6.id,
             onPick = { putString("proxyBaseIpv6", it); choice = null },
+            onDismiss = { choice = null },
+        )
+        "ports" -> HxTextSheet(
+            title = "端口细则",
+            text = listOf(
+                "TPROXY 透明代理    ${MihomoStartupConfig.TPROXY_PORT}",
+                "Redirect 转发      ${MihomoStartupConfig.REDIRECT_PORT}",
+                "DNS 监听           ${MihomoStartupConfig.DNS_PORT}",
+                "控制器             127.0.0.1:${vm.state.controllerPort}",
+                "出口探针           127.0.0.1:${MihomoStartupConfig.egressProbePort(vm.state.controllerPort)}",
+            ).joinToString("\n"),
             onDismiss = { choice = null },
         )
         "scope" -> HxChoiceSheet(

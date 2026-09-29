@@ -222,37 +222,34 @@ internal fun HxPage(
                     )
                     .background(c.canvas.copy(alpha = if (blur) .70f else 1f)),
             )
-            Box(
+            Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(top = statusTop)
+                    .padding(top = statusTop, start = 4.dp, end = 4.dp)
                     .height(HxTopBarHeight),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
+                if (onBack != null) {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回", tint = c.text)
+                    }
+                }
                 Text(
                     title,
                     modifier = Modifier
-                        .align(Alignment.Center)
-                        .padding(horizontal = 96.dp)
+                        .weight(1f)
+                        .padding(start = if (onBack == null) 12.dp else 2.dp, end = 8.dp)
                         .graphicsLayer {
                             alpha = barAlpha
-                            translationY = (1f - barAlpha) * 8.dp.toPx()
-                            val s = .94f + .06f * barAlpha
-                            scaleX = s
-                            scaleY = s
+                            translationY = (1f - barAlpha) * 6.dp.toPx()
                         },
                     style = MaterialTheme.typography.titleMedium,
                     color = c.text,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center,
+                    textAlign = TextAlign.Start,
                 )
-                if (onBack != null) {
-                    IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart).padding(start = 4.dp)) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回", tint = c.text)
-                    }
-                }
                 Row(
-                    Modifier.align(Alignment.CenterEnd).padding(end = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     content = actions,
                 )
