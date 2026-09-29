@@ -39,7 +39,7 @@ jobs:
       - name: Apply uploaded V20.15 delta
         run: |
           set -euo pipefail
-          cat updates/v2015-delta/p00.b64 updates/v2015-delta/p01.b64 | base64 -d > /tmp/v2015.patch.xz
+          cat updates/v2015-delta/p00.b64 updates/v2015-delta/p01a.b64 updates/v2015-delta/p01b.b64 | base64 -d > /tmp/v2015.patch.xz
           echo 'd1e843874aef59b77fa0439c2277b4149e260e9f156e64d96536c80da247d84a  /tmp/v2015.patch.xz' | sha256sum -c -
           xz -dc /tmp/v2015.patch.xz > /tmp/v2015.patch
           git apply --check /tmp/v2015.patch
