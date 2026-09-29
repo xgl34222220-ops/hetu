@@ -127,57 +127,109 @@ private fun HomeConnectionHub(vm: HetuViewModel) {
         HxRunOp.Stop -> "正在断开"
         HxRunOp.Restart -> "正在重启"
         HxRunOp.Reload -> "正在重载"
-        null -> if (running) "已连接" else "未连接"
+        null -> if (running) "代理运行中" else "代理未连接"
     }
 
     HxSection {
         HxCard(
             brush = aurora,
-            padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 22.dp),
+            padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 17.dp),
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(status, style = MaterialTheme.typography.titleLarge, color = c.text, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(3.dp))
-                Text(
-                    if (running) HxFormat.duration(vm.runtime.elapsedSeconds) else state.config,
-                    style = MaterialTheme.typography.bodySmall.merge(HxNumberStyle),
-                    color = c.textMuted,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.height(16.dp))
-                PowerButton(running = running, busy = op != null, onClick = vm::toggle)
-                Spacer(Modifier.height(18.dp))
-                HxSegmented(
-                    options = listOf("rule" to "规则", "global" to "全局", "direct" to "直连"),
-                    selected = state.trafficMode.lowercase().ifBlank { "rule" },
-                    onSelect = vm::setTrafficMode,
-                    enabled = running && op == null,
-                )
-                Spacer(Modifier.height(14.dp))
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("出口 IP", style = MaterialTheme.typography.labelMedium, color = c.textMuted)
-                        Text(
-                            if (running) vm.runtime.wanAddress.ifBlank { "—" } else "—",
-                            style = MaterialTheme.typography.bodyMedium.merge(HxNumberStyle),
-                            color = c.text,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(42.dp).clip(RoundedCornerShape(14.dp)).background(c.surfaceMuted),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    HxDot(if (running) c.good else c.textFaint, 9.dp)
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(status, style = MaterialTheme.typography.titleMedium, color = c.text, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(2.dp))
                     Text(
-                        if (running) vm.runtime.wanRegion.takeIf { it.isNotBlank() && it != "—" } ?: "经代理出口" else "代理未运行",
-                        style = MaterialTheme.typography.bodySmall,
+                        if (running) HxFormat.duration(vm.runtime.elapsedSeconds) else state.config,
+                        style = MaterialTheme.typography.bodySmall.merge(HxNumberStyle),
                         color = c.textMuted,
                         maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
-                if (running && vm.settingsRevision >= 0 && vm.settingsPending()) {
-                    Spacer(Modifier.height(10.dp))
-                    HxPill("设置待重启", HxTone.Warn)
-                }
+                ConnectionToggle(running = running, busy = op != null, onClick = vm::toggle)
             }
+
+            Spacer(Modifier.height(15.dp))
+            HxSegmented(
+                options = listOf("rule" to "规则", "global" to "全局", "direct" to "直连"),
+                selected = state.trafficMode.lowercase().ifBlank { "rule" },
+                onSelect = vm::setTrafficMode,
+                enabled = running && op == null,
+            )
+            Spacer(Modifier.height(13.dp))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("出口 IP", style = MaterialTheme.typography.labelMedium, color = c.textMuted)
+                    Text(
+                        if (running) vm.runtime.wanAddress.ifBlank { "—" } else "—",
+                        style = MaterialTheme.typography.bodyMedium.merge(HxNumberStyle),
+                        color = c.text,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Text(
+                    if (running) vm.runtime.wanRegion.takeIf { it.isNotBlank() && it != "—" } ?: "经代理出口" else "等待连接",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = c.textMuted,
+                    maxLines = 1,
+                )
+            }
+            if (running && vm.settingsRevision >= 0 && vm.settingsPending()) {
+                Spacer(Modifier.height(9.dp))
+                HxPill("设置待重启", HxTone.Warn)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConnectionToggle(running: Boolean, busy: Boolean, onClick: () -> Unit) {
+    val c = Hx.colors
+    val source = remember { MutableInteractionSource() }
+    val haptics = rememberHetuHaptics()
+    val bg by animateColorAsState(
+        if (running) c.surfaceMuted else c.accent,
+        spring(stiffness = Spring.StiffnessMediumLow),
+        label = "connection-toggle-bg",
+    )
+    val fg by animateColorAsState(
+        if (running) c.text else c.onAccent,
+        spring(stiffness = Spring.StiffnessMediumLow),
+        label = "connection-toggle-fg",
+    )
+    Row(
+        Modifier
+            .hxPressScale(source, .97f)
+            .height(42.dp)
+            .clip(Hx.pillShape)
+            .background(bg)
+            .clickable(
+                interactionSource = source,
+                indication = androidx.compose.foundation.LocalIndication.current,
+                enabled = !busy,
+            ) {
+                haptics.perform(HetuHaptic.Confirm)
+                onClick()
+            }
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        if (busy) {
+            HxSpinner(15.dp, fg)
+        } else {
+            Icon(Icons.Rounded.PowerSettingsNew, null, tint = fg, modifier = Modifier.size(17.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(if (running) "断开" else "连接", style = MaterialTheme.typography.labelLarge, color = fg)
         }
     }
 }
@@ -185,34 +237,71 @@ private fun HomeConnectionHub(vm: HetuViewModel) {
 @Composable
 private fun HomeLiveNetwork(vm: HetuViewModel) {
     val c = Hx.colors
+    val running = vm.state.running
     val tracked = vm.providers.filter { it.hasSubscriptionInfo && it.total > 0L }
     val used = tracked.sumOf { it.used }
     val total = tracked.sumOf { it.total }
     val remaining = (total - used).coerceAtLeast(0L)
-    val expire = tracked.mapNotNull { it.expire.takeIf { value -> value > 0L } }.minOrNull() ?: 0L
     val ratio = if (total > 0L) (used.toDouble() / total.toDouble()).toFloat().coerceIn(0f, 1f) else 0f
+    val memory = if (vm.runtime.rssBytes > 0) vm.runtime.rssBytes else vm.state.memoryBytes
 
-    HxSection("实时网络") {
-        HxCard {
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                HomeRate("下载", vm.downRate, Icons.Rounded.ArrowDownward, c.accent, Modifier.weight(1f))
-                HomeRate("上传", vm.upRate, Icons.Rounded.ArrowUpward, c.textMuted, Modifier.weight(1f))
+    HxSection {
+        HxCard(padding = androidx.compose.foundation.layout.PaddingValues(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("实时网络", style = MaterialTheme.typography.titleSmall, color = c.text, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.weight(1f))
+                HxPill(if (running) "代理运行中" else "未连接", if (running) HxTone.Good else HxTone.Neutral)
             }
-            Spacer(Modifier.height(14.dp))
-            Sparkline(vm.rateHistory.toList(), vm.upHistory.toList(), c.accent, c.textMuted, Modifier.fillMaxWidth().height(72.dp))
+            Spacer(Modifier.height(12.dp))
+
+            Box(Modifier.fillMaxWidth().height(142.dp)) {
+                Sparkline(
+                    vm.rateHistory.toList(),
+                    vm.upHistory.toList(),
+                    c.accent,
+                    c.textMuted,
+                    Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(94.dp).graphicsLayer { alpha = if (running) .92f else .38f },
+                )
+                Row(
+                    Modifier.fillMaxWidth().align(Alignment.TopCenter),
+                    horizontalArrangement = Arrangement.spacedBy(18.dp),
+                ) {
+                    HomeRate("下载", vm.downRate, "↓", c.accent, Modifier.weight(1f))
+                    HomeRate("上传", vm.upRate, "↑", c.textMuted, Modifier.weight(1f))
+                }
+            }
+
             if (total > 0L) {
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(5.dp))
                 HxProgressBar(ratio, color = c.accent, height = 5.dp)
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(7.dp))
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("订阅已用 ${HxFormat.bytes(used)}", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
+                    Text("已用 " + HxFormat.bytes(used), style = MaterialTheme.typography.bodySmall, color = c.textMuted)
                     Spacer(Modifier.weight(1f))
-                    Text("剩余 ${HxFormat.bytes(remaining)}", style = MaterialTheme.typography.bodySmall, color = c.text)
+                    Text("剩余 " + HxFormat.bytes(remaining), style = MaterialTheme.typography.bodySmall, color = c.text)
                 }
-                if (expire > 0L) {
-                    Spacer(Modifier.height(3.dp))
-                    Text(HxFormat.expireLabel(expire), style = MaterialTheme.typography.labelSmall, color = c.textFaint)
-                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(7.dp),
+            ) {
+                HomeMiniStat(
+                    "CPU",
+                    if (running) String.format(java.util.Locale.US, "%.1f%%", vm.cpuPercent) else "—",
+                    Modifier.weight(1f),
+                )
+                HomeMiniStat(
+                    "内存",
+                    if (running && memory > 0) HxFormat.bytes(memory) else "—",
+                    Modifier.weight(1f),
+                )
+                HomeMiniStat(
+                    "连接",
+                    if (running) vm.state.connections.size.toString() else "—",
+                    Modifier.weight(1f),
+                )
             }
         }
     }
@@ -222,19 +311,17 @@ private fun HomeLiveNetwork(vm: HetuViewModel) {
 private fun HomeRate(
     label: String,
     value: Long,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    arrow: String,
     tint: Color,
     modifier: Modifier,
 ) {
     val c = Hx.colors
-    val (number, unit) = HxFormat.speedParts(value)
+    val parts = HxFormat.speedParts(value)
+    val number = parts.first
+    val unit = parts.second
     Column(modifier) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, null, tint = tint, modifier = Modifier.size(15.dp))
-            Spacer(Modifier.width(5.dp))
-            Text(label, style = MaterialTheme.typography.labelMedium, color = c.textMuted)
-        }
-        Spacer(Modifier.height(5.dp))
+        Text(arrow + " " + label, style = MaterialTheme.typography.labelMedium, color = tint)
+        Spacer(Modifier.height(3.dp))
         Row(verticalAlignment = Alignment.Bottom) {
             HxRollingText(
                 number,
@@ -244,6 +331,30 @@ private fun HomeRate(
             Spacer(Modifier.width(4.dp))
             Text(unit, style = MaterialTheme.typography.labelMedium, color = c.textMuted, modifier = Modifier.padding(bottom = 4.dp))
         }
+    }
+}
+
+@Composable
+private fun HomeMiniStat(label: String, value: String, modifier: Modifier = Modifier) {
+    val c = Hx.colors
+    Row(
+        modifier
+            .height(30.dp)
+            .clip(Hx.pillShape)
+            .background(c.surfaceMuted)
+            .padding(horizontal = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = c.textFaint)
+        Spacer(Modifier.width(5.dp))
+        Text(
+            value,
+            style = MaterialTheme.typography.labelSmall.merge(HxNumberStyle),
+            color = c.text,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+        )
     }
 }
 
@@ -456,57 +567,6 @@ private fun PulseDot(color: Color, pulsing: Boolean) {
     }
 }
 
-@Composable
-private fun PowerButton(running: Boolean, busy: Boolean, onClick: () -> Unit) {
-    val c = Hx.colors
-    val haptics = rememberHetuHaptics()
-    val source = remember { MutableInteractionSource() }
-    val bg by animateColorAsState(
-        if (running) c.text else c.accent,
-        spring(stiffness = Spring.StiffnessMediumLow),
-        label = "power-bg",
-    )
-    val fg by animateColorAsState(
-        if (running) c.canvas else c.onAccent,
-        spring(stiffness = Spring.StiffnessMediumLow),
-        label = "power-fg",
-    )
-    val scale by animateFloatAsState(
-        if (busy) .94f else 1f,
-        spring(dampingRatio = .78f, stiffness = Spring.StiffnessMediumLow),
-        label = "power-scale",
-    )
-
-    Box(
-        Modifier
-            .size(84.dp)
-            .graphicsLayer { scaleX = scale; scaleY = scale }
-            .hxPressScale(source, .94f)
-            .clip(CircleShape)
-            .background(bg)
-            .clickable(
-                interactionSource = source,
-                indication = androidx.compose.foundation.LocalIndication.current,
-                enabled = !busy,
-            ) {
-                haptics.perform(HetuHaptic.Confirm)
-                onClick()
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        if (busy) {
-            HxSpinner(22.dp, fg)
-        } else {
-            Icon(
-                Icons.Rounded.PowerSettingsNew,
-                contentDescription = if (running) "停止代理" else "启动代理",
-                tint = fg,
-                modifier = Modifier.size(31.dp),
-            )
-        }
-    }
-}
-
 /* ---------------------------- traffic ---------------------------- */
 
 @Composable
@@ -601,8 +661,8 @@ private fun Sparkline(down: List<Long>, up: List<Long>, downColor: Color, upColo
             drawPath(line, color, style = Stroke(width = width, cap = StrokeCap.Round, join = StrokeJoin.Round))
             drawCircle(color, radius = width * 1.6f, center = Offset(prevX, prevY))
         }
-        series(up, upColor.copy(alpha = .85f), 0f, 1.5.dp.toPx())
-        series(down, downColor, .24f, 2.2.dp.toPx())
+        series(up, upColor.copy(alpha = .82f), .08f, 1.5.dp.toPx())
+        series(down, downColor, .20f, 2.2.dp.toPx())
     }
 }
 
