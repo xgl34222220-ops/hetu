@@ -298,16 +298,30 @@ jobs:
           grep -q 'fun updateHomeSpeedSource(source: String)' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
           grep -q 'vm.updateHomeSpeedSource(it)' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeScreen.kt
 
-      - name: Export effective V20.25 source
+      - name: Apply V20.26 panel deep-link fix
         run: |
           set -euo pipefail
-          tar -czf /tmp/Hetu-V20.25-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
-          sha256sum /tmp/Hetu-V20.25-effective-source.tar.gz
+          cat updates/v2026-panel-deeplink/p00.b64 | base64 -d > /tmp/v2026.patch.xz
+          echo 'ce818875f714df8e8aa31187939a94dc857185dd6df20c91acca1cb371b2057c  /tmp/v2026.patch.xz' | sha256sum -c -
+          xz -dc /tmp/v2026.patch.xz > /tmp/v2026.patch
+          git apply --check /tmp/v2026.patch
+          git apply /tmp/v2026.patch
+          grep -q 'versionCode = 2026' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.7.6-v20"' android-app/app/build.gradle.kts
+          grep -q 'firstEmission' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTabbedPage.kt
+          echo "V20.26 panel deep-link fix applied"
+          git diff --stat
+
+      - name: Export effective V20.26 source
+        run: |
+          set -euo pipefail
+          tar -czf /tmp/Hetu-V20.26-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+          sha256sum /tmp/Hetu-V20.26-effective-source.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.25-effective-source
-          path: /tmp/Hetu-V20.25-effective-source.tar.gz
+          name: Hetu-V20.26-effective-source
+          path: /tmp/Hetu-V20.26-effective-source.tar.gz
           compression-level: 0
           if-no-files-found: error
 
