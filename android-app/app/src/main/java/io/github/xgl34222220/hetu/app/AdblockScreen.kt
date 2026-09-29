@@ -24,6 +24,7 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.FilterAlt
+import androidx.compose.material.icons.rounded.HelpOutline
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Sync
@@ -70,6 +71,7 @@ internal fun AdblockScreen(vm: HetuViewModel) {
     val running = vm.state.running
     var injected by remember { mutableStateOf<Boolean?>(null) }
     var loadedInCore by remember { mutableStateOf<Boolean?>(null) }
+    var showHelp by remember { mutableStateOf(false) }
 
     LaunchedEffect(revision, running) {
         try {
@@ -153,7 +155,10 @@ internal fun AdblockScreen(vm: HetuViewModel) {
         title = "广告过滤",
         subtitle = "在 Mihomo 内按域名拦截广告与追踪",
         onBack = { nav.pop() },
-        actions = { HxBarAction(Icons.Rounded.Refresh, "刷新", onClick = { revision++ }) },
+        actions = {
+            HxBarAction(Icons.Rounded.HelpOutline, "说明", onClick = { showHelp = true })
+            HxBarAction(Icons.Rounded.Refresh, "刷新", onClick = { revision++ })
+        },
     ) {
         item(key = "master") {
             HxSection {
@@ -221,12 +226,6 @@ internal fun AdblockScreen(vm: HetuViewModel) {
                     HxDivider(44.dp)
                     VerifyRow("实际拦截", if (running) stats.count > 0 else null, if (running) "${stats.count} 次" else "代理启动后统计")
                 }
-                Text(
-                    "执行顺序：应用流量 → 直连应用 / 明确白名单 → 广告规则 REJECT → 配置分流 → 兜底。代理运行时独立 DNS 过滤自动暂停。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = c.textMuted,
-                    modifier = Modifier.padding(start = 4.dp, top = 8.dp),
-                )
             }
         }
 
@@ -419,9 +418,17 @@ private fun DomainList(title: String, domains: List<String>, tone: HxTone, onAdd
             }
         }
     }
+    if (showHelp) {
+        HxSheet(onDismiss = { showHelp = false }, title = "广告过滤说明") {
+            Text(
+                "应用流量会先经过应用直连与明确白名单，再匹配广告规则 REJECT，之后才进入普通配置分流与兜底。代理运行时，独立 DNS 过滤会自动暂停，避免两套过滤链同时接管。",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Hx.colors.textMuted,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+            )
+        }
+    }
 }
-
-
 @Composable
 private fun VerifyRow(label: String, ok: Boolean?, detail: String) {
     val c = Hx.colors
