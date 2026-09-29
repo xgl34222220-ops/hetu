@@ -24,6 +24,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Apply uploaded V20.11 source patch
+        run: |
+          set -euo pipefail
+          cat updates/v2011-patch/gz00.b64 updates/v2011-patch/gz01.b64 updates/v2011-patch/gz02.b64 \
+            | base64 -d | gzip -d > /tmp/v2011.patch
+          git apply --check /tmp/v2011.patch
+          git apply /tmp/v2011.patch
+          grep -q 'versionCode = 2011' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.6.1-v20"' android-app/app/build.gradle.kts
+          echo "V20.11 patch applied"
+          git diff --stat
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
