@@ -125,7 +125,7 @@ private object YamlSyntaxHighlightOutputTransformation : OutputTransformation {
         }
         commentRegex.findAll(source).forEach { match ->
             addStyle(
-                SpanStyle(color = Color(0xFF64748B)),
+                SpanStyle(color = Color(0xFF5D6670)),
                 match.range.first,
                 match.range.last + 1,
             )
@@ -306,7 +306,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                 Surface(
                     shape = RoundedCornerShape(24.dp),
                     color = tokens.cardBackground,
-                    border = BorderStroke(.7.dp, if (dark) tokens.outline.copy(alpha = .34f) else Color(0xFFE2E8F0).copy(alpha = .72f)),
+                    border = BorderStroke(.7.dp, if (dark) tokens.outline.copy(alpha = .34f) else Color(0xFFE4E7EB).copy(alpha = .72f)),
                     shadowElevation = 1.dp,
                 ) {
                     Column(Modifier.fillMaxWidth().padding(17.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
@@ -334,10 +334,10 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                             )
                         }
                         if (liveTotal > 0L) {
-                            Box(Modifier.fillMaxWidth().height(6.dp).background(Color(0xFFF1F5F9), CircleShape)) {
+                            Box(Modifier.fillMaxWidth().height(6.dp).background(Color(0xFFF4F5F7), CircleShape)) {
                                 Box(
                                     Modifier.fillMaxWidth(liveRatio.coerceIn(.001f, 1f)).fillMaxHeight()
-                                        .background(Brush.horizontalGradient(listOf(Color(0xFF2563EB), Color(0xFF22D3EE))), CircleShape),
+                                        .background(Brush.horizontalGradient(listOf(Color(0xFF12806F), Color(0xFF22D3EE))), CircleShape),
                                 )
                             }
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -354,7 +354,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                                 modifier = Modifier.weight(1f).height(46.dp),
                                 shape = CircleShape,
                                 colors = ButtonDefaults.filledTonalButtonColors(
-                                    containerColor = if (dark) Color.White.copy(alpha = .07f) else Color(0xFFE2E8F0).copy(alpha = .62f),
+                                    containerColor = if (dark) Color.White.copy(alpha = .07f) else Color(0xFFE4E7EB).copy(alpha = .62f),
                                     contentColor = if (dark) tokens.textPrimary else Color(0xFF334155),
                                 ),
                             ) {
@@ -394,7 +394,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                 val selectedBrush = if (dark) {
                     Brush.horizontalGradient(listOf(Color(0xFF172554).copy(alpha = .50f), Color(0xFF1B2431).copy(alpha = .82f)))
                 } else {
-                    Brush.horizontalGradient(listOf(Color(0xFFEFF6FF).copy(alpha = .76f), Color(0xFFF8FAFE).copy(alpha = .86f)))
+                    Brush.horizontalGradient(listOf(Color(0xFFDDF1EC).copy(alpha = .76f), Color(0xFFF8FAFE).copy(alpha = .86f)))
                 }
                 Box(
                     Modifier.fillMaxWidth()
@@ -402,8 +402,8 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                             1.dp,
                             cardShape,
                             clip = false,
-                            ambientColor = Color(0xFF0F172A).copy(alpha = .025f),
-                            spotColor = Color(0xFF0F172A).copy(alpha = .035f),
+                            ambientColor = Color(0xFF12161A).copy(alpha = .025f),
+                            spotColor = Color(0xFF12161A).copy(alpha = .035f),
                         )
                         .background(
                             if (config.selected) selectedBrush
@@ -414,7 +414,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                         .border(
                             if (config.selected) 1.5.dp else .7.dp,
                             if (config.selected) scheme.primary.copy(alpha = .88f)
-                            else if (dark) tokens.outline.copy(alpha = .34f) else Color(0xFFCBD5E1).copy(alpha = .50f),
+                            else if (dark) tokens.outline.copy(alpha = .34f) else Color(0xFFD5D9DE).copy(alpha = .50f),
                             cardShape,
                         )
                         .clip(cardShape)
@@ -540,8 +540,8 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                             8.dp,
                             ticketShape,
                             clip = false,
-                            ambientColor = Color(0xFF0F172A).copy(alpha = if (dark) .09f else .028f),
-                            spotColor = Color(0xFF0F172A).copy(alpha = if (dark) .12f else .050f),
+                            ambientColor = Color(0xFF12161A).copy(alpha = if (dark) .09f else .028f),
+                            spotColor = Color(0xFF12161A).copy(alpha = if (dark) .12f else .050f),
                         )
                         .background(ticketBrush, ticketShape)
                         .border(
@@ -588,12 +588,12 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
 
                         Box(
                             Modifier.fillMaxWidth().height(6.dp)
-                                .background(if (dark) Color.White.copy(alpha = .06f) else Color(0xFFE2E8F0).copy(alpha = .56f), CircleShape),
+                                .background(if (dark) Color.White.copy(alpha = .06f) else Color(0xFFE4E7EB).copy(alpha = .56f), CircleShape),
                         ) {
                             if (ratio != null && ratio > 0f) {
                                 Box(
                                     Modifier.fillMaxWidth(ratio.coerceIn(.001f, 1f)).fillMaxHeight()
-                                        .background(Brush.horizontalGradient(listOf(Color(0xFF2563EB), Color(0xFF22D3EE))), CircleShape),
+                                        .background(Brush.horizontalGradient(listOf(Color(0xFF12806F), Color(0xFF22D3EE))), CircleShape),
                                 )
                             }
                         }
@@ -652,7 +652,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                 }
                 Box(
                     Modifier.fillMaxWidth()
-                        .shadow(7.dp, yamlCardShape, clip = false, ambientColor = Color(0xFF0F172A).copy(alpha = .025f), spotColor = Color(0xFF0F172A).copy(alpha = .045f))
+                        .shadow(7.dp, yamlCardShape, clip = false, ambientColor = Color(0xFF12161A).copy(alpha = .025f), spotColor = Color(0xFF12161A).copy(alpha = .045f))
                         .background(yamlCardBrush, yamlCardShape)
                         .border(.8.dp, if (dark) Color.White.copy(alpha = .10f) else Color.White.copy(alpha = .78f), yamlCardShape)
                         .clip(yamlCardShape),
@@ -901,7 +901,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                         modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 12.dp, vertical = 7.dp),
                         shape = RoundedCornerShape(18.dp),
                         color = if (dark) Color(0xFF101722) else Color(0xFFF8FAFC),
-                        border = BorderStroke(.8.dp, if (dark) tokens.outline.copy(alpha = .44f) else Color(0xFFE2E8F0)),
+                        border = BorderStroke(.8.dp, if (dark) tokens.outline.copy(alpha = .44f) else Color(0xFFE4E7EB)),
                         tonalElevation = 0.dp,
                     ) {
                         Box(Modifier.fillMaxSize()) {
@@ -948,7 +948,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                                 val indentStep = 16.dp.toPx()
                                 val stroke = .5.dp.toPx()
                                 val dash = PathEffect.dashPathEffect(floatArrayOf(2.dp.toPx(), 3.dp.toPx()))
-                                val guideColor = if (dark) Color.White.copy(alpha = .075f) else Color(0xFF64748B).copy(alpha = .12f)
+                                val guideColor = if (dark) Color.White.copy(alpha = .075f) else Color(0xFF5D6670).copy(alpha = .12f)
                                 var x = firstGuide
                                 while (x < size.width) {
                                     drawLine(
@@ -999,8 +999,8 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                         Surface(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 5.dp),
                             shape = RoundedCornerShape(18.dp),
-                            color = if (dark) tokens.elevatedCardBackground else Color(0xFFF1F5F9),
-                            border = BorderStroke(.7.dp, if (dark) tokens.outline.copy(alpha = .42f) else Color(0xFFE2E8F0)),
+                            color = if (dark) tokens.elevatedCardBackground else Color(0xFFF4F5F7),
+                            border = BorderStroke(.7.dp, if (dark) tokens.outline.copy(alpha = .42f) else Color(0xFFE4E7EB)),
                             tonalElevation = 0.dp,
                         ) {
                             Row(

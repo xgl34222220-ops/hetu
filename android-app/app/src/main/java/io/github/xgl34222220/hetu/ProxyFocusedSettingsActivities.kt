@@ -69,7 +69,7 @@ private fun RuntimeCoreSettingsPage(onBack: () -> Unit) {
         item { FocusedNotice("修改运行核心后，下次启动或重启代理生效。这里仅负责核心选择；下载、更新和维护在“内核管理”中完成。") }
         item {
             FocusedGroup {
-                FocusedChoiceRow(Icons.Rounded.Memory, Color(0xFF2563EB), "Mihomo", "标准 Mihomo 运行核心", profile.core == ProxyRuntimeProfile.Core.MIHOMO) {
+                FocusedChoiceRow(Icons.Rounded.Memory, Color(0xFF12806F), "Mihomo", "标准 Mihomo 运行核心", profile.core == ProxyRuntimeProfile.Core.MIHOMO) {
                     prefs.edit().putString("proxyBaseCore", "mihomo").apply(); revision++
                 }
                 FocusedDivider()
@@ -172,7 +172,7 @@ private fun SharedNetworkSettingsPage(onBack: () -> Unit) {
                 FocusedDivider()
                 FocusedActionRow(
                     Icons.Rounded.Refresh,
-                    Color(0xFF64748B),
+                    Color(0xFF5D6670),
                     "刷新共享网络状态",
                     when {
                         loading -> "读取中…"
@@ -402,7 +402,7 @@ private fun BypassRulesPage(onBack: () -> Unit) {
                     open("proxyBypassCidrs", "CIDR 绕过", "每行一个 CIDR，例如 10.0.0.0/8 或 fd00::/8")
                 }
                 FocusedDivider()
-                FocusedValueRow(Icons.Rounded.Cable, Color(0xFF64748B), "接口绕过", "按接口名直接绕过", summary("proxyBypassInterfaces")) {
+                FocusedValueRow(Icons.Rounded.Cable, Color(0xFF5D6670), "接口绕过", "按接口名直接绕过", summary("proxyBypassInterfaces")) {
                     open("proxyBypassInterfaces", "接口绕过", "每行一个接口名，例如 dummy0、tun+；不能填写 lo")
                 }
             }
@@ -433,7 +433,7 @@ private fun BypassRulesPage(onBack: () -> Unit) {
 private fun FocusedSettingsScaffold(title: String, subtitle: String, onBack: () -> Unit, content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit) {
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val bg = if (dark) t.pageBackground else Color(0xFFF1F5F9)
+    val bg = if (dark) t.pageBackground else Color(0xFFF4F5F7)
     androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.fillMaxSize().background(bg), contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 92.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             Row(Modifier.fillMaxWidth().statusBarsPadding().padding(top = 8.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -452,13 +452,13 @@ private fun FocusedSettingsScaffold(title: String, subtitle: String, onBack: () 
 @Composable private fun FocusedNotice(text: String) { Surface(color = if (MaterialTheme.colorScheme.background.luminance() < .5f) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .46f) else Color(0xFFEFF4FA), shape = RoundedCornerShape(18.dp), tonalElevation = 0.dp, shadowElevation = 0.dp) { Text(text, modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, lineHeight = 18.sp, fontWeight = FontWeight.Medium) } }
 @Composable private fun FocusedGroup(content: @Composable ColumnScope.() -> Unit) { Surface(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(22.dp), tonalElevation = 0.dp, shadowElevation = 1.dp) { Column(content = content) } }
 @Composable private fun FocusedDivider() { HorizontalDivider(modifier = Modifier.padding(start = 58.dp), thickness = .5.dp, color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .55f)) }
-@Composable private fun FocusedIcon(icon: ImageVector, accent: Color) { Box(Modifier.size(34.dp).clip(RoundedCornerShape(11.dp)).background(accent.copy(alpha = .11f)), contentAlignment = Alignment.Center) { Icon(icon, null, tint = accent, modifier = Modifier.size(18.dp)) } }
+@Composable private fun FocusedIcon(icon: ImageVector, accent: Color) { io.github.xgl34222220.hetu.ui.HetuLineIcon(icon, boxSize = 34.dp) }
 
 @Composable
 private fun FocusedChoiceRow(icon: ImageVector, accent: Color, title: String, subtitle: String, selected: Boolean, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         FocusedIcon(icon, accent); Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text(title, fontSize = 14.sp, fontWeight = FontWeight.Bold); Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, lineHeight = 15.sp) }
-        if (selected) Surface(color = Color(0xFFEFF6FF), shape = CircleShape) { Icon(Icons.Rounded.Check, null, tint = Color(0xFF2563EB), modifier = Modifier.padding(6.dp).size(16.dp)) } else Icon(Icons.Rounded.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .52f))
+        if (selected) Surface(color = Color(0xFFDDF1EC), shape = CircleShape) { Icon(Icons.Rounded.Check, null, tint = Color(0xFF12806F), modifier = Modifier.padding(6.dp).size(16.dp)) } else Icon(Icons.Rounded.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .52f))
     }
 }
 
@@ -479,5 +479,5 @@ private fun FocusedInfoRow(icon: ImageVector, accent: Color, title: String, subt
 
 @Composable
 private fun FocusedValueRow(icon: ImageVector, accent: Color, title: String, subtitle: String, value: String, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) { FocusedIcon(icon, accent); Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text(title, fontSize = 14.sp, fontWeight = FontWeight.Bold); Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, lineHeight = 15.sp) }; Text(value, color = Color(0xFF64748B), fontSize = 12.sp, fontWeight = FontWeight.SemiBold); Spacer(Modifier.width(4.dp)); Icon(Icons.Rounded.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .52f)) }
+    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) { FocusedIcon(icon, accent); Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text(title, fontSize = 14.sp, fontWeight = FontWeight.Bold); Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, lineHeight = 15.sp) }; Text(value, color = Color(0xFF5D6670), fontSize = 12.sp, fontWeight = FontWeight.SemiBold); Spacer(Modifier.width(4.dp)); Icon(Icons.Rounded.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .52f)) }
 }

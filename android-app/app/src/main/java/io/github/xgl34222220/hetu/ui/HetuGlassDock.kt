@@ -119,7 +119,7 @@ fun HetuGlassDock(
         )
         else -> Brush.verticalGradient(
             if (dark) listOf(Color(0xFF1A2230), Color(0xFF151C27))
-            else listOf(Color(0xFFF1F5F9), Color(0xFFE8EEF6)),
+            else listOf(Color(0xFFF4F5F7), Color(0xFFE8EEF6)),
         )
     }
     val shellTint = if (dark) scheme.surface.copy(alpha = .26f) else Color(0xFFF8FBFF).copy(alpha = .34f)
@@ -195,8 +195,8 @@ fun HetuGlassDock(
                     if (floating) 14.dp else 4.dp,
                     shape,
                     clip = false,
-                    ambientColor = Color(0xFF0F172A).copy(alpha = if (dark) .12f else .035f),
-                    spotColor = Color(0xFF0F172A).copy(alpha = if (dark) .16f else .075f),
+                    ambientColor = Color(0xFF12161A).copy(alpha = if (dark) .12f else .035f),
+                    spotColor = Color(0xFF12161A).copy(alpha = if (dark) .16f else .075f),
                 )
                 .clip(shape)
                 .then(if (runtimeLiquid) Modifier.layerBackdrop(dockSurfaceBackdrop) else Modifier)
@@ -211,10 +211,10 @@ fun HetuGlassDock(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(start = 6.dp, top = 6.dp, end = 6.dp, bottom = if (floating) 6.dp else bottomInset + 6.dp),
-            indicatorColor = if (dark) Color(0xFF233D64) else Color(0xFFE7F1FF),
-            indicatorBorderColor = if (dark) Color(0xFF60A5FA).copy(alpha = .22f) else Color(0xFF2563EB).copy(alpha = .18f),
+            indicatorColor = if (dark) Color.White.copy(alpha = .10f) else Color(0xFF12161A).copy(alpha = .07f),
+            indicatorBorderColor = if (dark) Color.White.copy(alpha = .14f) else Color.White.copy(alpha = .85f),
             indicatorShadow = 0.dp,
-            selectedColor = if (dark) Color(0xFF8AB4FF) else Color(0xFF2563EB),
+            selectedColor = if (dark) Color(0xFF8AB4FF) else Color(0xFF12806F),
             unselectedColor = scheme.onSurfaceVariant.copy(alpha = .90f),
             liquidGlass = renderGlass,
             indicatorBackdrop = dockSurfaceBackdrop.takeIf { runtimeLiquid },

@@ -99,7 +99,7 @@ private fun overviewRouteAccent(name: String, primary: Color): Color {
         name.equals("DIRECT", true) -> Color(0xFF10B981)
         name.startsWith("REJECT", true) -> Color(0xFFF43F5E)
         "fallback" in lower || "故障" in name -> Color(0xFFF59E0B)
-        "google" in lower || "github" in lower || "youtube" in lower -> Color(0xFF2563EB)
+        "google" in lower || "github" in lower || "youtube" in lower -> Color(0xFF12806F)
         "ai" in lower || "openai" in lower -> Color(0xFF10A37F)
         else -> primary
     }
@@ -293,7 +293,7 @@ internal fun SubscriptionBoardingTicket(
                     .fillMaxWidth()
                     .height(5.dp)
                     .clip(CircleShape)
-                    .background(if (dark) Color.White.copy(alpha = .11f) else Color(0xFFF1F5F9))
+                    .background(if (dark) Color.White.copy(alpha = .11f) else Color(0xFFF4F5F7))
                     .testTag("ticket-progress:$name")
                     .semantics { progressBarRangeInfo = ProgressBarRangeInfo(progress, 0f..1f) },
             ) {

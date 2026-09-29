@@ -14,8 +14,8 @@ class ProxyTilePreferencesActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         startActivity(
-            Intent(this, ReferenceProxyActivity::class.java)
-                .putExtra(ReferenceProxyActivity.EXTRA_START_PAGE, "settings")
+            Intent(this, HetuActivity::class.java)
+                .putExtra(HetuActivity.EXTRA_START_PAGE, "settings")
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
         )
         finish()

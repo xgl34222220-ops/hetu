@@ -127,7 +127,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
     )
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val pageBg = if (dark) t.pageBackground else Color(0xFFF1F5F9)
+    val pageBg = if (dark) t.pageBackground else Color(0xFFF4F5F7)
     var revision by remember { mutableIntStateOf(0) }
     var busy by remember { mutableStateOf(false) }
     var updatingRules by remember { mutableStateOf(false) }
@@ -389,7 +389,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                             },
                         )
                     }
-                    HorizontalDivider(color = if (dark) t.outline else Color(0xFFF1F5F9))
+                    HorizontalDivider(color = if (dark) t.outline else Color(0xFFF4F5F7))
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         ChainMetric("有效规则", snapshot.rules.count.toString(), Modifier.weight(1f))
                         ChainMetric("规则源", snapshot.rules.sources.count { it.enabled }.toString(), Modifier.weight(1f))
@@ -413,7 +413,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
             val statusColor = when {
                 snapshot.lastError.isNotBlank() -> Color(0xFFF59E0B)
                 snapshot.effective -> Color(0xFF059669)
-                else -> Color(0xFF64748B)
+                else -> Color(0xFF5D6670)
             }
             Surface(
                 shape = RoundedCornerShape(20.dp),
@@ -440,7 +440,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                         }
                         TextButton(onClick = { if (!busy) revision++ }) { Text("重新检测", fontSize = 11.sp) }
                     }
-                    HorizontalDivider(color = if (dark) t.outline.copy(alpha = .35f) else Color(0xFFF1F5F9))
+                    HorizontalDivider(color = if (dark) t.outline.copy(alpha = .35f) else Color(0xFFF4F5F7))
                     ChainVerifyRow("本地规则库", snapshot.rules.count > 0, if (snapshot.rules.count > 0) "${snapshot.rules.count} 条有效规则" else "当前没有启用的拦截规则", allowNeutral = true)
                     ChainVerifyRow("启动配置注入", snapshot.startupInjected, if (snapshot.startupInjected) "hetu-adblock 已写入运行副本" else "当前启动副本没有广告 provider")
                     ChainVerifyRow("Mihomo 规则链", snapshot.controllerLoaded, if (snapshot.controllerLoaded) "Controller 已看到 REJECT 规则" else "当前 Controller 未看到广告规则")
@@ -697,7 +697,7 @@ private fun ChainVerifyRow(label: String, ok: Boolean, detail: String, allowNeut
             Modifier.size(20.dp).background(
                 when {
                     ok -> Color(0xFF10B981).copy(alpha = .12f)
-                    allowNeutral -> Color(0xFF94A3B8).copy(alpha = .12f)
+                    allowNeutral -> Color(0xFF98A1AA).copy(alpha = .12f)
                     else -> Color(0xFFF59E0B).copy(alpha = .12f)
                 },
                 CircleShape,
@@ -713,7 +713,7 @@ private fun ChainVerifyRow(label: String, ok: Boolean, detail: String, allowNeut
                 null,
                 tint = when {
                     ok -> Color(0xFF059669)
-                    allowNeutral -> Color(0xFF64748B)
+                    allowNeutral -> Color(0xFF5D6670)
                     else -> Color(0xFFD97706)
                 },
                 modifier = Modifier.size(13.dp),
@@ -729,7 +729,7 @@ private fun ChainVerifyRow(label: String, ok: Boolean, detail: String, allowNeut
 private fun ChainMetric(label: String, value: String, modifier: Modifier = Modifier) {
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val accent = if (dark) Color(0xFF60A5FA) else Color(0xFF2563EB)
+    val accent = if (dark) Color(0xFF60A5FA) else Color(0xFF12806F)
     Surface(
         modifier = modifier.height(70.dp),
         shape = RoundedCornerShape(16.dp),
@@ -743,12 +743,12 @@ private fun ChainMetric(label: String, value: String, modifier: Modifier = Modif
         ) {
             Text(value, color = accent, fontSize = 20.sp, lineHeight = 23.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
             Spacer(Modifier.height(2.dp))
-            Text(label, color = Color(0xFF94A3B8), fontSize = 10.sp, lineHeight = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+            Text(label, color = Color(0xFF98A1AA), fontSize = 10.sp, lineHeight = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1)
         }
     }
 }
 
 @Composable
 private fun ChainSectionLabel(text: String) {
-    Text(text, color = Color(0xFF94A3B8), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = .6.sp, modifier = Modifier.padding(start = 12.dp, top = 2.dp))
+    Text(text, color = Color(0xFF98A1AA), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = .6.sp, modifier = Modifier.padding(start = 12.dp, top = 2.dp))
 }

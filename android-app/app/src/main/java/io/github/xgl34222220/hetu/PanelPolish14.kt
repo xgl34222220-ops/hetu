@@ -119,7 +119,7 @@ internal fun PanelShortcut14(enabled: Boolean, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 16.dp)
         .testTag("panel14-shortcut-slot"), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
         Row(Modifier.height(48.dp).diffuseCardShadow(HomeContinuousShape(24.dp)).clip(CircleShape)
-            .background(Color(0xFF2563EB).copy(alpha = .94f))
+            .background(Color(0xFF12806F).copy(alpha = .94f))
             .nativePress(label = "打开主策略节点选择", onClick = onClick).testTag("panel11-fab")
             .padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)) {

@@ -346,5 +346,5 @@ private fun InstrumentNetworkDetailSheet(
 
 @Composable
 private fun PanelDivider() {
-    Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFF1F5F9)))
+    Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFF4F5F7)))
 }

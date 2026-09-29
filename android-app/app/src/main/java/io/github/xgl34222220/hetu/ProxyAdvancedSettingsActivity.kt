@@ -83,7 +83,7 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
     val profile = remember(revision) { ProxyRuntimeProfile.load(prefs) }
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val pageBg = if (dark) t.pageBackground else Color(0xFFF1F5F9)
+    val pageBg = if (dark) t.pageBackground else Color(0xFFF4F5F7)
     val running = runtimeStatus?.optBoolean("running", false) ?: prefs.getBoolean("proxyRootRuntimeRunning", false)
     val effectiveIpv6 = runtimeStatus?.optString("ipv6Mode", "").orEmpty()
     val settingsPending = ProxyRuntimeSettings.pending(running, prefs)
@@ -283,7 +283,7 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
                     context.startActivity(Intent(context, ProxyAppSelectionActivity::class.java))
                 }
                 AdvancedDivider()
-                AdvancedSwitchRow(Icons.Rounded.SwapHoriz, Color(0xFF2563EB), "TCP 接管", "透明代理 TCP 流量", prefs.getBoolean("proxyTcp", true)) { putBool("proxyTcp", it) }
+                AdvancedSwitchRow(Icons.Rounded.SwapHoriz, Color(0xFF12806F), "TCP 接管", "透明代理 TCP 流量", prefs.getBoolean("proxyTcp", true)) { putBool("proxyTcp", it) }
                 AdvancedDivider()
                 AdvancedSwitchRow(Icons.Rounded.Bolt, Color(0xFF0EA5E9), "UDP 接管", "游戏、VoIP 与 QUIC 等 UDP", prefs.getBoolean("proxyUdp", true)) { putBool("proxyUdp", it) }
             }
@@ -292,7 +292,7 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
         item { AdvancedSectionLabel("广告过滤") }
         item {
             AdvancedGroup {
-                AdvancedSwitchRow(Icons.Rounded.Shield, Color(0xFF2563EB), "随代理串联去广告", "广告规则先 REJECT，剩余流量再进入代理分流", profile.adblockChain) { putBool("proxyAdblockChain", it) }
+                AdvancedSwitchRow(Icons.Rounded.Shield, Color(0xFF12806F), "随代理串联去广告", "广告规则先 REJECT，剩余流量再进入代理分流", profile.adblockChain) { putBool("proxyAdblockChain", it) }
                 AdvancedDivider()
                 AdvancedActionRow(Icons.Rounded.FilterAlt, Color(0xFF8B5CF6), "广告规则与命中", "规则源 · 有效规则 · Mihomo REJECT 命中") {
                     context.startActivity(Intent(context, ProxyAdblockChainActivity::class.java))
@@ -340,7 +340,7 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
                 AdvancedDivider()
                 AdvancedSwitchRow(Icons.Rounded.RestartAlt, Color(0xFF6366F1), "Root 开机自启", "开机后恢复上次保持运行的 Root 代理", prefs.getBoolean("proxyRootAutoStart", false)) { putBool("proxyRootAutoStart", it) }
                 AdvancedDivider()
-                AdvancedInfoRow(Icons.Rounded.AutoFixHigh, Color(0xFF64748B), "运行配置副本", "代理设置应用到运行副本，保留原始订阅配置")
+                AdvancedInfoRow(Icons.Rounded.AutoFixHigh, Color(0xFF5D6670), "运行配置副本", "代理设置应用到运行副本，保留原始订阅配置")
             }
         }
 
@@ -368,7 +368,7 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
                     editSet("proxyBypassCidrs", "CIDR 绕过", "每行一个 IPv4/IPv6 CIDR，例如 10.0.0.0/8 或 fd00::/8。")
                 }
                 AdvancedDivider()
-                AdvancedValueRow(Icons.Rounded.Cable, Color(0xFF64748B), "接口绕过", setSummary("proxyBypassInterfaces")) {
+                AdvancedValueRow(Icons.Rounded.Cable, Color(0xFF5D6670), "接口绕过", setSummary("proxyBypassInterfaces")) {
                     editSet("proxyBypassInterfaces", "接口绕过", "每行一个接口名，例如 dummy0、tun+。不能填写 lo。")
                 }
             }
@@ -381,7 +381,7 @@ private fun ProxyAdvancedSettingsPage(focus: String, onBack: () -> Unit) {
                     runPreflight()
                 }
                 AdvancedDivider()
-                AdvancedActionRow(Icons.Rounded.Description, Color(0xFF3B82F6), "查看启动配置", "查看最终运行副本，不修改源配置") {
+                AdvancedActionRow(Icons.Rounded.Description, Color(0xFF5CCFBC), "查看启动配置", "查看最终运行副本，不修改源配置") {
                     runRoot("启动配置") { root.prepare(ProxyRuntimeProfile.load(prefs)).startup }
                 }
                 AdvancedDivider()
@@ -473,7 +473,7 @@ private fun AdvancedPreflightSheet(passed: Boolean, text: String, onDismiss: () 
         dragHandle = {
             Box(
                 Modifier.padding(top = 10.dp, bottom = 5.dp).size(width = 36.dp, height = 4.dp)
-                    .background(Color(0xFFCBD5E1), CircleShape),
+                    .background(Color(0xFFD5D9DE), CircleShape),
             )
         },
     ) {
@@ -510,14 +510,14 @@ private fun AdvancedPreflightSheet(passed: Boolean, text: String, onDismiss: () 
                     lineHeight = 19.sp,
                 )
             }
-            Text("下滑即可关闭", color = Color(0xFF94A3B8), fontSize = 10.sp, fontWeight = FontWeight.Medium)
+            Text("下滑即可关闭", color = Color(0xFF98A1AA), fontSize = 10.sp, fontWeight = FontWeight.Medium)
         }
     }
 }
 
 @Composable
 private fun AdvancedSectionLabel(text: String) {
-    Text(text, color = Color(0xFF94A3B8), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = .6.sp, modifier = Modifier.padding(start = 12.dp, top = 2.dp))
+    Text(text, color = Color(0xFF98A1AA), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = .6.sp, modifier = Modifier.padding(start = 12.dp, top = 2.dp))
 }
 
 @Composable
@@ -531,14 +531,12 @@ private fun AdvancedGroup(content: @Composable ColumnScope.() -> Unit) {
 
 @Composable
 private fun AdvancedDivider() {
-    HorizontalDivider(Modifier.padding(start = 62.dp, end = 14.dp), color = if (MaterialTheme.colorScheme.background.luminance() < .5f) LocalHetuTokens.current.outline else Color(0xFFF1F5F9))
+    HorizontalDivider(Modifier.padding(start = 62.dp, end = 14.dp), color = if (MaterialTheme.colorScheme.background.luminance() < .5f) LocalHetuTokens.current.outline else Color(0xFFF4F5F7))
 }
 
 @Composable
 private fun AdvancedIcon(icon: ImageVector, accent: Color) {
-    Box(Modifier.size(36.dp).background(accent.copy(alpha = .12f), RoundedCornerShape(11.dp)), contentAlignment = Alignment.Center) {
-        Icon(icon, null, tint = accent, modifier = Modifier.size(20.dp))
-    }
+    io.github.xgl34222220.hetu.ui.HetuLineIcon(icon, boxSize = 36.dp)
 }
 
 @Composable
@@ -550,7 +548,7 @@ private fun AdvancedValueRow(icon: ImageVector, accent: Color, title: String, va
             Text(title, color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             Text(value, color = t.textSecondary, fontSize = 13.sp, lineHeight = 18.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
-        Icon(Icons.Rounded.ChevronRight, null, tint = Color(0xFFCBD5E1), modifier = Modifier.size(18.dp))
+        Icon(Icons.Rounded.ChevronRight, null, tint = Color(0xFFD5D9DE), modifier = Modifier.size(18.dp))
     }
 }
 
@@ -613,7 +611,7 @@ private fun SetEditorDialog(state: SetEditorState, onDismiss: () -> Unit, onSave
         dragHandle = {
             Box(
                 Modifier.padding(top = 10.dp, bottom = 6.dp).size(width = 36.dp, height = 4.dp)
-                    .background(Color(0xFFCBD5E1), CircleShape),
+                    .background(Color(0xFFD5D9DE), CircleShape),
             )
         },
     ) {
@@ -646,8 +644,8 @@ private fun advancedYamlPreview(text: String): androidx.compose.ui.text.Annotate
     androidx.compose.ui.text.buildAnnotatedString {
         val cyan = Color(0xFF38BDF8)
         val lime = Color(0xFFA3E635)
-        val comment = Color(0xFF64748B)
-        val normal = Color(0xFFE2E8F0)
+        val comment = Color(0xFF5D6670)
+        val normal = Color(0xFFE4E7EB)
         val lines = text.lines()
         lines.forEachIndexed { index, line ->
             val trimmed = line.trimStart()
@@ -711,13 +709,13 @@ private fun AdvancedInfoSheet(title: String, text: String, onDismiss: () -> Unit
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = if (codePreview) Color(0xFF0B1220) else t.elevatedCardBackground,
-        contentColor = if (codePreview) Color(0xFFE2E8F0) else t.textPrimary,
+        contentColor = if (codePreview) Color(0xFFE4E7EB) else t.textPrimary,
         tonalElevation = 0.dp,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         dragHandle = {
             Box(
                 Modifier.padding(top = 10.dp, bottom = 6.dp).size(width = 36.dp, height = 4.dp)
-                    .background(if (codePreview) Color(0xFF334155) else Color(0xFFCBD5E1), CircleShape),
+                    .background(if (codePreview) Color(0xFF334155) else Color(0xFFD5D9DE), CircleShape),
             )
         },
     ) {
@@ -740,7 +738,7 @@ private fun AdvancedInfoSheet(title: String, text: String, onDismiss: () -> Unit
                 Surface(
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     shape = RoundedCornerShape(18.dp),
-                    color = Color(0xFF0F172A),
+                    color = Color(0xFF12161A),
                     border = BorderStroke(.7.dp, Color(0xFF334155)),
                 ) {
                     Row(Modifier.fillMaxSize().verticalScroll(vScroll)) {
@@ -781,7 +779,7 @@ private fun AdvancedInfoSheet(title: String, text: String, onDismiss: () -> Unit
             }
             Text(
                 "下滑即可关闭",
-                color = Color(0xFF94A3B8),
+                color = Color(0xFF98A1AA),
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.align(Alignment.CenterHorizontally),

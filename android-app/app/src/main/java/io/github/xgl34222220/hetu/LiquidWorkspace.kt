@@ -220,7 +220,7 @@ internal fun LiquidPill(text: String, icon: ImageVector, onClick: () -> Unit, mo
     )
     val color = if (danger) Color(0xFFE11D48) else if (primary || compact) scheme.primary else Color(0xFF475569)
     val fill = if (danger) Color(0xFFFFF1F2) else if (dark) Color.White.copy(alpha = .06f)
-        else if (primary) Color(0xFFEFF6FF) else Color(0xFFF8FAFC)
+        else if (primary) Color(0xFFDDF1EC) else Color(0xFFF8FAFC)
     Box(modifier.heightIn(min = if (compact) 36.dp else 48.dp).graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (enabled) 1f else .45f }
         .clip(CircleShape).clickable(enabled = enabled, interactionSource = interaction, indication = null, role = Role.Button) {
             view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK); onClick()
@@ -233,7 +233,7 @@ internal fun LiquidPill(text: String, icon: ImageVector, onClick: () -> Unit, mo
             .background(Brush.verticalGradient(listOf(fill, fill.copy(alpha = fill.alpha * .92f))), CircleShape)
             .border(
                 1.dp,
-                if (danger) Color(0xFFFFE4E6) else if (dark) Color.White.copy(alpha = .08f) else Color(0xFFF1F5F9),
+                if (danger) Color(0xFFFFE4E6) else if (dark) Color.White.copy(alpha = .08f) else Color(0xFFF4F5F7),
                 CircleShape,
             )
             .padding(horizontal = if (compact) 9.dp else 10.dp, vertical = if (compact) 5.dp else 6.dp),
@@ -298,7 +298,7 @@ internal fun LiquidStatusGlyph(running: Boolean, busy: Boolean) {
             )
             .border(
                 1.dp,
-                if (running && !busy) Color.Transparent else Color(0xFFE2E8F0),
+                if (running && !busy) Color.Transparent else Color(0xFFE4E7EB),
                 CircleShape,
             ),
         contentAlignment = Alignment.Center,

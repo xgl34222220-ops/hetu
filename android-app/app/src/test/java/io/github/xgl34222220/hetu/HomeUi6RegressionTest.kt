@@ -160,7 +160,7 @@ class HomeUi6RegressionTest {
         render()
         val b=bitmap();val pixels=IntArray(b.width*b.height)
         b.getPixels(pixels,0,b.width,0,0,b.width,b.height)
-        assertTrue(pixels.count {it==0xFFF4F6FB.toInt()}>3000)
+        assertTrue(pixels.count {it==0xFFECECFA.toInt()}>3000)
         assertTrue("Solid blue pill must not be a radial halo",pixels.count {it==0xFFE7F1FF.toInt()}>1000)
         b.recycle()
         rule.onNodeWithTag("dock-tab-2").performTouchInput{click()}

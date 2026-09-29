@@ -59,7 +59,7 @@ private fun ThemeSettingsScreen(onBack: () -> Unit, onThemeChanged: () -> Unit) 
     var monet by remember { mutableStateOf(prefs.getBoolean("enableMonet", false)) }
     var palette by remember { mutableStateOf(prefs.getString("colorPalette", "TonalSpot") ?: "TonalSpot") }
     var standard by remember { mutableStateOf(prefs.getString("colorStandard", "Material3_2021") ?: "Material3_2021") }
-    var accent by remember { mutableStateOf(prefs.getString("accentHex", "#2563EB") ?: "#2563EB") }
+    var accent by remember { mutableStateOf(prefs.getString("accentHex", "#12806F") ?: "#12806F") }
     var blur by remember { mutableStateOf(prefs.getBoolean("enableBlur", true)) }
     var floating by remember { mutableStateOf(prefs.getBoolean("floatingBottomBar", true)) }
     var liquid by remember { mutableStateOf(prefs.getBoolean("liquidGlass", true)) }
@@ -147,7 +147,7 @@ private fun ThemeSettingsScreen(onBack: () -> Unit, onThemeChanged: () -> Unit) 
             ThemeDivider()
             Column(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("强调色预设", color = t.textPrimary, style = MaterialTheme.typography.bodyMedium)
-                val accents = listOf("#2563EB", "#EF4444", "#EC4899", "#8B5CF6", "#6D28D9", "#4F46E5", "#0EA5E9", "#14B8A6")
+                val accents = listOf("#12806F", "#EF4444", "#EC4899", "#8B5CF6", "#6D28D9", "#4F46E5", "#0EA5E9", "#14B8A6")
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     accents.forEach { hex ->
                         val color = runCatching { Color(android.graphics.Color.parseColor(hex)) }.getOrDefault(Color.Blue)

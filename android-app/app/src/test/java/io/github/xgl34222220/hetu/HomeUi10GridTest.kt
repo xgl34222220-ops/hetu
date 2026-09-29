@@ -132,7 +132,7 @@ class HomeUi10GridTest {
             val v=rule.activity.window.decorView;val b=Bitmap.createBitmap(v.width,v.height,Bitmap.Config.ARGB_8888);v.draw(Canvas(b))
             val x=((boxes[0].right+boxes[1].left)/2).value.toInt()
             val y=((boxes[0].top+boxes[0].bottom)/2).value.toInt()
-            assertEquals("Independent cards expose the page between them",0xFFF4F6FB.toInt(),b.getPixel(x,y))
+            assertEquals("Independent cards expose the page between them",0xFFECECFA.toInt(),b.getPixel(x,y))
             b.recycle()
         }
     }

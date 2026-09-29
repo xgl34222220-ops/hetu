@@ -174,7 +174,7 @@ internal fun MotionModalSheet12(
     containerColor: Color = LocalHetuTokens.current.cardBackground,
     contentColor: Color = LocalHetuTokens.current.textPrimary,
     tonalElevation: Dp = 0.dp,
-    scrimColor: Color = Color(0xFF0F172A).copy(alpha = .26f),
+    scrimColor: Color = Color(0xFF12161A).copy(alpha = .26f),
     dragHandle: @Composable (() -> Unit)? = { BottomSheetDefaults.DragHandle() },
     content: @Composable ColumnScope.() -> Unit,
 ) {

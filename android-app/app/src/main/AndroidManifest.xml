@@ -17,7 +17,8 @@
         <activity android:name=".CompactMainActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".ThemeSettingsActivity" android:label="主题与界面" android:exported="false"  android:launchMode="singleTop" />
         <activity android:name=".HetuMainActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
-        <activity android:name=".ReferenceProxyActivity" android:label="河图" android:exported="true" android:launchMode="singleTop" />
+        <activity android:name=".HetuActivity" android:label="河图" android:exported="false" android:launchMode="singleTop" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".ReferenceProxyActivity" android:label="河图" android:exported="false" android:launchMode="singleTop" />
         <activity android:name=".ProxyTilePreferencesActivity" android:label="河图快捷磁贴" android:exported="false" android:launchMode="singleTop" />
         <activity
             android:name=".ProxySelectorSheetActivity"
@@ -39,7 +40,7 @@
             android:windowSoftInputMode="adjustResize" />
         <activity-alias
             android:name=".LauncherOfficial"
-            android:targetActivity=".ReferenceProxyActivity"
+            android:targetActivity=".HetuActivity"
             android:enabled="true"
             android:exported="true"
             android:icon="@drawable/ic_hetu_official"
@@ -51,7 +52,7 @@
         </activity-alias>
         <activity-alias
             android:name=".LauncherClassic"
-            android:targetActivity=".ReferenceProxyActivity"
+            android:targetActivity=".HetuActivity"
             android:enabled="false"
             android:exported="true"
             android:icon="@drawable/ic_hetu"

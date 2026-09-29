@@ -165,7 +165,7 @@ internal fun HomePullIndicator(state: HomePullState, motion: Boolean, modifier: 
         transition.animateFloat(0f, 360f, infiniteRepeatable(tween(800, easing = LinearEasing)), label = "pull-angle").value
     } else progress * 240f
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val color = if (dark) Color(0xFF93C5FD) else Color(0xFF2563EB)
+    val color = if (dark) Color(0xFF93C5FD) else Color(0xFF12806F)
     val title = if (active) "正在同步状态…" else if (state.armed) "松开立即刷新" else "下拉同步状态"
     Box(modifier.fillMaxWidth().height(state.offsetDp.dp).clip(RectangleShape)
         .testTag("home-pull-indicator").semantics {
@@ -285,7 +285,7 @@ internal fun HomeFeedbackPill(notice: HomeNotice?, motion: Boolean, haze: HazeSt
                 .then(if (hardware && blur) Modifier.hazeEffect(haze, HazeMaterials.ultraThin()) {
                     blurRadius = 14.dp; noiseFactor = 0f
                 } else Modifier)
-                .background(Color(0xFF0F172A).copy(alpha = .90f))
+                .background(Color(0xFF12161A).copy(alpha = .90f))
                 .testTag("home-feedback-pill").semantics { liveRegion = LiveRegionMode.Polite }
                 .nativePress(enabled = notice != null, label = "查看操作详情", motion = motion) { onDetails(value.raw) }
                 .padding(horizontal = 16.dp, vertical = 10.dp),

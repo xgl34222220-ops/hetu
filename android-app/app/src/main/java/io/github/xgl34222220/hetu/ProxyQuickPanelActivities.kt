@@ -222,8 +222,8 @@ private fun ProxyQuickPanelSheet(
                         onRefreshState = { refreshState() },
                         onOpenSettings = {
                             context.startActivity(
-                                Intent(context, ReferenceProxyActivity::class.java)
-                                    .putExtra(ReferenceProxyActivity.EXTRA_START_PAGE, "settings"),
+                                Intent(context, HetuActivity::class.java)
+                                    .putExtra(HetuActivity.EXTRA_START_PAGE, "settings"),
                             )
                             requestClose()
                         },

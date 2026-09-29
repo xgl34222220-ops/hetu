@@ -50,19 +50,19 @@ data class HetuTokens(
 
 val LocalHetuTokens = staticCompositionLocalOf {
     HetuTokens(
-        pageBackground = Color(0xFFF4F6FB),
+        pageBackground = Color(0xFFF4F5F7),
         cardBackground = Color(0xFFFFFFFF),
-        elevatedCardBackground = Color(0xFFF1F5F9),
+        elevatedCardBackground = Color(0xFFF4F5F7),
         heroBackground = Color(0xFFEDF4FF),
-        textPrimary = Color(0xFF0F172A),
-        textSecondary = Color(0xFF64748B),
-        textMuted = Color(0xFF94A3B8),
+        textPrimary = Color(0xFF12161A),
+        textSecondary = Color(0xFF5D6670),
+        textMuted = Color(0xFF98A1AA),
         success = Color(0xFF10B981),
         warning = Color(0xFFF59E0B),
         danger = Color(0xFFEF4444),
-        outline = Color(0xFFE2E8F0),
-        controlBackground = Color(0xFFF1F5F9),
-        selectionBackground = Color(0xFFDBEAFE),
+        outline = Color(0xFFE4E7EB),
+        controlBackground = Color(0xFFF4F5F7),
+        selectionBackground = Color(0xFFDDF1EC),
     )
 }
 
@@ -118,9 +118,9 @@ private fun paletteStyle(raw: String): PaletteStyle = when (raw) {
 }
 
 private fun accentColor(raw: String, dark: Boolean): Color {
-    val fallback = if (dark) Color(0xFF3B82F6) else Color(0xFF2563EB)
+    val fallback = if (dark) Color(0xFF5CCFBC) else Color(0xFF12806F)
     return runCatching {
-        val parsed = android.graphics.Color.parseColor(raw.ifBlank { if (dark) "#3B82F6" else "#2563EB" })
+        val parsed = android.graphics.Color.parseColor(raw.ifBlank { if (dark) "#5CCFBC" else "#12806F" })
         Color(parsed)
     }.getOrDefault(fallback)
 }
@@ -152,26 +152,28 @@ fun HetuTheme(content: @Composable () -> Unit) {
         else -> MiuixShapes
     }
 
-    val fixedPrimary = accentColor(prefs.getString("accentHex", if (dark) "#3B82F6" else "#2563EB") ?: "#2563EB", dark)
+    // The legacy blue default is treated as "not customised" so every page shares the V20 jade accent.
+    val storedAccent = (prefs.getString("accentHex", "") ?: "").takeUnless { it.equals("#2563EB", true) || it.equals("#3B82F6", true) }.orEmpty()
+    val fixedPrimary = accentColor(storedAccent.ifBlank { if (dark) "#5CCFBC" else "#12806F" }, dark)
     val baseLight = lightColorScheme(
         primary = fixedPrimary,
-        primaryContainer = Color(0xFFDBEAFE),
-        secondary = Color(0xFF2563EB),
-        background = Color(0xFFF4F6FB),
+        primaryContainer = Color(0xFFDDF1EC),
+        secondary = Color(0xFF12806F),
+        background = Color(0xFFF4F5F7),
         surface = Color.White,
         error = Color(0xFFEF4444),
-        onBackground = Color(0xFF0F172A),
-        onSurface = Color(0xFF0F172A),
+        onBackground = Color(0xFF12161A),
+        onSurface = Color(0xFF12161A),
     )
     val baseDark = darkColorScheme(
         primary = fixedPrimary,
-        primaryContainer = Color(0xFF1E3A8A),
-        secondary = Color(0xFF3B82F6),
-        background = if (pureBlack) Color.Black else Color(0xFF121212),
-        surface = Color(0xFF1E1E1E),
+        primaryContainer = Color(0xFF15403A),
+        secondary = Color(0xFF5CCFBC),
+        background = if (pureBlack) Color.Black else Color(0xFF0D1012),
+        surface = Color(0xFF171B1E),
         error = Color(0xFFF87171),
-        onBackground = Color(0xFFF4F6FB),
-        onSurface = Color(0xFFF4F6FB),
+        onBackground = Color(0xFFF4F5F7),
+        onSurface = Color(0xFFF4F5F7),
     )
 
     val density = LocalDensity.current
@@ -185,35 +187,36 @@ fun HetuTheme(content: @Composable () -> Unit) {
         val scheme = MaterialTheme.colorScheme
         val tokens = if (dark) {
             HetuTokens(
-                pageBackground = if (pureBlack) Color.Black else Color(0xFF121212),
-                cardBackground = Color(0xFF1E1E1E),
-                elevatedCardBackground = Color(0xFF242424),
-                heroBackground = Color(0xFF172338),
-                textPrimary = Color(0xFFF4F6FB),
-                textSecondary = Color(0xFF94A3B8),
-                textMuted = Color(0xFF64748B),
+                pageBackground = if (pureBlack) Color.Black else Color(0xFF0D1012),
+                cardBackground = Color(0xFF171B1E),
+                elevatedCardBackground = Color(0xFF20262A),
+                heroBackground = Color(0xFF15403A),
+                textPrimary = Color(0xFFF4F5F7),
+                textSecondary = Color(0xFF98A1AA),
+                textMuted = Color(0xFF5D6670),
                 success = Color(0xFF34D399),
                 warning = Color(0xFFFBBF24),
                 danger = Color(0xFFF87171),
-                outline = Color(0xFF30343B),
-                controlBackground = Color(0xFF24272D),
-                selectionBackground = if (enableMonet) scheme.primaryContainer.copy(alpha = .55f) else Color(0xFF1E3A8A),
+                outline = Color(0xFF283035),
+                controlBackground = Color(0xFF20262A),
+                selectionBackground = if (enableMonet) scheme.primaryContainer.copy(alpha = .55f) else Color(0xFF15403A),
             )
         } else {
+            // V19.3: reference palette, sampled from the BoxProxy recording.
             HetuTokens(
-                pageBackground = Color(0xFFF4F6FB),
+                pageBackground = Color(0xFFF4F5F7),
                 cardBackground = Color(0xFFFFFFFF),
-                elevatedCardBackground = Color(0xFFF1F5F9),
-                heroBackground = Color(0xFFEDF4FF),
-                textPrimary = Color(0xFF0F172A),
-                textSecondary = Color(0xFF64748B),
-                textMuted = Color(0xFF94A3B8),
+                elevatedCardBackground = Color(0xFFEEF0F3),
+                heroBackground = Color(0xFFDDF1EC),
+                textPrimary = Color(0xFF12161A),
+                textSecondary = Color(0xFF5D6670),
+                textMuted = Color(0xFF98A1AA),
                 success = Color(0xFF10B981),
                 warning = Color(0xFFF59E0B),
                 danger = Color(0xFFEF4444),
-                outline = Color(0xFFE2E8F0),
-                controlBackground = Color(0xFFF1F5F9),
-                selectionBackground = if (enableMonet) scheme.primaryContainer.copy(alpha = .72f) else Color(0xFFDBEAFE),
+                outline = Color(0xFFE4E7EB),
+                controlBackground = Color(0xFFEEF0F3),
+                selectionBackground = if (enableMonet) scheme.primaryContainer.copy(alpha = .72f) else Color(0xFFDDF1EC),
             )
         }
         CompositionLocalProvider(
@@ -233,7 +236,7 @@ fun HetuTheme(content: @Composable () -> Unit) {
         ) {
             ProvideTokens(content)
         }
-    } else if ((prefs.getString("accentHex", "#2563EB") ?: "#2563EB") == "#2563EB" && (prefs.getString("colorPalette", "TonalSpot") ?: "TonalSpot") == "TonalSpot") {
+    } else if ((storedAccent.isBlank() || storedAccent.equals("#12806F", true)) && (prefs.getString("colorPalette", "TonalSpot") ?: "TonalSpot") == "TonalSpot") {
         MaterialTheme(
             colorScheme = if (dark) baseDark else baseLight,
             shapes = shapes,

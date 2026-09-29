@@ -134,7 +134,7 @@ private fun ReferenceFileManagerScreen(onClose: () -> Unit) {
     val haptics = io.github.xgl34222220.hetu.ui.rememberHetuHaptics()
     val motion = io.github.xgl34222220.hetu.ui.LocalHetuMotionEnabled.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val page = if (dark) t.pageBackground else Color(0xFFF1F5F9)
+    val page = if (dark) t.pageBackground else Color(0xFFF4F5F7)
     androidx.activity.compose.BackHandler(enabled = path != REF_FILE_ROOT) { goBack() }
     Box(Modifier.fillMaxSize().background(page)) {
         androidx.compose.animation.AnimatedContent(
@@ -193,7 +193,7 @@ private fun ReferenceFileManagerScreen(onClose: () -> Unit) {
                                     val source = remember(item.path) { MutableInteractionSource() }
                                     Row(
                                         Modifier.fillMaxWidth().heightIn(min = 56.dp)
-                                            .hetuPressHighlight(source, (if (dark) Color.White else Color(0xFF0F172A)).copy(alpha = .05f))
+                                            .hetuPressHighlight(source, (if (dark) Color.White else Color(0xFF12161A)).copy(alpha = .05f))
                                             .clickable(interactionSource = source, indication = null) {
                                                 haptics.perform(io.github.xgl34222220.hetu.ui.HetuHaptic.Tap)
                                                 if (item.directory) path = item.path

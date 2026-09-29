@@ -64,7 +64,7 @@ private fun ProxyNetworkAutomationPage(onBack: () -> Unit) {
     val bssids = remember(revision) { TreeSet(prefs.getStringSet("networkMatchBssids", emptySet()).orEmpty()) }
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val pageBg = if (dark) t.pageBackground else Color(0xFFF1F5F9)
+    val pageBg = if (dark) t.pageBackground else Color(0xFFF4F5F7)
 
     fun refresh() { revision++ }
     fun service(action: String) {
@@ -137,7 +137,7 @@ private fun ProxyNetworkAutomationPage(onBack: () -> Unit) {
                             Text(environment, color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         }
                     }
-                    HorizontalDivider(color = if (dark) t.outline else Color(0xFFF1F5F9))
+                    HorizontalDivider(color = if (dark) t.outline else Color(0xFFF4F5F7))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text("自动网络匹配", color = t.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
@@ -210,7 +210,7 @@ private fun ProxyNetworkAutomationPage(onBack: () -> Unit) {
 }
 
 @Composable
-private fun NetworkSectionLabel(text: String) = Text(text, color = Color(0xFF94A3B8), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = .6.sp, modifier = Modifier.padding(start = 12.dp, top = 2.dp))
+private fun NetworkSectionLabel(text: String) = Text(text, color = Color(0xFF98A1AA), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = .6.sp, modifier = Modifier.padding(start = 12.dp, top = 2.dp))
 
 @Composable
 private fun NetworkGroup(content: @Composable ColumnScope.() -> Unit) {
@@ -220,11 +220,11 @@ private fun NetworkGroup(content: @Composable ColumnScope.() -> Unit) {
 }
 
 @Composable
-private fun NetworkDivider() = HorizontalDivider(Modifier.padding(start = 62.dp, end = 14.dp), color = if (MaterialTheme.colorScheme.background.luminance() < .5f) LocalHetuTokens.current.outline else Color(0xFFF1F5F9))
+private fun NetworkDivider() = HorizontalDivider(Modifier.padding(start = 62.dp, end = 14.dp), color = if (MaterialTheme.colorScheme.background.luminance() < .5f) LocalHetuTokens.current.outline else Color(0xFFF4F5F7))
 
 @Composable
 private fun NetworkIcon(icon: ImageVector, accent: Color) {
-    Box(Modifier.size(36.dp).background(accent.copy(alpha = .12f), RoundedCornerShape(11.dp)), contentAlignment = Alignment.Center) { Icon(icon, null, tint = accent, modifier = Modifier.size(20.dp)) }
+    io.github.xgl34222220.hetu.ui.HetuLineIcon(icon, boxSize = 36.dp)
 }
 
 @Composable
@@ -234,7 +234,7 @@ private fun NetworkValueRow(icon: ImageVector, accent: Color, title: String, val
         NetworkIcon(icon, accent); Spacer(Modifier.width(12.dp))
         Text(title, color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
         Text(value, color = t.textSecondary, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Spacer(Modifier.width(7.dp)); Icon(Icons.Rounded.ChevronRight, null, tint = Color(0xFFCBD5E1), modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(7.dp)); Icon(Icons.Rounded.ChevronRight, null, tint = Color(0xFFD5D9DE), modifier = Modifier.size(18.dp))
     }
 }
 
@@ -282,7 +282,7 @@ private fun NetworkSetEditor(state: NetworkEditor, onDismiss: () -> Unit, onSave
         dragHandle = {
             Box(
                 Modifier.padding(top = 10.dp, bottom = 6.dp).size(width = 36.dp, height = 4.dp)
-                    .background(Color(0xFFCBD5E1), RoundedCornerShape(999.dp)),
+                    .background(Color(0xFFD5D9DE), RoundedCornerShape(999.dp)),
             )
         },
     ) {

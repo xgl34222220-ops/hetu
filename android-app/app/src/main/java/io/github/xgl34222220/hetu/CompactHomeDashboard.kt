@@ -124,8 +124,9 @@ internal object CompactHomeFormat {
 private data class HomePalette(val page: Color, val card: Color, val text: Color,
     val muted: Color, val soft: Color, val blue: Color, val red: Color, val line: Color)
 private val LocalHomePalette = staticCompositionLocalOf {
-    HomePalette(Color(0xFFF4F6FB), Color.White, Color(0xFF1E293B), Color(0xFF64748B),
-        Color(0xFFF8FAFC), Color(0xFF2563EB), Color(0xFFEF4444), Color(0xFFF1F5F9))
+    // V19.3: reference lavender canvas / translucent-white cards.
+    HomePalette(Color(0xFFF4F5F7), Color(0xFFFFFFFF), Color(0xFF12161A), Color(0xFF5D6670),
+        Color(0xFFF2F1FA), Color(0xFF12806F), Color(0xFFEF4444), Color(0xFFEEF0F3))
 }
 private val LocalHomeMotion = staticCompositionLocalOf { false }
 
@@ -230,7 +231,7 @@ internal fun CompactHomeDashboard(
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val light = LocalHomePalette.current
     val palette = if (!dark) light else HomePalette(
-        MaterialTheme.colorScheme.background, Color(0xFF1C2430), Color(0xFFE2E8F0),
+        MaterialTheme.colorScheme.background, Color(0xFF1C2430), Color(0xFFE4E7EB),
         Color(0xFF9AA9BD), Color(0xFF253142), Color(0xFF8AB4FF), Color(0xFFFF8585), Color(0xFF293545))
     val motion = homeMotionAvailable(motionEnabled && io.github.xgl34222220.hetu.ui.LocalHetuMotionEnabled.current)
     CompositionLocalProvider(LocalHomePalette provides palette, LocalHomeMotion provides motion) {
@@ -612,7 +613,7 @@ internal fun HomeUsageBar(fraction: Float?, tag: String, description: String,
     val motion = LocalHomeMotion.current
     val target = fraction?.takeIf { it.isFinite() }?.coerceIn(0f, 1f)
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val track = if (dark) Color(0xFF334155) else Color(0xFFE2E8F0)
+    val track = if (dark) Color(0xFF334155) else Color(0xFFE4E7EB)
     val progress by animateFloatAsState(target ?: 0f,
         if (motion) tween(500, easing = FastOutSlowInEasing) else snap(), label = "$tag-progress")
     val color by animateColorAsState(tint, if (motion) tween(300) else snap(), label = "$tag-color")

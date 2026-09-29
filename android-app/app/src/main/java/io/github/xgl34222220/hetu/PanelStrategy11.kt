@@ -70,7 +70,7 @@ internal fun PanelNode11(group: String, node: ProxyNodeUi, active: Boolean, dela
     val t = LocalHetuTokens.current
     val motion = LocalHetuMotionEnabled.current
     val label14 = remember(node.name) { nodeLabel14(node.name) }
-    val fill by animateColorAsState(if (active) Color(0xFF2563EB).copy(alpha = .09f) else t.cardBackground,
+    val fill by animateColorAsState(if (active) Color(0xFF12806F).copy(alpha = .09f) else t.cardBackground,
         tween(if (motion) 200 else 0), label = "selected-node")
     // nativePress owns the main click; a separate info action exposes untruncated names.
     Column(modifier.diffuseCardShadow(HomeContinuousShape(18.dp)).clip(HomeContinuousShape(18.dp)).background(fill)
@@ -83,8 +83,8 @@ internal fun PanelNode11(group: String, node: ProxyNodeUi, active: Boolean, dela
                 color = t.textPrimary, fontSize = 14.sp, lineHeight = 20.sp,
                 fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
                 maxLines = if (compact) 2 else 3, overflow = TextOverflow.Ellipsis)
-            if (pending) NativeSpinner(Color(0xFF2563EB), motion, Modifier.size(16.dp))
-            else if (active) Icon(Icons.Rounded.Check, "当前正在使用", Modifier.size(17.dp).testTag("panel11-check:$group:${node.name}"), tint = Color(0xFF2563EB))
+            if (pending) NativeSpinner(Color(0xFF12806F), motion, Modifier.size(16.dp))
+            else if (active) Icon(Icons.Rounded.Check, "当前正在使用", Modifier.size(17.dp).testTag("panel11-check:$group:${node.name}"), tint = Color(0xFF12806F))
         }
         NodeTags14(label14.tags, Modifier.testTag("panel14-node-tags:$group:${node.name}"))
         Text(listOf(node.type.uppercase(Locale.ROOT).ifBlank { "协议未知" }, if (node.udp) "UDP" else "")

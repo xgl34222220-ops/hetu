@@ -105,7 +105,7 @@ internal fun YamlWorkbenchAccessory(
     val keys = yamlWorkbenchSymbols
     Row(
         Modifier.fillMaxWidth().height(42.dp).testTag("yaml-accessory")
-            .background(Color(0xFF0F172A))
+            .background(Color(0xFF12161A))
             .horizontalScroll(rememberScrollState())
             .padding(horizontal = 6.dp, vertical = 5.dp),
         horizontalArrangement = Arrangement.spacedBy(5.dp),
@@ -128,7 +128,7 @@ internal fun YamlWorkbenchAccessory(
             ) {
                 Text(
                     symbol,
-                    color = if (enabled) Color.White else Color(0xFF64748B),
+                    color = if (enabled) Color.White else Color(0xFF5D6670),
                     fontSize = 12.sp,
                     lineHeight = 16.sp,
                     fontFamily = io.github.xgl34222220.hetu.ui.HetuSystemFontFamily,
@@ -152,7 +152,7 @@ internal fun YamlWorkbenchAccessory(
                     icon,
                     label,
                     Modifier.size(16.dp),
-                    tint = if (enabled && available) Color(0xFF94A3B8) else Color(0xFF475569),
+                    tint = if (enabled && available) Color(0xFF98A1AA) else Color(0xFF475569),
                 )
             }
         }

@@ -76,7 +76,7 @@ private fun ProxyAppSelectionPage(onBack: () -> Unit) {
     val profile = remember(selected, reload) { ProxyRuntimeProfile.load(prefs) }
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val pageBg = if (dark) t.pageBackground else Color(0xFFF1F5F9)
+    val pageBg = if (dark) t.pageBackground else Color(0xFFF4F5F7)
     val shimmer = androidx.compose.animation.core.rememberInfiniteTransition(label = "appSkeletonShimmer")
     val shimmerX by shimmer.animateFloat(initialValue = -1f, targetValue = 2f, animationSpec = androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(1400, easing = androidx.compose.animation.core.LinearEasing)), label = "appSkeletonShimmerX")
     val shimmerBrush = Brush.linearGradient(

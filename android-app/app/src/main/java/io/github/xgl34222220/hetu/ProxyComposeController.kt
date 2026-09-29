@@ -303,7 +303,7 @@ internal class ProxyComposeController(context: Context) {
         }
         val selected = configs.selected(profile.core) ?: error("尚未选择配置")
         if (!configs.hasConfiguredSubscription(selected)) {
-            error("当前是河图内置占位配置，尚未填写真实订阅。请打开「面板 → 订阅」添加订阅，或导入一份完整可运行的 YAML 配置。")
+            error("当前是河图内置占位配置，尚未填写真实订阅。请到「设置 → 配置与订阅」添加订阅链接，或导入一份完整可运行的 YAML 配置。")
         }
         onProgress("执行服务启动前脚本…")
         ProxyScriptHooks.run(app, "pre-start", profile.mode.id, selected.name)

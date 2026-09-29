@@ -1,0 +1,15 @@
+<resources>
+    <!-- Same theme name as values/: the window background matches the dark canvas so
+         a cold start in system dark mode never flashes a light frame. -->
+    <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:colorAccent">#5CCFBC</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowBackground">#0D1012</item>
+        <item name="android:windowAnimationStyle">@style/HetuSharedAxisWindowAnimation</item>
+    </style>
+</resources>

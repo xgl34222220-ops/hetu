@@ -127,10 +127,10 @@ internal fun Modifier.nativePress(enabled: Boolean = true, label: String? = null
 }
 
 internal fun Modifier.diffuseCardShadow(shape: Shape): Modifier =
-    shadow(4.dp, shape, clip = false, ambientColor = Color(0xFF0F172A).copy(alpha = .02f),
-        spotColor = Color(0xFF0F172A).copy(alpha = .02f))
-        .shadow(10.dp, shape, clip = false, ambientColor = Color(0xFF0F172A).copy(alpha = .05f),
-            spotColor = Color(0xFF0F172A).copy(alpha = .05f))
+    shadow(4.dp, shape, clip = false, ambientColor = Color(0xFF12161A).copy(alpha = .02f),
+        spotColor = Color(0xFF12161A).copy(alpha = .02f))
+        .shadow(10.dp, shape, clip = false, ambientColor = Color(0xFF12161A).copy(alpha = .05f),
+            spotColor = Color(0xFF12161A).copy(alpha = .05f))
 
 @Composable
 internal fun NativeStatusHero(data: CompactHomeData, toggle: () -> Unit, reload: () -> Unit,
@@ -160,17 +160,17 @@ internal fun NativeStatusHero(data: CompactHomeData, toggle: () -> Unit, reload:
     }
     val colors = when (phase) {
         HomePhase.Running -> if (dark) listOf(Color(0xFF17243F), Color(0xFF262C4E), Color(0xFF8AB4FF))
-            else listOf(Color(0xFFEEF2FF), Color(0xFFDCE6FC), Color(0xFF2563EB))
+            else listOf(Color(0xFFE4E2FE), Color(0xFFDCDAFD), Color(0xFF2E6EDA))
         HomePhase.Processing -> if (dark) listOf(Color(0xFF392B16), Color(0xFF483515), Color(0xFFFBBF24))
             else listOf(Color(0xFFFEF3C7), Color(0xFFFDE68A), Color(0xFFD97706))
         HomePhase.Stopped -> if (dark) listOf(Color(0xFF1B2330), Color(0xFF222C3A), Color(0xFF9AA9BD))
-            else listOf(Color(0xFFF8FAFC), Color(0xFFF1F5F9), Color(0xFF64748B))
+            else listOf(Color(0xFFF4F3FB), Color(0xFFEAE9F5), Color(0xFF5D6670))
     }
     val top by animateColorAsState(colors[0], tween(if (motion) 400 else 0, easing = FastOutSlowInEasing), label = "hero-top")
     val bottom by animateColorAsState(colors[1], tween(if (motion) 400 else 0, easing = FastOutSlowInEasing), label = "hero-bottom")
     val accent by animateColorAsState(colors[2], tween(if (motion) 400 else 0), label = "hero-accent")
-    val text = if (dark) Color(0xFFE2E8F0) else Color(0xFF1E293B)
-    val muted = if (dark) Color(0xFFACB7CA) else Color(0xFF64748B)
+    val text = if (dark) Color(0xFFE4E7EB) else Color(0xFF1E293B)
+    val muted = if (dark) Color(0xFFACB7CA) else Color(0xFF5D6670)
     val shape = HomeContinuousShape(26.dp)
     val compact = LocalHomeCompactSpacing.current
     Box(Modifier.fillMaxWidth().testTag("home-hero").semantics { stateDescription = title }
@@ -228,7 +228,7 @@ internal fun NativeStatusHero(data: CompactHomeData, toggle: () -> Unit, reload:
                     .background(if (dark) Color.White.copy(alpha = .09f) else Color.White.copy(alpha = .95f))
                     .padding(4.dp).heightIn(min = 48.dp).testTag("home-control-pill"),
                     verticalAlignment = Alignment.CenterVertically) {
-                    val blue = if (dark) Color(0xFF8AB4FF) else Color(0xFF2563EB)
+                    val blue = if (dark) Color(0xFF8AB4FF) else Color(0xFF12806F)
                     when (shown) {
                         HomePhase.Running -> {
                             PillAction("重载", "home-reload", blue, Modifier.weight(1f), !processing && phase == shown, motion, reload)
@@ -381,7 +381,7 @@ internal fun NativeDetailsSheet(title: String, onDismiss: () -> Unit, content: @
     MotionModalSheet12(onDismissRequest = onDismiss, sheetState = sheet, sheetGesturesEnabled = true,
         shape = SheetShape12(32.dp),
         containerColor = t.cardBackground, contentColor = t.textPrimary,
-        scrimColor = Color(0xFF0F172A).copy(alpha = .4f), tonalElevation = 0.dp,
+        scrimColor = Color(0xFF12161A).copy(alpha = .4f), tonalElevation = 0.dp,
         modifier = Modifier.testTag("native-details-sheet"),
         dragHandle = { Box(Modifier.fillMaxWidth().height(48.dp).testTag("sheet-drag-handle")
             .semantics { contentDescription = "下拉关闭" }, contentAlignment = Alignment.Center) {
@@ -396,7 +396,7 @@ internal fun NativeDetailsSheet(title: String, onDismiss: () -> Unit, content: @
         Button(onClick = { scope.launch { sheet.hide(); onDismiss() } },
             modifier = Modifier.sheetReveal12(1).padding(horizontal = 24.dp, vertical = 16.dp).fillMaxWidth().heightIn(min = 52.dp)
                 .testTag("sheet-confirm"), shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB), contentColor = Color.White)) {
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF12806F), contentColor = Color.White)) {
             Text("确定", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         }
     }

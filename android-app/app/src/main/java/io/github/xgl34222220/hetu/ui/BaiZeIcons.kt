@@ -88,8 +88,5 @@ internal fun baiZeLineIcon(icon: ImageVector): ImageVector = hetuLucideIcon(icon
 
 @Composable
 internal fun BaiZeIconTile(icon: ImageVector, modifier: Modifier = Modifier) {
-    val accent = MaterialTheme.colorScheme.primary
-    Surface(modifier.size(40.dp), shape = RoundedCornerShape(12.dp), color = accent.copy(alpha = .07f)) {
-        Box(contentAlignment = Alignment.Center) { Icon(baiZeLineIcon(icon), null, Modifier.size(24.dp), tint = accent) }
-    }
+    HetuLineIcon(icon, modifier = modifier, boxSize = 40.dp)
 }

@@ -254,7 +254,7 @@ internal fun PanelGroupCard13(group: ProxyGroupUi, current: String, delays: Map<
 private fun PanelNotice13(text: String, failed: Boolean, tag: String, onClick: () -> Unit) {
     val t = LocalHetuTokens.current
     if (text.isNotBlank()) Text(text, Modifier.padding(horizontal = 16.dp, vertical = 4.dp).fillMaxWidth()
-        .clip(HomeContinuousShape(14.dp)).background((if (failed) t.danger else Color(0xFF2563EB)).copy(alpha = .07f))
+        .clip(HomeContinuousShape(14.dp)).background((if (failed) t.danger else Color(0xFF12806F)).copy(alpha = .07f))
         .testTag(tag).nativePress(label = "查看完整反馈", onClick = onClick).padding(12.dp)
         .semantics { liveRegion = LiveRegionMode.Polite }, color = if (failed) t.danger else t.textPrimary,
         fontSize = 12.sp, lineHeight = 18.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
