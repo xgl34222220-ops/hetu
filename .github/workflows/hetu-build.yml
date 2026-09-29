@@ -132,16 +132,31 @@ jobs:
           echo "V20.17 secondary polish applied"
           git diff --stat
 
-      - name: Export effective V20.17 source
+      - name: Apply V20.18 strategy card polish
         run: |
           set -euo pipefail
-          tar -czf /tmp/Hetu-V20.17-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
-          sha256sum /tmp/Hetu-V20.17-effective-source.tar.gz
+          cat updates/v2018-strategy/p00.b64 | base64 -d > /tmp/v2018.patch.xz
+          echo '5c6b7d7e709cb21eb034b3acfe9eda635a37d02af1692c8e13f91d7d05a14466  /tmp/v2018.patch.xz' | sha256sum -c -
+          xz -dc /tmp/v2018.patch.xz > /tmp/v2018.patch
+          git apply --check /tmp/v2018.patch
+          git apply /tmp/v2018.patch
+          grep -q 'versionCode = 2018' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.6.8-v20"' android-app/app/build.gradle.kts
+          grep -q 'internal fun BoxProxyGroupCard17' android-app/app/src/main/java/io/github/xgl34222220/hetu/BoxProxyExactPanel17.kt
+          grep -q 'modifier = Modifier.weight(1f).aspectRatio(groupRatio)' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ProxiesScreen.kt
+          echo "V20.18 strategy card polish applied"
+          git diff --stat
+
+      - name: Export effective V20.18 source
+        run: |
+          set -euo pipefail
+          tar -czf /tmp/Hetu-V20.18-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+          sha256sum /tmp/Hetu-V20.18-effective-source.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.17-effective-source
-          path: /tmp/Hetu-V20.17-effective-source.tar.gz
+          name: Hetu-V20.18-effective-source
+          path: /tmp/Hetu-V20.18-effective-source.tar.gz
           compression-level: 0
           if-no-files-found: error
 
