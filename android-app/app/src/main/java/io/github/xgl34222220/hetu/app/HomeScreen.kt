@@ -461,27 +461,49 @@ private fun PowerButton(running: Boolean, busy: Boolean, onClick: () -> Unit) {
     val c = Hx.colors
     val haptics = rememberHetuHaptics()
     val source = remember { MutableInteractionSource() }
-    val bg by animateColorAsState(if (running) c.badSoft else c.accent, tween(HxMotion.Medium), label = "powerBg")
-    val fg by animateColorAsState(if (running) c.bad else c.onAccent, tween(HxMotion.Medium), label = "powerFg")
-    Box(Modifier.size(108.dp), contentAlignment = Alignment.Center) {
-    HxPowerRing(busy = busy, breathing = running, color = if (running) c.good else c.accent, modifier = Modifier.matchParentSize())
+    val bg by animateColorAsState(
+        if (running) c.text else c.accent,
+        spring(stiffness = Spring.StiffnessMediumLow),
+        label = "power-bg",
+    )
+    val fg by animateColorAsState(
+        if (running) c.canvas else c.onAccent,
+        spring(stiffness = Spring.StiffnessMediumLow),
+        label = "power-fg",
+    )
+    val scale by animateFloatAsState(
+        if (busy) .94f else 1f,
+        spring(dampingRatio = .78f, stiffness = Spring.StiffnessMediumLow),
+        label = "power-scale",
+    )
+
     Box(
         Modifier
-            .size(86.dp)
-            .hxPressScale(source, .92f)
+            .size(84.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .hxPressScale(source, .94f)
             .clip(CircleShape)
             .background(bg)
-            .clickable(interactionSource = source, indication = androidx.compose.foundation.LocalIndication.current, enabled = !busy, onClick = { haptics.perform(HetuHaptic.Confirm); onClick() }),
+            .clickable(
+                interactionSource = source,
+                indication = androidx.compose.foundation.LocalIndication.current,
+                enabled = !busy,
+            ) {
+                haptics.perform(HetuHaptic.Confirm)
+                onClick()
+            },
         contentAlignment = Alignment.Center,
     ) {
-        val iconScale by animateFloatAsState(if (busy) .78f else 1f, spring(dampingRatio = .5f, stiffness = Spring.StiffnessMediumLow), label = "powerIcon")
-        Icon(
-            Icons.Rounded.PowerSettingsNew,
-            contentDescription = if (running) "停止代理" else "启动代理",
-            tint = fg,
-            modifier = Modifier.size(34.dp).graphicsLayer { scaleX = iconScale; scaleY = iconScale; alpha = if (busy) .7f else 1f },
-        )
-    }
+        if (busy) {
+            HxSpinner(22.dp, fg)
+        } else {
+            Icon(
+                Icons.Rounded.PowerSettingsNew,
+                contentDescription = if (running) "停止代理" else "启动代理",
+                tint = fg,
+                modifier = Modifier.size(31.dp),
+            )
+        }
     }
 }
 

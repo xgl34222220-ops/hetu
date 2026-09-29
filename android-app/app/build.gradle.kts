@@ -16,8 +16,8 @@ android {
         applicationId = "io.github.xgl34222220.hetu"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2005
-        versionName = "0.5.5-v20"
+        versionCode = 2006
+        versionName = "0.5.6-v20"
     }
 
     // Explicit CI debug identity. No private key is committed or exported.
