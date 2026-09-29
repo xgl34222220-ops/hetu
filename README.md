@@ -2,6 +2,10 @@
 
 河图是一个 Root Android 网络管理 App，负责 Mihomo 核心部署、透明代理、规则、订阅、去广告串联和运行状态管理。
 
+## 界面（V20）
+
+单一 `HetuActivity` + Compose 导航，界面代码位于 `android-app/app/src/main/java/io/github/xgl34222220/hetu/app/`，设计令牌见 `HxTheme.kt`，变更说明见 [CHANGELOG-V20.md](CHANGELOG-V20.md)。CI：`.github/workflows/hetu-build.yml`。
+
 ## 当前架构
 
 - Android 包名：`io.github.xgl34222220.hetu`

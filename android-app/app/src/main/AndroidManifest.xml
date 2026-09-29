@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
-    <uses-sdk tools:overrideLibrary="top.yukonga.miuix.kmp.blur" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
@@ -14,32 +13,15 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <application android:label="河图" android:theme="@style/AppTheme" android:icon="@drawable/ic_hetu_official" android:roundIcon="@drawable/ic_hetu_official" android:allowBackup="false" android:supportsRtl="true" android:usesCleartextTraffic="false" android:networkSecurityConfig="@xml/network_security_config" android:hardwareAccelerated="true" android:enableOnBackInvokedCallback="true">
         <service android:name=".UpdateJobService" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="true" />
-        <activity android:name=".CompactMainActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
-        <activity android:name=".ThemeSettingsActivity" android:label="主题与界面" android:exported="false"  android:launchMode="singleTop" />
-        <activity android:name=".HetuMainActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
-        <activity android:name=".ReferenceProxyActivity" android:label="河图" android:exported="true" android:launchMode="singleTop" />
-        <activity android:name=".ProxyTilePreferencesActivity" android:label="河图快捷磁贴" android:exported="false" android:launchMode="singleTop" />
         <activity
-            android:name=".ProxySelectorSheetActivity"
-            android:label="河图策略"
+            android:name=".HetuActivity"
+            android:label="河图"
             android:exported="false"
-            android:excludeFromRecents="true"
-            android:launchMode="singleInstance"
-            android:resizeableActivity="true"
-            android:theme="@style/HetuTranslucentPopupTheme"
-            android:windowSoftInputMode="adjustResize" />
-        <activity
-            android:name=".PanelSheetActivity"
-            android:label="河图面板"
-            android:exported="false"
-            android:excludeFromRecents="true"
-            android:launchMode="singleInstance"
-            android:resizeableActivity="true"
-            android:theme="@style/HetuTranslucentPopupTheme"
+            android:launchMode="singleTop"
             android:windowSoftInputMode="adjustResize" />
         <activity-alias
             android:name=".LauncherOfficial"
-            android:targetActivity=".ReferenceProxyActivity"
+            android:targetActivity=".HetuActivity"
             android:enabled="true"
             android:exported="true"
             android:icon="@drawable/ic_hetu_official"
@@ -51,7 +33,7 @@
         </activity-alias>
         <activity-alias
             android:name=".LauncherClassic"
-            android:targetActivity=".ReferenceProxyActivity"
+            android:targetActivity=".HetuActivity"
             android:enabled="false"
             android:exported="true"
             android:icon="@drawable/ic_hetu"
@@ -61,6 +43,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity-alias>
+        <activity android:name=".ProxyTilePreferencesActivity" android:label="河图快捷磁贴" android:exported="false" android:launchMode="singleTop" />
         <activity-alias
             android:name=".TilePreferencesOfficial"
             android:targetActivity=".ProxyTilePreferencesActivity"
@@ -74,61 +57,6 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity-alias>
-        <activity-alias
-            android:name=".TilePreferencesClassic"
-            android:targetActivity=".ProxyTilePreferencesActivity"
-            android:enabled="false"
-            android:exported="true"
-            android:icon="@drawable/ic_hetu"
-            android:label="河图代理"
-            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
-            <intent-filter>
-                <action android:name="android.service.quicksettings.action.QS_TILE_PREFERENCES" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-        </activity-alias>
-        <activity android:name=".ReferenceFileManagerActivity" android:label="文件管理" android:exported="false"  android:launchMode="singleTop" />
-        <activity android:name=".ProxyLogViewerActivity" android:label="日志查看" android:exported="false" android:launchMode="singleTop" />
-        <activity android:name=".ProxyScriptsActivity" android:label="脚本" android:exported="false" android:launchMode="singleTop" />
-        <activity android:name=".ProxyLocalWebUiActivity" android:label="河图 WebUI" android:exported="false" android:launchMode="singleTop" />
-        <activity android:name=".ProxyCoreActivity" android:label="内核管理" android:exported="false"  android:launchMode="singleTop" />
-        <activity android:name=".ProxySubscriptionActivity" android:label="订阅与配置" android:exported="false" android:windowSoftInputMode="adjustResize"  android:launchMode="singleTop" />
-        <activity android:name=".ProxyLatencyTargetsActivity" android:label="延迟目标" android:exported="false" android:launchMode="singleTop" />
-        <activity android:name=".ProxySubStoreActivity" android:label="Sub-Store" android:exported="false" android:launchMode="singleTop" />
-        <activity android:name=".ProxySubStoreWebActivity" android:label="Sub-Store 面板" android:exported="false" android:launchMode="singleTop" />
-        <activity android:name=".ProxyPolicyIconsActivity" android:label="策略图标" android:exported="false" android:launchMode="singleTop" />
-        <activity android:name=".ProxySelectorPreferencesActivity" android:label="策略显示" android:exported="false" android:launchMode="singleTop" />
-        <activity android:name=".ProxyWebPanelsActivity" android:label="Web 面板" android:exported="false" android:launchMode="singleTop" />
-        <activity android:name=".ProxyWebPanelViewerActivity" android:label="Web 面板" android:exported="false" android:launchMode="singleTop" />
-        <activity android:name=".ProxyStartupConfigActivity" android:label="启动配置" android:exported="false" android:launchMode="singleTop" />
-        <activity android:name=".ProxyNotificationSettingsActivity" android:label="通知设置" android:exported="false" android:launchMode="singleTop" />
-        <activity android:name=".RuntimeFileEditorActivity" android:label="运行文件编辑" android:exported="false" android:windowSoftInputMode="adjustResize" />
-        <activity android:name=".ProxyAboutActivity" android:label="关于河图" android:exported="false" android:launchMode="singleTop" />
-        <activity android:name=".ProxyAboutLibrariesActivity" android:label="开源库" android:exported="false" android:launchMode="singleTop" />
-        <activity android:name=".ProxyAboutLibraryDetailActivity" android:label="开源库详情" android:exported="false" />
-        <activity android:name=".ProxyAboutSponsorshipActivity" android:label="赞助与支持" android:exported="false" />
-        <activity android:name=".ProxyCoreImportActivity" android:label="导入核心" android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="content" android:mimeType="application/octet-stream" />
-                <data android:scheme="content" android:mimeType="application/x-executable" />
-                <data android:scheme="content" android:mimeType="application/zip" />
-                <data android:scheme="content" android:mimeType="application/gzip" />
-                <data android:scheme="content" android:mimeType="application/x-gzip" />
-            </intent-filter>
-        </activity>
-        <activity android:name=".ProxyRuntimeCoreSettingsActivity" android:label="运行核心" android:exported="false"  android:launchMode="singleTop" />
-        <activity android:name=".ProxySharedNetworkSettingsActivity" android:label="共享网络" android:exported="false"  android:launchMode="singleTop" />
-        <activity android:name=".ProxyCnIpSettingsActivity" android:label="CNIP 设置" android:exported="false"  android:launchMode="singleTop" />
-        <activity android:name=".ProxyBypassRulesActivity" android:label="绕过规则" android:exported="false"  android:launchMode="singleTop" />
-        <activity android:name=".ProxyAdvancedSettingsActivity" android:label="高级代理配置" android:exported="false"  android:launchMode="singleTop" />
-        <activity android:name=".ProxyNetworkAutomationActivity" android:label="网络匹配" android:exported="false"  android:launchMode="singleTop" />
-        <activity android:name=".ProxyAppSelectionActivity" android:label="代理应用名单" android:exported="false"  android:launchMode="singleTop" />
-        <activity android:name=".ProxyAdblockChainActivity" android:label="代理广告过滤" android:exported="false"  android:launchMode="singleTop" />
-        <activity android:name=".RootTproxyActivity" android:label="基础代理配置（旧）" android:exported="false" />
-        <activity android:name=".ProxyNetworkMatchActivity" android:label="网络匹配" android:exported="false" />
         <service android:name=".ProxyNetworkMatchService" android:exported="false" android:foregroundServiceType="specialUse">
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="Root proxy default-network continuity and optional environment matching" />
         </service>
@@ -159,6 +87,5 @@
             <meta-data android:name="android.net.VpnService.SUPPORTS_ALWAYS_ON" android:value="false" />
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User initiated local Mihomo proxy and domain filtering VPN" />
         </service>
-    <activity android:name=".Runtime146FeaturesActivity" android:exported="false" />
     </application>
 </manifest>

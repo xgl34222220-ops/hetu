@@ -16,8 +16,8 @@ android {
         applicationId = "io.github.xgl34222220.hetu"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1920
-        versionName = "0.4.0-ui92-r146.19.2-liquid"
+        versionCode = 2000
+        versionName = "0.5.0-v20"
     }
 
     // Explicit CI debug identity. No private key is committed or exported.
@@ -77,28 +77,18 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.10.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
     implementation("androidx.compose.foundation:foundation")
-    implementation("androidx.graphics:graphics-shapes:1.0.1")
     implementation("androidx.compose.material3:material3") { version { strictly("1.5.0-alpha22") } }
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     debugImplementation("androidx.compose.ui:ui-tooling")
-    implementation("com.materialkolor:material-kolor:2.0.0")
-    implementation("dev.chrisbanes.haze:haze:1.6.10")
-    implementation("dev.chrisbanes.haze:haze-materials:1.6.10")
-    implementation("top.yukonga.miuix.kmp:miuix-ui-android:0.9.4")
-    implementation("top.yukonga.miuix.kmp:miuix-preference-android:0.9.4")
-    implementation("top.yukonga.miuix.kmp:miuix-icons-android:0.9.4")
-    implementation("top.yukonga.miuix.kmp:miuix-blur-android:0.9.4")
-    implementation("top.yukonga.miuix.kmp:miuix-squircle-android:0.9.4")
     implementation(platform("io.github.rosemoe:editor-bom:0.24.6"))
     implementation("io.github.rosemoe:editor")
 }
 
-// Presentation-only: safe YAML icon projection, SVG decoding, rendered regression tests.
+// YAML parsing (runtime compatibility, group icons) and SVG group-icon decoding.
 dependencies {
     implementation("org.yaml:snakeyaml:2.3")
-    implementation("com.networknt:json-schema-validator:1.5.9")
     implementation("com.caverock:androidsvg-aar:1.4")
     testImplementation(platform("androidx.compose:compose-bom:2026.03.00"))
     testImplementation("junit:junit:4.13.2")

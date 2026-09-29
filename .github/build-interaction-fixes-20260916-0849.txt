@@ -1,1 +1,0 @@
-Trigger quick APK build after restoring the pre-RuntimeShader dock renderer.

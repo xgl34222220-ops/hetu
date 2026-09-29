@@ -1,1 +1,0 @@
-BoxProxy UI/UX artifact smoke trigger

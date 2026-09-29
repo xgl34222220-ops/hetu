@@ -20,6 +20,30 @@ final class MihomoStartupConfig {
     static final String CNIP_V6_PATH="./ruleset/hetu-cn-v6.txt";
     static final String ADBLOCK_PATH=ProxyAdblockRules.PROVIDER_PATH;
 
+    static final String ADBLOCK_SNIFFER=
+            "sniffer:\n"+
+            "  enable: true\n"+
+            "  force-dns-mapping: true\n"+
+            "  parse-pure-ip: true\n"+
+            "  override-destination: false\n"+
+            "  sniff:\n"+
+            "    HTTP:\n"+
+            "      ports: [80, 8080-8880]\n"+
+            "    TLS:\n"+
+            "      ports: [443, 8443]\n"+
+            "    QUIC:\n"+
+            "      ports: [443, 8443]\n";
+
+    static boolean hasTopLevelKey(String yaml,String key){
+        if(yaml==null)return false;
+        Pattern p=Pattern.compile("^"+Pattern.quote(key)+"\\s*:");
+        for(String line:yaml.split("\n",-1)){
+            if(line.isEmpty()||line.charAt(0)==' '||line.charAt(0)=='\t'||line.charAt(0)=='#')continue;
+            if(p.matcher(line).find())return true;
+        }
+        return false;
+    }
+
     static final class Result {
         final String yaml;
         final int tproxyPort,redirectPort;
@@ -162,6 +186,11 @@ final class MihomoStartupConfig {
         // the Root controller exempts the root-owned Mihomo process from OUTPUT interception.
         override.append("find-process-mode: strict\n");
         if(profile.adblockChain) override.append("log-level: info\n");
+        // Domain rule-sets only match flows whose hostname is known. Apps that resolve
+        // through their own DoH/DoT, cached answers or hard-coded IPs reach Mihomo as bare
+        // IPs and silently bypass the ad-block RULE-SET. Recover the hostname from TLS SNI,
+        // HTTP Host and QUIC so REJECT can match; destinations are never rewritten.
+        if(profile.adblockChain&&!hasTopLevelKey(yaml,"sniffer")) override.append(ADBLOCK_SNIFFER);
         override.append("external-controller: 127.0.0.1:").append(controllerPort).append('\n');
         override.append("listeners:\n");
         override.append("  - name: hetu-egress-probe\n");

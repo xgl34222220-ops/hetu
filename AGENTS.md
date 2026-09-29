@@ -1,3 +1,7 @@
+## 当前交付：V20 整体重构（以此为准）
+
+用户要求“按你的审美完全重构，包括功能”。V20 用单一 `HetuActivity` + `app/` 下的新 Compose 界面取代全部旧 UI；旧 UI 文件、UI 回归测试、旧迁移脚本与工作流已删除，下文 UI10–UI15 的界面约束全部作废，只保留运行层/签名相关事实。后端（Root、Mihomo、规则、DNS VPN、服务）未改，除：`MihomoStartupConfig` 在广告过滤开启且源配置无 sniffer 时注入嗅探。构建用 `.github/workflows/hetu-build.yml`。详情 `CHANGELOG-V20.md`。
+
 ## 当前已交付：UI15
 
 0.4.0-ui92-r146.15/1016，针对用户提供的启动诊断修复UI14集合别名50次上限误拦；已在哈希完全匹配的私有原配置复现旧错误及改后配置生成。界面、Root脚本、核心与依赖不改，不能重放旧UI方案；也不声称微信延迟已修复。详情docs/UI92_RUNTIME146_UI15.md。Actions 36456797711，277项通过。同UI10至UI14签名，缺失时失败关闭。
