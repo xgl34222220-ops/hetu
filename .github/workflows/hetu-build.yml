@@ -327,16 +327,31 @@ jobs:
           echo "V20.27 clean panel header applied"
           git diff --stat
 
-      - name: Export effective V20.27 source
+      - name: Apply V20.28 panel tabs refine
         run: |
           set -euo pipefail
-          tar -czf /tmp/Hetu-V20.27-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
-          sha256sum /tmp/Hetu-V20.27-effective-source.tar.gz
+          cat updates/v2028-panel-tabs/p00.b64 | base64 -d > /tmp/v2028.patch.xz
+          echo '2dceca3b071b9aa54a51f87f2a4d2ee6de9c359f7e2454f281278eade85e5eba  /tmp/v2028.patch.xz' | sha256sum -c -
+          xz -dc /tmp/v2028.patch.xz > /tmp/v2028.patch
+          git apply -p1 --check /tmp/v2028.patch
+          git apply -p1 /tmp/v2028.patch
+          grep -q 'versionCode = 2028' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.7.8-v20"' android-app/app/build.gradle.kts
+          grep -q 'val capsuleRadius = 13.dp' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuTabs.kt
+          grep -q 'Arrangement.spacedBy(7.dp)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuTabs.kt
+          echo "V20.28 panel tabs refine applied"
+          git diff --stat
+
+      - name: Export effective V20.28 source
+        run: |
+          set -euo pipefail
+          tar -czf /tmp/Hetu-V20.28-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+          sha256sum /tmp/Hetu-V20.28-effective-source.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.27-effective-source
-          path: /tmp/Hetu-V20.27-effective-source.tar.gz
+          name: Hetu-V20.28-effective-source
+          path: /tmp/Hetu-V20.28-effective-source.tar.gz
           compression-level: 0
           if-no-files-found: error
 
