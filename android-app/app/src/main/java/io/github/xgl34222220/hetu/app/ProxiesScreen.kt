@@ -451,17 +451,27 @@ private fun NodeTile(
             Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 13.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(Modifier.width(18.dp), contentAlignment = Alignment.CenterStart) {
-                AnimatedVisibility(
-                    visible = selected || pendingThis,
-                    enter = scaleIn(spring(dampingRatio = .55f, stiffness = Spring.StiffnessMediumLow), initialScale = .35f) +
-                        fadeIn(spring(stiffness = Spring.StiffnessMediumLow)),
-                    exit = scaleOut(spring(dampingRatio = .8f, stiffness = Spring.StiffnessMediumLow), targetScale = .45f) +
-                        fadeOut(spring(stiffness = Spring.StiffnessMediumLow)),
-                ) {
-                    if (pendingThis) HxSpinner(12.dp)
-                    else Box(Modifier.size(8.dp).clip(CircleShape).background(c.accent))
-                }
+            val indicatorVisible = selected || pendingThis
+            val indicatorScale by animateFloatAsState(
+                targetValue = if (indicatorVisible) 1f else 0f,
+                animationSpec = spring(dampingRatio = .72f, stiffness = Spring.StiffnessMediumLow),
+                label = "node-indicator-scale",
+            )
+            val indicatorAlpha by animateFloatAsState(
+                targetValue = if (indicatorVisible) 1f else 0f,
+                animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                label = "node-indicator-alpha",
+            )
+            Box(
+                Modifier.width(18.dp).graphicsLayer {
+                    scaleX = indicatorScale
+                    scaleY = indicatorScale
+                    alpha = indicatorAlpha
+                },
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                if (pendingThis) HxSpinner(12.dp)
+                else Box(Modifier.size(8.dp).clip(CircleShape).background(c.accent))
             }
             Spacer(Modifier.width(8.dp))
             Column(Modifier.weight(1f)) {
