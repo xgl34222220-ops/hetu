@@ -77,8 +77,9 @@ class NativeDockUi4Test {
         val bounds = all.indices.map { rule.onNodeWithTag("dock-tab-$it").fetchSemanticsNode().boundsInRoot }
         bounds.forEach { assertTrue(it.width >= 48f); assertTrue(it.height >= 48f) }
         bounds.zipWithNext().forEach { (a,b) -> assertTrue(a.right <= b.left) }
-        assertTrue(bounds.first().width > bounds.last().width)
-        rule.onNodeWithTag("dock-tab-0").assertHeightIsEqualTo(48.dp)
+        // V19: equal slots (icon + label everywhere); the glass lens marks selection.
+        assertEquals(bounds.first().width, bounds.last().width, 1f)
+        rule.onNodeWithTag("dock-tab-0").assertHeightIsEqualTo(52.dp)
     }
 
     @Test fun hiddenPanelPreferenceKeepsThreeUsableDestinations() {

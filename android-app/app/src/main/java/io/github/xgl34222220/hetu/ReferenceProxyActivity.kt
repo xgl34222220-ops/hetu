@@ -151,7 +151,7 @@ class ReferenceProxyActivity : ComponentActivity() {
 private enum class RefProxyPage { Home, Panel, Tools, Settings }
 private data class RefSubscriptionCache(val used: Long = 0L, val total: Long = 0L, val count: Int = 0)
 internal enum class RefPanelTab(val label: String) {
-    Groups("节点"), Overview("概览"), Subscriptions("订阅"), Connections("连接"), Rules("规则"), RuleSets("规则集")
+    Groups("节点"), Overview("概览"), Subscriptions("订阅"), Connections("连接"), Rules("规则"), RuleSets("规则集"), Logs("日志")
 }
 
 @Composable
@@ -800,6 +800,12 @@ private fun RefHome(
     val total = tracked.sumOf { it.total }.takeIf { it > 0L } ?: cachedSubscription.total
     val used = if (tracked.isNotEmpty()) tracked.sumOf { it.used } else cachedSubscription.used
     var webUiOpen by remember { mutableStateOf(false) }
+    var coreSheet by remember { mutableStateOf(false) }
+    var coreVersion by remember { mutableStateOf("") }
+    val versionRepo = remember { ProxyDashboardRepository(context) }
+    LaunchedEffect(coreSheet, state.running) {
+        if (coreSheet && state.running) coreVersion = versionRepo.coreVersion()
+    }
     CompactHomeDashboard(
         data = CompactHomeData(
             running = state.running, busy = operation.isNotBlank() || action != null, operation = action, refreshing = refreshing,
@@ -818,8 +824,26 @@ private fun RefHome(
         onSubscription = onSubscription, onConnections = onConnections, onSettings = onSettings,
         onDiagnostics = onDiagnostics,
         onAdblock = { context.startActivity(Intent(context, ProxyAdblockChainActivity::class.java)) },
+        onCoreDetails = { coreSheet = true },
     )
     if (webUiOpen) CompactHomeWebUiDialog { webUiOpen = false }
+    if (coreSheet) {
+        val rss = runtime.rssBytes.takeIf { it > 0L } ?: state.memoryBytes
+        CoreDetailsSheet19(
+            CoreDetails19(
+                pid = runtime.pid,
+                core = state.core,
+                version = coreVersion,
+                uptime = CompactHomeFormat.uptime(runtime.elapsedSeconds),
+                mode = state.mode,
+                config = state.config,
+                cpu = String.format(java.util.Locale.US, "%.1f%%", cpuPercent),
+                memory = if (rss > 0L) CompactHomeFormat.bytes(rss) else "—",
+                connections = (if (state.panelReady) state.connections.size else cachedConnections).toString(),
+                controller = "127.0.0.1:${state.controllerPort}",
+            ),
+        ) { coreSheet = false }
+    }
 }
 
 @Composable
@@ -986,6 +1010,13 @@ internal fun RefPanel(
     var capsuleText by remember { mutableStateOf("") }
     var capsuleError by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
+    // V19: logs tab + API configuration sheet.
+    val logInspector = remember { ProxyRuntimeInspector(context) }
+    var logEntries by remember { mutableStateOf<List<RefLogEntry>>(emptyList()) }
+    var logLoading by remember { mutableStateOf(false) }
+    var logMinLevel by rememberSaveable { mutableStateOf(RefLogLevel.Info) }
+    var logNewestFirst by rememberSaveable { mutableStateOf(true) }
+    var apiSheet by remember { mutableStateOf(false) }
     var searchOpen by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     var connectionView by rememberSaveable { mutableStateOf("active") }
@@ -1070,6 +1101,24 @@ internal fun RefPanel(
     val filteredRules = remember(rules, query) { rules.filter {
         query.isBlank() || it.type.contains(query.trim(), true) || it.payload.contains(query.trim(), true) || it.proxy.contains(query.trim(), true)
     } }
+    val visibleLogs = remember(logEntries, logMinLevel, logNewestFirst, query) {
+        val needle = query.trim()
+        logEntries.filter { it.level.rank >= logMinLevel.rank && (needle.isEmpty() || it.message.contains(needle, true)) }
+            .let { if (logNewestFirst) it.asReversed() else it }
+    }
+    suspend fun loadLogs() {
+        logLoading = true
+        try {
+            val text = logInspector.runtimeLog()
+            logEntries = refParseLogs19(text)
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (e: Exception) {
+            error = e.message ?: "日志读取失败"
+        } finally {
+            logLoading = false
+        }
+    }
     val filteredRuleSets = remember(ruleSets, query) { ruleSets.filter {
         query.isBlank() || it.name.contains(query.trim(), true) || it.behavior.contains(query.trim(), true)
     } }
@@ -1341,6 +1390,11 @@ internal fun RefPanel(
                         capsuleError = false
                         capsuleText = "连接状态已刷新"
                     }
+                    RefPanelTab.Logs -> {
+                        loadLogs()
+                        capsuleError = false
+                        capsuleText = "日志已刷新 · ${logEntries.size} 条"
+                    }
                 }
             } catch (cancel: CancellationException) {
                 throw cancel
@@ -1353,10 +1407,29 @@ internal fun RefPanel(
     }
 
     LaunchedEffect(tab, state.running) { loadTab() }
+    LaunchedEffect(tab) {
+        if (tab != RefPanelTab.Logs) return@LaunchedEffect
+        while (true) {
+            loadLogs()
+            delay(3000)
+        }
+    }
     LaunchedEffect(searchRequest) { if (searchRequest > 0) searchOpen = true }
 
     LaunchedEffect(tab) {
         if (tab != RefPanelTab.Groups) selectedGroupName = null
+    }
+    val panelList = androidx.compose.foundation.lazy.rememberLazyListState()
+    val accordionMotion = LocalHetuMotionEnabled.current
+    // Bring the tapped group's row to the top so its nodes open in view (reference behaviour).
+    LaunchedEffect(selectedGroupName) {
+        val name = selectedGroupName ?: return@LaunchedEffect
+        if (tab != RefPanelTab.Groups) return@LaunchedEffect
+        val row = filteredGroups.chunked(2).indexOfFirst { pair -> pair.any { it.name == name } }
+        if (row < 0) return@LaunchedEffect
+        val index = row + (if (error.isNotBlank()) 1 else 0)
+        if (index <= panelList.firstVisibleItemIndex && panelList.firstVisibleItemScrollOffset == 0) return@LaunchedEffect
+        if (accordionMotion) panelList.animateScrollToItem(index) else panelList.scrollToItem(index)
     }
     LaunchedEffect(tab, selectedGroupName) {
         onDetailVisibleChanged(tab == RefPanelTab.Groups && selectedGroupName != null)
@@ -1381,12 +1454,14 @@ internal fun RefPanel(
     LaunchedEffect(tab) {
         if (panelMotion) tabEnter19.animateTo(1f, HetuMotion.enter(true, durationMs = 260))
     }
-    Column(Modifier.fillMaxSize().background(panelCanvas19).padding(bottom = clearance13)
+    // V19: panel content scrolls UNDER the floating glass dock (reference behaviour);
+    // the dock clearance moves into the list's content padding instead of clipping it.
+    Column(Modifier.fillMaxSize().background(panelCanvas19)
         .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))) {
         RefPanelGlassHeader(selected = tab, onSelect = onSelectedTabChange,
             searchOpen = searchOpen, query = query, onQueryChange = { query = it },
             onSearchToggle = { searchOpen = !searchOpen; if (!searchOpen) query = "" },
-            onOpenSettings = onOpenSettings, hazeState = hazeState, backdrop = backdrop)
+            onOpenSettings = { apiSheet = true }, hazeState = hazeState, backdrop = backdrop)
         Box(Modifier.weight(1f).fillMaxWidth().clipToBounds()) {
             HetuRefreshBox(
                 isRefreshing = refreshing,
@@ -1398,32 +1473,86 @@ internal fun RefPanel(
                     else translationX = tabTravel19 * (1f - p) * 22.dp.toPx()
                 },
             ) {
-                LazyColumn(Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 8.dp, top = 7.dp, end = 8.dp, bottom = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                LazyColumn(Modifier.fillMaxSize(), state = panelList,
+                    contentPadding = PaddingValues(start = 12.dp, top = 8.dp, end = 12.dp, bottom = clearance13 + 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (error.isNotBlank()) item { RefNotice(error) }
-            if (!state.running) {
+            if (!state.running && tab != RefPanelTab.Logs) {
                 item { RefEmptyState("代理未运行", "启动代理后，在这里查看节点、应用连接和分流规则。", Icons.Rounded.PowerSettingsNew) }
             } else when (tab) {
-                RefPanelTab.Groups -> {
-                    item(key = "video-strategy-plane", contentType = "video-strategy-plane") {
-                        RefVideoStrategyPlane19(
-                            groups = filteredGroups,
-                            selectedGroupName = selectedGroupName,
-                            selectedNode = { group -> selectedLocal[group.name] ?: group.now },
-                            delays = delays,
-                            testing = testing,
-                            onGroup = { group ->
-                                selectedGroupName = group.name
-                                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                            },
-                            onCollapse = {
-                                selectedGroupName = null
-                                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                            },
-                            onNode = ::selectNode19,
-                            onDelay = ::measureOneNode19,
+                RefPanelTab.Logs -> {
+                    item(key = "logs-controls", contentType = "logs-controls") {
+                        RefLogControls19(
+                            minLevel = logMinLevel,
+                            newestFirst = logNewestFirst,
+                            shown = visibleLogs.size,
+                            total = logEntries.size,
+                            loading = logLoading,
+                            onLevel = { logMinLevel = it },
+                            onToggleOrder = { logNewestFirst = !logNewestFirst },
                         )
+                    }
+                    if (visibleLogs.isEmpty() && !logLoading) item(key = "logs-empty") {
+                        RefEmptyState(
+                            if (logEntries.isEmpty()) "暂无日志" else "没有符合条件的日志",
+                            if (logEntries.isEmpty()) "启动代理后，运行记录会显示在这里。" else "调低等级或清除搜索词后再试。",
+                            Icons.Rounded.Article,
+                        )
+                    }
+                    items(visibleLogs, key = { "log-${it.index}" }, contentType = { "log-line" }) { entry ->
+                        Box(hetuAnimateItem(panelMotion)) { RefLogRow19(entry) }
+                    }
+                }
+                RefPanelTab.Groups -> {
+                    // V19.2: reference accordion. Each row of two groups is its own lazy item;
+                    // the tapped group's nodes are inserted directly BELOW its row, the other
+                    // groups stay in place and glide down/up (item placement animation), and the
+                    // list scrolls the tapped row to the top. No more pinned "first two groups"
+                    // plus a whole-plane crossfade.
+                    if (filteredGroups.isEmpty()) item(key = "groups-empty") {
+                        RefEmptyState("没有匹配的节点", "试试其他节点或策略组名称。", Icons.Rounded.Search)
+                    }
+                    filteredGroups.chunked(2).forEach { pair ->
+                        item(key = "group-row-" + pair.joinToString("|") { it.name }, contentType = "group-row") {
+                            Box(hetuAnimateItem(panelMotion)) {
+                                RefVideoGroupRow19(
+                                    pair = pair,
+                                    activeName = selectedGroupName,
+                                    selectedNode = { group -> selectedLocal[group.name] ?: group.now },
+                                    delays = delays,
+                                    testing = testing,
+                                    onGroup = { group ->
+                                        if (selectedGroupName == group.name) {
+                                            selectedGroupName = null
+                                            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                        } else {
+                                            selectedGroupName = group.name
+                                            view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                                        }
+                                    },
+                                    onDelay = ::measureOneNode19,
+                                )
+                            }
+                        }
+                        val open = pair.firstOrNull { it.name == selectedGroupName }
+                        if (open != null) item(key = "group-nodes-" + open.name, contentType = "group-nodes") {
+                            Box(
+                                if (panelMotion) Modifier.animateItem(
+                                    fadeInSpec = tween(200, easing = HetuMotion.Standard),
+                                    placementSpec = spring(dampingRatio = .9f, stiffness = 420f),
+                                    fadeOutSpec = tween(140, easing = HetuMotion.Standard),
+                                ) else Modifier,
+                            ) {
+                                RefVideoNodeGrid19(
+                                    group = open,
+                                    selected = selectedLocal[open.name] ?: open.now,
+                                    delays = delays,
+                                    testing = testing,
+                                    onNode = { node -> selectNode19(open, node) },
+                                    onDelay = ::measureOneNode19,
+                                )
+                            }
+                        }
                     }
                 }
                 RefPanelTab.Overview -> item(key = "${tab.name}-traffic-overview", contentType = "traffic-overview") { RefTrafficOverview(state, rules.size, providers) }
@@ -1556,7 +1685,7 @@ internal fun RefPanel(
                             selectedGroupName = null
                             view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                         },
-                        modifier = Modifier.align(Alignment.BottomEnd).padding(end = 12.dp, bottom = 12.dp),
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(end = 14.dp, bottom = clearance13 + 12.dp),
                     )
                 }
             }
@@ -1575,6 +1704,16 @@ internal fun RefPanel(
     }
 
 
+    }
+
+    if (apiSheet) {
+        RefApiConfigSheet19(
+            repo = repo,
+            controllerPort = state.controllerPort,
+            running = state.running,
+            onMessage = { text, failed -> capsuleError = failed; capsuleText = text },
+            onDismiss = { apiSheet = false },
+        )
     }
 
     if (confirmCloseAll) {
@@ -1648,11 +1787,11 @@ private fun RefVideoStrategyPlane19(
             if (groups.isEmpty()) {
                 RefEmptyState("没有匹配的节点", "试试其他节点或策略组名称。", Icons.Rounded.Search)
             } else {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     groups.chunked(2).forEach { pair ->
                         Row(
                             Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
                             pair.forEach { group ->
                                 val selected = selectedNode(group)
@@ -1731,6 +1870,82 @@ private fun RefVideoStrategyPlane19(
 }
 
 @Composable
+private fun RefVideoGroupRow19(
+    pair: List<ProxyGroupUi>,
+    activeName: String?,
+    selectedNode: (ProxyGroupUi) -> String,
+    delays: Map<String, Long>,
+    testing: Map<String, Boolean>,
+    onGroup: (ProxyGroupUi) -> Unit,
+    onDelay: (String) -> Unit,
+) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        pair.forEach { group ->
+            val selected = selectedNode(group)
+            RefVideoGroupCard19(
+                group = group,
+                selected = selected,
+                delay = delays[selected] ?: group.nodes.firstOrNull { it.name == selected }?.lastDelay,
+                testing = selected.isNotBlank() && testing[selected] == true,
+                active = group.name == activeName,
+                modifier = Modifier.weight(1f),
+                onClick = { onGroup(group) },
+                onDelay = { if (selected.isNotBlank()) onDelay(selected) },
+            )
+        }
+        if (pair.size == 1) Spacer(Modifier.weight(1f))
+    }
+}
+
+/** The opened group's nodes sit in a soft recessed well directly under their group row. */
+@Composable
+private fun RefVideoNodeGrid19(
+    group: ProxyGroupUi,
+    selected: String,
+    delays: Map<String, Long>,
+    testing: Map<String, Boolean>,
+    onNode: (String) -> Unit,
+    onDelay: (String) -> Unit,
+) {
+    val t = LocalHetuTokens.current
+    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp))
+            .background(if (dark) Color.White.copy(alpha = .04f) else Color(0xFF3B2E7E).copy(alpha = .045f))
+            .padding(8.dp)
+            .testTag("group-nodes-grid"),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(group.name, color = t.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1,
+                overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Text("${group.nodes.size} 个节点", color = t.textSecondary, fontSize = 12.sp)
+        }
+        if (group.nodes.isEmpty()) {
+            Text("该策略组没有可选节点", color = t.textSecondary, fontSize = 13.sp, modifier = Modifier.padding(12.dp))
+        }
+        group.nodes.withIndex().toList().chunked(2).forEach { pair ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                pair.forEach { indexed ->
+                    val node = indexed.value
+                    RefVideoNodeCard19(
+                        index = indexed.index,
+                        node = node,
+                        active = node.name == selected,
+                        delay = delays[node.name] ?: node.lastDelay,
+                        testing = testing[node.name] == true,
+                        modifier = Modifier.weight(1f),
+                        onSelect = { onNode(node.name) },
+                        onDelay = { onDelay(node.name) },
+                    )
+                }
+                if (pair.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
 private fun RefVideoGroupCard19(
     group: ProxyGroupUi,
     selected: String,
@@ -1745,13 +1960,13 @@ private fun RefVideoGroupCard19(
     val t = LocalHetuTokens.current
     val motion = LocalHetuMotionEnabled.current
     val interaction = remember(group.name) { MutableInteractionSource() }
-    val shape = RoundedCornerShape(14.dp)
+    val shape = RoundedCornerShape(18.dp)
     // V18.3: selection tints cross-fade instead of snapping.
     val bg by animateColorAsState(when {
         dark && active -> Color(0xFF172554)
         dark -> t.cardBackground
         active -> Color(0xFFF3F7FF)
-        else -> Color(0xFFF9F7FF)
+        else -> Color.White
     }, HetuMotion.fade(motion, HetuMotion.StandardMs), label = "videoGroupBg")
     val borderTint by animateColorAsState(
         if (active) Color(0xFF8CB7FF) else Color.White.copy(alpha = if (dark) .08f else .72f),
@@ -1759,7 +1974,7 @@ private fun RefVideoGroupCard19(
     )
     val tested = group.nodes.count { node -> ((delay.takeIf { node.name == selected } ?: node.lastDelay) ?: 0L) > 0L }
     Column(
-        modifier.height(70.dp)
+        modifier.height(86.dp)
             .hetuPressScale(interaction, pressedScale = .965f)
             .shadow(
                 if (active) 4.dp else 2.dp,
@@ -1773,7 +1988,7 @@ private fun RefVideoGroupCard19(
             .clip(shape)
             .hetuPressHighlight(interaction, if (dark) Color.White.copy(alpha = .05f) else Color(0xFF3B2E7E).copy(alpha = .04f))
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 7.dp),
+            .padding(horizontal = 13.dp, vertical = 11.dp),
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
@@ -1781,36 +1996,36 @@ private fun RefVideoGroupCard19(
                 Text(
                     group.name,
                     color = t.textPrimary,
-                    fontSize = 12.5.sp,
-                    lineHeight = 14.sp,
+                    fontSize = 15.5.sp,
+                    lineHeight = 20.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     "${refGroupTypeCompact(group.type)}  $tested/${group.nodes.size}",
-                    color = Color(0xFF8D8AA0),
-                    fontSize = 9.sp,
-                    lineHeight = 11.sp,
+                    color = if (dark) t.textSecondary else Color(0xFF6E6A84),
+                    fontSize = 11.5.sp,
+                    lineHeight = 15.sp,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
                 )
             }
-            ConfiguredGroupIcon(group, Modifier.size(25.dp))
+            ConfiguredGroupIcon(group, Modifier.size(32.dp))
         }
 
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             val flag = refNodeFlag(selected)
             if (flag.isNotBlank()) {
-                Text(flag, fontSize = 10.5.sp)
+                Text(flag, fontSize = 13.sp)
                 Spacer(Modifier.width(3.dp))
             }
             Text(
                 selected.ifBlank { "未选择" },
                 modifier = Modifier.weight(1f),
                 color = if (dark) t.textSecondary else Color(0xFF454255),
-                fontSize = 10.sp,
-                lineHeight = 12.sp,
+                fontSize = 12.5.sp,
+                lineHeight = 16.sp,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -1847,14 +2062,14 @@ private fun RefVideoNodeCard19(
     val bg by animateColorAsState(when {
         dark && active -> Color(0xFF172554)
         dark -> Color(0xFF202635)
-        active -> Color(0xFFDCE9FF)
-        else -> Color(0xFFE7E6F3)
+        active -> Color(0xFFE3EDFF)
+        else -> Color.White
     }, HetuMotion.fade(motion, HetuMotion.StandardMs), label = "videoNodeBg")
     val borderTint by animateColorAsState(
         if (active) Color(0xFF5F96F7) else Color.White.copy(alpha = if (dark) .06f else .42f),
         HetuMotion.fade(motion, HetuMotion.StandardMs), label = "videoNodeBorder",
     )
-    Box(modifier.height(64.dp)) {
+    Box(modifier.height(74.dp)) {
     androidx.compose.animation.AnimatedVisibility(
         visible = visible,
         enter = androidx.compose.animation.fadeIn(tween(170, easing = HetuMotion.Standard)) +
@@ -1862,7 +2077,7 @@ private fun RefVideoNodeCard19(
                 animationSpec = spring(dampingRatio = .82f, stiffness = 470f),
             ) { it / 5 },
     ) {
-        val shape = RoundedCornerShape(11.dp)
+        val shape = RoundedCornerShape(16.dp)
         Column(
             Modifier.fillMaxSize()
                 .hetuPressScale(source, pressedScale = .97f)
@@ -1871,21 +2086,21 @@ private fun RefVideoNodeCard19(
                 .clip(shape)
                 .hetuPressHighlight(source, if (dark) Color.White.copy(alpha = .05f) else Color(0xFF1E3A8A).copy(alpha = .05f))
                 .clickable(interactionSource = source, indication = null, onClick = onSelect)
-                .padding(horizontal = 9.dp, vertical = 7.dp),
+                .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 val flag = refNodeFlag(node.name)
                 if (flag.isNotBlank()) {
-                    Text(flag, fontSize = 11.sp)
+                    Text(flag, fontSize = 13.sp)
                     Spacer(Modifier.width(3.dp))
                 }
                 Text(
                     node.name,
                     modifier = Modifier.weight(1f),
                     color = t.textPrimary,
-                    fontSize = 11.5.sp,
-                    lineHeight = 13.sp,
+                    fontSize = 14.sp,
+                    lineHeight = 18.sp,
                     fontWeight = if (active) FontWeight.ExtraBold else FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -1895,12 +2110,12 @@ private fun RefVideoNodeCard19(
                     val pop = remember { Animatable(if (motion) .4f else 1f) }
                     LaunchedEffect(Unit) { if (motion) pop.animateTo(1f, spring(dampingRatio = .55f, stiffness = 520f)) }
                     Box(
-                        Modifier.size(14.dp)
+                        Modifier.size(17.dp)
                             .graphicsLayer { scaleX = pop.value; scaleY = pop.value; alpha = (pop.value * 1.6f).coerceIn(0f, 1f) }
                             .background(Color(0xFF2474F3), CircleShape),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(Icons.Rounded.Check, "已选择", tint = Color.White, modifier = Modifier.size(9.dp))
+                        Icon(Icons.Rounded.Check, "已选择", tint = Color.White, modifier = Modifier.size(11.dp))
                     }
                 }
             }
@@ -1909,8 +2124,8 @@ private fun RefVideoNodeCard19(
                 Text(
                     refNodeProtocol(node),
                     color = if (active) Color(0xFF3C78DA) else Color(0xFF7D7990),
-                    fontSize = 9.sp,
-                    lineHeight = 10.sp,
+                    fontSize = 11.sp,
+                    lineHeight = 14.sp,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
                 )
@@ -1964,7 +2179,7 @@ private fun RefVideoDelayPill19(value: Long?, testing: Boolean, onClick: (() -> 
                     onClick = onClick,
                 ) else Modifier
             )
-            .padding(horizontal = 6.dp, vertical = 2.dp),
+            .padding(horizontal = 9.dp, vertical = 3.dp),
         contentAlignment = Alignment.Center,
     ) {
         androidx.compose.animation.AnimatedContent(
@@ -1985,8 +2200,8 @@ private fun RefVideoDelayPill19(value: Long?, testing: Boolean, onClick: (() -> 
                 shown,
                 modifier = Modifier.graphicsLayer { alpha = breathe },
                 color = fg,
-                fontSize = 9.sp,
-                lineHeight = 10.sp,
+                fontSize = 11.5.sp,
+                lineHeight = 14.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 style = LocalTextStyle.current.copy(fontFeatureSettings = "tnum"),
@@ -3891,8 +4106,12 @@ internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val stagger = rememberHetuStagger()
 
+    // V19: large title scrolls away; a compact centred title fades into the top bar.
+    val collapsingList = androidx.compose.foundation.lazy.rememberLazyListState()
+    Box(Modifier.fillMaxSize()) {
     LazyColumn(
-        Modifier.fillMaxSize().statusBarsPadding().background(if (dark) t.pageBackground else Color(0xFFF1F5F9)),
+        state = collapsingList,
+        modifier = Modifier.fillMaxSize().statusBarsPadding().background(if (dark) t.pageBackground else Color(0xFFF1F5F9)),
         contentPadding = PaddingValues(
             start = 16.dp,
             top = 8.dp,
@@ -3974,6 +4193,8 @@ internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
             }
         } }
     }
+    RefCollapsingTitleBar("工具", collapsingList)
+    }
 }
 
 @Composable
@@ -3992,8 +4213,12 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val stagger = rememberHetuStagger()
+    // V19: large title scrolls away; a compact centred title fades into the top bar.
+    val collapsingList = androidx.compose.foundation.lazy.rememberLazyListState()
+    Box(Modifier.fillMaxSize()) {
     LazyColumn(
-        Modifier.fillMaxSize().statusBarsPadding().background(if (dark) t.pageBackground else Color(0xFFF1F5F9)),
+        state = collapsingList,
+        modifier = Modifier.fillMaxSize().statusBarsPadding().background(if (dark) t.pageBackground else Color(0xFFF1F5F9)),
         contentPadding = PaddingValues(
             start = 16.dp,
             top = 8.dp,
@@ -4132,6 +4357,8 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
                 }
             }
         } }
+    }
+    RefCollapsingTitleBar("设置", collapsingList)
     }
 
     if (modePicker) {
@@ -4667,15 +4894,49 @@ private fun RefTopBar(title: String, onBack: () -> Unit, onRefresh: () -> Unit) 
     }
 }
 
+/**
+ * Compact title that appears once the page's large title has scrolled under the status bar.
+ * Draw-phase alpha/translation only; the bar never intercepts touches.
+ */
+@Composable
+internal fun RefCollapsingTitleBar(title: String, state: androidx.compose.foundation.lazy.LazyListState) {
+    val t = LocalHetuTokens.current
+    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
+    val threshold = with(LocalDensity.current) { 44.dp.toPx() }
+    val progress by remember(state, threshold) {
+        derivedStateOf {
+            if (state.firstVisibleItemIndex > 0) 1f
+            else (state.firstVisibleItemScrollOffset / threshold).coerceIn(0f, 1f)
+        }
+    }
+    val bar = if (dark) t.pageBackground else Color(0xFFF1F5F9)
+    Box(
+        Modifier.fillMaxWidth()
+            .graphicsLayer { alpha = progress }
+            .background(bar.copy(alpha = .94f))
+            .statusBarsPadding()
+            .height(48.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            title,
+            modifier = Modifier.graphicsLayer { translationY = (1f - progress) * 6.dp.toPx() },
+            color = t.textPrimary, fontSize = 17.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold,
+        )
+        HorizontalDivider(Modifier.align(Alignment.BottomCenter), thickness = .5.dp,
+            color = (if (dark) Color.White else Color(0xFF0F172A)).copy(alpha = .08f))
+    }
+}
+
 @Composable
 private fun RefTitleBar(title: String) {
     Text(
         title,
         color = LocalHetuTokens.current.textPrimary,
-        fontSize = 26.sp,
-        lineHeight = 32.sp,
+        fontSize = 32.sp,
+        lineHeight = 38.sp,
         fontWeight = FontWeight.Bold,
-        modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 6.dp),
     )
 }
 

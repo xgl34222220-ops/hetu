@@ -16,12 +16,20 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.animation.togetherWith
+import io.github.xgl34222220.hetu.ui.hetuPressHighlight
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -120,68 +128,111 @@ private fun ReferenceFileManagerScreen(onClose: () -> Unit) {
         }
     }
 
-    LazyColumn(
-        Modifier.fillMaxSize().background(t.pageBackground),
-        contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 92.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        item {
-            Row(
-                Modifier.fillMaxWidth().statusBarsPadding().heightIn(min = 56.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = ::goBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回") }
-                Text("文件管理", color = t.textPrimary, fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                IconButton(onClick = { refresh++ }) { Icon(Icons.Rounded.Refresh, "刷新") }
-            }
-        }
-        item {
-            val relative = path.removePrefix(REF_FILE_ROOT).trim('/')
-            Surface(shape = RoundedCornerShape(12.dp), color = t.selectionBackground) {
-                Text(
-                    if (relative.isBlank()) "hetu" else "hetu  ›  ${relative.replace("/", " › ")}",
-                    Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    color = t.textSecondary,
-                    style = MaterialTheme.typography.labelMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-        item {
-            Surface(shape = RoundedCornerShape(16.dp), color = t.cardBackground) {
-                Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp)) {
-                    if (items.isEmpty()) {
+    // V19: reference-style file manager. Large title that collapses into the bar, grouped
+    // outline rows with press highlight, directional slide between folders, system back
+    // walks up the tree, and previews open in the shared bottom sheet.
+    val haptics = io.github.xgl34222220.hetu.ui.rememberHetuHaptics()
+    val motion = io.github.xgl34222220.hetu.ui.LocalHetuMotionEnabled.current
+    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
+    val page = if (dark) t.pageBackground else Color(0xFFF1F5F9)
+    androidx.activity.compose.BackHandler(enabled = path != REF_FILE_ROOT) { goBack() }
+    Box(Modifier.fillMaxSize().background(page)) {
+        androidx.compose.animation.AnimatedContent(
+            targetState = path,
+            transitionSpec = {
+                val deeper = targetState.length > initialState.length
+                if (!motion) {
+                    androidx.compose.animation.EnterTransition.None togetherWith androidx.compose.animation.ExitTransition.None
+                } else {
+                    (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220)) +
+                        androidx.compose.animation.slideInHorizontally(androidx.compose.animation.core.tween(280,
+                            easing = io.github.xgl34222220.hetu.ui.HetuMotion.EmphasizedDecelerate)) { w -> if (deeper) w / 5 else -w / 5 }) togetherWith
+                        (androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(140)) +
+                            androidx.compose.animation.slideOutHorizontally(androidx.compose.animation.core.tween(200)) { w -> if (deeper) -w / 8 else w / 8 })
+                }
+            },
+            label = "file-manager-path",
+        ) { shownPath ->
+            val list = androidx.compose.foundation.lazy.rememberLazyListState()
+            val relative = shownPath.removePrefix(REF_FILE_ROOT).trim('/')
+            val folderTitle = if (relative.isBlank()) "文件管理" else relative.substringAfterLast('/')
+            Box(Modifier.fillMaxSize()) {
+                LazyColumn(
+                    state = list,
+                    modifier = Modifier.fillMaxSize().statusBarsPadding(),
+                    contentPadding = PaddingValues(start = 16.dp, top = 48.dp, end = 16.dp,
+                        bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 32.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    item(key = "title") {
+                        Text(folderTitle, color = t.textPrimary, fontSize = 32.sp, lineHeight = 38.sp,
+                            fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 4.dp))
+                    }
+                    item(key = "crumbs") {
                         Text(
-                            loadError.ifBlank { "此目录暂无运行文件" },
-                            Modifier.padding(vertical = 18.dp),
-                            color = if (loadError.isBlank()) t.textSecondary else MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall,
+                            if (relative.isBlank()) "/data/adb/hetu" else "hetu  ›  ${relative.replace("/", "  ›  ")}",
+                            color = t.textSecondary, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(start = 4.dp),
                         )
-                    } else {
-                        items.forEachIndexed { index, item ->
-                            Row(
-                                Modifier.fillMaxWidth().clickable {
-                                    if (item.directory) path = item.path
-                                    else {
-                                        previewTitle = item.name
-                                        previewText = "正在读取…"
+                    }
+                    item(key = "group") {
+                        Column(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp))
+                                .background(if (dark) t.cardBackground else Color.White),
+                        ) {
+                            if (shownPath != path || items.isEmpty()) {
+                                Text(
+                                    if (shownPath != path) "" else loadError.ifBlank { "此目录暂无运行文件" },
+                                    Modifier.padding(horizontal = 18.dp, vertical = 20.dp),
+                                    color = if (loadError.isBlank()) t.textSecondary else MaterialTheme.colorScheme.error,
+                                    fontSize = 14.sp,
+                                )
+                            } else {
+                                items.forEachIndexed { index, item ->
+                                    val source = remember(item.path) { MutableInteractionSource() }
+                                    Row(
+                                        Modifier.fillMaxWidth().heightIn(min = 56.dp)
+                                            .hetuPressHighlight(source, (if (dark) Color.White else Color(0xFF0F172A)).copy(alpha = .05f))
+                                            .clickable(interactionSource = source, indication = null) {
+                                                haptics.perform(io.github.xgl34222220.hetu.ui.HetuHaptic.Tap)
+                                                if (item.directory) path = item.path
+                                                else {
+                                                    previewTitle = item.name
+                                                    previewText = "正在读取…"
+                                                }
+                                            }
+                                            .padding(horizontal = 18.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Icon(if (item.directory) Icons.Outlined.Folder else Icons.Outlined.Description, null,
+                                            tint = t.textPrimary.copy(alpha = .78f), modifier = Modifier.size(22.dp))
+                                        Spacer(Modifier.width(16.dp))
+                                        Column(Modifier.weight(1f)) {
+                                            Text(item.name, color = t.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Medium,
+                                                maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            if (!item.directory) Text(refFileSize(item.size), color = t.textSecondary, fontSize = 12.sp)
+                                        }
+                                        if (item.directory) Icon(Icons.Rounded.ChevronRight, null, tint = t.textSecondary, modifier = Modifier.size(20.dp))
                                     }
-                                }.padding(vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(if (item.directory) Icons.Rounded.Folder else Icons.Rounded.Description, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                                Spacer(Modifier.width(11.dp))
-                                Column(Modifier.weight(1f)) {
-                                    Text(item.name, color = t.textPrimary, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    if (!item.directory) Text(refFileSize(item.size), color = t.textSecondary, style = MaterialTheme.typography.labelSmall)
+                                    if (index < items.lastIndex) HorizontalDivider(Modifier.padding(start = 56.dp), thickness = .5.dp, color = t.outline)
                                 }
-                                Icon(Icons.Rounded.ChevronRight, null, tint = t.textSecondary, modifier = Modifier.size(18.dp))
                             }
-                            if (index < items.lastIndex) HorizontalDivider(color = t.outline)
                         }
                     }
                 }
+                io.github.xgl34222220.hetu.RefCollapsingTitleBar(folderTitle, list)
+            }
+        }
+        // Top actions float above both the large title and the collapsed bar.
+        Row(
+            Modifier.fillMaxWidth().statusBarsPadding().height(48.dp).padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = ::goBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回", tint = t.textPrimary) }
+            Spacer(Modifier.weight(1f))
+            IconButton(onClick = { haptics.perform(io.github.xgl34222220.hetu.ui.HetuHaptic.Tick); refresh++ }) {
+                Icon(Icons.Rounded.Refresh, "刷新", tint = t.textPrimary)
             }
         }
     }
@@ -191,17 +242,12 @@ private fun ReferenceFileManagerScreen(onClose: () -> Unit) {
             val item = items.firstOrNull { it.name == title }
             if (item != null) previewText = readTextFile(context, item.path)
         }
-        AlertDialog(
-            onDismissRequest = { previewTitle = null },
-            shape = RoundedCornerShape(22.dp),
-            title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-            text = {
-                Box(Modifier.fillMaxWidth().heightIn(max = 500.dp).verticalScroll(rememberScrollState())) {
-                    Text(previewText, style = MaterialTheme.typography.bodySmall)
-                }
-            },
-            confirmButton = { TextButton(onClick = { previewTitle = null }) { Text("关闭") } },
-        )
+        NativeDetailsSheet(title, { previewTitle = null }) {
+            androidx.compose.foundation.text.selection.SelectionContainer {
+                Text(previewText, color = t.textPrimary, fontSize = 12.sp, lineHeight = 18.sp,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+            }
+        }
     }
 }
 

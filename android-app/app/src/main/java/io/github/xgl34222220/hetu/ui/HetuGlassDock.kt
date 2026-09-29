@@ -33,6 +33,9 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInParent
+import kotlinx.coroutines.launch
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.animation.core.snap
@@ -183,7 +186,7 @@ fun HetuGlassDock(
             .background(Color.Transparent)
             .then(if (floating) Modifier.padding(horizontal = 24.dp).padding(bottom = bottomInset + 12.dp) else Modifier)
             .fillMaxWidth()
-            .height(60.dp + if (floating) 0.dp else bottomInset).testTag("hetu-dock"),
+            .height(64.dp + if (floating) 0.dp else bottomInset).testTag("hetu-dock"),
     ) {
         Box(
             modifier = Modifier
@@ -204,7 +207,7 @@ fun HetuGlassDock(
             items = items,
             selected = selected,
             onSelect = onSelect,
-            itemHeight = 48.dp,
+            itemHeight = 52.dp,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(start = 6.dp, top = 6.dp, end = 6.dp, bottom = if (floating) 6.dp else bottomInset + 6.dp),
@@ -229,65 +232,100 @@ private fun DockItems(
     selectedColor: Color, unselectedColor: Color, liquidGlass: Boolean,
     indicatorBackdrop: LayerBackdrop?, dark: Boolean,
 ) {
+    // V19: reference-style dock. Every destination shows icon + label (equal slots);
+    // ONE glass lens travels between slots. Its leading edge is stiffer than its trailing
+    // edge, so the lens stretches in flight, thins slightly under tension and settles.
     val motion = LocalHetuMotionEnabled.current && android.animation.ValueAnimator.areAnimatorsEnabled()
     val target = selected.coerceIn(0, items.lastIndex)
     val haptics = rememberHetuHaptics()
-    Row(modifier.selectableGroup(), verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+    val slots = remember(items.size) { mutableStateListOf<Pair<Float, Float>>().apply { repeat(items.size) { add(0f to 0f) } } }
+    val lensLeft = remember { Animatable(0f) }
+    val lensRight = remember { Animatable(0f) }
+    val lensPress = remember { Animatable(1f) }
+    var lensPlaced by remember { mutableStateOf(false) }
+    val slot = slots.getOrNull(target) ?: (0f to 0f)
+    LaunchedEffect(slot, motion) {
+        if (slot.second <= 0f) return@LaunchedEffect
+        if (!lensPlaced || !motion) {
+            lensLeft.snapTo(slot.first); lensRight.snapTo(slot.first + slot.second); lensPlaced = true
+            return@LaunchedEffect
+        }
+        val forward = slot.first > lensLeft.value
+        launch { lensLeft.animateTo(slot.first, spring(dampingRatio = .74f, stiffness = if (forward) 210f else 560f)) }
+        launch { lensRight.animateTo(slot.first + slot.second, spring(dampingRatio = .74f, stiffness = if (forward) 560f else 210f)) }
+    }
+    val highlight = Color.White.copy(alpha = if (dark) .10f else .70f)
+    Row(
+        modifier.selectableGroup().drawBehind {
+            if (!lensPlaced || lensRight.value <= lensLeft.value) return@drawBehind
+            val width = lensRight.value - lensLeft.value
+            val settled = slot.second.coerceAtLeast(1f)
+            val stretch = ((width - settled) / settled).coerceIn(0f, 1.2f)
+            val h = size.height * (1f - .12f * stretch) * lensPress.value
+            val w = width * lensPress.value
+            val x = lensLeft.value + (width - w) / 2f
+            val y = (size.height - h) / 2f
+            val r = CornerRadius(h / 2f)
+            drawRoundRect(indicatorColor, Offset(x, y), androidx.compose.ui.geometry.Size(w, h), r)
+            // Specular rim: bright top edge fading down, like the reference lens.
+            drawRoundRect(
+                Brush.verticalGradient(listOf(highlight, Color.Transparent), startY = y, endY = y + h * .55f),
+                Offset(x, y), androidx.compose.ui.geometry.Size(w, h), r,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(1.2.dp.toPx()),
+            )
+            drawRoundRect(indicatorBorderColor, Offset(x, y), androidx.compose.ui.geometry.Size(w, h), r,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(.8.dp.toPx()))
+        },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         items.forEachIndexed { index, item ->
             key(item.label) {
                 val active = index == target
                 val interaction = remember { MutableInteractionSource() }
-                val weight by animateFloatAsState(if (active) 1.65f else 1f,
-                    if (motion) spring(dampingRatio = .84f, stiffness = 300f) else snap(), label = "dock-weight-$index")
-                // V18.3: icon "pop" when a tab becomes active (not on first composition).
+                val color by animateColorAsState(if (active) selectedColor else unselectedColor,
+                    if (motion) tween(200) else snap(), label = "dock-tint-$index")
                 val iconPop = remember { Animatable(1f) }
                 var wasActive by remember { mutableStateOf(active) }
                 LaunchedEffect(active) {
                     if (active && !wasActive && motion) {
                         iconPop.snapTo(1f)
-                        iconPop.animateTo(1.16f, tween(110, easing = HetuMotion.Standard))
+                        iconPop.animateTo(1.14f, tween(120, easing = HetuMotion.Standard))
                         iconPop.animateTo(1f, spring(dampingRatio = .45f, stiffness = 420f))
                     }
                     wasActive = active
                 }
-                val fill by animateColorAsState(if (active) indicatorColor else Color.Transparent,
-                    if (motion) tween(220) else snap(), label = "dock-fill-$index")
-                val color by animateColorAsState(if (active) selectedColor else unselectedColor,
-                    if (motion) tween(180) else snap(), label = "dock-tint-$index")
-                Row(Modifier.weight(weight).height(itemHeight).testTag("dock-tab-$index")
-                    .hetuPressScale(interaction, pressedScale = .97f, motion = motion)
-                    .clip(RoundedCornerShape(26.dp))
-                    // Fill is on the foreground sibling, outside every backdrop/shader layer.
-                    .drawBehind {
-                        val inset = 6.dp.toPx()
-                        val h = (size.height - 2 * inset).coerceAtLeast(0f)
-                        drawRoundRect(fill, topLeft = Offset(0f,inset),
-                            size = androidx.compose.ui.geometry.Size(size.width,h), cornerRadius = CornerRadius(h/2f))
+                // Pressing the active slot squeezes the lens itself (tactile "glass" feel).
+                LaunchedEffect(interaction, active, motion) {
+                    if (!active || !motion) return@LaunchedEffect
+                    interaction.interactions.collect { event ->
+                        when (event) {
+                            is androidx.compose.foundation.interaction.PressInteraction.Press ->
+                                launch { lensPress.animateTo(.94f, tween(90, easing = HetuMotion.Standard)) }
+                            is androidx.compose.foundation.interaction.PressInteraction.Release,
+                            is androidx.compose.foundation.interaction.PressInteraction.Cancel ->
+                                launch { lensPress.animateTo(1f, spring(dampingRatio = .5f, stiffness = 480f)) }
+                            else -> Unit
+                        }
+                        Unit
                     }
-                    .selectable(active, role = Role.Tab, interactionSource = interaction, indication = null,
-                        onClick = { if (!active) { haptics.perform(HetuHaptic.Tick); onSelect(index) } })
-                    .semantics { contentDescription = item.label }
-                    .padding(horizontal = 6.dp), horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically) {
+                }
+                Column(
+                    Modifier.weight(1f).height(itemHeight).testTag("dock-tab-$index")
+                        .onPlaced { c -> if (index < slots.size) slots[index] = c.positionInParent().x to c.size.width.toFloat() }
+                        .hetuPressScale(interaction, pressedScale = .92f, motion = motion && !active)
+                        .selectable(active, role = Role.Tab, interactionSource = interaction, indication = null,
+                            onClick = { if (!active) { haptics.perform(HetuHaptic.Tick); onSelect(index) } })
+                        .semantics { contentDescription = item.label },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
                     Icon(item.icon, null, Modifier.size(21.dp).graphicsLayer {
                         scaleX = item.opticalScale * iconPop.value; scaleY = item.opticalScale * iconPop.value
                     }, tint = color)
-                    if (active) {
-                        // V18.3: the label slides out of the icon while the capsule widens,
-                        // instead of popping in at full opacity. Still exactly one label node.
-                        val labelIn = remember { Animatable(if (motion) 0f else 1f) }
-                        LaunchedEffect(Unit) {
-                            if (motion) labelIn.animateTo(1f, tween(240, delayMillis = 40, easing = HetuMotion.EmphasizedDecelerate))
-                        }
-                        Spacer(Modifier.width(6.dp))
-                        Text(item.label, Modifier.testTag("dock-active-label").graphicsLayer {
-                            val p = labelIn.value.coerceIn(0f, 1f)
-                            alpha = p
-                            translationX = (1f - p) * -8.dp.toPx()
-                        }, color = color,
-                            fontSize = 12.sp, lineHeight = 17.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                    }
+                    Spacer(Modifier.height(1.dp))
+                    Text(item.label, if (active) Modifier.testTag("dock-active-label") else Modifier,
+                        color = color, fontSize = 10.5.sp, lineHeight = 13.sp,
+                        fontWeight = if (active) FontWeight.Bold else FontWeight.Medium, maxLines = 1)
                 }
             }
         }

@@ -225,6 +225,7 @@ internal fun CompactHomeDashboard(
     motionEnabled: Boolean = true,
     contentInsets: WindowInsets = WindowInsets.safeDrawing,
     onPullRefresh: () -> Unit = onRefresh,
+    onCoreDetails: (() -> Unit)? = null,
 ) {
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val light = LocalHomePalette.current
@@ -268,7 +269,8 @@ internal fun CompactHomeDashboard(
                 }
             }
             // UI11: a clean centered title; refresh remains a real pull/accessibility action.
-            HomeCollapsingHeader(collapse, motion, headerHaze, palette.text, centered = true,
+            // V19: reference-style large leading title that glides to the centre as it collapses.
+            HomeCollapsingHeader(collapse, motion, headerHaze, palette.text, centered = false,
                 modifier = Modifier.zIndex(2f)) { }
         BoxWithConstraints(Modifier.fillMaxWidth().weight(1f).clipToBounds()) {
         // Short windows reduce spacing, never the user's font size or address content.
@@ -285,7 +287,7 @@ internal fun CompactHomeDashboard(
             overscrollEffect = null,
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = if (compact) 2.dp else 4.dp, bottom = 0.dp),
             verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 10.dp)) {
-            item("hero") { Box(Modifier.hetuStaggerIn(stagger, 0, entranceMotion)) { HomeHero(data, onToggle, onReload, onRestart, onSettings) } }
+            item("hero") { Box(Modifier.hetuStaggerIn(stagger, 0, entranceMotion)) { HomeHero(data, onToggle, onReload, onRestart, onSettings, onCoreDetails) } }
             item("shortcuts") { Box(Modifier.hetuStaggerIn(stagger, 1, entranceMotion)) { HomeShortcutStrip(onWebUi, onLog) } }
             item("latency") { Box(Modifier.hetuStaggerIn(stagger, 2, entranceMotion)) { HomeLatency(data, onDelay) } }
             item("telemetry") { Box(Modifier.hetuStaggerIn(stagger, 3, entranceMotion)) { HomeTelemetryGrid(data, onConnections, onSubscription) } }
@@ -306,8 +308,8 @@ internal fun CompactHomeDashboard(
 
 @Composable
 private fun HomeHero(data: CompactHomeData, toggle: () -> Unit, reload: () -> Unit,
-    restart: () -> Unit, settings: () -> Unit) {
-    NativeStatusHero(data, toggle, reload, restart, settings, LocalHomeMotion.current)
+    restart: () -> Unit, settings: () -> Unit, details: (() -> Unit)? = null) {
+    NativeStatusHero(data, toggle, reload, restart, settings, LocalHomeMotion.current, details = details)
 }
 
 @Composable

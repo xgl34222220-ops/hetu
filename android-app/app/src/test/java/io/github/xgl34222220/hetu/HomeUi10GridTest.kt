@@ -145,8 +145,9 @@ class HomeUi10GridTest {
     @Test fun centeredTitleAndRealToolbarStayAboveContent() {
         render()
         val h=bounds("home-header");val brand=bounds("home-brand")
-        assertEquals(20.sp,text("home-brand").layoutInput.style.fontSize)
-        assertEquals(((h.left + h.right) / 2).value, ((brand.left + brand.right) / 2).value, 1f)
+        // V19: expanded state is the reference's large leading title (collapses to centre on scroll).
+        assertEquals(32.sp,text("home-brand").layoutInput.style.fontSize)
+        assertEquals((h.left + 16.dp).value, brand.left.value, 1f)
         assertEquals(44.dp,h.top)
         rule.onNodeWithTag("compact-home").refreshHome11()
         assertEquals(listOf("refresh"),calls)

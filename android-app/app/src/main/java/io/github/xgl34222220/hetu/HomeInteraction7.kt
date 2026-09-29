@@ -76,7 +76,7 @@ internal fun HomeCollapsingHeader(
                 val amount = if (motion) stretch.coerceIn(0f, 48f) else 0f
                 scaleX = 1f + amount / 2000f
                 scaleY = scaleX
-            }, color = color, fontSize = (if (centered) 20f else 28f - 8f * fraction).sp,
+            }, color = color, fontSize = (if (centered) 20f else 32f - 12f * fraction).sp,
                 lineHeight = 36.sp, fontWeight = FontWeight.Black, letterSpacing = .4.sp,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
             Row(content = actions)
@@ -86,7 +86,8 @@ internal fun HomeCollapsingHeader(
             val buttons = measurables[1].measure(constraints.copy(minWidth = 0, minHeight = 0))
             val title = measurables[0].measure(constraints.copy(minWidth = 0, minHeight = 0,
                 maxWidth = (width - 2 * side - buttons.width * (1f + fraction)).toInt().coerceAtLeast(1)))
-            val height = constraints.constrainHeight(maxOf((if (centered) 48.dp else 56.dp).roundToPx(), title.height, buttons.height))
+            // V19: the large title keeps the 48dp bar height, so the one-screen home layout does not shift.
+            val height = constraints.constrainHeight(maxOf(48.dp.roundToPx(), title.height, buttons.height))
             layout(width, height) {
                 val leading = side.toFloat()
                 val centered = (width - title.width) / 2f

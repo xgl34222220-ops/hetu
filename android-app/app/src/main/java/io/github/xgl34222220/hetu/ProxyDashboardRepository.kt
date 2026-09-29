@@ -110,6 +110,18 @@ internal class ProxyDashboardRepository(context: Context) {
             .apply()
     }
     suspend fun closeConnection(id: String) = controller.closeConnection(id)
+    /** V19: live Mihomo traffic mode (rule / global / direct); "rule" when unreadable. */
+    suspend fun trafficMode(): String = withContext(Dispatchers.IO) {
+        runCatching { api.configs().optString("mode", "rule").lowercase() }.getOrDefault("rule")
+    }
+    suspend fun setTrafficMode(mode: String) = withContext(Dispatchers.IO) { api.setTrafficMode(mode) }
+    /** V19: "v1.19.x Meta" style label from GET /version; empty when the core is down. */
+    suspend fun coreVersion(): String = withContext(Dispatchers.IO) {
+        runCatching {
+            val v = api.version()
+            listOf(v.optString("version"), if (v.optBoolean("meta")) "Meta" else "").filter { it.isNotBlank() }.joinToString(" ")
+        }.getOrDefault("")
+    }
     suspend fun closeAll() = controller.closeAll()
     suspend fun ensureIcons(): Int = controller.ensureIcons()
 

@@ -376,12 +376,13 @@ class CompactHomeDashboardTest {
         render()
         val header = rule.onNodeWithTag("home-header").fetchSemanticsNode().boundsInRoot
         val brand = rule.onNodeWithTag("home-brand").fetchSemanticsNode().boundsInRoot
-        assertEquals(header.center.x, brand.center.x, 1f)
-        assertEquals(20.sp, textLayout("home-brand").layoutInput.style.fontSize)
+        // V19: large leading title at rest (reference layout); it centres only when collapsed.
+        assertTrue(brand.center.x < header.center.x)
+        assertEquals(32.sp, textLayout("home-brand").layoutInput.style.fontSize)
         rule.onNodeWithText("BoxProxy").assertDoesNotExist()
         rule.onNodeWithTag("compact-home").refreshHome11()
         assertEquals(listOf("refresh"), calls)
-        snapshot("ui4-centered-header")
+        snapshot("v19-leading-header")
     }
 
     @Test fun ui4HeroTypographyAndGlyphAreLargerWithoutFakeUptime() {

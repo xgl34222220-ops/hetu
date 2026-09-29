@@ -138,6 +138,7 @@ internal val BoxProxyTabs17 = listOf(
     RefPanelTab.Connections,
     RefPanelTab.Rules,
     RefPanelTab.RuleSets,
+    RefPanelTab.Logs,
 )
 
 internal fun boxProxyTabLabel17(tab: RefPanelTab): String = when (tab) {
@@ -147,29 +148,18 @@ internal fun boxProxyTabLabel17(tab: RefPanelTab): String = when (tab) {
     RefPanelTab.Subscriptions -> "订阅"
     RefPanelTab.Rules -> "规则"
     RefPanelTab.RuleSets -> "规则集"
+    RefPanelTab.Logs -> "日志"
 }
 
 @Composable
 internal fun BoxProxyPanelTabs17(selected: RefPanelTab, onSelect: (RefPanelTab) -> Unit) {
-    val haptics = io.github.xgl34222220.hetu.ui.rememberHetuHaptics()
-    BoxProxyMiuixTheme17 {
-        MiuixTabRow(
-            tabs = BoxProxyTabs17.map(::boxProxyTabLabel17),
-            selectedTabIndex = BoxProxyTabs17.indexOf(selected).coerceAtLeast(0),
-            onTabSelected = { index ->
-                BoxProxyTabs17.getOrNull(index)?.let { tab ->
-                    if (tab != selected) haptics.perform(io.github.xgl34222220.hetu.ui.HetuHaptic.Tick)
-                    onSelect(tab)
-                }
-            },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).testTag("boxproxy17-tabs"),
-            height = 34.dp,
-            minWidth = 54.dp,
-            maxWidth = 86.dp,
-            cornerRadius = 11.dp,
-            itemSpacing = 6.dp,
-        )
-    }
+    // V19: content-sized scrolling tabs with a liquid selection capsule (haptics inside).
+    io.github.xgl34222220.hetu.ui.HetuScrollTabs(
+        labels = BoxProxyTabs17.map(::boxProxyTabLabel17),
+        selected = BoxProxyTabs17.indexOf(selected).coerceAtLeast(0),
+        onSelect = { index -> BoxProxyTabs17.getOrNull(index)?.let(onSelect) },
+        modifier = Modifier.padding(bottom = 4.dp),
+    )
 }
 
 @Composable
@@ -225,8 +215,8 @@ internal fun BoxProxyPanelHeader17(
             Text(
                 "面板",
                 color = MiuixTheme.colorScheme.onSurface,
-                fontSize = 27.sp,
-                lineHeight = 31.sp,
+                fontSize = 32.sp,
+                lineHeight = 38.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(start = 14.dp, top = 1.dp, bottom = 5.dp),
             )
@@ -248,6 +238,7 @@ internal fun BoxProxyPanelHeader17(
                                 RefPanelTab.Subscriptions -> "搜索订阅"
                                 RefPanelTab.Rules -> "搜索规则"
                                 RefPanelTab.RuleSets -> "搜索规则集"
+                                RefPanelTab.Logs -> "搜索日志内容"
                                 else -> "搜索"
                             },
                         )

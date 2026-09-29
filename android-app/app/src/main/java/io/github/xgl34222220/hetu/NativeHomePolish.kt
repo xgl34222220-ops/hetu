@@ -134,7 +134,8 @@ internal fun Modifier.diffuseCardShadow(shape: Shape): Modifier =
 
 @Composable
 internal fun NativeStatusHero(data: CompactHomeData, toggle: () -> Unit, reload: () -> Unit,
-    restart: () -> Unit, settings: () -> Unit, motion: Boolean, quickActions: (@Composable () -> Unit)? = null) {
+    restart: () -> Unit, settings: () -> Unit, motion: Boolean, quickActions: (@Composable () -> Unit)? = null,
+    details: (() -> Unit)? = null) {
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val phase = HomeLifecyclePresentation.phase(data)
     val processing = phase == HomePhase.Processing
@@ -181,7 +182,10 @@ internal fun NativeStatusHero(data: CompactHomeData, toggle: () -> Unit, reload:
                 center = Offset(size.width * .15f, size.height * .9f), radius = size.width * .8f))
         }) {
         Column(Modifier.fillMaxWidth().padding(if (LocalHomeShortSpacing.current) 14.dp else if (compact) 16.dp else 18.dp)) {
-            Row(Modifier.fillMaxWidth().testTag("hero-information"), verticalAlignment = Alignment.CenterVertically) {
+            // V19: tapping the status block opens the live core details sheet (running only).
+            Row(Modifier.fillMaxWidth()
+                .then(if (details != null && phase == HomePhase.Running) Modifier.nativePress(label = "核心运行详情", motion = motion, onClick = details) else Modifier)
+                .testTag("hero-information"), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f).testTag("hero-information-text"), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         HeroLiveDot(accent, live = phase == HomePhase.Running && motion)
