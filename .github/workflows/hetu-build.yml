@@ -250,16 +250,31 @@ jobs:
           echo "V20.23 overview redesign applied"
           git diff --stat
 
-      - name: Export effective V20.23 source
+      - name: Apply V20.24 home video parity
         run: |
           set -euo pipefail
-          tar -czf /tmp/Hetu-V20.23-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
-          sha256sum /tmp/Hetu-V20.23-effective-source.tar.gz
+          cat updates/v2024-home/p00.b64 | base64 -d > /tmp/v2024.patch.xz
+          echo '96cbb7a2d545b64024fe678c78f5b02f85e11c977717a3817263fea21e5862da  /tmp/v2024.patch.xz' | sha256sum -c -
+          xz -dc /tmp/v2024.patch.xz > /tmp/v2024.patch
+          git apply --check /tmp/v2024.patch
+          git apply /tmp/v2024.patch
+          grep -q 'versionCode = 2024' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.7.4-v20"' android-app/app/build.gradle.kts
+          grep -q 'HomeLauncherCard' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeScreen.kt
+          ! sed -n '95,180p' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeScreen.kt | grep -q '配置与订阅'
+          echo "V20.24 home video parity applied"
+          git diff --stat
+
+      - name: Export effective V20.24 source
+        run: |
+          set -euo pipefail
+          tar -czf /tmp/Hetu-V20.24-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+          sha256sum /tmp/Hetu-V20.24-effective-source.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.23-effective-source
-          path: /tmp/Hetu-V20.23-effective-source.tar.gz
+          name: Hetu-V20.24-effective-source
+          path: /tmp/Hetu-V20.24-effective-source.tar.gz
           compression-level: 0
           if-no-files-found: error
 
