@@ -60,10 +60,10 @@ internal data class HxColors(
 )
 
 private val LightHx = HxColors(
-    canvas = Color(0xFFF4F5F7),
+    canvas = Color(0xFFF6F7F9),
     surface = Color(0xFFFFFFFF),
-    surfaceMuted = Color(0xFFEEF0F3),
-    line = Color(0xFFE4E7EB),
+    surfaceMuted = Color(0xFFF0F2F5),
+    line = Color(0xFFE6E9EE),
     text = Color(0xFF12161A),
     textMuted = Color(0xFF5D6670),
     textFaint = Color(0xFF98A1AA),
@@ -110,9 +110,9 @@ internal object Hx {
     val gap = 12.dp
     val gapSmall = 8.dp
 
-    val cardShape = RoundedCornerShape(20.dp)
-    val rowShape = RoundedCornerShape(14.dp)
-    val chipShape = RoundedCornerShape(10.dp)
+    val cardShape = RoundedCornerShape(22.dp)
+    val rowShape = RoundedCornerShape(16.dp)
+    val chipShape = RoundedCornerShape(12.dp)
     val pillShape = RoundedCornerShape(50)
 }
 
@@ -142,7 +142,7 @@ private fun hxTypography(): Typography {
     val base = Typography()
     return base.copy(
         displaySmall = base.displaySmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 34.sp, lineHeight = 40.sp),
-        headlineMedium = base.headlineMedium.copy(fontWeight = FontWeight.Bold, fontSize = 28.sp, lineHeight = 34.sp),
+        headlineMedium = base.headlineMedium.copy(fontWeight = FontWeight.Bold, fontSize = 30.sp, lineHeight = 36.sp),
         headlineSmall = base.headlineSmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 22.sp, lineHeight = 28.sp),
         titleLarge = base.titleLarge.copy(fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 26.sp),
         titleMedium = base.titleMedium.copy(fontWeight = FontWeight.SemiBold, fontSize = 16.sp, lineHeight = 22.sp),

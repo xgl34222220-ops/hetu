@@ -80,33 +80,10 @@ import kotlinx.coroutines.launch
 
 @Composable
 internal fun HomeScreen(vm: HetuViewModel, bottomPadding: Dp) {
-    val nav = LocalNav.current
-    val scope = rememberCoroutineScope()
     val state = vm.state
-    var sheetTitle by remember { mutableStateOf<String?>(null) }
-    var sheetText by remember { mutableStateOf("") }
-    var sheetLoading by remember { mutableStateOf(false) }
     var showDetails by remember { mutableStateOf(false) }
-    val context = androidx.compose.ui.platform.LocalContext.current
-
-    fun openText(title: String, load: suspend () -> String) {
-        if (sheetLoading) return
-        sheetLoading = true
-        scope.launch {
-            try {
-                sheetText = load()
-                sheetTitle = title
-            } catch (cancel: CancellationException) {
-                throw cancel
-            } catch (error: Exception) {
-                vm.toast(error.message ?: "读取失败")
-            } finally {
-                sheetLoading = false
-            }
-        }
-    }
-
     val stagger = rememberHxStagger()
+
     HxPage(
         title = "河图", scrollToTopSignal = vm.reselect,
         subtitle = "${state.core} · ${state.mode}" + if (vm.coreVersion.isNotBlank()) " · ${vm.coreVersion}" else "",
@@ -114,48 +91,13 @@ internal fun HomeScreen(vm: HetuViewModel, bottomPadding: Dp) {
         refreshing = vm.refreshing,
         onRefresh = vm::pullRefresh,
     ) {
+        // Home is deliberately a dashboard, not a second settings menu. Management
+        // destinations live in Settings so the same page is not exposed in 2–3 places.
         item(key = "status") { Box(Modifier.hxEnter(stagger, 0)) { StatusCard(vm) { showDetails = true } } }
         item(key = "traffic") { Box(Modifier.hxEnter(stagger, 1)) { TrafficCard(vm) } }
         item(key = "network") { Box(Modifier.hxEnter(stagger, 2)) { NetworkCard(vm) } }
-        item(key = "config") { Box(Modifier.hxEnter(stagger, 3)) { ConfigCard(vm) { nav.push(HxRoute.Configs) } } }
-        item(key = "adblock") { Box(Modifier.hxEnter(stagger, 4)) { AdblockCard(vm) { nav.push(HxRoute.Adblock) } } }
-        item(key = "tools") {
-            HxSection("工具", modifier = Modifier.hxEnter(stagger, 5)) {
-                HxGroup {
-                    HxNavRow("运行日志", subtitle = "核心日志、启动状态与最近错误", icon = Icons.Rounded.Article, onClick = {
-                        openText("运行日志") { vm.inspector.runtimeLog() }
-                    })
-                    HxDivider()
-                    HxNavRow("网络诊断", subtitle = "Root 规则、DNS、保活与分流自检", icon = Icons.Rounded.Troubleshoot, iconTint = Hx.colors.warn, onClick = {
-                        openText("网络诊断") { vm.controller.diagnostics() }
-                    })
-                    HxDivider()
-                    HxNavRow("本地 WebUI", subtitle = "在应用内打开 Mihomo 管理面板", icon = Icons.Rounded.Web, enabled = state.running, onClick = {
-                        context.startActivity(android.content.Intent(context, ProxyLocalWebUiActivity::class.java))
-                    })
-                    HxDivider()
-                    HxNavRow("运行文件", subtitle = "浏览和编辑 /data/adb/hetu 下的运行文件", icon = Icons.Rounded.Inventory2, iconTint = Hx.colors.textMuted, onClick = {
-                        context.startActivity(android.content.Intent(context, ReferenceFileManagerActivity::class.java))
-                    })
-                    HxDivider()
-                    HxNavRow("运行配置", subtitle = "查看河图生成的最终 Mihomo 配置", icon = Icons.Rounded.Description, iconTint = Hx.colors.good, onClick = {
-                        openText("运行配置") { DiagnosticReport.redact(vm.controller.startupConfig(), vm.prefs.getString("proxyControllerSecret", "").orEmpty()) }
-                    })
-                }
-                if (sheetLoading) {
-                    Row(Modifier.padding(top = 10.dp, start = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                        HxSpinner(14.dp)
-                        Spacer(Modifier.width(8.dp))
-                        Text("正在读取…", style = MaterialTheme.typography.bodySmall, color = Hx.colors.textMuted)
-                    }
-                }
-            }
-        }
     }
 
-    sheetTitle?.let { title ->
-        HxTextSheet(title = title, text = sheetText, onDismiss = { sheetTitle = null })
-    }
     if (showDetails) CoreDetails(vm) { showDetails = false }
 }
 
@@ -591,4 +533,3 @@ private fun AdblockCard(vm: HetuViewModel, onOpen: () -> Unit) {
         }
     }
 }
-

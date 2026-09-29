@@ -117,16 +117,9 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp) {
                         nav.push(HxRoute.Network)
                     }
                     HxDivider()
-                    HxNavRow("运行核心", subtitle = "选择负责 Root 代理运行的核心", icon = Icons.Rounded.Memory, iconTint = c.textMuted, value = profile.core.label) {
-                        open(ProxyRuntimeCoreSettingsActivity::class.java)
-                    }
-                    HxDivider()
                     HxNavRow("高级代理配置", subtitle = "运行预检、Kill Switch、启动配置、恢复网络", icon = Icons.Rounded.HealthAndSafety, iconTint = c.good) {
                         open(ProxyAdvancedSettingsActivity::class.java)
                     }
-                    HxDivider()
-                    HxNavRow("应用名单", subtitle = "按应用决定走代理还是直连", icon = Icons.Rounded.Apps, iconTint = c.warn,
-                        value = "${prefs.getStringSet("proxyAppPackages", emptySet()).orEmpty().size} 个") { nav.push(HxRoute.Apps) }
                     HxDivider()
                     HxNavRow("网络匹配", subtitle = "按 Wi‑Fi / SSID / 移动网络自动启停", icon = Icons.Rounded.Wifi) {
                         open(ProxyNetworkAutomationActivity::class.java)
@@ -172,18 +165,10 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp) {
             }
         }
         item(key = "panel") {
-            HxSection("代理面板", modifier = Modifier.hxEnter(stagger, 2)) {
+            HxSection("代理行为", modifier = Modifier.hxEnter(stagger, 2)) {
                 HxGroup {
-                    HxNavRow("测速与 API", subtitle = "测速地址、外部 Clash API、历史采集", icon = Icons.Rounded.Speed, iconTint = c.warn) { choice = "api" }
-                    HxDivider()
-                    HxNavRow("策略显示", subtitle = "列数、密度、排序与隐藏策略组", icon = Icons.Rounded.GridView) {
-                        open(ProxySelectorPreferencesActivity::class.java)
-                    }
-                    HxDivider()
-                    HxNavRow("策略图标", subtitle = "为策略组设置自定义图标", icon = Icons.Rounded.Image, iconTint = c.good) {
-                        open(ProxyPolicyIconsActivity::class.java)
-                    }
-                    HxDivider()
+                    // Search/sort/layout/API/icon controls live on the Proxy page itself.
+                    // Keep only preferences that are not duplicated there.
                     HxSwitchRow("切换节点后断开旧连接", prefs.getBoolean("proxySelectorDisconnectOnSelect", false), {
                         prefs.edit().putBoolean("proxySelectorDisconnectOnSelect", it).apply(); revision++
                     }, subtitle = "只关闭经过当前策略组的旧连接", icon = Icons.Rounded.SwapHoriz, iconTint = c.good)

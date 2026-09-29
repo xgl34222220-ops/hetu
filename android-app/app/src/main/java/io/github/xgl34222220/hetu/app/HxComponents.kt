@@ -310,15 +310,15 @@ internal fun HxSection(
     trailing: @Composable (RowScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Column(modifier.fillMaxWidth().padding(horizontal = Hx.gutter).padding(bottom = 18.dp)) {
+    Column(modifier.fillMaxWidth().padding(horizontal = Hx.gutter).padding(bottom = 16.dp)) {
         if (title != null || trailing != null) {
             Row(
-                Modifier.fillMaxWidth().padding(start = 4.dp, end = 0.dp, bottom = 8.dp).heightIn(min = 24.dp),
+                Modifier.fillMaxWidth().padding(start = 3.dp, end = 0.dp, bottom = 7.dp).heightIn(min = 24.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     title.orEmpty(),
-                    style = MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp, letterSpacing = 0.15.sp),
                     color = Hx.colors.textMuted,
                     modifier = Modifier.weight(1f),
                 )
@@ -339,17 +339,17 @@ internal fun HxGroup(modifier: Modifier = Modifier, content: @Composable ColumnS
         color = c.surface,
         border = if (c.dark) BorderStroke(0.5.dp, c.line) else null,
     ) {
-        Column(Modifier.padding(vertical = 4.dp), content = content)
+        Column(Modifier.padding(vertical = 2.dp), content = content)
     }
 }
 
 @Composable
 internal fun HxDivider(inset: Dp = 60.dp) {
-    HorizontalDivider(Modifier.padding(start = inset), thickness = 0.5.dp, color = Hx.colors.line)
+    HorizontalDivider(Modifier.padding(start = inset), thickness = 0.5.dp, color = Hx.colors.line.copy(alpha = .78f))
 }
 
 @Composable
-internal fun HxIconBadge(icon: ImageVector, tint: Color = Hx.colors.accent, size: Dp = 36.dp) {
+internal fun HxIconBadge(icon: ImageVector, tint: Color = Hx.colors.accent, size: Dp = 38.dp) {
     Box(
         Modifier.size(size).clip(RoundedCornerShape(size * 0.32f)).background(tint.copy(alpha = if (Hx.colors.dark) .18f else .12f)),
         contentAlignment = Alignment.Center,
@@ -379,8 +379,8 @@ internal fun HxRow(
         modifier
             .fillMaxWidth()
             .then(if (onClick != null && enabled) Modifier.clickable(onClick = onClick) else Modifier)
-            .heightIn(min = 56.dp)
-            .padding(horizontal = 14.dp, vertical = 10.dp)
+            .heightIn(min = 58.dp)
+            .padding(horizontal = 15.dp, vertical = 10.dp)
             .graphicsLayer { alpha = if (enabled) 1f else .45f },
         verticalAlignment = Alignment.CenterVertically,
     ) {

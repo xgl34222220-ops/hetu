@@ -86,7 +86,7 @@ internal val LocalHxBlur = staticCompositionLocalOf { true }
 
 /** Soft, diffuse elevation for light mode; dark mode relies on hairline borders instead. */
 @Composable
-internal fun Modifier.hxSoftShadow(shape: Shape, elevation: Dp = 10.dp): Modifier {
+internal fun Modifier.hxSoftShadow(shape: Shape, elevation: Dp = 7.dp): Modifier {
     val c = Hx.colors
     return if (c.dark) this else this.shadow(
         elevation = elevation,
