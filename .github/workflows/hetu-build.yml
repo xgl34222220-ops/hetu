@@ -24,25 +24,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Restore uploaded V20.11 baseline
+      - name: Restore uploaded V20.14 source
         run: |
           set -euo pipefail
-          cat updates/v2011-patch/gz00.b64 updates/v2011-patch/gz01.b64 updates/v2011-patch/gz02.b64 \
-            | base64 -d | gzip -d > /tmp/v2011.patch
-          git apply --check /tmp/v2011.patch
-          git apply /tmp/v2011.patch
-          grep -q 'versionCode = 2011' android-app/app/build.gradle.kts
-          grep -q 'versionName = "0.6.1-v20"' android-app/app/build.gradle.kts
-          echo "V20.11 baseline restored"
-
-      - name: Apply uploaded V20.14 delta
-        run: |
-          set -euo pipefail
-          cat updates/v2014-delta/p00.b64 updates/v2014-delta/p01.b64 \
-              updates/v2014-delta/p02.b64 updates/v2014-delta/p03.b64 \
-              updates/v2014-delta/p04.b64 updates/v2014-delta/p05.b64 \
+          cat updates/v2014-full/p00.b64 updates/v2014-full/p01.b64 updates/v2014-full/p02.b64 updates/v2014-full/p03.b64 updates/v2014-full/p04.b64 updates/v2014-full/p05.b64 updates/v2014-full/p06.b64 updates/v2014-full/p07.b64 updates/v2014-full/p08.b64 updates/v2014-full/p09.b64 updates/v2014-full/p10.b64 updates/v2014-full/p11.b64 updates/v2014-full/p12.b64 \
             | base64 -d > /tmp/v2014-overlay.tar.gz
-          echo '4e858c447e101434d52ae79464b71d4076838839119ce6d3d682356ea81687db  /tmp/v2014-overlay.tar.gz' | sha256sum -c -
+          echo 'f272092f61363f608b39d2c3fa4f128fdb78b157be0dcca6404019472b1d4528  /tmp/v2014-overlay.tar.gz' | sha256sum -c -
           tar -xzf /tmp/v2014-overlay.tar.gz -C .
           grep -q 'versionCode = 2014' android-app/app/build.gradle.kts
           grep -q 'versionName = "0.6.4-v20"' android-app/app/build.gradle.kts
