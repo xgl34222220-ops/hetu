@@ -357,6 +357,19 @@ jobs:
           echo "V20.29 actual panel header applied"
           git diff --stat
 
+      - name: Fix V20.29 rounded-shape import
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTabbedPage.kt')
+          s = p.read_text()
+          if 'import androidx.compose.foundation.shape.RoundedCornerShape\n' not in s:
+              s = s.replace('import androidx.compose.foundation.rememberScrollState\n', 'import androidx.compose.foundation.rememberScrollState\nimport androidx.compose.foundation.shape.RoundedCornerShape\n')
+          p.write_text(s)
+          PY
+          grep -q 'import androidx.compose.foundation.shape.RoundedCornerShape' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTabbedPage.kt
+
       - name: Export effective V20.29 source
         run: |
           set -euo pipefail
