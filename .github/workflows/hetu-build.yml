@@ -68,16 +68,31 @@ jobs:
           grep -q 'fun updatePureBlack(value: Boolean)' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
           grep -q 'vm.updatePureBlack(it)' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
 
-      - name: Export effective V20.14 source
+      - name: Apply V20.16 BoxProxy+ UI layer
         run: |
           set -euo pipefail
-          tar -czf /tmp/Hetu-V20.14-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
-          sha256sum /tmp/Hetu-V20.14-effective-source.tar.gz
+          cat updates/v2016-boxplus/p00.b64 updates/v2016-boxplus/p01.b64 | base64 -d > /tmp/v2016-boxplus.patch.xz
+          echo 'db9bb8d3fc9e31f4cce19ad12de2696b9271be5cf9310721ebd4780c4afb58f8  /tmp/v2016-boxplus.patch.xz' | sha256sum -c -
+          xz -dc /tmp/v2016-boxplus.patch.xz > /tmp/v2016-boxplus.patch
+          git apply -p0 --check /tmp/v2016-boxplus.patch
+          git apply -p0 /tmp/v2016-boxplus.patch
+          grep -q 'versionCode = 2016' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.6.6-v20"' android-app/app/build.gradle.kts
+          grep -q 'com.patrykandpatrick.vico:compose:3.3.1' android-app/app/build.gradle.kts
+          grep -q 'io.coil-kt.coil3:coil-svg:3.6.3' android-app/app/build.gradle.kts
+          echo "V20.16 BoxProxy+ UI layer applied"
+          git diff --stat
+
+      - name: Export effective V20.16 source
+        run: |
+          set -euo pipefail
+          tar -czf /tmp/Hetu-V20.16-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+          sha256sum /tmp/Hetu-V20.16-effective-source.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.14-effective-source
-          path: /tmp/Hetu-V20.14-effective-source.tar.gz
+          name: Hetu-V20.16-effective-source
+          path: /tmp/Hetu-V20.16-effective-source.tar.gz
           compression-level: 0
           if-no-files-found: error
 
