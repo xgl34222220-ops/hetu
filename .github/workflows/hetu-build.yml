@@ -190,16 +190,32 @@ jobs:
           echo "V20.20 direct latency testing applied"
           git diff --stat
 
-      - name: Export effective V20.20 source
+      - name: Apply V20.21 panel strategy fast test
         run: |
           set -euo pipefail
-          tar -czf /tmp/Hetu-V20.20-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
-          sha256sum /tmp/Hetu-V20.20-effective-source.tar.gz
+          cat updates/v2021-panel-fasttest/p00.b64 | base64 -d > /tmp/v2021.patch.xz
+          echo 'df551d0448f4040c068914d22230994bed2a51d46c11f2a0555df06f41f63e14  /tmp/v2021.patch.xz' | sha256sum -c -
+          xz -dc /tmp/v2021.patch.xz > /tmp/v2021.patch
+          git apply --check /tmp/v2021.patch
+          git apply /tmp/v2021.patch
+          grep -q 'versionCode = 2021' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.7.1-v20"' android-app/app/build.gradle.kts
+          grep -q '"proxies" to "策略"' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
+          grep -q 'suspend fun groupDelay(group: String)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
+          grep -q 'timeout=5000' android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java
+          echo "V20.21 panel strategy fast test applied"
+          git diff --stat
+
+      - name: Export effective V20.21 source
+        run: |
+          set -euo pipefail
+          tar -czf /tmp/Hetu-V20.21-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+          sha256sum /tmp/Hetu-V20.21-effective-source.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.20-effective-source
-          path: /tmp/Hetu-V20.20-effective-source.tar.gz
+          name: Hetu-V20.21-effective-source
+          path: /tmp/Hetu-V20.21-effective-source.tar.gz
           compression-level: 0
           if-no-files-found: error
 
