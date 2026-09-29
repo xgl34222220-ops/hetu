@@ -386,6 +386,34 @@ jobs:
           echo "V20.30 page-specific panel bars applied"
           git diff --stat
 
+      - name: Fix V20.30 compile wiring
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelOverviewScreen.kt')
+          s = p.read_text()
+          s = s.replace(
+              '    var showApi by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }',
+              '    val showApi = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }'
+          )
+          s = s.replace('onClick = { showApi = true }', 'onClick = { showApi.value = true }')
+          s = s.replace('    if (showApi) ApiSettingsSheet(vm, onDismiss = { showApi = false })\n\n', '')
+          marker = '        }\n    }\n}\n\n@Composable\nprivate fun OverviewCenteredMetric'
+          replacement = '        }\n    }\n    if (showApi.value) ApiSettingsSheet(vm, onDismiss = { showApi.value = false })\n}\n\n@Composable\nprivate fun OverviewCenteredMetric'
+          assert marker in s
+          s = s.replace(marker, replacement, 1)
+          p.write_text(s)
+
+          p = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/app/RulesScreen.kt')
+          s = p.read_text()
+          s = s.replace('else -> ruleItems(vm, query) { query = it }', 'else -> ruleItems(vm, query, { query = it })')
+          p.write_text(s)
+          PY
+          grep -q 'if (showApi.value) ApiSettingsSheet' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelOverviewScreen.kt
+          grep -q 'ruleItems(vm, query, { query = it })' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/RulesScreen.kt
+
       - name: Export effective V20.30 source
         run: |
           set -euo pipefail
