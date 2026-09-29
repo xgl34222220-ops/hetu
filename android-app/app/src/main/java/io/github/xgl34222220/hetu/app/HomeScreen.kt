@@ -567,6 +567,11 @@ private fun PulseDot(color: Color, pulsing: Boolean) {
     }
 }
 
+@Composable
+private fun PowerButton(running: Boolean, busy: Boolean, onClick: () -> Unit) {
+    ConnectionToggle(running = running, busy = busy, onClick = onClick)
+}
+
 /* ---------------------------- traffic ---------------------------- */
 
 @Composable
