@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
@@ -137,8 +138,13 @@ internal fun ConnectionsScreen(vm: HetuViewModel, bottomPadding: Dp) {
                             }
                         }
                     } else {
-                        items(filtered, key = { it.id }) { item ->
-                            ConnectionRow(item, Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null)) { detailId = item.id }
+                        itemsIndexed(filtered, key = { _, item -> item.id }) { index, item ->
+                            ConnectionRow(
+                                item = item,
+                                first = index == 0,
+                                last = index == filtered.lastIndex,
+                                modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null),
+                            ) { detailId = item.id }
                         }
                     }
                 }
@@ -193,43 +199,57 @@ private fun DetailLine(label: String, value: String) {
 }
 
 @Composable
-private fun ConnectionRow(item: ProxyConnectionUi, modifier: Modifier, onClick: () -> Unit) {
+private fun ConnectionRow(
+    item: ProxyConnectionUi,
+    first: Boolean,
+    last: Boolean,
+    modifier: Modifier,
+    onClick: () -> Unit,
+) {
     val c = Hx.colors
-    Row(
+    val shape = RoundedCornerShape(
+        topStart = if (first) 16.dp else 0.dp,
+        topEnd = if (first) 16.dp else 0.dp,
+        bottomStart = if (last) 16.dp else 0.dp,
+        bottomEnd = if (last) 16.dp else 0.dp,
+    )
+    Column(
         modifier
             .fillMaxWidth()
             .padding(horizontal = Hx.gutter)
-            .padding(bottom = 8.dp)
-            .clip(Hx.rowShape)
-            .background(c.surface)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .clip(shape)
+            .background(c.surface),
     ) {
-        val icon = item.appIcon
-        if (icon != null) {
-            Image(icon.asImageBitmap(), null, Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)))
-        } else {
-            Box(Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(c.surfaceMuted), contentAlignment = Alignment.Center) {
-                Text(item.appName.take(1).ifBlank { "?" }, style = MaterialTheme.typography.labelLarge, color = c.textMuted)
+        Row(
+            Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 13.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            val icon = item.appIcon
+            if (icon != null) {
+                Image(icon.asImageBitmap(), null, Modifier.size(30.dp).clip(RoundedCornerShape(8.dp)))
+            } else {
+                Box(Modifier.size(30.dp), contentAlignment = Alignment.Center) {
+                    Text(item.appName.take(1).ifBlank { "?" }, style = MaterialTheme.typography.labelLarge, color = c.textMuted)
+                }
+            }
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(item.host, style = MaterialTheme.typography.bodyMedium, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    listOf(item.appName, item.chain).filter { it.isNotBlank() }.joinToString(" · "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = c.textMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Column(horizontalAlignment = Alignment.End) {
+                Text("↓ " + HxFormat.bytes(item.download), style = MaterialTheme.typography.labelMedium.merge(HxNumberStyle), color = c.text)
+                Text("↑ " + HxFormat.bytes(item.upload), style = MaterialTheme.typography.labelSmall.merge(HxNumberStyle), color = c.textFaint)
             }
         }
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(item.host, style = MaterialTheme.typography.bodyMedium, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(
-                listOf(item.appName, item.chain).filter { it.isNotBlank() }.joinToString(" · "),
-                style = MaterialTheme.typography.bodySmall,
-                color = c.textMuted,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        Spacer(Modifier.width(8.dp))
-        Column(horizontalAlignment = Alignment.End) {
-            Text("↓ " + HxFormat.bytes(item.download), style = MaterialTheme.typography.labelMedium.merge(HxNumberStyle), color = c.text)
-            Text("↑ " + HxFormat.bytes(item.upload), style = MaterialTheme.typography.labelSmall.merge(HxNumberStyle), color = c.textFaint)
-        }
+        if (!last) HxDivider(53.dp)
     }
 }
 

@@ -19,7 +19,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.CloudSync
@@ -114,10 +116,12 @@ private fun LazyListScope.ruleSetItems(vm: HetuViewModel) {
     if (sets.isEmpty() && !vm.ruleSetsLoading) {
         item(key = "sets-empty") { HxEmpty(Icons.Rounded.Rule, "当前配置没有规则集", "rule-providers 为空时这里不会有内容") }
     }
-    items(sets, key = { "rs:" + it.name }) { set ->
+    itemsIndexed(sets, key = { _, item -> "rs:" + item.name }) { index, set ->
         val remoteSet = set.vehicleType.equals("HTTP", true)
         TaskRow(
             modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null),
+            first = index == 0,
+            last = index == sets.lastIndex,
             title = set.name,
             subtitle = listOf(
                 set.behavior.ifBlank { "rule" },
@@ -148,9 +152,11 @@ internal fun LazyListScope.providerListItems(vm: HetuViewModel) {
     if (providers.isEmpty()) {
         item(key = "providers-empty") { HxEmpty(Icons.Rounded.CloudSync, "没有在线订阅", "在「设置 → 配置与订阅」中添加订阅链接") }
     }
-    items(providers, key = { "pv:" + it.name }) { p ->
+    itemsIndexed(providers, key = { _, item -> "pv:" + item.name }) { index, p ->
         Column(Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null)) {
             TaskRow(
+                first = index == 0,
+                last = index == providers.lastIndex,
                 title = p.name,
                 subtitle = buildString {
                     append("${p.nodes.size} 个节点 · ")
@@ -182,38 +188,66 @@ private fun LazyListScope.ruleItems(vm: HetuViewModel, query: String, onQuery: (
     } else if (list.isEmpty()) {
         item(key = "rules-empty") { HxEmpty(Icons.Rounded.Rule, if (vm.rules.isEmpty()) "没有规则" else "没有匹配的规则") }
     }
-    items(list, key = { "r:" + it.index }) { rule -> RuleRow(rule) }
+    itemsIndexed(list, key = { _, rule -> "r:" + rule.index }) { index, rule ->
+        RuleRow(rule, first = index == 0, last = index == list.lastIndex)
+    }
 }
 
 @Composable
-private fun RuleRow(rule: ProxyRuleUi) {
+private fun RuleRow(rule: ProxyRuleUi, first: Boolean, last: Boolean) {
     val c = Hx.colors
-    Row(
+    val shape = RoundedCornerShape(
+        topStart = if (first) 16.dp else 0.dp,
+        topEnd = if (first) 16.dp else 0.dp,
+        bottomStart = if (last) 16.dp else 0.dp,
+        bottomEnd = if (last) 16.dp else 0.dp,
+    )
+    Column(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = Hx.gutter)
-            .padding(bottom = 6.dp)
-            .clip(Hx.rowShape)
-            .background(c.surface)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .clip(shape)
+            .background(c.surface),
     ) {
-        Text(
-            "${rule.index + 1}",
-            style = MaterialTheme.typography.labelSmall.merge(HxNumberStyle),
-            color = c.textFaint,
-            modifier = Modifier.widthIn(min = 28.dp),
-        )
-        Column(Modifier.weight(1f)) {
-            Text(rule.payload.ifBlank { rule.type }, style = MaterialTheme.typography.bodyMedium, color = if (rule.disabled) c.textFaint else c.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Text(
-                rule.type + (if (rule.size >= 0) " · ${rule.size} 条" else "") + (if (rule.hitCount > 0) " · 命中 ${rule.hitCount}" else ""),
-                style = MaterialTheme.typography.labelSmall,
-                color = c.textMuted,
+                (rule.index + 1).toString(),
+                style = MaterialTheme.typography.labelSmall.merge(HxNumberStyle),
+                color = c.textFaint,
+                modifier = Modifier.widthIn(min = 30.dp),
+            )
+            Column(Modifier.weight(1f)) {
+                Text(
+                    rule.payload.ifBlank { rule.type },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (rule.disabled) c.textFaint else c.text,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    rule.type + (if (rule.size >= 0) " · " + rule.size + " 条" else "") + (if (rule.hitCount > 0) " · 命中 " + rule.hitCount else ""),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = c.textMuted,
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Text(
+                rule.proxy,
+                style = MaterialTheme.typography.labelMedium,
+                color = when {
+                    rule.proxy.startsWith("REJECT") -> c.bad
+                    rule.proxy == "DIRECT" -> c.good
+                    else -> c.textMuted
+                },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 92.dp),
             )
         }
-        Spacer(Modifier.width(8.dp))
-        HxPill(rule.proxy, if (rule.proxy.startsWith("REJECT")) HxTone.Bad else if (rule.proxy == "DIRECT") HxTone.Good else HxTone.Accent)
+        if (!last) HxDivider(43.dp)
     }
 }
 
@@ -222,11 +256,20 @@ private fun RuleRow(rule: ProxyRuleUi) {
 @Composable
 private fun UpdateAllBar(summary: String, label: String, busy: Boolean, enabled: Boolean, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = Hx.gutter).padding(bottom = 12.dp),
+        Modifier.fillMaxWidth().padding(horizontal = Hx.gutter).padding(bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(summary, style = MaterialTheme.typography.bodyMedium, color = Hx.colors.textMuted, modifier = Modifier.weight(1f))
-        HxButton(label, onClick = onClick, icon = Icons.Rounded.Sync, busy = busy, enabled = enabled)
+        Text(summary, style = MaterialTheme.typography.bodySmall, color = Hx.colors.textMuted, modifier = Modifier.weight(1f))
+        if (busy) HxSpinner(14.dp)
+        else Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (enabled) Hx.colors.accent else Hx.colors.textFaint,
+            modifier = Modifier
+                .clip(Hx.chipShape)
+                .clickable(enabled = enabled, onClick = onClick)
+                .padding(horizontal = 8.dp, vertical = 5.dp),
+        )
     }
 }
 
@@ -239,55 +282,52 @@ internal fun TaskRow(
     onRun: () -> Unit,
     modifier: Modifier = Modifier,
     progress: Float? = null,
+    first: Boolean = false,
+    last: Boolean = false,
 ) {
     val c = Hx.colors
+    val shape = RoundedCornerShape(
+        topStart = if (first) 16.dp else 0.dp,
+        topEnd = if (first) 16.dp else 0.dp,
+        bottomStart = if (last) 16.dp else 0.dp,
+        bottomEnd = if (last) 16.dp else 0.dp,
+    )
     Column(
         modifier
             .fillMaxWidth()
             .padding(horizontal = Hx.gutter)
-            .padding(bottom = 8.dp)
-            .clip(Hx.rowShape)
-            .background(c.surface)
-            .padding(start = 14.dp, end = 6.dp, top = 12.dp, bottom = 12.dp),
+            .clip(shape)
+            .background(c.surface),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier.fillMaxWidth().padding(start = 13.dp, end = 6.dp, top = 10.dp, bottom = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.bodyLarge, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Spacer(Modifier.height(2.dp))
+                Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(subtitle, style = MaterialTheme.typography.bodySmall, color = c.textMuted)
                 if (task != null && task.ok == false && task.message.isNotBlank()) {
                     Text(task.message, style = MaterialTheme.typography.bodySmall, color = c.bad, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
+                if (progress != null) HxProgressBar(progress, if (progress > .9f) c.bad else c.accent, Modifier.padding(top = 7.dp, end = 8.dp), height = 3.dp)
             }
             if (canRun) {
                 Box(
-                    Modifier.size(44.dp).clip(CircleShape).clickable(enabled = task?.running != true, onClick = onRun),
+                    Modifier.size(40.dp).clip(CircleShape).clickable(enabled = task?.running != true, onClick = onRun),
                     contentAlignment = Alignment.Center,
                 ) {
-                    AnimatedContent(
-                        targetState = when {
-                            task?.running == true -> 1
-                            task?.ok == true -> 2
-                            task?.ok == false -> 3
-                            else -> 0
-                        },
-                        transitionSpec = { fadeIn(tween(HxMotion.Short)) togetherWith fadeOut(tween(HxMotion.Short)) },
-                        label = "task",
-                    ) { phase ->
-                        when (phase) {
-                            1 -> HxSpinner(18.dp)
-                            2 -> Icon(Icons.Rounded.CheckCircle, "已更新", tint = c.good, modifier = Modifier.size(22.dp))
-                            3 -> Icon(Icons.Rounded.ErrorOutline, "更新失败，点按重试", tint = c.bad, modifier = Modifier.size(22.dp))
-                            else -> Icon(Icons.Rounded.Sync, "更新", tint = c.accent, modifier = Modifier.size(22.dp))
-                        }
+                    when {
+                        task?.running == true -> HxSpinner(16.dp)
+                        task?.ok == true -> Icon(Icons.Rounded.CheckCircle, "已更新", tint = c.good, modifier = Modifier.size(20.dp))
+                        task?.ok == false -> Icon(Icons.Rounded.ErrorOutline, "更新失败", tint = c.bad, modifier = Modifier.size(20.dp))
+                        else -> Icon(Icons.Rounded.Sync, "更新", tint = c.textMuted, modifier = Modifier.size(20.dp))
                     }
                 }
             } else {
-                HxPill("本地", modifier = Modifier.padding(end = 8.dp))
+                Text("本地", style = MaterialTheme.typography.labelSmall, color = c.textFaint, modifier = Modifier.padding(end = 8.dp))
             }
         }
-        if (progress != null) {
-            HxProgressBar(progress, if (progress > .9f) c.bad else c.accent, Modifier.padding(top = 8.dp, end = 8.dp), height = 4.dp)
-        }
+        if (!last) HxDivider(13.dp)
     }
 }
+
