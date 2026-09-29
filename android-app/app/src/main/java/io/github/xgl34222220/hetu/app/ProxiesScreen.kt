@@ -96,12 +96,17 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
     var showApi by remember { mutableStateOf(false) }
 
     val visibleGroups = panelGroups11(state.groups, query, state.trafficMode, options)
+    val manualGroups = visibleGroups.filter {
+        val type = it.type.lowercase(Locale.ROOT)
+        type.contains("select") || type == "selector"
+    }
+    val automaticGroups = visibleGroups.filterNot { it in manualGroups }
     val sheetGroup = state.groups.firstOrNull { it.name == sheetGroupName }
 
     HxPage(
         title = "代理",
         scrollToTopSignal = vm.reselect,
-        subtitle = if (state.running) visibleGroups.size.toString() + " 个策略组 · " + visibleGroups.sumOf { it.nodes.size } + " 个节点" else null,
+        subtitle = if (state.running) visibleGroups.size.toString() + " 个策略组" else null,
         bottomPadding = bottomPadding,
         actions = {
             if (state.running) {
@@ -116,7 +121,7 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
     ) {
         if (!state.running) {
             item(key = "stopped") {
-                HxEmpty(Icons.Rounded.Hub, "代理未运行", "启动后即可查看策略组、切换节点和测速") {
+                HxEmpty(Icons.Rounded.Hub, "代理未运行", "启动后可查看策略组、切换节点和测速") {
                     HxButton("启动代理", onClick = vm::toggle, icon = Icons.Rounded.PowerSettingsNew, busy = vm.operation != null)
                 }
             }
@@ -128,32 +133,9 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
                 HxSearchField(
                     query,
                     { query = it },
-                    "搜索策略组、节点、订阅或协议",
+                    "搜索策略组、节点或订阅",
                     Modifier.padding(horizontal = Hx.gutter).padding(bottom = 10.dp),
                 )
-            }
-        }
-
-        item(key = "strategy-heading") {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = Hx.gutter).padding(bottom = 9.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("策略组", style = MaterialTheme.typography.labelLarge, color = Hx.colors.textMuted, modifier = Modifier.weight(1f))
-                if (vm.testingAll) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        HxSpinner(13.dp)
-                        Spacer(Modifier.width(6.dp))
-                        Text("测速中", style = MaterialTheme.typography.labelMedium, color = Hx.colors.textMuted)
-                    }
-                } else {
-                    Text(
-                        "测速全部",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Hx.colors.accent,
-                        modifier = Modifier.clip(Hx.chipShape).clickable { vm.testAll() }.padding(horizontal = 8.dp, vertical = 5.dp),
-                    )
-                }
             }
         }
 
@@ -165,25 +147,26 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
             return@HxPage
         }
 
-        val rows = visibleGroups.chunked(2)
-        items(
-            count = rows.size,
-            key = { index -> "strategy-row:" + index + ":" + rows[index].joinToString("|") { it.name } },
-        ) { index ->
-            val row = rows[index]
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = Hx.gutter).padding(bottom = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                row.forEach { group ->
-                    StrategyDashboardCard(
-                        vm = vm,
-                        group = group,
-                        modifier = Modifier.weight(1f),
-                        onClick = { sheetGroupName = group.name },
-                    )
-                }
-                if (row.size < 2) Spacer(Modifier.weight(1f))
+        if (manualGroups.isNotEmpty()) {
+            item(key = "manual-groups") {
+                StrategyPolicySection(
+                    title = "手动策略",
+                    groups = manualGroups,
+                    vm = vm,
+                    showTestAll = true,
+                    onOpen = { sheetGroupName = it },
+                )
+            }
+        }
+        if (automaticGroups.isNotEmpty()) {
+            item(key = "automatic-groups") {
+                StrategyPolicySection(
+                    title = if (manualGroups.isEmpty()) "策略组" else "自动策略",
+                    groups = automaticGroups,
+                    vm = vm,
+                    showTestAll = manualGroups.isEmpty(),
+                    onOpen = { sheetGroupName = it },
+                )
             }
         }
     }
@@ -223,76 +206,86 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
         }
     }
 
-    if (showApi) {
-        ApiSettingsSheet(vm, onDismiss = { showApi = false })
+    if (showApi) ApiSettingsSheet(vm, onDismiss = { showApi = false })
+}
+
+@Composable
+private fun StrategyPolicySection(
+    title: String,
+    groups: List<ProxyGroupUi>,
+    vm: HetuViewModel,
+    showTestAll: Boolean,
+    onOpen: (String) -> Unit,
+) {
+    HxSection(
+        title,
+        trailing = {
+            if (showTestAll) {
+                if (vm.testingAll) HxSpinner(14.dp)
+                else Text(
+                    "全部测速",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Hx.colors.accent,
+                    modifier = Modifier
+                        .clip(Hx.chipShape)
+                        .clickable { vm.testAll() }
+                        .padding(horizontal = 7.dp, vertical = 4.dp),
+                )
+            }
+        },
+    ) {
+        HxGroup {
+            groups.forEachIndexed { index, group ->
+                if (index > 0) HxDivider(46.dp)
+                StrategyPolicyRow(
+                    vm = vm,
+                    group = group,
+                    onClick = { onOpen(group.name) },
+                )
+            }
+        }
     }
 }
 
 @Composable
-private fun StrategyDashboardCard(
-    vm: HetuViewModel,
-    group: ProxyGroupUi,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-) {
+private fun StrategyPolicyRow(vm: HetuViewModel, group: ProxyGroupUi, onClick: () -> Unit) {
     val c = Hx.colors
-    val source = remember(group.name) { MutableInteractionSource() }
     val currentNode = group.nodes.firstOrNull { it.name == group.now }
     val delay = vm.delays[group.now] ?: currentNode?.lastDelay
-    val flag = refNodeFlag(group.now).takeIf { it.isNotBlank() }
     val testing = vm.testingGroups[group.name] == true
-
-    Surface(
-        modifier = modifier.hxPressScale(source, .985f),
-        shape = RoundedCornerShape(17.dp),
-        color = c.surface,
-        border = BorderStroke(0.5.dp, c.line.copy(alpha = if (c.dark) .72f else .52f)),
-        shadowElevation = 0.dp,
-        onClick = onClick,
-        interactionSource = source,
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .heightIn(min = 58.dp)
+            .padding(start = 13.dp, end = 10.dp, top = 9.dp, bottom = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(
-            Modifier.fillMaxWidth().heightIn(min = 118.dp).padding(horizontal = 13.dp, vertical = 12.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    group.name,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = c.text,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    HxFormat.groupType(group.type).uppercase(Locale.ROOT),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = c.textFaint,
-                    maxLines = 1,
-                )
-            }
-            Spacer(Modifier.height(10.dp))
+        Box(Modifier.size(26.dp), contentAlignment = Alignment.Center) {
+            HxGroupIcon(group, Modifier.size(21.dp))
+        }
+        Spacer(Modifier.width(8.dp))
+        Column(Modifier.weight(1f)) {
             Text(
-                listOfNotNull(flag, group.now.ifBlank { null }).joinToString(" "),
+                group.name,
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
                 color = c.text,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Spacer(Modifier.weight(1f))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    group.nodes.size.toString() + " 个节点",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = c.textMuted,
-                    maxLines = 1,
-                )
-                Spacer(Modifier.weight(1f))
-                HxDelayPill(delay, testing) { vm.testGroup(group) }
-            }
+            Text(
+                HxFormat.groupType(group.type) + " · " + group.now.ifBlank { "未选择" } + " · " + group.nodes.size + " 节点",
+                style = MaterialTheme.typography.bodySmall,
+                color = c.textMuted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
+        Spacer(Modifier.width(8.dp))
+        HxDelayPill(delay, testing) { vm.testGroup(group) }
+        Spacer(Modifier.width(3.dp))
+        HxChevron()
     }
 }
 
@@ -304,60 +297,64 @@ private fun StrategyNodeSheet(
     onDismiss: () -> Unit,
 ) {
     val c = Hx.colors
-    val nodes = projectStrategyNodes(group.nodes, options.sort, options.descending, vm.delays)
-    val sections = if (options.providers) {
-        nodes.groupBy { it.provider.ifBlank { "配置内节点" } }
-    } else {
-        linkedMapOf("" to nodes)
+    var nodeQuery by rememberSaveable(group.name) { mutableStateOf("") }
+    val initialNode = remember(group.name) { group.now }
+    val pending = vm.pendingSelection[group.name]
+    val ordered = projectStrategyNodes(group.nodes, options.sort, options.descending, vm.delays)
+    val nodes = if (nodeQuery.isBlank()) ordered else ordered.filter {
+        it.name.contains(nodeQuery, true) || it.provider.contains(nodeQuery, true) || it.type.contains(nodeQuery, true)
+    }
+
+    LaunchedEffect(group.now, pending) {
+        if (pending == null && group.now.isNotBlank() && group.now != initialNode) onDismiss()
     }
 
     HxSheet(onDismiss = onDismiss) {
         Row(
-            Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, bottom = 6.dp),
+            Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
                 Text(group.name, style = MaterialTheme.typography.titleLarge, color = c.text, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(2.dp))
                 Text(
-                    group.nodes.size.toString() + " 个节点 · 当前 " + group.now.ifBlank { "未选择" },
+                    HxFormat.groupType(group.type) + " · " + group.nodes.size + " 个节点",
                     style = MaterialTheme.typography.bodySmall,
                     color = c.textMuted,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
                 )
             }
-            if (vm.testingGroups[group.name] == true) {
-                Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) { HxSpinner(17.dp) }
-            } else {
-                HxBarAction(Icons.Rounded.Speed, "测速本组", onClick = { vm.testGroup(group) })
-            }
+            if (vm.testingGroups[group.name] == true) Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) { HxSpinner(17.dp) }
+            else HxBarAction(Icons.Rounded.Speed, "测速本组", onClick = { vm.testGroup(group) })
         }
 
-        LazyColumn(
-            Modifier.fillMaxWidth().heightIn(min = 300.dp, max = 620.dp),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 14.dp, end = 14.dp, top = 4.dp, bottom = 18.dp),
+        if (group.nodes.size > 8) {
+            HxSearchField(
+                nodeQuery,
+                { nodeQuery = it },
+                "搜索节点",
+                Modifier.padding(horizontal = 14.dp, vertical = 4.dp),
+            )
+            Spacer(Modifier.height(4.dp))
+        }
+
+        Surface(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp),
+            shape = RoundedCornerShape(16.dp),
+            color = c.surface,
+            border = BorderStroke(0.5.dp, c.line.copy(alpha = if (c.dark) .72f else .42f)),
+            shadowElevation = 0.dp,
         ) {
-            sections.forEach { (provider, members) ->
-                if (provider.isNotBlank()) {
-                    item(key = "provider:" + group.name + ":" + provider) {
-                        Text(
-                            provider,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = c.textMuted,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
-                        )
-                    }
-                }
+            LazyColumn(
+                Modifier.fillMaxWidth().heightIn(min = 240.dp, max = 560.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 2.dp),
+            ) {
                 items(
-                    items = members,
+                    items = nodes,
                     key = { node -> "sheet-node:" + group.name + ":" + node.name },
                 ) { node ->
                     StrategySheetNodeRow(
                         vm = vm,
                         group = group,
                         node = node,
-                        onSelected = onDismiss,
                         modifier = Modifier.animateItem(
                             fadeInSpec = spring<Float>(stiffness = Spring.StiffnessMediumLow),
                             placementSpec = spring<IntOffset>(dampingRatio = .82f, stiffness = 420f),
@@ -375,71 +372,57 @@ private fun StrategySheetNodeRow(
     vm: HetuViewModel,
     group: ProxyGroupUi,
     node: ProxyNodeUi,
-    onSelected: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = Hx.colors
     val selectable = HxFormat.isSelectable(group.type)
     val pending = vm.pendingSelection[group.name]
     val selected = group.now == node.name
+    val pendingThis = pending == node.name
     val delay = vm.delays[node.name] ?: node.lastDelay
     val testing = vm.testingNodes[node.name] == true
-    val source = remember(node.name) { MutableInteractionSource() }
     val haptics = rememberHetuHaptics()
-    val bg by animateColorAsState(
-        if (selected) c.accentSoft.copy(alpha = if (c.dark) .34f else .52f) else c.surface,
-        spring(stiffness = Spring.StiffnessMediumLow),
-        label = "sheet-node-bg",
-    )
-    val outline by animateColorAsState(
-        if (selected) c.accent.copy(alpha = .38f) else c.line.copy(alpha = .45f),
-        spring(stiffness = Spring.StiffnessMediumLow),
-        label = "sheet-node-outline",
-    )
 
-    Surface(
-        modifier = modifier.fillMaxWidth().padding(vertical = 4.dp).hxPressScale(source, .988f),
-        shape = RoundedCornerShape(15.dp),
-        color = bg,
-        border = BorderStroke(if (selected) 1.dp else 0.5.dp, outline),
-        shadowElevation = 0.dp,
-        enabled = selectable && pending == null && !selected,
-        interactionSource = source,
-        onClick = {
-            haptics.perform(HetuHaptic.Tap)
-            vm.select(group.name, node.name)
-            onSelected()
-        },
+    Column(
+        modifier
+            .fillMaxWidth()
+            .background(if (selected) c.accentSoft.copy(alpha = if (c.dark) .28f else .40f) else Color.Transparent)
+            .clickable(enabled = selectable && pending == null && !selected) {
+                haptics.perform(HetuHaptic.Tap)
+                vm.select(group.name, node.name)
+            },
     ) {
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+            Modifier.fillMaxWidth().heightIn(min = 54.dp).padding(horizontal = 13.dp, vertical = 9.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(Modifier.width(18.dp), contentAlignment = Alignment.CenterStart) {
-                if (selected) Box(Modifier.size(8.dp).clip(CircleShape).background(c.accent))
+            Box(Modifier.width(22.dp), contentAlignment = Alignment.CenterStart) {
+                when {
+                    pendingThis -> HxSpinner(12.dp)
+                    selected -> Icon(Icons.Rounded.Check, null, tint = c.accent, modifier = Modifier.size(17.dp))
+                }
             }
-            Spacer(Modifier.width(8.dp))
             Column(Modifier.weight(1f)) {
                 Text(
                     node.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                     color = c.text,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(Modifier.height(2.dp))
                 Text(
                     listOf(node.type.uppercase(Locale.ROOT), node.provider).filter { it.isNotBlank() }.joinToString(" · "),
                     style = MaterialTheme.typography.labelSmall,
-                    color = c.textFaint,
+                    color = c.textMuted,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(8.dp))
             HxDelayPill(delay, testing) { vm.testNode(node.name) }
         }
+        HxDivider(35.dp)
     }
 }
 
