@@ -219,16 +219,32 @@ jobs:
           PY
           grep -q 'import androidx.compose.animation.animateColorAsState' android-app/app/src/main/java/io/github/xgl34222220/hetu/BoxProxyExactPanel17.kt
 
-      - name: Export effective V20.21 source
+      - name: Apply V20.22 panel defaults and routing cleanup
         run: |
           set -euo pipefail
-          tar -czf /tmp/Hetu-V20.21-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
-          sha256sum /tmp/Hetu-V20.21-effective-source.tar.gz
+          cat updates/v2022-panel-routing/p00.b64 | base64 -d > /tmp/v2022.patch.xz
+          echo 'e6e63d8cfb3c91a7b734e5940037f329ce2c2acd6aad819e08e20298f25af6e3  /tmp/v2022.patch.xz' | sha256sum -c -
+          xz -dc /tmp/v2022.patch.xz > /tmp/v2022.patch
+          git apply --check /tmp/v2022.patch
+          git apply /tmp/v2022.patch
+          grep -q 'versionCode = 2022' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.7.2-v20"' android-app/app/build.gradle.kts
+          grep -q '默认面板页面' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
+          grep -q 'vm.openPanel("providers")' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeScreen.kt
+          ! grep -q '全部测速' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ProxiesScreen.kt
+          echo "V20.22 panel defaults and routing cleanup applied"
+          git diff --stat
+
+      - name: Export effective V20.22 source
+        run: |
+          set -euo pipefail
+          tar -czf /tmp/Hetu-V20.22-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+          sha256sum /tmp/Hetu-V20.22-effective-source.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.21-effective-source
-          path: /tmp/Hetu-V20.21-effective-source.tar.gz
+          name: Hetu-V20.22-effective-source
+          path: /tmp/Hetu-V20.22-effective-source.tar.gz
           compression-level: 0
           if-no-files-found: error
 
