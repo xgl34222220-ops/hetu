@@ -1,12 +1,22 @@
 package io.github.xgl34222220.hetu
 
-import android.graphics.Bitmap
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,451 +27,487 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Apps
-import androidx.compose.material.icons.rounded.CloudDownload
-import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.ArrowDownward
+import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.Article
 import androidx.compose.material.icons.rounded.Description
-import androidx.compose.material.icons.rounded.FileOpen
-import androidx.compose.material.icons.rounded.Memory
+import androidx.compose.material.icons.rounded.PowerSettingsNew
+import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.SearchOff
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material.icons.rounded.RestartAlt
+import androidx.compose.material.icons.rounded.Router
+import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material.icons.rounded.Speed
+import androidx.compose.material.icons.rounded.Sync
+import androidx.compose.material.icons.rounded.Troubleshoot
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import io.github.xgl34222220.hetu.ui.AppItem
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-
-/* ------------------------------------------------------------------ */
-/*  Per-app routing list                                                */
-/* ------------------------------------------------------------------ */
 
 @Composable
-internal fun AppListScreen(vm: HetuViewModel) {
+internal fun HomeScreen(vm: HetuViewModel, bottomPadding: Dp) {
     val nav = LocalNav.current
-    val context = LocalContext.current
-    val prefs = vm.prefs
-    val c = Hx.colors
-    var reload by remember { mutableIntStateOf(0) }
-    var loading by remember { mutableStateOf(true) }
-    var apps by remember { mutableStateOf(vm.filters.cachedApps()) }
-    var selected by remember { mutableStateOf(prefs.getStringSet("proxyAppPackages", emptySet()).orEmpty().toSet()) }
-    var scope by remember { mutableStateOf(ProxyRuntimeProfile.load(prefs).appScope.id) }
-    var query by rememberSaveable { mutableStateOf("") }
-    var searching by rememberSaveable { mutableStateOf(false) }
-    var showSystem by rememberSaveable { mutableStateOf(false) }
-    var onlySelected by rememberSaveable { mutableStateOf(false) }
-
-    LaunchedEffect(reload) {
-        loading = true
-        try {
-            apps = ProxyUserAppsRepository.load(context, vm.filters, reload > 0)
-        } catch (cancel: CancellationException) {
-            throw cancel
-        } catch (error: Exception) {
-            vm.toast(error.message ?: "应用列表读取失败")
-        } finally {
-            loading = false
-        }
-    }
-
-    fun commit(next: Set<String>) {
-        selected = next
-        prefs.edit().putStringSet("proxyAppPackages", next).apply()
-        ProxyRuntimeSettings.markDirty(prefs, "proxyAppPackages")
-        vm.bumpSettings()
-    }
-
-    val visible = apps.filter { app ->
-        val key = app.selectionKey
-        (!onlySelected || key in selected) &&
-            (showSystem || !app.system || key in selected) &&
-            (query.isBlank() || app.label.contains(query, true) || app.packageName.contains(query, true))
-    }
-
-    HxPage(
-        title = "应用名单",
-        subtitle = "已选 ${selected.size} 个 · 修改后重启代理生效",
-        onBack = { nav.pop() },
-        actions = {
-            HxBarAction(if (searching) Icons.Rounded.SearchOff else Icons.Rounded.Search, "搜索", onClick = {
-                searching = !searching
-                if (!searching) query = ""
-            })
-            HxBarAction(Icons.Rounded.Refresh, "刷新", onClick = { reload++ }, busy = loading && apps.isNotEmpty())
-        },
-    ) {
-        item(key = "scope") {
-            Column(Modifier.padding(horizontal = Hx.gutter).padding(bottom = 12.dp)) {
-                HxSegmented(
-                    options = listOf("core" to "不区分", "blacklist" to "名单直连", "whitelist" to "名单代理"),
-                    selected = scope,
-                    onSelect = {
-                        scope = it
-                        prefs.edit().putString("proxyAppScope", it).apply()
-                        ProxyRuntimeSettings.markDirty(prefs, "proxyAppScope")
-                        vm.bumpSettings()
-                    },
-                )
-                Text(
-                    when (scope) {
-                        "blacklist" -> "勾选的应用绕过代理，其余应用正常走代理。"
-                        "whitelist" -> "只有勾选的应用走代理，其余应用直连。"
-                        else -> "不按应用区分，全部由配置规则决定；名单会保留但不生效。"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = c.textMuted,
-                    modifier = Modifier.padding(start = 4.dp, top = 8.dp),
-                )
-                if (searching) {
-                    Spacer(Modifier.height(10.dp))
-                    HxSearchField(query, { query = it }, "搜索应用或包名")
-                }
-                Spacer(Modifier.height(10.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    HxFilterChip("系统应用", showSystem) { showSystem = it }
-                    HxFilterChip("仅已选", onlySelected) { onlySelected = it }
-                    Spacer(Modifier.weight(1f))
-                    Text(
-                        if (visible.isNotEmpty() && visible.all { it.selectionKey in selected }) "取消全选" else "全选",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = c.accent,
-                        modifier = Modifier.clip(Hx.chipShape).clickable(enabled = visible.isNotEmpty()) {
-                            val keys = visible.map { it.selectionKey }.toSet()
-                            commit(if (keys.all { it in selected }) selected - keys else selected + keys)
-                        }.padding(horizontal = 8.dp, vertical = 6.dp),
-                    )
-                }
-            }
-        }
-        if (loading && apps.isEmpty()) {
-            item(key = "loading") { Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) { HxSpinner(26.dp) } }
-        } else if (visible.isEmpty()) {
-            item(key = "empty") { HxEmpty(Icons.Rounded.Apps, "没有匹配的应用") }
-        }
-        items(visible, key = { it.selectionKey }) { app ->
-            val key = app.selectionKey
-            AppRow(vm, app, key in selected) { checked -> commit(if (checked) selected + key else selected - key) }
-        }
-    }
-}
-
-@Composable
-private fun HxFilterChip(label: String, selected: Boolean, onChange: (Boolean) -> Unit) {
-    val c = Hx.colors
-    FilterChip(
-        selected = selected,
-        onClick = { onChange(!selected) },
-        label = { Text(label) },
-        shape = Hx.pillShape,
-        colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = c.accentSoft,
-            selectedLabelColor = c.accent,
-            labelColor = c.textMuted,
-        ),
-    )
-}
-
-@Composable
-private fun AppRow(vm: HetuViewModel, app: AppItem, checked: Boolean, onChange: (Boolean) -> Unit) {
-    val c = Hx.colors
-    val icon by produceState<Bitmap?>(app.icon, app.packageName) {
-        if (value == null) value = vm.filters.appIcon(app.packageName)
-    }
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = Hx.gutter)
-            .padding(bottom = 6.dp)
-            .clip(Hx.rowShape)
-            .background(c.surface)
-            .clickable { onChange(!checked) }
-            .padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        val bitmap = icon
-        if (bitmap != null) {
-            Image(bitmap.asImageBitmap(), null, Modifier.size(38.dp).clip(RoundedCornerShape(10.dp)))
-        } else {
-            Box(Modifier.size(38.dp).clip(RoundedCornerShape(10.dp)).background(c.surfaceMuted))
-        }
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(app.label, style = MaterialTheme.typography.bodyLarge, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(
-                app.packageName + (if (app.userId != android.os.Process.myUid() / 100000) " · 用户 ${app.userId}" else "") + if (app.system) " · 系统" else "",
-                style = MaterialTheme.typography.bodySmall,
-                color = c.textMuted,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        Checkbox(
-            checked = checked,
-            onCheckedChange = onChange,
-            colors = CheckboxDefaults.colors(checkedColor = c.accent, uncheckedColor = c.textFaint, checkmarkColor = c.onAccent),
-        )
-    }
-}
-
-/* ------------------------------------------------------------------ */
-/*  Core management                                                     */
-/* ------------------------------------------------------------------ */
-
-@Composable
-internal fun CoresScreen(vm: HetuViewModel) {
-    val nav = LocalNav.current
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val c = Hx.colors
-    val manager = remember { ProxyCoreDownloadManager(context) }
-    var statuses by remember { mutableStateOf<List<ProxyCoreRemoteStatus>>(emptyList()) }
-    var checking by remember { mutableStateOf(false) }
-    var working by remember { mutableStateOf<String?>(null) }
-    var progress by remember { mutableStateOf("") }
-    var importTarget by remember { mutableStateOf<String?>(null) }
-    val supported = setOf(ProxyRuntimeProfile.Core.MIHOMO.id, ProxyRuntimeProfile.Core.MIHOMO_SMART.id)
+    val state = vm.state
+    var sheetTitle by remember { mutableStateOf<String?>(null) }
+    var sheetText by remember { mutableStateOf("") }
+    var sheetLoading by remember { mutableStateOf(false) }
 
-    fun load(network: Boolean) {
-        checking = true
+    fun openText(title: String, load: suspend () -> String) {
+        if (sheetLoading) return
+        sheetLoading = true
         scope.launch {
             try {
-                statuses = manager.statuses(network).filter { it.id in supported }
+                sheetText = load()
+                sheetTitle = title
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                vm.toast(error.message ?: "检查失败")
+                vm.toast(error.message ?: "读取失败")
             } finally {
-                checking = false
-            }
-        }
-    }
-    LaunchedEffect(Unit) { load(false) }
-
-    fun afterChange(message: String) {
-        vm.toast(if (vm.state.running) "$message，重启代理后使用新核心" else message)
-        load(false)
-    }
-
-    val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-        val target = importTarget
-        importTarget = null
-        if (uri != null && target != null) {
-            working = target
-            scope.launch {
-                try {
-                    manager.importFromUri(ProxyRuntimeProfile.Core.from(target), uri, uri.lastPathSegment.orEmpty())
-                    afterChange("核心已导入")
-                } catch (cancel: CancellationException) {
-                    throw cancel
-                } catch (error: Exception) {
-                    vm.toast(error.message ?: "导入失败")
-                } finally {
-                    working = null
-                }
+                sheetLoading = false
             }
         }
     }
 
     HxPage(
-        title = "核心管理",
-        subtitle = if (vm.coreVersion.isNotBlank()) "运行中：${vm.coreVersion}" else "内置 Mihomo，可在线更新",
-        onBack = { nav.pop() },
-        actions = { HxBarAction(Icons.Rounded.Refresh, "检查更新", onClick = { load(true) }, busy = checking) },
+        title = "河图",
+        subtitle = "${state.core} · ${state.mode}" + if (vm.coreVersion.isNotBlank()) " · ${vm.coreVersion}" else "",
+        bottomPadding = bottomPadding,
+        refreshing = vm.refreshing,
+        onRefresh = vm::pullRefresh,
     ) {
-        if (statuses.isEmpty()) {
-            item(key = "loading") { Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) { HxSpinner(26.dp) } }
-        }
-        items(statuses, key = { it.id }) { status ->
-            val core = ProxyRuntimeProfile.Core.from(status.id)
-            val busy = working == status.id
-            HxSection {
-                HxCard {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        HxIconBadge(Icons.Rounded.Memory)
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(status.label, style = MaterialTheme.typography.titleMedium, color = c.text)
-                                if (status.updateAvailable) {
-                                    Spacer(Modifier.width(8.dp))
-                                    HxPill("有更新", HxTone.Accent)
-                                }
-                            }
-                            Text(
-                                listOf(
-                                    "当前 " + status.installedVersion.ifBlank { if (status.bundled) "内置版本" else "未安装" },
-                                    if (status.latestVersion.isNotBlank()) "最新 ${status.latestVersion}" else "",
-                                ).filter { it.isNotBlank() }.joinToString(" · "),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = c.textMuted,
-                            )
-                        }
-                    }
-                    if (busy && progress.isNotBlank()) {
-                        Text(progress, style = MaterialTheme.typography.bodySmall, color = c.accent, modifier = Modifier.padding(top = 10.dp))
-                    } else if (status.message.isNotBlank()) {
-                        Text(status.message, style = MaterialTheme.typography.bodySmall, color = c.textMuted, modifier = Modifier.padding(top = 10.dp))
-                    }
-                    Spacer(Modifier.height(14.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        HxButton(
-                            if (status.downloaded) "更新" else "下载",
-                            onClick = {
-                                working = status.id
-                                progress = ""
-                                scope.launch {
-                                    try {
-                                        manager.downloadOrUpdate(core) { text -> scope.launch { progress = text } }
-                                        afterChange("${status.label} 已安装")
-                                    } catch (cancel: CancellationException) {
-                                        throw cancel
-                                    } catch (error: Exception) {
-                                        vm.toast(error.message ?: "下载失败")
-                                    } finally {
-                                        working = null
-                                        progress = ""
-                                    }
-                                }
-                            },
-                            icon = Icons.Rounded.CloudDownload,
-                            busy = busy,
-                            enabled = working == null && status.canDownload,
-                            modifier = Modifier.weight(1f),
-                        )
-                        HxButton(
-                            "导入",
-                            onClick = {
-                                importTarget = status.id
-                                importer.launch(arrayOf("*/*"))
-                            },
-                            icon = Icons.Rounded.FileOpen,
-                            filled = false,
-                            enabled = working == null,
-                            modifier = Modifier.weight(1f),
-                        )
-                        if (status.downloaded) {
-                            HxButton(
-                                "删除",
-                                onClick = {
-                                    working = status.id
-                                    scope.launch {
-                                        try {
-                                            manager.removeDownloaded(core)
-                                            afterChange("已删除下载的核心")
-                                        } catch (cancel: CancellationException) {
-                                            throw cancel
-                                        } catch (error: Exception) {
-                                            vm.toast(error.message ?: "删除失败")
-                                        } finally {
-                                            working = null
-                                        }
-                                    }
-                                },
-                                icon = Icons.Rounded.DeleteOutline,
-                                tone = HxTone.Bad,
-                                filled = false,
-                                enabled = working == null,
-                            )
-                        }
+        item(key = "status") { StatusCard(vm) }
+        item(key = "traffic") { TrafficCard(vm) }
+        item(key = "network") { NetworkCard(vm) }
+        item(key = "config") { ConfigCard(vm) { nav.push(HxRoute.Configs) } }
+        item(key = "adblock") { AdblockCard(vm) { nav.push(HxRoute.Adblock) } }
+        item(key = "tools") {
+            HxSection("工具") {
+                HxGroup {
+                    HxNavRow("运行日志", subtitle = "核心日志、启动状态与最近错误", icon = Icons.Rounded.Article, onClick = {
+                        openText("运行日志") { vm.inspector.runtimeLog() }
+                    })
+                    HxDivider()
+                    HxNavRow("网络诊断", subtitle = "Root 规则、DNS、保活与分流自检", icon = Icons.Rounded.Troubleshoot, iconTint = Hx.colors.warn, onClick = {
+                        openText("网络诊断") { vm.controller.diagnostics() }
+                    })
+                    HxDivider()
+                    HxNavRow("运行配置", subtitle = "查看河图生成的最终 Mihomo 配置", icon = Icons.Rounded.Description, iconTint = Hx.colors.good, onClick = {
+                        openText("运行配置") { DiagnosticReport.redact(vm.controller.startupConfig(), vm.prefs.getString("proxyControllerSecret", "").orEmpty()) }
+                    })
+                }
+                if (sheetLoading) {
+                    Row(Modifier.padding(top = 10.dp, start = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        HxSpinner(14.dp)
+                        Spacer(Modifier.width(8.dp))
+                        Text("正在读取…", style = MaterialTheme.typography.bodySmall, color = Hx.colors.textMuted)
                     }
                 }
             }
         }
     }
+
+    sheetTitle?.let { title ->
+        HxTextSheet(title = title, text = sheetText, onDismiss = { sheetTitle = null })
+    }
 }
 
-/* ------------------------------------------------------------------ */
-/*  About                                                               */
-/* ------------------------------------------------------------------ */
+/* ---------------------------- status ---------------------------- */
 
 @Composable
-internal fun AboutScreen(vm: HetuViewModel) {
-    val nav = LocalNav.current
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+private fun StatusCard(vm: HetuViewModel) {
     val c = Hx.colors
-    var sheet by remember { mutableStateOf<Pair<String, String>?>(null) }
-    val revision = remember {
-        runCatching { context.assets.open("mihomo-revision.txt").bufferedReader().use { it.readText().trim() } }.getOrDefault("")
+    val state = vm.state
+    val op = vm.operation
+    val running = state.running
+    val healthy = running && state.message.isBlank()
+    val statusTitle = when (op) {
+        HxRunOp.Start -> "正在启动"
+        HxRunOp.Stop -> "正在停止"
+        HxRunOp.Restart -> "正在重启"
+        HxRunOp.Reload -> "正在重载"
+        null -> if (running) "代理运行中" else "代理未运行"
     }
+    val statusDetail = when {
+        op != null -> vm.operationText.ifBlank { "请稍候…" }
+        running -> "已运行 ${HxFormat.duration(vm.runtime.elapsedSeconds)} · ${state.config}"
+        else -> state.config
+    }
+    val dotColor by animateColorAsState(
+        when {
+            op != null -> c.warn
+            healthy -> c.good
+            running -> c.warn
+            else -> c.textFaint
+        },
+        tween(HxMotion.Medium),
+        label = "statusDot",
+    )
 
-    fun openAsset(title: String, path: String) {
-        scope.launch {
-            val text = withContext(Dispatchers.IO) {
-                runCatching { context.assets.open(path).bufferedReader().use { it.readText() } }.getOrElse { it.message ?: "读取失败" }
+    HxSection {
+        HxCard(padding = androidx.compose.foundation.layout.PaddingValues(18.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        PulseDot(dotColor, pulsing = op != null || healthy)
+                        Spacer(Modifier.width(8.dp))
+                        AnimatedContent(
+                            targetState = statusTitle,
+                            transitionSpec = { fadeIn(tween(HxMotion.Medium)) togetherWith fadeOut(tween(HxMotion.Short)) },
+                            label = "statusTitle",
+                        ) { text ->
+                            Text(text, style = MaterialTheme.typography.titleLarge, color = c.text)
+                        }
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        statusDetail,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = c.textMuted,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                PowerButton(running = running, busy = op != null, onClick = vm::toggle)
             }
-            sheet = title to text
-        }
-    }
 
-    HxPage(title = "关于", onBack = { nav.pop() }) {
-        item(key = "brand") {
-            Column(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Image(painterResource(R.drawable.ic_hetu_official), null, Modifier.size(84.dp).clip(RoundedCornerShape(22.dp)))
-                Spacer(Modifier.height(14.dp))
-                Text("河图", style = MaterialTheme.typography.headlineSmall, color = c.text)
-                Text("版本 ${BuildConfig.VERSION_NAME}（${BuildConfig.VERSION_CODE}）", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "Root 透明代理与广告过滤，基于 Mihomo。",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = c.textMuted,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 32.dp),
+            AnimatedVisibility(
+                visible = running && op == null,
+                enter = fadeIn(tween(HxMotion.Medium)) + expandVertically(tween(HxMotion.Medium, easing = HxMotion.Emphasized)),
+                exit = fadeOut(tween(HxMotion.Short)) + shrinkVertically(tween(HxMotion.Medium, easing = HxMotion.Emphasized)),
+            ) {
+                Column {
+                    Spacer(Modifier.height(16.dp))
+                    HxSegmented(
+                        options = listOf("rule" to "规则", "global" to "全局", "direct" to "直连"),
+                        selected = state.trafficMode.lowercase().ifBlank { "rule" },
+                        onSelect = vm::setTrafficMode,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        HxButton("重载配置", onClick = vm::reload, icon = Icons.Rounded.Refresh, filled = false, modifier = Modifier.weight(1f))
+                        HxButton("重启代理", onClick = vm::restart, icon = Icons.Rounded.RestartAlt, filled = false, modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+
+            val settingsRevision = vm.settingsRevision
+            val pending = running && settingsRevision >= 0 && vm.settingsPending()
+            AnimatedVisibility(pending && op == null) {
+                HxBanner(
+                    "网络设置已修改，重启代理后生效",
+                    tone = HxTone.Warn,
+                    modifier = Modifier.padding(top = 12.dp),
+                    actionLabel = "重启",
+                    onAction = vm::restart,
                 )
-                Spacer(Modifier.height(20.dp))
+            }
+            AnimatedVisibility(state.message.isNotBlank() && op == null) {
+                HxBanner(state.message, tone = if (running) HxTone.Warn else HxTone.Neutral, modifier = Modifier.padding(top = 12.dp))
             }
         }
-        item(key = "info") {
-            HxSection("信息") {
-                HxGroup {
-                    HxRow("内置核心", subtitle = revision.ifBlank { "Mihomo" }, icon = Icons.Rounded.Memory)
-                    HxDivider()
-                    HxRow("运行目录", subtitle = "/data/adb/hetu", icon = Icons.Rounded.Description, iconTint = c.textMuted)
-                }
+    }
+}
+
+@Composable
+private fun PulseDot(color: Color, pulsing: Boolean) {
+    val transition = rememberInfiniteTransition(label = "pulse")
+    val pulse by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(1600), RepeatMode.Restart),
+        label = "pulseValue",
+    )
+    Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) {
+        if (pulsing) {
+            Box(
+                Modifier
+                    .size(16.dp)
+                    .graphicsLayer {
+                        scaleX = .5f + pulse
+                        scaleY = .5f + pulse
+                        alpha = (1f - pulse) * .45f
+                    }
+                    .clip(CircleShape)
+                    .background(color),
+            )
+        }
+        HxDot(color, 9.dp)
+    }
+}
+
+@Composable
+private fun PowerButton(running: Boolean, busy: Boolean, onClick: () -> Unit) {
+    val c = Hx.colors
+    val source = remember { MutableInteractionSource() }
+    val bg by animateColorAsState(if (running) c.badSoft else c.accent, tween(HxMotion.Medium), label = "powerBg")
+    val fg by animateColorAsState(if (running) c.bad else c.onAccent, tween(HxMotion.Medium), label = "powerFg")
+    Box(
+        Modifier
+            .size(60.dp)
+            .hxPressScale(source, .92f)
+            .clip(CircleShape)
+            .background(bg)
+            .clickable(interactionSource = source, indication = androidx.compose.foundation.LocalIndication.current, enabled = !busy, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (busy) HxSpinner(24.dp, fg)
+        else Icon(Icons.Rounded.PowerSettingsNew, contentDescription = if (running) "停止代理" else "启动代理", tint = fg, modifier = Modifier.size(28.dp))
+    }
+}
+
+/* ---------------------------- traffic ---------------------------- */
+
+@Composable
+private fun TrafficCard(vm: HetuViewModel) {
+    val c = Hx.colors
+    val running = vm.state.running
+    HxSection("流量") {
+        HxCard {
+            Row {
+                SpeedFigure("下载", vm.downRate, Icons.Rounded.ArrowDownward, c.accent, Modifier.weight(1f), running)
+                SpeedFigure("上传", vm.upRate, Icons.Rounded.ArrowUpward, c.warn, Modifier.weight(1f), running)
+            }
+            Spacer(Modifier.height(12.dp))
+            Sparkline(vm.rateHistory.toList(), c.accent, Modifier.fillMaxWidth().height(44.dp))
+            Spacer(Modifier.height(14.dp))
+            Row {
+                HxMetric("总下载", HxFormat.bytes(vm.state.downloadTotal), Modifier.weight(1f))
+                HxMetric("总上传", HxFormat.bytes(vm.state.uploadTotal), Modifier.weight(1f))
+                HxMetric("连接", if (running) vm.state.connections.size.toString() else "—", Modifier.weight(.8f))
+            }
+            Spacer(Modifier.height(12.dp))
+            Row {
+                val memory = if (vm.runtime.rssBytes > 0) vm.runtime.rssBytes else vm.state.memoryBytes
+                HxMetric("内存", if (running && memory > 0) HxFormat.bytes(memory) else "—", Modifier.weight(1f))
+                HxMetric("CPU", if (running) String.format(java.util.Locale.US, "%.1f%%", vm.cpuPercent) else "—", Modifier.weight(1f))
+                HxMetric("运行", if (running) HxFormat.duration(vm.runtime.elapsedSeconds) else "—", Modifier.weight(.8f))
             }
         }
-        item(key = "licenses") {
-            HxSection("开源许可") {
-                HxGroup {
-                    HxNavRow("Mihomo", subtitle = "GPL-3.0", icon = Icons.Rounded.Description, iconTint = c.textMuted) { openAsset("Mihomo", "MIHOMO-LICENSE") }
-                    HxDivider()
-                    HxNavRow("AdGuard DNS Filter", subtitle = "GPL-3.0", icon = Icons.Rounded.Description, iconTint = c.textMuted) { openAsset("AdGuard", "ADGUARD-LICENSE") }
-                    HxDivider()
-                    HxNavRow("Lucide Icons", subtitle = "ISC", icon = Icons.Rounded.Description, iconTint = c.textMuted) { openAsset("Lucide", "licenses/lucide.txt") }
+    }
+}
+
+@Composable
+private fun SpeedFigure(label: String, value: Long, icon: androidx.compose.ui.graphics.vector.ImageVector, tint: Color, modifier: Modifier, active: Boolean) {
+    val c = Hx.colors
+    val (number, unit) = HxFormat.speedParts(value)
+    Column(modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, tint = tint, modifier = Modifier.size(14.dp))
+            Spacer(Modifier.width(4.dp))
+            Text(label, style = MaterialTheme.typography.labelMedium, color = c.textMuted)
+        }
+        Spacer(Modifier.height(4.dp))
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(
+                if (active) number else "0",
+                style = MaterialTheme.typography.displaySmall.merge(HxNumberStyle),
+                color = if (active) c.text else c.textFaint,
+                maxLines = 1,
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(unit, style = MaterialTheme.typography.labelMedium, color = c.textMuted, modifier = Modifier.padding(bottom = 6.dp))
+        }
+    }
+}
+
+@Composable
+private fun Sparkline(values: List<Long>, color: Color, modifier: Modifier) {
+    val c = Hx.colors
+    Canvas(modifier) {
+        val w = size.width
+        val h = size.height
+        // Baseline
+        drawLine(c.line, Offset(0f, h - 1f), Offset(w, h - 1f), strokeWidth = 1f)
+        if (values.size < 2) return@Canvas
+        val max = (values.maxOrNull() ?: 0L).coerceAtLeast(1L).toFloat()
+        val step = w / (40 - 1).toFloat()
+        val startX = w - step * (values.size - 1)
+        val line = Path()
+        val fill = Path()
+        values.forEachIndexed { i, v ->
+            val x = startX + step * i
+            val y = h - 2f - (v / max) * (h - 6f)
+            if (i == 0) {
+                line.moveTo(x, y)
+                fill.moveTo(x, h)
+                fill.lineTo(x, y)
+            } else {
+                line.lineTo(x, y)
+                fill.lineTo(x, y)
+            }
+        }
+        fill.lineTo(w, h)
+        fill.close()
+        drawPath(fill, Brush.verticalGradient(listOf(color.copy(alpha = .22f), color.copy(alpha = 0f))))
+        drawPath(line, color, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+    }
+}
+
+/* ---------------------------- network ---------------------------- */
+
+@Composable
+private fun NetworkCard(vm: HetuViewModel) {
+    val c = Hx.colors
+    val rt = vm.runtime
+    val running = vm.state.running
+    HxSection("网络") {
+        HxGroup {
+            val flag = HxFormat.flag(rt.wanCountryCode)
+            val wan = if (running && rt.wanAddress.isNotBlank() && rt.wanAddress != "—") rt.wanAddress else "—"
+            HxRow(
+                "出口 IP",
+                subtitle = when {
+                    !running -> "代理未运行"
+                    rt.wanState == "error" && rt.wanError.isNotBlank() -> rt.wanError
+                    rt.wanRegion.isNotBlank() && rt.wanRegion != "—" -> listOf(flag, rt.wanRegion).filter { it.isNotBlank() }.joinToString(" ")
+                    else -> "经代理出口探测"
+                },
+                icon = Icons.Rounded.Public,
+            ) {
+                Text(wan, style = MaterialTheme.typography.bodyMedium.merge(HxNumberStyle), color = c.text, maxLines = 1)
+            }
+            HxDivider()
+            HxRow("本机地址", subtitle = rt.lanInterface.takeIf { it.isNotBlank() && it != "—" } ?: "当前网络", icon = Icons.Rounded.Router, iconTint = c.good) {
+                Text(rt.lanAddress.ifBlank { "—" }, style = MaterialTheme.typography.bodyMedium.merge(HxNumberStyle), color = c.text, maxLines = 1)
+            }
+            HxDivider()
+            HxRow(
+                "站点延迟",
+                subtitle = if (running) "点按重新测试" else "启动代理后可测试",
+                icon = Icons.Rounded.Speed,
+                iconTint = c.warn,
+                enabled = running,
+                onClick = vm::measureSites,
+            ) {
+                if (vm.siteTesting) HxSpinner(16.dp)
+                else Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    ProxyLatencyTargets.load(vm.prefs).forEach { target ->
+                        val value = vm.siteDelays[target.name]
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                HxFormat.delay(value),
+                                style = MaterialTheme.typography.labelLarge.merge(HxNumberStyle),
+                                color = HxFormat.delayColor(value),
+                            )
+                            Text(target.name, style = MaterialTheme.typography.labelSmall, color = c.textFaint, maxLines = 1)
+                        }
+                    }
                 }
             }
         }
     }
-
-    sheet?.let { (title, text) -> HxTextSheet(title, text, onDismiss = { sheet = null }) }
 }
+
+/* ---------------------------- config ---------------------------- */
+
+@Composable
+private fun ConfigCard(vm: HetuViewModel, onOpen: () -> Unit) {
+    val c = Hx.colors
+    val tracked = vm.providers.filter { it.hasSubscriptionInfo && it.total > 0L }
+    val used = tracked.sumOf { it.used }
+    val total = tracked.sumOf { it.total }
+    val expire = tracked.mapNotNull { p -> p.expire.takeIf { it > 0L } }.minOrNull() ?: 0L
+    HxSection("配置与订阅") {
+        HxCard(onClick = onOpen) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                HxIconBadge(Icons.Rounded.Description)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(vm.state.config, style = MaterialTheme.typography.titleMedium, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        when {
+                            !vm.state.running -> "点按管理配置和订阅"
+                            vm.providers.isEmpty() -> "当前配置没有在线订阅"
+                            else -> "${vm.providers.size} 个订阅 · ${vm.providers.sumOf { it.nodes.size }} 个节点"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = c.textMuted,
+                    )
+                }
+                if (vm.state.running && vm.providers.isNotEmpty()) {
+                    HxBarAction(Icons.Rounded.Sync, "更新全部订阅", onClick = vm::updateAllProviders, busy = vm.providersUpdatingAll)
+                } else HxChevron()
+            }
+            if (total > 0L) {
+                Spacer(Modifier.height(14.dp))
+                val ratio = (used.toDouble() / total.toDouble()).toFloat().coerceIn(0f, 1f)
+                HxProgressBar(ratio, if (ratio > .9f) c.bad else if (ratio > .75f) c.warn else c.accent)
+                Spacer(Modifier.height(8.dp))
+                Row {
+                    Text("已用 ${HxFormat.bytes(used)} / ${HxFormat.bytes(total)}", style = MaterialTheme.typography.bodySmall, color = c.textMuted, modifier = Modifier.weight(1f))
+                    Text(HxFormat.expireLabel(expire), style = MaterialTheme.typography.bodySmall, color = c.textMuted)
+                }
+            }
+        }
+    }
+}
+
+/* ---------------------------- adblock ---------------------------- */
+
+@Composable
+private fun AdblockCard(vm: HetuViewModel, onOpen: () -> Unit) {
+    val c = Hx.colors
+    val prefs = vm.prefs
+    val enabled = vm.settingsRevision >= 0 && prefs.getBoolean("proxyAdblockChain", true)
+    val effective = vm.state.running && prefs.getBoolean("proxyAdblockLastEffective", false)
+    val count = prefs.getInt("proxyAdblockLastRuleCount", 0)
+    val hits = prefs.getLong("proxyAdblockSessionHits", 0L)
+    val error = prefs.getString("proxyAdblockLastError", "").orEmpty()
+    val (label, tone) = when {
+        !enabled -> "已关闭" to HxTone.Neutral
+        !vm.state.running -> "代理启动后生效" to HxTone.Neutral
+        error.isNotBlank() -> "未完整加载" to HxTone.Warn
+        effective -> "保护中" to HxTone.Good
+        else -> "规则已加载 · 非规则模式" to HxTone.Warn
+    }
+    HxSection("广告过滤") {
+        HxCard(onClick = onOpen) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                HxIconBadge(Icons.Rounded.Shield, tint = if (effective) c.good else c.textMuted)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("DNS 广告过滤", style = MaterialTheme.typography.titleMedium, color = c.text)
+                        Spacer(Modifier.width(8.dp))
+                        HxPill(label, tone)
+                    }
+                    Text(
+                        if (enabled) "${HxFormat.count(count.toLong())} 条规则 · 本次拦截 ${HxFormat.count(hits)} 次" else "开启后在代理内拦截广告与追踪域名",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = c.textMuted,
+                    )
+                }
+                HxChevron()
+            }
+        }
+    }
+}
+

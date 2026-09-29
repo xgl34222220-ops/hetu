@@ -1,281 +1,718 @@
 package io.github.xgl34222220.hetu
 
-import android.content.Intent
-import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
-import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.ContentTransform
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Home
-import androidx.compose.material.icons.rounded.Hub
-import androidx.compose.material.icons.rounded.Rule
-import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.SwapVert
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Snackbar
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import android.app.Application
+import android.content.Context
+import android.content.SharedPreferences
+import android.os.SystemClock
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
-import androidx.lifecycle.ViewModelProvider
-import kotlinx.coroutines.flow.collectLatest
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import io.github.xgl34222220.hetu.ui.HetuComposeController
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+
+internal enum class HxTab(val label: String) { Home("首页"), Proxies("代理"), Connections("连接"), Rules("规则"), Settings("设置") }
+
+internal enum class HxRunOp { Start, Stop, Restart, Reload }
+
+/** Result of a long-running per-item task (rule-set update, provider update…). */
+internal data class HxTask(val running: Boolean = false, val ok: Boolean? = null, val message: String = "")
 
 /**
- * The only launcher activity. Tabs and sub-pages are Compose destinations inside it,
- * so navigation, transitions and state are consistent everywhere.
+ * Single source of truth for the UI. Every action here calls the real Root / Mihomo
+ * backend; nothing is simulated. Polling runs only while the activity is started.
  */
-class HetuActivity : ComponentActivity() {
-    private lateinit var vm: HetuViewModel
+internal class HetuViewModel(application: Application) : AndroidViewModel(application) {
+    private val app: Application = application
+    val prefs: SharedPreferences = app.getSharedPreferences("hetu", Context.MODE_PRIVATE)
+    val controller = ProxyComposeController(app)
+    val repo = ProxyDashboardRepository(app)
+    val inspector = ProxyRuntimeInspector(app)
+    val filters = HetuComposeController(app)
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        vm = ViewModelProvider(this)[HetuViewModel::class.java]
-        if (savedInstanceState == null) applyStartPage(intent)
-        setContent {
-            HetuAppTheme(appearance = vm.appearance, dynamic = vm.dynamicColor) {
-                HetuRoot(vm)
-            }
-        }
-    }
+    /* ---------------- navigation ---------------- */
+    var tab by mutableStateOf(HxTab.Home)
 
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-        applyStartPage(intent)
-    }
-
-    override fun onStart() {
-        super.onStart()
-        vm.onForeground()
-    }
-
-    override fun onStop() {
-        vm.onBackground()
-        super.onStop()
-    }
-
-    private fun applyStartPage(intent: Intent?) {
-        when (intent?.getStringExtra(EXTRA_START_PAGE)?.lowercase()) {
-            "settings", "tools" -> vm.tab = HxTab.Settings
-            "panel", "strategy", "proxies", "panelsheet", "strategysheet" -> vm.tab = HxTab.Proxies
-            "connections" -> vm.tab = HxTab.Connections
-            "rules" -> vm.tab = HxTab.Rules
-            "home" -> vm.tab = HxTab.Home
-        }
-    }
-
-    companion object {
-        const val EXTRA_START_PAGE = "io.github.xgl34222220.hetu.START_PAGE"
-    }
-}
-
-/* ------------------------------------------------------------------ */
-/*  Navigation                                                          */
-/* ------------------------------------------------------------------ */
-
-internal sealed class HxRoute(val key: String) {
-    data object Main : HxRoute("main")
-    data object Configs : HxRoute("configs")
-    data object ConfigEditor : HxRoute("config-editor")
-    data object Providers : HxRoute("providers")
-    data object Adblock : HxRoute("adblock")
-    data object Network : HxRoute("network")
-    data object Apps : HxRoute("apps")
-    data object Cores : HxRoute("cores")
-    data object About : HxRoute("about")
-}
-
-internal class HxNav {
-    val stack = mutableStateListOf<HxRoute>(HxRoute.Main)
-    var forward by mutableStateOf(true)
+    /* ---------------- appearance ---------------- */
+    var appearance by mutableStateOf(prefs.getString("appearance", "system") ?: "system")
+        private set
+    var dynamicColor by mutableStateOf(prefs.getBoolean("hetuDynamicColor", false))
         private set
 
-    val current: HxRoute get() = stack.last()
-
-    fun push(route: HxRoute) {
-        if (stack.last() == route) return
-        forward = true
-        stack.add(route)
+    fun setAppearanceMode(value: String) {
+        prefs.edit().putString("appearance", value).apply()
+        appearance = value
     }
 
-    fun pop(): Boolean {
-        if (stack.size <= 1) return false
-        forward = false
-        stack.removeAt(stack.lastIndex)
-        return true
-    }
-}
-
-internal val LocalNav = staticCompositionLocalOf<HxNav> { error("HxNav not provided") }
-
-@Composable
-internal fun HetuRoot(vm: HetuViewModel) {
-    val nav = remember { HxNav() }
-    val routeHolder = rememberSaveableStateHolder()
-    val snackbar = remember { SnackbarHostState() }
-    val c = Hx.colors
-
-    LaunchedEffect(vm) {
-        vm.messages.collectLatest { snackbar.showSnackbar(it) }
+    fun setDynamic(value: Boolean) {
+        prefs.edit().putBoolean("hetuDynamicColor", value).apply()
+        dynamicColor = value
     }
 
-    BackHandler(enabled = nav.stack.size > 1) { nav.pop() }
-    BackHandler(enabled = nav.stack.size == 1 && vm.tab != HxTab.Home) { vm.tab = HxTab.Home }
+    /* ---------------- runtime state ---------------- */
+    var state by mutableStateOf(initialState())
+        private set
+    var runtime by mutableStateOf(initialRuntime())
+        private set
+    var upRate by mutableLongStateOf(0L)
+        private set
+    var downRate by mutableLongStateOf(0L)
+        private set
+    var cpuPercent by mutableFloatStateOf(0f)
+        private set
+    var operation by mutableStateOf<HxRunOp?>(null)
+        private set
+    var operationText by mutableStateOf("")
+        private set
+    var startupError by mutableStateOf<String?>(null)
+    var refreshing by mutableStateOf(false)
+        private set
+    var loadedOnce by mutableStateOf(false)
+        private set
+    var coreVersion by mutableStateOf("")
+        private set
+    var settingsRevision by mutableIntStateOf(0)
+        private set
 
-    androidx.compose.runtime.CompositionLocalProvider(LocalNav provides nav) {
-        Box(Modifier.fillMaxSize().background(c.canvas)) {
-            AnimatedContent(
-                targetState = nav.current,
-                transitionSpec = { routeTransition(nav.forward) },
-                label = "route",
-            ) { route ->
-                routeHolder.SaveableStateProvider(route.key) {
-                    when (route) {
-                        HxRoute.Main -> MainTabs(vm)
-                        HxRoute.Configs -> ConfigsScreen(vm)
-                        HxRoute.ConfigEditor -> ConfigEditorScreen(vm)
-                        HxRoute.Providers -> ProvidersScreen(vm)
-                        HxRoute.Adblock -> AdblockScreen(vm)
-                        HxRoute.Network -> NetworkSettingsScreen(vm)
-                        HxRoute.Apps -> AppListScreen(vm)
-                        HxRoute.Cores -> CoresScreen(vm)
-                        HxRoute.About -> AboutScreen(vm)
-                    }
-                }
+    var providers by mutableStateOf<List<DashboardProviderUi>>(emptyList())
+        private set
+    var siteDelays by mutableStateOf(ProxyLatencyTargets.lastResults(prefs))
+        private set
+    var siteTesting by mutableStateOf(false)
+        private set
+
+    /** node name -> delay (ms, -1 timeout, -2 failed). */
+    val delays = mutableStateMapOf<String, Long>()
+    /** Last ~40 samples of (download, upload) bytes/s for the home sparkline. */
+    val rateHistory = androidx.compose.runtime.mutableStateListOf<Long>()
+    val testingNodes = mutableStateMapOf<String, Boolean>()
+    val testingGroups = mutableStateMapOf<String, Boolean>()
+    val pendingSelection = mutableStateMapOf<String, String>()
+    var testingAll by mutableStateOf(false)
+        private set
+
+    /* ---------------- rules ---------------- */
+    var rules by mutableStateOf<List<ProxyRuleUi>>(emptyList())
+        private set
+    var rulesLoading by mutableStateOf(false)
+        private set
+    var ruleSets by mutableStateOf<List<DashboardRuleSetUi>>(emptyList())
+        private set
+    var ruleSetsLoading by mutableStateOf(false)
+        private set
+    val ruleSetTasks = mutableStateMapOf<String, HxTask>()
+    var ruleSetsUpdatingAll by mutableStateOf(false)
+        private set
+    val providerTasks = mutableStateMapOf<String, HxTask>()
+    var providersUpdatingAll by mutableStateOf(false)
+        private set
+
+    /* ---------------- messages ---------------- */
+    private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 16)
+    val messages: SharedFlow<String> = _messages
+    fun toast(text: String) {
+        if (text.isNotBlank()) _messages.tryEmit(text)
+    }
+
+    private fun errorText(error: Throwable, fallback: String): String =
+        error.message?.takeIf { it.isNotBlank() } ?: fallback
+
+    /* ---------------- polling ---------------- */
+    private var pollJob: Job? = null
+    private var lastUp = 0L
+    private var lastDown = 0L
+    private var lastAt = 0L
+    private var lastProcessTicks = 0L
+    private var lastSystemTicks = 0L
+    private var lastProviderRefreshAt = 0L
+    private val coldStartAt = SystemClock.elapsedRealtime()
+    private val measuredAt = HashMap<String, Long>()
+
+    fun onForeground() {
+        if (pollJob?.isActive == true) return
+        pollJob = viewModelScope.launch {
+            launch {
+                delay(600)
+                try { repo.ensureIcons() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { }
             }
-
-            val bottomOffset: Dp = if (nav.current == HxRoute.Main) 88.dp else 12.dp
-            SnackbarHost(
-                hostState = snackbar,
-                modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = bottomOffset, start = 12.dp, end = 12.dp),
-            ) { data ->
-                Snackbar(
-                    snackbarData = data,
-                    shape = RoundedCornerShape(14.dp),
-                    containerColor = c.text,
-                    contentColor = c.canvas,
-                )
+            while (isActive) {
+                if (operation == null) refreshNow()
+                delay(if (tab == HxTab.Home || tab == HxTab.Connections) 2_000L else 4_000L)
             }
         }
-
-        vm.startupError?.let { text ->
-            HxTextSheet(title = "启动失败", text = text, onDismiss = { vm.startupError = null })
-        }
+        ProxyStatusNotificationService.refresh(app)
     }
-}
 
-private fun routeTransition(forward: Boolean): ContentTransform {
-    val duration = HxMotion.Long
-    return if (forward) {
-        (slideInHorizontally(tween(duration, easing = HxMotion.Emphasized)) { it / 3 } + fadeIn(tween(HxMotion.Medium, easing = HxMotion.Emphasized)))
-            .togetherWith(slideOutHorizontally(tween(duration, easing = HxMotion.Emphasized)) { -it / 8 } + fadeOut(tween(HxMotion.Short)))
-            .apply { targetContentZIndex = 1f }
-    } else {
-        (slideInHorizontally(tween(duration, easing = HxMotion.Emphasized)) { -it / 8 } + fadeIn(tween(HxMotion.Medium)))
-            .togetherWith(slideOutHorizontally(tween(duration, easing = HxMotion.Emphasized)) { it / 3 } + fadeOut(tween(HxMotion.Short)))
-            .apply { targetContentZIndex = -1f }
+    fun onBackground() {
+        pollJob?.cancel()
+        pollJob = null
     }
-}
 
-private data class HxTabSpec(val tab: HxTab, val icon: ImageVector)
-
-@Composable
-private fun MainTabs(vm: HetuViewModel) {
-    val c = Hx.colors
-    val tabHolder = rememberSaveableStateHolder()
-    val tabs = remember {
-        listOf(
-            HxTabSpec(HxTab.Home, Icons.Rounded.Home),
-            HxTabSpec(HxTab.Proxies, Icons.Rounded.Hub),
-            HxTabSpec(HxTab.Connections, Icons.Rounded.SwapVert),
-            HxTabSpec(HxTab.Rules, Icons.Rounded.Rule),
-            HxTabSpec(HxTab.Settings, Icons.Rounded.Settings),
+    private fun initialState(): ProxyComposeState {
+        val profile = ProxyRuntimeProfile.load(prefs)
+        val cachedConfig = prefs.getString("proxySelectedConfig.${profile.core.id}", "").orEmpty().ifBlank { "尚未选择配置" }
+        return ProxyComposeState(
+            running = prefs.getBoolean("proxyUiLastRunning", prefs.getBoolean("proxyRootWanted", false)),
+            core = profile.core.label,
+            mode = profile.mode.label,
+            ipv6 = profile.ipv6.id,
+            autoOverwrite = profile.autoOverwrite,
+            config = prefs.getString("proxyUiLastConfig", cachedConfig) ?: cachedConfig,
         )
     }
-    Scaffold(
-        containerColor = c.canvas,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        bottomBar = {
-            Column(Modifier.fillMaxWidth()) {
-                HorizontalDivider(thickness = 0.5.dp, color = c.line)
-                NavigationBar(containerColor = c.surface, tonalElevation = 0.dp) {
-                    tabs.forEach { spec ->
-                        NavigationBarItem(
-                            selected = vm.tab == spec.tab,
-                            onClick = { vm.tab = spec.tab },
-                            icon = { Icon(spec.icon, contentDescription = spec.tab.label) },
-                            label = { Text(spec.tab.label, style = MaterialTheme.typography.labelMedium) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = c.accent,
-                                selectedTextColor = c.accent,
-                                indicatorColor = c.accentSoft,
-                                unselectedIconColor = c.textMuted,
-                                unselectedTextColor = c.textMuted,
-                            ),
-                        )
+
+    private fun initialRuntime(): ProxyRuntimeSnapshot = ProxyRuntimeSnapshot(
+        running = prefs.getBoolean("proxyUiLastRunning", false),
+        elapsedSeconds = prefs.getLong("proxyUiLastElapsed", 0L),
+        rssBytes = prefs.getLong("proxyUiLastRss", 0L),
+        lanAddress = prefs.getString("proxyUiLastLan", "—") ?: "—",
+        lanInterface = prefs.getString("proxyUiLastLanIf", "—") ?: "—",
+        wanAddress = prefs.getString("proxyUiLastWan", "—") ?: "—",
+        wanCountryCode = prefs.getString("proxyUiLastWanCountry", "") ?: "",
+        wanRegion = prefs.getString("proxyUiLastWanRegion", "—") ?: "—",
+        wanState = "stale",
+    )
+
+    suspend fun refreshNow() {
+        try {
+            val startedAt = SystemClock.elapsedRealtime()
+            val next = repo.state()
+            val now = SystemClock.elapsedRealtime()
+            // Right after process start a recovering core may briefly look stopped.
+            if (state.running && !next.running && prefs.getBoolean("proxyRootWanted", false) && now - coldStartAt < 2_500L) return
+
+            if (next.panelReady && lastAt > 0L && now > lastAt && next.uploadTotal >= lastUp && next.downloadTotal >= lastDown) {
+                val elapsed = now - lastAt
+                upRate = ((next.uploadTotal - lastUp) * 1000L / elapsed).coerceAtLeast(0L)
+                downRate = ((next.downloadTotal - lastDown) * 1000L / elapsed).coerceAtLeast(0L)
+                rateHistory.add(downRate + upRate)
+                while (rateHistory.size > 40) rateHistory.removeAt(0)
+            }
+            if (!next.running) {
+                upRate = 0L
+                downRate = 0L
+                rateHistory.clear()
+            }
+            syncCoreLatencyResults(next.groups, delays, measuredAt, startedAt)
+
+            val sampled = if (next.running) {
+                try { inspector.sample() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { runtime }
+            } else ProxyRuntimeSnapshot()
+            if (next.running && lastSystemTicks > 0L && sampled.systemTicks > lastSystemTicks && sampled.processTicks >= lastProcessTicks) {
+                val cores = Runtime.getRuntime().availableProcessors().coerceAtLeast(1)
+                cpuPercent = ((sampled.processTicks - lastProcessTicks).toDouble() /
+                    (sampled.systemTicks - lastSystemTicks).toDouble() * 100.0 * cores).toFloat().coerceIn(0f, 100f)
+            } else if (!next.running) cpuPercent = 0f
+            lastProcessTicks = sampled.processTicks
+            lastSystemTicks = sampled.systemTicks
+            runtime = sampled
+
+            if (!next.running) {
+                providers = emptyList()
+                lastProviderRefreshAt = 0L
+                coreVersion = ""
+            } else {
+                if (providers.isEmpty() || now - lastProviderRefreshAt > 30_000L) {
+                    lastProviderRefreshAt = now
+                    val fresh = try { repo.providers() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { providers }
+                    if (fresh.isNotEmpty() || providers.isEmpty()) providers = fresh
+                }
+                if (coreVersion.isBlank()) coreVersion = repo.coreVersion()
+            }
+
+            state = if (next.running && !next.panelReady) {
+                next.copy(groups = state.groups, connections = state.connections)
+            } else next
+            if (next.running) startupError = null
+            if (next.panelReady) {
+                lastAt = now
+                lastUp = next.uploadTotal
+                lastDown = next.downloadTotal
+            }
+            loadedOnce = true
+            persistSnapshot(next, sampled)
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (_: Exception) {
+            // Polling errors are shown through state.message on the next good read.
+        }
+    }
+
+    private fun persistSnapshot(next: ProxyComposeState, sampled: ProxyRuntimeSnapshot) {
+        prefs.edit()
+            .putBoolean("proxyUiLastRunning", next.running)
+            .putString("proxyUiLastConfig", next.config)
+            .putLong("proxyUiLastElapsed", sampled.elapsedSeconds)
+            .putLong("proxyUiLastRss", sampled.rssBytes)
+            .putString("proxyUiLastLan", sampled.lanAddress)
+            .putString("proxyUiLastLanIf", sampled.lanInterface)
+            .putString("proxyUiLastWan", sampled.wanAddress)
+            .putString("proxyUiLastWanCountry", sampled.wanCountryCode)
+            .putString("proxyUiLastWanRegion", sampled.wanRegion)
+            .apply()
+    }
+
+    fun pullRefresh() {
+        if (refreshing) return
+        viewModelScope.launch {
+            refreshing = true
+            try {
+                refreshNow()
+                if (state.running) {
+                    coroutineScope {
+                        val p = async { try { repo.providers() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { null } }
+                        val s = async { try { repo.siteLatencies() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { null } }
+                        p.await()?.let { providers = it; lastProviderRefreshAt = SystemClock.elapsedRealtime() }
+                        s.await()?.let { if (it.isNotEmpty()) { siteDelays = it; ProxyLatencyTargets.persistLast(prefs, it) } }
                     }
                 }
-            }
-        },
-    ) { inner ->
-        val bottom = inner.calculateBottomPadding()
-        AnimatedContent(
-            targetState = vm.tab,
-            transitionSpec = {
-                (fadeIn(tween(HxMotion.Medium, delayMillis = 40, easing = HxMotion.Emphasized)) +
-                    scaleIn(tween(HxMotion.Medium, delayMillis = 40, easing = HxMotion.Emphasized), initialScale = .985f))
-                    .togetherWith(fadeOut(tween(90)))
-            },
-            label = "tab",
-        ) { tab ->
-            tabHolder.SaveableStateProvider("tab-${tab.name}") {
-                when (tab) {
-                    HxTab.Home -> HomeScreen(vm, bottom)
-                    HxTab.Proxies -> ProxiesScreen(vm, bottom)
-                    HxTab.Connections -> ConnectionsScreen(vm, bottom)
-                    HxTab.Rules -> RulesScreen(vm, bottom)
-                    HxTab.Settings -> SettingsScreen(vm, bottom)
-                }
+            } finally {
+                refreshing = false
             }
         }
+    }
+
+    /* ---------------- lifecycle actions ---------------- */
+
+    fun toggle() {
+        if (operation != null) return
+        val stopping = state.running
+        operation = if (stopping) HxRunOp.Stop else HxRunOp.Start
+        viewModelScope.launch {
+            operationText = if (stopping) "正在停止…" else "正在启动…"
+            try {
+                if (stopping) controller.stop { operationText = it } else controller.start { operationText = it }
+                state = controller.state()
+                if (!stopping) toast("代理已启动")
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) {
+                val reason = errorText(error, "操作失败")
+                // Configuration problems are known before Root is touched; report them at once.
+                val configProblem = !stopping && (reason.contains("占位") || reason.contains("尚未选择配置") || reason.contains("仅所选应用代理"))
+                operationText = "确认最终运行状态…"
+                val recovered = if (configProblem || stopping) null else settleStart()
+                if (recovered != null) {
+                    state = recovered
+                } else if (!stopping) {
+                    startupError = if (reason.contains("仅所选应用代理")) {
+                        "当前应用范围是「仅所选应用代理」，但没有选中任何可用应用。\n\n请到「设置 → 应用名单」至少勾选一个应用，或把应用范围改为其它模式后再启动。"
+                    } else if (configProblem) {
+                        reason
+                    } else {
+                        val diagnostics = try { controller.diagnostics() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { "" }
+                        if (diagnostics.isBlank()) reason else "$reason\n\n—— Root / Mihomo 诊断 ——\n${diagnostics.trim()}"
+                    }
+                } else {
+                    toast(reason)
+                }
+            } finally {
+                operation = null
+                operationText = ""
+                refreshNow()
+            }
+        }
+    }
+
+    private suspend fun settleStart(): ProxyComposeState? {
+        for (wait in longArrayOf(350L, 1_050L, 1_800L)) {
+            delay(wait)
+            val confirmed = try { controller.state() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { null }
+            if (confirmed?.running == true) return confirmed
+        }
+        return null
+    }
+
+    fun restart() {
+        if (operation != null || !state.running) return
+        operation = HxRunOp.Restart
+        viewModelScope.launch {
+            operationText = "正在重启…"
+            ProxyRuntimeSettings.beginApply(prefs)
+            try {
+                controller.restart { operationText = it }
+                prefs.edit().remove("proxyRootRuntimeRefreshPending").remove("proxyRootUpgradeError").apply()
+                toast("已重启，设置已生效")
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) {
+                ProxyRuntimeSettings.recordFailure(prefs, error)
+                toast(errorText(error, "重启失败"))
+            } finally {
+                operation = null
+                operationText = ""
+                settingsRevision++
+                refreshNow()
+            }
+        }
+    }
+
+    fun reload() {
+        if (operation != null || !state.running) return
+        operation = HxRunOp.Reload
+        viewModelScope.launch {
+            operationText = "正在重载配置…"
+            try {
+                toast(controller.reload())
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) {
+                toast(errorText(error, "重载失败"))
+            } finally {
+                operation = null
+                operationText = ""
+                refreshNow()
+            }
+        }
+    }
+
+    fun setTrafficMode(mode: String) {
+        if (!state.running) return
+        viewModelScope.launch {
+            try {
+                repo.setTrafficMode(mode)
+                refreshNow()
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) {
+                toast(errorText(error, "切换模式失败"))
+            }
+        }
+    }
+
+    fun settingsPending(): Boolean = ProxyRuntimeSettings.pending(state.running, prefs)
+
+    fun bumpSettings() { settingsRevision++ }
+
+    /* ---------------- proxies ---------------- */
+
+    fun select(group: String, node: String) {
+        if (pendingSelection.containsKey(group)) return
+        pendingSelection[group] = node
+        viewModelScope.launch {
+            try {
+                repo.select(group, node, prefs.getBoolean("hetuCloseOnSwitch", true))
+                refreshNow()
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) {
+                toast("切换失败：" + errorText(error, "未知错误"))
+            } finally {
+                pendingSelection.remove(group)
+            }
+        }
+    }
+
+    private suspend fun probe(node: String) {
+        try {
+            delays[node] = repo.delay(node)
+            measuredAt[node] = SystemClock.elapsedRealtime()
+        } catch (failure: MihomoControllerClient.DelayFailure) {
+            delays[node] = if (failure.timedOut) -1L else -2L
+            measuredAt[node] = SystemClock.elapsedRealtime()
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (_: Exception) {
+            // Transport error: keep the previous measurement.
+        }
+    }
+
+    fun testNode(node: String) {
+        if (testingNodes[node] == true || !state.running) return
+        testingNodes[node] = true
+        viewModelScope.launch {
+            try { probe(node) } finally { testingNodes.remove(node) }
+        }
+    }
+
+    fun testGroup(group: ProxyGroupUi) {
+        if (testingGroups[group.name] == true || !state.running) return
+        val targets = group.nodes.map { it.name }.filter { it.uppercase() !in setOf("DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE") }.distinct()
+        if (targets.isEmpty()) return
+        testingGroups[group.name] = true
+        targets.forEach { testingNodes[it] = true }
+        viewModelScope.launch {
+            try {
+                for (chunk in targets.chunked(8)) {
+                    coroutineScope {
+                        chunk.map { node ->
+                            async {
+                                try { probe(node) } finally { testingNodes.remove(node) }
+                            }
+                        }.awaitAll()
+                    }
+                }
+            } finally {
+                targets.forEach { testingNodes.remove(it) }
+                testingGroups.remove(group.name)
+            }
+        }
+    }
+
+    fun testAll() {
+        if (testingAll || !state.running) return
+        testingAll = true
+        viewModelScope.launch {
+            try {
+                val result = repo.globalDelay()
+                delays.putAll(result)
+                val stamp = SystemClock.elapsedRealtime()
+                result.keys.forEach { measuredAt[it] = stamp }
+                val ok = result.values.count { it > 0L }
+                toast("测速完成：$ok / ${result.size} 个节点可用")
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) {
+                toast(errorText(error, "测速失败"))
+            } finally {
+                testingAll = false
+            }
+        }
+    }
+
+    fun measureSites() {
+        if (siteTesting || !state.running) return
+        siteTesting = true
+        viewModelScope.launch {
+            try {
+                val measured = repo.siteLatencies()
+                if (measured.isNotEmpty()) {
+                    siteDelays = measured
+                    ProxyLatencyTargets.persistLast(prefs, measured)
+                }
+                if (measured.values.none { it > 0L }) toast("站点测速失败，请检查网络")
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) {
+                toast(errorText(error, "测速失败"))
+            } finally {
+                siteTesting = false
+            }
+        }
+    }
+
+    /* ---------------- connections ---------------- */
+
+    fun closeConnection(id: String) {
+        viewModelScope.launch {
+            try {
+                repo.closeConnection(id)
+                refreshNow()
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) {
+                toast(errorText(error, "断开失败"))
+            }
+        }
+    }
+
+    fun closeAll() {
+        viewModelScope.launch {
+            try {
+                repo.closeAll()
+                toast("已断开全部连接")
+                refreshNow()
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) {
+                toast(errorText(error, "断开失败"))
+            }
+        }
+    }
+
+    /* ---------------- rules / rule sets / providers ---------------- */
+
+    fun loadRules() {
+        if (rulesLoading || !state.running) return
+        rulesLoading = true
+        viewModelScope.launch {
+            try {
+                rules = controller.rules()
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) {
+                toast(errorText(error, "规则读取失败"))
+            } finally {
+                rulesLoading = false
+            }
+        }
+    }
+
+    fun loadRuleSets() {
+        if (ruleSetsLoading || !state.running) return
+        ruleSetsLoading = true
+        viewModelScope.launch {
+            try {
+                ruleSets = repo.ruleSets()
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) {
+                toast(errorText(error, "规则集读取失败"))
+            } finally {
+                ruleSetsLoading = false
+            }
+        }
+    }
+
+    fun updateRuleSet(name: String) {
+        if (ruleSetTasks[name]?.running == true || !state.running) return
+        ruleSetTasks[name] = HxTask(running = true)
+        viewModelScope.launch {
+            try {
+                val fresh = repo.refreshRuleSet(name)
+                if (fresh != null) ruleSets = ruleSets.map { if (it.name == name) fresh else it }
+                ruleSetTasks[name] = HxTask(ok = true, message = "已更新")
+            } catch (cancel: CancellationException) {
+                ruleSetTasks.remove(name)
+                throw cancel
+            } catch (error: Exception) {
+                ruleSetTasks[name] = HxTask(ok = false, message = errorText(error, "更新失败"))
+            }
+        }
+    }
+
+    /** Updates every remote (HTTP) rule-set, three at a time, with per-item status. */
+    fun updateAllRuleSets() {
+        if (ruleSetsUpdatingAll || !state.running) return
+        ruleSetsUpdatingAll = true
+        viewModelScope.launch {
+            var ok = 0
+            var failed = 0
+            try {
+                val list = ruleSets.ifEmpty { repo.ruleSets().also { ruleSets = it } }
+                val targets = list.filter { it.vehicleType.equals("HTTP", ignoreCase = true) }
+                if (targets.isEmpty()) {
+                    toast("没有可在线更新的规则集（本地/内联规则集无需更新）")
+                    return@launch
+                }
+                targets.forEach { ruleSetTasks[it.name] = HxTask(running = true) }
+                for (chunk in targets.chunked(3)) {
+                    coroutineScope {
+                        chunk.map { item ->
+                            async {
+                                try {
+                                    repo.refreshRuleSet(item.name)
+                                    ruleSetTasks[item.name] = HxTask(ok = true, message = "已更新")
+                                    ok++
+                                } catch (cancel: CancellationException) {
+                                    throw cancel
+                                } catch (error: Exception) {
+                                    ruleSetTasks[item.name] = HxTask(ok = false, message = errorText(error, "更新失败"))
+                                    failed++
+                                }
+                            }
+                        }.awaitAll()
+                    }
+                }
+                ruleSets = try { repo.ruleSets() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { ruleSets }
+                toast(if (failed == 0) "全部 $ok 个规则集已更新" else "已更新 $ok 个，$failed 个失败")
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) {
+                toast(errorText(error, "规则集更新失败"))
+            } finally {
+                ruleSetsUpdatingAll = false
+            }
+        }
+    }
+
+    fun loadProviders() {
+        if (!state.running) return
+        viewModelScope.launch {
+            try {
+                providers = repo.providers()
+                lastProviderRefreshAt = SystemClock.elapsedRealtime()
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) {
+                toast(errorText(error, "订阅读取失败"))
+            }
+        }
+    }
+
+    fun updateProvider(name: String) {
+        if (providerTasks[name]?.running == true || !state.running) return
+        providerTasks[name] = HxTask(running = true)
+        viewModelScope.launch {
+            try {
+                val fresh = repo.refreshProvider(name)
+                if (fresh != null) providers = providers.map { if (it.name == name) fresh else it }
+                providerTasks[name] = HxTask(ok = true, message = "已更新")
+                refreshNow()
+            } catch (cancel: CancellationException) {
+                providerTasks.remove(name)
+                throw cancel
+            } catch (error: Exception) {
+                providerTasks[name] = HxTask(ok = false, message = errorText(error, "更新失败"))
+            }
+        }
+    }
+
+    fun updateAllProviders() {
+        if (providersUpdatingAll || !state.running) return
+        providersUpdatingAll = true
+        viewModelScope.launch {
+            var ok = 0
+            var failed = 0
+            try {
+                val targets = providers.ifEmpty { repo.providers() }
+                if (targets.isEmpty()) {
+                    toast("当前配置没有在线订阅（proxy-providers）")
+                    return@launch
+                }
+                targets.forEach { providerTasks[it.name] = HxTask(running = true) }
+                for (chunk in targets.chunked(3)) {
+                    coroutineScope {
+                        chunk.map { item ->
+                            async {
+                                try {
+                                    repo.refreshProvider(item.name)
+                                    providerTasks[item.name] = HxTask(ok = true, message = "已更新")
+                                    ok++
+                                } catch (cancel: CancellationException) {
+                                    throw cancel
+                                } catch (error: Exception) {
+                                    providerTasks[item.name] = HxTask(ok = false, message = errorText(error, "更新失败"))
+                                    failed++
+                                }
+                            }
+                        }.awaitAll()
+                    }
+                }
+                providers = try { repo.providers() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { providers }
+                lastProviderRefreshAt = SystemClock.elapsedRealtime()
+                toast(if (failed == 0) "全部 $ok 个订阅已更新" else "已更新 $ok 个，$failed 个失败")
+                refreshNow()
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) {
+                toast(errorText(error, "订阅更新失败"))
+            } finally {
+                providersUpdatingAll = false
+            }
+        }
+    }
+
+    /** Hot-reload the running core after a config change, or just report it's saved. */
+    fun applyConfigChange(savedMessage: String) {
+        if (!state.running) {
+            toast("$savedMessage，下次启动生效")
+            return
+        }
+        reload()
     }
 }

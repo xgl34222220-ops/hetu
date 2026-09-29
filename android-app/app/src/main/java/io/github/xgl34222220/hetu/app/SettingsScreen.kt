@@ -1,889 +1,460 @@
 package io.github.xgl34222220.hetu
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
-import android.widget.Toast
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.LocalIndication
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.ChevronRight
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.ContentCopy
-import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.Apps
+import androidx.compose.material.icons.rounded.Bolt
+import androidx.compose.material.icons.rounded.Cable
+import androidx.compose.material.icons.rounded.Contrast
+import androidx.compose.material.icons.rounded.DarkMode
+import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.Dns
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.GppGood
 import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material.icons.rounded.LinkOff
+import androidx.compose.material.icons.rounded.Memory
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Public
+import androidx.compose.material.icons.rounded.RestartAlt
+import androidx.compose.material.icons.rounded.Restore
+import androidx.compose.material.icons.rounded.Route
+import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material.icons.rounded.Speed
+import androidx.compose.material.icons.rounded.SwapHoriz
+import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.UploadFile
+import androidx.compose.material.icons.rounded.Web
+import androidx.compose.material.icons.rounded.WifiTethering
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-
-/* ------------------------------------------------------------------ */
-/*  Page scaffold                                                      */
-/* ------------------------------------------------------------------ */
-
-internal val HxTopBarHeight = 56.dp
-
-/**
- * Every screen uses this. A large left-aligned title scrolls with the content; once it
- * leaves the viewport the same title appears centred in the pinned bar. Title position
- * never animates sideways, so there is no half-way "slightly left" state.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-internal fun HxPage(
-    title: String,
-    subtitle: String? = null,
-    onBack: (() -> Unit)? = null,
-    bottomPadding: Dp = 0.dp,
-    listState: LazyListState = rememberLazyListState(),
-    refreshing: Boolean = false,
-    onRefresh: (() -> Unit)? = null,
-    actions: @Composable RowScope.() -> Unit = {},
-    overlay: @Composable BoxScope.() -> Unit = {},
-    content: LazyListScope.() -> Unit,
-) {
-    val c = Hx.colors
-    val density = LocalDensity.current
-    val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val thresholdPx = with(density) { 44.dp.toPx() }
-    val collapsed by remember(listState) {
-        derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > thresholdPx }
-    }
-    val barAlpha by animateFloatAsState(if (collapsed) 1f else 0f, tween(HxMotion.Short), label = "barAlpha")
-
-    Box(Modifier.fillMaxSize().background(c.canvas)) {
-        val list: @Composable () -> Unit = {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(
-                    top = statusTop + HxTopBarHeight,
-                    bottom = bottomPadding + 24.dp,
-                ),
-            ) {
-                item(key = "hx-page-header") {
-                    Column(Modifier.fillMaxWidth().padding(start = Hx.gutter, end = Hx.gutter, bottom = 14.dp)) {
-                        Text(
-                            title,
-                            style = MaterialTheme.typography.headlineMedium,
-                            color = c.text,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        if (!subtitle.isNullOrBlank()) {
-                            Spacer(Modifier.height(2.dp))
-                            Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = c.textMuted, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        }
-                    }
-                }
-                content()
-            }
-        }
-        if (onRefresh != null) {
-            val pullState = rememberPullToRefreshState()
-            PullToRefreshBox(
-                isRefreshing = refreshing,
-                onRefresh = { if (!refreshing) onRefresh() },
-                modifier = Modifier.fillMaxSize(),
-                state = pullState,
-                indicator = {
-                    PullToRefreshDefaults.Indicator(
-                        state = pullState,
-                        isRefreshing = refreshing,
-                        modifier = Modifier.align(Alignment.TopCenter).padding(top = statusTop + HxTopBarHeight - 8.dp),
-                        containerColor = c.surface,
-                        color = c.accent,
-                    )
-                },
-            ) { list() }
-        } else {
-            list()
-        }
-
-        // Pinned bar
-        Column(Modifier.fillMaxWidth().align(Alignment.TopCenter)) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .background(c.canvas.copy(alpha = barAlpha))
-                    .statusBarsPadding()
-                    .height(HxTopBarHeight),
-            ) {
-                Text(
-                    title,
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .padding(horizontal = 96.dp)
-                        .graphicsLayer {
-                            alpha = barAlpha
-                            translationY = (1f - barAlpha) * 6.dp.toPx()
-                        },
-                    style = MaterialTheme.typography.titleMedium,
-                    color = c.text,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center,
-                )
-                if (onBack != null) {
-                    IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart).padding(start = 4.dp)) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回", tint = c.text)
-                    }
-                }
-                Row(
-                    Modifier.align(Alignment.CenterEnd).padding(end = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    content = actions,
-                )
-            }
-            HorizontalDivider(color = c.line.copy(alpha = barAlpha), thickness = 0.5.dp)
-        }
-        overlay()
-    }
-}
-
-/* ------------------------------------------------------------------ */
-/*  Surfaces                                                            */
-/* ------------------------------------------------------------------ */
-
-/** Press feedback shared by every tappable surface: a small, quick scale. */
-@Composable
-internal fun Modifier.hxPressScale(source: MutableInteractionSource, pressedScale: Float = .975f): Modifier {
-    val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) pressedScale else 1f, HxMotion.press(), label = "press")
-    return this.graphicsLayer { scaleX = scale; scaleY = scale }
-}
+import androidx.core.content.ContextCompat
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 
 @Composable
-internal fun HxCard(
-    modifier: Modifier = Modifier,
-    onClick: (() -> Unit)? = null,
-    color: Color = Hx.colors.surface,
-    padding: PaddingValues = PaddingValues(16.dp),
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    val source = remember { MutableInteractionSource() }
-    val c = Hx.colors
-    Surface(
-        modifier = modifier.then(if (onClick != null) Modifier.hxPressScale(source) else Modifier),
-        shape = Hx.cardShape,
-        color = color,
-        border = if (c.dark) BorderStroke(0.5.dp, c.line) else null,
-    ) {
-        Column(
-            Modifier
-                .then(if (onClick != null) Modifier.clickable(interactionSource = source, indication = LocalIndication.current, onClick = onClick) else Modifier)
-                .padding(padding),
-            content = content,
-        )
-    }
-}
-
-/** A titled group of rows. */
-@Composable
-internal fun HxSection(
-    title: String? = null,
-    modifier: Modifier = Modifier,
-    trailing: @Composable (RowScope.() -> Unit)? = null,
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    Column(modifier.fillMaxWidth().padding(horizontal = Hx.gutter).padding(bottom = 18.dp)) {
-        if (title != null || trailing != null) {
-            Row(
-                Modifier.fillMaxWidth().padding(start = 4.dp, end = 0.dp, bottom = 8.dp).heightIn(min = 24.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    title.orEmpty(),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = Hx.colors.textMuted,
-                    modifier = Modifier.weight(1f),
-                )
-                if (trailing != null) trailing()
-            }
-        }
-        content()
-    }
-}
-
-/** Rows stacked in one card with inset hairlines. */
-@Composable
-internal fun HxGroup(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    val c = Hx.colors
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = Hx.cardShape,
-        color = c.surface,
-        border = if (c.dark) BorderStroke(0.5.dp, c.line) else null,
-    ) {
-        Column(Modifier.padding(vertical = 4.dp), content = content)
-    }
-}
-
-@Composable
-internal fun HxDivider(inset: Dp = 60.dp) {
-    HorizontalDivider(Modifier.padding(start = inset), thickness = 0.5.dp, color = Hx.colors.line)
-}
-
-@Composable
-internal fun HxIconBadge(icon: ImageVector, tint: Color = Hx.colors.accent, size: Dp = 36.dp) {
-    Box(
-        Modifier.size(size).clip(RoundedCornerShape(size * 0.32f)).background(tint.copy(alpha = if (Hx.colors.dark) .18f else .12f)),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(size * 0.55f))
-    }
-}
-
-/**
- * The single list-row primitive. Title, optional supporting line, optional trailing
- * slot; whole row tappable when [onClick] is set.
- */
-@Composable
-internal fun HxRow(
-    title: String,
-    modifier: Modifier = Modifier,
-    subtitle: String? = null,
-    icon: ImageVector? = null,
-    iconTint: Color = Hx.colors.accent,
-    enabled: Boolean = true,
-    danger: Boolean = false,
-    onClick: (() -> Unit)? = null,
-    trailing: @Composable (RowScope.() -> Unit)? = null,
-) {
-    val c = Hx.colors
-    Row(
-        modifier
-            .fillMaxWidth()
-            .then(if (onClick != null && enabled) Modifier.clickable(onClick = onClick) else Modifier)
-            .heightIn(min = 56.dp)
-            .padding(horizontal = 14.dp, vertical = 10.dp)
-            .graphicsLayer { alpha = if (enabled) 1f else .45f },
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (icon != null) {
-            HxIconBadge(icon, if (danger) c.bad else iconTint)
-            Spacer(Modifier.width(12.dp))
-        }
-        Column(Modifier.weight(1f)) {
-            Text(
-                title,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-                color = if (danger) c.bad else c.text,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (!subtitle.isNullOrBlank()) {
-                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = c.textMuted, maxLines = 3, overflow = TextOverflow.Ellipsis)
-            }
-        }
-        if (trailing != null) {
-            Spacer(Modifier.width(8.dp))
-            trailing()
-        }
-    }
-}
-
-@Composable
-internal fun HxChevron() {
-    Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = Hx.colors.textFaint, modifier = Modifier.size(20.dp))
-}
-
-@Composable
-internal fun HxNavRow(
-    title: String,
-    subtitle: String? = null,
-    icon: ImageVector? = null,
-    iconTint: Color = Hx.colors.accent,
-    value: String? = null,
-    enabled: Boolean = true,
-    danger: Boolean = false,
-    onClick: () -> Unit,
-) {
-    HxRow(title, subtitle = subtitle, icon = icon, iconTint = iconTint, enabled = enabled, danger = danger, onClick = onClick) {
-        if (!value.isNullOrBlank()) {
-            Text(
-                value,
-                style = MaterialTheme.typography.bodyMedium,
-                color = Hx.colors.textMuted,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.widthIn(max = 150.dp),
-            )
-            Spacer(Modifier.width(2.dp))
-        }
-        HxChevron()
-    }
-}
-
-@Composable
-internal fun HxSwitchRow(
-    title: String,
-    checked: Boolean,
-    onChange: (Boolean) -> Unit,
-    subtitle: String? = null,
-    icon: ImageVector? = null,
-    iconTint: Color = Hx.colors.accent,
-    enabled: Boolean = true,
-) {
-    HxRow(title, subtitle = subtitle, icon = icon, iconTint = iconTint, enabled = enabled, onClick = { onChange(!checked) }) {
-        HxSwitch(checked = checked, onChange = onChange, enabled = enabled)
-    }
-}
-
-@Composable
-internal fun HxSwitch(checked: Boolean, onChange: (Boolean) -> Unit, enabled: Boolean = true) {
-    val c = Hx.colors
-    Switch(
-        checked = checked,
-        onCheckedChange = onChange,
-        enabled = enabled,
-        colors = SwitchDefaults.colors(
-            checkedThumbColor = c.onAccent,
-            checkedTrackColor = c.accent,
-            checkedBorderColor = c.accent,
-            uncheckedThumbColor = c.textFaint,
-            uncheckedTrackColor = c.surfaceMuted,
-            uncheckedBorderColor = c.line,
-        ),
-    )
-}
-
-/* ------------------------------------------------------------------ */
-/*  Small pieces                                                        */
-/* ------------------------------------------------------------------ */
-
-internal enum class HxTone { Neutral, Accent, Good, Warn, Bad }
-
-@Composable
-internal fun HxTone.fg(): Color = when (this) {
-    HxTone.Neutral -> Hx.colors.textMuted
-    HxTone.Accent -> Hx.colors.accent
-    HxTone.Good -> Hx.colors.good
-    HxTone.Warn -> Hx.colors.warn
-    HxTone.Bad -> Hx.colors.bad
-}
-
-@Composable
-internal fun HxTone.bg(): Color = when (this) {
-    HxTone.Neutral -> Hx.colors.surfaceMuted
-    HxTone.Accent -> Hx.colors.accentSoft
-    HxTone.Good -> Hx.colors.goodSoft
-    HxTone.Warn -> Hx.colors.warnSoft
-    HxTone.Bad -> Hx.colors.badSoft
-}
-
-@Composable
-internal fun HxPill(text: String, tone: HxTone = HxTone.Neutral, modifier: Modifier = Modifier) {
-    Box(
-        modifier.clip(Hx.pillShape).background(tone.bg()).padding(horizontal = 8.dp, vertical = 3.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(text, style = MaterialTheme.typography.labelSmall, color = tone.fg(), maxLines = 1)
-    }
-}
-
-@Composable
-internal fun HxDot(color: Color, size: Dp = 8.dp) {
-    Box(Modifier.size(size).clip(CircleShape).background(color))
-}
-
-@Composable
-internal fun HxSpinner(size: Dp = 18.dp, color: Color = Hx.colors.accent) {
-    CircularProgressIndicator(modifier = Modifier.size(size), color = color, strokeWidth = 2.dp)
-}
-
-/** Inline status message with optional action. */
-@Composable
-internal fun HxBanner(
-    text: String,
-    tone: HxTone = HxTone.Accent,
-    modifier: Modifier = Modifier,
-    actionLabel: String? = null,
-    onAction: (() -> Unit)? = null,
-) {
-    Row(
-        modifier.fillMaxWidth().clip(Hx.rowShape).background(tone.bg()).padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            if (tone == HxTone.Bad || tone == HxTone.Warn) Icons.Rounded.ErrorOutline else Icons.Rounded.Info,
-            contentDescription = null,
-            tint = tone.fg(),
-            modifier = Modifier.size(18.dp),
-        )
-        Spacer(Modifier.width(10.dp))
-        Text(text, style = MaterialTheme.typography.bodyMedium, color = Hx.colors.text, modifier = Modifier.weight(1f))
-        if (actionLabel != null && onAction != null) {
-            TextButton(onClick = onAction) { Text(actionLabel, color = tone.fg(), fontWeight = FontWeight.SemiBold) }
-        }
-    }
-}
-
-@Composable
-internal fun HxEmpty(icon: ImageVector, title: String, description: String? = null, action: (@Composable () -> Unit)? = null) {
-    val c = Hx.colors
-    Column(
-        Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 48.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(Modifier.size(56.dp).clip(CircleShape).background(c.surfaceMuted), contentAlignment = Alignment.Center) {
-            Icon(icon, null, tint = c.textFaint, modifier = Modifier.size(26.dp))
-        }
-        Spacer(Modifier.height(14.dp))
-        Text(title, style = MaterialTheme.typography.titleSmall, color = c.text, textAlign = TextAlign.Center)
-        if (!description.isNullOrBlank()) {
-            Spacer(Modifier.height(4.dp))
-            Text(description, style = MaterialTheme.typography.bodySmall, color = c.textMuted, textAlign = TextAlign.Center)
-        }
-        if (action != null) {
-            Spacer(Modifier.height(16.dp))
-            action()
-        }
-    }
-}
-
-/** Pill-shaped segmented control with a sliding indicator. */
-@Composable
-internal fun HxSegmented(
-    options: List<Pair<String, String>>,
-    selected: String,
-    onSelect: (String) -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-) {
-    val c = Hx.colors
-    var widthPx by remember { mutableStateOf(0) }
-    val index = options.indexOfFirst { it.first == selected }.coerceAtLeast(0)
-    val density = LocalDensity.current
-    val segment = if (options.isEmpty()) 0.dp else with(density) { (widthPx / options.size).toDp() }
-    val offset by animateDpAsState(segment * index, HxMotion.enter(), label = "segment")
-    Box(
-        modifier
-            .fillMaxWidth()
-            .height(40.dp)
-            .clip(Hx.pillShape)
-            .background(c.surfaceMuted)
-            .padding(3.dp)
-            .onSizeChanged { widthPx = it.width },
-    ) {
-        if (widthPx > 0 && options.isNotEmpty()) {
-            Box(
-                Modifier
-                    .offset(x = offset)
-                    .width(segment)
-                    .height(34.dp)
-                    .clip(Hx.pillShape)
-                    .background(c.surface)
-                    .then(if (c.dark) Modifier.border(0.5.dp, c.line, Hx.pillShape) else Modifier),
-            )
-        }
-        Row(Modifier.fillMaxSize()) {
-            options.forEachIndexed { i, (id, label) ->
-                val active = i == index
-                val color by animateColorAsState(if (active) c.text else c.textMuted, tween(HxMotion.Short), label = "segText")
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .fillMaxSize()
-                        .clip(Hx.pillShape)
-                        .clickable(enabled = enabled && !active) { onSelect(id) },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(label, style = MaterialTheme.typography.labelLarge, color = color, maxLines = 1)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-internal fun HxSearchField(
-    value: String,
-    onChange: (String) -> Unit,
-    placeholder: String,
-    modifier: Modifier = Modifier,
-) {
-    val c = Hx.colors
-    OutlinedTextField(
-        value = value,
-        onValueChange = onChange,
-        modifier = modifier.fillMaxWidth(),
-        singleLine = true,
-        placeholder = { Text(placeholder, color = c.textFaint) },
-        leadingIcon = { Icon(Icons.Rounded.Search, null, tint = c.textMuted) },
-        trailingIcon = {
-            if (value.isNotEmpty()) IconButton(onClick = { onChange("") }) { Icon(Icons.Rounded.Close, "清除", tint = c.textMuted) }
-        },
-        shape = Hx.pillShape,
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = c.surface,
-            unfocusedContainerColor = c.surface,
-            focusedBorderColor = c.accent,
-            unfocusedBorderColor = c.line,
-        ),
-    )
-}
-
-/** A metric with a small caption. */
-@Composable
-internal fun HxMetric(label: String, value: String, modifier: Modifier = Modifier, unit: String? = null, valueColor: Color = Hx.colors.text) {
-    Column(modifier) {
-        Text(label, style = MaterialTheme.typography.labelMedium, color = Hx.colors.textMuted, maxLines = 1)
-        Spacer(Modifier.height(2.dp))
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(
-                value,
-                style = MaterialTheme.typography.titleMedium.merge(HxNumberStyle),
-                color = valueColor,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (!unit.isNullOrBlank()) {
-                Spacer(Modifier.width(3.dp))
-                Text(unit, style = MaterialTheme.typography.labelSmall, color = Hx.colors.textMuted, modifier = Modifier.padding(bottom = 2.dp))
-            }
-        }
-    }
-}
-
-/* ------------------------------------------------------------------ */
-/*  Sheets and dialogs                                                  */
-/* ------------------------------------------------------------------ */
-
-internal fun hxCopy(context: Context, label: String, text: String) {
-    val manager = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
-    manager.setPrimaryClip(ClipData.newPlainText(label, text))
-    Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-internal fun HxSheet(
-    onDismiss: () -> Unit,
-    title: String? = null,
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    val c = Hx.colors
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = c.surface,
-        contentColor = c.text,
-        scrimColor = Color.Black.copy(alpha = .38f),
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-    ) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 12.dp)) {
-            if (title != null) {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = c.text,
-                    modifier = Modifier.padding(horizontal = 22.dp).padding(bottom = 10.dp),
-                )
-            }
-            content()
-        }
-    }
-}
-
-/** Monospace text viewer (logs, diagnostics, generated config). */
-@Composable
-internal fun HxTextSheet(title: String, text: String, onDismiss: () -> Unit, onRefresh: (() -> Unit)? = null) {
+internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp) {
     val context = LocalContext.current
-    val c = Hx.colors
-    HxSheet(onDismiss = onDismiss) {
-        Row(Modifier.fillMaxWidth().padding(start = 22.dp, end = 10.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(title, style = MaterialTheme.typography.titleLarge, color = c.text, modifier = Modifier.weight(1f))
-            if (onRefresh != null) TextButton(onClick = onRefresh) { Text("刷新") }
-            IconButton(onClick = { hxCopy(context, title, text) }) { Icon(Icons.Rounded.ContentCopy, "复制", tint = c.textMuted) }
-        }
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .heightIn(max = 520.dp)
-                .padding(horizontal = 16.dp)
-                .clip(Hx.rowShape)
-                .background(c.surfaceMuted)
-                .verticalScroll(rememberScrollState())
-                .horizontalScroll(rememberScrollState())
-                .padding(14.dp),
-        ) {
-            Text(
-                text.ifBlank { "（空）" },
-                fontFamily = FontFamily.Monospace,
-                fontSize = 11.5.sp,
-                lineHeight = 16.sp,
-                color = c.text,
-            )
+    val nav = LocalNav.current
+    val scope = rememberCoroutineScope()
+    val prefs = vm.prefs
+    var revision by remember { mutableIntStateOf(0) }
+    var choice by remember { mutableStateOf<String?>(null) }
+    var editTargets by remember { mutableStateOf(false) }
+    var confirmRecover by remember { mutableStateOf(false) }
+    val recomposeTick = revision + vm.settingsRevision
+
+    val notifyPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            ProxyStatusNotificationService.setEnabled(context, true)
+            revision++
+        } else vm.toast("没有通知权限，无法显示状态通知")
+    }
+    val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri: Uri? ->
+        if (uri != null) scope.launch {
+            try {
+                val count = HetuSettingsBackup.export(context, uri)
+                vm.toast("已导出 $count 项设置")
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) {
+                vm.toast(error.message ?: "导出失败")
+            }
         }
     }
-}
+    val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri != null) scope.launch {
+            try {
+                val count = HetuSettingsBackup.restore(context, uri)
+                vm.toast("已恢复 $count 项设置")
+                vm.setAppearanceMode(prefs.getString("appearance", "system") ?: "system")
+                vm.bumpSettings()
+                revision++
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) {
+                vm.toast(error.message ?: "恢复失败")
+            }
+        }
+    }
 
-internal data class HxChoice(val id: String, val label: String, val description: String? = null, val enabled: Boolean = true)
+    val profile = ProxyRuntimeProfile.load(prefs)
 
-@Composable
-internal fun HxChoiceSheet(
-    title: String,
-    choices: List<HxChoice>,
-    selected: String?,
-    onPick: (String) -> Unit,
-    onDismiss: () -> Unit,
-    footer: String? = null,
-) {
-    val c = Hx.colors
-    HxSheet(onDismiss = onDismiss, title = title) {
-        Column(Modifier.padding(horizontal = 12.dp)) {
-            choices.forEach { choice ->
-                val active = choice.id == selected
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(Hx.rowShape)
-                        .background(if (active) c.accentSoft else Color.Transparent)
-                        .clickable(enabled = choice.enabled) { onPick(choice.id) }
-                        .padding(horizontal = 14.dp, vertical = 12.dp)
-                        .graphicsLayer { alpha = if (choice.enabled) 1f else .4f },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(choice.label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, color = c.text)
-                        if (!choice.description.isNullOrBlank()) {
-                            Text(choice.description, style = MaterialTheme.typography.bodySmall, color = c.textMuted)
+    HxPage(title = "设置", subtitle = if (recomposeTick >= 0) null else "", bottomPadding = bottomPadding) {
+        item(key = "proxy") {
+            HxSection("代理") {
+                HxGroup {
+                    HxNavRow("网络与分流", subtitle = "运行模式、DNS、IPv6、UDP/QUIC 与绕过", icon = Icons.Rounded.Tune, value = "${profile.core.label} · ${profile.mode.label}") {
+                        nav.push(HxRoute.Network)
+                    }
+                    HxDivider()
+                    HxNavRow("应用名单", subtitle = "按应用决定走代理还是直连", icon = Icons.Rounded.Apps, iconTint = Hx.colors.warn,
+                        value = "${prefs.getStringSet("proxyAppPackages", emptySet()).orEmpty().size} 个") { nav.push(HxRoute.Apps) }
+                    HxDivider()
+                    HxNavRow("配置与订阅", subtitle = "导入 YAML、订阅链接、编辑配置", icon = Icons.Rounded.Description, iconTint = Hx.colors.good,
+                        value = vm.state.config) { nav.push(HxRoute.Configs) }
+                    HxDivider()
+                    HxNavRow("广告过滤", subtitle = "规则源、黑白名单与拦截统计", icon = Icons.Rounded.Shield,
+                        value = if (prefs.getBoolean("proxyAdblockChain", true)) "开启" else "关闭") { nav.push(HxRoute.Adblock) }
+                    HxDivider()
+                    HxNavRow("核心管理", subtitle = "查看版本、在线更新或导入 Mihomo", icon = Icons.Rounded.Memory, iconTint = Hx.colors.textMuted,
+                        value = vm.coreVersion.ifBlank { profile.core.label }) { nav.push(HxRoute.Cores) }
+                }
+            }
+        }
+        item(key = "behavior") {
+            HxSection("启动与通知") {
+                HxGroup {
+                    HxSwitchRow("开机自动启动", prefs.getBoolean("proxyRootAutoStart", false), {
+                        prefs.edit().putBoolean("proxyRootAutoStart", it).apply(); revision++
+                    }, subtitle = "开机后恢复上次运行中的代理", icon = Icons.Rounded.RestartAlt)
+                    HxDivider()
+                    HxSwitchRow("状态通知", prefs.getBoolean(ProxyStatusNotificationService.PREF_ENABLED, false), { on ->
+                        if (on && Build.VERSION.SDK_INT >= 33 &&
+                            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                        ) {
+                            notifyPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        } else {
+                            ProxyStatusNotificationService.setEnabled(context, on)
+                            revision++
+                        }
+                    }, subtitle = "在通知栏显示网速，并提供重载/重启/停止按钮", icon = Icons.Rounded.Notifications, iconTint = Hx.colors.warn)
+                    HxDivider()
+                    HxSwitchRow("切换节点时断开旧连接", prefs.getBoolean("hetuCloseOnSwitch", true), {
+                        prefs.edit().putBoolean("hetuCloseOnSwitch", it).apply(); revision++
+                    }, subtitle = "让正在使用的应用立即走新节点", icon = Icons.Rounded.SwapHoriz, iconTint = Hx.colors.good)
+                }
+            }
+        }
+        item(key = "look") {
+            HxSection("外观") {
+                HxGroup {
+                    HxNavRow("主题", icon = Icons.Rounded.DarkMode, iconTint = Hx.colors.textMuted, value = when (vm.appearance) {
+                        "light" -> "浅色"
+                        "dark" -> "深色"
+                        else -> "跟随系统"
+                    }) { choice = "appearance" }
+                    if (Build.VERSION.SDK_INT >= 31) {
+                        HxDivider()
+                        HxSwitchRow("壁纸取色", vm.dynamicColor, { vm.setDynamic(it) }, subtitle = "使用系统壁纸的主题色", icon = Icons.Rounded.Palette)
+                    }
+                }
+            }
+        }
+        item(key = "tools") {
+            HxSection("工具") {
+                HxGroup {
+                    HxNavRow("Web 面板", subtitle = "在浏览器打开 metacubexd 管理当前核心", icon = Icons.Rounded.Web, enabled = vm.state.running) {
+                        val port = vm.state.controllerPort
+                        val secret = Uri.encode(prefs.getString("proxyControllerSecret", "").orEmpty())
+                        val url = "https://metacubex.github.io/metacubexd/#/setup?hostname=127.0.0.1&port=$port&secret=$secret"
+                        try {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                        } catch (_: Exception) {
+                            vm.toast("没有可用的浏览器")
                         }
                     }
-                    if (active) Icon(Icons.Rounded.Check, null, tint = c.accent, modifier = Modifier.size(20.dp))
+                    HxDivider()
+                    HxNavRow("测速站点", subtitle = ProxyLatencyTargets.load(prefs).joinToString(" · ") { it.name }, icon = Icons.Rounded.Speed, iconTint = Hx.colors.warn) {
+                        editTargets = true
+                    }
+                    HxDivider()
+                    HxNavRow("导出设置", subtitle = "备份代理、订阅选择与界面设置", icon = Icons.Rounded.Download, iconTint = Hx.colors.good) {
+                        exporter.launch("hetu-settings.json")
+                    }
+                    HxDivider()
+                    HxNavRow("导入设置", subtitle = "从备份文件恢复", icon = Icons.Rounded.UploadFile, iconTint = Hx.colors.good) {
+                        importer.launch(arrayOf("application/json", "text/plain", "*/*"))
+                    }
+                    HxDivider()
+                    HxNavRow("恢复网络", subtitle = "停止代理并清理河图写入的网络规则", icon = Icons.Rounded.Restore, danger = true) {
+                        confirmRecover = true
+                    }
                 }
             }
-            if (!footer.isNullOrBlank()) {
-                Text(footer, style = MaterialTheme.typography.bodySmall, color = c.textMuted, modifier = Modifier.padding(14.dp))
+        }
+        item(key = "about") {
+            HxSection {
+                HxGroup {
+                    HxNavRow("关于河图", icon = Icons.Rounded.Info, iconTint = Hx.colors.textMuted, value = BuildConfig.VERSION_NAME) { nav.push(HxRoute.About) }
+                }
             }
         }
     }
+
+    if (choice == "appearance") {
+        HxChoiceSheet(
+            title = "主题",
+            choices = listOf(HxChoice("system", "跟随系统"), HxChoice("light", "浅色"), HxChoice("dark", "深色")),
+            selected = vm.appearance,
+            onPick = { vm.setAppearanceMode(it); choice = null },
+            onDismiss = { choice = null },
+        )
+    }
+
+    if (editTargets) {
+        val targets = ProxyLatencyTargets.load(prefs)
+        HxFormDialog(
+            title = "测速站点",
+            message = "首页的三个站点延迟，通过当前网络（含代理）访问测量。",
+            fields = targets.flatMapIndexed { i, t ->
+                listOf(HxField("站点 ${i + 1} 名称", t.name), HxField("站点 ${i + 1} 地址", t.url, placeholder = "https://"))
+            },
+            validate = { values ->
+                values.chunked(2).map { ProxyLatencyTarget(it[0], it[1]) }.firstNotNullOfOrNull { ProxyLatencyTargets.validate(it) }
+            },
+            onConfirm = { values ->
+                ProxyLatencyTargets.save(prefs, values.chunked(2).map { ProxyLatencyTarget(it[0], it[1]) })
+                editTargets = false
+                vm.toast("已保存")
+            },
+            onDismiss = { editTargets = false },
+        )
+    }
+
+    if (confirmRecover) {
+        HxConfirmDialog(
+            title = "恢复网络？",
+            message = "将停止代理，并回滚河图添加的 iptables / 路由规则。用于网络异常时的紧急恢复。",
+            confirmLabel = "恢复",
+            danger = true,
+            onConfirm = {
+                confirmRecover = false
+                scope.launch {
+                    try {
+                        vm.controller.stop()
+                        vm.toast("已停止代理并恢复网络")
+                    } catch (cancel: CancellationException) {
+                        throw cancel
+                    } catch (error: Exception) {
+                        vm.toast(error.message ?: "恢复失败")
+                    }
+                    vm.refreshNow()
+                }
+            },
+            onDismiss = { confirmRecover = false },
+        )
+    }
 }
 
-internal data class HxField(
-    val label: String,
-    val initial: String = "",
-    val placeholder: String = "",
-    val singleLine: Boolean = true,
-    val number: Boolean = false,
-)
+/* ------------------------------------------------------------------ */
+/*  Network & routing                                                   */
+/* ------------------------------------------------------------------ */
 
-/** Generic form dialog: returns the entered values in field order. */
 @Composable
-internal fun HxFormDialog(
-    title: String,
-    fields: List<HxField>,
-    confirmLabel: String = "保存",
-    message: String? = null,
-    validate: (List<String>) -> String? = { null },
-    onConfirm: (List<String>) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val c = Hx.colors
-    val values = remember { fields.map { mutableStateOf(it.initial) } }
-    var error by remember { mutableStateOf<String?>(null) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = c.surface,
-        title = { Text(title, style = MaterialTheme.typography.titleLarge) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (!message.isNullOrBlank()) Text(message, style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
-                fields.forEachIndexed { index, field ->
-                    OutlinedTextField(
-                        value = values[index].value,
-                        onValueChange = { values[index].value = it; error = null },
-                        label = { Text(field.label) },
-                        placeholder = { if (field.placeholder.isNotBlank()) Text(field.placeholder, color = c.textFaint) },
-                        singleLine = field.singleLine,
-                        maxLines = if (field.singleLine) 1 else 6,
-                        keyboardOptions = if (field.number) KeyboardOptions(keyboardType = KeyboardType.Number) else KeyboardOptions.Default,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = Hx.rowShape,
+internal fun NetworkSettingsScreen(vm: HetuViewModel) {
+    val nav = LocalNav.current
+    val context = LocalContext.current
+    val prefs = vm.prefs
+    var revision by remember { mutableIntStateOf(0) }
+    var choice by remember { mutableStateOf<String?>(null) }
+    var editCidrs by remember { mutableStateOf(false) }
+    val recomposeTick = revision + vm.settingsRevision
+
+    val profile = ProxyRuntimeProfile.load(prefs)
+    fun changed(key: String) {
+        ProxyRuntimeSettings.markDirty(prefs, key)
+        revision++
+        vm.bumpSettings()
+    }
+    fun putString(key: String, value: String) { prefs.edit().putString(key, value).apply(); changed(key) }
+    fun putBool(key: String, value: Boolean) { prefs.edit().putBoolean(key, value).apply(); changed(key) }
+
+    val pending = vm.state.running && ProxyRuntimeSettings.pending(true, prefs)
+    val capability = profile.capability()
+
+    HxPage(title = "网络与分流", subtitle = if (recomposeTick >= 0) "修改后需重启代理生效" else null, onBack = { nav.pop() }) {
+        if (pending) {
+            item(key = "pending") {
+                Column(Modifier.padding(horizontal = Hx.gutter).padding(bottom = 16.dp)) {
+                    HxBanner(
+                        if (vm.operation == HxRunOp.Restart) vm.operationText.ifBlank { "正在重启…" } else "设置已修改，重启代理后生效",
+                        tone = HxTone.Warn,
+                        actionLabel = if (vm.operation == null) "立即重启" else null,
+                        onAction = vm::restart,
                     )
                 }
-                AnimatedVisibility(error != null, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
-                    Text(error.orEmpty(), color = c.bad, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+        item(key = "engine") {
+            HxSection("核心与模式") {
+                HxGroup {
+                    HxNavRow("核心", icon = Icons.Rounded.Memory, value = profile.core.label) { choice = "core" }
+                    HxDivider()
+                    HxNavRow("透明代理模式", subtitle = modeDescription(profile.mode), icon = Icons.Rounded.Route, value = profile.mode.label) { choice = "mode" }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                val result = values.map { it.value.trim() }
-                val problem = validate(result)
-                if (problem != null) error = problem else onConfirm(result)
-            }) { Text(confirmLabel, fontWeight = FontWeight.SemiBold) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消", color = c.textMuted) } },
-    )
-}
-
-@Composable
-internal fun HxConfirmDialog(
-    title: String,
-    message: String,
-    confirmLabel: String = "确定",
-    danger: Boolean = false,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val c = Hx.colors
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = c.surface,
-        title = { Text(title, style = MaterialTheme.typography.titleLarge) },
-        text = { Text(message, style = MaterialTheme.typography.bodyMedium, color = c.textMuted) },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(confirmLabel, color = if (danger) c.bad else c.accent, fontWeight = FontWeight.SemiBold)
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消", color = c.textMuted) } },
-    )
-}
-
-/** Primary filled button in the app's pill shape. */
-@Composable
-internal fun HxButton(
-    text: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    icon: ImageVector? = null,
-    enabled: Boolean = true,
-    busy: Boolean = false,
-    tone: HxTone = HxTone.Accent,
-    filled: Boolean = true,
-) {
-    val c = Hx.colors
-    val source = remember { MutableInteractionSource() }
-    val bg = if (filled) tone.fg() else tone.bg()
-    val fg = if (filled) (if (tone == HxTone.Accent) c.onAccent else Color.White) else tone.fg()
-    Row(
-        modifier
-            .hxPressScale(source, .97f)
-            .heightIn(min = 44.dp)
-            .clip(Hx.pillShape)
-            .background(if (enabled) bg else c.surfaceMuted)
-            .clickable(interactionSource = source, indication = LocalIndication.current, enabled = enabled && !busy, onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
-    ) {
-        if (busy) {
-            HxSpinner(16.dp, fg)
-            Spacer(Modifier.width(8.dp))
-        } else if (icon != null) {
-            Icon(icon, null, tint = if (enabled) fg else c.textFaint, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
         }
-        Text(text, style = MaterialTheme.typography.labelLarge, color = if (enabled) fg else c.textFaint, maxLines = 1)
+        item(key = "dns") {
+            HxSection("DNS 与协议") {
+                HxGroup {
+                    HxNavRow("DNS 劫持", subtitle = "让系统 DNS 交给 Mihomo 解析，广告过滤依赖此项", icon = Icons.Rounded.Dns, value = when (profile.dnsHijack) {
+                        ProxyRuntimeProfile.DnsHijack.OFF -> "关闭"
+                        ProxyRuntimeProfile.DnsHijack.REDIRECT -> "Redirect"
+                        else -> "自动"
+                    }, enabled = capability.dnsHijack) { choice = "dns" }
+                    HxDivider()
+                    HxNavRow("IPv6", icon = Icons.Rounded.Public, iconTint = Hx.colors.good, value = when (profile.ipv6) {
+                        ProxyRuntimeProfile.Ipv6.BYPASS -> "不进核心"
+                        ProxyRuntimeProfile.Ipv6.STRICT -> "严格防泄漏"
+                        ProxyRuntimeProfile.Ipv6.DISABLE -> "禁用"
+                        else -> "启用"
+                    }) { choice = "ipv6" }
+                    HxDivider()
+                    HxSwitchRow("TCP 接管", profile.tcp, { putBool("proxyTcp", it) }, icon = Icons.Rounded.SwapHoriz, enabled = capability.tcp)
+                    HxDivider()
+                    HxSwitchRow("UDP 接管", profile.udp, { putBool("proxyUdp", it) }, subtitle = "游戏、语音通话与 QUIC", icon = Icons.Rounded.Bolt, iconTint = Hx.colors.warn, enabled = capability.udp)
+                    HxDivider()
+                    HxSwitchRow("阻断 QUIC", profile.quicBlocked, { putBool("proxyQuicBlocked", it) }, subtitle = "拦截 UDP 443，迫使应用回落到 TCP", icon = Icons.Rounded.Speed, iconTint = Hx.colors.warn, enabled = capability.quicControl)
+                }
+            }
+        }
+        item(key = "routing") {
+            HxSection("分流") {
+                HxGroup {
+                    HxNavRow("应用范围", icon = Icons.Rounded.Apps, iconTint = Hx.colors.warn, value = when (profile.appScope) {
+                        ProxyRuntimeProfile.AppScope.WHITELIST -> "仅所选应用代理"
+                        ProxyRuntimeProfile.AppScope.BLACKLIST -> "所选应用直连"
+                        else -> "不区分应用"
+                    }, enabled = capability.appFilter) { choice = "scope" }
+                    HxDivider()
+                    HxNavRow("应用名单", icon = Icons.Rounded.Apps, iconTint = Hx.colors.warn,
+                        value = "${prefs.getStringSet("proxyAppPackages", emptySet()).orEmpty().size} 个") { nav.push(HxRoute.Apps) }
+                    HxDivider()
+                    HxSwitchRow("中国 IP 直连", profile.cnIpDirect, { putBool("proxyCnIpDirect", it) }, subtitle = "内置 CN IP 库，国内地址不经过代理", icon = Icons.Rounded.Public)
+                    HxDivider()
+                    HxNavRow("绕过网段", subtitle = "这些 CIDR 不进入透明代理", icon = Icons.Rounded.Cable, iconTint = Hx.colors.textMuted,
+                        value = "${prefs.getStringSet("proxyBypassCidrs", emptySet()).orEmpty().size} 条", enabled = capability.cidrBypass) { editCidrs = true }
+                }
+            }
+        }
+        item(key = "safety") {
+            HxSection("共享与安全") {
+                HxGroup {
+                    HxSwitchRow("接管热点/USB 共享", prefs.getBoolean("proxySharedNetwork", false), { putBool("proxySharedNetwork", it) },
+                        subtitle = "让连接本机热点的设备也走代理", icon = Icons.Rounded.WifiTethering, iconTint = Hx.colors.good, enabled = capability.sharedNetwork)
+                    HxDivider()
+                    HxSwitchRow("Kill Switch", prefs.getBoolean("proxyKillSwitch", false), { putBool("proxyKillSwitch", it) },
+                        subtitle = "核心异常退出时阻断流量，防止直连泄漏", icon = Icons.Rounded.GppGood, iconTint = Hx.colors.bad)
+                }
+            }
+        }
+        if (!capability.available && capability.reason.isNotBlank()) {
+            item(key = "cap") {
+                Column(Modifier.padding(horizontal = Hx.gutter)) { HxBanner(capability.reason, tone = HxTone.Warn) }
+            }
+        }
+    }
+
+    when (choice) {
+        "core" -> HxChoiceSheet(
+            title = "核心",
+            choices = listOf(ProxyRuntimeProfile.Core.MIHOMO, ProxyRuntimeProfile.Core.MIHOMO_SMART).map { core ->
+                val installed = core == ProxyRuntimeProfile.Core.MIHOMO || ProxyCoreStore(context).installed(core)
+                HxChoice(core.id, core.label, if (installed) null else "尚未安装，请先在「核心管理」下载", enabled = installed)
+            },
+            selected = profile.core.id,
+            onPick = { putString("proxyBaseCore", it); choice = null },
+            onDismiss = { choice = null },
+        )
+        "mode" -> HxChoiceSheet(
+            title = "透明代理模式",
+            choices = ProxyRuntimeProfile.Mode.values()
+                .filter { ProxyRuntimeProfile.capability(profile.core, it).available }
+                .map { HxChoice(it.id, it.label, modeDescription(it)) },
+            selected = profile.mode.id,
+            onPick = { putString("proxyBaseMode", it); choice = null },
+            onDismiss = { choice = null },
+        )
+        "dns" -> HxChoiceSheet(
+            title = "DNS 劫持",
+            choices = listOf(
+                HxChoice("tproxy", "自动", "推荐。系统 DNS 由 Mihomo 解析"),
+                HxChoice("redirect", "Redirect", "通过 REDIRECT 转发到本地 ${MihomoStartupConfig.DNS_PORT}"),
+                HxChoice("off", "关闭", "不接管 DNS；广告过滤与域名分流可能失效"),
+            ),
+            selected = profile.dnsHijack.id,
+            onPick = { putString("proxyDnsHijack", it); choice = null },
+            onDismiss = { choice = null },
+        )
+        "ipv6" -> HxChoiceSheet(
+            title = "IPv6",
+            choices = listOf(
+                HxChoice("enable", "启用", "IPv6 流量同样进入代理"),
+                HxChoice("bypass", "不进核心", "IPv6 直连，不经过代理"),
+                HxChoice("strict", "严格防泄漏", "仅用 IPv4，拦截 IPv6 防止绕过代理"),
+                HxChoice("disable", "禁用", "关闭本机 IPv6"),
+            ),
+            selected = profile.ipv6.id,
+            onPick = { putString("proxyBaseIpv6", it); choice = null },
+            onDismiss = { choice = null },
+        )
+        "scope" -> HxChoiceSheet(
+            title = "应用范围",
+            choices = listOf(
+                HxChoice("core", "不区分应用", "所有应用由配置规则决定"),
+                HxChoice("blacklist", "所选应用直连", "名单中的应用绕过代理"),
+                HxChoice("whitelist", "仅所选应用代理", "只有名单中的应用走代理"),
+            ),
+            selected = profile.appScope.id,
+            onPick = { putString("proxyAppScope", it); choice = null },
+            onDismiss = { choice = null },
+        )
+    }
+
+    if (editCidrs) {
+        val current = prefs.getStringSet("proxyBypassCidrs", emptySet()).orEmpty().sorted().joinToString("\n")
+        HxFormDialog(
+            title = "绕过网段",
+            message = "每行一个 IPv4/IPv6 CIDR，例如 10.0.0.0/8、fd00::/8",
+            fields = listOf(HxField("CIDR 列表", current, singleLine = false)),
+            validate = { values ->
+                val bad = values[0].lines().map { it.trim() }.filter { it.isNotEmpty() }.firstOrNull { !looksLikeCidr(it) }
+                if (bad != null) "格式不正确：$bad" else null
+            },
+            onConfirm = { values ->
+                val set = values[0].lines().map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+                prefs.edit().putStringSet("proxyBypassCidrs", set).apply()
+                changed("proxyBypassCidrs")
+                editCidrs = false
+            },
+            onDismiss = { editCidrs = false },
+        )
     }
 }
 
-/** Small circular icon action used in top bars. */
-@Composable
-internal fun HxBarAction(icon: ImageVector, description: String, onClick: () -> Unit, busy: Boolean = false, enabled: Boolean = true) {
-    IconButton(onClick = onClick, enabled = enabled && !busy) {
-        if (busy) HxSpinner(18.dp) else Icon(icon, description, tint = if (enabled) Hx.colors.text else Hx.colors.textFaint)
-    }
+private fun looksLikeCidr(value: String): Boolean {
+    val parts = value.split('/')
+    if (parts.size != 2) return false
+    val bits = parts[1].toIntOrNull() ?: return false
+    val ip = parts[0]
+    return if (ip.contains(':')) bits in 0..128 && ip.all { it.isLetterOrDigit() || it == ':' }
+    else bits in 0..32 && ip.split('.').let { octets -> octets.size == 4 && octets.all { o -> o.toIntOrNull()?.let { it in 0..255 } == true } }
 }
 
-/** Thin rounded progress bar with an animated fill. */
-@Composable
-internal fun HxProgressBar(ratio: Float, color: Color = Hx.colors.accent, modifier: Modifier = Modifier, height: Dp = 6.dp) {
-    val animated by animateFloatAsState(ratio.coerceIn(0f, 1f), tween(HxMotion.Long, easing = HxMotion.Emphasized), label = "progress")
-    Box(modifier.fillMaxWidth().height(height).clip(Hx.pillShape).background(Hx.colors.surfaceMuted)) {
-        Box(Modifier.fillMaxWidth(animated).height(height).clip(Hx.pillShape).background(color))
-    }
+private fun modeDescription(mode: ProxyRuntimeProfile.Mode): String = when (mode) {
+    ProxyRuntimeProfile.Mode.TPROXY -> "推荐。TCP/UDP 全接管，性能最好"
+    ProxyRuntimeProfile.Mode.REDIRECT -> "仅 TCP，兼容性最好"
+    ProxyRuntimeProfile.Mode.ENHANCE -> "TCP 走 Redirect，UDP 走 TPROXY"
+    ProxyRuntimeProfile.Mode.TUN -> "Root 下的 TUN 虚拟网卡"
+    ProxyRuntimeProfile.Mode.EBPF -> "eBPF 重定向到 TUN"
+    ProxyRuntimeProfile.Mode.MIXED -> "暂不可用"
 }
