@@ -162,6 +162,19 @@ jobs:
           echo "V20.19 strategy screenshot parity applied"
           git diff --stat
 
+      - name: Fix V20.19 text-unit import
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ProxiesScreen.kt')
+          text = path.read_text()
+          if 'import androidx.compose.ui.unit.sp\n' not in text:
+              text = text.replace('import androidx.compose.ui.unit.dp\n', 'import androidx.compose.ui.unit.dp\nimport androidx.compose.ui.unit.sp\n')
+          path.write_text(text)
+          PY
+          grep -q 'import androidx.compose.ui.unit.sp' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ProxiesScreen.kt
+
       - name: Export effective V20.19 source
         run: |
           set -euo pipefail
