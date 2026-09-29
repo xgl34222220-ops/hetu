@@ -114,16 +114,34 @@ jobs:
           grep -q 'layout.offset' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
           grep -q 'onClick = { scope.launch { vm.refreshNow() } }, busy = vm.refreshing' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelOverviewScreen.kt
 
-      - name: Export effective V20.16 source
+      - name: Apply V20.17 secondary polish
         run: |
           set -euo pipefail
-          tar -czf /tmp/Hetu-V20.16-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
-          sha256sum /tmp/Hetu-V20.16-effective-source.tar.gz
+          cat updates/v2017-secondary/p00.b64 updates/v2017-secondary/p01.b64 updates/v2017-secondary/p02.b64 \
+              updates/v2017-secondary/q06.b64 updates/v2017-secondary/q07.b64 updates/v2017-secondary/q08.b64 \
+              updates/v2017-secondary/q09.b64 updates/v2017-secondary/q10.b64 updates/v2017-secondary/q11.b64 \
+              updates/v2017-secondary/q12.b64 updates/v2017-secondary/q13.b64 updates/v2017-secondary/q14.b64 \
+              updates/v2017-secondary/q15.b64 updates/v2017-secondary/q16.b64 | base64 -d > /tmp/v2017.patch.xz
+          echo '25d4b4e327b7206fc78088e7dc297b62d6a4379c02c8663a56088a3c3323a862  /tmp/v2017.patch.xz' | sha256sum -c -
+          xz -dc /tmp/v2017.patch.xz > /tmp/v2017.patch
+          git apply --check /tmp/v2017.patch
+          git apply /tmp/v2017.patch
+          grep -q 'versionCode = 2017' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.6.7-v20"' android-app/app/build.gradle.kts
+          grep -q 'internal fun HxThemeLabScreen' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
+          echo "V20.17 secondary polish applied"
+          git diff --stat
+
+      - name: Export effective V20.17 source
+        run: |
+          set -euo pipefail
+          tar -czf /tmp/Hetu-V20.17-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+          sha256sum /tmp/Hetu-V20.17-effective-source.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.16-effective-source
-          path: /tmp/Hetu-V20.16-effective-source.tar.gz
+          name: Hetu-V20.17-effective-source
+          path: /tmp/Hetu-V20.17-effective-source.tar.gz
           compression-level: 0
           if-no-files-found: error
 
