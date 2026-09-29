@@ -281,6 +281,23 @@ jobs:
           echo "V20.25 home network/details applied"
           git diff --stat
 
+      - name: Fix V20.25 speed source setter clash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          vm = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt')
+          home = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeScreen.kt')
+          a = vm.read_text()
+          b = home.read_text()
+          a = a.replace('fun setHomeSpeedSource(source: String)', 'fun updateHomeSpeedSource(source: String)')
+          b = b.replace('vm.setHomeSpeedSource(it)', 'vm.updateHomeSpeedSource(it)')
+          vm.write_text(a)
+          home.write_text(b)
+          PY
+          grep -q 'fun updateHomeSpeedSource(source: String)' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
+          grep -q 'vm.updateHomeSpeedSource(it)' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeScreen.kt
+
       - name: Export effective V20.25 source
         run: |
           set -euo pipefail
