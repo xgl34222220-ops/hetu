@@ -432,7 +432,6 @@ private fun hxApplyYamlSymbol(editor: CodeEditor, symbol: String) {
     editor.ensureSelectionVisible()
 }
 
-@Composable
 class ProxyConfigEditorActivity : ComponentActivity() {
     private lateinit var vm: HetuViewModel
 
