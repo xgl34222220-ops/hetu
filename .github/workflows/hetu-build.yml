@@ -36,6 +36,19 @@ jobs:
           echo "V20.14 source restored"
           git diff --stat
 
+      - name: Export effective V20.14 source
+        run: |
+          set -euo pipefail
+          tar -czf /tmp/Hetu-V20.14-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+          sha256sum /tmp/Hetu-V20.14-effective-source.tar.gz
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Hetu-V20.14-effective-source
+          path: /tmp/Hetu-V20.14-effective-source.tar.gz
+          compression-level: 0
+          if-no-files-found: error
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
