@@ -291,6 +291,7 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
                 }
             }
         }
+    }
 
     if (showOptions) {
         HxSheet(onDismiss = { showOptions = false }, title = "显示与排序") {

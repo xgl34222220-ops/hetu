@@ -355,6 +355,17 @@ internal fun AdblockScreen(vm: HetuViewModel) {
         }
     }
 
+    if (showHelp) {
+        HxSheet(onDismiss = { showHelp = false }, title = "广告过滤说明") {
+            Text(
+                "应用流量会先经过应用直连与明确白名单，再匹配广告规则 REJECT，之后才进入普通配置分流与兜底。代理运行时，独立 DNS 过滤会自动暂停，避免两套过滤链同时接管。",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Hx.colors.textMuted,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+            )
+        }
+    }
+
     addDomain?.let { allow ->
         HxFormDialog(
             title = if (allow) "添加白名单" else "添加黑名单",
@@ -416,16 +427,6 @@ private fun DomainList(title: String, domains: List<String>, tone: HxTone, onAdd
             if (domains.size > 200) {
                 Text("仅显示前 200 条，共 ${domains.size} 条", style = MaterialTheme.typography.bodySmall, color = c.textMuted, modifier = Modifier.padding(16.dp))
             }
-        }
-    }
-    if (showHelp) {
-        HxSheet(onDismiss = { showHelp = false }, title = "广告过滤说明") {
-            Text(
-                "应用流量会先经过应用直连与明确白名单，再匹配广告规则 REJECT，之后才进入普通配置分流与兜底。代理运行时，独立 DNS 过滤会自动暂停，避免两套过滤链同时接管。",
-                style = MaterialTheme.typography.bodyMedium,
-                color = Hx.colors.textMuted,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-            )
         }
     }
 }
