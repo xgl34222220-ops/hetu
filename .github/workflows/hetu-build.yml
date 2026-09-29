@@ -49,6 +49,25 @@ jobs:
           echo "V20.15 delta applied"
           git diff --stat
 
+      - name: Fix V20.15 Kotlin setter clash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          vm = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt')
+          st = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt')
+          a = vm.read_text()
+          b = st.read_text()
+          old_a = 'fun setPureBlack(value: Boolean)'
+          old_b = 'vm.setPureBlack(it)'
+          assert a.count(old_a) == 1
+          assert b.count(old_b) == 1
+          vm.write_text(a.replace(old_a, 'fun updatePureBlack(value: Boolean)'))
+          st.write_text(b.replace(old_b, 'vm.updatePureBlack(it)'))
+          PY
+          grep -q 'fun updatePureBlack(value: Boolean)' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
+          grep -q 'vm.updatePureBlack(it)' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
+
       - name: Export effective V20.14 source
         run: |
           set -euo pipefail
