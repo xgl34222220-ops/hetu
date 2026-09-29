@@ -126,12 +126,11 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp) {
             HxSection("订阅与数据", modifier = Modifier.hxEnter(stagger, 1)) {
                 HxGroup {
                     HxNavRow(
-                        "配置与订阅",
-                        subtitle = "配置文件、订阅链接、YAML 编辑与高级订阅工具",
-                        icon = Icons.Rounded.Description,
-                        iconTint = c.good,
+                        "订阅工作台",
+                        subtitle = "配置库、订阅链接、流量用量与 YAML 编辑",
+                        icon = Icons.Rounded.CloudDownload,
                         value = vm.state.config,
-                    ) { nav.push(HxRoute.Configs) }
+                    ) { open(ProxySubscriptionActivity::class.java) }
                     HxDivider()
                     HxNavRow(
                         "广告过滤",

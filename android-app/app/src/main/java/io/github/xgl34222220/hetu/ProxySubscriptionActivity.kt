@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu
 
+import android.content.Intent
 import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
@@ -278,7 +279,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                         }
                     }
                     Column(Modifier.weight(1f)) {
-                        Text("订阅与配置", color = tokens.textPrimary, fontSize = 26.sp, lineHeight = 34.sp, fontWeight = FontWeight.Bold)
+                        Text("订阅工作台", color = tokens.textPrimary, fontSize = 26.sp, lineHeight = 34.sp, fontWeight = FontWeight.Bold)
                         Text(configName, color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
                     }
                     Surface(
@@ -319,7 +320,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                             }
                             Spacer(Modifier.width(11.dp))
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Text("订阅与配置", color = tokens.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
+                                Text("订阅 · 配置 · 用量", color = tokens.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
                                 Text("${subscriptions.size - configured} 个待填写 · ${configLibrary.size} 份本地配置", color = tokens.textSecondary, fontSize = 11.sp)
                             }
                         }
@@ -639,7 +640,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
 
             item("yaml-heading") {
                 Column(Modifier.padding(horizontal = 2.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text("高级编辑", color = tokens.textPrimary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text("配置编辑", color = tokens.textPrimary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Text("需要修改策略组、DNS、规则或其他 Mihomo 字段时直接编辑 YAML", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
                 }
             }
@@ -674,17 +675,10 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                             Text("编辑当前 YAML", color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall)
                             Text("保存后在下次启动/重启代理时生效", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
                         }
-                        TextButton(onClick = {
-                            yamlError = ""
-                            yamlLoading = true
-                            scope.launch {
-                                runCatching { controller.configText() }
-                                    .onSuccess { yamlText = it; yamlOpen = true }
-                                    .onFailure { message = it.message ?: "读取配置失败" }
-                                yamlLoading = false
-                            }
-                        }, enabled = !yamlLoading) {
-                            if (yamlLoading) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Text("打开")
+                        TextButton(
+                            onClick = { context.startActivity(Intent(context, ProxyConfigEditorActivity::class.java)) },
+                        ) {
+                            Text("编辑")
                         }
                     }
                 }

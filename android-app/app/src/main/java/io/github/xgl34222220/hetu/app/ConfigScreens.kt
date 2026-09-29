@@ -4,8 +4,12 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Typeface
 import android.net.Uri
+import android.os.Bundle
 import android.provider.OpenableColumns
+import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -61,6 +65,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.ViewModelProvider
 import io.github.rosemoe.sora.event.ContentChangeEvent
 import io.github.rosemoe.sora.widget.CodeEditor
 import io.github.rosemoe.sora.widget.schemes.SchemeDarcula
@@ -428,8 +433,24 @@ private fun hxApplyYamlSymbol(editor: CodeEditor, symbol: String) {
 }
 
 @Composable
-internal fun ConfigEditorScreen(vm: HetuViewModel) {
-    val nav = LocalNav.current
+class ProxyConfigEditorActivity : ComponentActivity() {
+    private lateinit var vm: HetuViewModel
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        vm = ViewModelProvider(this)[HetuViewModel::class.java]
+        setContent {
+            HetuAppTheme(appearance = vm.appearance, dynamic = vm.dynamicColor, accentHex = vm.accentHex) {
+                ConfigEditorScreen(vm, onBackOverride = { finish() })
+            }
+        }
+    }
+}
+
+@Composable
+internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)? = null) {
+    val nav = if (onBackOverride == null) LocalNav.current else null
     val scope = rememberCoroutineScope()
     val c = Hx.colors
     var text by remember { mutableStateOf<String?>(null) }
@@ -447,7 +468,10 @@ internal fun ConfigEditorScreen(vm: HetuViewModel) {
         }
     }
 
-    fun leave() { if (dirty) confirmLeave = true else nav.pop() }
+    fun leave() {
+        if (dirty) confirmLeave = true
+        else if (onBackOverride != null) onBackOverride() else nav?.pop()
+    }
     BackHandler(enabled = dirty) { confirmLeave = true }
 
     fun validate() {
@@ -565,7 +589,11 @@ internal fun ConfigEditorScreen(vm: HetuViewModel) {
             message = "当前修改还没有保存。",
             confirmLabel = "放弃",
             danger = true,
-            onConfirm = { confirmLeave = false; dirty = false; nav.pop() },
+            onConfirm = {
+                confirmLeave = false
+                dirty = false
+                if (onBackOverride != null) onBackOverride() else nav?.pop()
+            },
             onDismiss = { confirmLeave = false },
         )
     }
