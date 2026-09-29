@@ -1,4 +1,7 @@
 package io.github.xgl34222220.hetu
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.animation.Crossfade
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.rememberScrollState
@@ -88,34 +91,17 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
     val options = rememberPanelOptions11(vm.prefs)
     var searching by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
-    var selectedGroupName by rememberSaveable { mutableStateOf("") }
+    var sheetGroupName by rememberSaveable { mutableStateOf<String?>(null) }
     var showOptions by remember { mutableStateOf(false) }
     var showApi by remember { mutableStateOf(false) }
 
     val visibleGroups = panelGroups11(state.groups, query, state.trafficMode, options)
-    val defaultGroup = visibleGroups.firstOrNull { it.name == "节点选择" }
-        ?: visibleGroups.firstOrNull { it.type.equals("Selector", true) && !it.name.equals("GLOBAL", true) }
-        ?: visibleGroups.firstOrNull()
-    val selectedGroup = visibleGroups.firstOrNull { it.name == selectedGroupName } ?: defaultGroup
-    val selectedNodes = selectedGroup
-        ?.let { projectStrategyNodes(it.nodes, options.sort, options.descending, vm.delays) }
-        .orEmpty()
-    val sections = if (options.providers) {
-        selectedNodes.groupBy { it.provider.ifBlank { "配置内节点" } }
-    } else {
-        linkedMapOf("" to selectedNodes)
-    }
-
-    LaunchedEffect(defaultGroup?.name, visibleGroups.size, selectedGroupName) {
-        if (selectedGroupName.isBlank() || visibleGroups.none { it.name == selectedGroupName }) {
-            selectedGroupName = defaultGroup?.name.orEmpty()
-        }
-    }
+    val sheetGroup = state.groups.firstOrNull { it.name == sheetGroupName }
 
     HxPage(
         title = "代理",
         scrollToTopSignal = vm.reselect,
-        subtitle = if (state.running) "${visibleGroups.size} 个策略组 · ${visibleGroups.sumOf { it.nodes.size }} 个节点" else null,
+        subtitle = if (state.running) visibleGroups.size.toString() + " 个策略组 · " + visibleGroups.sumOf { it.nodes.size } + " 个节点" else null,
         bottomPadding = bottomPadding,
         actions = {
             if (state.running) {
@@ -130,7 +116,7 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
     ) {
         if (!state.running) {
             item(key = "stopped") {
-                HxEmpty(Icons.Rounded.Hub, "代理未运行", "启动后即可选择策略组、切换节点和测速") {
+                HxEmpty(Icons.Rounded.Hub, "代理未运行", "启动后即可查看策略组、切换节点和测速") {
                     HxButton("启动代理", onClick = vm::toggle, icon = Icons.Rounded.PowerSettingsNew, busy = vm.operation != null)
                 }
             }
@@ -148,6 +134,29 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
             }
         }
 
+        item(key = "strategy-heading") {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = Hx.gutter).padding(bottom = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("策略组", style = MaterialTheme.typography.labelLarge, color = Hx.colors.textMuted, modifier = Modifier.weight(1f))
+                if (vm.testingAll) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        HxSpinner(13.dp)
+                        Spacer(Modifier.width(6.dp))
+                        Text("测速中", style = MaterialTheme.typography.labelMedium, color = Hx.colors.textMuted)
+                    }
+                } else {
+                    Text(
+                        "测速全部",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Hx.colors.accent,
+                        modifier = Modifier.clip(Hx.chipShape).clickable { vm.testAll() }.padding(horizontal = 8.dp, vertical = 5.dp),
+                    )
+                }
+            }
+        }
+
         if (visibleGroups.isEmpty()) {
             item(key = "empty") {
                 if (!state.panelReady && state.groups.isEmpty()) HxSkeletonRows(6)
@@ -156,67 +165,36 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
             return@HxPage
         }
 
-        item(key = "strategy-tabs") {
-            StrategyGroupTabs(
-                groups = visibleGroups,
-                selected = selectedGroup?.name.orEmpty(),
-                onSelect = { selectedGroupName = it },
-            )
-        }
-
-        selectedGroup?.let { group ->
-            item(key = "strategy-summary") {
-                AnimatedContent(
-                    targetState = group,
-                    transitionSpec = {
-                        (fadeIn(spring(stiffness = Spring.StiffnessMediumLow)) +
-                            slideInVertically(spring(dampingRatio = .86f, stiffness = Spring.StiffnessMediumLow)) { it / 5 })
-                            .togetherWith(
-                                fadeOut(spring(stiffness = Spring.StiffnessMediumLow)) +
-                                    slideOutVertically(spring(dampingRatio = .9f, stiffness = Spring.StiffnessMediumLow)) { -it / 7 },
-                            )
-                    },
-                    label = "strategy-summary",
-                ) { targetGroup ->
-                    StrategySummary(
-                        vm = vm,
-                        group = targetGroup,
-                        nodeCount = if (targetGroup.name == group.name) selectedNodes.size else targetGroup.nodes.size,
-                    )
-                }
-            }
-
-            sections.forEach { (provider, members) ->
-                if (provider.isNotBlank()) {
-                    item(key = "provider:${group.name}:$provider") {
-                        Text(
-                            provider,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = Hx.colors.textMuted,
-                            modifier = Modifier.padding(horizontal = Hx.gutter + 4.dp).padding(top = 8.dp, bottom = 6.dp),
-                        )
-                    }
-                }
-                items(
-                    items = members,
-                    key = { node -> "node:${group.name}:${provider}:${node.name}" },
-                ) { node ->
-                    NodeTile(
+        val rows = visibleGroups.chunked(2)
+        items(
+            count = rows.size,
+            key = { index -> "strategy-row:" + index + ":" + rows[index].joinToString("|") { it.name } },
+        ) { index ->
+            val row = rows[index]
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = Hx.gutter).padding(bottom = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                row.forEach { group ->
+                    StrategyDashboardCard(
                         vm = vm,
                         group = group,
-                        node = node,
-                        modifier = Modifier
-                            .animateItem(
-                                fadeInSpec = spring<Float>(stiffness = Spring.StiffnessMediumLow),
-                                placementSpec = spring<IntOffset>(dampingRatio = .8f, stiffness = 400f),
-                                fadeOutSpec = spring<Float>(stiffness = Spring.StiffnessMediumLow),
-                            )
-                            .padding(horizontal = Hx.gutter, vertical = 4.dp),
+                        modifier = Modifier.weight(1f),
+                        onClick = { sheetGroupName = group.name },
                     )
                 }
+                if (row.size < 2) Spacer(Modifier.weight(1f))
             }
-            item(key = "node-bottom-space:${group.name}") { Spacer(Modifier.height(8.dp)) }
         }
+    }
+
+    sheetGroup?.let { group ->
+        StrategyNodeSheet(
+            vm = vm,
+            group = group,
+            options = options,
+            onDismiss = { sheetGroupName = null },
+        )
     }
 
     if (showOptions) {
@@ -235,14 +213,12 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
                     HxDivider(16.dp)
                     HxSwitchRow("显示隐藏策略组", options.showHidden, { options.copy(showHidden = it).save(vm.prefs) })
                 }
-                HxButton(
-                    if (vm.testingAll) "正在测速全部节点" else "测速全部节点",
-                    onClick = vm::testAll,
-                    icon = Icons.Rounded.Speed,
-                    busy = vm.testingAll,
-                    filled = false,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                HxGroup {
+                    HxNavRow("策略图标", subtitle = "为策略组配置图标") {
+                        showOptions = false
+                        context.startActivity(Intent(context, ProxyPolicyIconsActivity::class.java))
+                    }
+                }
             }
         }
     }
@@ -253,102 +229,216 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
 }
 
 @Composable
-private fun StrategyGroupTabs(
-    groups: List<ProxyGroupUi>,
-    selected: String,
-    onSelect: (String) -> Unit,
+private fun StrategyDashboardCard(
+    vm: HetuViewModel,
+    group: ProxyGroupUi,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
 ) {
     val c = Hx.colors
-    val haptics = rememberHetuHaptics()
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = Hx.gutter, vertical = 4.dp)
-            .padding(bottom = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    val source = remember(group.name) { MutableInteractionSource() }
+    val currentNode = group.nodes.firstOrNull { it.name == group.now }
+    val delay = vm.delays[group.now] ?: currentNode?.lastDelay
+    val flag = refNodeFlag(group.now).takeIf { it.isNotBlank() }
+    val testing = vm.testingGroups[group.name] == true
+
+    Surface(
+        modifier = modifier.hxPressScale(source, .985f),
+        shape = RoundedCornerShape(17.dp),
+        color = c.surface,
+        border = BorderStroke(0.5.dp, c.line.copy(alpha = if (c.dark) .72f else .52f)),
+        shadowElevation = 0.dp,
+        onClick = onClick,
+        interactionSource = source,
     ) {
-        groups.forEach { group ->
-            val active = group.name == selected
-            val bg by animateColorAsState(
-                targetValue = if (active) {
-                    if (c.dark) c.surfaceMuted else c.text
-                } else c.surfaceMuted,
-                animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                label = "strategy-tab-bg",
-            )
-            val fg by animateColorAsState(
-                targetValue = if (active) {
-                    if (c.dark) c.text else c.canvas
-                } else c.textMuted,
-                animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                label = "strategy-tab-fg",
-            )
-            val source = remember(group.name) { MutableInteractionSource() }
-            Box(
-                Modifier
-                    .hxPressScale(source, .97f)
-                    .clip(CircleShape)
-                    .background(bg)
-                    .clickable(
-                        interactionSource = source,
-                        indication = LocalIndication.current,
-                        enabled = !active,
-                    ) {
-                        haptics.perform(HetuHaptic.Tick)
-                        onSelect(group.name)
-                    }
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
-                contentAlignment = Alignment.Center,
-            ) {
+        Column(
+            Modifier.fillMaxWidth().heightIn(min = 118.dp).padding(horizontal = 13.dp, vertical = 12.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     group.name,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
-                    color = fg,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = c.text,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    HxFormat.groupType(group.type).uppercase(Locale.ROOT),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = c.textFaint,
                     maxLines = 1,
                 )
+            }
+            Spacer(Modifier.height(10.dp))
+            Text(
+                listOfNotNull(flag, group.now.ifBlank { null }).joinToString(" "),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = c.text,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.weight(1f))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    group.nodes.size.toString() + " 个节点",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = c.textMuted,
+                    maxLines = 1,
+                )
+                Spacer(Modifier.weight(1f))
+                HxDelayPill(delay, testing) { vm.testGroup(group) }
             }
         }
     }
 }
 
 @Composable
-private fun StrategySummary(vm: HetuViewModel, group: ProxyGroupUi, nodeCount: Int) {
+private fun StrategyNodeSheet(
+    vm: HetuViewModel,
+    group: ProxyGroupUi,
+    options: PanelOptions11,
+    onDismiss: () -> Unit,
+) {
     val c = Hx.colors
-    val current = group.now.ifBlank { "未选择节点" }
-    val delay = vm.delays[group.now] ?: group.nodes.firstOrNull { it.name == group.now }?.lastDelay
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = Hx.gutter, vertical = 6.dp).padding(bottom = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    val nodes = projectStrategyNodes(group.nodes, options.sort, options.descending, vm.delays)
+    val sections = if (options.providers) {
+        nodes.groupBy { it.provider.ifBlank { "配置内节点" } }
+    } else {
+        linkedMapOf("" to nodes)
+    }
+
+    HxSheet(onDismiss = onDismiss) {
+        Row(
+            Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(group.name, style = MaterialTheme.typography.titleLarge, color = c.text, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    group.nodes.size.toString() + " 个节点 · 当前 " + group.now.ifBlank { "未选择" },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = c.textMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (vm.testingGroups[group.name] == true) {
+                Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) { HxSpinner(17.dp) }
+            } else {
+                HxBarAction(Icons.Rounded.Speed, "测速本组", onClick = { vm.testGroup(group) })
+            }
+        }
+
+        LazyColumn(
+            Modifier.fillMaxWidth().heightIn(min = 300.dp, max = 620.dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 14.dp, end = 14.dp, top = 4.dp, bottom = 18.dp),
+        ) {
+            sections.forEach { (provider, members) ->
+                if (provider.isNotBlank()) {
+                    item(key = "provider:" + group.name + ":" + provider) {
+                        Text(
+                            provider,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = c.textMuted,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
+                        )
+                    }
+                }
+                items(
+                    items = members,
+                    key = { node -> "sheet-node:" + group.name + ":" + node.name },
+                ) { node ->
+                    StrategySheetNodeRow(
+                        vm = vm,
+                        group = group,
+                        node = node,
+                        onSelected = onDismiss,
+                        modifier = Modifier.animateItem(
+                            fadeInSpec = spring<Float>(stiffness = Spring.StiffnessMediumLow),
+                            placementSpec = spring<IntOffset>(dampingRatio = .82f, stiffness = 420f),
+                            fadeOutSpec = spring<Float>(stiffness = Spring.StiffnessMediumLow),
+                        ),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StrategySheetNodeRow(
+    vm: HetuViewModel,
+    group: ProxyGroupUi,
+    node: ProxyNodeUi,
+    onSelected: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val c = Hx.colors
+    val selectable = HxFormat.isSelectable(group.type)
+    val pending = vm.pendingSelection[group.name]
+    val selected = group.now == node.name
+    val delay = vm.delays[node.name] ?: node.lastDelay
+    val testing = vm.testingNodes[node.name] == true
+    val source = remember(node.name) { MutableInteractionSource() }
+    val haptics = rememberHetuHaptics()
+    val bg by animateColorAsState(
+        if (selected) c.accentSoft.copy(alpha = if (c.dark) .34f else .52f) else c.surface,
+        spring(stiffness = Spring.StiffnessMediumLow),
+        label = "sheet-node-bg",
+    )
+    val outline by animateColorAsState(
+        if (selected) c.accent.copy(alpha = .38f) else c.line.copy(alpha = .45f),
+        spring(stiffness = Spring.StiffnessMediumLow),
+        label = "sheet-node-outline",
+    )
+
+    Surface(
+        modifier = modifier.fillMaxWidth().padding(vertical = 4.dp).hxPressScale(source, .988f),
+        shape = RoundedCornerShape(15.dp),
+        color = bg,
+        border = BorderStroke(if (selected) 1.dp else 0.5.dp, outline),
+        shadowElevation = 0.dp,
+        enabled = selectable && pending == null && !selected,
+        interactionSource = source,
+        onClick = {
+            haptics.perform(HetuHaptic.Tap)
+            vm.select(group.name, node.name)
+            onSelected()
+        },
     ) {
-        Column(Modifier.weight(1f)) {
-            Text(group.name, style = MaterialTheme.typography.titleMedium, color = c.text, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(2.dp))
-            Text(
-                "$current · $nodeCount 个节点",
-                style = MaterialTheme.typography.bodySmall,
-                color = c.textMuted,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        if (delay != null && group.now.isNotBlank()) {
-            HxDelayPill(delay, false) { vm.testNode(group.now) }
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.width(18.dp), contentAlignment = Alignment.CenterStart) {
+                if (selected) Box(Modifier.size(8.dp).clip(CircleShape).background(c.accent))
+            }
             Spacer(Modifier.width(8.dp))
-        }
-        if (vm.testingGroups[group.name] == true) {
-            HxSpinner(16.dp)
-        } else {
-            Text(
-                "测速",
-                style = MaterialTheme.typography.labelMedium,
-                color = c.accent,
-                modifier = Modifier
-                    .clip(Hx.chipShape)
-                    .clickable { vm.testGroup(group) }
-                    .padding(horizontal = 9.dp, vertical = 6.dp),
-            )
+            Column(Modifier.weight(1f)) {
+                Text(
+                    node.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                    color = c.text,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    listOf(node.type.uppercase(Locale.ROOT), node.provider).filter { it.isNotBlank() }.joinToString(" · "),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = c.textFaint,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Spacer(Modifier.width(10.dp))
+            HxDelayPill(delay, testing) { vm.testNode(node.name) }
         }
     }
 }
@@ -405,120 +495,25 @@ internal fun ApiSettingsSheet(vm: HetuViewModel, onDismiss: () -> Unit) {
     }
 }
 
-@Composable
-private fun NodeTile(
-    vm: HetuViewModel,
-    group: ProxyGroupUi,
-    node: ProxyNodeUi,
-    modifier: Modifier = Modifier,
-) {
-    val c = Hx.colors
-    val selectable = HxFormat.isSelectable(group.type)
-    val pending = vm.pendingSelection[group.name]
-    val selected = group.now == node.name
-    val pendingThis = pending == node.name
-    val delay = vm.delays[node.name] ?: node.lastDelay
-    val testing = vm.testingNodes[node.name] == true
-    val source = remember(node.name) { MutableInteractionSource() }
-    val haptics = rememberHetuHaptics()
-
-    val bg by animateColorAsState(
-        targetValue = if (selected) c.accentSoft.copy(alpha = if (c.dark) .42f else .62f) else c.surface,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label = "node-bg",
-    )
-    val outline by animateColorAsState(
-        targetValue = if (selected) c.accent.copy(alpha = .48f) else c.line.copy(alpha = .55f),
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label = "node-outline",
-    )
-
-    Surface(
-        modifier = modifier.hxPressScale(source, .985f),
-        shape = RoundedCornerShape(16.dp),
-        color = bg,
-        border = BorderStroke(if (selected) 1.dp else 0.5.dp, outline),
-        shadowElevation = 0.dp,
-        onClick = {
-            if (selectable && pending == null && !selected) {
-                haptics.perform(HetuHaptic.Tap)
-                vm.select(group.name, node.name)
-            }
-        },
-        enabled = selectable && pending == null && !selected,
-    ) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 13.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            val indicatorVisible = selected || pendingThis
-            val indicatorScale by animateFloatAsState(
-                targetValue = if (indicatorVisible) 1f else 0f,
-                animationSpec = spring(dampingRatio = .72f, stiffness = Spring.StiffnessMediumLow),
-                label = "node-indicator-scale",
-            )
-            val indicatorAlpha by animateFloatAsState(
-                targetValue = if (indicatorVisible) 1f else 0f,
-                animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                label = "node-indicator-alpha",
-            )
-            Box(
-                Modifier.width(18.dp).graphicsLayer {
-                    scaleX = indicatorScale
-                    scaleY = indicatorScale
-                    alpha = indicatorAlpha
-                },
-                contentAlignment = Alignment.CenterStart,
-            ) {
-                if (pendingThis) HxSpinner(12.dp)
-                else Box(Modifier.size(8.dp).clip(CircleShape).background(c.accent))
-            }
-            Spacer(Modifier.width(8.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    node.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                    color = c.text,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    listOf(node.type.uppercase(Locale.ROOT), node.provider)
-                        .filter { it.isNotBlank() }
-                        .joinToString(" · "),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = c.textFaint,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Spacer(Modifier.width(10.dp))
-            HxDelayPill(delay, testing) { vm.testNode(node.name) }
-        }
-    }
-}
-
-/** Compact, low-saturation latency indicator. */
+/** Fixed-size latency indicator. Crossfade keeps spinner and text from deforming. */
 @Composable
 internal fun HxDelayPill(delay: Long?, testing: Boolean, onClick: () -> Unit) {
     val c = Hx.colors
     val bg = when {
-        delay == null || delay == 0L -> c.surfaceMuted
+        testing || delay == null || delay == 0L -> c.surfaceMuted
         delay < 0L -> c.badSoft.copy(alpha = .62f)
         delay < 100L -> c.goodSoft.copy(alpha = .68f)
         delay < 200L -> c.warnSoft.copy(alpha = .62f)
-        delay < 500L -> c.warnSoft.copy(alpha = .48f)
         else -> c.badSoft.copy(alpha = .58f)
     }
     val fg = when {
-        delay == null || delay == 0L -> c.textFaint
+        testing || delay == null || delay == 0L -> c.textFaint
         delay < 0L -> c.bad
         delay < 100L -> c.good
-        delay < 500L -> c.warn
+        delay < 200L -> c.warn
         else -> c.bad
     }
+
     Box(
         Modifier
             .width(62.dp)
@@ -528,21 +523,33 @@ internal fun HxDelayPill(delay: Long?, testing: Boolean, onClick: () -> Unit) {
             .clickable(enabled = !testing, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        if (testing) {
-            HxSpinner(11.dp, fg)
-        } else {
-            Text(
-                when {
-                    delay != null && delay > 0 -> "${delay}ms"
-                    delay == -1L -> "超时"
-                    delay != null && delay < 0 -> "失败"
-                    else -> "测速"
-                },
-                style = MaterialTheme.typography.labelSmall.merge(HxNumberStyle),
-                fontWeight = FontWeight.SemiBold,
-                color = fg,
-                maxLines = 1,
-            )
+        Crossfade(
+            targetState = testing,
+            animationSpec = tween(150),
+            label = "latency-crossfade",
+        ) { isTesting ->
+            if (isTesting) {
+                Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(13.dp),
+                        strokeWidth = 2.dp,
+                        color = c.accent,
+                    )
+                }
+            } else {
+                Text(
+                    when {
+                        delay != null && delay > 0 -> delay.toString() + "ms"
+                        delay == -1L -> "超时"
+                        delay != null && delay < 0 -> "失败"
+                        else -> "---"
+                    },
+                    style = MaterialTheme.typography.labelSmall.merge(HxNumberStyle),
+                    fontWeight = FontWeight.SemiBold,
+                    color = fg,
+                    maxLines = 1,
+                )
+            }
         }
     }
 }
