@@ -20,27 +20,35 @@ import androidx.compose.ui.platform.LocalDensity
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Home
@@ -58,6 +66,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -169,12 +178,16 @@ internal val LocalNav = staticCompositionLocalOf<HxNav> { error("HxNav not provi
 internal fun HetuRoot(vm: HetuViewModel) {
     val nav = remember { HxNav() }
     val routeHolder = rememberSaveableStateHolder()
-    val snackbar = remember { SnackbarHostState() }
+    var floatingMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val c = Hx.colors
 
     LaunchedEffect(vm) {
-        vm.messages.collectLatest { snackbar.showSnackbar(it) }
+        vm.messages.collectLatest { message ->
+            floatingMessage = message
+            delay(1600)
+            floatingMessage = null
+        }
     }
 
     // Predictive back: the page follows the finger (shrinks toward the swipe edge with
@@ -245,17 +258,27 @@ internal fun HetuRoot(vm: HetuViewModel) {
                 }
             }
 
-            val bottomOffset: Dp = if (nav.current == HxRoute.Main) HxDockHeight + 22.dp else 12.dp
-            SnackbarHost(
-                hostState = snackbar,
-                modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = bottomOffset, start = 16.dp, end = 16.dp),
-            ) { data ->
-                Snackbar(
-                    snackbarData = data,
-                    shape = RoundedCornerShape(16.dp),
-                    containerColor = c.text,
-                    contentColor = c.canvas,
-                )
+            AnimatedVisibility(
+                visible = floatingMessage != null,
+                modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 8.dp, start = 18.dp, end = 18.dp),
+                enter = slideInVertically(tween(260, easing = HxMotion.Emphasized)) { -it } +
+                    fadeIn(tween(180)) +
+                    scaleIn(tween(260, easing = HxMotion.Emphasized), initialScale = .94f),
+                exit = slideOutVertically(tween(180)) { -it / 2 } + fadeOut(tween(150)),
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(22.dp),
+                    color = c.surface.copy(alpha = .97f),
+                    contentColor = c.text,
+                    shadowElevation = 10.dp,
+                    tonalElevation = 0.dp,
+                ) {
+                    Row(Modifier.padding(horizontal = 16.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
+                        HxDot(c.accent, 7.dp)
+                        Spacer(Modifier.width(9.dp))
+                        Text(floatingMessage.orEmpty(), style = MaterialTheme.typography.bodyMedium, color = c.text, maxLines = 2)
+                    }
+                }
             }
         }
 

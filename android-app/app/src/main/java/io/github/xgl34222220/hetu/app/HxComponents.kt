@@ -347,11 +347,15 @@ internal fun HxDivider(inset: Dp = 60.dp) {
 
 @Composable
 internal fun HxIconBadge(icon: ImageVector, tint: Color = Hx.colors.accent, size: Dp = 38.dp) {
+    val c = Hx.colors
+    val danger = tint == c.bad
+    val foreground = if (danger) c.bad else c.textMuted
+    val background = if (danger) c.badSoft else c.surfaceMuted
     Box(
-        Modifier.size(size).clip(RoundedCornerShape(size * 0.32f)).background(tint.copy(alpha = if (Hx.colors.dark) .18f else .12f)),
+        Modifier.size(size).clip(RoundedCornerShape(size * 0.32f)).background(background),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(size * 0.55f))
+        Icon(icon, contentDescription = null, tint = foreground, modifier = Modifier.size(size * 0.55f))
     }
 }
 
