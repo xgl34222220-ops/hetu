@@ -147,16 +147,31 @@ jobs:
           echo "V20.18 strategy card polish applied"
           git diff --stat
 
-      - name: Export effective V20.18 source
+      - name: Apply V20.19 strategy screenshot parity
         run: |
           set -euo pipefail
-          tar -czf /tmp/Hetu-V20.18-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
-          sha256sum /tmp/Hetu-V20.18-effective-source.tar.gz
+          cat updates/v2019-strategy/p00.b64 | base64 -d > /tmp/v2019.patch.xz
+          echo 'aaf61436b9f4b9f0176badb336f6b688ecc1e75d699f02af9a77bd4549c0d21f  /tmp/v2019.patch.xz' | sha256sum -c -
+          xz -dc /tmp/v2019.patch.xz > /tmp/v2019.patch
+          git apply --check /tmp/v2019.patch
+          git apply /tmp/v2019.patch
+          grep -q 'versionCode = 2019' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.6.9-v20"' android-app/app/build.gradle.kts
+          grep -q 'val groupRatio = if (columns == 1) 4.0f else 2.02f' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ProxiesScreen.kt
+          grep -q 'height(62.dp)' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ProxiesScreen.kt
+          echo "V20.19 strategy screenshot parity applied"
+          git diff --stat
+
+      - name: Export effective V20.19 source
+        run: |
+          set -euo pipefail
+          tar -czf /tmp/Hetu-V20.19-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+          sha256sum /tmp/Hetu-V20.19-effective-source.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.18-effective-source
-          path: /tmp/Hetu-V20.18-effective-source.tar.gz
+          name: Hetu-V20.19-effective-source
+          path: /tmp/Hetu-V20.19-effective-source.tar.gz
           compression-level: 0
           if-no-files-found: error
 
