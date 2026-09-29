@@ -235,16 +235,31 @@ jobs:
           echo "V20.22 panel defaults and routing cleanup applied"
           git diff --stat
 
-      - name: Export effective V20.22 source
+      - name: Apply V20.23 overview redesign
         run: |
           set -euo pipefail
-          tar -czf /tmp/Hetu-V20.22-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
-          sha256sum /tmp/Hetu-V20.22-effective-source.tar.gz
+          cat updates/v2023-overview/p00.b64 updates/v2023-overview/p01.b64 | base64 -d > /tmp/v2023.patch.xz
+          echo '49f3c13faeb0538910638ff8b08b08b4f6a2ec5045cea50ea792fa64dd85cbc3  /tmp/v2023.patch.xz' | sha256sum -c -
+          xz -dc /tmp/v2023.patch.xz > /tmp/v2023.patch
+          git apply --check /tmp/v2023.patch
+          git apply /tmp/v2023.patch
+          grep -q 'versionCode = 2023' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.7.3-v20"' android-app/app/build.gradle.kts
+          grep -q '实时排行' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelOverviewScreen.kt
+          grep -q 'bitmap.asImageBitmap' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelOverviewScreen.kt
+          echo "V20.23 overview redesign applied"
+          git diff --stat
+
+      - name: Export effective V20.23 source
+        run: |
+          set -euo pipefail
+          tar -czf /tmp/Hetu-V20.23-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+          sha256sum /tmp/Hetu-V20.23-effective-source.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.22-effective-source
-          path: /tmp/Hetu-V20.22-effective-source.tar.gz
+          name: Hetu-V20.23-effective-source
+          path: /tmp/Hetu-V20.23-effective-source.tar.gz
           compression-level: 0
           if-no-files-found: error
 
