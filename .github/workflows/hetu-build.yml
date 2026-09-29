@@ -370,16 +370,32 @@ jobs:
           PY
           grep -q 'import androidx.compose.foundation.shape.RoundedCornerShape' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTabbedPage.kt
 
-      - name: Export effective V20.29 source
+      - name: Apply V20.30 page-specific panel bars
         run: |
           set -euo pipefail
-          tar -czf /tmp/Hetu-V20.29-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
-          sha256sum /tmp/Hetu-V20.29-effective-source.tar.gz
+          cat updates/v2030-page-bars/p00.b64 | base64 -d > /tmp/v2030.patch.xz
+          echo '66f28bbab7d722d1a0045b9ed52f0df7d05af4da1b7fb935788edab37612fa49  /tmp/v2030.patch.xz' | sha256sum -c -
+          xz -dc /tmp/v2030.patch.xz > /tmp/v2030.patch
+          git apply --check /tmp/v2030.patch
+          git apply /tmp/v2030.patch
+          grep -q 'versionCode = 2030' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.8.0-v20"' android-app/app/build.gradle.kts
+          grep -q 'showFilterMenu' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConnectionsScreen.kt
+          grep -q 'forcedLeadingActions' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/RulesScreen.kt
+          grep -q 'modifier = Modifier.hxAnchorSource()' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
+          echo "V20.30 page-specific panel bars applied"
+          git diff --stat
+
+      - name: Export effective V20.30 source
+        run: |
+          set -euo pipefail
+          tar -czf /tmp/Hetu-V20.30-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+          sha256sum /tmp/Hetu-V20.30-effective-source.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.29-effective-source
-          path: /tmp/Hetu-V20.29-effective-source.tar.gz
+          name: Hetu-V20.30-effective-source
+          path: /tmp/Hetu-V20.30-effective-source.tar.gz
           compression-level: 0
           if-no-files-found: error
 
