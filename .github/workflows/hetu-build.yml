@@ -206,6 +206,19 @@ jobs:
           echo "V20.21 panel strategy fast test applied"
           git diff --stat
 
+      - name: Fix V20.21 animated color import
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/BoxProxyExactPanel17.kt')
+          s = p.read_text()
+          if 'import androidx.compose.animation.animateColorAsState\n' not in s:
+              s = s.replace('import androidx.compose.animation.animateContentSize\n', 'import androidx.compose.animation.animateContentSize\nimport androidx.compose.animation.animateColorAsState\n')
+          p.write_text(s)
+          PY
+          grep -q 'import androidx.compose.animation.animateColorAsState' android-app/app/src/main/java/io/github/xgl34222220/hetu/BoxProxyExactPanel17.kt
+
       - name: Export effective V20.21 source
         run: |
           set -euo pipefail
