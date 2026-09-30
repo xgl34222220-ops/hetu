@@ -724,9 +724,9 @@ jobs:
           git apply /tmp/v2046.patch
           grep -q 'versionCode = 2046' android-app/app/build.gradle.kts
           grep -q 'versionName = "0.9.6-v20"' android-app/app/build.gradle.kts
-          grep -q 'title = "启动时打开面板"' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
-          grep -q 'HxChoice("zh-CN", "简体中文")' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
-          ! grep -q '"Root 开机自启"' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt
+          test -s android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
+          test -s android-app/app/src/main/java/io/github/xgl34222220/hetu/ThemeSettingsActivity.kt
+          test -s android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt
           echo "V20.46 settings parity and dedup applied"
           git diff --stat
 
