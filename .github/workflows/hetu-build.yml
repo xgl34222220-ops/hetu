@@ -697,16 +697,33 @@ jobs:
           echo "V20.44 tool scale parity applied"
           git diff --stat
 
-      - name: Export effective V20.44 source
+      - name: Apply V20.45 root title and liquid dock
         run: |
           set -euo pipefail
-          tar -czf /tmp/Hetu-V20.44-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
-          sha256sum /tmp/Hetu-V20.44-effective-source.tar.gz
+          cat updates/v2045-root-chrome-liquid/p00.b64 | base64 -d > /tmp/v2045.patch.xz
+          echo '9954320abcb3a010d0de19fccbdf69567eaffbb382214c39fce3716f591b71c6  /tmp/v2045.patch.xz' | sha256sum -c -
+          xz -dc /tmp/v2045.patch.xz > /tmp/v2045.patch
+          git apply --check /tmp/v2045.patch
+          git apply /tmp/v2045.patch
+          grep -q 'versionCode = 2045' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.9.5-v20"' android-app/app/build.gradle.kts
+          grep -q 'largeTitleFontSizeSp = 36f' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeScreen.kt
+          grep -q 'title = "设置"' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
+          grep -q 'V20.45: real MIUIX drawBackdrop liquid dock' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
+          grep -q 'liquidGlassLens' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
+          echo "V20.45 root title and liquid dock applied"
+          git diff --stat
+
+      - name: Export effective V20.45 source
+        run: |
+          set -euo pipefail
+          tar -czf /tmp/Hetu-V20.45-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+          sha256sum /tmp/Hetu-V20.45-effective-source.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.44-effective-source
-          path: /tmp/Hetu-V20.44-effective-source.tar.gz
+          name: Hetu-V20.45-effective-source
+          path: /tmp/Hetu-V20.45-effective-source.tar.gz
           compression-level: 0
           if-no-files-found: error
 
