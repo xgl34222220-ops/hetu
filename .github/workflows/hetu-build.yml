@@ -562,7 +562,7 @@ jobs:
         run: |
           set -euo pipefail
           cat updates/v2039-page-parity/p00.b64 | base64 -d > /tmp/v2039.patch.xz
-          echo '201833cdfbb4f64965b65880967d96d8d04b59b382f9fe138af1caae40b368d4  /tmp/v2039.patch.xz' | sha256sum -c -
+          echo '76b5d1eece9019646b52a798a25060d5b89d86d9cde75300faa551348f1381e6  /tmp/v2039.patch.xz' | sha256sum -c -
           xz -dc /tmp/v2039.patch.xz > /tmp/v2039.patch
           git apply --check /tmp/v2039.patch
           git apply /tmp/v2039.patch
