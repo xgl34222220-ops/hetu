@@ -526,16 +526,32 @@ jobs:
           echo "V20.36 tab glass and tool surface polish applied"
           git diff --stat
 
-      - name: Export effective V20.36 source
+      - name: Apply V20.37 secondary-page reference polish
         run: |
           set -euo pipefail
-          tar -czf /tmp/Hetu-V20.36-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
-          sha256sum /tmp/Hetu-V20.36-effective-source.tar.gz
+          cat updates/v2037-secondary-reference/p00.b64 | base64 -d > /tmp/v2037.patch.xz
+          echo '02e37b7a96fdd663149e3ec0d2eb006c1d89c6ba6ae599b051be879d63c26727  /tmp/v2037.patch.xz' | sha256sum -c -
+          xz -dc /tmp/v2037.patch.xz > /tmp/v2037.patch
+          git apply --check /tmp/v2037.patch
+          git apply /tmp/v2037.patch
+          grep -q 'versionCode = 2037' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.8.7-v20"' android-app/app/build.gradle.kts
+          grep -q 'pageBackground = Color(0xFFF2F0FB)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuTheme.kt
+          grep -q 'Text("应用管理"' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAppSelectionActivity.kt
+          grep -q 'Text("订阅管理"' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
+          echo "V20.37 secondary-page reference polish applied"
+          git diff --stat
+
+      - name: Export effective V20.37 source
+        run: |
+          set -euo pipefail
+          tar -czf /tmp/Hetu-V20.37-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+          sha256sum /tmp/Hetu-V20.37-effective-source.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.36-effective-source
-          path: /tmp/Hetu-V20.36-effective-source.tar.gz
+          name: Hetu-V20.37-effective-source
+          path: /tmp/Hetu-V20.37-effective-source.tar.gz
           compression-level: 0
           if-no-files-found: error
 
