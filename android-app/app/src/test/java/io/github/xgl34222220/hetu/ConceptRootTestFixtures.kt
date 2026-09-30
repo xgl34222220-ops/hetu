@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.compose.runtime.MutableState
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.CancellationException
 import org.json.JSONArray
 import org.json.JSONObject
 import org.robolectric.annotation.Implementation
@@ -12,12 +13,80 @@ import org.robolectric.annotation.Implements
 import org.robolectric.annotation.Resetter
 import org.robolectric.shadow.api.Shadow
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
+import java.io.IOException
+import kotlin.coroutines.Continuation
+
+/** One bounded, test-controlled selection request. Never wait for it on the UI thread. */
+internal class ConceptSelectionGate internal constructor(private val timeoutMs: Long) {
+    private val entered = CountDownLatch(1)
+    private val released = CountDownLatch(1)
+    @Volatile private var failure: Throwable? = null
+    private var completed = false
+
+    fun awaitStarted(timeoutMs: Long = 5_000L): Boolean {
+        require(timeoutMs in 1L..20_000L)
+        return entered.await(timeoutMs, TimeUnit.MILLISECONDS)
+    }
+    fun succeed() = complete(null)
+    fun fail(message: String = "测试选择失败") = complete(IOException(message))
+    fun cancel() = complete(CancellationException("Selection cancelled by the UI test"))
+
+    @Synchronized private fun complete(result: Throwable?) {
+        if (completed) return
+        completed = true
+        failure = result
+        released.countDown()
+    }
+
+    internal fun awaitOutcome() {
+        entered.countDown()
+        if (!released.await(timeoutMs, TimeUnit.MILLISECONDS)) throw IOException("Timed out waiting for the UI test to release selection")
+        failure?.let { throw it }
+    }
+}
+
+internal fun blockNextConceptSelection(timeoutMs: Long = 10_000L): ConceptSelectionGate {
+    require(timeoutMs in 1_000L..20_000L)
+    val gate = ConceptSelectionGate(timeoutMs)
+    check(ConceptTestIo.nextSelectionGate.compareAndSet(null, gate)) { "A selection gate is already armed" }
+    ConceptTestIo.selectionGates += gate
+    return gate
+}
+
+internal fun failNextConceptSelection(message: String = "测试选择失败") {
+    check(ConceptTestIo.nextSelectionFailure.compareAndSet(null, IOException(message))) { "A one-shot selection failure is already armed" }
+}
+
+internal fun conceptSelectionRequestCount(): Int = ConceptTestIo.selectionRequests.get()
+
+/** Explicitly enable production controller/VM read-back against the in-memory backend. */
+internal fun enableConceptActionMode(vm: HetuViewModel) {
+    check(Shadow.extract<Any>(vm.inspector) is ConceptRuntimeInspectorShadow) {
+        "ConceptRuntimeInspectorShadow is required: real sample() can schedule external WAN IO"
+    }
+    check(vm.state.running) { "Set a running concept state before enabling action mode" }
+    // Production state() reads icons from the selected source. Select a test-local,
+    // icon-free source so a later real UI render cannot fetch bundled remote icons.
+    val context = vm.getApplication<Application>()
+    val core = ProxyRuntimeProfile.load(vm.prefs).core
+    ProxyConfigLibrary(context).importConfig(core, "concept-action-fixture.yaml",
+        "mixed-port: 7890\nproxies: []\nproxy-groups: []\nrules: [MATCH,DIRECT]\n".byteInputStream())
+    ConceptTestIo.state = vm.state
+    ConceptTestIo.actionMode = true
+    vm.prefs.edit().putBoolean("proxyRootWanted", false).putBoolean("proxyRootRuntimeRunning", false)
+        .putLong("proxyRootHealthProbeElapsed", 0L).putBoolean("proxyApiHistoryEnabled", false).commit()
+}
 
 /**
  * Test-only fixtures for the real HetuRoot and real HetuViewModel.
  *
  * Required on the test: @Config(shadows = [ConceptRootBridgeShadow::class,
- * ConceptMihomoClientShadow::class]). No HTTP server, socket or su process is used.
+ * ConceptMihomoClientShadow::class, ConceptRuntimeInspectorShadow::class]).
+ * No HTTP server, socket or su process is used.
  * Call fixture/state helpers on the test UI thread. Do not call vm.onForeground().
  * Fixture data proves presentation and callback wiring, never live proxy behavior.
  */
@@ -30,6 +99,9 @@ internal fun newConceptTestVm(application: Application): HetuViewModel {
     }
     check(Shadow.extract<Any>(MihomoControllerClient(application)) is ConceptMihomoClientShadow) {
         "Add ConceptMihomoClientShadow to the test's @Config before creating this fixture"
+    }
+    check(Shadow.extract<Any>(ProxyRuntimeInspector(application)) is ConceptRuntimeInspectorShadow) {
+        "Add ConceptRuntimeInspectorShadow to the test's @Config before creating this fixture"
     }
     ConceptTestIo.reset()
     application.getSharedPreferences("hetu", Context.MODE_PRIVATE).edit()
@@ -70,6 +142,7 @@ internal fun <T> setConceptValue(vm: HetuViewModel, name: String, value: T) {
 /** Dispose the root composition first, then cancel jobs belonging to this test VM. */
 internal fun closeConceptTestVm(vm: HetuViewModel) {
     vm.onBackground()
+    ConceptTestIo.selectionGates.forEach { it.cancel() }
     vm.viewModelScope.cancel()
 }
 
@@ -122,6 +195,11 @@ internal fun conceptProviders(): List<DashboardProviderUi> = listOf(
 /** Observable calls are test assertions, not claims that any runtime operation ran. */
 internal object ConceptTestIo {
     val calls = CopyOnWriteArrayList<String>()
+    val selectionRequests = AtomicInteger()
+    val nextSelectionGate = AtomicReference<ConceptSelectionGate?>(null)
+    val nextSelectionFailure = AtomicReference<IOException?>(null)
+    val selectionGates = CopyOnWriteArrayList<ConceptSelectionGate>()
+    @Volatile var actionMode = false
     @Volatile var state = conceptRunningState()
     @Volatile var rules = conceptRules()
     @Volatile var ruleSets = conceptRuleSets()
@@ -129,6 +207,12 @@ internal object ConceptTestIo {
     const val logText = "[INFO] 连接已建立 example.invalid:443\n[WARN] 规则未匹配，使用 MATCH\n[ERROR] 测试连接已超时\n"
 
     fun reset() {
+        selectionGates.forEach { it.cancel() }
+        selectionGates.clear()
+        nextSelectionGate.set(null)
+        nextSelectionFailure.set(null)
+        selectionRequests.set(0)
+        actionMode = false
         calls.clear()
         state = conceptRunningState()
         rules = conceptRules()
@@ -139,6 +223,12 @@ internal object ConceptTestIo {
     fun stoppedRoot() = JSONObject().put("ok", true).put("running", false)
         .put("installed", false).put("rootGranted", false).put("pid", 0)
         .put("message", "Root is isolated by the UI test fixture")
+
+    fun runtimeRoot(): JSONObject = if (!actionMode) stoppedRoot() else JSONObject()
+        .put("ok", true).put("running", state.running).put("state", "running")
+        .put("controllerPort", 29090).put("pid", 1234).put("runtimeSchema", 0)
+        .put("dataPlaneHealthy", true).put("ipv4Rules", true).put("dnsListenerReady", true)
+        .put("message", "")
 }
 
 /** No unhandled RootBridge method is allowed to call through to production. */
@@ -156,7 +246,8 @@ class ConceptRootBridgeShadow {
             ConceptTestIo.calls += "root:blocked"
             return when {
                 command.startsWith("echo '--- controller-port ---';") -> RootBridge.Result(0, ConceptTestIo.logText)
-                command.contains(" status;") -> RootBridge.Result(0, ConceptTestIo.stoppedRoot().toString())
+                command.startsWith("if [ -x ") && command.contains(" 'status';") ->
+                    RootBridge.Result(0, ConceptTestIo.runtimeRoot().toString())
                 else -> RootBridge.Result(126, "Root command blocked by the UI test fixture")
             }
         }
@@ -167,6 +258,23 @@ class ConceptRootBridgeShadow {
         @JvmStatic @Implementation
         fun run(context: Context, timeoutMs: Long, vararg args: String): RootBridge.Result = RootBridge.Result(126, "Root command blocked by the UI test fixture")
     }
+}
+
+/**
+ * sample() otherwise schedules the independent ipwho.is WAN lookup after a successful
+ * production refresh. Kotlin suspend methods erase to (Continuation) -> Object; these
+ * ordinary methods match that exact JVM boundary and return completed values directly.
+ */
+@Implements(value = ProxyRuntimeInspector::class, isInAndroidSdk = false, callThroughByDefault = false)
+class ConceptRuntimeInspectorShadow {
+    @Implementation
+    fun sample(continuation: Continuation<Any?>): Any {
+        ConceptTestIo.calls += "inspector:sample"
+        return ProxyRuntimeSnapshot(running = ConceptTestIo.actionMode && ConceptTestIo.state.running)
+    }
+
+    @Implementation
+    fun runtimeLog(continuation: Continuation<Any?>): Any = ConceptTestIo.logText
 }
 
 /** In-memory API boundary. Unhandled methods cannot fall through to a real socket. */
@@ -200,7 +308,17 @@ class ConceptMihomoClientShadow {
         JSONObject().put("index", rule.index).put("type", rule.type).put("payload", rule.payload).put("proxy", rule.proxy)
     }))
 
-    @Implementation fun connections(): JSONObject = JSONObject().put("connections", JSONArray()).put("uploadTotal", 0).put("downloadTotal", 0)
+    @Implementation fun connections(): JSONObject {
+        val snapshot = ConceptTestIo.state
+        val entries = if (!ConceptTestIo.actionMode) emptyList() else snapshot.connections.map { connection ->
+            JSONObject().put("id", connection.id).put("rule", connection.rule).put("rulePayload", connection.rulePayload)
+                .put("chains", JSONArray(connection.chain.split(" → "))).put("upload", connection.upload).put("download", connection.download)
+                .put("metadata", JSONObject().put("host", connection.host).put("network", connection.network)
+                    .put("inboundName", connection.inbound).put("uid", 10001)
+                    .put("process", connection.appName.ifBlank { connection.process.ifBlank { "concept-fixture" } }))
+        }
+        return JSONObject().put("connections", JSONArray(entries)).put("uploadTotal", snapshot.uploadTotal).put("downloadTotal", snapshot.downloadTotal)
+    }
     @Implementation fun configs(): JSONObject = JSONObject().put("mode", ConceptTestIo.state.trafficMode.ifBlank { "rule" })
     @Implementation fun version(): JSONObject = JSONObject().put("version", "concept-ui-fixture").put("meta", true)
     @Implementation fun updateRuleProvider(name: String) { ConceptTestIo.calls += "PUT /providers/rules/$name" }
@@ -209,6 +327,11 @@ class ConceptMihomoClientShadow {
     @Implementation fun closeAll() { ConceptTestIo.calls += "DELETE /connections" }
     @Implementation fun select(group: String, node: String) {
         ConceptTestIo.calls += "PUT /proxies/$group:$node"
+        ConceptTestIo.selectionRequests.incrementAndGet()
+        val gate = ConceptTestIo.nextSelectionGate.getAndSet(null)
+        val failure = ConceptTestIo.nextSelectionFailure.getAndSet(null)
+        try { gate?.awaitOutcome() } finally { if (gate != null) ConceptTestIo.selectionGates.remove(gate) }
+        failure?.let { throw it }
         ConceptTestIo.state = ConceptTestIo.state.copy(groups = ConceptTestIo.state.groups.map { if (it.name == group) it.copy(now = node) else it })
     }
     @Implementation fun setTrafficMode(mode: String) {

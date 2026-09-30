@@ -25,7 +25,7 @@ import java.io.File
 
 /** Uses the actual HomeScreen/VM renderer. Test fixtures never enter production. */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35], qualifiers = "w393dp-h852dp-mdpi", application = Application::class, shadows = [ConceptRootBridgeShadow::class, ConceptMihomoClientShadow::class])
+@Config(sdk = [35], qualifiers = "w393dp-h852dp-mdpi", application = Application::class, shadows = [ConceptRootBridgeShadow::class, ConceptMihomoClientShadow::class, ConceptRuntimeInspectorShadow::class])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class HomeConceptUiTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
@@ -53,7 +53,7 @@ class HomeConceptUiTest {
             val density = LocalDensity.current
             CompositionLocalProvider(LocalNav provides nav, LocalHetuMotionEnabled provides false,
                 LocalDensity provides Density(density.density, scale)) {
-                HetuAppTheme(appearance = "light", dynamic = false) { content() }
+                HetuAppTheme(appearance = "light", dynamic = false) { CompositionLocalProvider(LocalHxMotionEnabled provides false) { content() } }
             }
         }
         rule.waitForIdle()

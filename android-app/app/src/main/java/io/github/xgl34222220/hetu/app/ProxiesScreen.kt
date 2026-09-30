@@ -404,6 +404,7 @@ private fun StrategyGroupCard(
     val online = group.nodes.count { (vm.delays[it.name] ?: it.lastDelay ?: 0L) > 0L }
 
     val c = Hx.colors
+    val nameLines = if (nameOverflow == "wrap" || LocalDensity.current.fontScale > 1.3f) 3 else 1
     val source = remember { MutableInteractionSource() }
     val shape = RoundedCornerShape(20.dp)
     val fill by animateColorAsState(if (expanded) c.accentSoft else c.surface.copy(alpha = .84f), HxMotion.enter(), label = "groupFill")
@@ -418,7 +419,7 @@ private fun StrategyGroupCard(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(group.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = c.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(group.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = c.text, maxLines = nameLines, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.height(3.dp))
                 Text("${group.type} · $online/${group.nodes.size}", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
             }
@@ -427,7 +428,7 @@ private fun StrategyGroupCard(
             else HxGroupIcon(group, Modifier.size(34.dp))
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(group.now.ifBlank { "未选择" }, style = MaterialTheme.typography.labelLarge, color = c.text, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Text(group.now.ifBlank { "未选择" }, style = MaterialTheme.typography.labelLarge, color = c.text, maxLines = nameLines, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             Spacer(Modifier.width(5.dp))
             StrategyCompactDelayPill(delay, testing) { vm.testGroup(group) }
         }
@@ -524,7 +525,7 @@ private fun StrategyNodeCard(
                 lineHeight = 20.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = c.text,
-                maxLines = if (LocalDensity.current.fontScale > 1.3f || nameOverflow == "wrap") 3 else 2,
+                maxLines = if (LocalDensity.current.fontScale > 1.3f || nameOverflow == "wrap") 3 else 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )

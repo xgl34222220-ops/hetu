@@ -138,14 +138,15 @@ internal fun HxTabbedPage(
 ) {
     val host = remember { HxEmbedHost() }
     val shownSubtitle = if (showSubtitle) (host.subtitles[selected] ?: subtitle) else null
-    val topBarHeight = if (panelReferenceStyle) 68.dp else if (minimalHeader) 48.dp else HxTopBarHeight
+    val stackedActions = panelReferenceStyle && LocalDensity.current.fontScale > 1.3f
+    val topBarHeight = if (stackedActions) (48f * LocalDensity.current.fontScale + 48f).dp else if (panelReferenceStyle) 68.dp else if (minimalHeader) 48.dp else HxTopBarHeight
     val c = Hx.colors
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val listBottom = (if (bottomPadding > 0.dp) bottomPadding else navInset) + 24.dp
-    val tabsHeight = if (panelReferenceStyle) 52.dp else 42.dp
+    val tabsHeight = if (panelReferenceStyle) maxOf(52f, 20f * density.fontScale + 20f).dp else 42.dp
     val headerOpenHeight = when {
         panelReferenceStyle -> 0.dp
         minimalHeader && shownSubtitle.isNullOrBlank() -> 52.dp
@@ -276,7 +277,7 @@ internal fun HxTabbedPage(
             Text(
                 title,
                 modifier = Modifier
-                    .align(if (panelReferenceStyle) Alignment.CenterStart else Alignment.Center)
+                    .align(if (stackedActions) Alignment.TopStart else if (panelReferenceStyle) Alignment.CenterStart else Alignment.Center)
                     .padding(horizontal = if (panelReferenceStyle) 2.dp else 96.dp)
                     .graphicsLayer {
                         alpha = if (panelReferenceStyle) 1f else ((collapse - .45f) / .55f).coerceIn(0f, 1f)
@@ -294,7 +295,7 @@ internal fun HxTabbedPage(
                     host.leadingActions[selected]?.invoke(this)
                 }
             }
-            Row(Modifier.align(Alignment.CenterEnd), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.align(if (stackedActions) Alignment.BottomEnd else Alignment.CenterEnd), verticalAlignment = Alignment.CenterVertically) {
                 if (panelReferenceStyle) host.leadingActions[selected]?.invoke(this)
                 host.actions[selected]?.invoke(this)
                 actions()

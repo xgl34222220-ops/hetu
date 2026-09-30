@@ -26,7 +26,7 @@ import java.io.File
 /** Runs the launcher composition itself. IO is blocked by test-only client/Root shadows. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], qualifiers = "w393dp-h852dp-mdpi", application = Application::class,
-    shadows = [ConceptRootBridgeShadow::class, ConceptMihomoClientShadow::class])
+    shadows = [ConceptRootBridgeShadow::class, ConceptMihomoClientShadow::class, ConceptRuntimeInspectorShadow::class])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class HetuConceptRootTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
@@ -83,7 +83,7 @@ class HetuConceptRootTest {
         val b = node("strategy-group-$second").getUnclippedBoundsInRoot()
         assertEquals(a.top, b.top)
         assertTrue(a.right < b.left)
-        assertTrue("group must have readable height", a.height >= 110.dp)
+        assertTrue("group must have readable height", (a.bottom - a.top) >= 110.dp)
         screenshot("01-root-strategy-groups")
     }
 
@@ -115,8 +115,75 @@ class HetuConceptRootTest {
         val b = node("strategy-node-${group.name}-${group.nodes[1].name}").getUnclippedBoundsInRoot()
         assertEquals(a.left, b.left)
         assertTrue(b.top >= a.bottom)
-        assertTrue(a.height >= 82.dp)
+        assertTrue((a.bottom - a.top) >= 82.dp)
         screenshot("03-root-strategy-large-font")
+    }
+
+    @Test @Config(qualifiers = "w320dp-h820dp-mdpi")
+    fun twoHundredPercentFontStacksPanelActionsBelowTheTitle() {
+        render(fontScale = 2f)
+        val search = rule.onNodeWithContentDescription("搜索").fetchSemanticsNode().boundsInRoot
+        val title = rule.onAllNodesWithText("面板").fetchSemanticsNodes().map { it.boundsInRoot }.minBy { it.top }
+        assertTrue("actions must be below large title", search.top >= title.bottom)
+        node("panel-tab-proxies").assertIsDisplayed()
+        screenshot("03b-root-narrow-200-percent-font")
+    }
+
+    @Test fun pendingSelectionKeepsOldCheckAndRepeatedPressSendsOnlyOneRequest() {
+        render()
+        rule.runOnIdle { enableConceptActionMode(vm) }
+        val group = vm.state.groups.first()
+        node("strategy-group-${group.name}").performClick()
+        val gate = blockNextConceptSelection()
+        val next = node("strategy-node-${group.name}-${group.nodes[1].name}")
+        next.performClick()
+        assertTrue("selection must reach the actual API boundary", gate.awaitStarted())
+        next.performTouchInput { click() }
+        node("strategy-node-${group.name}-${group.now}").assertIsSelected()
+        next.assertIsNotSelected()
+        assertEquals(1, conceptSelectionRequestCount())
+        screenshot("11-root-selection-pending")
+        gate.succeed()
+        rule.waitUntil(10_000) { vm.pendingSelection.isEmpty() && vm.state.groups.any { it.name == group.name && it.now == group.nodes[1].name } }
+        next.assertIsSelected()
+        screenshot("12-root-selection-confirmed")
+    }
+
+    @Test fun failedSelectionKeepsOldNodeAndAllowsAConfirmedRetry() {
+        render()
+        rule.runOnIdle { enableConceptActionMode(vm) }
+        val group = vm.state.groups.first()
+        node("strategy-group-${group.name}").performClick()
+        val next = node("strategy-node-${group.name}-${group.nodes[1].name}")
+        val failed = blockNextConceptSelection()
+        next.performClick()
+        assertTrue(failed.awaitStarted())
+        failed.fail("测试网络暂时不可用")
+        rule.waitUntil(10_000) { vm.pendingSelection.isEmpty() }
+        node("strategy-node-${group.name}-${group.now}").assertIsSelected()
+        next.assertIsNotSelected()
+        screenshot("13-root-selection-failed")
+        val retry = blockNextConceptSelection()
+        next.performClick()
+        assertTrue(retry.awaitStarted())
+        retry.succeed()
+        rule.waitUntil(10_000) { vm.pendingSelection.isEmpty() && vm.state.groups.any { it.name == group.name && it.now == group.nodes[1].name } }
+        next.assertIsSelected()
+        assertEquals(2, conceptSelectionRequestCount())
+    }
+
+    @Test fun cancelledSelectionReleasesPendingAndKeepsThePreviousCheck() {
+        render()
+        rule.runOnIdle { enableConceptActionMode(vm) }
+        val group = vm.state.groups.first()
+        node("strategy-group-${group.name}").performClick()
+        val gate = blockNextConceptSelection()
+        node("strategy-node-${group.name}-${group.nodes[1].name}").performClick()
+        assertTrue(gate.awaitStarted())
+        gate.cancel()
+        rule.waitUntil(10_000) { vm.pendingSelection.isEmpty() }
+        node("strategy-node-${group.name}-${group.now}").assertIsSelected()
+        node("strategy-node-${group.name}-${group.nodes[1].name}").assertIsNotSelected()
     }
 
     @Test fun settingsHasOneOwnerPerFeatureAndBasicConfigurationHasNoSecondImporter() {

@@ -112,6 +112,10 @@ jobs:
         run: |
           gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:testDebugUnitTest --stacktrace
 
+      - name: Report actual concept UI results
+        if: always()
+        run: python3 tools/report_concept_ui_results.py
+
       - name: Verify packaged runtime matches reviewed source
         id: runtime_audit
         if: always() && steps.build.outcome == 'success'
@@ -137,6 +141,7 @@ jobs:
             android-app/app/build/outputs/hetu-concept-root/
             out/Hetu-dot-ui-source.tar.gz
             out/commit.txt
+            out/concept-ui-result.json
           if-no-files-found: error
 
       - name: Verify APK
