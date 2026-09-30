@@ -751,7 +751,7 @@ jobs:
       - name: Apply V20.47 settings functional parity
         run: |
           set -euxo pipefail
-          cat updates/v2047-settings-functional/p00.b64 updates/v2047-settings-functional/p01.b64 | base64 -d > /tmp/v2047.patch.xz
+          cat updates/v2047-settings-functional/p00.b64 updates/v2047-settings-functional/p01a.b64 updates/v2047-settings-functional/p01b.b64 updates/v2047-settings-functional/p01c.b64 | base64 -d > /tmp/v2047.patch.xz
           echo '9b7dc9325c1ba616fce9a11b978326415df8782870eaed89d5840690f5027796  /tmp/v2047.patch.xz' | sha256sum -c -
           xz -dc /tmp/v2047.patch.xz > /tmp/v2047.patch
           sed -i 's#^--- /mnt/data/v2047_base/#--- a/#; s#^+++ /mnt/data/v2047_work/#+++ b/#' /tmp/v2047.patch
