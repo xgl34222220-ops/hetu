@@ -729,7 +729,7 @@ jobs:
           grep -q 'proxyDnsHijackTcp' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java
           grep -q 'RUNTIME_REVISION = 146' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java
           sh -n android-app/app/src/main/assets/hetu-root.sh
-          echo "V20.46 settings parity applied"
+          echo "V20.46 settings parity applied (retry)"
           git diff --stat
 
       - name: Export effective V20.46 source
