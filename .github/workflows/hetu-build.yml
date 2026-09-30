@@ -607,6 +607,24 @@ jobs:
           echo "V20.41 settings/tools/dock parity applied"
           git diff --stat
 
+      - name: Fix V20.41 Color import
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt')
+          s = p.read_text()
+          imp = 'import androidx.compose.ui.graphics.Color\n'
+          if imp not in s:
+              anchor = 'import androidx.compose.ui.graphics.graphicsLayer\n'
+              if anchor in s:
+                  s = s.replace(anchor, imp + anchor)
+              else:
+                  s = s.replace('import androidx.compose.ui.Modifier\n', 'import androidx.compose.ui.Modifier\n' + imp)
+          p.write_text(s)
+          PY
+          grep -q 'import androidx.compose.ui.graphics.Color' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
+
       - name: Export effective V20.41 source
         run: |
           set -euo pipefail
