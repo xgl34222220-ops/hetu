@@ -202,6 +202,8 @@ jobs:
       - name: Validate default glass in an ordinary Android window
         if: always() && steps.window_test_build.outcome == 'success' && env.HETU_WINDOW_QA == 'true'
         timeout-minutes: 55
+        env:
+          HETU_WINDOW_EXPECTED_APK_SHA256: f10a805597c1dfe3145f5203e00acb800b9e8898bf9c32bc363f44e6a0e48f33
         run: python3 tools/run_android_window_qa.py
 
       - uses: actions/upload-artifact@v4

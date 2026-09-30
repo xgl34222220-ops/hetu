@@ -2,7 +2,9 @@
 """Run an isolated Android window test. No root, security changes, or license acceptance."""
 from pathlib import Path
 import json
+import hashlib
 import os
+import re
 import shutil
 import subprocess
 import time
@@ -47,6 +49,17 @@ def capture_file(data, name):
     return False
 
 
+def collect(args, *, timeout=30, output=None, check=False):
+    """Best-effort diagnostics must not prevent collecting the remaining crash evidence."""
+    try:
+        return run(args, timeout=timeout, output=output, check=check)
+    except (subprocess.TimeoutExpired, OSError) as error:
+        if output:
+            with Path(output).open("ab") as stream:
+                stream.write(("\nDiagnostic collection failed: " + str(error) + "\n").encode())
+        return subprocess.CompletedProcess(args, 124, stdout=b"", stderr=str(error).encode())
+
+
 sdkmanager = sorted(SDK.glob("cmdline-tools/*/bin/sdkmanager"))[-1]
 avdmanager = sdkmanager.with_name("avdmanager")
 # Empty stdin deliberately declines any new license prompt. Never use `yes --licenses` here.
@@ -77,6 +90,11 @@ app_apk = ROOT / "android-app/app/build/outputs/apk/debug/app-debug.apk"
 test_apk = ROOT / "android-app/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
 if not app_apk.is_file() or not test_apk.is_file():
     raise RuntimeError("Build both the reviewed app APK and its instrumentation test APK first")
+app_digest = hashlib.sha256(app_apk.read_bytes()).hexdigest()
+expected_digest = os.environ.get("HETU_WINDOW_EXPECTED_APK_SHA256", "")
+if expected_digest and app_digest != expected_digest:
+    raise RuntimeError("Diagnostic reproduction must use the identical previously tested production APK")
+(OUT / "apk-identity.json").write_text(json.dumps({"sha256": app_digest, "expectedSha256": expected_digest or None}, indent=2))
 
 emulator_log = (OUT / "emulator.log").open("wb")
 process = subprocess.Popen([str(emulator), "-avd", "hetu_window_qa", "-port", "5556",
@@ -84,6 +102,9 @@ process = subprocess.Popen([str(emulator), "-avd", "hetu_window_qa", "-port", "5
     "-gpu", "software", "-memory", "2048"], env=env, stdout=emulator_log, stderr=subprocess.STDOUT)
 recording = None
 record_log = None
+app_log = None
+app_log_process = None
+record_path = "/data/local/tmp/hetu-window-qa.mp4"
 ready = False
 installed = False
 stage = "boot"
@@ -130,10 +151,19 @@ try:
     install(app_apk, "app")
     installed = True
     install(test_apk, "test")
+    # Capture from before process launch; pidof after a fatal exit loses the useful stack.
+    packages = run([adb, "-s", SERIAL, "shell", "cmd", "package", "list", "packages", "-U", APP], timeout=30).stdout.decode()
+    uids = [uid for package, uid in re.findall(r"package:(\S+)\s+uid:(\d+)", packages) if package in (APP, APP + ".test")]
+    if not uids:
+        raise RuntimeError("Installed test application UID was not found")
+    app_log = (OUT / "app-logcat.txt").open("wb")
+    app_log_process = subprocess.Popen([str(adb), "-s", SERIAL, "logcat", "-v", "threadtime", "--uid=" + ",".join(uids)],
+        env=env, stdout=app_log, stderr=subprocess.STDOUT)
+    run([adb, "-s", SERIAL, "shell", "test", "-w", "/data/local/tmp"], timeout=15)
     record_stage("instrumentation")
     record_log = (OUT / "screenrecord.log").open("wb")
     recording = subprocess.Popen([str(adb), "-s", SERIAL, "shell", "screenrecord", "--time-limit", "180",
-        "/sdcard/hetu-window-qa.mp4"], env=env, stdout=record_log, stderr=subprocess.STDOUT)
+        record_path], env=env, stdout=record_log, stderr=subprocess.STDOUT)
     result = run([adb, "-s", SERIAL, "shell", "am", "instrument", "-w", "-r", "-e", "class",
         APP + ".HetuWindowUiTest", TEST_PACKAGE], timeout=900, output=OUT / "instrumentation.log", check=False)
     text = (OUT / "instrumentation.log").read_text(errors="replace")
@@ -146,12 +176,16 @@ except Exception as error:
     raise
 finally:
     if ready and installed:
+        collect([adb, "-s", SERIAL, "logcat", "-b", "crash", "-d", "-v", "threadtime"], timeout=30,
+            output=OUT / "crash-logcat.txt")
+        collect([adb, "-s", SERIAL, "shell", "dumpsys", "activity", "exit-info", APP], timeout=30,
+            output=OUT / "app-exit-info.txt")
         rejected = []
         for name in ["report.json", "01-home-default-glass.png", "02-strategy-default-glass.png",
                      "03-inline-nodes-default-glass.png", "04-strategy-collapsed.png",
                      "05-overview-default-glass.png", "06-tools-default-glass.png"]:
             # Supported debug-app sandbox access, never adb root or a permission change.
-            result = run([adb, "-s", SERIAL, "exec-out", "run-as", APP, "cat", "files/window-ui-qa/" + name], timeout=20, check=False)
+            result = collect([adb, "-s", SERIAL, "exec-out", "run-as", APP, "cat", "files/window-ui-qa/" + name], timeout=20)
             if result.returncode == 0 and capture_file(result.stdout, name):
                 (OUT / name).write_bytes(result.stdout)
             else:
@@ -159,15 +193,20 @@ finally:
         (OUT / "capture-status.json").write_text(json.dumps(rejected, indent=2))
         if recording is not None and recording.poll() is None:
             # Stop only the screenrecord process launched by this test, allowing MP4 finalization.
-            run([adb, "-s", SERIAL, "shell", "pkill", "-INT", "screenrecord"], check=False)
+            collect([adb, "-s", SERIAL, "shell", "pkill", "-INT", "screenrecord"])
             try:
                 recording.wait(timeout=15)
             except subprocess.TimeoutExpired:
                 recording.terminate()
-        run([adb, "-s", SERIAL, "pull", "/sdcard/hetu-window-qa.mp4", OUT / "interaction.mp4"], timeout=30, check=False)
-        pid = run([adb, "-s", SERIAL, "shell", "pidof", APP], timeout=10, check=False).stdout.decode().strip().split()
-        if pid:
-            run([adb, "-s", SERIAL, "logcat", "-d", "--pid=" + pid[0]], timeout=20, output=OUT / "app-logcat.txt", check=False)
+        collect([adb, "-s", SERIAL, "pull", record_path, OUT / "interaction.mp4"], timeout=30)
+    if app_log_process is not None and app_log_process.poll() is None:
+        app_log_process.terminate()
+        try:
+            app_log_process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            app_log_process.kill()
+    if app_log:
+        app_log.close()
     if process.poll() is None:
         process.terminate()
         try:
