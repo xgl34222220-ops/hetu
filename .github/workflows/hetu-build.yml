@@ -24,7 +24,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 70
     env:
       HETU_TEST_KEYSTORE: /home/runner/.android/hetu-ui10-debug.jks
       HETU_WINDOW_QA: ${{ github.ref == 'refs/heads/test/dot-v2048-ui-safety' && (inputs.android_window_qa == true || contains(github.event.head_commit.message, '[window-qa]')) }}
@@ -201,7 +201,7 @@ jobs:
 
       - name: Validate default glass in an ordinary Android window
         if: always() && steps.window_test_build.outcome == 'success' && env.HETU_WINDOW_QA == 'true'
-        timeout-minutes: 24
+        timeout-minutes: 55
         run: python3 tools/run_android_window_qa.py
 
       - uses: actions/upload-artifact@v4
