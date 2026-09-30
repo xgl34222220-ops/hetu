@@ -720,6 +720,7 @@ jobs:
           cat updates/v2046-settings-parity/p00.b64 | base64 -d > /tmp/v2046.patch.xz
           echo '37974eacbef0d762f1acdf8c89dbd475a0ab1b335cbde16a2110e7c681b0c5d2  /tmp/v2046.patch.xz' | sha256sum -c -
           xz -dc /tmp/v2046.patch.xz > /tmp/v2046.patch
+          sed -i 's#^--- /mnt/data/v2046_base/#--- a/#; s#^+++ /mnt/data/v2046_work/#+++ b/#' /tmp/v2046.patch
           git apply --check /tmp/v2046.patch
           git apply /tmp/v2046.patch
           grep -q 'versionCode = 2046' android-app/app/build.gradle.kts
