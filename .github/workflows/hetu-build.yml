@@ -386,6 +386,18 @@ jobs:
           echo "V20.30 page-specific panel actions applied"
           git diff --stat
 
+      - name: Fix V20.30 provider search type
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/app/RulesScreen.kt')
+          s = p.read_text()
+          s = s.replace('p.nodes.any { it.name.contains(query, true) }', 'p.nodes.any { it.contains(query, true) }')
+          p.write_text(s)
+          PY
+          grep -q 'p.nodes.any { it.contains(query, true) }' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/RulesScreen.kt
+
       - name: Export effective V20.30 source
         run: |
           set -euo pipefail
