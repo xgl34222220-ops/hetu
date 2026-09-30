@@ -68,6 +68,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
@@ -93,6 +95,12 @@ import kotlinx.coroutines.delay
 
 /** Whether frosted-glass bars are drawn (user switch 「模糊效果」). */
 internal val LocalHxBlur = staticCompositionLocalOf { true }
+
+/** Runtime shaders cannot draw into software bitmaps even when their window is accelerated.
+ * Apply only to the effect/background layer; foreground controls remain separate. */
+internal fun Modifier.hxHardwareEffectFallback(color: Color): Modifier = drawWithContent {
+    if (drawContext.canvas.nativeCanvas.isHardwareAccelerated) drawContent() else drawRect(color)
+}
 
 /* ------------------------------------------------------------------ */
 /*  Depth                                                               */

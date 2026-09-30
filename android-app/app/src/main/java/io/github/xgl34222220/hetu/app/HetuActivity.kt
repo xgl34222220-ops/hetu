@@ -401,10 +401,11 @@ private fun MainTabs(vm: HetuViewModel) {
     // The dock tucks away while reading down a list and returns on any upward scroll.
     var dockVisible by remember { mutableStateOf(true) }
     val page = vm.tab.name
-    LaunchedEffect(page) { dockVisible = true }
+    LaunchedEffect(page, vm.panelSection, vm.reselect) { dockVisible = true }
     val dockScroll = remember {
         object : NestedScrollConnection {
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                if (source != NestedScrollSource.UserInput) return Offset.Zero
                 if (consumed.y < -18f) dockVisible = false
                 else if (consumed.y > 12f || available.y > 0f) dockVisible = true
                 return Offset.Zero

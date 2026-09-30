@@ -63,7 +63,9 @@ class HetuConceptRootTest {
             val view = rule.activity.window.decorView
             assertTrue("actual root must be measured", view.width > 0 && view.height > 0)
             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-            view.draw(Canvas(bitmap))
+            val softwareCanvas = Canvas(bitmap)
+            assertFalse("capture must exercise software Canvas fallback", softwareCanvas.isHardwareAccelerated)
+            view.draw(softwareCanvas)
             val file = File("build/outputs/hetu-concept-root/$name.png")
             file.parentFile!!.mkdirs()
             file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
@@ -82,7 +84,6 @@ class HetuConceptRootTest {
         node("hetu-dock").assertIsDisplayed()
         rule.onNodeWithText("停止").assertIsDisplayed()
         rule.onNodeWithText("203.0.113.24").assertIsDisplayed()
-        rule.runOnIdle { assertFalse("software fallback must be the actual tested rendering path", rule.activity.window.decorView.isHardwareAccelerated) }
         screenshot("00-actual-root-home-software-glass-fallback")
     }
 
@@ -135,6 +136,7 @@ class HetuConceptRootTest {
         repeat(2) {
             node("strategy-group-${group.name}").performClick()
             node("strategy-expanded-${group.name}").assertIsDisplayed()
+            node("hetu-dock").assertIsDisplayed()
             val a = node("strategy-node-${group.name}-${group.nodes[0].name}").getUnclippedBoundsInRoot()
             val b = node("strategy-node-${group.name}-${group.nodes[1].name}").getUnclippedBoundsInRoot()
             assertEquals(a.top, b.top)

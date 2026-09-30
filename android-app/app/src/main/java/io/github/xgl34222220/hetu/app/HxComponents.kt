@@ -286,6 +286,7 @@ internal fun HxPage(
                 Modifier
                     .matchParentSize()
                     .graphicsLayer { alpha = barAlpha }
+                    .hxHardwareEffectFallback(pageCanvas)
                     .then(
                         if (blur) Modifier.hazeEffect(state = pageHaze, style = HazeMaterials.ultraThin()) {
                             blurRadius = if (progressiveBar) 28.dp else 22.dp

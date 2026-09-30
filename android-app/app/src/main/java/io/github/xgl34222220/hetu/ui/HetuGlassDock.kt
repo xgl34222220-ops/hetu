@@ -47,6 +47,7 @@ import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import dev.chrisbanes.haze.materials.HazeMaterials
+import io.github.xgl34222220.hetu.hxHardwareEffectFallback
 import io.github.xgl34222220.hetu.ui.glass.liquidGlassLens
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.blur.blur
@@ -203,6 +204,7 @@ fun HetuGlassDock(
                     spotColor = Color(0xFF12161A).copy(alpha = if (dark) .16f else .075f),
                 )
                 .clip(shape)
+                .hxHardwareEffectFallback(if (dark) scheme.surface else Color(0xFFF4F7FF))
                 .then(if (runtimeLiquid) Modifier.layerBackdrop(dockSurfaceBackdrop) else Modifier)
                 .then(liquidShellModifier),
         )

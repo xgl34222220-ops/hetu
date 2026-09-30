@@ -250,6 +250,7 @@ internal fun HxTabbedPage(
                 .fillMaxWidth()
                 .height(statusTop + topBarHeight)
                 .graphicsLayer { alpha = collapse }
+                .hxHardwareEffectFallback(pageCanvas)
                 .then(
                     if (blur) Modifier.hazeEffect(state = pageHaze, style = HazeMaterials.ultraThin()) {
                         blurRadius = 30.dp
@@ -353,6 +354,7 @@ internal fun HxTabbedPage(
                 Modifier
                     .matchParentSize()
                     .graphicsLayer { alpha = collapse }
+                    .hxHardwareEffectFallback(pageCanvas)
                     .then(
                         if (blur) Modifier.hazeEffect(state = pageHaze, style = HazeMaterials.ultraThin()) {
                             blurRadius = 28.dp
