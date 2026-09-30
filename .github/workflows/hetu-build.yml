@@ -748,16 +748,33 @@ jobs:
           grep -q 'import androidx.compose.runtime.LaunchedEffect' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
           grep -q 'import androidx.compose.material.icons.rounded.AddCircleOutline' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
 
-      - name: Export effective V20.46 source
+      - name: Apply V20.47 settings functional parity
+        run: |
+          set -euxo pipefail
+          cat updates/v2047-settings-functional/p00.b64 updates/v2047-settings-functional/p01.b64 | base64 -d > /tmp/v2047.patch.xz
+          echo '9b7dc9325c1ba616fce9a11b978326415df8782870eaed89d5840690f5027796  /tmp/v2047.patch.xz' | sha256sum -c -
+          xz -dc /tmp/v2047.patch.xz > /tmp/v2047.patch
+          sed -i 's#^--- /mnt/data/v2047_base/#--- a/#; s#^+++ /mnt/data/v2047_work/#+++ b/#' /tmp/v2047.patch
+          git apply --check --verbose /tmp/v2047.patch
+          git apply --verbose /tmp/v2047.patch
+          grep -q 'versionCode = 2047' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.9.7-v20"' android-app/app/build.gradle.kts
+          grep -q 'setEditable(true)' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt
+          grep -q 'proxyDnsHijackTcp' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt
+          grep -q 'START_DNS_TCP' android-app/app/src/main/assets/hetu-root.sh
+          echo "V20.47 settings functional parity applied"
+          git diff --stat
+
+      - name: Export effective V20.47 source
         run: |
           set -euo pipefail
-          tar -czf /tmp/Hetu-V20.46-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
-          sha256sum /tmp/Hetu-V20.46-effective-source.tar.gz
+          tar -czf /tmp/Hetu-V20.47-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+          sha256sum /tmp/Hetu-V20.47-effective-source.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.46-effective-source
-          path: /tmp/Hetu-V20.46-effective-source.tar.gz
+          name: Hetu-V20.47-effective-source
+          path: /tmp/Hetu-V20.47-effective-source.tar.gz
           compression-level: 0
           if-no-files-found: error
 
