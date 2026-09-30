@@ -460,16 +460,31 @@ jobs:
           echo "V20.33 transparent glass bars applied"
           git diff --stat
 
-      - name: Export effective V20.33 source
+      - name: Apply V20.34 reference-style tools page
         run: |
           set -euo pipefail
-          tar -czf /tmp/Hetu-V20.33-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
-          sha256sum /tmp/Hetu-V20.33-effective-source.tar.gz
+          cat updates/v2034-tools-reference/p00.b64 | base64 -d > /tmp/v2034.patch.xz
+          echo 'cd9283f7ec69e4d45142cf20e3fa031b0b18a8beeb377838b6716f3265dc7231  /tmp/v2034.patch.xz' | sha256sum -c -
+          xz -dc /tmp/v2034.patch.xz > /tmp/v2034.patch
+          git apply --check /tmp/v2034.patch
+          git apply /tmp/v2034.patch
+          grep -q 'versionCode = 2034' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.8.4-v20"' android-app/app/build.gradle.kts
+          grep -q 'ToolReferenceCard' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
+          grep -q 'ToolReferenceRow' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
+          echo "V20.34 reference-style tools page applied"
+          git diff --stat
+
+      - name: Export effective V20.34 source
+        run: |
+          set -euo pipefail
+          tar -czf /tmp/Hetu-V20.34-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+          sha256sum /tmp/Hetu-V20.34-effective-source.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.33-effective-source
-          path: /tmp/Hetu-V20.33-effective-source.tar.gz
+          name: Hetu-V20.34-effective-source
+          path: /tmp/Hetu-V20.34-effective-source.tar.gz
           compression-level: 0
           if-no-files-found: error
 
