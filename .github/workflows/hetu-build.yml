@@ -496,16 +496,31 @@ jobs:
           PY
           grep -q 'import androidx.compose.foundation.shape.RoundedCornerShape' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
 
-      - name: Export effective V20.34 source
+      - name: Apply V20.35 tool proportions and glass polish
         run: |
           set -euo pipefail
-          tar -czf /tmp/Hetu-V20.34-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
-          sha256sum /tmp/Hetu-V20.34-effective-source.tar.gz
+          cat updates/v2035-tools-proportion/p00.b64 | base64 -d > /tmp/v2035.patch.xz
+          echo 'bf3d68d82b356929a6f4cff05c73b05f2f133ecc1b83f39686f8aee63850e3aa  /tmp/v2035.patch.xz' | sha256sum -c -
+          xz -dc /tmp/v2035.patch.xz > /tmp/v2035.patch
+          git apply --check /tmp/v2035.patch
+          git apply /tmp/v2035.patch
+          grep -q 'versionCode = 2035' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.8.5-v20"' android-app/app/build.gradle.kts
+          grep -q 'largeTitleStartPadding = 24.dp' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
+          grep -q 'heightIn(min = 64.dp)' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
+          echo "V20.35 tool proportions and glass polish applied"
+          git diff --stat
+
+      - name: Export effective V20.35 source
+        run: |
+          set -euo pipefail
+          tar -czf /tmp/Hetu-V20.35-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+          sha256sum /tmp/Hetu-V20.35-effective-source.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.34-effective-source
-          path: /tmp/Hetu-V20.34-effective-source.tar.gz
+          name: Hetu-V20.35-effective-source
+          path: /tmp/Hetu-V20.35-effective-source.tar.gz
           compression-level: 0
           if-no-files-found: error
 
