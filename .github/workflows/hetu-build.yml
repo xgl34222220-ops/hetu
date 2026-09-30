@@ -681,16 +681,32 @@ jobs:
           grep -q 'Color(0xFFD9DAE5)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
           grep -q 'import androidx.compose.runtime.getValue' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
 
-      - name: Export effective V20.43 source
+      - name: Apply V20.44 tool scale parity
         run: |
           set -euo pipefail
-          tar -czf /tmp/Hetu-V20.43-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
-          sha256sum /tmp/Hetu-V20.43-effective-source.tar.gz
+          cat updates/v2044-tool-scale/p00.b64 | base64 -d > /tmp/v2044.patch.xz
+          echo 'b93495bacfd9426f5b7ed722379b08fb8fa8356fc8e4e9f453a60545161498ea  /tmp/v2044.patch.xz' | sha256sum -c -
+          xz -dc /tmp/v2044.patch.xz > /tmp/v2044.patch
+          git apply --check /tmp/v2044.patch
+          git apply /tmp/v2044.patch
+          grep -q 'versionCode = 2044' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.9.4-v20"' android-app/app/build.gradle.kts
+          grep -q 'largeTitleFontSizeSp = 36f' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
+          grep -q 'heightIn(min = 64.dp)' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
+          grep -q 'Color(0xFFEBEDFA)' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
+          echo "V20.44 tool scale parity applied"
+          git diff --stat
+
+      - name: Export effective V20.44 source
+        run: |
+          set -euo pipefail
+          tar -czf /tmp/Hetu-V20.44-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+          sha256sum /tmp/Hetu-V20.44-effective-source.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.43-effective-source
-          path: /tmp/Hetu-V20.43-effective-source.tar.gz
+          name: Hetu-V20.44-effective-source
+          path: /tmp/Hetu-V20.44-effective-source.tar.gz
           compression-level: 0
           if-no-files-found: error
 
