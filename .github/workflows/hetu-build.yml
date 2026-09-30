@@ -568,9 +568,9 @@ jobs:
           git apply /tmp/v2039.patch
           grep -q 'versionCode = 2039' android-app/app/build.gradle.kts
           grep -q 'versionName = "0.8.9-v20"' android-app/app/build.gradle.kts
-          grep -q 'title = "应用管理"' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
+          grep -q 'TargetAppRow' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
           grep -q 'largeTitle = true' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
-          grep -q 'Text("脚本"' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptsActivity.kt
+          grep -q 'fixedStatus' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptsActivity.kt
           echo "V20.39 page parity applied"
           git diff --stat
 
