@@ -6,6 +6,12 @@ on:
       - 'android-app/**'
       - '.github/workflows/hetu-build.yml'
   workflow_dispatch:
+    inputs:
+      android_window_qa:
+        description: 'Run isolated Android default-glass window validation'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -21,6 +27,7 @@ jobs:
     timeout-minutes: 40
     env:
       HETU_TEST_KEYSTORE: /home/runner/.android/hetu-ui10-debug.jks
+      HETU_WINDOW_QA: ${{ github.ref == 'refs/heads/test/dot-v2048-ui-safety' && (inputs.android_window_qa == true || contains(github.event.head_commit.message, '[window-qa]')) }}
     steps:
       - uses: actions/checkout@v4
 
@@ -60,7 +67,9 @@ jobs:
         run: |
           set -euo pipefail
           SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort | tail -n 1)
-          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          if [ "$HETU_WINDOW_QA" != 'true' ]; then
+            yes | "$SDKMANAGER" --licenses >/dev/null || true
+          fi
           "$SDKMANAGER" 'platforms;android-37.0' 'build-tools;37.0.0'
 
       - uses: gradle/actions/setup-gradle@v4
@@ -182,3 +191,22 @@ jobs:
           path: out/*.apk
           compression-level: 0
           if-no-files-found: error
+
+      # Optional, explicit window QA. It does not run proxy services or alter device security.
+      - name: Compile ordinary Android window test host
+        if: always() && steps.apk_audit.outcome == 'success' && env.HETU_WINDOW_QA == 'true'
+        id: window_test_build
+        working-directory: android-app
+        run: gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:assembleDebugAndroidTest --stacktrace
+
+      - name: Validate default glass in an ordinary Android window
+        if: always() && steps.window_test_build.outcome == 'success' && env.HETU_WINDOW_QA == 'true'
+        timeout-minutes: 24
+        run: python3 tools/run_android_window_qa.py
+
+      - uses: actions/upload-artifact@v4
+        if: always() && env.HETU_WINDOW_QA == 'true'
+        with:
+          name: Hetu-Android-window-QA
+          path: out/android-window-qa/
+          if-no-files-found: warn
