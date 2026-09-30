@@ -640,6 +640,47 @@ jobs:
           echo "V20.43 pure Miuix reset applied"
           git diff --stat
 
+      - name: Fix V20.43 compile and screenshot parity
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          dock = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt')
+          s = dock.read_text()
+          s = s.replace('import androidx.compose.foundation.layout.weight\n', '')
+          if 'import androidx.compose.runtime.getValue\n' not in s:
+              s = s.replace('import androidx.compose.runtime.Composable\n', 'import androidx.compose.runtime.Composable\nimport androidx.compose.runtime.getValue\n')
+          s = s.replace('surfaceContainer = Color(0xFFFCFBFF)', 'surfaceContainer = Color(0xFFF9F8FE)')
+          s = s.replace('runtimeBlur -> Color.White.copy(alpha = .34f)', 'runtimeBlur -> Color.White.copy(alpha = .44f)')
+          s = s.replace(
+              'if (dark) Color.White.copy(alpha = .10f) else MiuixTheme.colorScheme.primary.copy(alpha = .10f)',
+              'if (dark) Color.White.copy(alpha = .10f) else Color(0xFFD9DAE5).copy(alpha = .78f)',
+          )
+          s = s.replace(
+              'MiuixTheme.colorScheme.onSurface.copy(alpha = .58f)',
+              'MiuixTheme.colorScheme.onSurface.copy(alpha = .90f)',
+          )
+          dock.write_text(s)
+
+          settings = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt')
+          s = settings.read_text()
+          s = s.replace('background = Color(0xFFF2F0F9),', 'background = Color(0xFFEBEDFA),')
+          s = s.replace('surface = Color(0xFFF2F0F9),', 'surface = Color(0xFFEBEDFA),')
+          s = s.replace('surfaceVariant = Color(0xFFF2F0F9),', 'surfaceVariant = Color(0xFFEBEDFA),')
+          s = s.replace('surfaceContainer = Color(0xFFFCFBFF),', 'surfaceContainer = Color(0xFFF9F8FE),')
+          s = s.replace('onSurfaceVariantSummary = c.textMuted,', 'onSurfaceVariantSummary = Color(0xFF55576A),')
+          s = s.replace('onSurfaceVariantActions = c.textFaint,', 'onSurfaceVariantActions = Color(0xFF4A4C5E),')
+          s = s.replace(
+              'tint = top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme.primary,',
+              'tint = top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme.onSurface,',
+          )
+          settings.write_text(s)
+          PY
+          grep -q 'Color(0xFFEBEDFA)' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
+          grep -q 'Color(0xFFD9DAE5)' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
+          grep -q 'import androidx.compose.runtime.getValue' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
+
       - name: Export effective V20.43 source
         run: |
           set -euo pipefail
