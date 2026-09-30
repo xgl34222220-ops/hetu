@@ -732,6 +732,22 @@ jobs:
           echo "V20.46 settings parity and dedup applied"
           git diff --stat
 
+      - name: Fix V20.46 imports
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt')
+          s = p.read_text()
+          if 'import androidx.compose.runtime.LaunchedEffect\n' not in s:
+              s = s.replace('import androidx.compose.runtime.Composable\n', 'import androidx.compose.runtime.Composable\nimport androidx.compose.runtime.LaunchedEffect\n')
+          if 'import androidx.compose.material.icons.rounded.AddCircleOutline\n' not in s:
+              s = s.replace('import androidx.compose.material.icons.rounded.Apps\n', 'import androidx.compose.material.icons.rounded.Apps\nimport androidx.compose.material.icons.rounded.AddCircleOutline\n')
+          p.write_text(s)
+          PY
+          grep -q 'import androidx.compose.runtime.LaunchedEffect' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
+          grep -q 'import androidx.compose.material.icons.rounded.AddCircleOutline' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
+
       - name: Export effective V20.46 source
         run: |
           set -euo pipefail
