@@ -145,7 +145,7 @@ internal fun ToolsScreen(vm: HetuViewModel, bottomPadding: Dp) {
         visible.forEachIndexed { index, section ->
             item(key = section.title) {
                 HxSection {
-                    HxCard(modifier = Modifier.hxEnter(stagger, index).testTag("tools-${section.title}")) {
+                    HxCard(modifier = Modifier.hxEnter(stagger, index).testTag("tools-${section.title}"), padding = androidx.compose.foundation.layout.PaddingValues(12.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             HxIconBadge(section.icon)
                             Spacer(Modifier.width(10.dp))
@@ -154,8 +154,8 @@ internal fun ToolsScreen(vm: HetuViewModel, bottomPadding: Dp) {
                                 Text(section.summary, style = MaterialTheme.typography.bodySmall, color = Hx.colors.textMuted)
                             }
                         }
-                        Spacer(Modifier.height(12.dp))
-                        val columns = if (LocalDensity.current.fontScale > 1.25f) 2 else section.tools.size.coerceAtMost(4)
+                        Spacer(Modifier.height(10.dp))
+                        val columns = if (LocalDensity.current.fontScale > 1.25f || section.tools.size == 4) 2 else section.tools.size.coerceAtMost(3)
                         section.tools.chunked(columns).forEach { row ->
                             Row(Modifier.fillMaxWidth().padding(bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 row.forEach { tool -> ConceptToolTile(tool, Modifier.weight(1f)) }
@@ -174,9 +174,9 @@ internal fun ToolsScreen(vm: HetuViewModel, bottomPadding: Dp) {
 private fun ConceptToolTile(tool: ConceptTool, modifier: Modifier) {
     val c = Hx.colors
     val source = remember { MutableInteractionSource() }
-    Column(modifier.heightIn(min = 94.dp).testTag("tool-${tool.title}").hxPressScale(source).clip(Hx.rowShape)
+    Column(modifier.heightIn(min = 80.dp).testTag("tool-${tool.title}").hxPressScale(source).clip(Hx.rowShape)
         .background(c.surfaceMuted.copy(alpha = .85f)).clickable(interactionSource = source, indication = LocalIndication.current, onClick = tool.open)
-        .padding(horizontal = 9.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        .padding(horizontal = 7.dp, vertical = 7.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
         Icon(tool.icon, null, tint = c.accent, modifier = Modifier.size(26.dp))
         Text(tool.title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = c.text)
         Text(tool.summary, style = MaterialTheme.typography.bodySmall, color = c.textMuted)

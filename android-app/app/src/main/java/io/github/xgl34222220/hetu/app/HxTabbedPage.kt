@@ -214,7 +214,7 @@ internal fun HxTabbedPage(
     val visibleHeader = with(density) { (headerHeightPx - fold).coerceAtLeast(0f).toDp() }
     val contentTop = statusTop + topBarHeight + tabsHeight + visibleHeader + 2.dp
     val pageCanvas = c.canvas
-    val blur = LocalHxBlur.current
+    val blur = LocalHxBlur.current && androidx.compose.ui.platform.LocalView.current.isHardwareAccelerated
     val pageHaze = rememberHazeState()
 
     Box(Modifier.fillMaxSize().background(pageCanvas).testTag("hetu-panel")) {

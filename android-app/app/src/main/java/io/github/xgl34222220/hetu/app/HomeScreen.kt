@@ -243,6 +243,7 @@ private fun HomeHero(vm: HetuViewModel, onDetails: () -> Unit) {
     val running = state.running
     val op = vm.operation
     var controls by rememberSaveable { mutableStateOf(false) }
+    val largeFont = androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f
     val tint by animateColorAsState(
         when { op != null -> c.warn; running -> c.good; else -> c.textMuted },
         tween(HxMotion.Medium), label = "heroTint",
@@ -277,16 +278,16 @@ private fun HomeHero(vm: HetuViewModel, onDetails: () -> Unit) {
                     HeroAction(if (running) "停止" else "启动", if (running) c.bad else c.accent,
                         op == HxRunOp.Start || op == HxRunOp.Stop, op == null, Modifier.fillMaxSize(), vm::toggle)
                 }
+                if (!largeFont) HxBarAction(Icons.Rounded.MoreHoriz, "运行控制", onClick = { controls = !controls })
             }
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(state.core + " · " + state.mode, style = MaterialTheme.typography.bodySmall, color = c.textMuted,
-                    modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (largeFont) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 HxBarAction(Icons.Rounded.MoreHoriz, "运行控制", onClick = { controls = !controls })
             }
             AnimatedVisibility(visible = controls,
                 enter = fadeIn(tween(HxMotion.Short)) + expandVertically(tween(HxMotion.Medium)),
                 exit = fadeOut(tween(HxMotion.Short)) + shrinkVertically(tween(HxMotion.Medium))) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(state.core + " · " + state.mode, style = MaterialTheme.typography.bodySmall, color = c.textMuted)
                     Text(state.config, style = MaterialTheme.typography.bodySmall, color = c.textMuted)
                     HxSegmented(options = listOf("rule" to "规则", "global" to "全局", "direct" to "直连"),
                         selected = state.trafficMode.lowercase().ifBlank { "rule" }, onSelect = vm::setTrafficMode,

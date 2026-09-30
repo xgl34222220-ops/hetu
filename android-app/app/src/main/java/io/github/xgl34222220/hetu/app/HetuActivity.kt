@@ -375,7 +375,7 @@ private fun MainTabs(vm: HetuViewModel) {
     val tabHolder = rememberSaveableStateHolder()
     val dockHaze = rememberHazeState()
     val liquidBackdrop = rememberLayerBackdrop()
-    val runtimeLiquid = isRuntimeShaderSupported()
+    val runtimeLiquid = androidx.compose.ui.platform.LocalView.current.isHardwareAccelerated && isRuntimeShaderSupported()
     val settingsTick = vm.settingsRevision
     val showPanelDock = remember(settingsTick) { vm.prefs.getBoolean("showPanelDock", true) }
     val dockTabs = remember(settingsTick, vm.tab) {

@@ -40,7 +40,7 @@ class HetuConceptRootTest {
         vm = newConceptTestVm(app)
     }
     @After fun close() { if (::vm.isInitialized) rule.runOnIdle { closeConceptTestVm(vm) } }
-    private fun render(tab: HxTab = HxTab.Panel, section: String = "proxies", fontScale: Float = 1f, dark: Boolean = false, running: Boolean = true) {
+    private fun render(tab: HxTab = HxTab.Panel, section: String = "proxies", fontScale: Float = 1f, dark: Boolean = false, running: Boolean = true, motion: Boolean = false) {
         if (running) setConceptState(vm, conceptRunningState())
         setConceptValue(vm, "rules", conceptRules())
         setConceptValue(vm, "ruleSets", conceptRuleSets())
@@ -49,7 +49,7 @@ class HetuConceptRootTest {
         rule.setContent {
             HetuAppTheme(if (dark) "dark" else "light", dynamic = false) {
                 val density = LocalDensity.current
-                CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale), LocalHxMotionEnabled provides false) {
+                CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale), LocalHxMotionEnabled provides motion) {
                     HetuRoot(vm)
                 }
             }
@@ -71,6 +71,48 @@ class HetuConceptRootTest {
         }
     }
     private fun back() { rule.runOnIdle { rule.activity.onBackPressedDispatcher.onBackPressed() }; rule.waitForIdle() }
+
+    @Test fun homeUsesActualRootAndKeepsTheDockVisibleWithSoftwareGlassFallback() {
+        rule.runOnIdle {
+            vm.prefs.edit().putBoolean("enableBlur", true).putBoolean("liquidGlass", true).commit()
+            vm.reloadAppearance()
+            setConceptValue(vm, "runtime", ProxyRuntimeSnapshot(running = true, pid = 456, elapsedSeconds = 3661, rssBytes = 132120576L, wanAddress = "203.0.113.24", wanCountryCode = "SG", wanCountry = "测试地区"))
+        }
+        render(tab = HxTab.Home)
+        node("hetu-dock").assertIsDisplayed()
+        rule.onNodeWithText("停止").assertIsDisplayed()
+        rule.onNodeWithText("203.0.113.24").assertIsDisplayed()
+        rule.runOnIdle { assertFalse("software fallback must be the actual tested rendering path", rule.activity.window.decorView.isHardwareAccelerated) }
+        screenshot("00-actual-root-home-software-glass-fallback")
+    }
+
+    @Test fun actualMotionClockCapturesInlineExpansionCollapseAndPageTransitionFrames() {
+        render(motion = true)
+        val group = vm.state.groups.first()
+        val following = "strategy-group-${vm.state.groups[2].name}"
+        val before = node(following).getUnclippedBoundsInRoot().top
+        rule.mainClock.autoAdvance = false
+        node("strategy-group-${group.name}").performClick()
+        rule.mainClock.advanceTimeBy(80)
+        screenshot("motion-01-expansion-middle")
+        rule.mainClock.advanceTimeBy(700)
+        val expandedTop = node(following).getUnclippedBoundsInRoot().top
+        assertTrue("expansion must move following groups", expandedTop > before)
+        screenshot("motion-02-expansion-settled")
+        rule.onNodeWithContentDescription("收起策略 ${group.name}").performClick()
+        rule.mainClock.advanceTimeBy(80)
+        screenshot("motion-03-collapse-middle")
+        rule.mainClock.advanceTimeBy(700)
+        assertEquals(before, node(following).getUnclippedBoundsInRoot().top)
+        screenshot("motion-04-collapse-settled")
+        node("panel-tab-rules").performClick()
+        rule.mainClock.advanceTimeBy(120)
+        screenshot("motion-05-panel-transition-middle")
+        rule.mainClock.advanceTimeBy(900)
+        node("panel-rules-summary").assertIsDisplayed()
+        screenshot("motion-06-panel-transition-settled")
+        rule.mainClock.autoAdvance = true
+    }
 
     @Test fun realRootShowsSevenPanelsAndTwoColumnStrategyCards() {
         render()
@@ -144,7 +186,7 @@ class HetuConceptRootTest {
         assertEquals(1, conceptSelectionRequestCount())
         screenshot("11-root-selection-pending")
         gate.succeed()
-        rule.waitUntil(10_000) { vm.pendingSelection.isEmpty() && vm.state.groups.any { it.name == group.name && it.now == group.nodes[1].name } }
+        rule.waitUntil(10_000) { org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle(); vm.pendingSelection.isEmpty() && vm.state.groups.any { it.name == group.name && it.now == group.nodes[1].name } }
         next.assertIsSelected()
         screenshot("12-root-selection-confirmed")
     }
@@ -159,7 +201,7 @@ class HetuConceptRootTest {
         next.performClick()
         assertTrue(failed.awaitStarted())
         failed.fail("测试网络暂时不可用")
-        rule.waitUntil(10_000) { vm.pendingSelection.isEmpty() }
+        rule.waitUntil(10_000) { org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle(); vm.pendingSelection.isEmpty() }
         node("strategy-node-${group.name}-${group.now}").assertIsSelected()
         next.assertIsNotSelected()
         screenshot("13-root-selection-failed")
@@ -167,7 +209,7 @@ class HetuConceptRootTest {
         next.performClick()
         assertTrue(retry.awaitStarted())
         retry.succeed()
-        rule.waitUntil(10_000) { vm.pendingSelection.isEmpty() && vm.state.groups.any { it.name == group.name && it.now == group.nodes[1].name } }
+        rule.waitUntil(10_000) { org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle(); vm.pendingSelection.isEmpty() && vm.state.groups.any { it.name == group.name && it.now == group.nodes[1].name } }
         next.assertIsSelected()
         assertEquals(2, conceptSelectionRequestCount())
     }
@@ -181,7 +223,7 @@ class HetuConceptRootTest {
         node("strategy-node-${group.name}-${group.nodes[1].name}").performClick()
         assertTrue(gate.awaitStarted())
         gate.cancel()
-        rule.waitUntil(10_000) { vm.pendingSelection.isEmpty() }
+        rule.waitUntil(10_000) { org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle(); vm.pendingSelection.isEmpty() }
         node("strategy-node-${group.name}-${group.now}").assertIsSelected()
         node("strategy-node-${group.name}-${group.nodes[1].name}").assertIsNotSelected()
     }
@@ -242,7 +284,7 @@ class HetuConceptRootTest {
         node("settings-默认面板").performScrollTo().performTouchInput { click() }
         node("hetu-route-panel-preferences").assertExists()
         rule.onNodeWithText("默认面板页面").performClick()
-        rule.onNodeWithText("概览", useUnmergedTree = true).assertExists()
+        rule.onAllNodesWithText("概览", useUnmergedTree = true).assertCountEquals(2)
         rule.onNodeWithText("日志", useUnmergedTree = true).assertExists()
     }
 }

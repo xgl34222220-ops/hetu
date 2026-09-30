@@ -277,7 +277,7 @@ internal fun HxPage(
         }
 
         // Pinned bar: frosted glass over the scrolling content once the large title is gone.
-        val blur = LocalHxBlur.current
+        val blur = LocalHxBlur.current && androidx.compose.ui.platform.LocalView.current.isHardwareAccelerated
         val topBarStyle = LocalContext.current.getSharedPreferences("hetu", 0).getString("topBarBlurStyle", "progressive").orEmpty()
         val progressiveBar = topBarStyle != "gaussian"
         Box(Modifier.fillMaxWidth().align(Alignment.TopCenter).height(statusTop + pageBarHeight)) {

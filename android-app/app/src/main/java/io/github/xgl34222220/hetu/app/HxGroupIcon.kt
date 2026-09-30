@@ -1,5 +1,13 @@
 package io.github.xgl34222220.hetu
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.*
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
@@ -47,12 +55,18 @@ internal fun HxGroupIcon(group: ProxyGroupUi, modifier: Modifier = Modifier) {
             if (flag != null) {
                 Text(flag, fontSize = glyph)
             } else {
-                Text(
-                    group.name.firstOrNull { it.isLetterOrDigit() }?.uppercase() ?: "?",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontSize = glyph * .8f,
-                    color = Hx.colors.accent,
-                )
+                val c = Hx.colors
+                val type = group.type.lowercase()
+                val icon = when (type) {
+                    "selector" -> Icons.Rounded.SwapHoriz
+                    "urltest", "url-test" -> Icons.Rounded.Speed
+                    "fallback" -> Icons.Rounded.Sync
+                    "direct" -> Icons.Rounded.Public
+                    "reject", "rejectdrop" -> Icons.Rounded.Block
+                    else -> Icons.Rounded.Hub
+                }
+                val tint = when (type) { "direct" -> c.good; "urltest", "url-test" -> c.warn; else -> c.accent }
+                Icon(icon, null, tint = tint, modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)).background(tint.copy(alpha = .10f)).padding(6.dp))
             }
             if (model != null) {
                 AsyncImage(

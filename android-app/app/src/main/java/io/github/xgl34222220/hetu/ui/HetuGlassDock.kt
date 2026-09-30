@@ -102,7 +102,9 @@ fun HetuGlassDock(
     val shape = if (floating) RoundedCornerShape(31.dp) else RoundedCornerShape(topStart = 31.dp, topEnd = 31.dp)
     // Never render a translucent glass shell without a real blur/backdrop behind it.
     // That fallback was the source of the opaque white slab when either appearance switch was disabled.
-    val renderGlass = activeGlass && enableBlur
+    // Software windows cannot draw RuntimeShader or backdrop effects. Keep controls visible
+    // with the same surface shape; hardware windows keep the real glass renderer.
+    val renderGlass = activeGlass && enableBlur && androidx.compose.ui.platform.LocalView.current.isHardwareAccelerated
     val runtimeLiquid = renderGlass && backdrop != null && isRuntimeShaderSupported()
     val activeHaze = renderGlass && !runtimeLiquid
     val dockSurfaceBackdrop = rememberLayerBackdrop()

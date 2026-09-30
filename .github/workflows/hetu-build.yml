@@ -107,7 +107,25 @@ jobs:
         working-directory: android-app
         run: gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:assembleDebug --stacktrace
 
+      - name: Actual launcher and editor regression tests
+        if: success()
+        working-directory: android-app
+        run: |
+          gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:testDebugUnitTest --tests '*HetuConceptRootTest' --tests '*HomeConceptUiTest' --tests '*ConfigEditorSafetyTest' --stacktrace
+
+      - name: Archive first actual launcher frames
+        if: always() && steps.build.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hetu-concept-first-results
+          path: |
+            android-app/app/build/test-results/
+            android-app/app/build/outputs/hetu-ui-consolidation/
+            android-app/app/build/outputs/hetu-concept-root/
+          if-no-files-found: warn
+
       - name: Complete unit and UI regression tests
+        if: always() && steps.build.outcome == 'success'
         working-directory: android-app
         run: |
           gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:testDebugUnitTest --stacktrace

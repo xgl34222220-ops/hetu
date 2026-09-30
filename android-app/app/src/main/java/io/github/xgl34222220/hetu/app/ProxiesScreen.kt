@@ -15,6 +15,7 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.slideOutVertically
@@ -146,6 +147,7 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
     var expandedNames by rememberSaveable { mutableStateOf(emptyList<String>()) }
     val expandedName = expandedNames.lastOrNull()
     var showFilter by remember { mutableStateOf(false) }
+    var showLayout by remember { mutableStateOf(false) }
     var showApi by remember { mutableStateOf(false) }
     // Layout controls are real: strategy and node grids each honor their own preference.
     val forceSingleColumn = LocalDensity.current.fontScale > 1.3f
@@ -226,7 +228,7 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
             }
         },
         actions = {
-            if (state.running) BoxProxyMiuixTheme17 { ReferenceStrategyMenu(vm.prefs) }
+            if (state.running) HxBarAction(Icons.Rounded.Sort, "排序与布局", { showLayout = true })
             HxBarAction(Icons.Rounded.Settings, "测速与 API", onClick = { showApi = true })
         },
         overlay = {
@@ -381,6 +383,25 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
         )
     }
 
+
+    if (showLayout) {
+        HxSheet(onDismiss = { showLayout = false }, title = "排序与布局") {
+            Column(Modifier.fillMaxWidth().heightIn(max = 600.dp).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Text("排序方式", style = MaterialTheme.typography.titleSmall, color = c.text)
+                HxSegmented(listOf("config" to "按配置", "name" to "名称", "latency" to "延迟"), options.sort,
+                    { options.copy(sort = it).save(vm.prefs) })
+                HxSwitchRow("倒序", options.descending, { options.copy(descending = it).save(vm.prefs) })
+                Text("策略列数", style = MaterialTheme.typography.titleSmall, color = c.text)
+                HxSegmented(listOf("1" to "1 列", "2" to "2 列"), options.groupColumns.toString(), { options.copy(groupColumns = it.toInt()).save(vm.prefs) })
+                HxSwitchRow("紧凑策略卡", options.groupCompact, { options.copy(groupCompact = it).save(vm.prefs) })
+                Text("节点列数", style = MaterialTheme.typography.titleSmall, color = c.text)
+                HxSegmented(listOf("1" to "1 列", "2" to "2 列"), options.columns.toString(), { options.copy(columns = it.toInt()).save(vm.prefs) })
+                HxSwitchRow("紧凑节点卡", options.compact, { options.copy(compact = it).save(vm.prefs) })
+                Text("名称显示", style = MaterialTheme.typography.titleSmall, color = c.text)
+                HxSegmented(listOf("clip" to "单行截断", "wrap" to "自动换行"), options.nameOverflow, { options.copy(nameOverflow = it).save(vm.prefs) })
+            }
+        }
+    }
 
     if (showApi) ApiSettingsSheet(vm, onDismiss = { showApi = false })
 }
