@@ -413,6 +413,23 @@ jobs:
           echo "V20.31 panel cards and strategy menu applied"
           git diff --stat
 
+      - name: Fix V20.31 Compose width import
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConnectionsScreen.kt')
+          s = p.read_text()
+          imp = 'import androidx.compose.foundation.layout.widthIn\n'
+          if imp not in s:
+              if 'import androidx.compose.foundation.layout.width\n' in s:
+                  s = s.replace('import androidx.compose.foundation.layout.width\n', 'import androidx.compose.foundation.layout.width\n' + imp)
+              else:
+                  s = s.replace('import androidx.compose.foundation.layout.', imp + 'import androidx.compose.foundation.layout.', 1)
+          p.write_text(s)
+          PY
+          grep -q 'import androidx.compose.foundation.layout.widthIn' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConnectionsScreen.kt
+
       - name: Export effective V20.31 source
         run: |
           set -euo pipefail
