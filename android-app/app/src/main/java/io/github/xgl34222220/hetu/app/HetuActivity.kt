@@ -306,7 +306,7 @@ internal fun HetuRoot(vm: HetuViewModel) {
                             HxRoute.Providers -> ProvidersScreen(vm)
                             HxRoute.Adblock -> AdblockScreen(vm)
                             HxRoute.Network -> NetworkSettingsScreen(vm)
-                            HxRoute.AdvancedNetwork -> AdvancedNetworkSettingsScreen(vm) { nav.pop() }
+                            HxRoute.AdvancedNetwork -> OtherProxySettingsPage { nav.pop() }
                             HxRoute.Apps -> AppListScreen(vm)
                             HxRoute.Cores -> CoresScreen(vm)
                             HxRoute.About -> AboutScreen(vm)

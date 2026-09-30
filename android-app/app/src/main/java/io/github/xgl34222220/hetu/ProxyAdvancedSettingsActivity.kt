@@ -36,7 +36,7 @@ class ProxyAdvancedSettingsActivity : ComponentActivity() {
 private data class OtherChoice(val label: String, val value: String)
 
 @Composable
-private fun OtherProxySettingsPage(onBack: () -> Unit) {
+internal fun OtherProxySettingsPage(onBack: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = remember { context.getSharedPreferences("hetu", 0) }
     var revision by remember { mutableIntStateOf(0) }
