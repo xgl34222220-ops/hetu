@@ -511,16 +511,31 @@ jobs:
           echo "V20.35 tool proportions and glass polish applied"
           git diff --stat
 
-      - name: Export effective V20.35 source
+      - name: Apply V20.36 tab glass and tool surface polish
         run: |
           set -euo pipefail
-          tar -czf /tmp/Hetu-V20.35-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
-          sha256sum /tmp/Hetu-V20.35-effective-source.tar.gz
+          cat updates/v2036-tab-glass-tools/p00.b64 | base64 -d > /tmp/v2036.patch.xz
+          echo '8d3c621637b702b0128bf6beda133515e7c10365acecbb6b351d118d2a9260ce  /tmp/v2036.patch.xz' | sha256sum -c -
+          xz -dc /tmp/v2036.patch.xz > /tmp/v2036.patch
+          git apply --check /tmp/v2036.patch
+          git apply /tmp/v2036.patch
+          grep -q 'versionCode = 2036' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.8.6-v20"' android-app/app/build.gradle.kts
+          grep -q 'canvasColor = if (Hx.colors.dark)' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
+          grep -q 'keep the expanded tab rail truly transparent' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTabbedPage.kt
+          echo "V20.36 tab glass and tool surface polish applied"
+          git diff --stat
+
+      - name: Export effective V20.36 source
+        run: |
+          set -euo pipefail
+          tar -czf /tmp/Hetu-V20.36-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+          sha256sum /tmp/Hetu-V20.36-effective-source.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.35-effective-source
-          path: /tmp/Hetu-V20.35-effective-source.tar.gz
+          name: Hetu-V20.36-effective-source
+          path: /tmp/Hetu-V20.36-effective-source.tar.gz
           compression-level: 0
           if-no-files-found: error
 
