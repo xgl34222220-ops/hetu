@@ -1,5 +1,9 @@
 package io.github.xgl34222220.hetu
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.Alignment
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -33,13 +37,19 @@ internal fun HxTrafficChart(
     val downValues = remember(down) { down.map { it.coerceAtLeast(0L) } }
     val upValues = remember(up) { up.map { it.coerceAtLeast(0L) } }
 
+    val hasDown = downValues.size >= 2
+    val hasUp = upValues.size >= 2
+    if (!hasDown && !hasUp) {
+        Box(modifier, contentAlignment = Alignment.Center) {
+            Text(if (downValues.isEmpty() && upValues.isEmpty()) "暂无采样" else "等待更多采样", style = MaterialTheme.typography.bodySmall, color = Hx.colors.textMuted)
+        }
+        return
+    }
     LaunchedEffect(downValues, upValues) {
-        val d = if (downValues.size >= 2) downValues else listOf(0L, downValues.lastOrNull() ?: 0L)
-        val u = if (upValues.size >= 2) upValues else listOf(0L, upValues.lastOrNull() ?: 0L)
         modelProducer.runTransaction {
             lineModel {
-                series(y = d)
-                series(y = u)
+                if (hasDown) series(y = downValues)
+                if (hasUp) series(y = upValues)
             }
         }
     }
@@ -57,12 +67,12 @@ internal fun HxTrafficChart(
     CartesianChartHost(
         chart = rememberCartesianChart(
             rememberLineCartesianLayer(
-                lineProvider = LineCartesianLayer.LineProvider.series(downLine, upLine),
+                lineProvider = LineCartesianLayer.LineProvider.series(*listOfNotNull(downLine.takeIf { hasDown }, upLine.takeIf { hasUp }).toTypedArray()),
             ),
         ),
         modelProducer = modelProducer,
         modifier = modifier,
         scrollState = rememberVicoScrollState(scrollEnabled = false),
-        animationSpec = HxMotion.enter(),
+        animationSpec = if (LocalHxMotionEnabled.current) HxMotion.enter() else androidx.compose.animation.core.snap(),
     )
 }

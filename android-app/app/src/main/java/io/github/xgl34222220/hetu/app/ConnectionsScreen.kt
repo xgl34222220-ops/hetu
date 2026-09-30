@@ -11,6 +11,7 @@ import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,7 +31,10 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.LinkOff
+import androidx.compose.material.icons.rounded.Public
+import androidx.compose.material.icons.rounded.WifiTethering
 import androidx.compose.material.icons.rounded.FilterList
 import androidx.compose.material.icons.rounded.Sort
 import androidx.compose.material.icons.rounded.Settings
@@ -52,6 +56,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -123,7 +128,18 @@ internal fun ConnectionsScreen(vm: HetuViewModel, bottomPadding: Dp, forcedSecti
     }
     val body: LazyListScope.(String) -> Unit = { tab ->
         when (tab) {
-            "logs" -> logItems(vm, logState, searching && section == "logs")
+            "logs" -> {
+                item(key = "logs-summary") {
+                    HxPanelSectionIntro(
+                        title = "运行日志",
+                        subtitle = "连接、规则匹配与系统事件",
+                        icon = Icons.Rounded.Description,
+                        count = if (vm.logsLoading && vm.logEntries.isEmpty()) "读取中" else "${vm.logEntries.size} 条",
+                        tag = "panel-logs-summary",
+                    )
+                }
+                logItems(vm, logState, searching && section == "logs")
+            }
             "rank" -> if (!state.running && !rankState.historical) {
                 item(key = "rank-stopped") { HxEmpty(Icons.Rounded.SwapVert, "代理未运行", "实时排行来自运行中的连接；开启历史采集后可查看 24 小时排行") }
             } else rankItems(vm, rankState)
@@ -131,6 +147,15 @@ internal fun ConnectionsScreen(vm: HetuViewModel, bottomPadding: Dp, forcedSecti
                 if (!state.running) {
                     item(key = "stopped") { HxEmpty(Icons.Rounded.SwapVert, "代理未运行", "启动代理后这里会实时显示每个应用的连接") }
                 } else {
+                    item(key = "connection-summary") {
+                        HxPanelSectionIntro(
+                            title = "连接监测",
+                            subtitle = "实时查看设备的网络连接",
+                            icon = Icons.Rounded.WifiTethering,
+                            count = "${all.size} 个",
+                            tag = "panel-connections-summary",
+                        )
+                    }
                     item(key = "filters") {
                         Column(Modifier.padding(horizontal = Hx.gutter).padding(bottom = 12.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -309,17 +334,18 @@ private fun ConnectionRow(
     onClick: () -> Unit,
 ) {
     val c = Hx.colors
-    val shape = RoundedCornerShape(22.dp)
+    val shape = Hx.cardShape
     val source = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     Column(
         modifier
             .fillMaxWidth()
             .padding(horizontal = Hx.gutter)
             .padding(bottom = 9.dp)
+            .testTag("panel-connection-${item.id}")
             .hxPressScale(source, .985f)
-            .hxSoftShadow(shape, 2.dp)
             .clip(shape)
-            .background(c.surface),
+            .background(c.surface)
+            .border(0.8.dp, c.line.copy(alpha = .55f), shape),
     ) {
         HxSwipeAction(label = "断开", icon = Icons.Rounded.LinkOff, onAction = onClose) {
             Column(
@@ -327,14 +353,16 @@ private fun ConnectionRow(
                     .fillMaxWidth()
                     .background(c.surface)
                     .clickable(interactionSource = source, indication = androidx.compose.foundation.LocalIndication.current, onClick = onClick)
-                    .padding(horizontal = 15.dp, vertical = 12.dp),
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     val icon = item.appIcon
                     if (icon != null) {
-                        Image(icon.asImageBitmap(), null, Modifier.size(30.dp).clip(RoundedCornerShape(9.dp)))
-                        Spacer(Modifier.width(9.dp))
+                        Image(icon.asImageBitmap(), null, Modifier.size(36.dp).clip(RoundedCornerShape(11.dp)))
+                    } else {
+                        HxIconBadge(Icons.Rounded.Public, size = 36.dp)
                     }
+                    Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
                         Text(
                             item.host,
@@ -362,20 +390,26 @@ private fun ConnectionRow(
                             modifier = Modifier
                                 .widthIn(max = 88.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(c.surfaceMuted)
+                                .background(c.accent.copy(alpha = .06f))
                                 .padding(horizontal = 7.dp, vertical = 3.dp),
                         )
                     }
                 }
                 Spacer(Modifier.height(8.dp))
+                val chain = item.chain.ifBlank { item.rule.ifBlank { "链路未知" } }
+                val direct = item.chain.split(" → ").any { it.trim().equals("DIRECT", true) }
+                val chainTint = if (direct) c.good else c.accent
                 Text(
-                    item.chain.ifBlank { item.rule.ifBlank { "DIRECT" } },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = c.text,
+                    chain,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = chainTint,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.clip(Hx.chipShape).background(chainTint.copy(alpha = .08f))
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
                 )
                 if (item.rule.isNotBlank() || item.rulePayload.isNotBlank()) {
+                    Spacer(Modifier.height(4.dp))
                     Text(
                         listOf(item.rule, item.rulePayload).filter { it.isNotBlank() }.joinToString(" · "),
                         style = MaterialTheme.typography.labelSmall,
@@ -385,10 +419,16 @@ private fun ConnectionRow(
                     )
                 }
                 Spacer(Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("↑ 总计 ${HxFormat.bytes(item.upload)}", style = MaterialTheme.typography.labelMedium.merge(HxNumberStyle), color = c.good)
+                Row(
+                    Modifier.fillMaxWidth().clip(Hx.chipShape).background(c.accent.copy(alpha = .035f))
+                        .padding(horizontal = 10.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("↑ ${HxFormat.bytes(item.upload)}", style = MaterialTheme.typography.labelMedium.merge(HxNumberStyle), color = c.good)
                     Spacer(Modifier.weight(1f))
-                    Text("↓ 总计 ${HxFormat.bytes(item.download)}", style = MaterialTheme.typography.labelMedium.merge(HxNumberStyle), color = c.accent)
+                    Text("累计流量", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
+                    Spacer(Modifier.weight(1f))
+                    Text("↓ ${HxFormat.bytes(item.download)}", style = MaterialTheme.typography.labelMedium.merge(HxNumberStyle), color = c.accent)
                 }
             }
         }

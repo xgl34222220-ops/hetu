@@ -31,6 +31,10 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.input.KeyboardType
@@ -114,6 +118,10 @@ private data class PxPanelHead(val group: ProxyGroupUi, val shown: Int) : PxEntr
     override val key: String get() = "pn-head:" + group.name
 }
 
+private data class PxProviderHead(val group: ProxyGroupUi, val provider: String) : PxEntry {
+    override val key: String get() = "pn-provider:${group.name.length}:${group.name}:$provider"
+}
+
 private data class PxNodeRow(val group: ProxyGroupUi, val nodes: List<ProxyNodeUi>, val last: Boolean) : PxEntry {
     override val key: String get() = "pn:" + group.name + ":" + nodes.joinToString("|") { it.name }
 }
@@ -135,7 +143,8 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
     val listState = embed?.listState ?: ownListState
     var searching by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
-    var expandedName by rememberSaveable { mutableStateOf<String?>(null) }
+    var expandedNames by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    val expandedName = expandedNames.lastOrNull()
     var showFilter by remember { mutableStateOf(false) }
     var showApi by remember { mutableStateOf(false) }
     // Layout controls are real: strategy and node grids each honor their own preference.
@@ -151,15 +160,19 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
     val entries = buildList<PxEntry> {
         visibleGroups.chunked(groupColumns).forEach { row ->
             add(PxGroupRow(row))
-            if (expanded != null && row.any { it.name == expanded.name }) {
+            row.filter { it.name in expandedNames }.forEach { expanded ->
                 val ordered = projectStrategyNodes(expanded.nodes, options.sort, options.descending, vm.delays)
                 val q = query.trim()
                 val nodes = if (q.isBlank() || expanded.name.contains(q, true)) ordered else ordered.filter {
                     it.name.contains(q, true) || it.provider.contains(q, true) || it.type.contains(q, true)
                 }
                 add(PxPanelHead(expanded, nodes.size))
-                val nodeRows = nodes.chunked(nodeColumns)
-                nodeRows.forEachIndexed { i, chunk -> add(PxNodeRow(expanded, chunk, i == nodeRows.lastIndex)) }
+                val providerGroups = if (options.providers) nodes.groupBy { it.provider.ifBlank { "配置内节点" } } else linkedMapOf("" to nodes)
+                providerGroups.entries.forEachIndexed { sectionIndex, (provider, members) ->
+                    if (provider.isNotBlank()) add(PxProviderHead(expanded, provider))
+                    val nodeRows = members.chunked(nodeColumns)
+                    nodeRows.forEachIndexed { i, chunk -> add(PxNodeRow(expanded, chunk, sectionIndex == providerGroups.size - 1 && i == nodeRows.lastIndex)) }
+                }
                 add(PxPanelFoot(expanded, nodes.isEmpty()))
             }
         }
@@ -169,8 +182,8 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
 
     fun toggleGroup(group: ProxyGroupUi) {
         haptics.perform(HetuHaptic.Tick)
-        val opening = expandedName != group.name
-        expandedName = if (opening) group.name else null
+        val opening = group.name !in expandedNames
+        expandedNames = if (!opening) expandedNames - group.name else if (options.collapsePrevious) listOf(group.name) else expandedNames + group.name
         if (opening) {
             val rowIndex = entries.indexOfFirst { it is PxGroupRow && it.groups.any { g -> g.name == group.name } }
             if (rowIndex >= 0) scope.launch {
@@ -229,7 +242,7 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
                     onCollapse = {
                         haptics.perform(HetuHaptic.Tick)
                         val name = expandedName
-                        expandedName = null
+                        expandedNames = expandedNames.filter { it != expandedName }
                         val rowIndex = entries.indexOfFirst { it is PxGroupRow && it.groups.any { g -> g.name == name } }
                         if (rowIndex >= 0) scope.launch { listState.animateScrollToItem(gridOffset + rowIndex) }
                     },
@@ -267,10 +280,17 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
             return@HxPage
         }
 
+        item(key = "strategy-summary") {
+            Row(Modifier.fillMaxWidth().padding(horizontal = Hx.gutter + 4.dp).padding(top = 4.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("策略分组", style = MaterialTheme.typography.titleLarge, color = c.text, modifier = Modifier.weight(1f))
+                Text("共 ${visibleGroups.size} 个分组", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
+            }
+        }
         entries.forEach { entry ->
             val type = when (entry) {
                 is PxGroupRow -> "group-row"
                 is PxPanelHead -> "panel-head"
+                is PxProviderHead -> "provider-head"
                 is PxNodeRow -> "node-row"
                 is PxPanelFoot -> "panel-foot"
             }
@@ -288,32 +308,28 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
                             .padding(bottom = 10.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        val groupRatio = when {
-                            groupColumns == 1 && options.groupCompact -> 5.0f
-                            groupColumns == 1 -> 4.1f
-                            options.groupCompact -> 2.34f
-                            else -> 2.02f
-                        }
                         entry.groups.forEach { group ->
                             StrategyGroupCard(
                                 vm = vm,
                                 group = group,
-                                expanded = group.name == expandedName,
+                                expanded = group.name in expandedNames,
                                 compact = options.groupCompact,
                                 nameOverflow = options.nameOverflow,
-                                modifier = Modifier.weight(1f).aspectRatio(groupRatio),
+                                modifier = Modifier.weight(1f),
                                 onClick = { toggleGroup(group) },
                             )
                         }
                         repeat(groupColumns - entry.groups.size) { Spacer(Modifier.weight(1f)) }
                     }
-                    is PxPanelHead -> PanelHead(vm, entry.group, entry.shown, motion)
+                    is PxPanelHead -> PanelHead(vm, entry.group, entry.shown, motion) { expandedNames = expandedNames - entry.group.name }
+                    is PxProviderHead -> Text(entry.provider, style = MaterialTheme.typography.labelLarge, color = c.textMuted,
+                        modifier = motion.fillMaxWidth().padding(horizontal = Hx.gutter).background(c.surface).padding(horizontal = 14.dp, vertical = 8.dp))
                     is PxNodeRow -> Row(
                         motion
                             .fillMaxWidth()
                             .height(IntrinsicSize.Min)
                             .padding(horizontal = Hx.gutter)
-                            .clip(if (entry.last) RoundedCornerShape(bottomStart = 18.dp, bottomEnd = 18.dp) else RoundedCornerShape(0.dp))
+                            .clip(if (entry.last) RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp) else RoundedCornerShape(0.dp))
                             .background(c.surface)
                             .padding(horizontal = 9.dp)
                             .padding(bottom = if (entry.last) 9.dp else 7.dp),
@@ -387,48 +403,57 @@ private fun StrategyGroupCard(
     val testing = vm.testingGroups[group.name] == true
     val online = group.nodes.count { (vm.delays[it.name] ?: it.lastDelay ?: 0L) > 0L }
 
-    // Use the exact compact BoxProxy-style strategy tile used by the Panel screenshot:
-    // 1.50:1 geometry, 13dp corners, raw URLTest/Selector/Fallback metadata,
-    // compact 26dp icon well, full current-node row and a wrap-content latency pill.
-    // The standalone strategy page keeps its own accordion + long-press behavior.
-    BoxProxyMiuixTheme17 {
-        BoxProxyGroupCard17(
-            group = group,
-            selected = group.now,
-            delay = delay,
-            online = online,
-            compact = compact,
-            nameOverflow = nameOverflow,
-            modifier = modifier,
-            testing = testing,
-            onLongClick = {
-                haptics.perform(HetuHaptic.LongPress)
-                vm.testGroup(group)
-            },
-            onDelayClick = {
-                haptics.perform(HetuHaptic.Tap)
-                vm.testGroup(group)
-            },
-            onClick = onClick,
-        )
+    val c = Hx.colors
+    val source = remember { MutableInteractionSource() }
+    val shape = RoundedCornerShape(20.dp)
+    val fill by animateColorAsState(if (expanded) c.accentSoft else c.surface.copy(alpha = .84f), HxMotion.enter(), label = "groupFill")
+    Column(
+        modifier.heightIn(min = if (compact) 112.dp else 124.dp)
+            .testTag("strategy-group-${group.name}")
+            .semantics { stateDescription = if (expanded) "已展开" else "已收起" }
+            .hxPressScale(source).clip(shape).background(fill)
+            .border(if (expanded) 1.dp else .8.dp, if (expanded) c.accent.copy(alpha = .6f) else c.line.copy(alpha = .7f), shape)
+            .hxCombinedClickSource(source, onLongClick = { vm.testGroup(group) }, onClick = onClick)
+            .padding(13.dp), verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(group.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = c.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(3.dp))
+                Text("${group.type} · $online/${group.nodes.size}", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
+            }
+            Spacer(Modifier.width(6.dp))
+            if (expanded) Icon(Icons.Rounded.ExpandLess, "收起 ${group.name}", tint = c.accent, modifier = Modifier.size(30.dp))
+            else HxGroupIcon(group, Modifier.size(34.dp))
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(group.now.ifBlank { "未选择" }, style = MaterialTheme.typography.labelLarge, color = c.text, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Spacer(Modifier.width(5.dp))
+            StrategyCompactDelayPill(delay, testing) { vm.testGroup(group) }
+        }
     }
 }
 
 /** Top of the expanded node panel: count, sort hint and a per-group latency test. */
 @Composable
-private fun PanelHead(vm: HetuViewModel, group: ProxyGroupUi, shown: Int, modifier: Modifier) {
+private fun PanelHead(vm: HetuViewModel, group: ProxyGroupUi, shown: Int, modifier: Modifier, onCollapse: () -> Unit) {
     val c = Hx.colors
-    // Reference layout: the expanded node grid grows directly under the group cards.
-    // Keep only a slim rounded cap so the white panel reads as one surface instead of
-    // inserting a second toolbar/header between the group and its nodes.
-    Box(
-        modifier
-            .fillMaxWidth()
+    Row(
+        modifier.fillMaxWidth().testTag("strategy-expanded-${group.name}")
             .padding(horizontal = Hx.gutter)
-            .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
-            .background(c.surface)
-            .height(9.dp),
-    )
+            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)).background(c.surface)
+            .padding(start = 14.dp, end = 6.dp, top = 8.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        HxGroupIcon(group, Modifier.size(28.dp))
+        Spacer(Modifier.width(9.dp))
+        Column(Modifier.weight(1f)) {
+            Text(group.name, style = MaterialTheme.typography.titleMedium, color = c.text, maxLines = 2)
+            Text("$shown 个节点", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
+        }
+        HxBarAction(Icons.Rounded.Speed, "全部测速 ${group.name}", { vm.testGroup(group) }, busy = vm.testingGroups[group.name] == true)
+        HxBarAction(Icons.Rounded.ExpandLess, "收起策略 ${group.name}", onCollapse)
+    }
 }
 
 /** A node tile inside the expanded panel. Tap to switch; the selected tile is outlined. */
@@ -451,9 +476,9 @@ private fun StrategyNodeCard(
     val delay = vm.delays[node.name] ?: node.lastDelay
     val testing = vm.testingNodes[node.name] == true
     val shape = RoundedCornerShape(12.dp)
-    val selectedLight = Color(0xFFE8D8FA)
+    val selectedLight = c.accentSoft
     val selectedDark = androidx.compose.ui.graphics.lerp(c.surfaceMuted, c.accentSoft, .42f)
-    val idleLight = Color(0xFFE7E9F2)
+    val idleLight = c.surfaceMuted.copy(alpha = .66f)
     val bg by animateColorAsState(
         if (selected) { if (c.dark) selectedDark else selectedLight }
         else { if (c.dark) c.surfaceMuted else idleLight },
@@ -461,14 +486,16 @@ private fun StrategyNodeCard(
         label = "nodeCardBg",
     )
     val border by animateColorAsState(
-        if (selected) { if (c.dark) c.accent.copy(alpha = .55f) else Color(0xFFB69BCC) } else Color.Transparent,
+        if (selected) { if (c.dark) c.accent.copy(alpha = .55f) else c.accent.copy(alpha = .6f) } else Color.Transparent,
         tween(HxMotion.Medium),
         label = "nodeCardBorder",
     )
 
     Column(
         modifier
-            .height(if (compact) 54.dp else 62.dp)
+            .heightIn(min = if (compact) 72.dp else 82.dp)
+            .testTag("strategy-node-${group.name}-${node.name}")
+            .semantics { this.selected = selected; stateDescription = if (pendingThis) "正在切换" else if (selected) "已选择" else "未选择" }
             .hxPressScale(source, .965f)
             .clip(shape)
             .background(bg)
@@ -493,11 +520,11 @@ private fun StrategyNodeCard(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 node.name,
-                fontSize = 12.5.sp,
-                lineHeight = 14.sp,
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = c.text,
-                maxLines = if (nameOverflow == "wrap" && !compact) 2 else 1,
+                maxLines = if (LocalDensity.current.fontScale > 1.3f || nameOverflow == "wrap") 3 else 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
@@ -506,20 +533,12 @@ private fun StrategyNodeCard(
                 HxSpinner(11.dp)
             } else if (selected) {
                 Spacer(Modifier.width(4.dp))
-                Icon(Icons.Rounded.Check, null, tint = c.text.copy(alpha = .76f), modifier = Modifier.size(16.dp))
+                Icon(Icons.Rounded.Check, "当前节点", tint = c.onAccent, modifier = Modifier.size(20.dp).background(c.accent, CircleShape).padding(3.dp))
             }
         }
-        Text(
-            if (node.udp) "UDP" else "TCP",
-            fontSize = 10.5.sp,
-            lineHeight = 11.5.sp,
-            fontWeight = FontWeight.Medium,
-            color = c.textMuted,
-            maxLines = 1,
-        )
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                node.type.replaceFirstChar { it.uppercase() },
+                (if (node.udp) "UDP · " else "") + node.type.replaceFirstChar { it.uppercase() },
                 fontSize = 10.5.sp,
                 lineHeight = 12.sp,
                 fontWeight = FontWeight.Medium,
@@ -539,13 +558,15 @@ private fun StrategyCompactDelayPill(delay: Long?, testing: Boolean, onClick: ()
     val bg = when {
         testing || delay == null || delay == 0L -> c.surface
         delay < 0L -> c.badSoft
-        delay < 800L -> c.accentSoft
+        delay < 100L -> c.goodSoft
+        delay < 300L -> c.accentSoft
         else -> c.warnSoft
     }
     val fg = when {
         testing || delay == null || delay == 0L -> c.textFaint
         delay < 0L -> c.bad
-        delay < 800L -> c.accent
+        delay < 100L -> c.good
+        delay < 300L -> c.accent
         else -> c.warn
     }
     val source = remember { MutableInteractionSource() }
@@ -560,7 +581,7 @@ private fun StrategyCompactDelayPill(delay: Long?, testing: Boolean, onClick: ()
     ) {
         if (testing) HxSpinner(10.dp)
         else Text(
-            if (delay == null || delay <= 0L) "--" else "$delay ms",
+            if (delay == null || delay == 0L) "未知" else if (delay < 0L) "超时" else "$delay ms",
             fontSize = 10.5.sp,
             lineHeight = 12.sp,
             fontWeight = FontWeight.SemiBold,

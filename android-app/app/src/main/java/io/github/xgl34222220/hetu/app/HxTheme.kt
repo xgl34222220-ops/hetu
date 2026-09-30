@@ -60,15 +60,15 @@ internal data class HxColors(
 )
 
 private val LightHx = HxColors(
-    canvas = Color(0xFFF2F0F9),
-    surface = Color(0xFFFCFBFF),
-    surfaceMuted = Color(0xFFF0EDF7),
-    line = Color(0xFFE7E2EF),
-    text = Color(0xFF171820),
-    textMuted = Color(0xFF686C79),
-    textFaint = Color(0xFFA4A6B0),
-    accent = Color(0xFF2A62E8),
-    accentSoft = Color(0xFFE9EDFC),
+    canvas = Color(0xFFE9EEFF),
+    surface = Color(0xFFF9FBFF),
+    surfaceMuted = Color(0xFFEDF2FF),
+    line = Color(0xFFDCE5FC),
+    text = Color(0xFF111932),
+    textMuted = Color(0xFF596A95),
+    textFaint = Color(0xFF8491B1),
+    accent = Color(0xFF1768FF),
+    accentSoft = Color(0xFFE0EBFF),
     onAccent = Color(0xFFFFFFFF),
     good = Color(0xFF16A34A),
     goodSoft = Color(0xFFDDF5E5),
@@ -106,13 +106,13 @@ internal object Hx {
         @Composable get() = LocalHx.current
 
     /** Spacing scale – every gap in the app is one of these. */
-    val gutter = 12.dp
-    val gap = 10.dp
+    val gutter = 16.dp
+    val gap = 12.dp
     val gapSmall = 7.dp
 
-    val cardShape = RoundedCornerShape(18.dp)
-    val rowShape = RoundedCornerShape(15.dp)
-    val chipShape = RoundedCornerShape(11.dp)
+    val cardShape = RoundedCornerShape(24.dp)
+    val rowShape = RoundedCornerShape(18.dp)
+    val chipShape = RoundedCornerShape(14.dp)
     val pillShape = RoundedCornerShape(50)
 }
 
@@ -149,14 +149,14 @@ private fun hxTypography(): Typography {
     val base = Typography()
     return base.copy(
         displaySmall = base.displaySmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 30.sp, lineHeight = 36.sp),
-        headlineMedium = base.headlineMedium.copy(fontWeight = FontWeight.SemiBold, fontSize = 26.sp, lineHeight = 32.sp),
+        headlineMedium = base.headlineMedium.copy(fontWeight = FontWeight.SemiBold, fontSize = 32.sp, lineHeight = 40.sp),
         headlineSmall = base.headlineSmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 25.sp),
         titleLarge = base.titleLarge.copy(fontWeight = FontWeight.SemiBold, fontSize = 18.sp, lineHeight = 23.sp),
-        titleMedium = base.titleMedium.copy(fontWeight = FontWeight.SemiBold, fontSize = 15.sp, lineHeight = 20.sp, letterSpacing = (-0.1).sp),
-        titleSmall = base.titleSmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp, lineHeight = 18.sp),
-        bodyLarge = base.bodyLarge.copy(fontSize = 14.sp, lineHeight = 19.sp),
-        bodyMedium = base.bodyMedium.copy(fontSize = 13.sp, lineHeight = 18.sp),
-        bodySmall = base.bodySmall.copy(fontSize = 11.5.sp, lineHeight = 15.5.sp),
+        titleMedium = base.titleMedium.copy(fontWeight = FontWeight.SemiBold, fontSize = 16.sp, lineHeight = 22.sp, letterSpacing = (-0.1).sp),
+        titleSmall = base.titleSmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 15.sp, lineHeight = 21.sp),
+        bodyLarge = base.bodyLarge.copy(fontSize = 15.sp, lineHeight = 22.sp),
+        bodyMedium = base.bodyMedium.copy(fontSize = 14.sp, lineHeight = 20.sp),
+        bodySmall = base.bodySmall.copy(fontSize = 12.sp, lineHeight = 18.sp),
         labelLarge = base.labelLarge.copy(fontWeight = FontWeight.SemiBold, fontSize = 13.sp),
         labelMedium = base.labelMedium.copy(fontWeight = FontWeight.Medium, fontSize = 11.5.sp),
         labelSmall = base.labelSmall.copy(fontWeight = FontWeight.Medium, fontSize = 10.5.sp),
@@ -258,7 +258,7 @@ internal fun HetuAppTheme(appearance: String, dynamic: Boolean, accentHex: Strin
         }
     }
 
-    CompositionLocalProvider(LocalHx provides colors) {
+    CompositionLocalProvider(LocalHx provides colors, LocalHxMotionEnabled provides rememberHxMotionEnabled()) {
         MaterialTheme(
             colorScheme = schemeFrom(colors),
             typography = hxTypography(),

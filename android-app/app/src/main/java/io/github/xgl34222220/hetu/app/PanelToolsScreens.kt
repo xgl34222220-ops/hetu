@@ -57,6 +57,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.SearchOff
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -98,126 +102,84 @@ internal fun PanelScreen(vm: HetuViewModel, bottomPadding: Dp) {
 /*  工具: every management tool, one tap away                           */
 /* ------------------------------------------------------------------ */
 
+private data class ConceptTool(val title: String, val summary: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val open: () -> Unit)
+private data class ConceptToolSection(val title: String, val summary: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val tools: List<ConceptTool>)
+
 @Composable
 internal fun ToolsScreen(vm: HetuViewModel, bottomPadding: Dp) {
     val context = LocalContext.current
     val nav = LocalNav.current
     val stagger = rememberHxStagger()
+    var searching by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
     fun open(type: Class<out android.app.Activity>) { context.startActivity(Intent(context, type)) }
-
-    HxPage(
-        title = "工具",
-        scrollToTopSignal = vm.reselect,
-        bottomPadding = bottomPadding,
-        largeTitleStartPadding = 26.dp,
-        largeTitleFontSizeSp = 36f,
-        largeTitleBottomPadding = 18.dp,
-        canvasColor = if (Hx.colors.dark) Hx.colors.canvas else Color(0xFFEBEDFA),
+    val sections = listOf(
+        ConceptToolSection("文件与脚本", "管理应用文件、脚本与日志", Icons.Rounded.Folder, listOf(
+            ConceptTool("文件管理", "浏览与编辑", Icons.Rounded.Folder) { nav.push(HxRoute.Files) },
+            ConceptTool("脚本", "运行与管理", Icons.Rounded.Terminal) { open(ProxyScriptsActivity::class.java) },
+            ConceptTool("日志文件", "查看与导出", Icons.Rounded.Article) { nav.push(HxRoute.Logs) },
+        )),
+        ConceptToolSection("网络与应用", "管理应用、共享网络与网络策略", Icons.Rounded.Wifi, listOf(
+            ConceptTool("应用管理", "代理与直连", Icons.Rounded.Apps) { nav.push(HxRoute.Apps) },
+            ConceptTool("共享网络", "热点与代理", Icons.Rounded.WifiTethering) { nav.push(HxRoute.SharedNet) },
+            ConceptTool("网络匹配", "自动切换", Icons.Rounded.Wifi) { nav.push(HxRoute.NetMatch) },
+            ConceptTool("绕过规则", "网段与接口", Icons.Rounded.AltRoute) { nav.push(HxRoute.Bypass) },
+        )),
+        ConceptToolSection("配置与订阅", "配置文件与订阅来源", Icons.Rounded.CloudDownload, listOf(
+            ConceptTool("配置管理", "导入与编辑", Icons.Rounded.Description) { nav.push(HxRoute.Configs) },
+            ConceptTool("Sub-Store", "订阅处理", Icons.Rounded.CloudSync) { open(ProxySubStoreActivity::class.java) },
+            ConceptTool("CNIP", "规则集管理", Icons.Rounded.Place) { nav.push(HxRoute.CnIp) },
+        )),
+        ConceptToolSection("其他工具", "核心、过滤与运行维护", Icons.Rounded.Memory, listOf(
+            ConceptTool("核心管理", "下载与更新", Icons.Rounded.Memory) { nav.push(HxRoute.Cores) },
+            ConceptTool("广告过滤", "规则与屏蔽", Icons.Rounded.Shield) { nav.push(HxRoute.Adblock) },
+            ConceptTool("诊断工具", "网络与环境", Icons.Rounded.HealthAndSafety) { nav.push(HxRoute.Diagnostics) },
+            ConceptTool("WebUI", "外部面板", Icons.Rounded.Web) { open(ProxyWebPanelsActivity::class.java) },
+        )),
+    )
+    val visible = sections.map { section -> section.copy(tools = section.tools.filter { query.isBlank() || it.title.contains(query, true) || it.summary.contains(query, true) || section.title.contains(query, true) }) }.filter { it.tools.isNotEmpty() }
+    HxPage(title = "工具", scrollToTopSignal = vm.reselect, bottomPadding = bottomPadding,
+        actions = { HxBarAction(if (searching) Icons.Rounded.SearchOff else Icons.Rounded.Search, "搜索工具", { searching = !searching; if (!searching) query = "" }) },
     ) {
-        item(key = "file-run") {
-            ToolReferenceCard(Modifier.hxEnter(stagger, 0)) {
-                ToolReferenceRow(
-                    "文件管理",
-                    "查看与处理应用文件",
-                    Icons.Rounded.Folder,
-                ) { nav.push(HxRoute.Files) }
-                ToolReferenceRow(
-                    "脚本",
-                    "管理服务脚本",
-                    Icons.Rounded.Terminal,
-                ) { open(ProxyScriptsActivity::class.java) }
+        if (searching) item("tool-search") { HxSearchField(query, { query = it }, "搜索工具", Modifier.padding(horizontal = Hx.gutter).padding(bottom = 12.dp), autoFocus = true) }
+        visible.forEachIndexed { index, section ->
+            item(key = section.title) {
+                HxSection {
+                    HxCard(modifier = Modifier.hxEnter(stagger, index).testTag("tools-${section.title}")) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            HxIconBadge(section.icon)
+                            Spacer(Modifier.width(10.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(section.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Hx.colors.text)
+                                Text(section.summary, style = MaterialTheme.typography.bodySmall, color = Hx.colors.textMuted)
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        val columns = if (LocalDensity.current.fontScale > 1.25f) 2 else section.tools.size.coerceAtMost(4)
+                        section.tools.chunked(columns).forEach { row ->
+                            Row(Modifier.fillMaxWidth().padding(bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                row.forEach { tool -> ConceptToolTile(tool, Modifier.weight(1f)) }
+                                repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
+                            }
+                        }
+                    }
+                }
             }
         }
+        if (visible.isEmpty()) item("no-tools") { HxEmpty(Icons.Rounded.SearchOff, "没有匹配的工具") }
+    }
+}
 
-        item(key = "logs") {
-            ToolReferenceCard(Modifier.hxEnter(stagger, 1)) {
-                ToolReferenceRow(
-                    "日志查看",
-                    "查看运行日志与调试输出",
-                    Icons.Rounded.Article,
-                ) { nav.push(HxRoute.Logs) }
-            }
-        }
-
-        item(key = "apps") {
-            ToolReferenceCard(Modifier.hxEnter(stagger, 2)) {
-                ToolReferenceRow(
-                    "应用管理",
-                    "查看并管理应用相关规则",
-                    Icons.Rounded.Apps,
-                ) { nav.push(HxRoute.Apps) }
-            }
-        }
-
-        item(key = "network") {
-            ToolReferenceCard(Modifier.hxEnter(stagger, 3)) {
-                ToolReferenceRow(
-                    "网络匹配",
-                    "设置网络匹配后要执行的操作",
-                    Icons.Rounded.Wifi,
-                ) { nav.push(HxRoute.NetMatch) }
-                ToolReferenceRow(
-                    "共享网络",
-                    "管理共享网络转发相关设置",
-                    Icons.Rounded.WifiTethering,
-                ) { nav.push(HxRoute.SharedNet) }
-                ToolReferenceRow(
-                    "绕过规则",
-                    "管理本地 CIDR 与接口规则",
-                    Icons.Rounded.AltRoute,
-                ) { nav.push(HxRoute.Bypass) }
-            }
-        }
-
-        item(key = "subscription") {
-            ToolReferenceCard(Modifier.hxEnter(stagger, 4)) {
-                ToolReferenceRow(
-                    "配置与订阅",
-                    "导入、切换配置与编辑订阅",
-                    Icons.Rounded.CloudDownload,
-                ) { nav.push(HxRoute.Configs) }
-                ToolReferenceRow(
-                    "Sub-Store",
-                    "订阅处理、覆写与配置导入",
-                    Icons.Rounded.CloudSync,
-                ) { open(ProxySubStoreActivity::class.java) }
-                ToolReferenceRow(
-                    "CNIP 设置",
-                    "配置 CNIP 数据源并更新地理数据",
-                    Icons.Rounded.Place,
-                ) { nav.push(HxRoute.CnIp) }
-            }
-        }
-
-        item(key = "updates") {
-            ToolReferenceCard(Modifier.hxEnter(stagger, 5)) {
-                ToolReferenceRow(
-                    "更新 WebUI",
-                    "检查、安装与管理本地 WebUI 资源",
-                    Icons.Rounded.Web,
-                ) { open(ProxyWebPanelsActivity::class.java) }
-                ToolReferenceRow(
-                    "更新核心",
-                    "下载、更新、导入与管理运行核心",
-                    Icons.Rounded.Memory,
-                ) { nav.push(HxRoute.Cores) }
-                ToolReferenceRow(
-                    "广告过滤",
-                    "规则源、黑白名单与拦截统计",
-                    Icons.Rounded.Shield,
-                ) { nav.push(HxRoute.Adblock) }
-            }
-        }
-
-        item(key = "maintenance") {
-            ToolReferenceCard(Modifier.hxEnter(stagger, 6)) {
-                ToolReferenceRow(
-                    "诊断与维护",
-                    "运行预检、网络诊断与紧急恢复",
-                    Icons.Rounded.HealthAndSafety,
-                ) { nav.push(HxRoute.Diagnostics) }
-            }
-        }
+@Composable
+private fun ConceptToolTile(tool: ConceptTool, modifier: Modifier) {
+    val c = Hx.colors
+    val source = remember { MutableInteractionSource() }
+    Column(modifier.heightIn(min = 94.dp).testTag("tool-${tool.title}").hxPressScale(source).clip(Hx.rowShape)
+        .background(c.surfaceMuted.copy(alpha = .85f)).clickable(interactionSource = source, indication = LocalIndication.current, onClick = tool.open)
+        .padding(horizontal = 9.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Icon(tool.icon, null, tint = c.accent, modifier = Modifier.size(26.dp))
+        Text(tool.title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = c.text)
+        Text(tool.summary, style = MaterialTheme.typography.bodySmall, color = c.textMuted)
     }
 }
 

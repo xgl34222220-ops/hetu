@@ -18,6 +18,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Memory
+import androidx.compose.material.icons.rounded.Wifi
+import androidx.compose.ui.platform.testTag
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
@@ -97,117 +100,71 @@ internal fun PanelOverviewScreen(vm: HetuViewModel, bottomPadding: Dp) {
             }
         },
     ) {
-        item(key = "overview-status") {
-            HxSection {
-                HxCard(padding = PaddingValues(horizontal = 15.dp, vertical = 13.dp)) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text("运行概况", style = MaterialTheme.typography.titleSmall, color = c.text, fontWeight = FontWeight.SemiBold)
-                        Spacer(Modifier.weight(1f))
-                        HxDot(if (state.running) c.good else c.textFaint, 7.dp)
-                        Spacer(Modifier.width(5.dp))
-                        Text(if (state.running) "运行中" else "未连接", style = MaterialTheme.typography.labelSmall, color = c.textMuted)
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    Row(Modifier.fillMaxWidth()) {
-                        OverviewCenteredMetric("策略", state.groups.size.toString(), Modifier.weight(1f))
-                        OverviewCenteredMetric("规则", vm.rules.size.toString(), Modifier.weight(1f))
-                        OverviewCenteredMetric("当前连接", connections.size.toString(), Modifier.weight(1f))
-                    }
-                }
-            }
-        }
-
-        item(key = "overview-subscription") {
-            HxSection {
-                HxCard(
-                    onClick = { vm.openPanel("providers") },
-                    padding = PaddingValues(horizontal = 15.dp, vertical = 13.dp),
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("订阅", style = MaterialTheme.typography.titleSmall, color = c.text, fontWeight = FontWeight.SemiBold)
-                        Spacer(Modifier.weight(1f))
-                        if (expire > 0L) {
-                            Text("到期 ${overviewExpireDate(expire)}", style = MaterialTheme.typography.labelSmall, color = c.textMuted)
-                        }
-                    }
-                    Spacer(Modifier.height(9.dp))
-                    Row(Modifier.fillMaxWidth()) {
-                        OverviewValueBlock("已用", if (total > 0L) HxFormat.bytes(used) else "—", Modifier.weight(1f))
-                        OverviewValueBlock("剩余", if (total > 0L) HxFormat.bytes(remaining) else "—", Modifier.weight(1f))
-                        OverviewValueBlock("总量", if (total > 0L) HxFormat.bytes(total) else "—", Modifier.weight(1f), end = true)
-                    }
-                    Spacer(Modifier.height(10.dp))
-                    HxProgressBar(ratio, c.accent, height = 3.dp)
-                    Spacer(Modifier.height(8.dp))
-                    Row(Modifier.fillMaxWidth()) {
-                        Text("${tracked.size} 个订阅", style = MaterialTheme.typography.labelSmall, color = c.textMuted)
-                        Spacer(Modifier.weight(1f))
-                        Text("$nodeCount 个节点", style = MaterialTheme.typography.labelSmall, color = c.textMuted)
-                    }
-                }
-            }
-        }
-
-        item(key = "overview-speed") {
-            HxSection {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OverviewSpeedCard(
-                        title = "上行速度",
-                        value = HxFormat.speed(vm.upRate),
-                        iconUp = true,
-                        tint = c.good,
-                        soft = c.goodSoft,
-                        modifier = Modifier.weight(1f),
-                    )
-                    OverviewSpeedCard(
-                        title = "下行速度",
-                        value = HxFormat.speed(vm.downRate),
-                        iconUp = false,
-                        tint = c.accent,
-                        soft = c.accentSoft,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
-        }
-
-        item(key = "overview-total") {
-            HxSection {
-                HxCard(padding = PaddingValues(horizontal = 15.dp, vertical = 12.dp)) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text("总流量", style = MaterialTheme.typography.titleSmall, color = c.text, fontWeight = FontWeight.SemiBold)
-                        Spacer(Modifier.weight(1f))
-                        Text("上行 ${HxFormat.bytes(state.uploadTotal)}", style = MaterialTheme.typography.labelMedium.merge(HxNumberStyle), color = c.good)
-                        Text("  /  ", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
-                        Text("下行 ${HxFormat.bytes(state.downloadTotal)}", style = MaterialTheme.typography.labelMedium.merge(HxNumberStyle), color = c.accent)
-                    }
-                }
-            }
-        }
-
         item(key = "overview-trend") {
             HxSection {
-                HxCard(padding = PaddingValues(horizontal = 15.dp, vertical = 13.dp)) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                        Column {
-                            Text("近期趋势", style = MaterialTheme.typography.titleSmall, color = c.text, fontWeight = FontWeight.SemiBold)
-                            Text("最近 60 秒", style = MaterialTheme.typography.labelSmall, color = c.textMuted)
-                        }
-                        Spacer(Modifier.weight(1f))
-                        OverviewLegend("上行", c.good, c.goodSoft)
-                        Spacer(Modifier.width(7.dp))
-                        OverviewLegend("下行", c.accent, c.accentSoft)
+                HxCard(modifier = Modifier.testTag("panel-overview-traffic"), padding = PaddingValues(18.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("网络流量", style = MaterialTheme.typography.titleLarge, color = c.text, modifier = Modifier.weight(1f))
+                        HxPill(if (state.running) "实时" else "未运行", if (state.running) HxTone.Accent else HxTone.Neutral)
                     }
-                    Spacer(Modifier.height(8.dp))
-                    HxTrafficChart(
-                        down = vm.rateHistory.toList(),
-                        up = vm.upHistory.toList(),
-                        downColor = c.accent,
-                        upColor = c.good,
-                        modifier = Modifier.fillMaxWidth().height(142.dp),
-                    )
+                    Spacer(Modifier.height(18.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        HxMetric("下行速度", if (state.running) HxFormat.bytes(vm.downRate) + "/s" else "—", Modifier.weight(1f), valueColor = c.accent)
+                        HxMetric("上行速度", if (state.running) HxFormat.bytes(vm.upRate) + "/s" else "—", Modifier.weight(1f), valueColor = c.good)
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    HxTrafficChart(vm.rateHistory.toList(), vm.upHistory.toList(), c.accent, c.good, Modifier.fillMaxWidth().height(152.dp))
+                    Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.Center) {
+                        OverviewLegend("下行", c.accent, c.accentSoft)
+                        Spacer(Modifier.width(20.dp))
+                        OverviewLegend("上行", c.good, c.goodSoft)
+                    }
                 }
             }
+        }
+        item(key = "overview-runtime") {
+            HxSection {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    HxCard(Modifier.weight(1f), onClick = { vm.openPanel("conn") }) {
+                        HxIconBadge(Icons.Rounded.Wifi)
+                        Spacer(Modifier.height(9.dp))
+                        HxMetric("活动连接", if (state.panelReady) connections.size.toString() else "—")
+                        Spacer(Modifier.height(10.dp))
+                        val tcp = connections.count { it.network.equals("tcp", true) }
+                        val udp = connections.count { it.network.equals("udp", true) }
+                        Text("TCP  ${if (state.panelReady) tcp.toString() else "—"}", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
+                        HxProgressBar(if (connections.isEmpty()) 0f else tcp.toFloat() / connections.size, modifier = Modifier.padding(vertical = 5.dp))
+                        Text("UDP  ${if (state.panelReady) udp.toString() else "—"}", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
+                        HxProgressBar(if (connections.isEmpty()) 0f else udp.toFloat() / connections.size, color = c.good, modifier = Modifier.padding(top = 5.dp))
+                    }
+                    HxCard(Modifier.weight(1f)) {
+                        HxIconBadge(Icons.Rounded.Memory)
+                        Spacer(Modifier.height(9.dp))
+                        HxMetric("内存占用", if (state.memoryBytes > 0) HxFormat.bytes(state.memoryBytes) else "—")
+                        Spacer(Modifier.height(14.dp))
+                        Text("累计上传", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
+                        Text(HxFormat.bytes(state.uploadTotal), style = MaterialTheme.typography.titleSmall, color = c.text)
+                        Spacer(Modifier.height(6.dp))
+                        Text("累计下载", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
+                        Text(HxFormat.bytes(state.downloadTotal), style = MaterialTheme.typography.titleSmall, color = c.text)
+                    }
+                }
+            }
+        }
+        item(key = "overview-subscription") {
+            HxSection { HxCard(onClick = { vm.openPanel("providers") }) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("订阅流量", style = MaterialTheme.typography.titleMedium, color = c.text, modifier = Modifier.weight(1f))
+                    if (expire > 0L) Text("到期 ${overviewExpireDate(expire)}", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
+                }
+                Spacer(Modifier.height(12.dp))
+                Row {
+                    OverviewValueBlock("已用", if (total > 0L) HxFormat.bytes(used) else "—", Modifier.weight(1f))
+                    OverviewValueBlock("剩余", if (total > 0L) HxFormat.bytes(remaining) else "—", Modifier.weight(1f))
+                    OverviewValueBlock("节点", if (vm.providers.isEmpty()) "—" else nodeCount.toString(), Modifier.weight(1f))
+                }
+                HxProgressBar(ratio, modifier = Modifier.padding(top = 12.dp))
+            } }
         }
 
         item(key = "overview-ranking") {

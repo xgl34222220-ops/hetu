@@ -160,7 +160,7 @@ internal fun HxPage(
     overlay: @Composable BoxScope.() -> Unit = {},
     scrollToTopSignal: Int = 0,
     showScrollTop: Boolean = true,
-    largeTitle: Boolean = true,
+    largeTitle: Boolean = onBack == null,
     largeTitleStartPadding: Dp = Hx.gutter,
     largeTitleFontSizeSp: Float? = null,
     largeTitleBottomPadding: Dp = 10.dp,
@@ -179,6 +179,8 @@ internal fun HxPage(
     }
     val c = Hx.colors
     val pageCanvas = canvasColor ?: c.canvas
+    val prominent = largeTitle && onBack == null
+    val pageBarHeight = if (prominent) 72.dp else HxTopBarHeight
     val density = LocalDensity.current
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -205,11 +207,11 @@ internal fun HxPage(
                 state = listState,
                 modifier = Modifier.fillMaxSize().hazeSource(pageHaze),
                 contentPadding = PaddingValues(
-                    top = statusTop + HxTopBarHeight,
+                    top = statusTop + pageBarHeight,
                     bottom = listBottom,
                 ),
             ) {
-                if (largeTitle) item(key = "hx-page-header") {
+                if (largeTitle && !prominent) item(key = "hx-page-header") {
                     Column(
                         Modifier
                             .fillMaxWidth()
@@ -264,7 +266,7 @@ internal fun HxPage(
                     PullToRefreshDefaults.Indicator(
                         state = pullState,
                         isRefreshing = refreshing,
-                        modifier = Modifier.align(Alignment.TopCenter).padding(top = statusTop + HxTopBarHeight - 8.dp),
+                        modifier = Modifier.align(Alignment.TopCenter).padding(top = statusTop + pageBarHeight - 8.dp),
                         containerColor = c.surface,
                         color = c.accent,
                     )
@@ -278,7 +280,7 @@ internal fun HxPage(
         val blur = LocalHxBlur.current
         val topBarStyle = LocalContext.current.getSharedPreferences("hetu", 0).getString("topBarBlurStyle", "progressive").orEmpty()
         val progressiveBar = topBarStyle != "gaussian"
-        Box(Modifier.fillMaxWidth().align(Alignment.TopCenter).height(statusTop + HxTopBarHeight)) {
+        Box(Modifier.fillMaxWidth().align(Alignment.TopCenter).height(statusTop + pageBarHeight)) {
             // Progressive blur stays denser near the status bar and dissolves into content.
             Box(
                 Modifier
@@ -301,21 +303,22 @@ internal fun HxPage(
                 Modifier
                     .fillMaxWidth()
                     .padding(top = statusTop, start = 4.dp, end = 4.dp)
-                    .height(HxTopBarHeight),
+                    .height(pageBarHeight),
             ) {
                 Text(
                     title,
                     modifier = Modifier
-                        .align(Alignment.Center)
-                        .padding(horizontal = 96.dp)
+                        .align(if (prominent) Alignment.CenterStart else Alignment.Center)
+                        .padding(horizontal = if (prominent) Hx.gutter - 4.dp else 72.dp)
                         .graphicsLayer {
-                            alpha = barAlpha
-                            translationY = (1f - barAlpha) * 8.dp.toPx()
-                            val s = .94f + .06f * barAlpha
+                            alpha = if (prominent) 1f else barAlpha
+                            translationY = if (prominent) 0f else (1f - barAlpha) * 8.dp.toPx()
+                            val s = if (prominent) 1f else .94f + .06f * barAlpha
                             scaleX = s
                             scaleY = s
                         },
-                    style = MaterialTheme.typography.titleMedium,
+                    style = if (prominent) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
                     color = c.text,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -445,6 +448,7 @@ private fun HxEmbeddedPage(
 /** Press feedback shared by every tappable surface: a small, quick scale. */
 @Composable
 internal fun Modifier.hxPressScale(source: MutableInteractionSource, pressedScale: Float = .975f): Modifier {
+    if (!LocalHxMotionEnabled.current) return this
     val pressed by source.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) pressedScale else 1f, HxMotion.press(), label = "press")
     return this.graphicsLayer { scaleX = scale; scaleY = scale }
@@ -465,7 +469,7 @@ internal fun HxCard(
         modifier = modifier.then(if (onClick != null) Modifier.hxPressScale(source) else Modifier).hxSoftShadow(Hx.cardShape),
         shape = Hx.cardShape,
         color = color,
-        border = if (c.dark) BorderStroke(0.5.dp, c.line) else null,
+        border = BorderStroke(0.8.dp, if (c.dark) c.line else Color.White.copy(alpha = .85f)),
     ) {
         Column(
             Modifier
@@ -512,7 +516,7 @@ internal fun HxGroup(modifier: Modifier = Modifier, title: String? = null, conte
         modifier = modifier.fillMaxWidth(),
         shape = Hx.cardShape,
         color = c.surface,
-        border = if (c.dark) BorderStroke(0.5.dp, c.line.copy(alpha = .72f)) else null,
+        border = BorderStroke(0.8.dp, if (c.dark) c.line.copy(alpha = .72f) else Color.White.copy(alpha = .85f)),
         shadowElevation = 0.dp,
         tonalElevation = 0.dp,
     ) {
@@ -539,11 +543,10 @@ internal fun HxDivider(inset: Dp = 50.dp) {
 }
 
 @Composable
-internal fun HxIconBadge(icon: ImageVector, tint: Color = Hx.colors.accent, size: Dp = 27.dp) {
+internal fun HxIconBadge(icon: ImageVector, tint: Color = Hx.colors.accent, size: Dp = 38.dp) {
     val c = Hx.colors
-    val foreground = if (tint == c.bad) c.bad else c.textMuted
-    Box(Modifier.size(size), contentAlignment = Alignment.Center) {
-        Icon(icon, contentDescription = null, tint = foreground, modifier = Modifier.size(19.dp))
+    Box(Modifier.size(size).clip(CircleShape).background(tint.copy(alpha = if (c.dark) .16f else .09f)), contentAlignment = Alignment.Center) {
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(size * .56f))
     }
 }
 
@@ -577,8 +580,8 @@ internal fun HxRow(
                     onLongClick = onLongClick?.let { long -> { haptics.perform(HetuHaptic.LongPress); long() } },
                 ) else Modifier,
             )
-            .heightIn(min = 50.dp)
-            .padding(horizontal = 14.dp, vertical = 8.dp)
+            .heightIn(min = 64.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
             .graphicsLayer { alpha = contentAlpha },
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -731,7 +734,8 @@ internal fun HxDot(color: Color, size: Dp = 8.dp) {
 
 @Composable
 internal fun HxSpinner(size: Dp = 18.dp, color: Color = Hx.colors.accent) {
-    CircularProgressIndicator(modifier = Modifier.size(size), color = color, strokeWidth = 2.dp)
+    if (LocalHxMotionEnabled.current) CircularProgressIndicator(modifier = Modifier.size(size), color = color, strokeWidth = 2.dp)
+    else CircularProgressIndicator(progress = { .72f }, modifier = Modifier.size(size), color = color, strokeWidth = 2.dp)
 }
 
 /** Inline status message with optional action. */
@@ -1291,7 +1295,7 @@ internal fun HxBarAction(icon: ImageVector, description: String, onClick: () -> 
     val c = Hx.colors
     val haptics = rememberHetuHaptics()
     val tint by animateColorAsState(if (enabled) c.text else c.textFaint, tween(HxMotion.Medium), label = "barTint")
-    IconButton(onClick = { haptics.perform(HetuHaptic.Tap); onClick() }, enabled = enabled && !busy, modifier = Modifier.size(44.dp)) {
+    IconButton(onClick = { haptics.perform(HetuHaptic.Tap); onClick() }, enabled = enabled && !busy, modifier = Modifier.size(48.dp).padding(3.dp).background(c.surface.copy(alpha = .78f), CircleShape).border(.8.dp, if (c.dark) c.line else Color.White, CircleShape)) {
         // Icon swaps (search ↔ close search, idle ↔ busy) rotate/scale through instead of blinking.
         AnimatedContent(
             targetState = if (busy) null else icon,

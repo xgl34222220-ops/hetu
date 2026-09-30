@@ -135,7 +135,7 @@ internal fun rememberHxStagger(): HxStagger {
 
 @Composable
 internal fun Modifier.hxEnter(stagger: HxStagger, index: Int): Modifier {
-    if (stagger.played) return this
+    if (!LocalHxMotionEnabled.current || stagger.played) return this
     val progress = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
         delay(40L * index.coerceAtMost(8))
@@ -158,6 +158,7 @@ internal fun Modifier.hxEnter(stagger: HxStagger, index: Int): Modifier {
 /** Each digit rolls up or down to its new value, like an odometer. */
 @Composable
 internal fun HxRollingText(text: String, style: TextStyle, color: Color, modifier: Modifier = Modifier) {
+    if (!LocalHxMotionEnabled.current) { Text(text, style = style.merge(HxNumberStyle), color = color, modifier = modifier); return }
     Row(modifier) {
         val length = text.length
         text.forEachIndexed { index, char ->
@@ -190,6 +191,7 @@ internal fun HxRollingText(text: String, style: TextStyle, color: Color, modifie
 @Composable
 internal fun rememberHxShimmer(): Brush {
     val c = Hx.colors
+    if (!LocalHxMotionEnabled.current) return Brush.linearGradient(listOf(c.surfaceMuted, c.surfaceMuted))
     val transition = rememberInfiniteTransition(label = "shimmer")
     val x by transition.animateFloat(
         initialValue = -1f,
@@ -386,6 +388,7 @@ internal fun HxDock(
  */
 @Composable
 internal fun HxPowerRing(busy: Boolean, breathing: Boolean, color: Color, modifier: Modifier = Modifier) {
+    if (!LocalHxMotionEnabled.current) return
     val transition = rememberInfiniteTransition(label = "ring")
     val angle by transition.animateFloat(0f, 360f, infiniteRepeatable(tween(1100, easing = LinearEasing)), label = "ringAngle")
     val breath by transition.animateFloat(0f, 1f, infiniteRepeatable(tween(2400), RepeatMode.Reverse), label = "ringBreath")
@@ -418,6 +421,7 @@ internal fun HxPowerRing(busy: Boolean, breathing: Boolean, color: Color, modifi
 @Composable
 internal fun rememberHxAurora(active: Boolean): Brush {
     val c = Hx.colors
+    if (!LocalHxMotionEnabled.current) return Brush.linearGradient(listOf(c.surface, c.surface))
     val transition = rememberInfiniteTransition(label = "aurora")
     val t by transition.animateFloat(0f, 1f, infiniteRepeatable(tween(9000, easing = LinearEasing), RepeatMode.Reverse), label = "auroraT")
     val strength by animateFloatAsState(if (active) 1f else 0f, tween(700), label = "auroraStrength")

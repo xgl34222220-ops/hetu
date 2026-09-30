@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalDensity
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
@@ -79,6 +80,7 @@ import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Hub
 import androidx.compose.material.icons.rounded.Rule
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.WorkOutline
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -195,6 +197,11 @@ internal sealed class HxRoute(val key: String) {
     data object Diagnostics : HxRoute("diagnostics")
     data object Notifications : HxRoute("notifications")
     data object Theme : HxRoute("theme")
+    data object PublicIp : HxRoute("public-ip")
+    data object Resources : HxRoute("resources")
+    data object Backup : HxRoute("backup")
+    data object Startup : HxRoute("startup")
+    data object PanelPreferences : HxRoute("panel-preferences")
 }
 
 internal class HxNav {
@@ -226,11 +233,12 @@ internal fun HetuRoot(vm: HetuViewModel) {
     val routeHolder = rememberSaveableStateHolder()
     val scope = rememberCoroutineScope()
     val c = Hx.colors
+    val motion = LocalHxMotionEnabled.current
 
     // Predictive back: the page follows the finger (shrinks toward the swipe edge with
     // rounded corners); releasing completes the normal return transition from there.
     val settingsRevision = vm.settingsRevision
-    val predictiveBackEnabled = remember(settingsRevision) { vm.prefs.getBoolean("predictiveBackAnimation", true) }
+    val predictiveBackEnabled = motion && remember(settingsRevision) { vm.prefs.getBoolean("predictiveBackAnimation", true) }
     val predictiveBackFollowEdge = remember(settingsRevision) { vm.prefs.getBoolean("predictiveBackFollowEdge", true) }
     val backProgress = remember { Animatable(0f) }
     var gestureRoute by remember { mutableStateOf<HxRoute?>(null) }
@@ -260,11 +268,11 @@ internal fun HetuRoot(vm: HetuViewModel) {
     BackHandler(enabled = nav.stack.size > 1 && !predictiveBackEnabled) { nav.pop() }
     BackHandler(enabled = nav.stack.size == 1 && vm.tab != HxTab.Home) { vm.tab = HxTab.Home }
 
-    CompositionLocalProvider(LocalNav provides nav, LocalHxBlur provides vm.blurEnabled) {
+    CompositionLocalProvider(LocalNav provides nav, LocalHxBlur provides vm.blurEnabled, io.github.xgl34222220.hetu.ui.LocalHetuMotionEnabled provides motion) {
         Box(Modifier.fillMaxSize().background(c.canvas)) {
             AnimatedContent(
                 targetState = nav.current,
-                transitionSpec = { routeTransition(nav.forward) },
+                transitionSpec = { routeTransition(nav.forward, motion) },
                 label = "route",
             ) { route ->
                 val density = LocalDensity.current
@@ -282,6 +290,7 @@ internal fun HetuRoot(vm: HetuViewModel) {
                 Box(
                     Modifier
                         .fillMaxSize()
+                        .testTag("hetu-route-${route.key}")
                         .drawWithContent {
                             drawContent()
                             if (dim > 0f) drawRect(androidx.compose.ui.graphics.Color.Black.copy(alpha = dim))
@@ -319,6 +328,11 @@ internal fun HetuRoot(vm: HetuViewModel) {
                             HxRoute.Diagnostics -> DiagnosticsScreen(vm) { nav.pop() }
                             HxRoute.Notifications -> NotificationSettingsScreen(vm) { nav.pop() }
                             HxRoute.Theme -> HxThemeLabScreen(vm) { nav.pop() }
+                            HxRoute.PublicIp -> PublicIpDetails(vm) { nav.pop() }
+                            HxRoute.Resources -> CoreDetails(vm) { nav.pop() }
+                            HxRoute.Backup -> HxBackupScreen(vm) { nav.pop() }
+                            HxRoute.Startup -> HxStartupSettingsScreen(vm) { nav.pop() }
+                            HxRoute.PanelPreferences -> HxPanelPreferencesScreen(vm) { nav.pop() }
                         }
                     }
                 }
@@ -334,7 +348,8 @@ internal fun HetuRoot(vm: HetuViewModel) {
     }
 }
 
-private fun routeTransition(forward: Boolean): ContentTransform {
+private fun routeTransition(forward: Boolean, enabled: Boolean): ContentTransform {
+    if (!enabled) return androidx.compose.animation.EnterTransition.None.togetherWith(androidx.compose.animation.ExitTransition.None)
     val duration = HxMotion.Route
     val ease = HxMotion.Emphasized
     // Card-stack navigation: the new page covers the old one from the right edge; the old
@@ -375,8 +390,8 @@ private fun MainTabs(vm: HetuViewModel) {
         dockTabs.map { tab ->
             when (tab) {
                 HxTab.Home -> DockItem(tab.label, Icons.Rounded.Home, .94f)
-                HxTab.Panel -> DockItem(tab.label, Icons.Rounded.Link, .94f)
-                HxTab.Tools -> DockItem(tab.label, Icons.Rounded.GridView, .94f)
+                HxTab.Panel -> DockItem(tab.label, Icons.Rounded.Dashboard, .94f)
+                HxTab.Tools -> DockItem(tab.label, Icons.Rounded.WorkOutline, .94f)
                 HxTab.Settings -> DockItem(tab.label, Icons.Rounded.Settings, .94f)
             }
         }
@@ -442,7 +457,7 @@ private fun MainTabs(vm: HetuViewModel) {
             },
             hazeState = dockHaze,
             backdrop = liquidBackdrop.takeIf { runtimeLiquid },
-            modifier = Modifier.align(Alignment.BottomCenter).offset(y = dockShift),
+            modifier = Modifier.align(Alignment.BottomCenter).offset(y = dockShift).testTag("hetu-dock"),
         )
     }
 }

@@ -1,0 +1,181 @@
+package io.github.xgl34222220.hetu
+
+import android.app.Application
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import androidx.activity.ComponentActivity
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.test.*
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
+import androidx.test.core.app.ApplicationProvider
+import org.junit.Assert.*
+import org.junit.After
+import org.junit.Before
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+import java.io.File
+
+/** Runs the launcher composition itself. IO is blocked by test-only client/Root shadows. */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35], qualifiers = "w393dp-h852dp-mdpi", application = Application::class,
+    shadows = [ConceptRootBridgeShadow::class, ConceptMihomoClientShadow::class])
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+class HetuConceptRootTest {
+    @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
+    private val app get() = ApplicationProvider.getApplicationContext<Application>()
+    private lateinit var vm: HetuViewModel
+
+    @Before fun clean() {
+        app.getSharedPreferences("hetu", Context.MODE_PRIVATE).edit().clear()
+            .putBoolean("enableBlur", false).putBoolean("liquidGlass", false)
+            .putBoolean("proxySelectorShowHidden", true).commit()
+        vm = newConceptTestVm(app)
+    }
+    @After fun close() { if (::vm.isInitialized) rule.runOnIdle { closeConceptTestVm(vm) } }
+    private fun render(tab: HxTab = HxTab.Panel, section: String = "proxies", fontScale: Float = 1f, dark: Boolean = false, running: Boolean = true) {
+        if (running) setConceptState(vm, conceptRunningState())
+        setConceptValue(vm, "rules", conceptRules())
+        setConceptValue(vm, "ruleSets", conceptRuleSets())
+        vm.openPanel(section)
+        vm.tab = tab
+        rule.setContent {
+            HetuAppTheme(if (dark) "dark" else "light", dynamic = false) {
+                val density = LocalDensity.current
+                CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale), LocalHxMotionEnabled provides false) {
+                    HetuRoot(vm)
+                }
+            }
+        }
+        rule.waitForIdle()
+    }
+    private fun node(tag: String) = rule.onNodeWithTag(tag, useUnmergedTree = true)
+    private fun screenshot(name: String) {
+        rule.waitForIdle()
+        rule.runOnIdle {
+            val view = rule.activity.window.decorView
+            assertTrue("actual root must be measured", view.width > 0 && view.height > 0)
+            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+            view.draw(Canvas(bitmap))
+            val file = File("build/outputs/hetu-concept-root/$name.png")
+            file.parentFile!!.mkdirs()
+            file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            bitmap.recycle()
+        }
+    }
+    private fun back() { rule.runOnIdle { rule.activity.onBackPressedDispatcher.onBackPressed() }; rule.waitForIdle() }
+
+    @Test fun realRootShowsSevenPanelsAndTwoColumnStrategyCards() {
+        render()
+        node("hetu-route-main").assertExists()
+        node("hetu-dock").assertIsDisplayed()
+        HxPanelSections.forEach { (key, _) -> node("panel-tab-$key").assertExists() }
+        val first = vm.state.groups[0].name
+        val second = vm.state.groups[1].name
+        val a = node("strategy-group-$first").getUnclippedBoundsInRoot()
+        val b = node("strategy-group-$second").getUnclippedBoundsInRoot()
+        assertEquals(a.top, b.top)
+        assertTrue(a.right < b.left)
+        assertTrue("group must have readable height", a.height >= 110.dp)
+        screenshot("01-root-strategy-groups")
+    }
+
+    @Test fun expansionIsInlineWithRealHeaderAndTwoNodeColumnsAndCanBeRepeated() {
+        render()
+        val group = vm.state.groups.first()
+        repeat(2) {
+            node("strategy-group-${group.name}").performClick()
+            node("strategy-expanded-${group.name}").assertIsDisplayed()
+            val a = node("strategy-node-${group.name}-${group.nodes[0].name}").getUnclippedBoundsInRoot()
+            val b = node("strategy-node-${group.name}-${group.nodes[1].name}").getUnclippedBoundsInRoot()
+            assertEquals(a.top, b.top)
+            assertTrue(a.right < b.left)
+            node("strategy-node-${group.name}-${group.now}").assertIsSelected()
+            rule.onAllNodes(isDialog()).assertCountEquals(0)
+            screenshot("02-root-inline-nodes-$it")
+            rule.onNodeWithContentDescription("收起策略 ${group.name}").performClick()
+            node("strategy-expanded-${group.name}").assertDoesNotExist()
+        }
+    }
+
+    @Test fun largeFontsUseOneColumnWithoutCompressingNodeHeight() {
+        render(fontScale = 1.6f)
+        val group = vm.state.groups.first()
+        node("strategy-group-${group.name}").performClick()
+        val first = node("strategy-node-${group.name}-${group.nodes[0].name}")
+        first.performScrollTo().assertIsDisplayed()
+        val a = first.getUnclippedBoundsInRoot()
+        val b = node("strategy-node-${group.name}-${group.nodes[1].name}").getUnclippedBoundsInRoot()
+        assertEquals(a.left, b.left)
+        assertTrue(b.top >= a.bottom)
+        assertTrue(a.height >= 82.dp)
+        screenshot("03-root-strategy-large-font")
+    }
+
+    @Test fun settingsHasOneOwnerPerFeatureAndBasicConfigurationHasNoSecondImporter() {
+        render(tab = HxTab.Settings, running = false)
+        node("settings-基础代理配置").performTouchInput { click() }
+        node("hetu-route-network").assertExists()
+        rule.onNodeWithText("代理核心").assertIsDisplayed()
+        rule.onNodeWithText("配置选择").assertDoesNotExist()
+        rule.onNodeWithContentDescription("导入配置").assertDoesNotExist()
+        screenshot("04-root-basic-settings")
+        back()
+        node("settings-高级代理配置").performTouchInput { click() }
+        node("hetu-route-advanced-network").assertExists()
+        rule.onNodeWithText("代理 TCP").assertIsDisplayed()
+        rule.onNodeWithText("Mihomo DNS 转发").assertIsDisplayed()
+        screenshot("05-root-advanced-settings")
+        back()
+        node("settings-通知设置").performScrollTo().performTouchInput { click() }
+        node("hetu-route-notifications").assertExists()
+        back()
+        node("hetu-route-main").assertExists()
+    }
+
+    @Test fun groupedToolsOpenTheCanonicalConfigLibraryAndBackReturnsToTools() {
+        render(tab = HxTab.Tools, running = false)
+        node("tools-文件与脚本").assertIsDisplayed()
+        screenshot("06-root-tools")
+        node("tool-配置管理").performScrollTo().performClick()
+        node("hetu-route-configs").assertExists()
+        rule.onNodeWithText("配置与订阅").assertExists()
+        back()
+        node("tool-配置管理").assertExists()
+        assertEquals(HxTab.Tools, vm.tab)
+    }
+
+    @Test fun panelNavigationUsesActualRulesSetsAndConnectionsAndSupportsDarkMode() {
+        render(section = "rules", dark = true)
+        node("panel-rules-summary").assertIsDisplayed()
+        node("panel-rule-0").assertExists()
+        screenshot("07-root-rules-dark")
+        node("panel-tab-sets").performClick()
+        node("panel-rule-sets-summary").assertIsDisplayed()
+        screenshot("08-root-rule-sets-dark")
+        node("panel-tab-conn").performClick()
+        node("panel-connections-summary").assertIsDisplayed()
+        screenshot("09-root-connections-dark")
+    }
+
+    @Test fun disabledMotionLeavesFirstFrameContentVisibleAndNavigationFunctional() {
+        render(tab = HxTab.Settings, running = false)
+        node("settings-备份与恢复").performTouchInput { click() }
+        node("hetu-route-backup").assertIsDisplayed()
+        rule.onNodeWithText("创建备份").assertIsDisplayed()
+        screenshot("10-root-backup-reduced-motion")
+        back()
+        node("settings-默认面板").performScrollTo().performTouchInput { click() }
+        node("hetu-route-panel-preferences").assertExists()
+        rule.onNodeWithText("默认面板页面").performClick()
+        rule.onNodeWithText("概览", useUnmergedTree = true).assertExists()
+        rule.onNodeWithText("日志", useUnmergedTree = true).assertExists()
+    }
+}

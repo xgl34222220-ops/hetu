@@ -46,6 +46,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.material.icons.rounded.MoreHoriz
+import androidx.compose.material.icons.rounded.Memory
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -101,8 +107,7 @@ import kotlinx.coroutines.launch
 internal fun HomeScreen(vm: HetuViewModel, bottomPadding: Dp) {
     val context = LocalContext.current
     val stagger = rememberHxStagger()
-    var showCoreDetails by remember { mutableStateOf(false) }
-    var showWanDetails by remember { mutableStateOf(false) }
+    val nav = LocalNav.current
     var showSpeedSource by remember { mutableStateOf(false) }
 
     HxPage(
@@ -111,47 +116,42 @@ internal fun HomeScreen(vm: HetuViewModel, bottomPadding: Dp) {
         bottomPadding = bottomPadding,
         refreshing = vm.refreshing,
         onRefresh = vm::pullRefresh,
-        largeTitleStartPadding = 26.dp,
-        largeTitleFontSizeSp = 36f,
-        largeTitleBottomPadding = 18.dp,
-        canvasColor = if (Hx.colors.dark) Hx.colors.canvas else Color(0xFFEBEDFA),
+        largeTitleStartPadding = Hx.gutter,
+        largeTitleFontSizeSp = 32f,
+        largeTitleBottomPadding = 14.dp,
+        canvasColor = Hx.colors.canvas,
     ) {
         item(key = "hero") {
-            Box(Modifier.hxEnter(stagger, 0)) { HomeHero(vm, onDetails = { showCoreDetails = true }) }
+            Box(Modifier.hxEnter(stagger, 0)) { HomeHero(vm, onDetails = { nav.push(HxRoute.Resources) }) }
         }
-        item(key = "launchers") {
-            BentoRow(Modifier.hxEnter(stagger, 1)) {
-                HomeLauncherCard(
-                    title = "WebUI",
-                    subtitle = "Web 界面",
-                    modifier = Modifier.weight(1f),
-                ) { context.startActivity(Intent(context, ProxyWebPanelsActivity::class.java)) }
-                HomeLauncherCard(
-                    title = "日志",
-                    subtitle = "查看",
-                    modifier = Modifier.weight(1f),
-                ) { context.startActivity(Intent(context, ProxyLogViewerActivity::class.java)) }
+        item(key = "address") {
+            HxSection(modifier = Modifier.hxEnter(stagger, 1)) {
+                HomeWanCard(vm, Modifier.fillMaxWidth(), onDetails = { nav.push(HxRoute.PublicIp) })
             }
         }
-        item(key = "latency") {
-            Box(Modifier.hxEnter(stagger, 2)) { HomeLatencyCard(vm) }
+        item(key = "traffic") {
+            BentoRow(Modifier.hxEnter(stagger, 2)) {
+                HomeFlowTile(vm, upload = true, Modifier.weight(1f)) { showSpeedSource = true }
+                HomeFlowTile(vm, upload = false, Modifier.weight(1f)) { showSpeedSource = true }
+            }
         }
-        item(key = "net") {
+        item(key = "resources") {
             BentoRow(Modifier.hxEnter(stagger, 3)) {
-                HomeWanCard(vm, Modifier.weight(1f), onDetails = { showWanDetails = true })
-                HomeSpeedCard(vm, Modifier.weight(1f), onOpen = { showSpeedSource = true })
+                HomeResourceTile(vm, cpu = true, Modifier.weight(1f)) { nav.push(HxRoute.Resources) }
+                HomeResourceTile(vm, cpu = false, Modifier.weight(1f)) { nav.push(HxRoute.Resources) }
             }
         }
-        item(key = "usage") {
-            BentoRow(Modifier.hxEnter(stagger, 4)) {
-                HomeSubscriptionCard(vm, Modifier.weight(1f)) { vm.openPanel("providers") }
-                HomeResourceCard(vm, Modifier.weight(1f)) { showCoreDetails = true }
-            }
+        item(key = "outbound") {
+            val primary = vm.state.groups.firstOrNull { it.name.equals("GLOBAL", true) && vm.state.trafficMode.equals("global", true) }
+                ?: vm.state.groups.firstOrNull { it.name != "GLOBAL" && it.now.isNotBlank() }
+            Box(Modifier.hxEnter(stagger, 4)) { HomeOutboundNode(vm, primary) }
+        }
+        item(key = "latency") { HomeLatencyCard(vm) }
+        item(key = "subscription") {
+            HxSection { HomeSubscriptionCard(vm, Modifier.fillMaxWidth()) { vm.openPanel("providers") } }
         }
     }
 
-    if (showCoreDetails) CoreDetails(vm, onDismiss = { showCoreDetails = false })
-    if (showWanDetails) PublicIpDetails(vm, onDismiss = { showWanDetails = false })
     if (showSpeedSource) {
         HxChoiceSheet(
             title = "网速数据来源",
@@ -242,30 +242,11 @@ private fun HomeHero(vm: HetuViewModel, onDetails: () -> Unit) {
     val state = vm.state
     val running = state.running
     val op = vm.operation
-    val healthy = running && state.message.isBlank()
+    var controls by rememberSaveable { mutableStateOf(false) }
     val tint by animateColorAsState(
-        when {
-            op != null -> c.warn
-            running -> c.accent
-            else -> c.textFaint
-        },
-        tween(HxMotion.Medium),
-        label = "heroTint",
+        when { op != null -> c.warn; running -> c.good; else -> c.textMuted },
+        tween(HxMotion.Medium), label = "heroTint",
     )
-    val wash by animateColorAsState(
-        when {
-            op != null -> c.warnSoft
-            running -> c.accentSoft
-            else -> c.surfaceMuted
-        },
-        tween(HxMotion.Long),
-        label = "heroWash",
-    )
-    val glyphScale = remember { androidx.compose.animation.core.Animatable(1f) }
-    LaunchedEffect(running) {
-        glyphScale.snapTo(.7f)
-        glyphScale.animateTo(1f, spring(dampingRatio = .5f, stiffness = 300f))
-    }
     val status = when (op) {
         HxRunOp.Start -> "正在启动"
         HxRunOp.Stop -> "正在停止"
@@ -273,122 +254,100 @@ private fun HomeHero(vm: HetuViewModel, onDetails: () -> Unit) {
         HxRunOp.Reload -> "正在重载"
         null -> if (running) "运行中" else "未运行"
     }
-
     HxSection {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
-                .background(c.surface)
-                .then(if (c.dark) Modifier.border(0.5.dp, c.line, RoundedCornerShape(20.dp)) else Modifier),
-        ) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .background(Brush.verticalGradient(listOf(wash, wash.copy(alpha = .35f), c.surface.copy(alpha = 0f))))
-                    .clickable(enabled = running && op == null, onClick = onDetails),
-            ) {
-                // Oversized status glyph, cropped by the card edge.
-                Icon(
-                    if (running || op != null) Icons.Rounded.TaskAlt else Icons.Rounded.PowerSettingsNew,
-                    null,
-                    tint = tint.copy(alpha = if (running) .95f else .35f),
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 14.dp)
-                        .size(112.dp)
-                        .graphicsLayer {
-                            translationX = 22.dp.toPx()
-                            scaleX = glyphScale.value
-                            scaleY = glyphScale.value
-                        },
-                )
-                Column(Modifier.padding(start = 18.dp, end = 110.dp, top = 16.dp, bottom = 14.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        PulseDot(tint, pulsing = op != null || healthy)
-                        Spacer(Modifier.width(4.dp))
-                        AnimatedContent(
-                            targetState = status,
-                            transitionSpec = {
-                                (fadeIn(tween(HxMotion.Medium)) + slideInVertically(tween(HxMotion.Medium, easing = HxMotion.Emphasized)) { it / 2 })
-                                    .togetherWith(fadeOut(tween(HxMotion.Short)) + slideOutVertically(tween(HxMotion.Short)) { -it / 2 })
-                            },
-                            label = "heroStatus",
-                        ) { text ->
-                            Text(text, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = tint)
-                        }
+        HxCard(padding = PaddingValues(16.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(48.dp).clip(CircleShape).background(tint.copy(alpha = .12f)), contentAlignment = Alignment.Center) {
+                    if (op != null) HxSpinner(25.dp, tint)
+                    else Icon(if (running) Icons.Rounded.TaskAlt else Icons.Rounded.PowerSettingsNew,
+                        null, tint = tint, modifier = Modifier.size(30.dp))
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f).clickable(enabled = running && op == null, onClick = onDetails)) {
+                    AnimatedContent(targetState = status,
+                        transitionSpec = { fadeIn(tween(HxMotion.Medium)).togetherWith(fadeOut(tween(HxMotion.Short))) },
+                        label = "heroStatus") { text ->
+                        Text(text, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, color = tint)
                     }
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        when {
-                            op != null -> vm.operationText.ifBlank { "请稍候…" }
-                            running -> HxFormat.duration(vm.runtime.elapsedSeconds)
-                            else -> "点按下方启动代理"
-                        },
-                        style = MaterialTheme.typography.titleMedium.merge(HxNumberStyle),
-                        fontWeight = FontWeight.SemiBold,
-                        color = c.text,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        state.core + " · " + state.mode,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = c.textMuted,
-                        maxLines = 1,
-                    )
-                    Text(
-                        state.config,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = c.textMuted,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    Text(when { op != null -> vm.operationText.ifBlank { "请稍候…" }; running -> "已连接 " + HxFormat.duration(vm.runtime.elapsedSeconds); else -> "随时连接你的网络" },
+                        style = MaterialTheme.typography.bodySmall.merge(HxNumberStyle), color = c.textMuted, maxLines = 2)
+                }
+                Spacer(Modifier.width(8.dp))
+                Box(Modifier.height(48.dp).width(72.dp).clip(RoundedCornerShape(16.dp)).background(if (running) c.badSoft.copy(alpha = .5f) else c.accentSoft)) {
+                    HeroAction(if (running) "停止" else "启动", if (running) c.bad else c.accent,
+                        op == HxRunOp.Start || op == HxRunOp.Stop, op == null, Modifier.fillMaxSize(), vm::toggle)
                 }
             }
-            HxSegmented(
-                options = listOf("rule" to "规则", "global" to "全局", "direct" to "直连"),
-                selected = state.trafficMode.lowercase().ifBlank { "rule" },
-                onSelect = vm::setTrafficMode,
-                enabled = running && op == null,
-                modifier = Modifier.padding(horizontal = 14.dp),
-            )
-            val pending = running && vm.settingsRevision >= 0 && vm.settingsPending()
-            AnimatedVisibility(
-                visible = pending && op == null,
-                enter = fadeIn(tween(HxMotion.Medium)) + expandVertically(tween(HxMotion.Medium, easing = HxMotion.Emphasized)),
-                exit = fadeOut(tween(HxMotion.Short)) + shrinkVertically(tween(HxMotion.Medium, easing = HxMotion.Emphasized)),
-            ) {
-                HxBanner("设置已修改，重启后生效", tone = HxTone.Warn, modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 10.dp))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(state.core + " · " + state.mode, style = MaterialTheme.typography.bodySmall, color = c.textMuted,
+                    modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                HxBarAction(Icons.Rounded.MoreHoriz, "运行控制", onClick = { controls = !controls })
             }
-            AnimatedVisibility(
-                visible = state.message.isNotBlank() && op == null,
-                enter = fadeIn(tween(HxMotion.Medium)) + expandVertically(tween(HxMotion.Medium, easing = HxMotion.Emphasized)),
-                exit = fadeOut(tween(HxMotion.Short)) + shrinkVertically(tween(HxMotion.Medium, easing = HxMotion.Emphasized)),
-            ) {
-                HxBanner(state.message, tone = if (running) HxTone.Warn else HxTone.Neutral, modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 10.dp))
-            }
-            Spacer(Modifier.height(10.dp))
-            HorizontalDivider(thickness = 0.5.dp, color = c.line.copy(alpha = .7f))
-            // Action bar: reload / stop / restart while running, a single start action otherwise.
-            AnimatedContent(
-                targetState = running,
-                transitionSpec = { fadeIn(tween(HxMotion.Medium)).togetherWith(fadeOut(tween(HxMotion.Short))) },
-                label = "heroActions",
-            ) { isRunning ->
-                Row(Modifier.fillMaxWidth().height(52.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (isRunning) {
-                        HeroAction("重载", c.accent, op == HxRunOp.Reload, op == null, Modifier.weight(1f), vm::reload)
-                        Box(Modifier.width(0.5.dp).height(22.dp).background(c.line))
-                        HeroAction("停止", c.bad, op == HxRunOp.Stop, op == null, Modifier.weight(1f), vm::toggle)
-                        Box(Modifier.width(0.5.dp).height(22.dp).background(c.line))
-                        HeroAction("重启", c.warn, op == HxRunOp.Restart, op == null, Modifier.weight(1f), vm::restart)
-                    } else {
-                        HeroAction("启动代理", c.accent, op == HxRunOp.Start, op == null, Modifier.weight(1f), vm::toggle)
+            AnimatedVisibility(visible = controls,
+                enter = fadeIn(tween(HxMotion.Short)) + expandVertically(tween(HxMotion.Medium)),
+                exit = fadeOut(tween(HxMotion.Short)) + shrinkVertically(tween(HxMotion.Medium))) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(state.config, style = MaterialTheme.typography.bodySmall, color = c.textMuted)
+                    HxSegmented(options = listOf("rule" to "规则", "global" to "全局", "direct" to "直连"),
+                        selected = state.trafficMode.lowercase().ifBlank { "rule" }, onSelect = vm::setTrafficMode,
+                        enabled = running && op == null)
+                    if (running) Row(Modifier.fillMaxWidth().height(48.dp)) {
+                        HeroAction("重载配置", c.accent, op == HxRunOp.Reload, op == null, Modifier.weight(1f), vm::reload)
+                        HeroAction("重启核心", c.warn, op == HxRunOp.Restart, op == null, Modifier.weight(1f), vm::restart)
                     }
                 }
+            }
+            AnimatedVisibility(visible = running && vm.settingsRevision >= 0 && vm.settingsPending() && op == null) {
+                HxBanner("设置已修改，重启后生效", tone = HxTone.Warn)
+            }
+            AnimatedVisibility(visible = state.message.isNotBlank() && op == null) {
+                HxBanner(state.message, tone = if (running) HxTone.Warn else HxTone.Neutral)
             }
         }
+    }
+}
+
+@Composable
+private fun HomeFlowTile(vm: HetuViewModel, upload: Boolean, modifier: Modifier, onOpen: () -> Unit) {
+    val c = Hx.colors
+    val local = vm.homeSpeedSource == "local"
+    val rate = if (upload) { if (local) vm.localUpRate else vm.upRate } else { if (local) vm.localDownRate else vm.downRate }
+    val history = if (upload) vm.upHistory.toList() else vm.rateHistory.toList()
+    val tint = if (upload) c.accent else c.good
+    HxCard(modifier = modifier, onClick = onOpen, padding = PaddingValues(14.dp)) {
+        Text(if (upload) "上传速度" else "下载速度", style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
+        Spacer(Modifier.height(10.dp))
+        if (!local && vm.state.running && history.size > 1) {
+            HxTrafficChart(history, emptyList(), tint, tint, Modifier.fillMaxWidth().height(30.dp))
+        } else {
+            Box(Modifier.fillMaxWidth().height(30.dp), contentAlignment = Alignment.CenterStart) {
+                Text(if (local) "本地实时速率" else if (vm.state.running) "正在采样" else "等待连接", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(if (vm.state.running || local) HxFormat.speed(rate) else "—",
+            style = MaterialTheme.typography.titleLarge.merge(HxNumberStyle), color = tint, maxLines = 2)
+    }
+}
+
+@Composable
+private fun HomeResourceTile(vm: HetuViewModel, cpu: Boolean, modifier: Modifier, onOpen: () -> Unit) {
+    val c = Hx.colors
+    val running = vm.state.running
+    val memory = vm.runtime.rssBytes.takeIf { it > 0 } ?: vm.state.memoryBytes
+    HxCard(modifier = modifier, onClick = onOpen, padding = PaddingValues(14.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(if (cpu) Icons.Rounded.Speed else Icons.Rounded.Memory, null, tint = c.accent, modifier = Modifier.size(24.dp))
+            Spacer(Modifier.width(9.dp))
+            Column(Modifier.weight(1f)) {
+                Text(if (cpu) "CPU 占用" else "内存占用", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
+                Text(if (!running) "—" else if (cpu) String.format(java.util.Locale.US, "%.1f%%", vm.cpuPercent)
+                    else if (memory > 0) HxFormat.bytes(memory) else "—", style = MaterialTheme.typography.titleMedium.merge(HxNumberStyle), color = c.text)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        if (cpu) HxProgressBar(if (running) (vm.cpuPercent / 100f).coerceIn(0f, 1f) else 0f, c.accent, height = 5.dp)
+        else Text("核心实际驻留", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
     }
 }
 
@@ -591,7 +550,7 @@ private fun HomeWanCard(
     val wan = if (running) rt.wanAddress.takeIf { it.isNotBlank() && it != "—" } else null
     val lan = if (running) rt.lanAddress.takeIf { it.isNotBlank() && it != "—" } else null
     val address = if (showLan) lan else wan
-    val title = if (showLan) "LAN" else "WAN"
+    val title = if (showLan) "局域网 IP" else "公网 IP"
     val source = remember { MutableInteractionSource() }
     val haptics = rememberHetuHaptics()
 
@@ -610,7 +569,7 @@ private fun HomeWanCard(
             )
             .padding(horizontal = 15.dp, vertical = 13.dp),
     ) {
-        Row(Modifier.fillMaxWidth().height(24.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().heightIn(min = 36.dp), verticalAlignment = Alignment.CenterVertically) {
             AnimatedContent(
                 targetState = title,
                 transitionSpec = { fadeIn(tween(HxMotion.Medium)).togetherWith(fadeOut(tween(HxMotion.Short))) },
@@ -629,7 +588,7 @@ private fun HomeWanCard(
                             haptics.perform(HetuHaptic.Tap)
                             onDetails()
                         }
-                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                        .heightIn(min = 48.dp).padding(horizontal = 12.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text("详情", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = c.accent)
@@ -647,10 +606,10 @@ private fun HomeWanCard(
         ) { ip ->
             Text(
                 ip,
-                style = MaterialTheme.typography.titleMedium.merge(HxNumberStyle),
+                style = MaterialTheme.typography.headlineSmall.merge(HxNumberStyle),
                 fontWeight = FontWeight.SemiBold,
                 color = c.text,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }
@@ -1035,7 +994,7 @@ private fun HomeOutboundNode(vm: HetuViewModel, group: ProxyGroupUi?) {
     val delay = if (selected.isNotBlank()) vm.delays[selected] ?: node?.lastDelay else null
     val testing = group != null && vm.testingGroups[group.name] == true
 
-    HxSection("当前出站节点") {
+    HxSection {
         HxCard(onClick = { vm.openPanel("proxies") }, padding = androidx.compose.foundation.layout.PaddingValues(15.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
@@ -1065,7 +1024,7 @@ private fun HomeOutboundNode(vm: HetuViewModel, group: ProxyGroupUi?) {
                         )
                     }
                     Text(
-                        group?.name ?: vm.state.config,
+                        listOfNotNull(node?.type?.uppercase(), group?.name).joinToString(" · ").ifBlank { vm.state.config },
                         style = MaterialTheme.typography.bodySmall,
                         color = c.textMuted,
                         maxLines = 1,
@@ -1224,37 +1183,82 @@ private fun Modifier.combinedClickableCompat(
 )
 
 @Composable
-private fun PublicIpDetails(vm: HetuViewModel, onDismiss: () -> Unit) {
+internal fun PublicIpDetails(vm: HetuViewModel, onDismiss: () -> Unit) {
     val c = Hx.colors
+    val context = LocalContext.current
     val rt = vm.runtime
-    val flag = HxFormat.flag(rt.wanCountryCode)
-    val location = buildList {
-        if (flag.isNotBlank()) add(flag)
-        if (rt.wanCountry.isNotBlank() && rt.wanCountry != "—") add(rt.wanCountry)
-        if (rt.wanRegion.isNotBlank() && rt.wanRegion != "—" && rt.wanRegion != rt.wanCountry) add(rt.wanRegion)
-        if (rt.wanCity.isNotBlank() && rt.wanCity != "—" && rt.wanCity != rt.wanRegion) add(rt.wanCity)
-    }.joinToString(" · ").ifBlank { "—" }
-    val isV6 = rt.wanAddress.contains(':')
+    var lan by rememberSaveable { mutableStateOf(false) }
+    fun shown(value: String) = value.takeIf { it.isNotBlank() && it != "—" } ?: "未知"
+    val address = if (lan) rt.lanAddress else rt.wanAddress
+    val location = listOf(HxFormat.flag(rt.wanCountryCode), rt.wanCountry, rt.wanRegion)
+        .filter { it.isNotBlank() && it != "—" }.distinct().joinToString(" · ").ifBlank { "未知" }
+    val rows = if (lan) listOf("IP 地址" to shown(address), "网络接口" to shown(rt.lanInterface))
+        else listOf("IP 地址" to shown(address), "地理位置" to location,
+            "网络运营商" to shown(rt.wanIsp), "ASN" to shown(rt.wanAsn), "城市" to shown(rt.wanCity),
+            "组织" to "未知", "IP 类型" to "未知", "时区" to "未知", "经纬度" to "未知")
+    HxPage(title = "公网 IP 详情", onBack = onDismiss, largeTitle = false,
+        refreshing = vm.refreshing, onRefresh = vm::pullRefresh,
+        actions = { HxBarAction(Icons.Rounded.Refresh, "刷新 IP", onClick = vm::pullRefresh) }) {
+        item {
+            HxSection {
+                HxSegmented(options = listOf("wan" to "公网 IP", "lan" to "局域网 IP"),
+                    selected = if (lan) "lan" else "wan", onSelect = { lan = it == "lan" })
+            }
+        }
+        item {
+            HxSection {
+                HxCard(padding = PaddingValues(vertical = 12.dp)) {
+                    rows.forEach { (label, value) ->
+                        Row(Modifier.fillMaxWidth().heightIn(min = 54.dp).padding(start = 18.dp, end = 8.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(label, style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.weight(.8f))
+                            Text(value, style = MaterialTheme.typography.bodyLarge.merge(HxNumberStyle), color = c.text, modifier = Modifier.weight(1.3f))
+                            if (value != "未知") HxBarAction(Icons.Rounded.ContentCopy, "复制" + label, onClick = { hxCopy(context, label, value) })
+                            else Spacer(Modifier.width(48.dp))
+                        }
+                    }
+                }
+            }
+        }
+        if (!lan && rt.wanError.isNotBlank()) item { HxSection { HxBanner(rt.wanError, tone = HxTone.Warn) } }
+    }
+}
+
+@Composable
+internal fun CoreDetails(vm: HetuViewModel, onDismiss: () -> Unit) {
+    val c = Hx.colors
+    val state = vm.state
+    val memory = if (vm.runtime.rssBytes > 0) vm.runtime.rssBytes else state.memoryBytes
+    val cpuSamples = remember(vm) { androidx.compose.runtime.mutableStateListOf<Long>() }
+    val memorySamples = remember(vm) { androidx.compose.runtime.mutableStateListOf<Long>() }
+    LaunchedEffect(vm.runtime) {
+        if (state.running && vm.runtime.pid > 0) {
+            cpuSamples.add((vm.cpuPercent.coerceAtLeast(0f) * 100).toLong())
+            memorySamples.add(memory.coerceAtLeast(0))
+            while (cpuSamples.size > 40) cpuSamples.removeAt(0)
+            while (memorySamples.size > 40) memorySamples.removeAt(0)
+        } else { cpuSamples.clear(); memorySamples.clear() }
+    }
     val rows = listOf(
-        (if (isV6) "IPv6 IP" else "IPv4 IP") to rt.wanAddress.ifBlank { "—" },
-        "地区" to location,
-        "ISP" to rt.wanIsp.ifBlank { "—" },
-        "ASN" to rt.wanAsn.ifBlank { "—" },
-        (if (isV6) "IPv4" else "IPv6") to "暂不可用",
+        "运行时长" to if (state.running) HxFormat.duration(vm.runtime.elapsedSeconds) else "—",
+        "进程 PID" to (if (vm.runtime.pid > 0) vm.runtime.pid.toString() else if (state.corePid > 0) state.corePid.toString() else "—"),
+        "核心版本" to vm.coreVersion.ifBlank { state.core.ifBlank { "—" } },
+        "CPU 核心分配" to vm.runtime.cpuAffinity.ifBlank { "—" },
+        "当前 CPU" to (if (vm.runtime.currentCpu >= 0) "CPU ${vm.runtime.currentCpu}" else "—"),
+        "模式" to "${state.mode} · ${state.trafficMode.ifBlank { "rule" }}",
+        "启动配置" to state.config,
+        "活动连接" to if (state.running) state.connections.size.toString() else "—",
     )
-    HxSheet(onDismiss = onDismiss, title = "公网 IP 详情") {
-        Column(Modifier.padding(horizontal = 16.dp)) {
-            HxGroup {
-                rows.forEachIndexed { index, (label, value) ->
-                    if (index > 0) HxDivider(16.dp)
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 11.dp)) {
-                        Text(label, style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.width(76.dp))
-                        Text(
-                            value,
-                            style = MaterialTheme.typography.bodyMedium.merge(HxNumberStyle),
-                            color = c.text,
-                            modifier = Modifier.weight(1f),
-                        )
+    HxPage(title = "资源占用", onBack = onDismiss, largeTitle = false) {
+        item { ResourceDetailChart("CPU", if (state.running) String.format(java.util.Locale.US, "%.1f%%", vm.cpuPercent) else "—", cpuSamples.toList(), c.accent) }
+        item { ResourceDetailChart("内存", if (state.running && memory > 0) HxFormat.bytes(memory) else "—", memorySamples.toList(), c.good) }
+        item {
+            HxSection {
+                HxCard(padding = PaddingValues(vertical = 8.dp)) {
+                    rows.forEach { (label, value) ->
+                        Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(horizontal = 18.dp, vertical = 10.dp)) {
+                            Text(label, style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.weight(.85f))
+                            Text(value, style = MaterialTheme.typography.bodyLarge.merge(HxNumberStyle), color = c.text, modifier = Modifier.weight(1.15f))
+                        }
                     }
                 }
             }
@@ -1263,32 +1267,20 @@ private fun PublicIpDetails(vm: HetuViewModel, onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun CoreDetails(vm: HetuViewModel, onDismiss: () -> Unit) {
-    val c = Hx.colors
-    val state = vm.state
-    val memory = if (vm.runtime.rssBytes > 0) vm.runtime.rssBytes else state.memoryBytes
-    val rows = listOf(
-        "PID" to (if (vm.runtime.pid > 0) vm.runtime.pid.toString() else if (state.corePid > 0) state.corePid.toString() else "—"),
-        "版本" to vm.coreVersion.ifBlank { state.core.ifBlank { "—" } },
-        "CPU 核心分配" to vm.runtime.cpuAffinity.ifBlank { "—" },
-        "当前 CPU" to (if (vm.runtime.currentCpu >= 0) "CPU ${vm.runtime.currentCpu}" else "—"),
-        "CPU 使用" to String.format(java.util.Locale.US, "%.1f%%", vm.cpuPercent),
-        "内存" to (if (memory > 0) HxFormat.bytes(memory) else "—"),
-        "运行时长" to HxFormat.duration(vm.runtime.elapsedSeconds),
-        "模式" to "${state.mode} · ${state.trafficMode.ifBlank { "rule" }}",
-        "配置" to state.config,
-        "活动连接" to state.connections.size.toString(),
-    )
-    HxSheet(onDismiss = onDismiss, title = "核心运行详情") {
-        Column(Modifier.padding(horizontal = 16.dp)) {
-            HxGroup {
-                rows.forEachIndexed { i, (label, value) ->
-                    if (i > 0) HxDivider(16.dp)
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 11.dp)) {
-                        Text(label, style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.width(76.dp))
-                        Text(value, style = MaterialTheme.typography.bodyMedium.merge(HxNumberStyle), color = c.text, modifier = Modifier.weight(1f))
-                    }
+private fun ResourceDetailChart(title: String, value: String, samples: List<Long>, tint: Color) {
+    HxSection {
+        HxCard {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(title, style = MaterialTheme.typography.bodyMedium, color = Hx.colors.textMuted)
+                    Text(value, style = MaterialTheme.typography.headlineSmall.merge(HxNumberStyle), color = Hx.colors.text)
                 }
+                Text("本次查看", style = MaterialTheme.typography.bodySmall, color = Hx.colors.textMuted)
+            }
+            Spacer(Modifier.height(16.dp))
+            if (samples.size > 1) HxTrafficChart(samples, emptyList(), tint, tint, Modifier.fillMaxWidth().height(76.dp))
+            else Box(Modifier.fillMaxWidth().height(76.dp), contentAlignment = Alignment.Center) {
+                Text("等待连续运行采样", style = MaterialTheme.typography.bodySmall, color = Hx.colors.textFaint)
             }
         }
     }

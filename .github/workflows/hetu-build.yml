@@ -103,6 +103,7 @@ jobs:
           git diff --stat -- android-app/app/src/main/java || true
 
       - name: Build APK
+        id: build
         working-directory: android-app
         run: gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:assembleDebug --stacktrace
 
@@ -112,6 +113,8 @@ jobs:
           gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:testDebugUnitTest --stacktrace
 
       - name: Verify packaged runtime matches reviewed source
+        id: runtime_audit
+        if: always() && steps.build.outcome == 'success'
         run: |
           python3 tools/verify_runtime_source.py android-app/app/build/outputs/apk/debug/app-debug.apk
 
@@ -131,11 +134,14 @@ jobs:
             android-app/app/build/test-results/
             android-app/app/build/reports/tests/
             android-app/app/build/outputs/hetu-ui-consolidation/
+            android-app/app/build/outputs/hetu-concept-root/
             out/Hetu-dot-ui-source.tar.gz
             out/commit.txt
           if-no-files-found: error
 
       - name: Verify APK
+        id: apk_audit
+        if: always() && steps.runtime_audit.outcome == 'success'
         run: |
           set -euo pipefail
           APK=android-app/app/build/outputs/apk/debug/app-debug.apk
@@ -147,8 +153,9 @@ jobs:
           sha256sum out/*.apk
 
       - uses: actions/upload-artifact@v4
+        if: always() && steps.apk_audit.outcome == 'success'
         with:
-          name: Hetu-APK
+          name: Hetu-QA-APK-not-release
           path: out/*.apk
           compression-level: 0
           if-no-files-found: error

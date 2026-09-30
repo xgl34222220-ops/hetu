@@ -20,6 +20,10 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -134,15 +138,16 @@ internal fun HxTabbedPage(
 ) {
     val host = remember { HxEmbedHost() }
     val shownSubtitle = if (showSubtitle) (host.subtitles[selected] ?: subtitle) else null
-    val topBarHeight = if (minimalHeader) 48.dp else HxTopBarHeight
+    val topBarHeight = if (panelReferenceStyle) 68.dp else if (minimalHeader) 48.dp else HxTopBarHeight
     val c = Hx.colors
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val listBottom = (if (bottomPadding > 0.dp) bottomPadding else navInset) + 24.dp
-    val tabsHeight = 42.dp
+    val tabsHeight = if (panelReferenceStyle) 52.dp else 42.dp
     val headerOpenHeight = when {
+        panelReferenceStyle -> 0.dp
         minimalHeader && shownSubtitle.isNullOrBlank() -> 52.dp
         minimalHeader -> 70.dp
         shownSubtitle.isNullOrBlank() -> 66.dp
@@ -204,14 +209,14 @@ internal fun HxTabbedPage(
         }
     }
 
-    val collapse = if (headerHeightPx > 0f) (fold / headerHeightPx).coerceIn(0f, 1f) else 0f
+    val collapse = if (panelReferenceStyle) { if (listStates[selected]?.let { it.firstVisibleItemIndex > 0 || it.firstVisibleItemScrollOffset > 0 } == true) 1f else 0f } else if (headerHeightPx > 0f) (fold / headerHeightPx).coerceIn(0f, 1f) else 0f
     val visibleHeader = with(density) { (headerHeightPx - fold).coerceAtLeast(0f).toDp() }
     val contentTop = statusTop + topBarHeight + tabsHeight + visibleHeader + 2.dp
-    val pageCanvas = if (panelReferenceStyle && MaterialTheme.colorScheme.background.luminance() > .5f) Color(0xFFEBEDFA) else c.canvas
+    val pageCanvas = c.canvas
     val blur = LocalHxBlur.current
     val pageHaze = rememberHazeState()
 
-    Box(Modifier.fillMaxSize().background(pageCanvas)) {
+    Box(Modifier.fillMaxSize().background(pageCanvas).testTag("hetu-panel")) {
         // Full-screen scrolling source. Content insets track the collapsing header, so
         // after collapse the list naturally passes underneath the pinned glass chrome.
         Box(Modifier.fillMaxSize().hazeSource(pageHaze)) {
@@ -271,24 +276,26 @@ internal fun HxTabbedPage(
             Text(
                 title,
                 modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(horizontal = 96.dp)
+                    .align(if (panelReferenceStyle) Alignment.CenterStart else Alignment.Center)
+                    .padding(horizontal = if (panelReferenceStyle) 2.dp else 96.dp)
                     .graphicsLayer {
-                        alpha = ((collapse - .45f) / .55f).coerceIn(0f, 1f)
+                        alpha = if (panelReferenceStyle) 1f else ((collapse - .45f) / .55f).coerceIn(0f, 1f)
                         translationY = (1f - alpha) * 6.dp.toPx()
                     },
-                style = MaterialTheme.typography.titleMedium,
+                style = if (panelReferenceStyle) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
                 color = c.text,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
             )
-            if (panelReferenceStyle) {
+            if (!panelReferenceStyle) {
                 Row(Modifier.align(Alignment.CenterStart), verticalAlignment = Alignment.CenterVertically) {
                     host.leadingActions[selected]?.invoke(this)
                 }
             }
             Row(Modifier.align(Alignment.CenterEnd), verticalAlignment = Alignment.CenterVertically) {
+                if (panelReferenceStyle) host.leadingActions[selected]?.invoke(this)
                 host.actions[selected]?.invoke(this)
                 actions()
             }
@@ -386,8 +393,8 @@ internal fun HxChipTabs(tabs: List<HxPageTab>, pagerState: PagerState, reference
     val density = LocalDensity.current
     val lefts = remember(tabs.size) { IntArray(tabs.size) }
     val position = pagerState.currentPage + pagerState.currentPageOffsetFraction
-    val refOutline = Color(0xFF646775).copy(alpha = .78f)
-    val refSelected = Color(0xE8F8F7FF)
+    val refOutline = c.surface.copy(alpha = .65f)
+    val refSelected = c.surface
     LaunchedEffect(pagerState.targetPage) {
         val left = lefts.getOrNull(pagerState.targetPage) ?: return@LaunchedEffect
         val margin = with(density) { 56.dp.toPx() }.toInt()
@@ -399,7 +406,7 @@ internal fun HxChipTabs(tabs: List<HxPageTab>, pagerState: PagerState, reference
             .horizontalScroll(scroll)
             .padding(horizontal = if (referenceStyle) 12.dp else Hx.gutter)
             .padding(bottom = if (referenceStyle) 4.dp else 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(if (referenceStyle) 7.dp else 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (referenceStyle) 5.dp else 8.dp),
     ) {
         tabs.forEachIndexed { index, tab ->
             val sel = (1f - abs(position - index)).coerceIn(0f, 1f)
@@ -408,26 +415,28 @@ internal fun HxChipTabs(tabs: List<HxPageTab>, pagerState: PagerState, reference
                 Modifier
                     .onPlaced { lefts[index] = it.positionInParent().x.roundToInt() }
                     .hxPressScale(source, .93f)
-                    .height(if (referenceStyle) 36.dp else 38.dp)
+                    .testTag("panel-tab-${tab.key}")
+                    .semantics { selected = pagerState.targetPage == index }
+                    .heightIn(min = if (referenceStyle) 40.dp else 38.dp)
                     .clip(if (referenceStyle) RoundedCornerShape(14.dp) else Hx.pillShape)
-                    .background(if (referenceStyle) lerp(Color.Transparent, refSelected, sel) else lerp(Color.Transparent, c.surface, sel))
+                    .background(if (referenceStyle) lerp(c.surface.copy(alpha = .52f), refSelected, sel) else lerp(Color.Transparent, c.surface, sel))
                     .border(
                         .8.dp,
-                        if (referenceStyle) lerp(refOutline, Color.Transparent, sel) else lerp(c.line, Color.Transparent, sel),
+                        if (referenceStyle) lerp(refOutline, c.line, sel) else lerp(c.line, Color.Transparent, sel),
                         if (referenceStyle) RoundedCornerShape(14.dp) else Hx.pillShape,
                     )
                     .clickable(interactionSource = source, indication = null) {
                         haptics.perform(HetuHaptic.Tick)
                         onSelect(index)
                     }
-                    .padding(horizontal = if (referenceStyle) 16.dp else 17.dp),
+                    .padding(horizontal = if (referenceStyle) 11.dp else 17.dp, vertical = 8.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     tab.label,
-                    style = MaterialTheme.typography.labelLarge.copy(fontSize = if (referenceStyle) 15.5.sp else 15.sp),
+                    style = MaterialTheme.typography.labelLarge.copy(fontSize = if (referenceStyle) 12.sp else 15.sp),
                     fontWeight = if (sel > .5f) FontWeight.SemiBold else FontWeight.Medium,
-                    color = if (referenceStyle) lerp(Color(0xFF4F5261), Color(0xFF171923), sel) else lerp(c.textMuted, c.text, sel),
+                    color = if (referenceStyle) lerp(c.textMuted, c.accent, sel) else lerp(c.textMuted, c.text, sel),
                     maxLines = 1,
                 )
             }

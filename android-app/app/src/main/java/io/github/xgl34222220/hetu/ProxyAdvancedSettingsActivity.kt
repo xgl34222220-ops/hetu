@@ -29,7 +29,10 @@ class ProxyAdvancedSettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { HetuTheme { OtherProxySettingsPage { finish() } } }
+        setContent {
+            val prefs = getSharedPreferences("hetu", 0)
+            HetuAppTheme(prefs.getString("appearance", "system").orEmpty(), prefs.getBoolean("hetuDynamicColor", false), prefs.getString("accentHex", "").orEmpty()) { OtherProxySettingsPage { finish() } }
+        }
     }
 }
 
@@ -42,32 +45,16 @@ internal fun OtherProxySettingsPage(onBack: () -> Unit) {
     var revision by remember { mutableIntStateOf(0) }
     var choice by remember { mutableStateOf<String?>(null) }
     val profile = remember(revision) { ProxyRuntimeProfile.load(prefs) }
-    val t = LocalHetuTokens.current
+    val c = Hx.colors
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val page = if (dark) t.pageBackground else Color(0xFFEBEDFA)
-    val card = if (dark) t.cardBackground else Color(0xFFF9F8FE)
+    val page = c.canvas
+    val card = c.surface
 
     fun changed(key: String) { ProxyRuntimeSettings.markDirty(prefs, key); revision++ }
     fun putBool(key: String, value: Boolean) { prefs.edit().putBoolean(key, value).apply(); changed(key) }
     fun putString(key: String, value: String) { prefs.edit().putString(key, value).apply(); changed(key) }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().background(page),
-        contentPadding = PaddingValues(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 28.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item {
-            Row(
-                Modifier.fillMaxWidth().statusBarsPadding().padding(start = 8.dp, end = 18.dp, top = 8.dp, bottom = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回", tint = t.textPrimary)
-                }
-                Text("其他代理配置", fontSize = 28.sp, lineHeight = 34.sp, fontWeight = FontWeight.Bold, color = t.textPrimary, modifier = Modifier.padding(start = 8.dp))
-            }
-        }
-
+    HxPage(title = "高级代理配置", onBack = onBack, largeTitle = false) {
         item {
             OtherCard(card) {
                 OtherLabel("代理能力")
@@ -172,7 +159,7 @@ internal fun OtherProxySettingsPage(onBack: () -> Unit) {
 @Composable
 private fun OtherCard(color: Color, content: @Composable ColumnScope.() -> Unit) {
     Column(
-        Modifier.fillMaxWidth().padding(horizontal = 14.dp).background(color, RoundedCornerShape(22.dp)).padding(horizontal = 20.dp, vertical = 12.dp),
+        Modifier.fillMaxWidth().padding(horizontal = Hx.gutter).padding(bottom = 12.dp).background(color, Hx.cardShape).padding(horizontal = 20.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
         content = content,
     )
@@ -180,27 +167,27 @@ private fun OtherCard(color: Color, content: @Composable ColumnScope.() -> Unit)
 
 @Composable
 private fun OtherLabel(text: String) {
-    val t = LocalHetuTokens.current
-    Text(text, color = t.textPrimary, fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 2.dp, bottom = 8.dp))
+    val c = Hx.colors
+    Text(text, color = c.text, fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 2.dp, bottom = 8.dp))
 }
 
 @Composable
 private fun OtherSwitch(title: String, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
-    val t = LocalHetuTokens.current
+    val c = Hx.colors
     Row(Modifier.fillMaxWidth().heightIn(min = 64.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(title, color = if (enabled) t.textPrimary else t.textSecondary, fontSize = 16.5.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+        Text(title, color = if (enabled) c.text else c.textMuted, fontSize = 16.5.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
         Switch(checked = checked, enabled = enabled, onCheckedChange = onChange)
     }
 }
 
 @Composable
 private fun OtherChoiceRow(title: String, value: String, onClick: () -> Unit) {
-    val t = LocalHetuTokens.current
+    val c = Hx.colors
     Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).clickable(onClick = onClick), verticalAlignment = Alignment.CenterVertically) {
-        Text(title, color = t.textPrimary, fontSize = 16.5.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-        Text(value, color = t.textSecondary, fontSize = 15.sp)
+        Text(title, color = c.text, fontSize = 16.5.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+        Text(value, color = c.textMuted, fontSize = 15.sp)
         Spacer(Modifier.width(6.dp))
-        Text("⌃\n⌄", color = t.textSecondary, fontSize = 14.sp, lineHeight = 10.sp)
+        Text("⌃\n⌄", color = c.textMuted, fontSize = 14.sp, lineHeight = 10.sp)
     }
 }
 
@@ -214,10 +201,10 @@ private fun ResourceSetting(
     onEnabled: (Boolean) -> Unit,
     onValue: (String) -> Unit,
 ) {
-    val t = LocalHetuTokens.current
+    val c = Hx.colors
     Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
         Row(Modifier.fillMaxWidth().heightIn(min = 58.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(title, color = t.textPrimary, fontSize = 16.5.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+            Text(title, color = c.text, fontSize = 16.5.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
             Switch(checked = enabled, onCheckedChange = onEnabled)
         }
         OutlinedTextField(
@@ -230,9 +217,9 @@ private fun ResourceSetting(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(14.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = Color(0xFFF0F0FC),
-                unfocusedContainerColor = Color(0xFFF0F0FC),
-                disabledContainerColor = Color(0xFFEDEDF7),
+                focusedContainerColor = c.surfaceMuted,
+                unfocusedContainerColor = c.surfaceMuted,
+                disabledContainerColor = c.surfaceMuted.copy(alpha = .5f),
                 focusedBorderColor = Color.Transparent,
                 unfocusedBorderColor = Color.Transparent,
                 disabledBorderColor = Color.Transparent,

@@ -94,6 +94,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -143,183 +144,25 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp) {
     val appLanguage = prefs.getString("appLanguage", "system").orEmpty().ifBlank { "system" }
     val startOnPanel = prefs.getBoolean("startOnPanel", false)
 
-    val miuixColors = if (c.dark) {
-        top.yukonga.miuix.kmp.theme.darkColorScheme(
-            primary = c.accent,
-            primaryVariant = c.accent,
-            background = c.canvas,
-            surface = c.canvas,
-            surfaceVariant = c.canvas,
-            surfaceContainer = c.surface,
-            onBackground = c.text,
-            onSurface = c.text,
-            onSurfaceContainer = c.text,
-            onSurfaceVariantSummary = Color(0xFF55576A),
-            onSurfaceVariantActions = Color(0xFF4A4C5E),
-            outline = c.line,
-            dividerLine = c.line,
+    HxPage(title = "设置", scrollToTopSignal = vm.reselect, bottomPadding = bottomPadding) {
+        val rows = listOf(
+            Triple("基础代理配置", "核心 · 模式 · IPv6 · 自动覆写", Icons.Rounded.Tune) to { nav.push(HxRoute.Network) },
+            Triple("高级代理配置", "性能 · TCP/UDP · DNS · 资源限制", Icons.Rounded.AltRoute) to { nav.push(HxRoute.AdvancedNetwork) },
+            Triple("语言与主题", "系统语言 · 外观主题 · 颜色", Icons.Rounded.Palette) to { nav.push(HxRoute.Theme) },
+            Triple("备份与恢复", "配置备份 · 从备份恢复", Icons.Rounded.CloudSync) to { nav.push(HxRoute.Backup) },
+            Triple("开机启动与下载", "开机自启 · 后台下载", Icons.Rounded.RestartAlt) to { nav.push(HxRoute.Startup) },
+            Triple("通知设置", "状态通知 · 通知内容 · 常用操作", Icons.Rounded.Notifications) to { nav.push(HxRoute.Notifications) },
+            Triple("默认面板", "启动后默认打开的功能页面", Icons.Rounded.GridView) to { nav.push(HxRoute.PanelPreferences) },
+            Triple("关于", "版本信息 · 开源许可 · 致谢", Icons.Rounded.Info) to { nav.push(HxRoute.About) },
         )
-    } else {
-        top.yukonga.miuix.kmp.theme.lightColorScheme(
-            primary = c.accent,
-            primaryVariant = c.accent,
-            background = Color(0xFFEBEDFA),
-            surface = Color(0xFFEBEDFA),
-            surfaceVariant = Color(0xFFEBEDFA),
-            surfaceContainer = Color(0xFFF9F8FE),
-            onBackground = c.text,
-            onSurface = c.text,
-            onSurfaceContainer = c.text,
-            onSurfaceVariantSummary = Color(0xFF55576A),
-            onSurfaceVariantActions = Color(0xFF4A4C5E),
-            outline = c.line,
-            dividerLine = Color.Transparent,
-        )
-    }
-
-    top.yukonga.miuix.kmp.theme.MiuixTheme(colors = miuixColors) {
-        HxPage(
-            title = "设置",
-            scrollToTopSignal = vm.reselect,
-            bottomPadding = bottomPadding,
-            largeTitleStartPadding = 26.dp,
-            largeTitleFontSizeSp = 36f,
-            largeTitleBottomPadding = 18.dp,
-            canvasColor = if (c.dark) c.canvas else Color(0xFFEBEDFA),
-        ) {
-                item(key = "proxy-config") {
-                    MiuixSettingsCard {
-                        MiuixSettingsArrow(
-                            title = "基础代理配置",
-                            summary = "配置核心、模式、IPv6 和当前配置",
-                            icon = Icons.Rounded.Tune,
-                            onClick = { open(RootTproxyActivity::class.java) },
-                        )
-                        MiuixSettingsArrow(
-                            title = "其他代理配置",
-                            summary = "调整代理开关、DNS 劫持、资源限制与防火墙",
-                            icon = Icons.Rounded.AltRoute,
-                            onClick = { open(ProxyAdvancedSettingsActivity::class.java) },
-                        )
+        rows.forEach { (row, action) ->
+            item(key = row.first) {
+                HxSection {
+                    HxGroup(Modifier.testTag("settings-${row.first}")) {
+                        HxRow(row.first, subtitle = row.second, icon = row.third, onClick = action) { HxChevron() }
                     }
                 }
-
-                item(key = "appearance-data") {
-                    MiuixSettingsCard {
-                        MiuixSettingsArrow(
-                            title = "语言",
-                            summary = "切换应用语言",
-                            icon = Icons.Rounded.Public,
-                            value = when (prefs.getString("appLanguage", "system").orEmpty()) {
-                                "zh-CN" -> "简体中文"
-                                "zh-TW", "zh-HK" -> "繁體中文"
-                                "en" -> "English"
-                                "ru" -> "Русский"
-                                else -> "跟随系统"
-                            },
-                            onClick = { choice = "language" },
-                        )
-                        MiuixSettingsArrow(
-                            title = "主题设置",
-                            summary = "调整主题、模糊、底栏和缩放",
-                            icon = Icons.Rounded.Palette,
-                            value = when (vm.appearance) { "light" -> "浅色"; "dark" -> "深色"; else -> "跟随系统" },
-                            onClick = { open(ThemeSettingsActivity::class.java) },
-                        )
-                        MiuixSettingsArrow(
-                            title = "备份与恢复",
-                            summary = "备份或恢复应用数据",
-                            icon = Icons.Rounded.CloudSync,
-                            onClick = { choice = "backup" },
-                        )
-                    }
-                }
-
-                item(key = "startup-download") {
-                    MiuixSettingsCard {
-                        MiuixSettingsSwitch(
-                            title = "开机自启",
-                            summary = "安装 Root 开机脚本，开机后自动启动服务",
-                            icon = Icons.Rounded.RestartAlt,
-                            checked = prefs.getBoolean("proxyRootAutoStart", false),
-                            onCheckedChange = { on -> prefs.edit().putBoolean("proxyRootAutoStart", on).apply(); bump() },
-                        )
-                        MiuixSettingsSwitch(
-                            title = "加速下载",
-                            summary = "为下载资源启用加速通道",
-                            icon = Icons.Rounded.Download,
-                            checked = mirrorEnabled,
-                            onCheckedChange = { on -> prefs.edit().putBoolean("downloadMirrorEnabled", on).apply(); bump() },
-                        )
-                        AnimatedVisibility(mirrorEnabled) {
-                            MiuixSettingsArrow(
-                                title = "加速地址",
-                                summary = prefs.getString("downloadMirrorPrefix", "").orEmpty().ifBlank { "设置下载镜像前缀" },
-                                icon = Icons.Rounded.LinkOff,
-                                onClick = { choice = "mirror" },
-                            )
-                        }
-                    }
-                }
-
-                item(key = "notification-panel") {
-                    MiuixSettingsCard {
-                        MiuixSettingsSwitch(
-                            title = "通知",
-                            summary = "启用状态通知",
-                            icon = Icons.Rounded.Notifications,
-                            checked = notifyEnabled,
-                            onCheckedChange = { on ->
-                                if (on && Build.VERSION.SDK_INT >= 33 &&
-                                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-                                ) {
-                                    notifyPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                } else {
-                                    ProxyStatusNotificationService.setEnabled(context, on)
-                                    bump()
-                                }
-                            },
-                        )
-                        MiuixSettingsArrow(
-                            title = "通知详细设置",
-                            summary = "配置通知内容与操作按钮",
-                            icon = Icons.Rounded.Notifications,
-                            onClick = { nav.push(HxRoute.Notifications) },
-                        )
-                        MiuixSettingsSwitch(
-                            title = "显示底栏面板入口",
-                            summary = "在底栏显示面板入口",
-                            icon = Icons.Rounded.Dashboard,
-                            checked = showPanelDock,
-                            onCheckedChange = { on -> prefs.edit().putBoolean("showPanelDock", on).apply(); bump() },
-                        )
-                        MiuixSettingsArrow(
-                            title = "默认面板页面",
-                            summary = "选择打开面板时默认显示的页面",
-                            icon = Icons.Rounded.GridView,
-                            value = HxPanelSections.firstOrNull { it.first == panelDefault }?.second ?: "策略",
-                            onClick = { choice = "defaultPanel" },
-                        )
-                        MiuixSettingsSwitch(
-                            title = "启动时打开面板",
-                            summary = "启动后自动进入面板页面",
-                            icon = Icons.Rounded.Dashboard,
-                            checked = prefs.getBoolean("startOnPanel", false),
-                            onCheckedChange = { on -> prefs.edit().putBoolean("startOnPanel", on).apply(); bump() },
-                        )
-                    }
-                }
-
-                item(key = "about") {
-                    MiuixSettingsCard {
-                        MiuixSettingsArrow(
-                            title = "关于",
-                            summary = "版本、项目、内核组件与开源引用",
-                            icon = Icons.Rounded.Info,
-                            onClick = { nav.push(HxRoute.About) },
-                        )
-                    }
-                }
+            }
         }
     }
 
@@ -513,14 +356,14 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
         title = "基础代理配置",
         onBack = { nav.pop() },
         largeTitle = false,
-        canvasColor = if (c.dark) c.canvas else Color(0xFFF2F0F9),
+        canvasColor = c.canvas,
     ) {
         item(key = "core") {
             HxSection {
                 HxGroup {
-                    HxNavRow("核心选择", value = profile.core.label, dropdown = true) { choice = "core" }
+                    HxNavRow("代理核心", icon = Icons.Rounded.Memory, value = profile.core.label, dropdown = true) { choice = "core" }
                     HxDivider()
-                    HxNavRow("运行模式", value = profile.mode.label, dropdown = true) { choice = "mode" }
+                    HxNavRow("运行模式", icon = Icons.Rounded.Route, value = profile.mode.label, dropdown = true) { choice = "mode" }
                     HxDivider()
                     HxNavRow(
                         "IPv6",
@@ -549,35 +392,8 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
                 }
             }
         }
-        item(key = "config") {
-            HxSection {
-                HxGroup {
-                    Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text("配置选择", style = MaterialTheme.typography.titleSmall, color = c.text, modifier = Modifier.weight(1f))
-                        Icon(
-                            Icons.Rounded.AddCircleOutline, "导入配置", tint = c.text,
-                            modifier = Modifier.size(26.dp).clip(CircleShape).clickable { importConfig.launch(arrayOf("*/*")) }.padding(2.dp),
-                        )
-                    }
-                    configs.forEachIndexed { index, config ->
-                        if (index > 0) HxDivider()
-                        HxRow(
-                            config.name,
-                            onClick = {
-                                if (!config.selected) scope.launch {
-                                    runCatching { vm.controller.selectConfig(config.name) }
-                                        .onSuccess { vm.applyConfigChange("已切换到 ${config.name}"); revision++ }
-                                        .onFailure { vm.toast(it.message ?: "切换配置失败") }
-                                }
-                            },
-                        ) { if (config.selected) Icon(Icons.Rounded.Check, null, tint = c.accent, modifier = Modifier.size(22.dp)) }
-                    }
-                    if (configs.isEmpty()) HxRow("暂无配置", subtitle = "点右上角 + 导入 YAML 配置")
-                }
-            }
+        item(key = "config-source") {
+            HxSection { HxGroup { HxRow("当前配置", subtitle = configs.firstOrNull { it.selected }?.name ?: "尚未选择配置", icon = Icons.Rounded.Description) } }
         }
         if (vm.state.running && ProxyRuntimeSettings.pending(true, prefs)) {
             item(key = "pending") {
@@ -753,6 +569,9 @@ internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
         onBack = onBack,
         largeTitle = false,
     ) {
+        item(key = "language") {
+            HxSection { HxGroup { HxNavRow("语言", icon = Icons.Rounded.Public, value = when (prefs.getString("appLanguage", "system")) { "zh-CN" -> "简体中文"; "zh-TW" -> "繁體中文"; "en" -> "English"; "ru" -> "Русский"; else -> "跟随系统" }) { choice = "language" } } }
+        }
         item(key = "theme") {
             HxSection {
                 HxGroup {
@@ -779,7 +598,7 @@ internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
                 HxGroup {
                     HxSwitchRow("模糊效果", blur, { setBool("enableBlur", it, reload = true) }, subtitle = "控制顶栏、底栏与浮层的实时模糊", icon = Icons.Rounded.BlurOn, iconTint = c.textMuted)
                     HxDivider()
-                    HxNavRow("顶栏模糊样式", subtitle = "渐进式更接近视频中的顶栏层次", icon = Icons.Rounded.Tune, iconTint = c.textMuted, value = if (topBlur == "gaussian") "高斯模糊" else "渐进式模糊", dropdown = true) { choice = "topBlur" }
+                    HxNavRow("顶栏模糊样式", subtitle = "选择顶栏磨砂的过渡方式", icon = Icons.Rounded.Tune, iconTint = c.textMuted, value = if (topBlur == "gaussian") "高斯模糊" else "渐进式模糊", dropdown = true) { choice = "topBlur" }
                     HxDivider()
                     HxSwitchRow("悬浮底栏", floating, { setBool("floatingBottomBar", it) }, subtitle = "关闭后底栏吸附屏幕底部", icon = Icons.Rounded.Dashboard, iconTint = c.textMuted)
                     HxDivider()
@@ -808,6 +627,8 @@ internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
     }
 
     when (choice) {
+        "language" -> HxChoiceSheet("语言", listOf(HxChoice("system", "跟随系统"), HxChoice("zh-CN", "简体中文"), HxChoice("zh-TW", "繁體中文"), HxChoice("en", "English"), HxChoice("ru", "Русский")), prefs.getString("appLanguage", "system"), onPick = { setString("appLanguage", it); choice = null }, onDismiss = { choice = null })
+
         "appearance" -> HxChoiceSheet(
             title = "主题模式",
             choices = listOf(HxChoice("system", "跟随系统"), HxChoice("light", "浅色"), HxChoice("dark", "深色")),

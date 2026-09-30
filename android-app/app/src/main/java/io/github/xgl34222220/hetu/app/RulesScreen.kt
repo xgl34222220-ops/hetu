@@ -25,6 +25,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,6 +43,10 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.CloudSync
 import androidx.compose.material.icons.rounded.CloudDownload
@@ -63,6 +68,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -154,9 +160,17 @@ internal fun RulesScreen(vm: HetuViewModel, bottomPadding: Dp, forcedSection: St
 /* ---------------------------- rule sets ---------------------------- */
 
 private fun LazyListScope.ruleSetItems(vm: HetuViewModel, query: String = "", showSearch: Boolean = false, onQuery: (String) -> Unit = {}) {
+    item(key = "sets-intro") {
+        HxPanelSectionIntro(
+            title = "规则集管理",
+            subtitle = "订阅与本地规则 · 远程规则可更新",
+            icon = Icons.Rounded.Layers,
+            count = if (vm.ruleSetsLoading && vm.ruleSets.isEmpty()) "读取中" else "${vm.ruleSets.size} 个",
+            tag = "panel-rule-sets-summary",
+        )
+    }
     if (showSearch) item(key = "sets-search") { HxSearchField(query, onQuery, "搜索规则集", Modifier.padding(horizontal = Hx.gutter).padding(bottom = 12.dp), autoFocus = true) }
     val sets = if (query.isBlank()) vm.ruleSets else vm.ruleSets.filter { it.name.contains(query, true) || it.behavior.contains(query, true) || it.format.contains(query, true) }
-    val remote = sets.count { it.vehicleType.equals("HTTP", true) }
     if (sets.isEmpty() && vm.ruleSetsLoading) {
         item(key = "sets-loading") { HxSkeletonRows(6) }
     }
@@ -178,37 +192,30 @@ private fun RuleSetCard(set: DashboardRuleSetUi, task: HxTask?, onUpdate: () -> 
     val c = Hx.colors
     val haptics = rememberHetuHaptics()
     val remote = set.vehicleType.equals("HTTP", true)
-    val shape = RoundedCornerShape(22.dp)
+    val shape = Hx.cardShape
     Column(
         modifier
             .fillMaxWidth()
             .padding(horizontal = Hx.gutter)
             .padding(bottom = 10.dp)
-            .hxSoftShadow(shape, 3.dp)
+            .testTag("panel-rule-set-${set.name}")
             .clip(shape)
             .background(c.surface)
-            .padding(start = 16.dp, end = 10.dp, top = 13.dp, bottom = 13.dp),
+            .border(0.8.dp, c.line.copy(alpha = .55f), shape)
+            .padding(start = 14.dp, end = 10.dp, top = 12.dp, bottom = 12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            HxIconBadge(Icons.Rounded.Layers, tint = if (remote) c.accent else c.textMuted, size = 40.dp)
+            Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        set.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
-                        color = c.text,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
-                    Spacer(Modifier.width(7.dp))
-                    Text(
-                        "${HxFormat.count(set.ruleCount.toLong())} 条规则",
-                        style = MaterialTheme.typography.labelLarge.merge(HxNumberStyle),
-                        color = c.accent,
-                        maxLines = 1,
-                    )
-                }
+                Text(
+                    set.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                    color = c.text,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 Spacer(Modifier.height(3.dp))
                 Text(
                     listOf(set.behavior.ifBlank { "Rule" }, set.format, set.vehicleType.ifBlank { "LOCAL" })
@@ -220,15 +227,17 @@ private fun RuleSetCard(set: DashboardRuleSetUi, task: HxTask?, onUpdate: () -> 
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    if (set.updatedAt.isBlank()) "本地规则集" else "更新于 ${HxFormat.isoAgo(set.updatedAt)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = c.textMuted,
+                    "${HxFormat.count(set.ruleCount.toLong())} 条 · " +
+                        if (set.updatedAt.isBlank()) (if (remote) "更新时间未知" else "本地规则集") else HxFormat.isoAgo(set.updatedAt),
+                    style = MaterialTheme.typography.labelMedium.merge(HxNumberStyle),
+                    color = c.accent,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
             if (remote) {
                 Box(
-                    Modifier.size(42.dp).clip(CircleShape).clickable(enabled = task?.running != true) {
+                    Modifier.size(48.dp).clip(Hx.pillShape).background(c.accent.copy(alpha = .08f)).clickable(enabled = task?.running != true) {
                         haptics.perform(HetuHaptic.Tap)
                         onUpdate()
                     },
@@ -406,6 +415,15 @@ private fun ProviderFigure(value: String, label: String, color: Color, modifier:
 /* ---------------------------- rules ---------------------------- */
 
 private fun LazyListScope.ruleItems(vm: HetuViewModel, query: String, showSearch: Boolean = true, onQuery: (String) -> Unit) {
+    item(key = "rules-intro") {
+        HxPanelSectionIntro(
+            title = "规则列表",
+            subtitle = "按照实际匹配顺序生效",
+            icon = Icons.Rounded.Description,
+            count = if (vm.rulesLoading && vm.rules.isEmpty()) "读取中" else "${vm.rules.size} 条",
+            tag = "panel-rules-summary",
+        )
+    }
     if (showSearch) item(key = "rules-search") {
         HxSearchField(query, onQuery, "搜索规则内容或策略", Modifier.padding(horizontal = Hx.gutter).padding(bottom = 12.dp), autoFocus = true)
     }
@@ -422,16 +440,27 @@ private fun LazyListScope.ruleItems(vm: HetuViewModel, query: String, showSearch
             RuleRow(rule, first = index == 0, last = index == list.lastIndex)
         }
     }
+    if (list.isNotEmpty()) item(key = "rules-order-note") {
+        Row(
+            Modifier.padding(horizontal = Hx.gutter).padding(top = 3.dp, bottom = 12.dp)
+                .clip(Hx.rowShape).background(Hx.colors.accent.copy(alpha = .05f)).padding(13.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Rounded.Info, null, tint = Hx.colors.accent, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("规则按原顺序匹配，首个命中项生效。长按规则可复制。", style = MaterialTheme.typography.bodySmall, color = Hx.colors.textMuted)
+        }
+    }
 }
 
 @Composable
 private fun RuleRow(rule: ProxyRuleUi, first: Boolean, last: Boolean) {
     val c = Hx.colors
     val context = LocalContext.current
-    val shape = RoundedCornerShape(22.dp)
+    val shape = Hx.rowShape
     val proxyColor = when {
         rule.proxy == "DIRECT" -> c.good
-        rule.proxy.startsWith("REJECT") -> c.accent
+        rule.proxy.startsWith("REJECT") -> c.bad
         else -> c.accent
     }
     Row(
@@ -439,20 +468,23 @@ private fun RuleRow(rule: ProxyRuleUi, first: Boolean, last: Boolean) {
             .fillMaxWidth()
             .padding(horizontal = Hx.gutter)
             .padding(bottom = 9.dp)
-            .hxSoftShadow(shape, 2.dp)
+            .testTag("panel-rule-${rule.index}")
             .clip(shape)
-            .background(c.surface)
+            .background(if (c.dark) c.surface else c.accent.copy(alpha = .045f))
+            .border(0.8.dp, c.line.copy(alpha = .45f), shape)
             .hxCombinedClick(
                 onLongClick = { hxCopy(context, "规则", listOf(rule.type, rule.payload, rule.proxy).filter { it.isNotBlank() }.joinToString(",")) },
                 onClick = {},
             )
-            .padding(horizontal = 16.dp, vertical = 13.dp),
+            .padding(horizontal = 12.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        HxIconBadge(Icons.Rounded.Description, size = 34.dp)
+        Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(
                 rule.type,
-                fontSize = 16.sp,
+                fontSize = 14.sp,
                 lineHeight = 19.sp,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
                 color = if (rule.disabled) c.textFaint else c.text,
@@ -469,17 +501,45 @@ private fun RuleRow(rule: ProxyRuleUi, first: Boolean, last: Boolean) {
                 )
             }
         }
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(8.dp))
+        Icon(Icons.AutoMirrored.Rounded.ArrowForward, null, tint = c.textFaint, modifier = Modifier.size(17.dp))
+        Spacer(Modifier.width(8.dp))
         Text(
             rule.proxy,
-            fontSize = 16.sp,
+            fontSize = 13.sp,
             lineHeight = 19.sp,
             fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
             color = proxyColor,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.widthIn(max = 112.dp),
+            modifier = Modifier.widthIn(max = 112.dp).clip(Hx.chipShape)
+                .background(proxyColor.copy(alpha = .09f)).padding(horizontal = 10.dp, vertical = 9.dp),
         )
+    }
+}
+
+/** A compact, data-backed introduction shared by the live panel sections. */
+@Composable
+internal fun HxPanelSectionIntro(
+    title: String,
+    subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    count: String,
+    tag: String,
+) {
+    val c = Hx.colors
+    HxCard(modifier = Modifier.padding(horizontal = Hx.gutter).padding(bottom = 12.dp).testTag(tag)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            HxIconBadge(icon, size = 48.dp)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = c.text)
+                Spacer(Modifier.height(3.dp))
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = c.textMuted)
+            }
+            Spacer(Modifier.width(8.dp))
+            HxPill(count, HxTone.Accent)
+        }
     }
 }
 
@@ -625,4 +685,3 @@ internal fun TaskRow(
         if (!last) HxDivider(16.dp)
     }
 }
-
