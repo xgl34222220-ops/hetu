@@ -625,16 +625,33 @@ jobs:
           PY
           grep -q 'import androidx.compose.ui.graphics.Color' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
 
-      - name: Export effective V20.41 source
+      - name: Apply V20.42 Miuix native components phase 1
         run: |
           set -euo pipefail
-          tar -czf /tmp/Hetu-V20.41-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
-          sha256sum /tmp/Hetu-V20.41-effective-source.tar.gz
+          cat updates/v2042-miuix-native/p00.b64 updates/v2042-miuix-native/p01.b64 | base64 -d > /tmp/v2042.patch.xz
+          echo '8886d30d7d3e2709183ead68705c17b5c18cb881dcdd34e7585f96fe18bda11e  /tmp/v2042.patch.xz' | sha256sum -c -
+          xz -dc /tmp/v2042.patch.xz > /tmp/v2042.patch
+          git apply --check /tmp/v2042.patch
+          git apply /tmp/v2042.patch
+          grep -q 'versionCode = 2042' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.9.2-v20"' android-app/app/build.gradle.kts
+          grep -q 'MiuixTheme(colors = miuixColors)' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTheme.kt
+          grep -q 'MiuixArrowPreference' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
+          grep -q 'MiuixTopAppBar' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
+          grep -q 'MiuixHetuDock' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiuixNativeDock.kt
+          echo "V20.42 Miuix native phase 1 applied"
+          git diff --stat
+
+      - name: Export effective V20.42 source
+        run: |
+          set -euo pipefail
+          tar -czf /tmp/Hetu-V20.42-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+          sha256sum /tmp/Hetu-V20.42-effective-source.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.41-effective-source
-          path: /tmp/Hetu-V20.41-effective-source.tar.gz
+          name: Hetu-V20.42-effective-source
+          path: /tmp/Hetu-V20.42-effective-source.tar.gz
           compression-level: 0
           if-no-files-found: error
 
