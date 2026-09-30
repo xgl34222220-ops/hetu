@@ -12,6 +12,19 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.automirrored.rounded.Redo
+import androidx.compose.material.icons.automirrored.rounded.FormatListBulleted
+import androidx.compose.material.icons.automirrored.rounded.Undo
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -19,6 +32,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -40,6 +54,7 @@ import androidx.compose.material.icons.rounded.FactCheck
 import androidx.compose.material.icons.rounded.FileOpen
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.MoreHoriz
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.HorizontalDivider
@@ -96,9 +111,12 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
     var busy by remember { mutableStateOf(false) }
     var menuFor by remember { mutableStateOf<ProxyConfigUi?>(null) }
     var confirmDelete by remember { mutableStateOf<ProxyConfigUi?>(null) }
+    var renameConfig by remember { mutableStateOf<ProxyConfigUi?>(null) }
+    var exportBytes by remember { mutableStateOf<ByteArray?>(null) }
     var urlImport by remember { mutableStateOf(false) }
     var editSub by remember { mutableStateOf<ProxySubscriptionUi?>(null) }
     var addSub by remember { mutableStateOf(false) }
+    val haptics = io.github.xgl34222220.hetu.ui.rememberHetuHaptics()
     var deleteSub by remember { mutableStateOf<ProxySubscriptionUi?>(null) }
 
     LaunchedEffect(revision) {
@@ -140,8 +158,20 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
         }
     }
 
+    val exportFile = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+        val bytes = exportBytes
+        exportBytes = null
+        if (uri != null && bytes != null) perform("配置已导出", applyToRuntime = false) {
+            withContext(Dispatchers.IO) {
+                context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
+                    ?: error("无法写入导出文件")
+            }
+        }
+    }
+
     HxPage(
         title = "配置与订阅",
+        largeTitle = false,
         subtitle = "当前：${vm.state.config}",
         onBack = { nav.pop() },
         actions = { if (busy) Box(Modifier.padding(12.dp)) { HxSpinner(18.dp) } },
@@ -155,8 +185,8 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
             }
         }
         item(key = "configs") {
-            HxSection("配置文件") {
-                HxGroup {
+            HxSection() {
+                HxGroup(title = "配置文件") {
                     if (loading && configs.isEmpty()) {
                         Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { HxSpinner() }
                     }
@@ -165,23 +195,32 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
                         Row(
                             Modifier
                                 .fillMaxWidth()
-                                .clickable(enabled = !busy && !config.selected) {
-                                    perform("已切换到 ${config.name}", applyToRuntime = true) { vm.controller.selectConfig(config.name) }
-                                }
+                                .hxAnchorSource()
+                                .hxCombinedClick(
+                                    enabled = !busy,
+                                    onLongClick = { haptics.perform(io.github.xgl34222220.hetu.ui.HetuHaptic.LongPress); menuFor = config },
+                                    onClick = {
+                                        if (!config.selected) {
+                                            perform("已切换到 ${config.name}", applyToRuntime = true) { vm.controller.selectConfig(config.name) }
+                                        }
+                                    },
+                                )
                                 .padding(start = 4.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            RadioButton(
-                                selected = config.selected,
-                                onClick = null,
-                                modifier = Modifier.padding(horizontal = 10.dp),
-                                colors = RadioButtonDefaults.colors(selectedColor = c.accent, unselectedColor = c.textFaint),
-                            )
+                            HxSelectMark(config.selected, Modifier.padding(horizontal = 14.dp))
                             Column(Modifier.weight(1f).padding(vertical = 10.dp)) {
-                                Text(config.name, style = MaterialTheme.typography.bodyLarge, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(
+                                    config.name,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = if (config.selected) androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Normal,
+                                    color = c.text,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
                                 if (config.bundled) Text("内置模板 · 需要填写订阅", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
                             }
-                            IconButton(onClick = { menuFor = config }) {
+                            IconButton(onClick = { menuFor = config }, modifier = Modifier.hxAnchorSource()) {
                                 Icon(Icons.Rounded.MoreHoriz, "更多", tint = c.textMuted)
                             }
                         }
@@ -221,42 +260,54 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
             }
         }
         item(key = "more") {
-            HxSection("更多") {
-                HxGroup {
-                    HxNavRow("编辑 YAML", subtitle = "直接修改当前配置文件，保存前自动校验", icon = Icons.Rounded.Edit) { nav.push(HxRoute.ConfigEditor) }
-                    HxDivider()
-                    HxNavRow("订阅流量与更新", subtitle = "查看已用流量、到期时间并更新节点", icon = Icons.Rounded.Sync, iconTint = c.good, enabled = vm.state.running) {
-                        nav.push(HxRoute.Providers)
-                    }
-                    HxDivider()
-                    HxNavRow("订阅工作台", subtitle = "健康检查、YAML 大纲与完整编辑工具", icon = Icons.Rounded.FactCheck) {
-                        context.startActivity(Intent(context, ProxySubscriptionActivity::class.java))
-                    }
-                    HxDivider()
-                    HxNavRow("Sub-Store", subtitle = "订阅处理与配置导入", icon = Icons.Rounded.CloudSync) {
-                        context.startActivity(Intent(context, ProxySubStoreActivity::class.java))
-                    }
+            HxSection() {
+                HxGroup(title = "编辑") {
+                    HxNavRow("编辑 YAML", subtitle = "语法大纲跳转、撤销重做，保存前自动校验", icon = Icons.Rounded.Edit) { nav.push(HxRoute.ConfigEditor) }
                 }
             }
         }
     }
 
     menuFor?.let { config ->
-        HxSheet(onDismiss = { menuFor = null }, title = config.name) {
-            Column(Modifier.padding(horizontal = 8.dp)) {
+        HxActionMenu(
+            title = config.name,
+            actions = buildList {
                 if (!config.selected) {
-                    HxRow("设为当前配置", icon = Icons.Rounded.CheckCircle, onClick = {
+                    add(HxMenuAction("设为当前配置", Icons.Rounded.CheckCircle) {
                         menuFor = null
                         perform("已切换到 ${config.name}", applyToRuntime = true) { vm.controller.selectConfig(config.name) }
                     })
-                } else {
-                    HxRow("编辑 YAML", icon = Icons.Rounded.Edit, onClick = { menuFor = null; nav.push(HxRoute.ConfigEditor) })
                 }
-                if (!config.bundled) {
-                    HxRow("删除配置", icon = Icons.Rounded.DeleteOutline, danger = true, onClick = { menuFor = null; confirmDelete = config })
+                add(HxMenuAction("导出配置", Icons.Rounded.FileOpen) {
+                    menuFor = null
+                    perform("请选择导出位置", applyToRuntime = false) {
+                        exportBytes = vm.controller.exportConfig(config.name)
+                        exportFile.launch(config.name)
+                    }
+                })
+                if (!config.bundled) add(HxMenuAction("重命名", Icons.Rounded.Edit) {
+                    menuFor = null
+                    renameConfig = config
+                })
+                if (!config.bundled) add(HxMenuAction("删除配置", Icons.Rounded.DeleteOutline, danger = true) { menuFor = null; confirmDelete = config })
+            },
+            onDismiss = { menuFor = null },
+        )
+    }
+
+    renameConfig?.let { config ->
+        HxFormDialog(
+            title = "重命名配置",
+            fields = listOf(HxField("名称", config.name)),
+            validate = { values -> if (values[0].isBlank()) "名称不能为空" else null },
+            onConfirm = { values ->
+                renameConfig = null
+                perform("已重命名", applyToRuntime = false) {
+                    vm.controller.renameConfig(config.name, values[0].trim())
                 }
-            }
-        }
+            },
+            onDismiss = { renameConfig = null },
+        )
     }
 
     confirmDelete?.let { config ->
@@ -398,6 +449,7 @@ internal fun ProvidersScreen(vm: HetuViewModel) {
     LaunchedEffect(Unit) { vm.loadProviders() }
     HxPage(
         title = "订阅流量",
+        largeTitle = false,
         subtitle = if (vm.state.running) "来自运行中 Mihomo 的 proxy-providers" else "代理未运行",
         onBack = { nav.pop() },
     ) {
@@ -440,7 +492,7 @@ class ProxyConfigEditorActivity : ComponentActivity() {
         enableEdgeToEdge()
         vm = ViewModelProvider(this)[HetuViewModel::class.java]
         setContent {
-            HetuAppTheme(appearance = vm.appearance, dynamic = vm.dynamicColor, accentHex = vm.accentHex) {
+            HetuAppTheme(appearance = vm.appearance, dynamic = vm.dynamicColor, accentHex = vm.accentHex, pureBlack = vm.pureBlack) {
                 ConfigEditorScreen(vm, onBackOverride = { finish() })
             }
         }
@@ -448,43 +500,60 @@ class ProxyConfigEditorActivity : ComponentActivity() {
 }
 
 @Composable
-internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)? = null) {
+internal fun ConfigEditorScreen(
+    vm: HetuViewModel,
+    onBackOverride: (() -> Unit)? = null,
+    editorRepository: ConfigEditorRepository? = null,
+) {
+    val repository = editorRepository ?: remember(vm) { ControllerConfigEditorRepository(vm.controller) }
     val nav = if (onBackOverride == null) LocalNav.current else null
     val scope = rememberCoroutineScope()
     val c = Hx.colors
-    var text by remember { mutableStateOf<String?>(null) }
+    var snapshot by remember { mutableStateOf<ConfigEditSnapshot?>(null) }
+    var loadError by remember { mutableStateOf<String?>(null) }
+    var loadRevision by remember { mutableIntStateOf(0) }
     var editor by remember { mutableStateOf<CodeEditor?>(null) }
     var dirty by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var validating by remember { mutableStateOf(false) }
     var problem by remember { mutableStateOf<String?>(null) }
     var confirmLeave by remember { mutableStateOf(false) }
+    var showOutline by remember { mutableStateOf(false) }
+    val haptics = io.github.xgl34222220.hetu.ui.rememberHetuHaptics()
     val editorColors = remember(c.dark) { HetuYamlLanguage.colors(if (c.dark) SchemeDarcula() else SchemeGitHub(), c.dark) }
 
-    LaunchedEffect(Unit) {
-        text = try { vm.controller.configText() } catch (cancel: CancellationException) { throw cancel } catch (error: Exception) {
-            vm.toast(error.message ?: "读取失败"); ""
+    LaunchedEffect(loadRevision) {
+        loadError = null
+        try {
+            snapshot = repository.load()
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (error: Exception) {
+            loadError = error.message ?: "配置读取失败"
         }
     }
 
     fun leave() {
+        if (saving) return
         if (dirty) confirmLeave = true
         else if (onBackOverride != null) onBackOverride() else nav?.pop()
     }
-    BackHandler(enabled = dirty) { confirmLeave = true }
+    BackHandler(enabled = dirty || saving) { if (!saving) confirmLeave = true }
 
     fun validate() {
+        if (validating || saving || snapshot == null) return
         val current = editor?.text?.toString() ?: return
         validating = true
         scope.launch {
             try {
-                vm.controller.validateConfigText(current)
+                repository.validate(current)
                 problem = null
-                vm.toast("校验通过")
+                vm.toast(if (editor?.text?.toString() == current) "校验通过" else "内容已修改，请重新校验")
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                problem = error.message ?: "配置无效"
+                if (editor?.text?.toString() == current) problem = error.message ?: "配置无效"
+                else vm.toast("内容已修改，请重新校验")
             } finally {
                 validating = false
             }
@@ -492,11 +561,15 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
     }
 
     fun save() {
+        if (saving || validating || !dirty) return
+        val opened = snapshot ?: return
         val current = editor?.text?.toString() ?: return
         saving = true
+        editor?.isEditable = false
         scope.launch {
             try {
-                vm.controller.saveConfigText(current)
+                repository.save(opened, current)
+                snapshot = ConfigEditSnapshot(opened.coreId, opened.name, current)
                 dirty = false
                 problem = null
                 vm.applyConfigChange("配置已保存")
@@ -506,6 +579,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
                 problem = error.message ?: "保存失败"
             } finally {
                 saving = false
+                editor?.isEditable = true
             }
         }
     }
@@ -515,21 +589,48 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
             Modifier.fillMaxWidth().statusBarsPadding().height(HxTopBarHeight).padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = ::leave) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回", tint = c.text) }
+            IconButton(onClick = ::leave, enabled = !saving) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回", tint = c.text) }
             Column(Modifier.weight(1f)) {
-                Text("编辑配置" + if (dirty) " ·" else "", style = MaterialTheme.typography.titleMedium, color = c.text)
-                Text(vm.state.config, style = MaterialTheme.typography.bodySmall, color = c.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("编辑配置", style = MaterialTheme.typography.titleMedium, color = c.text)
+                    val dot by androidx.compose.animation.core.animateFloatAsState(if (dirty) 1f else 0f, HxMotion.pop(), label = "dirtyDot")
+                    Spacer(Modifier.width(6.dp))
+                    Box(
+                        Modifier
+                            .size(7.dp)
+                            .graphicsLayer { scaleX = dot; scaleY = dot; alpha = dot.coerceIn(0f, 1f) }
+                            .clip(CircleShape)
+                            .background(c.warn),
+                    )
+                }
+                Text(snapshot?.name ?: "读取配置", style = MaterialTheme.typography.bodySmall, color = c.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            HxBarAction(Icons.Rounded.FactCheck, "校验", onClick = ::validate, busy = validating, enabled = text != null)
-            HxBarAction(Icons.Rounded.Save, "保存", onClick = ::save, busy = saving, enabled = dirty)
+            HxBarAction(Icons.AutoMirrored.Rounded.FormatListBulleted, "语法大纲", onClick = { showOutline = true }, enabled = snapshot != null && !saving)
+            HxBarAction(Icons.Rounded.FactCheck, "校验", onClick = ::validate, busy = validating, enabled = snapshot != null && !saving)
+            HxBarAction(Icons.Rounded.Save, "保存", onClick = ::save, busy = saving, enabled = dirty && !validating)
         }
         HorizontalDivider(thickness = 0.5.dp, color = c.line)
-        problem?.let {
-            HxBanner(it, tone = HxTone.Bad, modifier = Modifier.padding(12.dp))
+        var lastProblem by remember { mutableStateOf("") }
+        LaunchedEffect(problem) { problem?.let { lastProblem = it } }
+        AnimatedVisibility(
+            visible = problem != null,
+            enter = fadeIn(tween(HxMotion.Medium)) + expandVertically(tween(HxMotion.Medium, easing = HxMotion.Emphasized)),
+            exit = fadeOut(tween(HxMotion.Short)) + shrinkVertically(tween(HxMotion.Medium, easing = HxMotion.Emphasized)),
+        ) {
+            HxBanner(problem ?: lastProblem, tone = HxTone.Bad, modifier = Modifier.padding(12.dp), actionLabel = "关闭", onAction = { problem = null })
         }
         Box(Modifier.weight(1f).fillMaxWidth().background(c.surface)) {
-            val initial = text
-            if (initial == null) {
+            val initial = snapshot?.originalText
+            if (loadError != null) {
+                Column(
+                    Modifier.align(Alignment.Center).padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    Text(loadError.orEmpty(), style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
+                    HxButton("重新读取", onClick = { loadRevision++ }, icon = Icons.Rounded.Refresh)
+                }
+            } else if (initial == null) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { HxSpinner(26.dp) }
             } else {
                 AndroidView(
@@ -537,6 +638,11 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
                         CodeEditor(viewContext).apply {
                             setEditorLanguage(HetuYamlLanguage())
                             setText(initial)
+                            isEditable = true
+                            isEnabled = true
+                            setSoftKeyboardEnabled(true)
+                            isFocusableInTouchMode = true
+                            contentDescription = "配置 YAML 编辑器"
                             typefaceText = Typeface.MONOSPACE
                             setTextSize(13f)
                             setLineNumberEnabled(true)
@@ -544,12 +650,17 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
                             setTabWidth(2)
                             setHighlightCurrentLine(true)
                             colorScheme = editorColors
-                            subscribeAlways<ContentChangeEvent> { dirty = true }
+                            subscribeAlways<ContentChangeEvent> {
+                                dirty = this.text.toString() != snapshot?.originalText
+                            }
                             editor = this
                         }
                     },
                     modifier = Modifier.fillMaxSize(),
-                    update = { native -> if (native.colorScheme !== editorColors) native.colorScheme = editorColors },
+                    update = { native ->
+                        if (native.colorScheme !== editorColors) native.colorScheme = editorColors
+                        native.isEditable = !saving
+                    },
                     onRelease = { native ->
                         if (editor === native) editor = null
                         native.release()
@@ -567,16 +678,69 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
                 .padding(horizontal = 8.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
+            HxEditorKey(Icons.AutoMirrored.Rounded.Undo, "撤销") { if (!saving) editor?.let { if (it.canUndo()) it.undo() } }
+            HxEditorKey(Icons.AutoMirrored.Rounded.Redo, "重做") { if (!saving) editor?.let { if (it.canRedo()) it.redo() } }
+            Box(Modifier.padding(vertical = 6.dp).width(0.5.dp).height(22.dp).background(c.line))
             HxYamlSymbols.forEach { symbol ->
+                val source = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
                 Box(
                     Modifier
+                        .hxPressScale(source, .9f)
                         .clip(Hx.chipShape)
                         .background(c.surface)
-                        .clickable { editor?.let { hxApplyYamlSymbol(it, symbol) } }
+                        .clickable(enabled = !saving && snapshot != null, interactionSource = source, indication = androidx.compose.foundation.LocalIndication.current) {
+                            haptics.perform(io.github.xgl34222220.hetu.ui.HetuHaptic.Tick)
+                            editor?.let { hxApplyYamlSymbol(it, symbol) }
+                        }
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(symbol, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelLarge, color = c.text)
+                }
+            }
+        }
+    }
+
+    if (showOutline) {
+        val current = editor?.text?.toString().orEmpty()
+        val outline = remember(current) { hxYamlOutline(current) }
+        HxSheet(onDismiss = { showOutline = false }, title = "语法大纲") {
+            val close = LocalHxSheetClose.current
+            if (outline.isEmpty()) {
+                Text("没有识别到顶层字段", style = MaterialTheme.typography.bodyMedium, color = c.textMuted, modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp))
+            }
+            androidx.compose.foundation.lazy.LazyColumn(Modifier.fillMaxWidth().heightIn(max = 520.dp)) {
+                items(outline.size) { index ->
+                    val entry = outline[index]
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                close {
+                                    showOutline = false
+                                    editor?.let { native ->
+                                        runCatching {
+                                            native.setSelection(entry.line, 0)
+                                            native.ensureSelectionVisible()
+                                            native.requestFocus()
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(start = if (entry.level == 0) 22.dp else 40.dp, end = 22.dp, top = 10.dp, bottom = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            entry.label,
+                            style = if (entry.level == 0) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (entry.level == 0) androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Normal,
+                            color = if (entry.level == 0) c.text else c.textMuted,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text("${entry.line + 1}", style = MaterialTheme.typography.labelSmall.merge(HxNumberStyle), color = c.textFaint)
+                    }
                 }
             }
         }
@@ -598,3 +762,72 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
     }
 }
 
+
+@Composable
+private fun HxEditorKey(icon: androidx.compose.ui.graphics.vector.ImageVector, description: String, onClick: () -> Unit) {
+    val c = Hx.colors
+    val haptics = io.github.xgl34222220.hetu.ui.rememberHetuHaptics()
+    val source = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    Box(
+        Modifier
+            .hxPressScale(source, .9f)
+            .clip(Hx.chipShape)
+            .background(c.surface)
+            .clickable(interactionSource = source, indication = androidx.compose.foundation.LocalIndication.current) {
+                haptics.perform(io.github.xgl34222220.hetu.ui.HetuHaptic.Tick)
+                onClick()
+            }
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, description, tint = c.text, modifier = Modifier.size(19.dp))
+    }
+}
+
+/** Selection mark for single-choice lists: a ring that fills with a check. */
+@Composable
+internal fun HxSelectMark(selected: Boolean, modifier: Modifier = Modifier) {
+    val c = Hx.colors
+    val fill by androidx.compose.animation.core.animateFloatAsState(if (selected) 1f else 0f, HxMotion.pop(), label = "selectMark")
+    val ring by androidx.compose.animation.animateColorAsState(if (selected) c.accent else c.textFaint.copy(alpha = .6f), tween(HxMotion.Medium), label = "selectRing")
+    Box(
+        modifier.size(22.dp).clip(CircleShape).border(1.6.dp, ring, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier
+                .size(22.dp)
+                .graphicsLayer { scaleX = fill; scaleY = fill; alpha = fill.coerceIn(0f, 1f) }
+                .clip(CircleShape)
+                .background(c.accent),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Rounded.Check, null, tint = c.onAccent, modifier = Modifier.size(14.dp))
+        }
+    }
+}
+
+
+private data class HxOutlineEntry(val label: String, val line: Int, val level: Int)
+
+/** Top-level keys plus named entries under the list/map sections that matter in Mihomo YAML. */
+private fun hxYamlOutline(text: String): List<HxOutlineEntry> {
+    val top = Regex("^([A-Za-z0-9_.-]+):")
+    val named = Regex("^\\s*-\\s*(?:\\{\\s*)?name:\\s*[\"']?([^\"',}]+)")
+    val mapChild = Regex("^  ([^\\s#][^:]*):\\s*$")
+    val out = ArrayList<HxOutlineEntry>()
+    var section = ""
+    text.lineSequence().forEachIndexed { index, line ->
+        if (out.size >= 600) return@forEachIndexed
+        top.find(line)?.let { match ->
+            section = match.groupValues[1]
+            out.add(HxOutlineEntry(section, index, 0))
+            return@forEachIndexed
+        }
+        when (section) {
+            "proxies", "proxy-groups" -> named.find(line)?.let { out.add(HxOutlineEntry(it.groupValues[1].trim(), index, 1)) }
+            "proxy-providers", "rule-providers" -> mapChild.find(line)?.let { out.add(HxOutlineEntry(it.groupValues[1].trim(), index, 1)) }
+        }
+    }
+    return out
+}

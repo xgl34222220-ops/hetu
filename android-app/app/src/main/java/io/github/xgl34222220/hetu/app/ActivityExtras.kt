@@ -1,6 +1,10 @@
 package io.github.xgl34222220.hetu
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -53,12 +57,15 @@ internal fun HxToggleChip(label: String, selected: Boolean, onChange: (Boolean) 
     val haptics = rememberHetuHaptics()
     val bg by animateColorAsState(if (selected) c.accentSoft else c.surfaceMuted, tween(HxMotion.Short), label = "chipBg")
     val fg by animateColorAsState(if (selected) c.accent else c.textMuted, tween(HxMotion.Short), label = "chipFg")
+    val source = remember { MutableInteractionSource() }
     Box(
         Modifier
+            .hxPressScale(source, .94f)
             .heightIn(min = 40.dp)
             .clip(Hx.pillShape)
             .background(bg)
-            .clickable { haptics.perform(HetuHaptic.Tick); onChange(!selected) }
+            .clickable(interactionSource = source, indication = LocalIndication.current) { haptics.perform(HetuHaptic.Tick); onChange(!selected) }
+            .animateContentSize(tween(HxMotion.Short, easing = HxMotion.Emphasized))
             .padding(horizontal = 14.dp, vertical = 9.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -117,7 +124,7 @@ internal fun LazyListScope.logItems(vm: HetuViewModel, filter: LogFilterState, s
             }
             if (searching) {
                 Spacer(Modifier.height(10.dp))
-                HxSearchField(filter.query, { filter.query = it }, "搜索日志内容")
+                HxSearchField(filter.query, { filter.query = it }, "搜索日志内容", autoFocus = true)
             }
         }
     }
@@ -134,35 +141,60 @@ internal fun LazyListScope.logItems(vm: HetuViewModel, filter: LogFilterState, s
     }
     items(list, key = { "log:" + it.index + ":" + it.message.hashCode() }) { entry ->
         val color = levelColor(entry.level)
-        Row(
+        val context = LocalContext.current
+        var expanded by rememberSaveable(entry.index, entry.message.hashCode()) { mutableStateOf(false) }
+        val shape = RoundedCornerShape(22.dp)
+        Column(
             Modifier
+                .animateItem(fadeInSpec = tween(HxMotion.Medium), placementSpec = HxMotion.glide(), fadeOutSpec = null)
                 .fillMaxWidth()
                 .padding(horizontal = Hx.gutter)
-                .padding(bottom = 6.dp)
-                .clip(Hx.rowShape)
+                .padding(bottom = 9.dp)
+                .hxSoftShadow(shape, 2.dp)
+                .clip(shape)
                 .background(Hx.colors.surface)
-                .padding(horizontal = 12.dp, vertical = 9.dp),
-        ) {
-            Box(Modifier.padding(top = 5.dp).size(width = 3.dp, height = 14.dp).clip(Hx.pillShape).background(color))
-            Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(entry.level.label, style = MaterialTheme.typography.labelSmall, color = color)
-                    if (entry.time.isNotBlank()) {
-                        Spacer(Modifier.width(8.dp))
-                        Text(entry.time, style = MaterialTheme.typography.labelSmall.merge(HxNumberStyle), color = Hx.colors.textFaint)
-                    }
-                }
-                Text(
-                    entry.message,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 12.sp,
-                    lineHeight = 17.sp,
-                    color = Hx.colors.text,
-                    maxLines = 12,
-                    overflow = TextOverflow.Ellipsis,
+                // Tap expands long lines; long-press copies the whole entry.
+                .hxCombinedClick(
+                    onLongClick = { hxCopy(context, "日志", listOf(entry.time, entry.level.label, entry.message).filter { it.isNotBlank() }.joinToString(" ")) },
+                    onClick = { expanded = !expanded },
                 )
+                .animateContentSize(tween(HxMotion.Medium, easing = HxMotion.Emphasized))
+                .padding(horizontal = 15.dp, vertical = 12.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    entry.level.label.uppercase(),
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    lineHeight = 14.sp,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    color = color,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(color.copy(alpha = if (Hx.colors.dark) .16f else .10f))
+                        .padding(horizontal = 9.dp, vertical = 4.dp),
+                )
+                Spacer(Modifier.weight(1f))
+                if (entry.time.isNotBlank()) {
+                    Text(
+                        entry.time,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.5.sp,
+                        lineHeight = 14.sp,
+                        color = Hx.colors.textMuted,
+                    )
+                }
             }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                entry.message,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+                color = Hx.colors.text,
+                maxLines = if (expanded) Int.MAX_VALUE else 4,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -236,7 +268,7 @@ internal fun LazyListScope.rankItems(vm: HetuViewModel, rank: RankState) {
         val value = if (rank.sort == "traffic") row.upload + row.download else row.connections.toLong()
         Column(
             Modifier
-                .animateItem(fadeInSpec = null, fadeOutSpec = null)
+                .animateItem(fadeInSpec = tween(HxMotion.Medium), placementSpec = HxMotion.glide(), fadeOutSpec = null)
                 .fillMaxWidth()
                 .padding(horizontal = Hx.gutter)
                 .padding(bottom = 6.dp)
@@ -245,12 +277,21 @@ internal fun LazyListScope.rankItems(vm: HetuViewModel, rank: RankState) {
                 .padding(horizontal = 12.dp, vertical = 10.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "${index + 1}",
-                    style = MaterialTheme.typography.labelLarge.merge(HxNumberStyle),
-                    color = if (index < 3) Hx.colors.accent else Hx.colors.textFaint,
-                    modifier = Modifier.widthIn(min = 26.dp),
-                )
+                Box(Modifier.width(26.dp), contentAlignment = Alignment.CenterStart) {
+                    Box(
+                        Modifier
+                            .size(20.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(if (index < 3) Hx.colors.accentSoft else Color.Transparent),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            "${index + 1}",
+                            style = MaterialTheme.typography.labelMedium.merge(HxNumberStyle),
+                            color = if (index < 3) Hx.colors.accent else Hx.colors.textFaint,
+                        )
+                    }
+                }
                 Text(row.name, style = MaterialTheme.typography.bodyMedium, color = Hx.colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                 Spacer(Modifier.width(8.dp))
                 Text(

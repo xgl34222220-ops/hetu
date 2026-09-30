@@ -4,6 +4,19 @@ import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
+import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.runtime.key
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -153,6 +166,7 @@ internal fun AdblockScreen(vm: HetuViewModel) {
 
     HxPage(
         title = "广告过滤",
+        largeTitle = false,
         subtitle = "在 Mihomo 内按域名拦截广告与追踪",
         onBack = { nav.pop() },
         actions = {
@@ -165,13 +179,31 @@ internal fun AdblockScreen(vm: HetuViewModel) {
                 HxCard {
                     val tint by animateColorAsState(if (effective) c.good else if (enabled) c.warn else c.textFaint, tween(HxMotion.Medium), label = "shield")
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(48.dp).clip(CircleShape).background(tint.copy(alpha = .14f)), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Rounded.Shield, null, tint = tint, modifier = Modifier.size(26.dp))
+                        // While actively protecting, a soft ring breathes around the shield.
+                        val breathing = rememberInfiniteTransition(label = "shieldBreath")
+                        val breath by breathing.animateFloat(0f, 1f, infiniteRepeatable(tween(2200), RepeatMode.Reverse), label = "shieldBreathValue")
+                        val haloStrength by animateFloatAsState(if (effective) 1f else 0f, tween(HxMotion.Long), label = "shieldHalo")
+                        Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) {
+                            Box(
+                                Modifier
+                                    .size(52.dp)
+                                    .graphicsLayer {
+                                        val s = 1f + .12f * breath * haloStrength
+                                        scaleX = s
+                                        scaleY = s
+                                        alpha = haloStrength * (.55f - .35f * breath)
+                                    }
+                                    .clip(CircleShape)
+                                    .background(tint.copy(alpha = .18f)),
+                            )
+                            Box(Modifier.size(48.dp).clip(CircleShape).background(tint.copy(alpha = .14f)), contentAlignment = Alignment.Center) {
+                                Icon(Icons.Rounded.Shield, null, tint = tint, modifier = Modifier.size(26.dp))
+                            }
                         }
                         Spacer(Modifier.width(14.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(
-                                when {
+                            AnimatedContent(
+                                targetState = when {
                                     !enabled -> "已关闭"
                                     !running -> "已开启 · 等待代理启动"
                                     lastError.isNotBlank() -> "未完整加载"
@@ -179,9 +211,11 @@ internal fun AdblockScreen(vm: HetuViewModel) {
                                     effective -> "保护中"
                                     else -> "正在验证"
                                 },
-                                style = MaterialTheme.typography.titleLarge,
-                                color = c.text,
-                            )
+                                transitionSpec = { fadeIn(tween(HxMotion.Medium)).togetherWith(fadeOut(tween(HxMotion.Short))) },
+                                label = "adblockTitle",
+                            ) { title ->
+                                Text(title, style = MaterialTheme.typography.titleLarge, color = c.text)
+                            }
                             Text(
                                 if (actualMode == "global" || actualMode == "direct") "广告规则只在「规则」模式下生效" else "广告域名直接 REJECT，其余流量照常分流",
                                 style = MaterialTheme.typography.bodySmall,
@@ -216,8 +250,8 @@ internal fun AdblockScreen(vm: HetuViewModel) {
         }
 
         item(key = "verify") {
-            HxSection("运行链验证") {
-                HxGroup {
+            HxSection() {
+                HxGroup(title = "运行链验证") {
                     VerifyRow("本地规则库", (snapshot?.count ?: 0) > 0, if ((snapshot?.count ?: 0) > 0) "${snapshot?.count} 条有效规则" else "当前没有启用的拦截规则")
                     HxDivider(44.dp)
                     VerifyRow("启动配置注入", injected, when (injected) { true -> "hetu-adblock 已写入运行副本"; false -> "当前运行副本没有广告规则"; null -> "代理启动后检测" })
@@ -231,8 +265,8 @@ internal fun AdblockScreen(vm: HetuViewModel) {
 
         if (running && stats.recentDomains.isNotEmpty()) {
             item(key = "recent") {
-                HxSection("最近拦截") {
-                    HxGroup {
+                HxSection() {
+                    HxGroup(title = "最近拦截") {
                         stats.recentDomains.forEachIndexed { index, domain ->
                             if (index > 0) HxDivider(16.dp)
                             HxRow(domain, subtitle = "点按可加入白名单", onClick = { whitelistCandidate = domain }) {
@@ -327,8 +361,8 @@ internal fun AdblockScreen(vm: HetuViewModel) {
         }
 
         item(key = "fallback") {
-            HxSection("代理关闭时") {
-                HxGroup {
+            HxSection() {
+                HxGroup(title = "代理关闭时") {
                     HxSwitchRow(
                         "独立 DNS 过滤",
                         fallback,
@@ -417,11 +451,15 @@ private fun DomainList(title: String, domains: List<String>, tone: HxTone, onAdd
             }
             domains.take(200).forEachIndexed { index, domain ->
                 if (index > 0) HxDivider(16.dp)
-                Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(if (tone == HxTone.Good) Icons.Rounded.CheckCircle else Icons.Rounded.Block, null, tint = tone.fg(), modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(10.dp))
-                    Text(domain, style = MaterialTheme.typography.bodyMedium, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                    IconButton(onClick = { onRemove(domain) }) { Icon(Icons.Rounded.Close, "移除", tint = c.textFaint, modifier = Modifier.size(18.dp)) }
+                key(domain) {
+                    HxSwipeAction(label = "移除", icon = Icons.Rounded.Close, onAction = { onRemove(domain) }) {
+                        Row(Modifier.fillMaxWidth().background(c.surface).padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(if (tone == HxTone.Good) Icons.Rounded.CheckCircle else Icons.Rounded.Block, null, tint = tone.fg(), modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(10.dp))
+                            Text(domain, style = MaterialTheme.typography.bodyMedium, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                            IconButton(onClick = { onRemove(domain) }) { Icon(Icons.Rounded.Close, "移除", tint = c.textFaint, modifier = Modifier.size(18.dp)) }
+                        }
+                    }
                 }
             }
             if (domains.size > 200) {
@@ -433,9 +471,24 @@ private fun DomainList(title: String, domains: List<String>, tone: HxTone, onAdd
 @Composable
 private fun VerifyRow(label: String, ok: Boolean?, detail: String) {
     val c = Hx.colors
+    val tint by animateColorAsState(when (ok) { true -> c.good; false -> c.warn; null -> c.textFaint }, tween(HxMotion.Medium), label = "verifyTint")
     Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
-        HxDot(when (ok) { true -> c.good; false -> c.warn; null -> c.textFaint }, 10.dp)
-        Spacer(Modifier.width(16.dp))
+        Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) {
+            AnimatedContent(
+                targetState = ok,
+                transitionSpec = {
+                    (fadeIn(tween(HxMotion.Short)) + scaleIn(HxMotion.pop(), initialScale = .5f)).togetherWith(fadeOut(tween(100)))
+                },
+                label = "verifyIcon",
+            ) { state ->
+                when (state) {
+                    true -> Icon(Icons.Rounded.CheckCircle, null, tint = tint, modifier = Modifier.size(19.dp))
+                    false -> Icon(Icons.Rounded.ErrorOutline, null, tint = tint, modifier = Modifier.size(19.dp))
+                    null -> HxDot(tint, 9.dp)
+                }
+            }
+        }
+        Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(label, style = MaterialTheme.typography.bodyMedium, color = c.text)
             Text(detail, style = MaterialTheme.typography.bodySmall, color = c.textMuted)

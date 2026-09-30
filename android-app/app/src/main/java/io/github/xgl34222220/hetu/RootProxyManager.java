@@ -332,6 +332,11 @@ final class RootProxyManager {
     private String topologyFingerprint(ProxyRuntimeProfile profile,RootProxyPolicy policy){
         return profile.core.id+"|"+profile.mode.id+"|"+profile.ipv6.id+"|"+profile.dnsHijack.id
                 +"|tcp="+bit(profile.tcp)+"|udp="+bit(profile.udp)+"|quic="+bit(profile.quicBlocked)
+                +"|dnsForward="+bit(prefs.getBoolean("proxyMihomoDnsForward",true))
+                +"|dnsTcp="+bit(prefs.getBoolean("proxyDnsHijackTcp",true))+"|dnsUdp="+bit(prefs.getBoolean("proxyDnsHijackUdp",true))
+                +"|perf="+bit(prefs.getBoolean("proxyPerformanceMode",false))+"|cpu="+prefs.getString("proxyCpuAffinity","")
+                +"|mem="+prefs.getString("proxyMemoryLimit","")+"|io="+prefs.getString("proxyIoWeight","")
+                +"|vendorClean="+bit(prefs.getBoolean("proxyVendorFirewallCleanup",false))
                 +"|scope="+policy.appScope+"|uids="+policy.uidRanges+"|share="+bit(policy.sharedNetwork)
                 +"|kill="+bit(policy.killSwitch)+"|cidrs="+policy.cidrs+"|ifaces="+policy.interfaces
                 +"|sharedMacs="+policy.sharedBypassMacs
@@ -439,9 +444,10 @@ final class RootProxyManager {
         try{
         installRuntimeFiles(p,false);
         RootProxyPolicy policy=p.policy;
+        String preflightDns=prefs.getBoolean("proxyMihomoDnsForward",true)?p.profile.dnsHijack.id:"off";
         return runJson("preflight",
                 p.profile.mode.id,String.valueOf(p.tproxyPort),String.valueOf(p.redirectPort),p.profile.ipv6.id,
-                bit(p.profile.tcp),bit(p.profile.udp),p.profile.dnsHijack.id,bit(p.profile.quicBlocked),
+                bit(p.profile.tcp),bit(p.profile.udp),preflightDns,bit(p.profile.quicBlocked),
                 String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(p.controllerPort),
                 policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,policy.directGidRanges,policy.sharedBypassMacs);
         }finally{CONTROL_LOCK.unlock();}
@@ -603,12 +609,21 @@ final class RootProxyManager {
                 .apply();
         }
         trace.next("coreAndNetwork");
+        String runtimeDns=prefs.getBoolean("proxyMihomoDnsForward",true)?profile.dnsHijack.id:"off";
+        String dnsTcp=bit(prefs.getBoolean("proxyDnsHijackTcp",true));
+        String dnsUdp=bit(prefs.getBoolean("proxyDnsHijackUdp",true));
+        String perf=bit(prefs.getBoolean("proxyPerformanceMode",false));
+        String cpu=prefs.getBoolean("proxyCpuAffinityEnabled",false)?prefs.getString("proxyCpuAffinity","0-7"):"";
+        String mem=prefs.getBoolean("proxyMemoryLimitEnabled",false)?prefs.getString("proxyMemoryLimit","100M"):"";
+        String ioWeight=prefs.getBoolean("proxyIoWeightEnabled",false)?prefs.getString("proxyIoWeight","4"):"";
+        String vendorClean=bit(prefs.getBoolean("proxyVendorFirewallCleanup",false));
         JSONObject result;
         try{result=runJsonWithTimeout(125000L,"start",
                 BIN,CONFIG,profile.mode.id,String.valueOf(p.tproxyPort),String.valueOf(p.redirectPort),profile.ipv6.id,
-                bit(profile.tcp),bit(profile.udp),profile.dnsHijack.id,bit(profile.quicBlocked),
+                bit(profile.tcp),bit(profile.udp),runtimeDns,bit(profile.quicBlocked),
                 String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(p.controllerPort),
-                policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,"1",bit(capabilityKnown),policy.directGidRanges,policy.sharedBypassMacs);
+                policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,"1",bit(capabilityKnown),policy.directGidRanges,policy.sharedBypassMacs,
+                dnsTcp,dnsUdp,perf,cpu,mem,ioWeight,vendorClean);
             if(!result.optBoolean("ok"))throw new IOException(result.optString("message","Root 代理启动失败"));
         }catch(Exception startFailure){if(adblockCoordinatorEntered)ProxyAdblockCoordinator.exit(context);throw startFailure;}
 

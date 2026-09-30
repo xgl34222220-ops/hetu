@@ -7,6 +7,23 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.UnfoldMore
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import kotlinx.coroutines.launch
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
@@ -24,6 +41,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -96,6 +114,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onSizeChanged
@@ -119,7 +138,7 @@ import dev.chrisbanes.haze.rememberHazeState
 /*  Page scaffold                                                      */
 /* ------------------------------------------------------------------ */
 
-internal val HxTopBarHeight = 56.dp
+internal val HxTopBarHeight = 52.dp
 
 /**
  * Every screen uses this. A large left-aligned title scrolls with the content; once it
@@ -136,42 +155,82 @@ internal fun HxPage(
     listState: LazyListState = rememberLazyListState(),
     refreshing: Boolean = false,
     onRefresh: (() -> Unit)? = null,
+    leadingActions: @Composable RowScope.() -> Unit = {},
     actions: @Composable RowScope.() -> Unit = {},
     overlay: @Composable BoxScope.() -> Unit = {},
     scrollToTopSignal: Int = 0,
+    showScrollTop: Boolean = true,
+    largeTitle: Boolean = true,
+    largeTitleStartPadding: Dp = Hx.gutter,
+    largeTitleFontSizeSp: Float? = null,
+    largeTitleBottomPadding: Dp = 10.dp,
+    canvasColor: Color? = null,
     content: LazyListScope.() -> Unit,
 ) {
+    val embed = LocalHxEmbed.current
+    if (embed != null) {
+        HxEmbeddedPage(embed, subtitle, refreshing, onRefresh, leadingActions, actions, overlay, content)
+        return
+    }
     // Re-tapping the current dock item scrolls the page back to the top.
     val initialSignal = remember { scrollToTopSignal }
     LaunchedEffect(scrollToTopSignal) {
         if (scrollToTopSignal != initialSignal) listState.animateScrollToItem(0)
     }
     val c = Hx.colors
+    val pageCanvas = canvasColor ?: c.canvas
     val density = LocalDensity.current
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val thresholdPx = with(density) { 44.dp.toPx() }
+    val thresholdPx = with(density) { 38.dp.toPx() }
     val collapsed by remember(listState) {
         derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > thresholdPx }
     }
-    val barAlpha by animateFloatAsState(if (collapsed) 1f else 0f, tween(HxMotion.Short), label = "barAlpha")
+    // 0 → large title fully visible, 1 → scrolled away. Read only inside graphicsLayer so
+    // scrolling never recomposes the page.
+    val headerProgress = remember(listState) {
+        derivedStateOf {
+            if (listState.firstVisibleItemIndex > 0) 1f
+            else (listState.firstVisibleItemScrollOffset / (thresholdPx * 1.25f)).coerceIn(0f, 1f)
+        }
+    }
+    val scrollTopWanted by remember(listState) { derivedStateOf { listState.firstVisibleItemIndex > 7 } }
+    val barAlpha by animateFloatAsState(if (!largeTitle || collapsed) 1f else 0f, tween(HxMotion.Short), label = "barAlpha")
+    val listBottom = (if (bottomPadding > 0.dp) bottomPadding else navInset) + 24.dp
 
     val pageHaze = rememberHazeState()
-    Box(Modifier.fillMaxSize().background(c.canvas)) {
+    Box(Modifier.fillMaxSize().background(pageCanvas)) {
         val list: @Composable () -> Unit = {
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize().hazeSource(pageHaze),
                 contentPadding = PaddingValues(
                     top = statusTop + HxTopBarHeight,
-                    bottom = (if (bottomPadding > 0.dp) bottomPadding else navInset) + 24.dp,
+                    bottom = listBottom,
                 ),
             ) {
-                item(key = "hx-page-header") {
-                    Column(Modifier.fillMaxWidth().padding(start = Hx.gutter, end = Hx.gutter, bottom = 14.dp)) {
+                if (largeTitle) item(key = "hx-page-header") {
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(start = largeTitleStartPadding, end = Hx.gutter, bottom = largeTitleBottomPadding)
+                            .graphicsLayer {
+                                val p = headerProgress.value
+                                alpha = 1f - p * .92f
+                                val s = 1f - .05f * p
+                                scaleX = s
+                                scaleY = s
+                                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 1f)
+                                translationY = p * 10.dp.toPx()
+                            },
+                    ) {
                         Text(
                             title,
-                            style = MaterialTheme.typography.headlineMedium.copy(letterSpacing = (-0.6).sp),
+                            style = MaterialTheme.typography.headlineMedium.copy(
+                                fontSize = largeTitleFontSizeSp?.sp ?: MaterialTheme.typography.headlineMedium.fontSize,
+                                lineHeight = largeTitleFontSizeSp?.let { (it + 8f).sp } ?: MaterialTheme.typography.headlineMedium.lineHeight,
+                                letterSpacing = (-0.35).sp,
+                            ),
                             color = c.text,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -181,6 +240,15 @@ internal fun HxPage(
                             Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = c.textMuted, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         }
                     }
+                } else if (!subtitle.isNullOrBlank()) item(key = "hx-page-compact-subtitle") {
+                    Text(
+                        subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = c.textMuted,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = Hx.gutter).padding(top = 8.dp, bottom = 10.dp),
+                    )
                 }
                 content()
             }
@@ -208,55 +276,165 @@ internal fun HxPage(
 
         // Pinned bar: frosted glass over the scrolling content once the large title is gone.
         val blur = LocalHxBlur.current
+        val topBarStyle = LocalContext.current.getSharedPreferences("hetu", 0).getString("topBarBlurStyle", "progressive").orEmpty()
+        val progressiveBar = topBarStyle != "gaussian"
         Box(Modifier.fillMaxWidth().align(Alignment.TopCenter).height(statusTop + HxTopBarHeight)) {
-            // Glass layer covers the status bar and the bar itself.
+            // Progressive blur stays denser near the status bar and dissolves into content.
             Box(
                 Modifier
                     .matchParentSize()
                     .graphicsLayer { alpha = barAlpha }
                     .then(
                         if (blur) Modifier.hazeEffect(state = pageHaze, style = HazeMaterials.ultraThin()) {
-                            blurRadius = 22.dp
-                            noiseFactor = .01f
+                            blurRadius = if (progressiveBar) 28.dp else 22.dp
+                            noiseFactor = .008f
                         } else Modifier,
                     )
-                    .background(c.canvas.copy(alpha = if (blur) .70f else 1f)),
+                    .then(
+                        if (blur && progressiveBar) Modifier.background(
+                            Brush.verticalGradient(listOf(pageCanvas.copy(alpha = .38f), pageCanvas.copy(alpha = .20f), pageCanvas.copy(alpha = .035f)))
+                        ) else Modifier.background(pageCanvas.copy(alpha = if (blur) .24f else 1f))
+                    ),
             )
-            Row(
+            // Collapsed title sits dead centre in the bar; back and actions float on either side.
+            Box(
                 Modifier
                     .fillMaxWidth()
                     .padding(top = statusTop, start = 4.dp, end = 4.dp)
                     .height(HxTopBarHeight),
-                verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (onBack != null) {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回", tint = c.text)
-                    }
-                }
                 Text(
                     title,
                     modifier = Modifier
-                        .weight(1f)
-                        .padding(start = if (onBack == null) 12.dp else 2.dp, end = 8.dp)
+                        .align(Alignment.Center)
+                        .padding(horizontal = 96.dp)
                         .graphicsLayer {
                             alpha = barAlpha
-                            translationY = (1f - barAlpha) * 6.dp.toPx()
+                            translationY = (1f - barAlpha) * 8.dp.toPx()
+                            val s = .94f + .06f * barAlpha
+                            scaleX = s
+                            scaleY = s
                         },
                     style = MaterialTheme.typography.titleMedium,
                     color = c.text,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Start,
+                    textAlign = TextAlign.Center,
                 )
+                if (onBack != null) {
+                    IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回", tint = c.text)
+                    }
+                }
                 Row(
+                    modifier = Modifier.align(Alignment.CenterEnd),
                     verticalAlignment = Alignment.CenterVertically,
                     content = actions,
                 )
             }
-            HorizontalDivider(Modifier.align(Alignment.BottomCenter), color = c.line.copy(alpha = barAlpha), thickness = 0.5.dp)
+            if (c.dark) HorizontalDivider(Modifier.align(Alignment.BottomCenter), color = c.line.copy(alpha = barAlpha * .28f), thickness = 0.5.dp)
+        }
+
+        // Long lists get a small glass "back to top" button once the user is deep in them.
+        val scrollScope = rememberCoroutineScope()
+        AnimatedVisibility(
+            visible = showScrollTop && scrollTopWanted,
+            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 18.dp, bottom = listBottom - 8.dp),
+            enter = fadeIn(tween(HxMotion.Short)) + scaleIn(HxMotion.pop(), initialScale = .6f),
+            exit = fadeOut(tween(HxMotion.Short)) + scaleOut(tween(HxMotion.Short), targetScale = .6f),
+        ) {
+            HxScrollTopButton { scrollScope.launch { listState.animateScrollToItem(0) } }
         }
         overlay()
+    }
+}
+
+@Composable
+private fun HxScrollTopButton(onClick: () -> Unit) {
+    val c = Hx.colors
+    val haptics = rememberHetuHaptics()
+    val source = remember { MutableInteractionSource() }
+    Box(
+        Modifier
+            .hxPressScale(source, .9f)
+            .size(42.dp)
+            .hxSoftShadow(CircleShape, 10.dp)
+            .clip(CircleShape)
+            .background(c.surface.copy(alpha = .96f))
+            .border(0.5.dp, c.line, CircleShape)
+            .clickable(interactionSource = source, indication = LocalIndication.current) {
+                haptics.perform(HetuHaptic.Tick)
+                onClick()
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = "回到顶部", tint = c.text, modifier = Modifier.size(22.dp))
+    }
+}
+
+/**
+ * [HxPage] inside an [HxTabbedPage] section: just the list. Its bar actions, overlay and
+ * subtitle are handed to the host page through stable wrappers, so they update in place
+ * without the host and the section recomposing each other in a loop.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HxEmbeddedPage(
+    embed: HxEmbed,
+    subtitle: String?,
+    refreshing: Boolean,
+    onRefresh: (() -> Unit)?,
+    leadingActions: @Composable RowScope.() -> Unit,
+    actions: @Composable RowScope.() -> Unit,
+    overlay: @Composable BoxScope.() -> Unit,
+    content: LazyListScope.() -> Unit,
+) {
+    val c = Hx.colors
+    val currentLeadingActions by rememberUpdatedState(leadingActions)
+    val currentActions by rememberUpdatedState(actions)
+    val currentOverlay by rememberUpdatedState(overlay)
+    val stableLeadingActions = remember<@Composable RowScope.() -> Unit> { { currentLeadingActions.invoke(this) } }
+    val stableActions = remember<@Composable RowScope.() -> Unit> { { currentActions.invoke(this) } }
+    val stableOverlay = remember<@Composable BoxScope.() -> Unit> { { currentOverlay.invoke(this) } }
+    val host = embed.host
+    val key = embed.key
+    DisposableEffect(host, key) {
+        host.leadingActions[key] = stableLeadingActions
+        host.actions[key] = stableActions
+        host.overlays[key] = stableOverlay
+        onDispose {
+            host.leadingActions.remove(key)
+            host.actions.remove(key)
+            host.overlays.remove(key)
+        }
+    }
+    SideEffect { if (host.subtitles[key] != subtitle) host.subtitles[key] = subtitle }
+    val list: @Composable () -> Unit = {
+        LazyColumn(
+            state = embed.listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(top = embed.top, bottom = embed.bottom),
+        ) { content() }
+    }
+    if (onRefresh != null) {
+        val pullState = rememberPullToRefreshState()
+        PullToRefreshBox(
+            isRefreshing = refreshing,
+            onRefresh = { if (!refreshing) onRefresh() },
+            modifier = Modifier.fillMaxSize(),
+            state = pullState,
+            indicator = {
+                PullToRefreshDefaults.Indicator(
+                    state = pullState,
+                    isRefreshing = refreshing,
+                    modifier = Modifier.align(Alignment.TopCenter).padding(top = (embed.top - 6.dp).coerceAtLeast(0.dp)),
+                    containerColor = c.surface.copy(alpha = .90f),
+                    color = c.accent,
+                )
+            },
+        ) { list() }
+    } else {
+        list()
     }
 }
 
@@ -277,7 +455,7 @@ internal fun HxCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     color: Color = Hx.colors.surface,
-    padding: PaddingValues = PaddingValues(16.dp),
+    padding: PaddingValues = PaddingValues(14.dp),
     brush: androidx.compose.ui.graphics.Brush? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -307,7 +485,7 @@ internal fun HxSection(
     trailing: @Composable (RowScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Column(modifier.fillMaxWidth().padding(horizontal = Hx.gutter).padding(bottom = 14.dp)) {
+    Column(modifier.fillMaxWidth().padding(horizontal = Hx.gutter).padding(bottom = 10.dp)) {
         if (title != null || trailing != null) {
             Row(
                 Modifier.fillMaxWidth().padding(start = 4.dp, end = 2.dp, bottom = 6.dp).heightIn(min = 20.dp),
@@ -328,31 +506,44 @@ internal fun HxSection(
 
 /** Rows stacked in one card with inset hairlines. */
 @Composable
-internal fun HxGroup(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+internal fun HxGroup(modifier: Modifier = Modifier, title: String? = null, content: @Composable ColumnScope.() -> Unit) {
     val c = Hx.colors
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = Hx.cardShape,
         color = c.surface,
-        border = BorderStroke(0.5.dp, c.line.copy(alpha = if (c.dark) .72f else .42f)),
+        border = if (c.dark) BorderStroke(0.5.dp, c.line.copy(alpha = .72f)) else null,
         shadowElevation = 0.dp,
         tonalElevation = 0.dp,
     ) {
-        Column(content = content)
+        // Rows that appear/disappear (expanded options, loaded lists) resize the card smoothly.
+        Column(Modifier.animateContentSize(tween(HxMotion.Medium, easing = HxMotion.Emphasized)).padding(vertical = 2.dp)) {
+            if (title != null) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Hx.colors.text,
+                    modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 2.dp),
+                )
+            }
+            content()
+        }
     }
 }
 
 @Composable
 internal fun HxDivider(inset: Dp = 50.dp) {
-    HorizontalDivider(Modifier.padding(start = inset), thickness = 0.5.dp, color = Hx.colors.line.copy(alpha = .58f))
+    // Rows inside a card are separated by rhythm, not rules; a faint hairline remains in dark mode.
+    if (Hx.colors.dark) HorizontalDivider(Modifier.padding(start = inset), thickness = 0.5.dp, color = Hx.colors.line.copy(alpha = .35f))
 }
 
 @Composable
-internal fun HxIconBadge(icon: ImageVector, tint: Color = Hx.colors.accent, size: Dp = 30.dp) {
+internal fun HxIconBadge(icon: ImageVector, tint: Color = Hx.colors.accent, size: Dp = 27.dp) {
     val c = Hx.colors
     val foreground = if (tint == c.bad) c.bad else c.textMuted
     Box(Modifier.size(size), contentAlignment = Alignment.Center) {
-        Icon(icon, contentDescription = null, tint = foreground, modifier = Modifier.size(20.dp))
+        Icon(icon, contentDescription = null, tint = foreground, modifier = Modifier.size(19.dp))
     }
 }
 
@@ -370,26 +561,35 @@ internal fun HxRow(
     enabled: Boolean = true,
     danger: Boolean = false,
     onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
     trailing: @Composable (RowScope.() -> Unit)? = null,
 ) {
     val c = Hx.colors
+    val haptics = rememberHetuHaptics()
+    val contentAlpha by animateFloatAsState(if (enabled) 1f else .45f, tween(HxMotion.Medium), label = "rowAlpha")
     Row(
         modifier
             .fillMaxWidth()
-            .then(if (onClick != null && enabled) Modifier.clickable(onClick = onClick) else Modifier)
-            .heightIn(min = 52.dp)
-            .padding(horizontal = 14.dp, vertical = 9.dp)
-            .graphicsLayer { alpha = if (enabled) 1f else .45f },
+            .hxAnchorSource()
+            .then(
+                if ((onClick != null || onLongClick != null) && enabled) Modifier.hxCombinedClick(
+                    onClick = onClick ?: {},
+                    onLongClick = onLongClick?.let { long -> { haptics.perform(HetuHaptic.LongPress); long() } },
+                ) else Modifier,
+            )
+            .heightIn(min = 50.dp)
+            .padding(horizontal = 14.dp, vertical = 8.dp)
+            .graphicsLayer { alpha = contentAlpha },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {
             HxIconBadge(icon, if (danger) c.bad else iconTint)
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(9.dp))
         }
         Column(Modifier.weight(1f)) {
             Text(
                 title,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Medium,
                 color = if (danger) c.bad else c.text,
                 maxLines = 2,
@@ -408,7 +608,7 @@ internal fun HxRow(
 
 @Composable
 internal fun HxChevron() {
-    Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = Hx.colors.textFaint, modifier = Modifier.size(20.dp))
+    Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = Hx.colors.textFaint, modifier = Modifier.size(18.dp))
 }
 
 @Composable
@@ -420,21 +620,29 @@ internal fun HxNavRow(
     value: String? = null,
     enabled: Boolean = true,
     danger: Boolean = false,
+    dropdown: Boolean = false,
     onClick: () -> Unit,
 ) {
     HxRow(title, subtitle = subtitle, icon = icon, iconTint = iconTint, enabled = enabled, danger = danger, onClick = onClick) {
         if (!value.isNullOrBlank()) {
-            Text(
-                value,
-                style = MaterialTheme.typography.bodyMedium,
-                color = Hx.colors.textMuted,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.widthIn(max = 150.dp),
-            )
+            AnimatedContent(
+                targetState = value,
+                transitionSpec = { fadeIn(tween(HxMotion.Medium)).togetherWith(fadeOut(tween(HxMotion.Short))) },
+                label = "navValue",
+            ) { v ->
+                Text(
+                    v,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Hx.colors.textMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 150.dp),
+                )
+            }
             Spacer(Modifier.width(2.dp))
         }
-        HxChevron()
+        if (dropdown) Icon(Icons.Rounded.UnfoldMore, contentDescription = null, tint = Hx.colors.textFaint, modifier = Modifier.size(18.dp))
+        else HxChevron()
     }
 }
 
@@ -502,11 +710,17 @@ internal fun HxTone.bg(): Color = when (this) {
 
 @Composable
 internal fun HxPill(text: String, tone: HxTone = HxTone.Neutral, modifier: Modifier = Modifier) {
+    val bg by animateColorAsState(tone.bg(), tween(HxMotion.Medium), label = "pillBg")
+    val fg by animateColorAsState(tone.fg(), tween(HxMotion.Medium), label = "pillFg")
     Box(
-        modifier.clip(Hx.pillShape).background(tone.bg()).padding(horizontal = 8.dp, vertical = 3.dp),
+        modifier
+            .clip(Hx.pillShape)
+            .background(bg)
+            .animateContentSize(tween(HxMotion.Short, easing = HxMotion.Emphasized))
+            .padding(horizontal = 8.dp, vertical = 3.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, style = MaterialTheme.typography.labelSmall, color = tone.fg(), maxLines = 1)
+        Text(text, style = MaterialTheme.typography.labelSmall, color = fg, maxLines = 1)
     }
 }
 
@@ -529,8 +743,14 @@ internal fun HxBanner(
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
 ) {
+    val bg by animateColorAsState(tone.bg(), tween(HxMotion.Medium), label = "bannerBg")
     Row(
-        modifier.fillMaxWidth().clip(Hx.rowShape).background(tone.bg()).padding(horizontal = 14.dp, vertical = 12.dp),
+        modifier
+            .fillMaxWidth()
+            .clip(Hx.rowShape)
+            .background(bg)
+            .animateContentSize(tween(HxMotion.Medium, easing = HxMotion.Emphasized))
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
@@ -550,12 +770,34 @@ internal fun HxBanner(
 @Composable
 internal fun HxEmpty(icon: ImageVector, title: String, description: String? = null, action: (@Composable () -> Unit)? = null) {
     val c = Hx.colors
+    // Settles in once instead of popping: the empty state is often the first thing seen.
+    val appear = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(Unit) { appear.animateTo(1f, tween(HxMotion.Long, easing = HxMotion.Emphasized)) }
     Column(
-        Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 42.dp),
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 32.dp, vertical = 36.dp)
+            .graphicsLayer {
+                alpha = appear.value
+                translationY = (1f - appear.value) * 12.dp.toPx()
+            },
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(icon, null, tint = c.textFaint, modifier = Modifier.size(30.dp))
-        Spacer(Modifier.height(12.dp))
+        Box(
+            Modifier
+                .size(64.dp)
+                .graphicsLayer {
+                    val s = .82f + .18f * appear.value
+                    scaleX = s
+                    scaleY = s
+                }
+                .clip(CircleShape)
+                .background(c.surfaceMuted),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, null, tint = c.textMuted, modifier = Modifier.size(28.dp))
+        }
+        Spacer(Modifier.height(14.dp))
         Text(title, style = MaterialTheme.typography.titleSmall, color = c.text, textAlign = TextAlign.Center)
         if (!description.isNullOrBlank()) {
             Spacer(Modifier.height(4.dp))
@@ -583,15 +825,19 @@ internal fun HxSegmented(
     val index = options.indexOfFirst { it.first == selected }.coerceAtLeast(0)
     val density = LocalDensity.current
     val segment = if (options.isEmpty()) 0.dp else with(density) { (widthPx / options.size).toDp() }
-    val offset by animateDpAsState(
-        segment * index,
-        androidx.compose.animation.core.spring(dampingRatio = .8f, stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow),
-        label = "segment",
-    )
+    // Liquid indicator: the leading edge moves first and the trailing edge catches up, so
+    // the thumb stretches toward its destination and settles back to one segment.
+    val forward = rememberHxDirection(index)
+    val fast = androidx.compose.animation.core.spring<Dp>(dampingRatio = .82f, stiffness = 700f)
+    val slow = androidx.compose.animation.core.spring<Dp>(dampingRatio = .86f, stiffness = 260f)
+    val left by animateDpAsState(segment * index, if (forward) slow else fast, label = "segLeft")
+    val right by animateDpAsState(segment * (index + 1), if (forward) fast else slow, label = "segRight")
+    val contentAlpha by animateFloatAsState(if (enabled) 1f else .5f, tween(HxMotion.Medium), label = "segEnabled")
     Box(
         modifier
             .fillMaxWidth()
             .height(36.dp)
+            .graphicsLayer { alpha = contentAlpha }
             .clip(Hx.pillShape)
             .background(c.surfaceMuted)
             .padding(2.dp)
@@ -600,9 +846,10 @@ internal fun HxSegmented(
         if (widthPx > 0 && options.isNotEmpty()) {
             Box(
                 Modifier
-                    .offset(x = offset)
-                    .width(segment)
+                    .offset(x = left)
+                    .width((right - left).coerceAtLeast(0.dp))
                     .height(32.dp)
+                    .hxSoftShadow(Hx.pillShape, 3.dp)
                     .clip(Hx.pillShape)
                     .background(c.surface)
                     .then(if (c.dark) Modifier.border(0.5.dp, c.line, Hx.pillShape) else Modifier),
@@ -612,15 +859,26 @@ internal fun HxSegmented(
             options.forEachIndexed { i, (id, label) ->
                 val active = i == index
                 val color by animateColorAsState(if (active) c.text else c.textMuted, tween(HxMotion.Short), label = "segText")
+                val source = remember { MutableInteractionSource() }
                 Box(
                     Modifier
                         .weight(1f)
                         .fillMaxSize()
+                        .hxPressScale(source, .94f)
                         .clip(Hx.pillShape)
-                        .clickable(enabled = enabled && !active) { haptics.perform(HetuHaptic.Tick); onSelect(id) },
+                        .clickable(interactionSource = source, indication = null, enabled = enabled && !active) {
+                            haptics.perform(HetuHaptic.Tick)
+                            onSelect(id)
+                        },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(label, style = MaterialTheme.typography.labelLarge, color = color, maxLines = 1)
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
+                        color = color,
+                        maxLines = 1,
+                    )
                 }
             }
         }
@@ -633,24 +891,39 @@ internal fun HxSearchField(
     onChange: (String) -> Unit,
     placeholder: String,
     modifier: Modifier = Modifier,
+    autoFocus: Boolean = false,
 ) {
     val c = Hx.colors
+    val focus = remember { FocusRequester() }
+    if (autoFocus) {
+        LaunchedEffect(Unit) {
+            // Wait one frame so the field is attached before asking for focus + keyboard.
+            kotlinx.coroutines.delay(60)
+            runCatching { focus.requestFocus() }
+        }
+    }
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().focusRequester(focus),
         singleLine = true,
         placeholder = { Text(placeholder, color = c.textFaint) },
         leadingIcon = { Icon(Icons.Rounded.Search, null, tint = c.textMuted) },
         trailingIcon = {
-            if (value.isNotEmpty()) IconButton(onClick = { onChange("") }) { Icon(Icons.Rounded.Close, "清除", tint = c.textMuted) }
+            AnimatedVisibility(
+                value.isNotEmpty(),
+                enter = fadeIn(tween(HxMotion.Short)) + scaleIn(HxMotion.pop(), initialScale = .6f),
+                exit = fadeOut(tween(HxMotion.Short)) + scaleOut(tween(HxMotion.Short), targetScale = .6f),
+            ) {
+                IconButton(onClick = { onChange("") }) { Icon(Icons.Rounded.Close, "清除", tint = c.textMuted) }
+            }
         },
         shape = Hx.pillShape,
         colors = OutlinedTextFieldDefaults.colors(
             focusedContainerColor = c.surface,
             unfocusedContainerColor = c.surface,
             focusedBorderColor = c.accent,
-            unfocusedBorderColor = c.line,
+            unfocusedBorderColor = Color.Transparent,
         ),
     )
 }
@@ -696,27 +969,58 @@ internal fun HxSheet(
 ) {
     val c = Hx.colors
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+    // Actions inside a sheet close it with the slide-down animation first, then run —
+    // instead of the sheet vanishing in a single frame when its state flips to null.
+    val close: (() -> Unit) -> Unit = remember(sheetState, scope) {
+        { after ->
+            scope.launch {
+                try {
+                    sheetState.hide()
+                } finally {
+                    after()
+                }
+            }
+        }
+    }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = c.surface,
         contentColor = c.text,
-        scrimColor = Color.Black.copy(alpha = .38f),
+        scrimColor = Color.Black.copy(alpha = if (c.dark) .52f else .32f),
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        dragHandle = {
+            Box(
+                Modifier
+                    .padding(top = 10.dp, bottom = 12.dp)
+                    .size(width = 36.dp, height = 4.dp)
+                    .clip(Hx.pillShape)
+                    .background(c.textFaint.copy(alpha = .45f)),
+            )
+        },
     ) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 12.dp)) {
-            if (title != null) {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = c.text,
-                    modifier = Modifier.padding(horizontal = 22.dp).padding(bottom = 10.dp),
-                )
+        CompositionLocalProvider(LocalHxSheetClose provides close) {
+            Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 12.dp)) {
+                if (title != null) {
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = c.text,
+                        modifier = Modifier.padding(horizontal = 22.dp).padding(bottom = 10.dp),
+                    )
+                }
+                content()
             }
-            content()
         }
     }
 }
+
+/**
+ * Inside an [HxSheet]: `LocalHxSheetClose.current { … }` animates the sheet away and then
+ * runs the block. Outside a sheet it simply runs the block.
+ */
+internal val LocalHxSheetClose = staticCompositionLocalOf<(() -> Unit) -> Unit> { { after -> after() } }
 
 /** Monospace text viewer (logs, diagnostics, generated config). */
 @Composable
@@ -763,27 +1067,74 @@ internal fun HxChoiceSheet(
     footer: String? = null,
 ) {
     val c = Hx.colors
-    HxSheet(onDismiss = onDismiss, title = title) {
-        Column(Modifier.padding(horizontal = 12.dp)) {
+    val haptics = rememberHetuHaptics()
+    // Opened from a row: show a dropdown right next to it (the row stays visible).
+    val anchor = remember { HxAnchor.take() }
+    if (anchor != null) {
+        HxAnchoredMenu(anchor, onDismiss) { close ->
             choices.forEach { choice ->
-                val active = choice.id == selected
+                HxMenuItem(
+                    choice.label,
+                    onClick = { close { onPick(choice.id) } },
+                    description = choice.description,
+                    selected = choice.id == selected,
+                    enabled = choice.enabled,
+                )
+            }
+            if (!footer.isNullOrBlank()) {
+                Text(footer, style = MaterialTheme.typography.labelSmall, color = c.textFaint, modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
+            }
+        }
+        return
+    }
+    // The tapped row lights up and its check pops in; the sheet then slides away.
+    var picked by remember { mutableStateOf(selected) }
+    var closing by remember { mutableStateOf(false) }
+    HxSheet(onDismiss = onDismiss, title = title) {
+        val close = LocalHxSheetClose.current
+        Column(Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            choices.forEach { choice ->
+                val active = choice.id == picked
+                val bg by animateColorAsState(if (active) c.accentSoft else Color.Transparent, tween(HxMotion.Medium), label = "choiceBg")
+                val checkScale by animateFloatAsState(if (active) 1f else 0f, HxMotion.pop(), label = "choiceCheck")
                 Row(
                     Modifier
                         .fillMaxWidth()
                         .clip(Hx.rowShape)
-                        .background(if (active) c.accentSoft else Color.Transparent)
-                        .clickable(enabled = choice.enabled) { onPick(choice.id) }
+                        .background(bg)
+                        .clickable(enabled = choice.enabled) {
+                            if (!closing) {
+                                closing = true
+                                haptics.perform(HetuHaptic.Tick)
+                                picked = choice.id
+                                close { onPick(choice.id) }
+                            }
+                        }
                         .padding(horizontal = 14.dp, vertical = 12.dp)
                         .graphicsLayer { alpha = if (choice.enabled) 1f else .4f },
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text(choice.label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, color = c.text)
+                        Text(
+                            choice.label,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
+                            color = if (active) c.accent else c.text,
+                        )
                         if (!choice.description.isNullOrBlank()) {
                             Text(choice.description, style = MaterialTheme.typography.bodySmall, color = c.textMuted)
                         }
                     }
-                    if (active) Icon(Icons.Rounded.Check, null, tint = c.accent, modifier = Modifier.size(20.dp))
+                    Icon(
+                        Icons.Rounded.Check,
+                        null,
+                        tint = c.accent,
+                        modifier = Modifier.size(20.dp).graphicsLayer {
+                            scaleX = checkScale
+                            scaleY = checkScale
+                            alpha = checkScale.coerceIn(0f, 1f)
+                        },
+                    )
                 }
             }
             if (!footer.isNullOrBlank()) {
@@ -815,15 +1166,28 @@ internal fun HxFormDialog(
     val c = Hx.colors
     val values = remember { fields.map { mutableStateOf(it.initial) } }
     var error by remember { mutableStateOf<String?>(null) }
+    val haptics = rememberHetuHaptics()
+    // Invalid input: a short horizontal shake plus a reject haptic, like a wrong passcode.
+    var shakeTick by remember { mutableIntStateOf(0) }
+    val shake = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(shakeTick) {
+        if (shakeTick > 0) {
+            haptics.perform(HetuHaptic.Reject)
+            for (x in listOf(12f, -9f, 6f, -3f, 0f)) shake.animateTo(x, tween(48))
+        }
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = c.surface,
         title = { Text(title, style = MaterialTheme.typography.titleLarge) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(
+                Modifier.graphicsLayer { translationX = shake.value * density },
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
                 if (!message.isNullOrBlank()) Text(message, style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
                 fields.forEachIndexed { index, field ->
-                    OutlinedTextField(
+                    HxTextField(
                         value = values[index].value,
                         onValueChange = { values[index].value = it; error = null },
                         label = { Text(field.label) },
@@ -841,13 +1205,19 @@ internal fun HxFormDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = {
+            HxDialogButtons(confirmLabel, c.accent, onDismiss = onDismiss) {
                 val result = values.map { it.value.trim() }
                 val problem = validate(result)
-                if (problem != null) error = problem else onConfirm(result)
-            }) { Text(confirmLabel, fontWeight = FontWeight.SemiBold) }
+                if (problem != null) {
+                    error = problem
+                    shakeTick++
+                } else {
+                    haptics.perform(HetuHaptic.Confirm)
+                    onConfirm(result)
+                }
+            }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消", color = c.textMuted) } },
+        shape = RoundedCornerShape(28.dp),
     )
 }
 
@@ -867,11 +1237,9 @@ internal fun HxConfirmDialog(
         title = { Text(title, style = MaterialTheme.typography.titleLarge) },
         text = { Text(message, style = MaterialTheme.typography.bodyMedium, color = c.textMuted) },
         confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(confirmLabel, color = if (danger) c.bad else c.accent, fontWeight = FontWeight.SemiBold)
-            }
+            HxDialogButtons(confirmLabel, if (danger) c.bad else c.accent, onDismiss = onDismiss, onConfirm = onConfirm)
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消", color = c.textMuted) } },
+        shape = RoundedCornerShape(28.dp),
     )
 }
 
@@ -890,15 +1258,18 @@ internal fun HxButton(
     val c = Hx.colors
     val haptics = rememberHetuHaptics()
     val source = remember { MutableInteractionSource() }
-    val bg = if (filled) tone.fg() else tone.bg()
-    val fg = if (filled) (if (tone == HxTone.Accent) c.onAccent else Color.White) else tone.fg()
+    val rawBg = if (filled) tone.fg() else tone.bg()
+    val rawFg = if (filled) (if (tone == HxTone.Accent) c.onAccent else Color.White) else tone.fg()
+    val bg by animateColorAsState(if (enabled) rawBg else c.surfaceMuted, tween(HxMotion.Medium), label = "btnBg")
+    val fg by animateColorAsState(if (enabled) rawFg else c.textFaint, tween(HxMotion.Medium), label = "btnFg")
     Row(
         modifier
             .hxPressScale(source, .97f)
             .heightIn(min = 44.dp)
             .clip(Hx.pillShape)
-            .background(if (enabled) bg else c.surfaceMuted)
+            .background(bg)
             .clickable(interactionSource = source, indication = LocalIndication.current, enabled = enabled && !busy, onClick = { haptics.perform(HetuHaptic.Tap); onClick() })
+            .animateContentSize(tween(HxMotion.Short, easing = HxMotion.Emphasized))
             .padding(horizontal = 18.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
@@ -907,18 +1278,32 @@ internal fun HxButton(
             HxSpinner(16.dp, fg)
             Spacer(Modifier.width(8.dp))
         } else if (icon != null) {
-            Icon(icon, null, tint = if (enabled) fg else c.textFaint, modifier = Modifier.size(18.dp))
+            Icon(icon, null, tint = fg, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(6.dp))
         }
-        Text(text, style = MaterialTheme.typography.labelLarge, color = if (enabled) fg else c.textFaint, maxLines = 1)
+        Text(text, style = MaterialTheme.typography.labelLarge, color = fg, maxLines = 1)
     }
 }
 
 /** Small circular icon action used in top bars. */
 @Composable
 internal fun HxBarAction(icon: ImageVector, description: String, onClick: () -> Unit, busy: Boolean = false, enabled: Boolean = true) {
-    IconButton(onClick = onClick, enabled = enabled && !busy) {
-        if (busy) HxSpinner(18.dp) else Icon(icon, description, tint = if (enabled) Hx.colors.text else Hx.colors.textFaint)
+    val c = Hx.colors
+    val haptics = rememberHetuHaptics()
+    val tint by animateColorAsState(if (enabled) c.text else c.textFaint, tween(HxMotion.Medium), label = "barTint")
+    IconButton(onClick = { haptics.perform(HetuHaptic.Tap); onClick() }, enabled = enabled && !busy, modifier = Modifier.size(44.dp)) {
+        // Icon swaps (search ↔ close search, idle ↔ busy) rotate/scale through instead of blinking.
+        AnimatedContent(
+            targetState = if (busy) null else icon,
+            transitionSpec = {
+                (fadeIn(tween(HxMotion.Short)) + scaleIn(HxMotion.pop(), initialScale = .5f))
+                    .togetherWith(fadeOut(tween(90)) + scaleOut(tween(HxMotion.Short), targetScale = .5f))
+            },
+            contentAlignment = Alignment.Center,
+            label = "barAction",
+        ) { target ->
+            if (target == null) HxSpinner(18.dp) else Icon(target, description, tint = tint)
+        }
     }
 }
 
@@ -928,5 +1313,86 @@ internal fun HxProgressBar(ratio: Float, color: Color = Hx.colors.accent, modifi
     val animated by animateFloatAsState(ratio.coerceIn(0f, 1f), tween(HxMotion.Long, easing = HxMotion.Emphasized), label = "progress")
     Box(modifier.fillMaxWidth().height(height).clip(Hx.pillShape).background(Hx.colors.surfaceMuted)) {
         Box(Modifier.fillMaxWidth(animated).height(height).clip(Hx.pillShape).background(color))
+    }
+}
+
+/**
+ * Filled input used in dialogs and sheets: a soft tinted well, no underline, and an accent
+ * ring that fades in while focused.
+ */
+@Composable
+internal fun HxTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    label: (@Composable () -> Unit)? = null,
+    placeholder: (@Composable () -> Unit)? = null,
+    singleLine: Boolean = false,
+    maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    @Suppress("UNUSED_PARAMETER") shape: androidx.compose.ui.graphics.Shape? = null,
+) {
+    val c = Hx.colors
+    val source = remember { MutableInteractionSource() }
+    val focused by source.collectIsFocusedAsState()
+    val ring by animateColorAsState(if (focused) c.accent else Color.Transparent, tween(HxMotion.Medium), label = "fieldRing")
+    val fieldShape = RoundedCornerShape(16.dp)
+    androidx.compose.material3.TextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier.border(1.5.dp, ring, fieldShape),
+        label = label,
+        placeholder = placeholder,
+        singleLine = singleLine,
+        maxLines = maxLines,
+        keyboardOptions = keyboardOptions,
+        interactionSource = source,
+        shape = fieldShape,
+        colors = androidx.compose.material3.TextFieldDefaults.colors(
+            focusedContainerColor = c.surfaceMuted,
+            unfocusedContainerColor = c.surfaceMuted,
+            disabledContainerColor = c.surfaceMuted,
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
+            disabledIndicatorColor = Color.Transparent,
+            focusedLabelColor = c.accent,
+            unfocusedLabelColor = c.textMuted,
+            cursorColor = c.accent,
+        ),
+    )
+}
+
+
+/** Dialog footer: two equal pills — a quiet cancel and a solid confirm. */
+@Composable
+private fun HxDialogButtons(confirmLabel: String, confirmColor: Color, onDismiss: () -> Unit, onConfirm: () -> Unit) {
+    val c = Hx.colors
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        val cancelSource = remember { MutableInteractionSource() }
+        Box(
+            Modifier
+                .weight(1f)
+                .hxPressScale(cancelSource, .96f)
+                .height(46.dp)
+                .clip(Hx.pillShape)
+                .background(c.surfaceMuted)
+                .clickable(interactionSource = cancelSource, indication = LocalIndication.current, onClick = onDismiss),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("取消", style = MaterialTheme.typography.labelLarge, color = c.text)
+        }
+        val okSource = remember { MutableInteractionSource() }
+        Box(
+            Modifier
+                .weight(1f)
+                .hxPressScale(okSource, .96f)
+                .height(46.dp)
+                .clip(Hx.pillShape)
+                .background(confirmColor)
+                .clickable(interactionSource = okSource, indication = LocalIndication.current, onClick = onConfirm),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(confirmLabel, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = if (confirmColor == c.accent) c.onAccent else Color.White)
+        }
     }
 }

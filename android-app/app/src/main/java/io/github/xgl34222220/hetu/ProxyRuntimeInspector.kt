@@ -20,6 +20,16 @@ internal data class AdblockRuntimeStats(
     val logAvailable: Boolean = false,
 )
 
+internal data class WanRuntimeInfo(
+    val address: String = "—",
+    val countryCode: String = "",
+    val country: String = "—",
+    val region: String = "—",
+    val city: String = "—",
+    val isp: String = "—",
+    val asn: String = "—",
+)
+
 internal data class ProxyRuntimeSnapshot(
     val running: Boolean = false,
     val pid: Int = 0,
@@ -31,7 +41,13 @@ internal data class ProxyRuntimeSnapshot(
     val lanInterface: String = "—",
     val wanAddress: String = "—",
     val wanCountryCode: String = "",
+    val wanCountry: String = "—",
     val wanRegion: String = "—",
+    val wanCity: String = "—",
+    val wanIsp: String = "—",
+    val wanAsn: String = "—",
+    val cpuAffinity: String = "—",
+    val currentCpu: Int = -1,
     val wanState: String = "idle",
     val wanCheckedAt: Long = 0L,
     val wanError: String = "",
@@ -62,10 +78,13 @@ internal class ProxyRuntimeInspector(context: Context) {
               PT=${'$'}(awk '{print ${'$'}14+${'$'}15}' /proc/${'$'}P/stat 2>/dev/null || echo 0)
               ST=${'$'}(awk '/^cpu /{s=0; for(i=2;i<=NF;i++)s+=${'$'}i; print s; exit}' /proc/stat 2>/dev/null || echo 0)
               RKB=${'$'}(awk '/^VmRSS:/{print ${'$'}2; exit}' /proc/${'$'}P/status 2>/dev/null || echo 0)
+              CPU=${'$'}(awk '{print ${'$'}39}' /proc/${'$'}P/stat 2>/dev/null || echo -1)
+              AFF=${'$'}(awk '/^Cpus_allowed_list:/{print ${'$'}2; exit}' /proc/${'$'}P/status 2>/dev/null || echo -)
               case "${'$'}PT" in ''|*[!0-9]*) PT=0;; esac
               case "${'$'}ST" in ''|*[!0-9]*) ST=0;; esac
               case "${'$'}RKB" in ''|*[!0-9]*) RKB=0;; esac
-              printf '{"running":true,"pid":%s,"elapsed":%s,"processTicks":%s,"systemTicks":%s,"rssBytes":%s}\n' "${'$'}P" "${'$'}ELAPSED" "${'$'}PT" "${'$'}ST" "${'$'}((RKB*1024))"
+              case "${'$'}CPU" in ''|*[!0-9-]*) CPU=-1;; esac
+              printf '{"running":true,"pid":%s,"elapsed":%s,"processTicks":%s,"systemTicks":%s,"rssBytes":%s,"currentCpu":%s,"cpuAffinity":"%s"}\n' "${'$'}P" "${'$'}ELAPSED" "${'$'}PT" "${'$'}ST" "${'$'}((RKB*1024))" "${'$'}CPU" "${'$'}AFF"
             else
               printf '%s\n' '{"running":false,"pid":0,"elapsed":0,"processTicks":0,"systemTicks":0,"rssBytes":0}'
             fi
@@ -106,9 +125,15 @@ internal class ProxyRuntimeInspector(context: Context) {
             rssBytes = json?.optLong("rssBytes", 0L) ?: 0L,
             lanAddress = local.first,
             lanInterface = local.second,
-            wanAddress = wan.first,
-            wanCountryCode = wan.second,
-            wanRegion = wan.third,
+            wanAddress = wan.address,
+            wanCountryCode = wan.countryCode,
+            wanCountry = wan.country,
+            wanRegion = wan.region,
+            wanCity = wan.city,
+            wanIsp = wan.isp,
+            wanAsn = wan.asn,
+            cpuAffinity = json?.optString("cpuAffinity", "—")?.ifBlank { "—" } ?: "—",
+            currentCpu = json?.optInt("currentCpu", -1) ?: -1,
             wanState = lookup.state,
             wanCheckedAt = if (lookup.succeededAt > 0L) System.currentTimeMillis() - (SystemClock.elapsedRealtime() - lookup.succeededAt) else 0L,
             wanError = if (lookup.failure.isNotBlank() && prefs.getBoolean("proxyRootRuntimeRefreshPending", false))
@@ -213,7 +238,7 @@ internal class ProxyRuntimeInspector(context: Context) {
         }.getOrDefault("—" to "—")
     }
 
-    private fun publicNetwork(): Triple<String, String, String> {
+    private fun publicNetwork(): WanRuntimeInfo {
         val active = runCatching {
             (app.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager)?.activeNetwork
         }.getOrNull()
@@ -242,21 +267,21 @@ internal class ProxyRuntimeInspector(context: Context) {
             Thread(task, "hetu-public-network").apply { isDaemon = true }
         }
         @Volatile var probeEgressPort: Int = 0
-        val wanLookup = ProxyAsyncValue<Triple<String, String, String>>(
+        val wanLookup = ProxyAsyncValue<WanRuntimeInfo>(
             wanWorker,
             { SystemClock.elapsedRealtime() },
             { fetchPublicNetwork() },
-            Triple("—", "", "—"),
+            WanRuntimeInfo(),
             900_000L,
             60_000L,
         )
 
-        fun fetchPublicNetwork(): Triple<String, String, String> {
+        fun fetchPublicNetwork(): WanRuntimeInfo {
             val deadline = SystemClock.elapsedRealtime() + 6_000L
             val port = probeEgressPort
             if (port !in 1024..65535) error("Mihomo egress probe is not ready")
             val proxy = Proxy(Proxy.Type.HTTP, InetSocketAddress("127.0.0.1", port))
-            val connection = (URL("https://ipwho.is/?fields=success,ip,country_code,region").openConnection(proxy) as HttpURLConnection).apply {
+            val connection = (URL("https://ipwho.is/?fields=success,ip,country_code,country,region,city,connection").openConnection(proxy) as HttpURLConnection).apply {
                 connectTimeout = 3_000
                 readTimeout = 3_000
                 requestMethod = "GET"
@@ -282,10 +307,15 @@ internal class ProxyRuntimeInspector(context: Context) {
                 if (!json.optBoolean("success", false)) error("WAN lookup failed")
                 val address = json.optString("ip", "").trim()
                 if (address.isBlank()) error("WAN response has no address")
-                return Triple(
-                    address,
-                    json.optString("country_code", ""),
-                    json.optString("region", "—").ifBlank { "—" },
+                val carrier = json.optJSONObject("connection")
+                return WanRuntimeInfo(
+                    address = address,
+                    countryCode = json.optString("country_code", ""),
+                    country = json.optString("country", "—").ifBlank { "—" },
+                    region = json.optString("region", "—").ifBlank { "—" },
+                    city = json.optString("city", "—").ifBlank { "—" },
+                    isp = carrier?.optString("isp", "—")?.ifBlank { "—" } ?: "—",
+                    asn = carrier?.optString("asn", "—")?.ifBlank { "—" } ?: "—",
                 )
             } finally {
                 connection.disconnect()

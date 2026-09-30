@@ -1,5 +1,8 @@
 package io.github.xgl34222220.hetu
 
+import com.mikepenz.aboutlibraries.ui.compose.android.produceLibraries
+import com.mikepenz.aboutlibraries.ui.compose.m3.LibrariesContainer
+
 import io.github.xgl34222220.hetu.ui.ReferenceButton as Button
 
 import io.github.xgl34222220.hetu.ui.ReferenceModalBottomSheet as ModalBottomSheet
@@ -650,7 +653,7 @@ class ProxyNotificationSettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { HetuTheme { ProxyNotificationSettingsScreen { finish() } } }
+        hxHost { vm -> NotificationSettingsScreen(vm) { finish() } }
     }
 }
 
@@ -907,17 +910,25 @@ class ProxyAboutLibrariesActivity : ComponentActivity() {
 
 @Composable
 internal fun ProxyAboutLibrariesScreen(onBack: () -> Unit) {
-    val context = LocalContext.current
-    ExtraPage("开源库", "当前河图构建使用的主要组件", onBack) {
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(HETU_LIBRARIES, key = { it.id }) { lib ->
-                ExtraCard {
-                    ExtraRow(Icons.Rounded.Extension, lib.name, lib.project, lib.version) {
-                        context.startActivity(Intent(context, ProxyAboutLibraryDetailActivity::class.java).putExtra("library_id", lib.id))
+    val libraries by produceLibraries(R.raw.aboutlibraries)
+    ExtraPage("开源库", "自动读取当前 APK 的真实依赖与许可证", onBack) {
+        LibrariesContainer(
+            libraries = libraries,
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            header = {
+                item {
+                    ExtraCard {
+                        Text("构建依赖", color = LocalHetuTokens.current.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            "这里不再维护手写清单。Gradle 构建时自动收集 Compose、Miuix、Vico、Coil、Sora 等实际打进 APK 的组件和许可证。",
+                            color = LocalHetuTokens.current.textSecondary,
+                            fontSize = 12.5.sp,
+                            lineHeight = 18.sp,
+                        )
                     }
                 }
-            }
-        }
+            },
+        )
     }
 }
 

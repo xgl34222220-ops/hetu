@@ -419,6 +419,18 @@ internal class ProxyComposeController(context: Context) {
         configs.select(ProxyRuntimeProfile.load(prefs).core, name)
     }
 
+    suspend fun renameConfig(name: String, newName: String) = withContext(Dispatchers.IO) {
+        val core = ProxyRuntimeProfile.load(prefs).core
+        val entry = configs.list(core).firstOrNull { it.name == name } ?: error("配置不存在")
+        configs.rename(entry, newName).name
+    }
+
+    suspend fun exportConfig(name: String): ByteArray = withContext(Dispatchers.IO) {
+        val core = ProxyRuntimeProfile.load(prefs).core
+        val entry = configs.list(core).firstOrNull { it.name == name } ?: error("配置不存在")
+        configs.read(entry).toByteArray(Charsets.UTF_8)
+    }
+
     suspend fun deleteConfig(name: String) = withContext(Dispatchers.IO) {
         val profile = ProxyRuntimeProfile.load(prefs)
         val entry = configs.list(profile.core).firstOrNull { it.name == name } ?: error("配置不存在")
@@ -467,6 +479,25 @@ internal class ProxyComposeController(context: Context) {
         val profile = ProxyRuntimeProfile.load(prefs)
         val entry = configs.selected(profile.core) ?: error("尚未选择配置")
         configs.read(entry)
+    }
+
+    /** The editor retains the identity and exact source it opened. */
+    suspend fun configEditSnapshot(): ConfigEditSnapshot = withContext(Dispatchers.IO) {
+        val profile = ProxyRuntimeProfile.load(prefs)
+        val entry = configs.selected(profile.core) ?: error("尚未选择配置")
+        ConfigEditSnapshot(profile.core.id, entry.name, configs.read(entry))
+    }
+
+    suspend fun saveConfigSnapshot(snapshot: ConfigEditSnapshot, text: String) = withContext(Dispatchers.IO) {
+        val profile = ProxyRuntimeProfile.load(prefs)
+        val entry = configs.selected(profile.core) ?: error("尚未选择配置")
+        snapshot.requireUnchanged(profile.core.id, entry.name, configs.read(entry))
+        root.validateConfigText(text)
+        // Validation can take seconds: check again before replacing any source bytes.
+        val latestProfile = ProxyRuntimeProfile.load(prefs)
+        val latest = configs.selected(latestProfile.core) ?: error("尚未选择配置")
+        snapshot.requireUnchanged(latestProfile.core.id, latest.name, configs.read(latest))
+        configs.writeIfUnchanged(latest, snapshot, text)
     }
 
     suspend fun validateConfigText(text: String) = withContext(Dispatchers.IO) {

@@ -61,6 +61,8 @@ import top.yukonga.miuix.kmp.squircle.squircleClip
 data class DockItem(val label: String, val icon: ImageVector, val opticalScale: Float = 1f)
 
 /**
+ * V20.45: real MIUIX drawBackdrop liquid dock. Uses miuix-blur drawBackdrop/blur/highlight
+ * plus the runtime refraction lens instead of an opaque Card/textureBlur shell.
  * Shared MIUIX floating dock. This mirrors LuoShu's three-layer implementation:
  * page backdrop -> refractive shell -> moving refractive lens. Icons and labels are
  * always siblings above the shader layers, preventing OEM compositors from turning
@@ -97,7 +99,7 @@ fun HetuGlassDock(
         prefs.registerOnSharedPreferenceChangeListener(listener)
         onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
-    val shape = if (floating) RoundedCornerShape(32.dp) else RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
+    val shape = if (floating) RoundedCornerShape(31.dp) else RoundedCornerShape(topStart = 31.dp, topEnd = 31.dp)
     // Never render a translucent glass shell without a real blur/backdrop behind it.
     // That fallback was the source of the opaque white slab when either appearance switch was disabled.
     val renderGlass = activeGlass && enableBlur
@@ -106,7 +108,7 @@ fun HetuGlassDock(
     val dockSurfaceBackdrop = rememberLayerBackdrop()
     val hazeModifier = if (activeHaze) {
         Modifier.hazeEffect(state = hazeState, style = HazeMaterials.ultraThin()) {
-            blurRadius = 20.dp
+            blurRadius = 32.dp
             noiseFactor = .006f
         }
     } else Modifier
@@ -115,14 +117,14 @@ fun HetuGlassDock(
             listOf(Color.White.copy(alpha = .085f), Color(0xFF60A5FA).copy(alpha = .035f)),
         )
         renderGlass -> Brush.verticalGradient(
-            listOf(Color(0xFFF8FBFF).copy(alpha = .58f), Color(0xFFEAF2FF).copy(alpha = .34f)),
+            listOf(Color.White.copy(alpha = .22f), Color(0xFFE8E9F5).copy(alpha = .08f)),
         )
         else -> Brush.verticalGradient(
             if (dark) listOf(Color(0xFF1A2230), Color(0xFF151C27))
             else listOf(Color(0xFFF4F5F7), Color(0xFFE8EEF6)),
         )
     }
-    val shellTint = if (dark) scheme.surface.copy(alpha = .26f) else Color(0xFFF8FBFF).copy(alpha = .34f)
+    val shellTint = if (dark) scheme.surface.copy(alpha = .22f) else Color.White.copy(alpha = .14f)
     val liquidShellModifier = if (runtimeLiquid) {
         Modifier.drawBackdrop(
             backdrop = requireNotNull(backdrop),
@@ -134,17 +136,17 @@ fun HetuGlassDock(
                     contrast = 1.05f,
                     saturation = 1.15f,
                 )
-                blur(24.dp.toPx(), 24.dp.toPx())
+                blur(26.dp.toPx(), 26.dp.toPx())
                 liquidGlassLens(
-                    refractionHeight = 12.dp.toPx(),
-                    refractionAmount = 8.dp.toPx(),
+                    refractionHeight = 14.dp.toPx(),
+                    refractionAmount = 10.dp.toPx(),
                     depthEffect = true,
                     chromaticAberration = .045f,
                 )
             },
             highlight = {
                 (if (dark) Highlight.GlassStrokeSmallDark else Highlight.GlassStrokeSmallLight)
-                    .copy(alpha = if (dark) .16f else .24f)
+                    .copy(alpha = if (dark) .22f else .42f)
             },
             onDrawSurface = {
                 drawRect(shellTint)
@@ -184,7 +186,7 @@ fun HetuGlassDock(
     Box(
         modifier = modifier
             .background(Color.Transparent)
-            .then(if (floating) Modifier.padding(horizontal = 24.dp).padding(bottom = bottomInset + 12.dp) else Modifier)
+            .then(if (floating) Modifier.padding(horizontal = 24.dp).padding(bottom = bottomInset + 8.dp) else Modifier)
             .fillMaxWidth()
             .height(64.dp + if (floating) 0.dp else bottomInset).testTag("hetu-dock"),
     ) {
@@ -192,7 +194,7 @@ fun HetuGlassDock(
             modifier = Modifier
                 .fillMaxSize()
                 .shadow(
-                    if (floating) 14.dp else 4.dp,
+                    if (floating) 7.dp else 3.dp,
                     shape,
                     clip = false,
                     ambientColor = Color(0xFF12161A).copy(alpha = if (dark) .12f else .035f),
@@ -207,14 +209,14 @@ fun HetuGlassDock(
             items = items,
             selected = selected,
             onSelect = onSelect,
-            itemHeight = 52.dp,
+            itemHeight = 56.dp,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = 6.dp, top = 6.dp, end = 6.dp, bottom = if (floating) 6.dp else bottomInset + 6.dp),
-            indicatorColor = if (dark) Color.White.copy(alpha = .10f) else Color(0xFF12161A).copy(alpha = .07f),
-            indicatorBorderColor = if (dark) Color.White.copy(alpha = .14f) else Color.White.copy(alpha = .85f),
+                .padding(start = 4.dp, top = 4.dp, end = 4.dp, bottom = if (floating) 4.dp else bottomInset + 4.dp),
+            indicatorColor = if (dark) Color.White.copy(alpha = .10f) else Color(0xFFB7B9C9).copy(alpha = .24f),
+            indicatorBorderColor = if (dark) Color.White.copy(alpha = .18f) else Color.White.copy(alpha = .82f),
             indicatorShadow = 0.dp,
-            selectedColor = if (dark) Color(0xFF8AB4FF) else Color(0xFF12806F),
+            selectedColor = if (dark) Color(0xFF8AB4FF) else Color(0xFF1267D6),
             unselectedColor = scheme.onSurfaceVariant.copy(alpha = .90f),
             liquidGlass = renderGlass,
             indicatorBackdrop = dockSurfaceBackdrop.takeIf { runtimeLiquid },
@@ -261,7 +263,7 @@ private fun DockItems(
             val width = lensRight.value - lensLeft.value
             val settled = slot.second.coerceAtLeast(1f)
             val stretch = ((width - settled) / settled).coerceIn(0f, 1.2f)
-            val h = size.height * (1f - .12f * stretch) * lensPress.value
+            val h = size.height * .90f * (1f - .10f * stretch) * lensPress.value
             val w = width * lensPress.value
             val x = lensLeft.value + (width - w) / 2f
             val y = (size.height - h) / 2f
@@ -319,13 +321,13 @@ private fun DockItems(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
-                    Icon(item.icon, null, Modifier.size(21.dp).graphicsLayer {
+                    Icon(item.icon, null, Modifier.size(23.dp).graphicsLayer {
                         scaleX = item.opticalScale * iconPop.value; scaleY = item.opticalScale * iconPop.value
                     }, tint = color)
                     Spacer(Modifier.height(1.dp))
                     Text(item.label, if (active) Modifier.testTag("dock-active-label") else Modifier,
-                        color = color, fontSize = 10.5.sp, lineHeight = 13.sp,
-                        fontWeight = if (active) FontWeight.Bold else FontWeight.Medium, maxLines = 1)
+                        color = color, fontSize = 12.sp, lineHeight = 14.sp,
+                        fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1)
                 }
             }
         }

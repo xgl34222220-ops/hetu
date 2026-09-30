@@ -66,8 +66,7 @@ import kotlinx.coroutines.launch
 class ProxyCoreActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        setContent { HetuTheme { CoreManagerScreen(onBack = { finish() }) } }
+        hxHost { vm -> CoresScreen(vm, onBackOverride = { finish() }) }
     }
 }
 
@@ -126,23 +125,14 @@ private fun CoreManagerScreen(onBack: () -> Unit) {
             }
         }
         item("intro") {
-            Surface(shape = RoundedCornerShape(24.dp), color = tokens.cardBackground, shadowElevation = 1.dp) {
-                Column(Modifier.fillMaxWidth().padding(17.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Surface(shape = RoundedCornerShape(18.dp), color = tokens.cardBackground, shadowElevation = 1.dp) {
+                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Rounded.Memory, null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(9.dp))
                         Text("核心按设备 ABI 从发布源直接拉取", color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall)
                     }
                     Text("Mihomo 没有下载更新时自动回退到 App 内置版本；下载更新后优先使用下载版。其他核心先完成下载与版本管理，运行后端未接入时不会假报可用。", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
-                    OutlinedButton(
-                        onClick = { context.startActivity(Intent(context, ProxyAdvancedSettingsActivity::class.java)) },
-                        modifier = Modifier.fillMaxWidth().height(46.dp),
-                        shape = RoundedCornerShape(17.dp),
-                    ) {
-                        Icon(Icons.Rounded.Tune, null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(7.dp))
-                        Text("Root 网络高级设置")
-                    }
                     if (progress.isNotBlank()) Text(progress, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
                     else if (notice.isNotBlank()) Text(notice, color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
                     if (loading) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
@@ -202,7 +192,7 @@ private fun CoreStatusCard(
     onRemove: () -> Unit,
 ) {
     val tokens = LocalHetuTokens.current
-    Surface(shape = RoundedCornerShape(24.dp), color = tokens.cardBackground, shadowElevation = 1.dp) {
+    Surface(shape = RoundedCornerShape(18.dp), color = tokens.cardBackground, shadowElevation = 1.dp) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(shape = RoundedCornerShape(14.dp), color = tokens.elevatedCardBackground, modifier = Modifier.size(44.dp)) {
@@ -243,7 +233,7 @@ private fun CoreStatusCard(
                     onClick = onInstall,
                     enabled = enabled && item.canDownload,
                     modifier = Modifier.weight(1f).height(46.dp),
-                    shape = RoundedCornerShape(17.dp),
+                    shape = RoundedCornerShape(14.dp),
                 ) {
                     Icon(if (busy) Icons.Rounded.Downloading else Icons.Rounded.CloudDownload, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
@@ -254,7 +244,7 @@ private fun CoreStatusCard(
                         onClick = onRemove,
                         enabled = enabled,
                         modifier = Modifier.height(46.dp),
-                        shape = RoundedCornerShape(17.dp),
+                        shape = RoundedCornerShape(14.dp),
                     ) {
                         Icon(Icons.Rounded.DeleteOutline, null, Modifier.size(18.dp))
                         Spacer(Modifier.width(5.dp))

@@ -3,6 +3,7 @@ package io.github.xgl34222220.hetu
 import android.app.Application
 import android.content.Context
 import android.content.SharedPreferences
+import android.net.TrafficStats
 import android.os.SystemClock
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -25,7 +26,18 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-internal enum class HxTab(val label: String) { Home("首页"), Proxies("代理"), Connections("活动"), Rules("规则"), Settings("设置") }
+internal enum class HxTab(val label: String) { Home("首页"), Panel("面板"), Tools("工具"), Settings("设置") }
+
+/** Compact panel sections. Strategy stays inside Panel so the dock remains focused. */
+internal val HxPanelSections = listOf(
+    "overview" to "概览",
+    "proxies" to "策略",
+    "providers" to "订阅",
+    "conn" to "连接",
+    "rules" to "规则",
+    "sets" to "规则集",
+    "logs" to "日志",
+)
 
 internal enum class HxRunOp { Start, Stop, Restart, Reload }
 
@@ -45,7 +57,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     val filters = HetuComposeController(app)
 
     /* ---------------- navigation ---------------- */
-    var tab by mutableStateOf(if (prefs.getBoolean("startOnPanel", false)) HxTab.Proxies else HxTab.Home)
+    private var tabState by mutableStateOf(if (prefs.getBoolean("startOnPanel", false)) HxTab.Panel else HxTab.Home)
+
+    /** Current 「面板」 section; startup uses the user's configured default page. */
+    var panelSection by mutableStateOf(defaultPanelSection())
+        private set
+
+    private fun defaultPanelSection(): String {
+        val requested = prefs.getString("defaultPanelSection", "overview").orEmpty()
+        return requested.takeIf { key -> HxPanelSections.any { it.first == key } } ?: "overview"
+    }
+
+    /** Dock destination. Panel remembers whichever live sub-page the user last opened. */
+    var tab: HxTab
+        get() = tabState
+        set(value) { tabState = value }
+
+    /** Open a live panel section from home cards, tools or deep links. */
+    fun openPanel(section: String) {
+        val requested = section.ifBlank { "overview" }
+        panelSection = requested.takeIf { key -> HxPanelSections.any { it.first == key } } ?: "overview"
+        tabState = HxTab.Panel
+    }
+
+    fun setDefaultPanelSection(section: String) {
+        val value = section.takeIf { key -> HxPanelSections.any { it.first == key } } ?: "overview"
+        prefs.edit().putString("defaultPanelSection", value).apply()
+        bumpSettings()
+    }
 
     /** Incremented when the current dock tab is tapped again (scroll to top). */
     var reselect by mutableIntStateOf(0)
@@ -61,8 +100,26 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     var accentHex by mutableStateOf(customAccent())
         private set
 
+    /** Dark mode on true black (OLED). */
+    var pureBlack by mutableStateOf(prefs.getBoolean("pureBlackDark", false))
+        private set
+
+    fun updatePureBlack(value: Boolean) {
+        prefs.edit().putBoolean("pureBlackDark", value).apply()
+        pureBlack = value
+    }
+
+    /** Accent swatch; blank or the default blue resets to the Hetu default. */
+    fun setAccent(hex: String) {
+        prefs.edit().putString("accentHex", hex).apply()
+        accentHex = customAccent()
+    }
+
+    /** The accent as stored (default blue when none), for showing the current swatch. */
+    val accentChoice: String get() = accentHex.ifBlank { "#2A62E8" }
+
     private fun customAccent(): String = (prefs.getString("accentHex", "") ?: "")
-        .takeUnless { it.equals("#2563EB", true) || it.equals("#3B82F6", true) || it.equals("#12806F", true) || it.equals("#5CCFBC", true) }
+        .takeUnless { it.equals("#2563EB", true) || it.equals("#3B82F6", true) || it.equals("#2A62E8", true) || it.equals("#7EA6FF", true) }
         .orEmpty()
 
     /** Theme pages that still live in their own activities write prefs; pick them up on return. */
@@ -71,6 +128,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         dynamicColor = prefs.getBoolean("hetuDynamicColor", prefs.getBoolean("enableMonet", false))
         accentHex = customAccent()
         blurEnabled = prefs.getBoolean("enableBlur", true)
+        pureBlack = prefs.getBoolean("pureBlackDark", false)
     }
 
     fun setAppearanceMode(value: String) {
@@ -91,6 +149,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     var upRate by mutableLongStateOf(0L)
         private set
     var downRate by mutableLongStateOf(0L)
+        private set
+    var localUpRate by mutableLongStateOf(0L)
+        private set
+    var localDownRate by mutableLongStateOf(0L)
+        private set
+    var homeSpeedSource by mutableStateOf(
+        prefs.getString("homeSpeedSource", "api").orEmpty().takeIf { it == "api" || it == "local" } ?: "api"
+    )
         private set
     var cpuPercent by mutableFloatStateOf(0f)
         private set
@@ -159,6 +225,9 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     private var lastAt = 0L
     private var lastProcessTicks = 0L
     private var lastSystemTicks = 0L
+    private var lastLocalTxBytes = -1L
+    private var lastLocalRxBytes = -1L
+    private var lastLocalAt = 0L
     private var lastProviderRefreshAt = 0L
     private val coldStartAt = SystemClock.elapsedRealtime()
     private val measuredAt = HashMap<String, Long>()
@@ -181,7 +250,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             }
             while (isActive) {
                 if (operation == null) refreshNow()
-                delay(if (tab == HxTab.Home || tab == HxTab.Connections) 2_000L else 4_000L)
+                delay(if (tab == HxTab.Home || tab == HxTab.Panel) 2_000L else 4_000L)
             }
         }
         ProxyStatusNotificationService.refresh(app)
@@ -213,7 +282,13 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         lanInterface = prefs.getString("proxyUiLastLanIf", "—") ?: "—",
         wanAddress = prefs.getString("proxyUiLastWan", "—") ?: "—",
         wanCountryCode = prefs.getString("proxyUiLastWanCountry", "") ?: "",
+        wanCountry = prefs.getString("proxyUiLastWanCountryName", "—") ?: "—",
         wanRegion = prefs.getString("proxyUiLastWanRegion", "—") ?: "—",
+        wanCity = prefs.getString("proxyUiLastWanCity", "—") ?: "—",
+        wanIsp = prefs.getString("proxyUiLastWanIsp", "—") ?: "—",
+        wanAsn = prefs.getString("proxyUiLastWanAsn", "—") ?: "—",
+        cpuAffinity = prefs.getString("proxyUiLastCpuAffinity", "—") ?: "—",
+        currentCpu = prefs.getInt("proxyUiLastCurrentCpu", -1),
         wanState = "stale",
     )
 
@@ -222,6 +297,23 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             val startedAt = SystemClock.elapsedRealtime()
             val next = repo.state()
             val now = SystemClock.elapsedRealtime()
+            val totalTx = TrafficStats.getTotalTxBytes()
+            val totalRx = TrafficStats.getTotalRxBytes()
+            if (next.running && lastLocalAt > 0L && now > lastLocalAt &&
+                totalTx >= 0L && totalRx >= 0L && lastLocalTxBytes >= 0L && lastLocalRxBytes >= 0L &&
+                totalTx >= lastLocalTxBytes && totalRx >= lastLocalRxBytes) {
+                val elapsedLocal = now - lastLocalAt
+                localUpRate = ((totalTx - lastLocalTxBytes) * 1000L / elapsedLocal).coerceAtLeast(0L)
+                localDownRate = ((totalRx - lastLocalRxBytes) * 1000L / elapsedLocal).coerceAtLeast(0L)
+            } else if (!next.running) {
+                localUpRate = 0L
+                localDownRate = 0L
+            }
+            if (totalTx >= 0L && totalRx >= 0L) {
+                lastLocalTxBytes = totalTx
+                lastLocalRxBytes = totalRx
+                lastLocalAt = now
+            }
             // Right after process start a recovering core may briefly look stopped.
             if (state.running && !next.running && prefs.getBoolean("proxyRootWanted", false) && now - coldStartAt < 2_500L) return
 
@@ -297,8 +389,20 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             .putString("proxyUiLastLanIf", sampled.lanInterface)
             .putString("proxyUiLastWan", sampled.wanAddress)
             .putString("proxyUiLastWanCountry", sampled.wanCountryCode)
+            .putString("proxyUiLastWanCountryName", sampled.wanCountry)
             .putString("proxyUiLastWanRegion", sampled.wanRegion)
+            .putString("proxyUiLastWanCity", sampled.wanCity)
+            .putString("proxyUiLastWanIsp", sampled.wanIsp)
+            .putString("proxyUiLastWanAsn", sampled.wanAsn)
+            .putString("proxyUiLastCpuAffinity", sampled.cpuAffinity)
+            .putInt("proxyUiLastCurrentCpu", sampled.currentCpu)
             .apply()
+    }
+
+    fun updateHomeSpeedSource(source: String) {
+        val value = source.takeIf { it == "api" || it == "local" } ?: "api"
+        prefs.edit().putString("homeSpeedSource", value).apply()
+        homeSpeedSource = value
     }
 
     fun pullRefresh() {
@@ -482,15 +586,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         targets.forEach { testingNodes[it] = true }
         viewModelScope.launch {
             try {
-                for (chunk in targets.chunked(8)) {
-                    coroutineScope {
-                        chunk.map { node ->
-                            async {
-                                try { probe(node) } finally { testingNodes.remove(node) }
-                            }
-                        }.awaitAll()
-                    }
+                // Mihomo's group endpoint measures the whole strategy group in one parallel core
+                // operation. This avoids serial timeout waves where every visible delay is already
+                // known but the group pill keeps spinning on a few unreachable nodes.
+                val result = repo.groupDelay(group.name)
+                val stamp = SystemClock.elapsedRealtime()
+                targets.forEach { node ->
+                    delays[node] = result[node] ?: -1L
+                    measuredAt[node] = stamp
                 }
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) {
+                toast(errorText(error, "策略组测速失败"))
             } finally {
                 targets.forEach { testingNodes.remove(it) }
                 testingGroups.remove(group.name)

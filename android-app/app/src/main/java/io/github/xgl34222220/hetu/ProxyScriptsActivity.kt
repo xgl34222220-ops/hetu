@@ -11,6 +11,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -22,7 +23,10 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Terminal
@@ -31,6 +35,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -85,7 +90,13 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
     var message by remember { mutableStateOf("") }
     var environment by remember { mutableStateOf(false) }
     var managedRevision by remember { mutableIntStateOf(0) }
+    var hookRevision by remember { mutableIntStateOf(0) }
+    var menuOpen by remember { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<ManagedScript?>(null) }
+    val fixedStatus by produceState(initialValue = mapOf<String, Boolean>(), hookRevision) {
+        value = try { entries.associate { it.path to ProxyScriptHooks.read(context, it.path).isNotBlank() } }
+        catch (_: Exception) { emptyMap() }
+    }
     val managedScripts by produceState(initialValue = emptyList<ManagedScript>(), managedRevision) {
         value = try {
             ProxyScriptHooks.listManaged(context)
@@ -144,9 +155,55 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
         }
     }
 
-    HetuDetailList("脚本", onBack) {
+    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
+    val pageBg = if (dark) t.pageBackground else Color(0xFFF2F0F9)
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().background(pageBg),
+        contentPadding = PaddingValues(
+            start = 14.dp,
+            top = 8.dp,
+            end = 14.dp,
+            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 28.dp,
+        ),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item("header") {
+            Column(Modifier.statusBarsPadding()) {
+                Row(Modifier.fillMaxWidth().height(54.dp), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onBack, modifier = Modifier.size(42.dp)) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回", tint = t.textPrimary, modifier = Modifier.size(28.dp))
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Box {
+                        IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(42.dp)) {
+                            Icon(Icons.Rounded.MoreHoriz, "更多", tint = t.textPrimary, modifier = Modifier.size(28.dp))
+                        }
+                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            DropdownMenuItem(
+                                text = { Text("导入自定义脚本") },
+                                leadingIcon = { Icon(Icons.Rounded.Add, null) },
+                                onClick = { menuOpen = false; importer.launch(arrayOf("text/*", "application/octet-stream")) },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("脚本环境") },
+                                leadingIcon = { Icon(Icons.Rounded.Info, null) },
+                                onClick = { menuOpen = false; environment = true },
+                            )
+                        }
+                    }
+                }
+                Text(
+                    "脚本",
+                    color = t.textPrimary,
+                    fontSize = 31.sp,
+                    lineHeight = 37.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(start = 6.dp, top = 6.dp, bottom = 10.dp),
+                )
+            }
+        }
 
-        item {
+        item("hooks") {
             Surface(
                 shape = RoundedCornerShape(20.dp),
                 color = t.cardBackground,
@@ -154,130 +211,63 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
             ) {
                 Column(Modifier.fillMaxWidth()) {
                     entries.forEachIndexed { index, entry ->
-                        WorkspaceSettingRow(
-                            entry.title,
-                            entry.subtitle,
-                            Icons.Rounded.Code,
-                            onClick = { open(entry) },
+                        Row(
+                            Modifier.fillMaxWidth().heightIn(min = 64.dp).clickable { open(entry) }.padding(horizontal = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(
-                                if (busy) "读取中" else "编辑",
-                                color = MaterialTheme.colorScheme.primary,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                            )
+                            Text(entry.title, color = t.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                            Text(if (fixedStatus[entry.path] == true) "已设置" else "不设置", color = t.textSecondary, fontSize = 13.sp)
+                            Spacer(Modifier.width(8.dp))
+                            Icon(Icons.Rounded.ExpandMore, null, tint = t.textSecondary, modifier = Modifier.size(22.dp))
                         }
-                        if (index != entries.lastIndex) WorkspaceInsetDivider()
+                        if (index != entries.lastIndex) HorizontalDivider(Modifier.padding(start = 16.dp), thickness = .5.dp, color = t.outline.copy(alpha = .55f))
                     }
-                }
-            }
-        }
-
-        item("managed-title") {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("自定义脚本", color = t.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    Text("导入 UTF-8 Shell 脚本，可手动执行；最长 12 秒", color = t.textSecondary, fontSize = 11.5.sp)
-                }
-                TextButton(
-                    onClick = { importer.launch(arrayOf("text/*", "application/octet-stream")) },
-                    enabled = !busy,
-                ) {
-                    Icon(Icons.Rounded.Add, null, Modifier.size(17.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("导入")
+                    HorizontalDivider(Modifier.padding(start = 16.dp), thickness = .5.dp, color = t.outline.copy(alpha = .55f))
+                    Row(
+                        Modifier.fillMaxWidth().heightIn(min = 64.dp).clickable { environment = true }.padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("脚本环境", color = t.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                        Icon(Icons.Rounded.ChevronRight, null, tint = t.textSecondary, modifier = Modifier.size(22.dp))
+                    }
                 }
             }
         }
 
         if (managedScripts.isEmpty()) {
-            item("managed-empty") {
-                Surface(
-                    shape = RoundedCornerShape(18.dp),
-                    color = t.controlBackground,
-                    shadowElevation = 0.dp,
-                ) {
-                    Text(
-                        "还没有自定义脚本。导入后保存在 /data/adb/hetu/scripts；固定 pre-start / post-stop Hook 不会被覆盖。",
-                        Modifier.fillMaxWidth().padding(14.dp),
-                        color = t.textSecondary,
-                        fontSize = 12.sp,
-                        lineHeight = 18.sp,
-                    )
-                }
+            item("empty") {
+                Text("暂无脚本", color = t.textSecondary, fontSize = 16.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 6.dp, top = 10.dp))
             }
         } else {
+            item("custom-title") {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("自定义脚本", color = t.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { importer.launch(arrayOf("text/*", "application/octet-stream")) }, enabled = !busy) {
+                        Icon(Icons.Rounded.Add, null, Modifier.size(17.dp)); Spacer(Modifier.width(4.dp)); Text("导入")
+                    }
+                }
+            }
             items(managedScripts, key = { it.name }) { script ->
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = t.cardBackground,
-                    shadowElevation = 0.dp,
-                ) {
-                    WorkspaceSettingRow(
-                        script.name,
-                        scriptSize(script.size) + " · /data/adb/hetu/scripts",
-                        Icons.Rounded.Code,
-                    ) {
+                Surface(shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+                    WorkspaceSettingRow(script.name, scriptSize(script.size), Icons.Rounded.Code) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(
-                                onClick = {
-                                    if (!busy) scope.launch {
-                                        busy = true
-                                        message = ""
-                                        try {
-                                            message = ProxyScriptHooks.runManaged(context, script.name)
-                                        } catch (cancel: CancellationException) {
-                                            throw cancel
-                                        } catch (failure: Exception) {
-                                            message = failure.message ?: "脚本执行失败"
-                                        } finally {
-                                            busy = false
-                                        }
-                                    }
-                                },
-                                enabled = !busy,
-                                modifier = Modifier.size(40.dp),
-                            ) {
-                                Icon(Icons.Rounded.PlayArrow, "执行", tint = MaterialTheme.colorScheme.primary)
-                            }
-                            IconButton(
-                                onClick = { if (!busy) deleteTarget = script },
-                                enabled = !busy,
-                                modifier = Modifier.size(40.dp),
-                            ) {
-                                Icon(Icons.Rounded.DeleteOutline, "删除", tint = t.textSecondary)
-                            }
+                            IconButton(onClick = {
+                                if (!busy) scope.launch {
+                                    busy = true; message = ""
+                                    try { message = ProxyScriptHooks.runManaged(context, script.name) }
+                                    catch (cancel: CancellationException) { throw cancel }
+                                    catch (failure: Exception) { message = failure.message ?: "脚本执行失败" }
+                                    finally { busy = false }
+                                }
+                            }, enabled = !busy, modifier = Modifier.size(38.dp)) { Icon(Icons.Rounded.PlayArrow, "执行", tint = MaterialTheme.colorScheme.primary) }
+                            IconButton(onClick = { if (!busy) deleteTarget = script }, enabled = !busy, modifier = Modifier.size(38.dp)) { Icon(Icons.Rounded.DeleteOutline, "删除", tint = t.textSecondary) }
                         }
                     }
                 }
             }
         }
-
-        item {
-            Surface(
-                onClick = { environment = true },
-                shape = RoundedCornerShape(20.dp),
-                color = t.cardBackground,
-                shadowElevation = 0.dp,
-            ) {
-                WorkspaceSettingRow(
-                    "脚本环境",
-                    "查看河图注入的环境变量、路径和执行限制",
-                    Icons.Rounded.Terminal,
-                ) {
-                    Icon(Icons.Rounded.Info, null, Modifier.size(18.dp), tint = t.textSecondary)
-                }
-            }
-        }
-
         if (message.isNotBlank()) {
-            item {
-                HetuTaskFeedback(
-                    message,
-                    error = message.contains("失败") || message.contains("错误"),
-                    busy = busy,
-                )
-            }
+            item("feedback") { HetuTaskFeedback(message, error = message.contains("失败") || message.contains("错误"), busy = busy) }
         }
     }
 
@@ -328,7 +318,7 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
                                 try {
                                     ProxyScriptHooks.clear(context, entry.path)
                                     text = ""
-                                    message = "已清空${entry.title}脚本"
+                                    message = "已清空${entry.title}脚本"; hookRevision++
                                 } catch (failure: Exception) {
                                     message = failure.message ?: "清空失败"
                                 } finally {
@@ -350,6 +340,7 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
                                 try {
                                     ProxyScriptHooks.write(context, entry.path, text)
                                     message = "${entry.title}脚本已保存"
+                                    hookRevision++
                                     editor = null
                                 } catch (failure: Exception) {
                                     message = failure.message ?: "保存失败"

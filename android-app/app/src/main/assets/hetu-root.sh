@@ -520,7 +520,7 @@ select_dns6_policy(){
 }
 install_disabled_dns6(){
   case "$START_DNS6" in
-    redirect) install_dns_redirect6 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" "${START_SHARED_MACS:-}";;
+    redirect) install_dns_redirect6 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" "$START_SHARED_MACS" "$START_DNS_TCP" "$START_DNS_UDP" "${START_SHARED_MACS:-}";;
     blocked-no-nat|blocked-no-redirect)
       # Verify the actual fail-closed guard; do not treat optional NAT failure as
       # permission to send system/app IPv6 DNS directly to an external resolver.
@@ -671,14 +671,20 @@ install_redirect6(){
 }
 
 install_dns_redirect4(){
-  P="$1"; S="$2"; UIDS="$3"; SHARE="$4"; IFACES="$5"; MACS="${6:-}"; xt4 -t nat -N "$DNSOUT" || return 1; xt4 -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; xt4 -t nat -A "$DNSOUT" -m owner --uid-owner 0 -j RETURN || return 1; iface_out xt4 nat "$DNSOUT" "$IFACES" || return 1; blacklist_returns xt4 nat "$DNSOUT" "$S" "$UIDS" || return 1
-  for X in tcp udp; do scoped_redirect xt4 nat "$DNSOUT" "$S" "$UIDS" "$X" 53 "$P" || return 1; done; xt4 -t nat -I OUTPUT 1 -j "$DNSOUT" || return 1
-  if [ "$SHARE" = 1 ]; then xt4 -t nat -N "$DNSPRE" || return 1; iface_in xt4 nat "$DNSPRE" "$IFACES" || return 1; shared_mac_returns xt4 nat "$DNSPRE" "$MACS" || return 1; for X in tcp udp; do xt4 -t nat -A "$DNSPRE" -p "$X" --dport 53 -j REDIRECT --to-ports "$P" || return 1; done; xt4 -t nat -I PREROUTING 1 -j "$DNSPRE" || return 1; fi
+  P="$1"; S="$2"; UIDS="$3"; SHARE="$4"; IFACES="$5"; MACS="${6:-}"; DTCP="${7:-1}"; DUDP="${8:-1}"; [ "$DTCP" = 1 ] || [ "$DUDP" = 1 ] || return 0
+  xt4 -t nat -N "$DNSOUT" || return 1; xt4 -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; xt4 -t nat -A "$DNSOUT" -m owner --uid-owner 0 -j RETURN || return 1; iface_out xt4 nat "$DNSOUT" "$IFACES" || return 1; blacklist_returns xt4 nat "$DNSOUT" "$S" "$UIDS" || return 1
+  [ "$DTCP" = 1 ] && scoped_redirect xt4 nat "$DNSOUT" "$S" "$UIDS" tcp 53 "$P" || [ "$DTCP" != 1 ] || return 1
+  [ "$DUDP" = 1 ] && scoped_redirect xt4 nat "$DNSOUT" "$S" "$UIDS" udp 53 "$P" || [ "$DUDP" != 1 ] || return 1
+  xt4 -t nat -I OUTPUT 1 -j "$DNSOUT" || return 1
+  if [ "$SHARE" = 1 ]; then xt4 -t nat -N "$DNSPRE" || return 1; iface_in xt4 nat "$DNSPRE" "$IFACES" || return 1; shared_mac_returns xt4 nat "$DNSPRE" "$MACS" || return 1; [ "$DTCP" = 1 ] && xt4 -t nat -A "$DNSPRE" -p tcp --dport 53 -j REDIRECT --to-ports "$P" || [ "$DTCP" != 1 ] || return 1; [ "$DUDP" = 1 ] && xt4 -t nat -A "$DNSPRE" -p udp --dport 53 -j REDIRECT --to-ports "$P" || [ "$DUDP" != 1 ] || return 1; xt4 -t nat -I PREROUTING 1 -j "$DNSPRE" || return 1; fi
 }
 install_dns_redirect6(){
-  P="$1"; S="$2"; UIDS="$3"; SHARE="$4"; IFACES="$5"; MACS="${6:-}"; v6supported || return 0; xt6 -t nat -N "$DNSOUT" || return 1; xt6 -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; xt6 -t nat -A "$DNSOUT" -m owner --uid-owner 0 -j RETURN || return 1; iface_out xt6 nat "$DNSOUT" "$IFACES" || return 1; blacklist_returns xt6 nat "$DNSOUT" "$S" "$UIDS" || return 1
-  for X in tcp udp; do scoped_redirect xt6 nat "$DNSOUT" "$S" "$UIDS" "$X" 53 "$P" || return 1; done; xt6 -t nat -I OUTPUT 1 -j "$DNSOUT" || return 1
-  if [ "$SHARE" = 1 ]; then xt6 -t nat -N "$DNSPRE" || return 1; iface_in xt6 nat "$DNSPRE" "$IFACES" || return 1; shared_mac_returns xt6 nat "$DNSPRE" "$MACS" || return 1; for X in tcp udp; do xt6 -t nat -A "$DNSPRE" -p "$X" --dport 53 -j REDIRECT --to-ports "$P" || return 1; done; xt6 -t nat -I PREROUTING 1 -j "$DNSPRE" || return 1; fi
+  P="$1"; S="$2"; UIDS="$3"; SHARE="$4"; IFACES="$5"; MACS="${6:-}"; DTCP="${7:-1}"; DUDP="${8:-1}"; v6supported || return 0; [ "$DTCP" = 1 ] || [ "$DUDP" = 1 ] || return 0
+  xt6 -t nat -N "$DNSOUT" || return 1; xt6 -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; xt6 -t nat -A "$DNSOUT" -m owner --uid-owner 0 -j RETURN || return 1; iface_out xt6 nat "$DNSOUT" "$IFACES" || return 1; blacklist_returns xt6 nat "$DNSOUT" "$S" "$UIDS" || return 1
+  [ "$DTCP" = 1 ] && scoped_redirect xt6 nat "$DNSOUT" "$S" "$UIDS" tcp 53 "$P" || [ "$DTCP" != 1 ] || return 1
+  [ "$DUDP" = 1 ] && scoped_redirect xt6 nat "$DNSOUT" "$S" "$UIDS" udp 53 "$P" || [ "$DUDP" != 1 ] || return 1
+  xt6 -t nat -I OUTPUT 1 -j "$DNSOUT" || return 1
+  if [ "$SHARE" = 1 ]; then xt6 -t nat -N "$DNSPRE" || return 1; iface_in xt6 nat "$DNSPRE" "$IFACES" || return 1; shared_mac_returns xt6 nat "$DNSPRE" "$MACS" || return 1; [ "$DTCP" = 1 ] && xt6 -t nat -A "$DNSPRE" -p tcp --dport 53 -j REDIRECT --to-ports "$P" || [ "$DTCP" != 1 ] || return 1; [ "$DUDP" = 1 ] && xt6 -t nat -A "$DNSPRE" -p udp --dport 53 -j REDIRECT --to-ports "$P" || [ "$DUDP" != 1 ] || return 1; xt6 -t nat -I PREROUTING 1 -j "$DNSPRE" || return 1; fi
 }
 
 install_udp_leak_guard4(){
@@ -883,8 +889,36 @@ watchdog(){
 }
 start_watchdog(){ COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS="$6"; IFACES="$7"; DUIDS="$8"; DGIDS="${9:-}"; MACS="${10:-}"; stopwatchdog; "$0" watchdog "$COREPID" "$KILL" "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" "$DUIDS" "$DGIDS" "$MACS" >/dev/null 2>&1 & }
 
+mem_to_kb(){
+  V="$1"; case "$V" in
+    *[Kk]) N=${V%?}; M=1;;
+    *[Mm]) N=${V%?}; M=1024;;
+    *[Gg]) N=${V%?}; M=1048576;;
+    *) N=$V; M=1;;
+  esac
+  case "$N" in ''|*[!0-9]*) return 1;; esac
+  [ "$N" -gt 0 ] || return 1; echo $((N*M))
+}
+vendor_firewall_cleanup(){
+  [ "${1:-0}" = 1 ] || return 0
+  # User-opt-in only. Restrict cleanup to OEM-named chains; never touch Android/netd fw_* chains.
+  for TOOL in xt4 xt6; do
+    CHAINS=$($TOOL -t filter -S 2>/dev/null | sed -n 's/^-N //p' | grep -Ei '^(oplus|coloros|realme|oneplus|oem)[A-Za-z0-9_-]*$' || true)
+    for C in $CHAINS; do
+      $TOOL -t filter -S "$C" 2>/dev/null | grep ' -j REJECT' | while IFS= read -r RULE; do
+        SPEC=${RULE#-A $C }; $TOOL -t filter -D "$C" $SPEC >/dev/null 2>&1 || true
+      done
+    done
+  done
+}
+apply_core_controls(){
+  P="$1"; PERF="$2"; CPU="$3"; IO="$4"
+  if [ "$PERF" = 1 ]; then renice -n -10 -p "$P" >/dev/null 2>&1 || fail "性能模式无法设置进程优先级"; fi
+  if [ -n "$CPU" ]; then command -v taskset >/dev/null 2>&1 || fail "系统缺少 taskset，无法应用 CPU 核心分配"; printf '%s' "$CPU" | grep -Eq '^[0-9,-]+$' || fail "CPU 核心分配格式无效"; taskset -pc "$CPU" "$P" >/dev/null 2>&1 || fail "CPU 核心分配失败"; fi
+  if [ -n "$IO" ]; then command -v ionice >/dev/null 2>&1 || fail "系统缺少 ionice，无法应用磁盘 I/O 权重"; case "$IO" in [0-7]) ;; *) fail "磁盘 I/O 权重必须是 0-7";; esac; ionice -c 2 -n "$IO" -p "$P" >/dev/null 2>&1 || fail "磁盘 I/O 权重设置失败"; fi
+}
 start(){
-  START_BIN="$1"; START_CFG="$2"; START_MODE="$3"; START_TP="$4"; START_RP="$5"; START_V6="$6"; START_TCP="$7"; START_UDP="$8"; START_DNS="$9"; START_QUIC="${10}"; START_DP="${11}"; START_CP="${12}"; START_SCOPE="${13}"; START_UIDS="${14}"; START_SHARE="${15}"; START_KILL="${16}"; START_CIDRS="${17}"; START_IFACES="${18}"; START_DIRECT_UIDS="${19}"; START_PREVALIDATED="${20:-0}"; START_FAST_CAPS="${21:-0}"; START_DIRECT_GIDS="${22:-}"; START_SHARED_MACS="${23:-}"
+  START_BIN="$1"; START_CFG="$2"; START_MODE="$3"; START_TP="$4"; START_RP="$5"; START_V6="$6"; START_TCP="$7"; START_UDP="$8"; START_DNS="$9"; START_QUIC="${10}"; START_DP="${11}"; START_CP="${12}"; START_SCOPE="${13}"; START_UIDS="${14}"; START_SHARE="${15}"; START_KILL="${16}"; START_CIDRS="${17}"; START_IFACES="${18}"; START_DIRECT_UIDS="${19}"; START_PREVALIDATED="${20:-0}"; START_FAST_CAPS="${21:-0}"; START_DIRECT_GIDS="${22:-}"; START_SHARED_MACS="${23:-}"; START_DNS_TCP="${24:-1}"; START_DNS_UDP="${25:-1}"; START_PERF="${26:-0}"; START_CPU="${27:-}"; START_MEM="${28:-}"; START_IO="${29:-}"; START_VENDOR_CLEAN="${30:-0}"
   mkdir -p "$RUN" || fail "无法创建运行目录"; : > "$START_TIMING"
   acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
   rm -f "$START_ERROR"; start_stage "preflight"
@@ -898,6 +932,7 @@ start(){
   [ -x "$START_BIN" ] || fail "核心文件不存在或不可执行"; [ -r "$START_CFG" ] || fail "启动配置不存在"; mkdir -p "$RUN" || fail "无法创建运行目录"; if [ "$START_PREVALIDATED" != 1 ]; then validatecfg "$START_BIN" "$START_CFG" || fail "Mihomo 配置校验失败，当前网络未被接管"; fi; acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
   start_stage "cleanup-network"
   stopwatchdog; cleanup; restorev6 || fail "上次 IPv6 状态尚未恢复，请重试停止后再启动"
+  vendor_firewall_cleanup "$START_VENDOR_CLEAN"
   start_stage "stop-old-core"
   stopcore; rm -f "$CRASH_STATE" "$SESSION"
   start_stage "check-ports"
@@ -912,7 +947,9 @@ start(){
 
   mkdir -p "$RUN/rules" "$RUN/proxy_provider" "$RUN/ruleset" "$RUN/ui" || { cleanup; restorev6; rm -f "$SESSION"; fail "无法创建 Mihomo 运行缓存目录"; }
   start_stage "launch-core"
-  : > "$LOG"; "$START_BIN" -d "$RUN" -f "$START_CFG" >>"$LOG" 2>&1 & START_PID=$!; printf '%s\n' "$START_PID" > "$PIDFILE"; printf '%s\n' "$START_MODE" > "$MODEFILE"; write_session "$START_MODE" "$START_V6" "$START_DNS" "$START_DP" "$START_SCOPE" "$START_SHARE" "$START_KILL" "$START_CP" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS"
+  : > "$LOG"
+  if [ -n "$START_MEM" ]; then MEM_KB=$(mem_to_kb "$START_MEM") || fail "内存限制格式无效（示例 100M）"; [ "$MEM_KB" -ge 65536 ] || fail "内存限制不能低于 64M"; (ulimit -v "$MEM_KB" 2>/dev/null || exit 126; exec "$START_BIN" -d "$RUN" -f "$START_CFG") >>"$LOG" 2>&1 & START_PID=$!; else "$START_BIN" -d "$RUN" -f "$START_CFG" >>"$LOG" 2>&1 & START_PID=$!; fi
+  printf '%s\n' "$START_PID" > "$PIDFILE"; printf '%s\n' "$START_MODE" > "$MODEFILE"; apply_core_controls "$START_PID" "$START_PERF" "$START_CPU" "$START_IO"; write_session "$START_MODE" "$START_V6" "$START_DNS" "$START_DP" "$START_SCOPE" "$START_SHARE" "$START_KILL" "$START_CP" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS"
   start_stage "wait-listeners"
   wait_ready "$START_PID" "$START_MODE" "$START_TP" "$START_RP" "$START_TCP" "$START_UDP" "$START_DNS" "$START_DP" "$START_CP"; READY_RC=$?
   if [ "$READY_RC" -ne 0 ]; then
@@ -932,7 +969,7 @@ start(){
   start_stage "install-ipv4-redirect"
   install_redirect4 "$START_RP" "$START_MODE" "$START_TCP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 Redirect 规则安装失败，已回滚"; }
   start_stage "install-ipv4-dns"
-  if [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ] && [ "$START_DNS" != off ]; then install_dns_redirect4 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 DNS 劫持安装失败，已回滚"; }; fi
+  if [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ] && [ "$START_DNS" != off ]; then install_dns_redirect4 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" "$START_SHARED_MACS" "$START_DNS_TCP" "$START_DNS_UDP" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 DNS 劫持安装失败，已回滚"; }; fi
   start_stage "install-udp-leak-guard"
   if [ "$START_UDP" = 1 ]; then
     case "$START_MODE" in
@@ -948,7 +985,7 @@ start(){
   if [ "$START_V6" = enable ]; then
     install_mangle6 "$START_TP" "$START_MODE" "$START_TCP" "$START_UDP" "$START_DNS" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 TPROXY 规则安装失败，已回滚"; }
     install_redirect6 "$START_RP" "$START_MODE" "$START_TCP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 Redirect 规则安装失败，已回滚"; }
-    if [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ] && [ "$START_DNS" != off ]; then install_dns_redirect6 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 DNS 劫持安装失败，已回滚"; }; fi
+    if [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ] && [ "$START_DNS" != off ]; then install_dns_redirect6 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" "$START_SHARED_MACS" "$START_DNS_TCP" "$START_DNS_UDP" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 DNS 劫持安装失败，已回滚"; }; fi
     [ "$START_QUIC" = 0 ] || install_quic6 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 QUIC 策略安装失败，已回滚"; }
   elif [ "$START_V6" = strict ]; then install_v6_strict "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "严格 IPv4 防泄漏规则安装失败，已回滚"; }; fi
 

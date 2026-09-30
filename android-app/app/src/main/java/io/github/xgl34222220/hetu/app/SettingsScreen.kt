@@ -7,10 +7,41 @@ import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material3.Icon
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Apps
+import androidx.compose.material.icons.rounded.AddCircleOutline
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.AltRoute
 import androidx.compose.material.icons.rounded.Article
 import androidx.compose.material.icons.rounded.BlurOn
@@ -55,6 +86,7 @@ import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.material.icons.rounded.Web
 import androidx.compose.material.icons.rounded.WifiTethering
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -78,16 +110,8 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp) {
     val prefs = vm.prefs
     var revision by remember { mutableIntStateOf(0) }
     var choice by remember { mutableStateOf<String?>(null) }
-    var editTargets by remember { mutableStateOf(false) }
-    var confirmRecover by remember { mutableStateOf(false) }
-    val recomposeTick = revision + vm.settingsRevision
+    var restoreUri by remember { mutableStateOf<Uri?>(null) }
 
-    val notifyPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) {
-            ProxyStatusNotificationService.setEnabled(context, true)
-            revision++
-        } else vm.toast("没有通知权限，无法显示状态通知")
-    }
     val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri: Uri? ->
         if (uri != null) scope.launch {
             try {
@@ -100,215 +124,258 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp) {
             }
         }
     }
-    var restoreUri by remember { mutableStateOf<Uri?>(null) }
     val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? -> restoreUri = uri }
-
-    val profile = ProxyRuntimeProfile.load(prefs)
+    val notifyPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            ProxyStatusNotificationService.setEnabled(context, true)
+            revision++
+        } else vm.toast("没有通知权限，无法显示状态通知")
+    }
 
     fun open(type: Class<out android.app.Activity>) { context.startActivity(Intent(context, type)) }
-    val c = Hx.colors
+    fun bump() { revision++; vm.bumpSettings() }
 
-    val stagger = rememberHxStagger()
-    HxPage(title = "设置", scrollToTopSignal = vm.reselect, subtitle = if (recomposeTick >= 0) null else "", bottomPadding = bottomPadding) {
-        item(key = "proxy") {
-            HxSection("代理与网络", modifier = Modifier.hxEnter(stagger, 0)) {
-                HxGroup {
-                    HxNavRow(
-                        "网络与分流",
-                        subtitle = "核心模式、DNS、IPv6、应用范围、网络自动化与高级运行控制",
-                        icon = Icons.Rounded.Tune,
-                        value = "${profile.core.label} · ${profile.mode.label}",
-                    ) { nav.push(HxRoute.Network) }
-                }
-            }
-        }
-        item(key = "data") {
-            HxSection("订阅与数据", modifier = Modifier.hxEnter(stagger, 1)) {
-                HxGroup {
-                    HxNavRow(
-                        "订阅工作台",
-                        subtitle = "配置库、订阅链接、流量用量与 YAML 编辑",
-                        icon = Icons.Rounded.CloudDownload,
-                        value = vm.state.config,
-                    ) { open(ProxySubscriptionActivity::class.java) }
-                    HxDivider()
-                    HxNavRow(
-                        "广告过滤",
-                        subtitle = "规则源、黑白名单与拦截统计",
-                        icon = Icons.Rounded.Shield,
-                        value = if (prefs.getBoolean("proxyAdblockChain", true)) "开启" else "关闭",
-                    ) { nav.push(HxRoute.Adblock) }
-                    HxDivider()
-                    HxNavRow(
-                        "内核管理",
-                        subtitle = "下载、更新、导入与删除各核心",
-                        icon = Icons.Rounded.Memory,
-                        iconTint = c.textMuted,
-                        value = vm.coreVersion.ifBlank { profile.core.label },
-                    ) { nav.push(HxRoute.Cores) }
-                }
-            }
-        }
-        item(key = "panel") {
-            HxSection("代理行为", modifier = Modifier.hxEnter(stagger, 2)) {
-                HxGroup {
-                    // Search/sort/layout/API/icon controls live on the Proxy page itself.
-                    // Keep only preferences that are not duplicated there.
-                    HxSwitchRow("切换节点后断开旧连接", prefs.getBoolean("proxySelectorDisconnectOnSelect", false), {
-                        prefs.edit().putBoolean("proxySelectorDisconnectOnSelect", it).apply(); revision++
-                    }, subtitle = "只关闭经过当前策略组的旧连接", icon = Icons.Rounded.SwapHoriz, iconTint = c.good)
-                    HxDivider()
-                    HxSwitchRow("启动后进入代理页", prefs.getBoolean("startOnPanel", false), {
-                        prefs.edit().putBoolean("startOnPanel", it).apply(); revision++
-                    }, icon = Icons.Rounded.Dashboard)
-                    HxDivider()
-                    HxNavRow("延迟自动刷新", subtitle = "首页站点延迟定时测速", icon = Icons.Rounded.Sync, iconTint = c.textMuted,
-                        value = prefs.getInt("latencyAutoRefreshSeconds", 0).let { if (it == 30 || it == 60) "$it 秒" else "关闭" }) { choice = "latency" }
-                    HxDivider()
-                    HxNavRow("测速站点", subtitle = ProxyLatencyTargets.load(prefs).joinToString(" · ") { it.name }, icon = Icons.Rounded.Speed, iconTint = c.warn) {
-                        editTargets = true
+    val c = Hx.colors
+    val panelDefault = prefs.getString("defaultPanelSection", "proxies").orEmpty()
+    val mirrorEnabled = prefs.getBoolean("downloadMirrorEnabled", false)
+    val notifyEnabled = prefs.getBoolean(ProxyStatusNotificationService.PREF_ENABLED, false)
+    val showPanelDock = prefs.getBoolean("showPanelDock", true)
+    val appLanguage = prefs.getString("appLanguage", "system").orEmpty().ifBlank { "system" }
+    val startOnPanel = prefs.getBoolean("startOnPanel", false)
+
+    val miuixColors = if (c.dark) {
+        top.yukonga.miuix.kmp.theme.darkColorScheme(
+            primary = c.accent,
+            primaryVariant = c.accent,
+            background = c.canvas,
+            surface = c.canvas,
+            surfaceVariant = c.canvas,
+            surfaceContainer = c.surface,
+            onBackground = c.text,
+            onSurface = c.text,
+            onSurfaceContainer = c.text,
+            onSurfaceVariantSummary = Color(0xFF55576A),
+            onSurfaceVariantActions = Color(0xFF4A4C5E),
+            outline = c.line,
+            dividerLine = c.line,
+        )
+    } else {
+        top.yukonga.miuix.kmp.theme.lightColorScheme(
+            primary = c.accent,
+            primaryVariant = c.accent,
+            background = Color(0xFFEBEDFA),
+            surface = Color(0xFFEBEDFA),
+            surfaceVariant = Color(0xFFEBEDFA),
+            surfaceContainer = Color(0xFFF9F8FE),
+            onBackground = c.text,
+            onSurface = c.text,
+            onSurfaceContainer = c.text,
+            onSurfaceVariantSummary = Color(0xFF55576A),
+            onSurfaceVariantActions = Color(0xFF4A4C5E),
+            outline = c.line,
+            dividerLine = Color.Transparent,
+        )
+    }
+
+    top.yukonga.miuix.kmp.theme.MiuixTheme(colors = miuixColors) {
+        HxPage(
+            title = "设置",
+            scrollToTopSignal = vm.reselect,
+            bottomPadding = bottomPadding,
+            largeTitleStartPadding = 26.dp,
+            largeTitleFontSizeSp = 36f,
+            largeTitleBottomPadding = 18.dp,
+            canvasColor = if (c.dark) c.canvas else Color(0xFFEBEDFA),
+        ) {
+                item(key = "proxy-config") {
+                    MiuixSettingsCard {
+                        MiuixSettingsArrow(
+                            title = "基础代理配置",
+                            summary = "配置核心、模式、IPv6 和当前配置",
+                            icon = Icons.Rounded.Tune,
+                            onClick = { open(RootTproxyActivity::class.java) },
+                        )
+                        MiuixSettingsArrow(
+                            title = "其他代理配置",
+                            summary = "调整代理开关、DNS 劫持、资源限制与防火墙",
+                            icon = Icons.Rounded.AltRoute,
+                            onClick = { open(ProxyAdvancedSettingsActivity::class.java) },
+                        )
                     }
                 }
-            }
-        }
-        item(key = "services") {
-            HxSection("服务与控制", modifier = Modifier.hxEnter(stagger, 3)) {
-                HxGroup {
-                    HxSwitchRow("开机自动启动", prefs.getBoolean("proxyRootAutoStart", false), {
-                        prefs.edit().putBoolean("proxyRootAutoStart", it).apply(); revision++
-                    }, subtitle = "开机后恢复上次运行中的代理", icon = Icons.Rounded.RestartAlt)
-                    HxDivider()
-                    HxSwitchRow("状态通知", prefs.getBoolean(ProxyStatusNotificationService.PREF_ENABLED, false), { on ->
-                        if (on && Build.VERSION.SDK_INT >= 33 &&
-                            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-                        ) {
-                            notifyPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-                        } else {
-                            ProxyStatusNotificationService.setEnabled(context, on)
-                            revision++
+
+                item(key = "appearance-data") {
+                    MiuixSettingsCard {
+                        MiuixSettingsArrow(
+                            title = "语言",
+                            summary = "切换应用语言",
+                            icon = Icons.Rounded.Public,
+                            value = when (prefs.getString("appLanguage", "system").orEmpty()) {
+                                "zh-CN" -> "简体中文"
+                                "zh-TW", "zh-HK" -> "繁體中文"
+                                "en" -> "English"
+                                "ru" -> "Русский"
+                                else -> "跟随系统"
+                            },
+                            onClick = { choice = "language" },
+                        )
+                        MiuixSettingsArrow(
+                            title = "主题设置",
+                            summary = "调整主题、模糊、底栏和缩放",
+                            icon = Icons.Rounded.Palette,
+                            value = when (vm.appearance) { "light" -> "浅色"; "dark" -> "深色"; else -> "跟随系统" },
+                            onClick = { open(ThemeSettingsActivity::class.java) },
+                        )
+                        MiuixSettingsArrow(
+                            title = "备份与恢复",
+                            summary = "备份或恢复应用数据",
+                            icon = Icons.Rounded.CloudSync,
+                            onClick = { choice = "backup" },
+                        )
+                    }
+                }
+
+                item(key = "startup-download") {
+                    MiuixSettingsCard {
+                        MiuixSettingsSwitch(
+                            title = "开机自启",
+                            summary = "安装 Root 开机脚本，开机后自动启动服务",
+                            icon = Icons.Rounded.RestartAlt,
+                            checked = prefs.getBoolean("proxyRootAutoStart", false),
+                            onCheckedChange = { on -> prefs.edit().putBoolean("proxyRootAutoStart", on).apply(); bump() },
+                        )
+                        MiuixSettingsSwitch(
+                            title = "加速下载",
+                            summary = "为下载资源启用加速通道",
+                            icon = Icons.Rounded.Download,
+                            checked = mirrorEnabled,
+                            onCheckedChange = { on -> prefs.edit().putBoolean("downloadMirrorEnabled", on).apply(); bump() },
+                        )
+                        AnimatedVisibility(mirrorEnabled) {
+                            MiuixSettingsArrow(
+                                title = "加速地址",
+                                summary = prefs.getString("downloadMirrorPrefix", "").orEmpty().ifBlank { "设置下载镜像前缀" },
+                                icon = Icons.Rounded.LinkOff,
+                                onClick = { choice = "mirror" },
+                            )
                         }
-                    }, subtitle = "通知栏显示网速，并提供快捷按钮", icon = Icons.Rounded.Notifications, iconTint = c.warn)
-                    HxDivider()
-                    HxNavRow("通知与快捷控制", subtitle = "通知模板、按钮、刷新间隔与系统磁贴", icon = Icons.Rounded.Notifications, iconTint = c.warn) {
-                        open(ProxyNotificationSettingsActivity::class.java)
-                    }
-                    HxDivider()
-                    HxNavRow("脚本", subtitle = "脚本管理与启动、停止钩子", icon = Icons.Rounded.Terminal, iconTint = c.textMuted) {
-                        open(ProxyScriptsActivity::class.java)
-                    }
-                    HxDivider()
-                    HxNavRow("日志管理", subtitle = "筛选、搜索、暂停和导出运行日志", icon = Icons.Rounded.Article) {
-                        open(ProxyLogViewerActivity::class.java)
-                    }
-                    HxDivider()
-                    HxNavRow("运行文件", subtitle = "浏览和编辑 Root 运行目录", icon = Icons.Rounded.Inventory2, iconTint = c.textMuted) {
-                        open(ReferenceFileManagerActivity::class.java)
                     }
                 }
-            }
-        }
-        item(key = "panels") {
-            HxSection("Web 面板", modifier = Modifier.hxEnter(stagger, 4)) {
-                HxGroup {
-                    HxNavRow(
-                        "Web 面板",
-                        subtitle = "本地 WebUI、Zashboard 与远程面板统一在这里管理",
-                        icon = Icons.Rounded.Web,
-                    ) { open(ProxyWebPanelsActivity::class.java) }
-                }
-            }
-        }
-        item(key = "look") {
-            HxSection("界面", modifier = Modifier.hxEnter(stagger, 5)) {
-                HxGroup {
-                    HxNavRow("主题", icon = Icons.Rounded.DarkMode, iconTint = c.textMuted, value = when (vm.appearance) {
-                        "light" -> "浅色"
-                        "dark" -> "深色"
-                        else -> "跟随系统"
-                    }) { choice = "appearance" }
-                    if (Build.VERSION.SDK_INT >= 31) {
-                        HxDivider()
-                        HxSwitchRow("壁纸取色", vm.dynamicColor, { vm.setDynamic(it) }, subtitle = "使用系统壁纸的主题色", icon = Icons.Rounded.Palette)
-                    }
-                    HxDivider()
-                    HxSwitchRow("触感反馈", prefs.getBoolean(HetuHaptics.PREF_KEY, true), {
-                        prefs.edit().putBoolean(HetuHaptics.PREF_KEY, it).apply(); revision++
-                    }, subtitle = "点按、切换与操作结果的振动反馈", icon = Icons.Rounded.Vibration, iconTint = c.textMuted)
-                    HxDivider()
-                    HxSwitchRow("模糊效果", prefs.getBoolean("enableBlur", true), {
-                        prefs.edit().putBoolean("enableBlur", it).apply(); vm.reloadAppearance(); revision++
-                    }, subtitle = "底栏、顶栏与工具页面的毛玻璃效果", icon = Icons.Rounded.BlurOn, iconTint = c.textMuted)
-                    HxDivider()
-                    HxNavRow("更多主题选项", subtitle = "强调色、配色风格、纯黑深色、界面缩放、语言", icon = Icons.Rounded.ColorLens) {
-                        open(ThemeSettingsActivity::class.java)
-                    }
-                }
-            }
-        }
-        item(key = "backup") {
-            HxSection("下载与备份", modifier = Modifier.hxEnter(stagger, 6)) {
-                HxGroup {
-                    HxNavRow("下载镜像", subtitle = "核心、规则等下载经由镜像前缀", icon = Icons.Rounded.Download, iconTint = c.good,
-                        value = if (prefs.getBoolean("downloadMirrorEnabled", false)) prefs.getString("downloadMirrorPrefix", "").orEmpty().ifBlank { "已开启" } else "关闭") {
-                        choice = "mirror"
-                    }
-                    HxDivider()
-                    HxNavRow("导出备份", subtitle = "导出应用设置与配置库", icon = Icons.Rounded.UploadFile, iconTint = c.good) {
-                        exporter.launch("Hetu-backup.json")
-                    }
-                    HxDivider()
-                    HxNavRow("恢复备份", subtitle = "恢复前确认，不会卸载或清除数据", icon = Icons.Rounded.Restore, iconTint = c.good) {
-                        importer.launch(arrayOf("application/json", "text/plain", "application/octet-stream"))
+
+                item(key = "notification-panel") {
+                    MiuixSettingsCard {
+                        MiuixSettingsSwitch(
+                            title = "通知",
+                            summary = "启用状态通知",
+                            icon = Icons.Rounded.Notifications,
+                            checked = notifyEnabled,
+                            onCheckedChange = { on ->
+                                if (on && Build.VERSION.SDK_INT >= 33 &&
+                                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                                ) {
+                                    notifyPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                } else {
+                                    ProxyStatusNotificationService.setEnabled(context, on)
+                                    bump()
+                                }
+                            },
+                        )
+                        MiuixSettingsArrow(
+                            title = "通知详细设置",
+                            summary = "配置通知内容与操作按钮",
+                            icon = Icons.Rounded.Notifications,
+                            onClick = { nav.push(HxRoute.Notifications) },
+                        )
+                        MiuixSettingsSwitch(
+                            title = "显示底栏面板入口",
+                            summary = "在底栏显示面板入口",
+                            icon = Icons.Rounded.Dashboard,
+                            checked = showPanelDock,
+                            onCheckedChange = { on -> prefs.edit().putBoolean("showPanelDock", on).apply(); bump() },
+                        )
+                        MiuixSettingsArrow(
+                            title = "默认面板页面",
+                            summary = "选择打开面板时默认显示的页面",
+                            icon = Icons.Rounded.GridView,
+                            value = HxPanelSections.firstOrNull { it.first == panelDefault }?.second ?: "策略",
+                            onClick = { choice = "defaultPanel" },
+                        )
+                        MiuixSettingsSwitch(
+                            title = "启动时打开面板",
+                            summary = "启动后自动进入面板页面",
+                            icon = Icons.Rounded.Dashboard,
+                            checked = prefs.getBoolean("startOnPanel", false),
+                            onCheckedChange = { on -> prefs.edit().putBoolean("startOnPanel", on).apply(); bump() },
+                        )
                     }
                 }
-            }
-        }
-        item(key = "about") {
-            HxSection("关于", modifier = Modifier.hxEnter(stagger, 7)) {
-                HxGroup {
-                    HxNavRow("关于河图", icon = Icons.Rounded.Info, iconTint = c.textMuted, value = BuildConfig.VERSION_NAME) { nav.push(HxRoute.About) }
-                    HxDivider()
-                    HxNavRow("开源库", icon = Icons.Rounded.LibraryBooks, iconTint = c.textMuted) { open(ProxyAboutLibrariesActivity::class.java) }
-                    HxDivider()
-                    HxNavRow("赞助与支持", icon = Icons.Rounded.Favorite, iconTint = c.bad) { open(ProxyAboutSponsorshipActivity::class.java) }
+
+                item(key = "about") {
+                    MiuixSettingsCard {
+                        MiuixSettingsArrow(
+                            title = "关于",
+                            summary = "版本、项目、内核组件与开源引用",
+                            icon = Icons.Rounded.Info,
+                            onClick = { nav.push(HxRoute.About) },
+                        )
+                    }
                 }
-            }
         }
     }
 
     when (choice) {
-        "api" -> ApiSettingsSheet(vm, onDismiss = { choice = null })
-        "latency" -> HxChoiceSheet(
-            title = "延迟自动刷新",
-            choices = listOf(HxChoice("0", "关闭"), HxChoice("30", "每 30 秒"), HxChoice("60", "每 60 秒")),
-            selected = prefs.getInt("latencyAutoRefreshSeconds", 0).let { if (it == 30 || it == 60) it.toString() else "0" },
-            onPick = { prefs.edit().putInt("latencyAutoRefreshSeconds", it.toInt()).apply(); revision++; choice = null },
+        "language" -> HxChoiceSheet(
+            title = "语言",
+            choices = listOf(
+                HxChoice("system", "跟随系统"),
+                HxChoice("zh-CN", "简体中文"),
+                HxChoice("zh-TW", "繁體中文"),
+                HxChoice("en", "English"),
+                HxChoice("ru", "Русский"),
+            ),
+            selected = prefs.getString("appLanguage", "system").orEmpty(),
+            onPick = { value -> prefs.edit().putString("appLanguage", value).apply(); vm.bumpSettings(); revision++; choice = null },
             onDismiss = { choice = null },
-            footer = "只测试首页的三个站点，不会对全部节点测速。",
         )
-        "ports" -> HxTextSheet(
-            title = "端口细则",
-            text = listOf(
-                "TPROXY 透明代理    ${MihomoStartupConfig.TPROXY_PORT}",
-                "Redirect 转发      ${MihomoStartupConfig.REDIRECT_PORT}",
-                "DNS 监听           ${MihomoStartupConfig.DNS_PORT}",
-                "控制器             127.0.0.1:${vm.state.controllerPort}",
-                "出口探针           127.0.0.1:${MihomoStartupConfig.egressProbePort(vm.state.controllerPort)}",
-                "",
-                "以上端口仅供河图私有运行副本使用，订阅配置里的 mixed-port / socks-port 等不会被继承。",
-            ).joinToString("\n"),
+        "backup" -> HxChoiceSheet(
+            title = "备份与恢复",
+            choices = listOf(
+                HxChoice("export", "导出备份", "导出应用设置与配置库"),
+                HxChoice("restore", "恢复备份", "从备份文件恢复应用数据"),
+            ),
+            selected = null,
+            onPick = { value ->
+                choice = null
+                if (value == "export") exporter.launch("Hetu-backup.json")
+                else importer.launch(arrayOf("application/json", "text/plain", "application/octet-stream"))
+            },
             onDismiss = { choice = null },
         )
         "mirror" -> HxFormDialog(
-            title = "下载镜像",
-            message = "填写镜像前缀，例如 https://ghfast.top/ ，留空表示关闭。仅使用你信任的镜像；不会附加控制器密钥。",
+            title = "加速下载",
+            message = "填写镜像前缀，例如 https://ghfast.top/ 。",
             fields = listOf(HxField("镜像前缀", prefs.getString("downloadMirrorPrefix", "").orEmpty(), placeholder = "https://")),
-            validate = { v -> if (v[0].isNotBlank() && !v[0].startsWith("https://") && !v[0].startsWith("http://")) "请填写 http/https 地址" else null },
-            onConfirm = { v ->
-                prefs.edit().putBoolean("downloadMirrorEnabled", v[0].isNotBlank()).putString("downloadMirrorPrefix", v[0]).apply()
-                revision++
-                choice = null
+            validate = { values ->
+                val v = values.firstOrNull().orEmpty().trim()
+                if (v.isNotBlank() && !v.startsWith("https://") && !v.startsWith("http://")) "请填写 http/https 地址" else null
             },
+            onConfirm = { values ->
+                prefs.edit().putString("downloadMirrorPrefix", values.firstOrNull().orEmpty().trim()).apply()
+                bump(); choice = null
+            },
+            onDismiss = { choice = null },
+        )
+        "defaultPanel" -> HxChoiceSheet(
+            title = "默认面板页面",
+            choices = listOf(
+                HxChoice("proxies", "策略"),
+                HxChoice("conn", "连接"),
+                HxChoice("providers", "订阅"),
+                HxChoice("rules", "规则"),
+                HxChoice("sets", "规则集"),
+            ),
+            selected = panelDefault,
+            onPick = { vm.setDefaultPanelSection(it); revision++; choice = null },
             onDismiss = { choice = null },
         )
     }
@@ -325,8 +392,7 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp) {
                         val count = HetuSettingsBackup.restore(context, uri)
                         vm.toast("已恢复 $count 项，请检查设置后手动应用")
                         vm.reloadAppearance()
-                        vm.bumpSettings()
-                        revision++
+                        bump()
                     } catch (cancel: CancellationException) {
                         throw cancel
                     } catch (error: Exception) {
@@ -337,61 +403,79 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp) {
             onDismiss = { restoreUri = null },
         )
     }
+}
 
-    if (choice == "appearance") {
-        HxChoiceSheet(
-            title = "主题",
-            choices = listOf(HxChoice("system", "跟随系统"), HxChoice("light", "浅色"), HxChoice("dark", "深色")),
-            selected = vm.appearance,
-            onPick = { vm.setAppearanceMode(it); choice = null },
-            onDismiss = { choice = null },
-        )
-    }
+@Composable
+private fun MiuixSettingsCard(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+    top.yukonga.miuix.kmp.basic.Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp)
+            .padding(bottom = 12.dp),
+        cornerRadius = 16.dp,
+        insideMargin = PaddingValues(0.dp),
+        colors = top.yukonga.miuix.kmp.basic.CardDefaults.defaultColors(
+            color = top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme.surfaceContainer,
+        ),
+        content = content,
+    )
+}
 
-    if (editTargets) {
-        val targets = ProxyLatencyTargets.load(prefs)
-        HxFormDialog(
-            title = "测速站点",
-            message = "首页的三个站点延迟，通过当前网络（含代理）访问测量。",
-            fields = targets.flatMapIndexed { i, t ->
-                listOf(HxField("站点 ${i + 1} 名称", t.name), HxField("站点 ${i + 1} 地址", t.url, placeholder = "https://"))
-            },
-            validate = { values ->
-                values.chunked(2).map { ProxyLatencyTarget(it[0], it[1]) }.firstNotNullOfOrNull { ProxyLatencyTargets.validate(it) }
-            },
-            onConfirm = { values ->
-                ProxyLatencyTargets.save(prefs, values.chunked(2).map { ProxyLatencyTarget(it[0], it[1]) })
-                editTargets = false
-                vm.toast("已保存")
-            },
-            onDismiss = { editTargets = false },
-        )
-    }
-
-    if (confirmRecover) {
-        HxConfirmDialog(
-            title = "恢复网络？",
-            message = "将停止代理，并回滚河图添加的 iptables / 路由规则。用于网络异常时的紧急恢复。",
-            confirmLabel = "恢复",
-            danger = true,
-            onConfirm = {
-                confirmRecover = false
-                scope.launch {
-                    try {
-                        vm.controller.stop()
-                        vm.toast("已停止代理并恢复网络")
-                    } catch (cancel: CancellationException) {
-                        throw cancel
-                    } catch (error: Exception) {
-                        vm.toast(error.message ?: "恢复失败")
-                    }
-                    vm.refreshNow()
-                }
-            },
-            onDismiss = { confirmRecover = false },
+@Composable
+private fun MiuixSettingsIcon(icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    Box(Modifier.size(34.dp), contentAlignment = Alignment.Center) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme.onSurface,
+            modifier = Modifier.size(21.dp),
         )
     }
 }
+
+@Composable
+private fun MiuixSettingsArrow(
+    title: String,
+    summary: String? = null,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    value: String? = null,
+    onClick: () -> Unit,
+) {
+    top.yukonga.miuix.kmp.preference.ArrowPreference(
+        title = title,
+        summary = summary,
+        startAction = { MiuixSettingsIcon(icon) },
+        endActions = {
+            if (!value.isNullOrBlank()) {
+                top.yukonga.miuix.kmp.basic.Text(
+                    text = value,
+                    color = top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    fontSize = 14.sp,
+                    maxLines = 1,
+                )
+            }
+        },
+        onClick = onClick,
+    )
+}
+
+@Composable
+private fun MiuixSettingsSwitch(
+    title: String,
+    summary: String? = null,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    top.yukonga.miuix.kmp.preference.SwitchPreference(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        title = title,
+        summary = summary,
+        startAction = { MiuixSettingsIcon(icon) },
+    )
+}
+
 
 /* ------------------------------------------------------------------ */
 /*  Network & routing                                                   */
@@ -402,12 +486,20 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
     val nav = LocalNav.current
     val context = LocalContext.current
     val prefs = vm.prefs
+    val scope = rememberCoroutineScope()
     var revision by remember { mutableIntStateOf(0) }
     var choice by remember { mutableStateOf<String?>(null) }
-    var editCidrs by remember { mutableStateOf(false) }
-    val recomposeTick = revision + vm.settingsRevision
-
+    var configs by remember { mutableStateOf<List<ProxyConfigUi>>(emptyList()) }
     val profile = ProxyRuntimeProfile.load(prefs)
+    LaunchedEffect(revision) { configs = runCatching { vm.controller.configLibrary() }.getOrDefault(emptyList()) }
+    val importConfig = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri != null) scope.launch {
+            runCatching { vm.controller.importConfig(uri, uri.lastPathSegment?.substringAfterLast('/') ?: "config.yaml") }
+                .onSuccess { vm.applyConfigChange("配置已导入并设为当前"); revision++ }
+                .onFailure { vm.toast(it.message ?: "配置导入失败") }
+        }
+    }
+
     fun changed(key: String) {
         ProxyRuntimeSettings.markDirty(prefs, key)
         revision++
@@ -415,17 +507,83 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
     }
     fun putString(key: String, value: String) { prefs.edit().putString(key, value).apply(); changed(key) }
     fun putBool(key: String, value: Boolean) { prefs.edit().putBoolean(key, value).apply(); changed(key) }
+    val c = Hx.colors
 
-    val pending = vm.state.running && ProxyRuntimeSettings.pending(true, prefs)
-    val capability = profile.capability()
-
-    val stagger = rememberHxStagger()
-    HxPage(title = "网络与分流", subtitle = if (recomposeTick >= 0) "修改后需重启代理生效" else null, onBack = { nav.pop() }) {
-        if (pending) {
+    HxPage(
+        title = "基础代理配置",
+        onBack = { nav.pop() },
+        largeTitle = false,
+        canvasColor = if (c.dark) c.canvas else Color(0xFFF2F0F9),
+    ) {
+        item(key = "core") {
+            HxSection {
+                HxGroup {
+                    HxNavRow("核心选择", value = profile.core.label, dropdown = true) { choice = "core" }
+                    HxDivider()
+                    HxNavRow("运行模式", value = profile.mode.label, dropdown = true) { choice = "mode" }
+                    HxDivider()
+                    HxNavRow(
+                        "IPv6",
+                        value = when (profile.ipv6) {
+                            ProxyRuntimeProfile.Ipv6.BYPASS -> "不进核心"
+                            ProxyRuntimeProfile.Ipv6.STRICT -> "严格防泄漏"
+                            ProxyRuntimeProfile.Ipv6.DISABLE -> "禁用系统 IPv6"
+                            else -> "启用"
+                        },
+                        dropdown = true,
+                    ) { choice = "ipv6" }
+                    HxDivider()
+                    HxSwitchRow(
+                        "自动覆写",
+                        profile.autoOverwrite,
+                        { putBool("proxyBaseAutoOverwrite", it) },
+                        subtitle = "启动时将必要的河图参数覆写到运行配置",
+                    )
+                }
+            }
+        }
+        item(key = "startup") {
+            HxSection {
+                HxGroup {
+                    HxNavRow("查看启动配置") { context.startActivity(Intent(context, ProxyStartupConfigActivity::class.java)) }
+                }
+            }
+        }
+        item(key = "config") {
+            HxSection {
+                HxGroup {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("配置选择", style = MaterialTheme.typography.titleSmall, color = c.text, modifier = Modifier.weight(1f))
+                        Icon(
+                            Icons.Rounded.AddCircleOutline, "导入配置", tint = c.text,
+                            modifier = Modifier.size(26.dp).clip(CircleShape).clickable { importConfig.launch(arrayOf("*/*")) }.padding(2.dp),
+                        )
+                    }
+                    configs.forEachIndexed { index, config ->
+                        if (index > 0) HxDivider()
+                        HxRow(
+                            config.name,
+                            onClick = {
+                                if (!config.selected) scope.launch {
+                                    runCatching { vm.controller.selectConfig(config.name) }
+                                        .onSuccess { vm.applyConfigChange("已切换到 ${config.name}"); revision++ }
+                                        .onFailure { vm.toast(it.message ?: "切换配置失败") }
+                                }
+                            },
+                        ) { if (config.selected) Icon(Icons.Rounded.Check, null, tint = c.accent, modifier = Modifier.size(22.dp)) }
+                    }
+                    if (configs.isEmpty()) HxRow("暂无配置", subtitle = "点右上角 + 导入 YAML 配置")
+                }
+            }
+        }
+        if (vm.state.running && ProxyRuntimeSettings.pending(true, prefs)) {
             item(key = "pending") {
-                Column(Modifier.padding(horizontal = Hx.gutter).padding(bottom = 16.dp)) {
+                Column(Modifier.padding(horizontal = Hx.gutter).padding(bottom = 12.dp)) {
                     HxBanner(
-                        if (vm.operation == HxRunOp.Restart) vm.operationText.ifBlank { "正在重启…" } else "设置已修改，重启代理后生效",
+                        "设置已修改，重启代理后生效",
                         tone = HxTone.Warn,
                         actionLabel = if (vm.operation == null) "立即重启" else null,
                         onAction = vm::restart,
@@ -433,115 +591,21 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
                 }
             }
         }
-        item(key = "engine") {
-            HxSection("核心与模式", modifier = Modifier.hxEnter(stagger, 0)) {
-                HxGroup {
-                    HxNavRow("核心", icon = Icons.Rounded.Memory, value = profile.core.label) { choice = "core" }
-                    HxDivider()
-                    HxNavRow("透明代理模式", subtitle = modeDescription(profile.mode), icon = Icons.Rounded.Route, value = profile.mode.label) { choice = "mode" }
-                }
-            }
-        }
-        item(key = "dns") {
-            HxSection("DNS 与协议", modifier = Modifier.hxEnter(stagger, 1)) {
-                HxGroup {
-                    HxNavRow("DNS 劫持", subtitle = "让系统 DNS 交给 Mihomo 解析，广告过滤依赖此项", icon = Icons.Rounded.Dns, value = when (profile.dnsHijack) {
-                        ProxyRuntimeProfile.DnsHijack.OFF -> "关闭"
-                        ProxyRuntimeProfile.DnsHijack.REDIRECT -> "Redirect"
-                        else -> "自动"
-                    }, enabled = capability.dnsHijack) { choice = "dns" }
-                    HxDivider()
-                    HxNavRow("IPv6", icon = Icons.Rounded.Public, iconTint = Hx.colors.good, value = when (profile.ipv6) {
-                        ProxyRuntimeProfile.Ipv6.BYPASS -> "不进核心"
-                        ProxyRuntimeProfile.Ipv6.STRICT -> "严格防泄漏"
-                        ProxyRuntimeProfile.Ipv6.DISABLE -> "禁用"
-                        else -> "启用"
-                    }) { choice = "ipv6" }
-                    HxDivider()
-                    HxSwitchRow("TCP 接管", profile.tcp, { putBool("proxyTcp", it) }, icon = Icons.Rounded.SwapHoriz, enabled = capability.tcp)
-                    HxDivider()
-                    HxSwitchRow("UDP 接管", profile.udp, { putBool("proxyUdp", it) }, subtitle = "游戏、语音通话与 QUIC", icon = Icons.Rounded.Bolt, iconTint = Hx.colors.warn, enabled = capability.udp)
-                    HxDivider()
-                    HxSwitchRow("阻断 QUIC", profile.quicBlocked, { putBool("proxyQuicBlocked", it) }, subtitle = "拦截 UDP 443，迫使应用回落到 TCP", icon = Icons.Rounded.Speed, iconTint = Hx.colors.warn, enabled = capability.quicControl)
-                }
-            }
-        }
-        item(key = "routing") {
-            HxSection("分流", modifier = Modifier.hxEnter(stagger, 2)) {
-                HxGroup {
-                    HxNavRow("应用范围", icon = Icons.Rounded.Apps, iconTint = Hx.colors.warn, value = when (profile.appScope) {
-                        ProxyRuntimeProfile.AppScope.WHITELIST -> "仅所选应用代理"
-                        ProxyRuntimeProfile.AppScope.BLACKLIST -> "所选应用直连"
-                        else -> "不区分应用"
-                    }, enabled = capability.appFilter) { choice = "scope" }
-                    HxDivider()
-                    HxNavRow("应用名单", icon = Icons.Rounded.Apps, iconTint = Hx.colors.warn,
-                        value = "${prefs.getStringSet("proxyAppPackages", emptySet()).orEmpty().size} 个") { nav.push(HxRoute.Apps) }
-                    HxDivider()
-                    HxSwitchRow("中国 IP 直连", profile.cnIpDirect, { putBool("proxyCnIpDirect", it) }, subtitle = "内置 CN IP 库，国内地址不经过代理", icon = Icons.Rounded.Public)
-                    HxDivider()
-                    HxNavRow("绕过网段", subtitle = "这些 CIDR 不进入透明代理", icon = Icons.Rounded.Cable, iconTint = Hx.colors.textMuted,
-                        value = "${prefs.getStringSet("proxyBypassCidrs", emptySet()).orEmpty().size} 条", enabled = capability.cidrBypass) { editCidrs = true }
-                }
-            }
-        }
-        item(key = "safety") {
-            HxSection("共享与安全", modifier = Modifier.hxEnter(stagger, 3)) {
-                HxGroup {
-                    HxSwitchRow("接管热点/USB 共享", prefs.getBoolean("proxySharedNetwork", false), { putBool("proxySharedNetwork", it) },
-                        subtitle = "让连接本机热点的设备也走代理", icon = Icons.Rounded.WifiTethering, iconTint = Hx.colors.good, enabled = capability.sharedNetwork)
-                    HxDivider()
-                    HxSwitchRow("Kill Switch", prefs.getBoolean("proxyKillSwitch", false), { putBool("proxyKillSwitch", it) },
-                        subtitle = "核心异常退出时阻断流量，防止直连泄漏", icon = Icons.Rounded.GppGood, iconTint = Hx.colors.bad)
-                }
-            }
-        }
-        item(key = "automation") {
-            HxSection("自动化与高级", modifier = Modifier.hxEnter(stagger, 4)) {
-                HxGroup {
-                    HxNavRow(
-                        "网络匹配",
-                        subtitle = "按 Wi‑Fi / SSID / 移动网络自动启停",
-                        icon = Icons.Rounded.Wifi,
-                    ) { context.startActivity(Intent(context, ProxyNetworkAutomationActivity::class.java)) }
-                    HxDivider()
-                    HxNavRow(
-                        "高级运行控制",
-                        subtitle = "运行预检、Kill Switch、启动配置与恢复网络",
-                        icon = Icons.Rounded.HealthAndSafety,
-                        iconTint = Hx.colors.good,
-                    ) { context.startActivity(Intent(context, ProxyAdvancedSettingsActivity::class.java)) }
-                    HxDivider()
-                    HxNavRow(
-                        "端口细则",
-                        subtitle = "透明代理、DNS 与控制器端口",
-                        icon = Icons.Rounded.Cable,
-                        iconTint = Hx.colors.textMuted,
-                        value = "${MihomoStartupConfig.TPROXY_PORT} / ${MihomoStartupConfig.REDIRECT_PORT}",
-                    ) { choice = "ports" }
-                }
-            }
-        }
-        if (!capability.available && capability.reason.isNotBlank()) {
-            item(key = "cap") {
-                Column(Modifier.padding(horizontal = Hx.gutter)) { HxBanner(capability.reason, tone = HxTone.Warn) }
-            }
-        }
     }
 
     when (choice) {
         "core" -> HxChoiceSheet(
-            title = "核心",
+            title = "核心选择",
             choices = listOf(ProxyRuntimeProfile.Core.MIHOMO, ProxyRuntimeProfile.Core.MIHOMO_SMART).map { core ->
                 val installed = core == ProxyRuntimeProfile.Core.MIHOMO || ProxyCoreStore(context).installed(core)
-                HxChoice(core.id, core.label, if (installed) null else "尚未安装，请先在「核心管理」下载", enabled = installed)
+                HxChoice(core.id, core.label, if (installed) null else "尚未安装，请先在核心管理下载", enabled = installed)
             },
             selected = profile.core.id,
             onPick = { putString("proxyBaseCore", it); choice = null },
             onDismiss = { choice = null },
         )
         "mode" -> HxChoiceSheet(
-            title = "透明代理模式",
+            title = "运行模式",
             choices = ProxyRuntimeProfile.Mode.values()
                 .filter { ProxyRuntimeProfile.capability(profile.core, it).available }
                 .map { HxChoice(it.id, it.label, modeDescription(it)) },
@@ -549,70 +613,17 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
             onPick = { putString("proxyBaseMode", it); choice = null },
             onDismiss = { choice = null },
         )
-        "dns" -> HxChoiceSheet(
-            title = "DNS 劫持",
-            choices = listOf(
-                HxChoice("tproxy", "自动", "推荐。系统 DNS 由 Mihomo 解析"),
-                HxChoice("redirect", "Redirect", "通过 REDIRECT 转发到本地 ${MihomoStartupConfig.DNS_PORT}"),
-                HxChoice("off", "关闭", "不接管 DNS；广告过滤与域名分流可能失效"),
-            ),
-            selected = profile.dnsHijack.id,
-            onPick = { putString("proxyDnsHijack", it); choice = null },
-            onDismiss = { choice = null },
-        )
         "ipv6" -> HxChoiceSheet(
             title = "IPv6",
             choices = listOf(
                 HxChoice("enable", "启用", "IPv6 流量同样进入代理"),
                 HxChoice("bypass", "不进核心", "IPv6 直连，不经过代理"),
-                HxChoice("strict", "严格防泄漏", "仅用 IPv4，拦截 IPv6 防止绕过代理"),
-                HxChoice("disable", "禁用", "关闭本机 IPv6"),
+                HxChoice("strict", "严格防泄漏", "仅用 IPv4，拦截 IPv6"),
+                HxChoice("disable", "禁用系统 IPv6", "关闭系统 IPv6 外联"),
             ),
             selected = profile.ipv6.id,
             onPick = { putString("proxyBaseIpv6", it); choice = null },
             onDismiss = { choice = null },
-        )
-        "ports" -> HxTextSheet(
-            title = "端口细则",
-            text = listOf(
-                "TPROXY 透明代理    ${MihomoStartupConfig.TPROXY_PORT}",
-                "Redirect 转发      ${MihomoStartupConfig.REDIRECT_PORT}",
-                "DNS 监听           ${MihomoStartupConfig.DNS_PORT}",
-                "控制器             127.0.0.1:${vm.state.controllerPort}",
-                "出口探针           127.0.0.1:${MihomoStartupConfig.egressProbePort(vm.state.controllerPort)}",
-            ).joinToString("\n"),
-            onDismiss = { choice = null },
-        )
-        "scope" -> HxChoiceSheet(
-            title = "应用范围",
-            choices = listOf(
-                HxChoice("core", "不区分应用", "所有应用由配置规则决定"),
-                HxChoice("blacklist", "所选应用直连", "名单中的应用绕过代理"),
-                HxChoice("whitelist", "仅所选应用代理", "只有名单中的应用走代理"),
-            ),
-            selected = profile.appScope.id,
-            onPick = { putString("proxyAppScope", it); choice = null },
-            onDismiss = { choice = null },
-        )
-    }
-
-    if (editCidrs) {
-        val current = prefs.getStringSet("proxyBypassCidrs", emptySet()).orEmpty().sorted().joinToString("\n")
-        HxFormDialog(
-            title = "绕过网段",
-            message = "每行一个 IPv4/IPv6 CIDR，例如 10.0.0.0/8、fd00::/8",
-            fields = listOf(HxField("CIDR 列表", current, singleLine = false)),
-            validate = { values ->
-                val bad = values[0].lines().map { it.trim() }.filter { it.isNotEmpty() }.firstOrNull { !looksLikeCidr(it) }
-                if (bad != null) "格式不正确：$bad" else null
-            },
-            onConfirm = { values ->
-                val set = values[0].lines().map { it.trim() }.filter { it.isNotEmpty() }.toSet()
-                prefs.edit().putStringSet("proxyBypassCidrs", set).apply()
-                changed("proxyBypassCidrs")
-                editCidrs = false
-            },
-            onDismiss = { editCidrs = false },
         )
     }
 }
@@ -633,4 +644,194 @@ private fun modeDescription(mode: ProxyRuntimeProfile.Mode): String = when (mode
     ProxyRuntimeProfile.Mode.TUN -> "Root 下的 TUN 虚拟网卡"
     ProxyRuntimeProfile.Mode.EBPF -> "eBPF 重定向到 TUN"
     ProxyRuntimeProfile.Mode.MIXED -> "暂不可用"
+}
+@Composable
+private fun SettingsIdentityCard(vm: HetuViewModel, onClick: () -> Unit) {
+    val c = Hx.colors
+    val running = vm.state.running
+    HxSection {
+        HxCard(onClick = onClick, padding = PaddingValues(horizontal = 16.dp, vertical = 14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Image(
+                    painterResource(R.drawable.ic_hetu_official),
+                    null,
+                    Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)),
+                )
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("河图", style = MaterialTheme.typography.titleMedium, color = c.text)
+                    Text(
+                        "v" + BuildConfig.VERSION_NAME + " · " + vm.coreVersion.ifBlank { "Mihomo" },
+                        style = MaterialTheme.typography.bodySmall.merge(HxNumberStyle),
+                        color = c.textMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                HxPill(if (running) "运行中" else "未运行", if (running) HxTone.Good else HxTone.Neutral)
+                Spacer(Modifier.width(4.dp))
+                HxChevron()
+            }
+        }
+    }
+}
+
+
+/** Accent colour swatches; the chosen one grows and shows a check. */
+@Composable
+private fun HxAccentSwatches(vm: HetuViewModel) {
+    val c = Hx.colors
+    val haptics = io.github.xgl34222220.hetu.ui.rememberHetuHaptics()
+    val swatches = listOf("#2A62E8", "#12806F", "#0EA5E9", "#4F46E5", "#8B5CF6", "#EC4899", "#EF4444", "#F59E0B")
+    Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            HxIconBadge(Icons.Rounded.ColorLens, c.textMuted)
+            Spacer(Modifier.width(10.dp))
+            Text("强调色", style = MaterialTheme.typography.bodyLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = c.text)
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            swatches.forEach { hex ->
+                val color = androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(hex))
+                val selected = vm.accentChoice.equals(hex, true)
+                val scale by androidx.compose.animation.core.animateFloatAsState(if (selected) 1f else .82f, HxMotion.pop(), label = "swatch")
+                Box(
+                    Modifier
+                        .size(34.dp)
+                        .graphicsLayer { scaleX = scale; scaleY = scale }
+                        .clip(CircleShape)
+                        .background(color)
+                        .then(if (selected) Modifier.border(3.dp, c.surface, CircleShape) else Modifier)
+                        .clickable {
+                            haptics.perform(io.github.xgl34222220.hetu.ui.HetuHaptic.Tick)
+                            vm.setAccent(hex)
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (selected) Icon(Icons.Rounded.Check, null, tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(16.dp))
+                }
+            }
+        }
+    }
+}
+
+
+/* ------------------------------------------------------------------ */
+/*  Theme lab — BoxProxy interaction model, Hetu rendering primitives  */
+/* ------------------------------------------------------------------ */
+
+@Composable
+internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
+    val prefs = vm.prefs
+    var revision by remember { mutableIntStateOf(0) }
+    var choice by remember { mutableStateOf<String?>(null) }
+    val tick = revision + vm.settingsRevision
+    val blur = remember(tick) { prefs.getBoolean("enableBlur", true) }
+    val floating = remember(tick) { prefs.getBoolean("floatingBottomBar", true) }
+    val liquid = remember(tick) { prefs.getBoolean("liquidGlass", true) }
+    val backAnim = remember(tick) { prefs.getBoolean("predictiveBackAnimation", true) }
+    val followEdge = remember(tick) { prefs.getBoolean("predictiveBackFollowEdge", true) }
+    val topBlur = remember(tick) { prefs.getString("topBarBlurStyle", "progressive").orEmpty().ifBlank { "progressive" } }
+    val uiScale = remember(tick) { prefs.getFloat("uiScale", 1f).coerceIn(.8f, 1.2f) }
+    val c = Hx.colors
+
+    fun setBool(key: String, value: Boolean, reload: Boolean = false) {
+        prefs.edit().putBoolean(key, value).apply()
+        if (reload) vm.reloadAppearance()
+        vm.bumpSettings()
+        revision++
+    }
+    fun setString(key: String, value: String) {
+        prefs.edit().putString(key, value).apply()
+        vm.bumpSettings()
+        revision++
+    }
+
+    HxPage(
+        title = "主题设置",
+        subtitle = null,
+        onBack = onBack,
+        largeTitle = false,
+    ) {
+        item(key = "theme") {
+            HxSection {
+                HxGroup {
+                    HxNavRow("界面风格", subtitle = "河图的 Miuix / Liquid Glass 界面体系", icon = Icons.Rounded.GridView, iconTint = c.textMuted, value = "Miuix") { vm.toast("当前使用 Miuix 界面风格") }
+                    HxDivider()
+                    HxNavRow("主题模式", icon = Icons.Rounded.DarkMode, iconTint = c.textMuted, value = when (vm.appearance) {
+                        "light" -> "浅色"; "dark" -> "深色"; else -> "跟随系统"
+                    }, dropdown = true) { choice = "appearance" }
+                    if (Build.VERSION.SDK_INT >= 31) {
+                        HxDivider()
+                        HxSwitchRow("Monet 动态取色", vm.dynamicColor, { vm.setDynamic(it); vm.bumpSettings(); revision++ }, subtitle = "Android 12+ 使用系统动态色", icon = Icons.Rounded.Palette)
+                    }
+                    HxDivider()
+                    HxSwitchRow("深色纯黑背景", vm.pureBlack, { vm.updatePureBlack(it); vm.bumpSettings(); revision++ }, subtitle = "OLED 模式使用纯黑画布", icon = Icons.Rounded.Contrast, iconTint = c.textMuted)
+                    if (!vm.dynamicColor) {
+                        HxDivider()
+                        HxAccentSwatches(vm)
+                    }
+                }
+            }
+        }
+        item(key = "glass") {
+            HxSection {
+                HxGroup {
+                    HxSwitchRow("模糊效果", blur, { setBool("enableBlur", it, reload = true) }, subtitle = "控制顶栏、底栏与浮层的实时模糊", icon = Icons.Rounded.BlurOn, iconTint = c.textMuted)
+                    HxDivider()
+                    HxNavRow("顶栏模糊样式", subtitle = "渐进式更接近视频中的顶栏层次", icon = Icons.Rounded.Tune, iconTint = c.textMuted, value = if (topBlur == "gaussian") "高斯模糊" else "渐进式模糊", dropdown = true) { choice = "topBlur" }
+                    HxDivider()
+                    HxSwitchRow("悬浮底栏", floating, { setBool("floatingBottomBar", it) }, subtitle = "关闭后底栏吸附屏幕底部", icon = Icons.Rounded.Dashboard, iconTint = c.textMuted)
+                    HxDivider()
+                    HxSwitchRow("底栏液态玻璃", liquid, { setBool("liquidGlass", it) }, subtitle = "Runtime Shader 可用时启用折射与高光", icon = Icons.Rounded.BlurOn, iconTint = c.accent, enabled = blur)
+                }
+            }
+        }
+        item(key = "motion") {
+            HxSection {
+                HxGroup {
+                    HxSwitchRow("预测性返回动画", backAnim, { setBool("predictiveBackAnimation", it) }, subtitle = "返回手势让页面跟手缩放、位移并露出上一层", icon = Icons.Rounded.Route, iconTint = c.textMuted)
+                    AnimatedVisibility(backAnim) {
+                        Column {
+                            HxDivider()
+                            HxSwitchRow("动画方向跟随滑动边缘", followEdge, { setBool("predictiveBackFollowEdge", it) }, subtitle = "从右边缘返回时方向同步反转", icon = Icons.Rounded.SwapHoriz, iconTint = c.textMuted)
+                        }
+                    }
+                    HxDivider()
+                    HxNavRow("界面缩放", subtitle = "全局按比例调整页面、Dock、Sheet 与字体", icon = Icons.Rounded.GridView, iconTint = c.textMuted, value = "${(uiScale * 100).toInt()}%", dropdown = true) { choice = "scale" }
+                }
+            }
+        }
+        item(key = "note") {
+            HxBanner("这些设置只影响界面层；代理核心、规则、订阅与运行配置不会被修改。", tone = HxTone.Accent, modifier = Modifier.padding(horizontal = Hx.gutter))
+        }
+    }
+
+    when (choice) {
+        "appearance" -> HxChoiceSheet(
+            title = "主题模式",
+            choices = listOf(HxChoice("system", "跟随系统"), HxChoice("light", "浅色"), HxChoice("dark", "深色")),
+            selected = vm.appearance,
+            onPick = { vm.setAppearanceMode(it); vm.bumpSettings(); revision++; choice = null },
+            onDismiss = { choice = null },
+        )
+        "topBlur" -> HxChoiceSheet(
+            title = "顶栏模糊样式",
+            choices = listOf(
+                HxChoice("progressive", "渐进式模糊", "顶部更浓，向内容区域逐渐消散"),
+                HxChoice("gaussian", "高斯模糊", "整条顶栏使用均匀磨砂"),
+            ),
+            selected = topBlur,
+            onPick = { setString("topBarBlurStyle", it); choice = null },
+            onDismiss = { choice = null },
+        )
+        "scale" -> HxChoiceSheet(
+            title = "界面缩放",
+            choices = listOf(.8f, .9f, 1f, 1.1f, 1.2f).map { HxChoice(it.toString(), "${(it * 100).toInt()}%") },
+            selected = uiScale.toString(),
+            onPick = { value -> prefs.edit().putFloat("uiScale", value.toFloat()).apply(); vm.bumpSettings(); revision++; choice = null },
+            onDismiss = { choice = null },
+            footer = "缩放通过 Compose Density 全局应用，不会单独挤压某一个页面。",
+        )
+    }
 }

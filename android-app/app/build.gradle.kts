@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("com.mikepenz.aboutlibraries.plugin.android")
 }
 
 android {
@@ -16,8 +17,8 @@ android {
         applicationId = "io.github.xgl34222220.hetu"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2008
-        versionName = "0.5.8-v20"
+        versionCode = 2048
+        versionName = "0.9.8-v20-ui-test"
     }
 
     // Explicit CI debug identity. No private key is committed or exported.
@@ -91,6 +92,11 @@ dependencies {
     implementation("top.yukonga.miuix.kmp:miuix-icons-android:0.9.4")
     implementation("top.yukonga.miuix.kmp:miuix-blur-android:0.9.4")
     implementation("top.yukonga.miuix.kmp:miuix-squircle-android:0.9.4")
+    implementation("com.patrykandpatrick.vico:compose:3.3.1")
+    implementation("io.coil-kt.coil3:coil-compose:3.6.3")
+    implementation("io.coil-kt.coil3:coil-network-okhttp:3.6.3")
+    implementation("io.coil-kt.coil3:coil-svg:3.6.3")
+    implementation("com.mikepenz:aboutlibraries-compose-m3:15.2.0")
     implementation(platform("io.github.rosemoe:editor-bom:0.24.6"))
     implementation("io.github.rosemoe:editor")
 }

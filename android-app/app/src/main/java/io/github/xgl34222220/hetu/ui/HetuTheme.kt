@@ -50,28 +50,28 @@ data class HetuTokens(
 
 val LocalHetuTokens = staticCompositionLocalOf {
     HetuTokens(
-        pageBackground = Color(0xFFF4F5F7),
-        cardBackground = Color(0xFFFFFFFF),
-        elevatedCardBackground = Color(0xFFF4F5F7),
-        heroBackground = Color(0xFFEDF4FF),
+        pageBackground = Color(0xFFF2F0F9),
+        cardBackground = Color(0xFFFBFAFD),
+        elevatedCardBackground = Color(0xFFF6F3FA),
+        heroBackground = Color(0xFFEDE9F7),
         textPrimary = Color(0xFF12161A),
-        textSecondary = Color(0xFF5D6670),
-        textMuted = Color(0xFF98A1AA),
+        textSecondary = Color(0xFF686C79),
+        textMuted = Color(0xFFA4A6B0),
         success = Color(0xFF10B981),
         warning = Color(0xFFF59E0B),
         danger = Color(0xFFEF4444),
-        outline = Color(0xFFE4E7EB),
-        controlBackground = Color(0xFFF4F5F7),
-        selectionBackground = Color(0xFFDDF1EC),
+        outline = Color(0xFFE7E2EF),
+        controlBackground = Color(0xFFF0ECF7),
+        selectionBackground = Color(0xFFEAE5F5),
     )
 }
 
 private val MiuixShapes = Shapes(
     extraSmall = RoundedCornerShape(9.dp),
     small = RoundedCornerShape(13.dp),
-    medium = RoundedCornerShape(17.dp),
-    large = RoundedCornerShape(21.dp),
-    extraLarge = RoundedCornerShape(27.dp),
+    medium = RoundedCornerShape(15.dp),
+    large = RoundedCornerShape(18.dp),
+    extraLarge = RoundedCornerShape(24.dp),
 )
 
 private val MaterialShapes = Shapes(
@@ -91,19 +91,19 @@ private val ExpressiveShapes = Shapes(
 )
 
 private val HetuTypography = Typography(
-    displaySmall = TextStyle(fontSize = 30.sp, lineHeight = 36.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.4).sp),
-    headlineLarge = TextStyle(fontSize = 27.sp, lineHeight = 34.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.35).sp),
-    headlineMedium = TextStyle(fontSize = 23.sp, lineHeight = 30.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.3).sp),
-    headlineSmall = TextStyle(fontSize = 20.sp, lineHeight = 27.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.2).sp),
-    titleLarge = TextStyle(fontSize = 19.sp, lineHeight = 25.sp, fontWeight = FontWeight.SemiBold),
-    titleMedium = TextStyle(fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold),
-    titleSmall = TextStyle(fontSize = 14.5.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold),
-    bodyLarge = TextStyle(fontSize = 15.sp, lineHeight = 22.sp),
-    bodyMedium = TextStyle(fontSize = 14.sp, lineHeight = 20.sp),
-    bodySmall = TextStyle(fontSize = 12.5.sp, lineHeight = 18.sp),
-    labelLarge = TextStyle(fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold),
-    labelMedium = TextStyle(fontSize = 11.5.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium),
-    labelSmall = TextStyle(fontSize = 10.5.sp, lineHeight = 15.sp, fontWeight = FontWeight.Medium, letterSpacing = .1.sp),
+    displaySmall = TextStyle(fontSize = 27.sp, lineHeight = 32.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.35).sp),
+    headlineLarge = TextStyle(fontSize = 24.sp, lineHeight = 30.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.3).sp),
+    headlineMedium = TextStyle(fontSize = 21.sp, lineHeight = 27.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.25).sp),
+    headlineSmall = TextStyle(fontSize = 18.5.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.15).sp),
+    titleLarge = TextStyle(fontSize = 16.5.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold),
+    titleMedium = TextStyle(fontSize = 14.5.sp, lineHeight = 19.5.sp, fontWeight = FontWeight.SemiBold),
+    titleSmall = TextStyle(fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold),
+    bodyLarge = TextStyle(fontSize = 13.5.sp, lineHeight = 19.sp),
+    bodyMedium = TextStyle(fontSize = 12.75.sp, lineHeight = 18.sp),
+    bodySmall = TextStyle(fontSize = 11.5.sp, lineHeight = 16.sp),
+    labelLarge = TextStyle(fontSize = 12.5.sp, lineHeight = 17.sp, fontWeight = FontWeight.SemiBold),
+    labelMedium = TextStyle(fontSize = 11.sp, lineHeight = 15.sp, fontWeight = FontWeight.Medium),
+    labelSmall = TextStyle(fontSize = 10.sp, lineHeight = 14.sp, fontWeight = FontWeight.Medium, letterSpacing = .08.sp),
 )
 
 private fun paletteStyle(raw: String): PaletteStyle = when (raw) {
@@ -118,9 +118,9 @@ private fun paletteStyle(raw: String): PaletteStyle = when (raw) {
 }
 
 private fun accentColor(raw: String, dark: Boolean): Color {
-    val fallback = if (dark) Color(0xFF5CCFBC) else Color(0xFF12806F)
+    val fallback = if (dark) Color(0xFF7EA6FF) else Color(0xFF2A62E8)
     return runCatching {
-        val parsed = android.graphics.Color.parseColor(raw.ifBlank { if (dark) "#5CCFBC" else "#12806F" })
+        val parsed = android.graphics.Color.parseColor(raw.ifBlank { if (dark) "#7EA6FF" else "#2A62E8" })
         Color(parsed)
     }.getOrDefault(fallback)
 }
@@ -154,21 +154,21 @@ fun HetuTheme(content: @Composable () -> Unit) {
 
     // The legacy blue default is treated as "not customised" so every page shares the V20 jade accent.
     val storedAccent = (prefs.getString("accentHex", "") ?: "").takeUnless { it.equals("#2563EB", true) || it.equals("#3B82F6", true) }.orEmpty()
-    val fixedPrimary = accentColor(storedAccent.ifBlank { if (dark) "#5CCFBC" else "#12806F" }, dark)
+    val fixedPrimary = accentColor(storedAccent.ifBlank { if (dark) "#7EA6FF" else "#2A62E8" }, dark)
     val baseLight = lightColorScheme(
         primary = fixedPrimary,
-        primaryContainer = Color(0xFFDDF1EC),
-        secondary = Color(0xFF12806F),
-        background = Color(0xFFF4F5F7),
-        surface = Color.White,
+        primaryContainer = Color(0xFFE3EAFD),
+        secondary = Color(0xFF2A62E8),
+        background = Color(0xFFF2F0F9),
+        surface = Color(0xFFFBFAFD),
         error = Color(0xFFEF4444),
         onBackground = Color(0xFF12161A),
         onSurface = Color(0xFF12161A),
     )
     val baseDark = darkColorScheme(
         primary = fixedPrimary,
-        primaryContainer = Color(0xFF15403A),
-        secondary = Color(0xFF5CCFBC),
+        primaryContainer = Color(0xFF1D2C52),
+        secondary = Color(0xFF7EA6FF),
         background = if (pureBlack) Color.Black else Color(0xFF0D1012),
         surface = Color(0xFF171B1E),
         error = Color(0xFFF87171),
@@ -190,7 +190,7 @@ fun HetuTheme(content: @Composable () -> Unit) {
                 pageBackground = if (pureBlack) Color.Black else Color(0xFF0D1012),
                 cardBackground = Color(0xFF171B1E),
                 elevatedCardBackground = Color(0xFF20262A),
-                heroBackground = Color(0xFF15403A),
+                heroBackground = Color(0xFF1D2C52),
                 textPrimary = Color(0xFFF4F5F7),
                 textSecondary = Color(0xFF98A1AA),
                 textMuted = Color(0xFF5D6670),
@@ -199,24 +199,24 @@ fun HetuTheme(content: @Composable () -> Unit) {
                 danger = Color(0xFFF87171),
                 outline = Color(0xFF283035),
                 controlBackground = Color(0xFF20262A),
-                selectionBackground = if (enableMonet) scheme.primaryContainer.copy(alpha = .55f) else Color(0xFF15403A),
+                selectionBackground = if (enableMonet) scheme.primaryContainer.copy(alpha = .55f) else Color(0xFF1D2C52),
             )
         } else {
             // V19.3: reference palette, sampled from the BoxProxy recording.
             HetuTokens(
-                pageBackground = Color(0xFFF4F5F7),
-                cardBackground = Color(0xFFFFFFFF),
-                elevatedCardBackground = Color(0xFFEEF0F3),
-                heroBackground = Color(0xFFDDF1EC),
+                pageBackground = Color(0xFFF2F0F9),
+                cardBackground = Color(0xFFFBFAFD),
+                elevatedCardBackground = Color(0xFFF6F3FA),
+                heroBackground = Color(0xFFEDE9F7),
                 textPrimary = Color(0xFF12161A),
-                textSecondary = Color(0xFF5D6670),
-                textMuted = Color(0xFF98A1AA),
+                textSecondary = Color(0xFF686C79),
+                textMuted = Color(0xFFA4A6B0),
                 success = Color(0xFF10B981),
                 warning = Color(0xFFF59E0B),
                 danger = Color(0xFFEF4444),
-                outline = Color(0xFFE4E7EB),
-                controlBackground = Color(0xFFEEF0F3),
-                selectionBackground = if (enableMonet) scheme.primaryContainer.copy(alpha = .72f) else Color(0xFFDDF1EC),
+                outline = Color(0xFFE7E2EF),
+                controlBackground = Color(0xFFF0ECF7),
+                selectionBackground = if (enableMonet) scheme.primaryContainer.copy(alpha = .62f) else Color(0xFFEAE5F5),
             )
         }
         CompositionLocalProvider(
@@ -236,7 +236,7 @@ fun HetuTheme(content: @Composable () -> Unit) {
         ) {
             ProvideTokens(content)
         }
-    } else if ((storedAccent.isBlank() || storedAccent.equals("#12806F", true)) && (prefs.getString("colorPalette", "TonalSpot") ?: "TonalSpot") == "TonalSpot") {
+    } else if ((storedAccent.isBlank() || storedAccent.equals("#2A62E8", true)) && (prefs.getString("colorPalette", "TonalSpot") ?: "TonalSpot") == "TonalSpot") {
         MaterialTheme(
             colorScheme = if (dark) baseDark else baseLight,
             shapes = shapes,

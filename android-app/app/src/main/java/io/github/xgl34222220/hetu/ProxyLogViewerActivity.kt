@@ -6,6 +6,12 @@ import io.github.xgl34222220.hetu.ui.ReferenceModalBottomSheet as ModalBottomShe
 
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.LazyItemScope
+import androidx.compose.animation.animateContentSize
+import androidx.compose.ui.draw.clip
+import androidx.compose.material.icons.rounded.SearchOff
+import androidx.compose.material.icons.rounded.FolderOpen
+import androidx.compose.material.icons.rounded.Article
 import androidx.compose.foundation.horizontalScroll
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -49,12 +55,7 @@ import java.io.File
 class ProxyLogViewerActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        setContent {
-            HetuTheme {
-                ProxyLogViewerScreen(onBack = { finish() })
-            }
-        }
+        hxHost { vm -> HxLogFilesScreen(vm) { finish() } }
     }
 }
 
@@ -195,7 +196,7 @@ private fun ProxyLogViewerScreen(onBack: () -> Unit) {
         ) {
             IconButton(
                 onClick = onBack,
-                modifier = Modifier.size(48.dp),
+                modifier = Modifier.size(40.dp),
             ) {
                 Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回", tint = t.textPrimary)
             }
@@ -208,8 +209,8 @@ private fun ProxyLogViewerScreen(onBack: () -> Unit) {
                     Text(
                         selected?.name ?: "日志查看",
                         color = t.textPrimary,
-                        fontSize = 20.sp,
-                        lineHeight = 28.sp,
+                        fontSize = 18.sp,
+                        lineHeight = 24.sp,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -247,7 +248,7 @@ private fun ProxyLogViewerScreen(onBack: () -> Unit) {
             IconButton(
                 onClick = { revision++ },
                 enabled = !loading,
-                modifier = Modifier.size(44.dp),
+                modifier = Modifier.size(40.dp),
             ) {
                 if (loading) {
                     CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
@@ -259,27 +260,27 @@ private fun ProxyLogViewerScreen(onBack: () -> Unit) {
             IconButton(
                 onClick = { if (selected != null) clearConfirm = true },
                 enabled = selected != null && !loading,
-                modifier = Modifier.size(44.dp),
+                modifier = Modifier.size(40.dp),
             ) {
                 Icon(Icons.Rounded.DeleteOutline, "清空当前日志", tint = t.textSecondary)
             }
 
             IconButton(
                 onClick = { menuOpen = true },
-                modifier = Modifier.size(44.dp),
+                modifier = Modifier.size(40.dp),
             ) {
                 Icon(Icons.Rounded.MoreHoriz, "选择日志", tint = t.textSecondary)
             }
         }
 
-        LiquidGlassTextField(query, { query = it }, "搜索日志", Modifier.fillMaxWidth().padding(horizontal = 12.dp), leadingIcon = Icons.Rounded.Search)
+        LiquidGlassTextField(query, { query = it }, "搜索日志", Modifier.fillMaxWidth().padding(horizontal = 10.dp), leadingIcon = Icons.Rounded.Search)
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             LiquidChoicePill(if (autoRefresh) "自动刷新中" else "自动刷新", autoRefresh, { autoRefresh = !autoRefresh; prefs.edit().putBoolean("logAutoRefresh", autoRefresh).apply() })
             LiquidChoicePill("逐条卡片", cards, { cards = !cards; prefs.edit().putBoolean("logCardView", cards).apply() })
             listOf("all" to "全部", "error" to "错误", "warn" to "警告", "info" to "信息", "debug" to "调试").forEach { (key,label) -> LiquidChoicePill(label, level == key, { level = key }) }
         }
-        if (error.isNotBlank()) HetuTaskFeedback(error, true, modifier = Modifier.padding(horizontal = 12.dp))
-        LazyColumn(Modifier.fillMaxWidth().weight(1f), contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, hetuContentBottomPadding()), verticalArrangement = Arrangement.spacedBy(if (cards) 6.dp else 0.dp)) {
+        if (error.isNotBlank()) HetuTaskFeedback(error, true, modifier = Modifier.padding(horizontal = 10.dp))
+        LazyColumn(Modifier.fillMaxWidth().weight(1f), contentPadding = PaddingValues(12.dp, 6.dp, 12.dp, hetuContentBottomPadding()), verticalArrangement = Arrangement.spacedBy(if (cards) 6.dp else 0.dp)) {
             if (visibleLines.isEmpty()) item { Text("没有匹配的日志", color = t.textSecondary, modifier = Modifier.padding(12.dp)) }
             itemsIndexed(visibleLines, key = { index, _ -> index }) { _, line ->
                 if (cards) StructuredLogCard(line)
@@ -339,5 +340,200 @@ private fun ProxyLogViewerScreen(onBack: () -> Unit) {
                 }
             }
         }
+    }
+}
+
+
+/* ------------------------------------------------------------------ */
+/*  Hx log files viewer                                                 */
+/* ------------------------------------------------------------------ */
+
+private fun hxLineLevel(line: String): String {
+    val l = line.lowercase()
+    return when {
+        "error" in l || "fatal" in l || "[e]" in l -> "error"
+        "warn" in l || "[w]" in l -> "warn"
+        "debug" in l || "[d]" in l -> "debug"
+        else -> "info"
+    }
+}
+
+@Composable
+internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val c = Hx.colors
+    val scope = rememberCoroutineScope()
+    val prefs = vm.prefs
+    var revision by remember { mutableIntStateOf(0) }
+    var files by remember { mutableStateOf<List<HetuLogFile>>(emptyList()) }
+    var selectedPath by rememberSaveable { mutableStateOf("") }
+    var content by remember { mutableStateOf("") }
+    var loading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf("") }
+    var pickFile by remember { mutableStateOf(false) }
+    var clearConfirm by remember { mutableStateOf(false) }
+    var searching by rememberSaveable { mutableStateOf(false) }
+    var autoRefresh by rememberSaveable { mutableStateOf(prefs.getBoolean("logAutoRefresh", false)) }
+    var newestFirst by rememberSaveable { mutableStateOf(true) }
+    var query by rememberSaveable { mutableStateOf("") }
+    var level by rememberSaveable { mutableStateOf("all") }
+    val lifecycle = LocalLifecycleOwner.current
+
+    LaunchedEffect(autoRefresh, lifecycle) {
+        if (autoRefresh) lifecycle.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (true) { delay(2000); if (!loading) revision++ }
+        }
+    }
+    LaunchedEffect(revision, selectedPath) {
+        loading = true
+        try {
+            files = listLogFiles(context)
+            val selected = files.firstOrNull { it.path == selectedPath } ?: files.firstOrNull()
+            if (selected == null) {
+                selectedPath = ""
+                content = ""
+            } else {
+                if (selectedPath != selected.path) selectedPath = selected.path
+                content = readLogFile(context, selected)
+            }
+            error = ""
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (failure: Exception) {
+            error = failure.message ?: "日志读取失败"
+        } finally {
+            loading = false
+        }
+    }
+    val lines = remember(content, query, level, newestFirst) {
+        content.lines()
+            .filter { it.isNotBlank() && (query.isBlank() || it.contains(query, true)) && (level == "all" || hxLineLevel(it) == level) }
+            .let { if (newestFirst) it.asReversed() else it }
+    }
+    val selected = files.firstOrNull { it.path == selectedPath }
+
+    HxPage(
+        title = selected?.name ?: "core.log",
+        largeTitle = false,
+        subtitle = if (selected == null) "查看运行日志与调试输出" else "${lines.size} 行 · ${selected.path.removePrefix(LOG_ROOT + "/")}",
+        onBack = onBack,
+        refreshing = loading && content.isNotEmpty() && !autoRefresh,
+        onRefresh = { revision++ },
+        actions = {
+            HxBarAction(if (searching) Icons.Rounded.SearchOff else Icons.Rounded.Search, "搜索", onClick = {
+                searching = !searching
+                if (!searching) query = ""
+            })
+            IconButton(onClick = { pickFile = true }, modifier = Modifier.hxAnchorSource()) {
+                Icon(Icons.Rounded.FolderOpen, "选择日志", tint = c.text)
+            }
+            HxBarAction(Icons.Rounded.DeleteOutline, "清空当前日志", onClick = { clearConfirm = true }, enabled = selected != null && !loading)
+        },
+    ) {
+        item(key = "controls") {
+            Column(Modifier.padding(horizontal = Hx.gutter).padding(bottom = 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (searching) HxSearchField(query, { query = it }, "搜索日志", autoFocus = true)
+                HxSegmented(
+                    options = listOf("all" to "全部", "error" to "错误", "warn" to "警告", "info" to "信息", "debug" to "调试"),
+                    selected = level,
+                    onSelect = { level = it },
+                )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    HxToggleChip(if (autoRefresh) "自动刷新中" else "自动刷新", autoRefresh) {
+                        autoRefresh = it
+                        prefs.edit().putBoolean("logAutoRefresh", it).apply()
+                    }
+                    HxToggleChip(if (newestFirst) "最新在前" else "最早在前", newestFirst) { newestFirst = it }
+                }
+            }
+        }
+        if (error.isNotBlank()) {
+            item(key = "error") { HxBanner(error, tone = HxTone.Bad, modifier = Modifier.padding(horizontal = Hx.gutter).padding(bottom = 10.dp)) }
+        }
+        when {
+            loading && content.isEmpty() -> item(key = "loading") { HxSkeletonRows(8) }
+            files.isEmpty() -> item(key = "none") { HxEmpty(Icons.Rounded.Article, "暂无日志文件", "代理运行后会在运行目录生成日志") }
+            lines.isEmpty() -> item(key = "empty") { HxEmpty(Icons.Rounded.SearchOff, "当前筛选条件下没有日志") }
+            else -> itemsIndexed(lines, key = { index, line -> "l:" + index + ":" + line.hashCode() }) { index, line ->
+                HxLogLine(line, first = index == 0, last = index == lines.lastIndex)
+            }
+        }
+    }
+
+    if (pickFile) {
+        HxChoiceSheet(
+            title = "选择日志",
+            choices = files.map { HxChoice(it.path, it.name, it.path.removePrefix(LOG_ROOT + "/").substringBeforeLast('/', "").ifBlank { null }) },
+            selected = selectedPath,
+            onPick = { selectedPath = it; pickFile = false },
+            onDismiss = { pickFile = false },
+        )
+    }
+    val clearTarget = selected
+    if (clearConfirm && clearTarget != null) {
+        HxConfirmDialog(
+            title = "清空 ${clearTarget.name}？",
+            message = "只清空当前日志，不影响代理配置和其他日志。",
+            confirmLabel = "清空",
+            danger = true,
+            onConfirm = {
+                clearConfirm = false
+                scope.launch {
+                    try {
+                        clearLogFile(context, clearTarget)
+                        vm.toast("已清空 ${clearTarget.name}")
+                        revision++
+                    } catch (cancel: CancellationException) {
+                        throw cancel
+                    } catch (failure: Exception) {
+                        vm.toast(failure.message ?: "日志清空失败")
+                    }
+                }
+            },
+            onDismiss = { clearConfirm = false },
+        )
+    }
+}
+
+@Composable
+private fun LazyItemScope.HxLogLine(line: String, first: Boolean, last: Boolean) {
+    val c = Hx.colors
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var expanded by remember(line) { mutableStateOf(false) }
+    val tint = when (hxLineLevel(line)) {
+        "error" -> c.bad
+        "warn" -> c.warn
+        "debug" -> c.textFaint
+        else -> c.accent
+    }
+    val shape = RoundedCornerShape(
+        topStart = if (first) 18.dp else 0.dp,
+        topEnd = if (first) 18.dp else 0.dp,
+        bottomStart = if (last) 18.dp else 0.dp,
+        bottomEnd = if (last) 18.dp else 0.dp,
+    )
+    Row(
+        Modifier
+            .animateItem(fadeInSpec = androidx.compose.animation.core.tween(HxMotion.Medium), placementSpec = HxMotion.glide(), fadeOutSpec = null)
+            .fillMaxWidth()
+            .padding(horizontal = Hx.gutter)
+            .padding(bottom = if (last) 12.dp else 0.dp)
+            .clip(shape)
+            .background(c.surface)
+            .hxCombinedClick(onLongClick = { hxCopy(context, "日志", line) }, onClick = { expanded = !expanded })
+            .animateContentSize(androidx.compose.animation.core.tween(HxMotion.Medium, easing = HxMotion.Emphasized))
+            .padding(horizontal = 12.dp, vertical = 9.dp),
+    ) {
+        Box(Modifier.padding(top = 4.dp).size(width = 3.dp, height = 14.dp).clip(Hx.pillShape).background(tint))
+        Spacer(Modifier.width(10.dp))
+        Text(
+            line,
+            fontFamily = FontFamily.Monospace,
+            fontSize = 12.sp,
+            lineHeight = 17.sp,
+            color = c.text,
+            maxLines = if (expanded) Int.MAX_VALUE else 5,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }

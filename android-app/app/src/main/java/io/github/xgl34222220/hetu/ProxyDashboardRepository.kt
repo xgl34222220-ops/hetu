@@ -215,6 +215,18 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
         probe(node, probeSnapshot())
     }
 
+    /** Core-parallel group latency probe used by strategy-card delay taps. */
+    suspend fun groupDelay(group: String): Map<String, Long> = withContext(Dispatchers.IO) {
+        val raw = api.groupDelay(group)
+        buildMap {
+            val keys = raw.keys()
+            while (keys.hasNext()) {
+                val name = keys.next()
+                put(name, raw.optLong(name, -1L))
+            }
+        }
+    }
+
     suspend fun ipv6Delay(node: String): Long = withContext(Dispatchers.IO) {
         val snapshot = probeSnapshot()
         val leaf = selectedProxyName(snapshot.proxies, node)

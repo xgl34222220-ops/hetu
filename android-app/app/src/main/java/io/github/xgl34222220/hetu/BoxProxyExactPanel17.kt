@@ -2,6 +2,14 @@ package io.github.xgl34222220.hetu
 
 import android.content.SharedPreferences
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.background
@@ -12,6 +20,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.*
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.spring
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -31,6 +40,7 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.Icon
 import androidx.compose.material3.TextButton
@@ -158,7 +168,7 @@ internal fun BoxProxyPanelTabs17(selected: RefPanelTab, onSelect: (RefPanelTab) 
         labels = BoxProxyTabs17.map(::boxProxyTabLabel17),
         selected = BoxProxyTabs17.indexOf(selected).coerceAtLeast(0),
         onSelect = { index -> BoxProxyTabs17.getOrNull(index)?.let(onSelect) },
-        modifier = Modifier.padding(bottom = 4.dp),
+        modifier = Modifier.padding(bottom = 2.dp),
     )
 }
 
@@ -463,6 +473,8 @@ internal fun BoxProxyExactStrategy17(
                                         },
                                         compact = options.groupDensity == "compact",
                                         modifier = Modifier.weight(1f).aspectRatio(1.50f),
+                                        testing = batchTesting[group.name] == true,
+                                        onDelayClick = { testAll(group) },
                                     ) {
                                         sheetGroup = group.name
                                     }
@@ -588,13 +600,17 @@ private fun boxProxyGroupAccent17(group: ProxyGroupUi): Color {
 }
 
 @Composable
-private fun BoxProxyGroupCard17(
+internal fun BoxProxyGroupCard17(
     group: ProxyGroupUi,
     selected: String,
     delay: Long?,
     online: Int,
     compact: Boolean,
     modifier: Modifier,
+    nameOverflow: String = "clip",
+    testing: Boolean = false,
+    onLongClick: (() -> Unit)? = null,
+    onDelayClick: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
     val accent = boxProxyGroupAccent17(group)
@@ -605,6 +621,20 @@ private fun BoxProxyGroupCard17(
         animationSpec = spring(dampingRatio = .72f, stiffness = 520f),
         label = "strategy-card-${group.name}",
     )
+    val clickModifier = if (onLongClick != null) {
+        Modifier.combinedClickable(
+            interactionSource = interaction,
+            indication = null,
+            onClick = onClick,
+            onLongClick = onLongClick,
+        )
+    } else {
+        Modifier.clickable(
+            interactionSource = interaction,
+            indication = null,
+            onClick = onClick,
+        )
+    }
     Box(
         modifier
             .graphicsLayer {
@@ -612,20 +642,16 @@ private fun BoxProxyGroupCard17(
                 scaleY = scale
                 alpha = if (pressed) .965f else 1f
             }
-            .clickable(
-                interactionSource = interaction,
-                indication = null,
-                onClick = onClick,
-            )
+            .then(clickModifier)
             .testTag("boxproxy17-group:${group.name}"),
     ) {
         MiuixCard(
             modifier = Modifier.fillMaxSize(),
-            cornerRadius = 13.dp,
+            cornerRadius = 16.dp,
             colors = MiuixCardDefaults.defaultColors(),
         ) {
             Column(
-                Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 10.dp),
+                Modifier.fillMaxSize().padding(horizontal = 11.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(0.dp),
             ) {
                 Row(verticalAlignment = Alignment.Top) {
@@ -634,9 +660,9 @@ private fun BoxProxyGroupCard17(
                             group.name,
                             color = MiuixTheme.colorScheme.onSurfaceContainer,
                             fontSize = 14.sp,
-                            lineHeight = 15.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
+                            lineHeight = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = if (nameOverflow == "wrap" && !compact) 2 else 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                         Spacer(Modifier.height(2.dp))
@@ -651,29 +677,33 @@ private fun BoxProxyGroupCard17(
                         )
                     }
                     Spacer(Modifier.width(6.dp))
-                    Box(
-                        Modifier.size(26.dp).background(accent.copy(alpha = .12f), RoundedCornerShape(8.dp)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        ConfiguredGroupIcon(group, Modifier.size(19.dp))
+                    // Reference screenshot keeps the artwork visually free-standing;
+                    // the extra tinted icon well made the compact card feel heavier.
+                    Box(Modifier.size(34.dp), contentAlignment = Alignment.Center) {
+                        ConfiguredGroupIcon(group, Modifier.size(30.dp))
                     }
                 }
                 Spacer(Modifier.weight(1f))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(boxProxyFlag17(selected), fontSize = 13.sp, lineHeight = 15.sp)
-                    Spacer(Modifier.width(4.dp))
+                    val explicitFlag = boxProxyExplicitFlag18(selected)
+                    val inferredFlag = if (explicitFlag == null) boxProxyFlag17(selected).takeUnless { it == "◉" } else explicitFlag
+                    val displaySelected = inferredFlag?.let { flag -> selected.removePrefix(flag).trimStart() } ?: selected
+                    if (inferredFlag != null) {
+                        Text(inferredFlag, fontSize = 13.sp, lineHeight = 15.sp)
+                        Spacer(Modifier.width(3.dp))
+                    }
                     Text(
-                        selected.ifBlank { "未选择" },
+                        displaySelected.ifBlank { "未选择" },
                         Modifier.weight(1f),
                         color = MiuixTheme.colorScheme.onSurfaceSecondary,
-                        fontSize = 11.5.sp,
-                        lineHeight = 14.sp,
+                        fontSize = 11.sp,
+                        lineHeight = 13.sp,
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Spacer(Modifier.width(6.dp))
-                    BoxProxyDelay17(delay, false)
+                    BoxProxyDelay17(delay, testing, onClick = onDelayClick)
                 }
             }
         }
@@ -811,9 +841,12 @@ private fun boxProxyExplicitFlag18(name: String): String? {
 }
 
 @Composable
-private fun BoxProxyDelay17(value: Long?, testing: Boolean) {
+private fun BoxProxyDelay17(
+    value: Long?,
+    testing: Boolean,
+    onClick: (() -> Unit)? = null,
+) {
     val text = when {
-        testing -> "…"
         value == null || value <= 0L -> "--"
         else -> "$value ms"
     }
@@ -821,8 +854,8 @@ private fun BoxProxyDelay17(value: Long?, testing: Boolean) {
     val background: Color
     when {
         testing || value == null || value <= 0L -> {
-            foreground = Color(0xFF9CA3AF)
-            background = Color(0xFFF3F4F6)
+            foreground = if (testing) Color(0xFF1E6FFF) else Color(0xFF9CA3AF)
+            background = if (testing) Color(0xFFE9F1FF) else Color(0xFFF3F4F6)
         }
         value < 100L -> {
             foreground = Color(0xFF00B578)
@@ -837,12 +870,69 @@ private fun BoxProxyDelay17(value: Long?, testing: Boolean) {
             background = Color(0xFFFFF4E6)
         }
     }
-    Box(
-        Modifier.background(background, RoundedCornerShape(999.dp))
-            .padding(horizontal = 6.dp, vertical = 2.dp),
-        contentAlignment = Alignment.Center
+    val animatedForeground by animateColorAsState(foreground, tween(180), label = "delay-pill-fg")
+    val animatedBackground by animateColorAsState(background, tween(180), label = "delay-pill-bg")
+    val interaction = remember(onClick) { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) .92f else 1f,
+        animationSpec = spring(dampingRatio = .68f, stiffness = 720f),
+        label = "delay-pill-press",
+    )
+    val click = if (onClick != null) {
+        Modifier.clickable(
+            interactionSource = interaction,
+            indication = null,
+            enabled = !testing,
+            onClick = onClick,
+        )
+    } else Modifier
+
+    Row(
+        Modifier
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .then(click)
+            .background(animatedBackground, RoundedCornerShape(999.dp))
+            .animateContentSize(tween(180))
+            .heightIn(min = 20.dp)
+            .padding(horizontal = if (testing) 7.dp else 6.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
     ) {
-        Text(text, color = foreground, fontSize = 10.sp, lineHeight = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        if (testing) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(10.dp),
+                color = animatedForeground,
+                strokeWidth = 1.5.dp,
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                "测速",
+                color = animatedForeground,
+                fontSize = 9.5.sp,
+                lineHeight = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+            )
+        } else {
+            AnimatedContent(
+                targetState = text,
+                transitionSpec = {
+                    (slideInVertically(tween(170)) { it / 2 } + fadeIn(tween(150)))
+                        .togetherWith(slideOutVertically(tween(130)) { -it / 2 } + fadeOut(tween(120)))
+                },
+                label = "delay-value",
+            ) { shown ->
+                Text(
+                    shown,
+                    color = animatedForeground,
+                    fontSize = 10.sp,
+                    lineHeight = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                )
+            }
+        }
     }
 }
 

@@ -146,9 +146,13 @@ class ProxyStatusNotificationService : Service() {
             "mode" to state.mode,
         )
         val template = prefs.getString(PREF_TEMPLATE, DEFAULT_TEMPLATE).orEmpty().ifBlank { DEFAULT_TEMPLATE }
+        val titleTemplate = prefs.getString(PREF_TITLE_TEMPLATE, DEFAULT_TITLE_TEMPLATE).orEmpty().ifBlank { DEFAULT_TITLE_TEMPLATE }
         var body = template
-        values.forEach { (key, value) -> body = body.replace("{$key}", value) }
-        val title = "河图 · ${state.core} · ${state.mode}"
+        var title = titleTemplate
+        values.forEach { (key, value) ->
+            body = body.replace("{$key}", value)
+            title = title.replace("{$key}", value)
+        }
         getSystemService(NotificationManager::class.java)
             .notify(NOTIFICATION_ID, buildNotification(title, body, state.running))
     }
@@ -226,6 +230,7 @@ class ProxyStatusNotificationService : Service() {
     companion object {
         const val PREF_ENABLED = "proxyStatusNotificationEnabled"
         const val PREF_TEMPLATE = "proxyStatusNotificationTemplate"
+        const val PREF_TITLE_TEMPLATE = "proxyStatusNotificationTitleTemplate"
         const val PREF_ACTION_1 = "proxyStatusNotificationAction1"
         const val PREF_ACTION_2 = "proxyStatusNotificationAction2"
         const val PREF_ACTION_3 = "proxyStatusNotificationAction3"
@@ -234,6 +239,7 @@ class ProxyStatusNotificationService : Service() {
         const val PREF_ACTION_LABEL_3 = "proxyStatusNotificationActionLabel3"
         const val PREF_REFRESH_SECONDS = "proxyStatusNotificationRefreshSeconds"
         const val PREF_CLICK_TARGET = "proxyStatusNotificationClickTarget"
+        const val DEFAULT_TITLE_TEMPLATE = "河图 · {status}"
         const val DEFAULT_TEMPLATE = "{status} · {uptime}\n↓ {download}  ↑ {upload} · CPU {cpu}"
         private const val CHANNEL_ID = "proxy_status"
         private const val NOTIFICATION_ID = 2026

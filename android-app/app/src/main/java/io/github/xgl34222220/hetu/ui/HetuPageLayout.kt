@@ -23,12 +23,12 @@ val HetuSystemFontFamily = FontFamily(Typeface.DEFAULT)
 
 /** Shared with the LuoShu/BaiZe page rhythm; toolbar and dock use the same gutter. */
 object HetuPageMetrics {
-    val Gutter = 16.dp
-    val Gap = 16.dp
-    val ToolbarHeight = 64.dp
-    val RowHeight = 72.dp
-    val CardRadius = 16.dp
-    val DockHeight = 72.dp
+    val Gutter = 12.dp
+    val Gap = 8.dp
+    val ToolbarHeight = 50.dp
+    val RowHeight = 54.dp
+    val CardRadius = 18.dp
+    val DockHeight = 64.dp
 }
 
 @Composable
@@ -37,8 +37,8 @@ fun HetuPrimaryHeader(title: String, actions: @Composable RowScope.() -> Unit = 
         .padding(horizontal = HetuPageMetrics.Gutter, vertical = 8.dp).testTag("page-header"),
         verticalAlignment = Alignment.CenterVertically) {
         Text(ht(title), Modifier.weight(1f), color = LocalHetuTokens.current.textPrimary,
-            fontFamily = HetuSystemFontFamily, fontSize = 26.sp, lineHeight = 34.sp,
-            fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            fontFamily = HetuSystemFontFamily, fontSize = 22.sp, lineHeight = 28.sp,
+            fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Row(verticalAlignment = Alignment.CenterVertically, content = actions)
     }
 }
@@ -51,7 +51,7 @@ fun HetuPageList(title: String, modifier: Modifier = Modifier, listTag: String =
         HetuPrimaryHeader(title)
         LazyColumn(Modifier.fillMaxWidth().weight(1f).testTag(listTag), state = state,
             contentPadding = PaddingValues(start = HetuPageMetrics.Gutter, end = HetuPageMetrics.Gutter,
-                top = 8.dp, bottom = hetuContentBottomPadding()),
+                top = 4.dp, bottom = hetuContentBottomPadding()),
             verticalArrangement = Arrangement.spacedBy(HetuPageMetrics.Gap), content = content)
     }
 }
@@ -64,7 +64,7 @@ fun HetuDetailList(title: String, onBack: () -> Unit, subtitle: String = "",
         Box(Modifier.padding(horizontal = HetuPageMetrics.Gutter)) { HetuPageHeader(title, onBack, subtitle, actions) }
         LazyColumn(Modifier.fillMaxWidth().weight(1f), state = state,
             contentPadding = PaddingValues(start = HetuPageMetrics.Gutter, end = HetuPageMetrics.Gutter,
-                top = 8.dp, bottom = hetuContentBottomPadding()),
+                top = 4.dp, bottom = hetuContentBottomPadding()),
             verticalArrangement = Arrangement.spacedBy(HetuPageMetrics.Gap), content = content)
     }
 }

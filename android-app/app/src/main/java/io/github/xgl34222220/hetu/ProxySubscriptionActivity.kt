@@ -258,8 +258,8 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
         ) {
         LazyColumn(
             Modifier.fillMaxSize().statusBarsPadding(),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 94.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 94.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             item("header") {
                 Row(
@@ -267,32 +267,14 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Surface(
-                        modifier = Modifier.size(44.dp),
-                        shape = CircleShape,
-                        color = tokens.cardBackground,
-                        contentColor = scheme.primary,
-                        shadowElevation = 1.dp,
-                    ) {
-                        IconButton(onClick = onBack, modifier = Modifier.fillMaxSize()) {
-                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回", Modifier.size(21.dp))
-                        }
+                    IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回", Modifier.size(20.dp), tint = tokens.textPrimary)
                     }
-                    Column(Modifier.weight(1f)) {
-                        Text("订阅工作台", color = tokens.textPrimary, fontSize = 26.sp, lineHeight = 34.sp, fontWeight = FontWeight.Bold)
-                        Text(configName, color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
-                    }
-                    Surface(
-                        modifier = Modifier.size(44.dp),
-                        shape = CircleShape,
-                        color = tokens.cardBackground,
-                        contentColor = scheme.primary,
-                        shadowElevation = 1.dp,
-                    ) {
-                        IconButton(onClick = ::pullRefreshAll, enabled = !loading && !pullRefreshing, modifier = Modifier.fillMaxSize()) {
-                            if (loading) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                            else Icon(Icons.Rounded.Refresh, "刷新", Modifier.size(21.dp))
-                        }
+                    Text("订阅管理", color = tokens.textPrimary, fontSize = 22.sp, lineHeight = 28.sp,
+                        fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    IconButton(onClick = ::pullRefreshAll, enabled = !loading && !pullRefreshing, modifier = Modifier.size(40.dp)) {
+                        if (loading) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                        else Icon(Icons.Rounded.Refresh, "刷新", Modifier.size(20.dp), tint = tokens.textPrimary)
                     }
                 }
             }
@@ -305,7 +287,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                 val liveRatio = if (liveTotal > 0L) (liveUsed.toDouble() / liveTotal.toDouble()).toFloat().coerceIn(0f, 1f) else 0f
                 val liveNodeCount = live.sumOf { it.nodes.size }
                 Surface(
-                    shape = RoundedCornerShape(24.dp),
+                    shape = RoundedCornerShape(18.dp),
                     color = tokens.cardBackground,
                     border = BorderStroke(.7.dp, if (dark) tokens.outline.copy(alpha = .34f) else Color(0xFFE4E7EB).copy(alpha = .72f)),
                     shadowElevation = 1.dp,
@@ -338,7 +320,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                             Box(Modifier.fillMaxWidth().height(6.dp).background(Color(0xFFF4F5F7), CircleShape)) {
                                 Box(
                                     Modifier.fillMaxWidth(liveRatio.coerceIn(.001f, 1f)).fillMaxHeight()
-                                        .background(Brush.horizontalGradient(listOf(Color(0xFF12806F), Color(0xFF22D3EE))), CircleShape),
+                                        .background(Brush.horizontalGradient(listOf(Color(0xFF2A62E8), Color(0xFF22D3EE))), CircleShape),
                                 )
                             }
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -391,11 +373,11 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
             }
 
             items(configLibrary, key = { "config-" + it.name }) { config ->
-                val cardShape = RoundedCornerShape(20.dp)
+                val cardShape = RoundedCornerShape(16.dp)
                 val selectedBrush = if (dark) {
                     Brush.horizontalGradient(listOf(Color(0xFF172554).copy(alpha = .50f), Color(0xFF1B2431).copy(alpha = .82f)))
                 } else {
-                    Brush.horizontalGradient(listOf(Color(0xFFDDF1EC).copy(alpha = .76f), Color(0xFFF8FAFE).copy(alpha = .86f)))
+                    Brush.horizontalGradient(listOf(Color(0xFFE3EAFD).copy(alpha = .76f), Color(0xFFF8FAFE).copy(alpha = .86f)))
                 }
                 Box(
                     Modifier.fillMaxWidth()
@@ -494,7 +476,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
 
             if (message.isNotBlank()) {
                 item("message") {
-                    Surface(shape = RoundedCornerShape(20.dp), color = scheme.errorContainer) {
+                    Surface(shape = RoundedCornerShape(16.dp), color = scheme.errorContainer) {
                         Text(message, Modifier.fillMaxWidth().padding(16.dp), color = scheme.onErrorContainer, style = MaterialTheme.typography.bodySmall)
                     }
                 }
@@ -509,7 +491,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
 
             if (!loading && subscriptions.isEmpty()) {
                 item("empty") {
-                    Surface(shape = RoundedCornerShape(24.dp), color = tokens.cardBackground) {
+                    Surface(shape = RoundedCornerShape(18.dp), color = tokens.cardBackground) {
                         Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text("当前配置没有 proxy-providers", color = tokens.textPrimary, style = MaterialTheme.typography.titleSmall)
                             Text("可以直接使用下方 YAML 编辑器修改整份配置。", color = tokens.textSecondary, style = MaterialTheme.typography.bodySmall)
@@ -529,7 +511,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                 val host = subscriptionHost(item)
                 val ratio = provider?.takeIf { it.hasSubscriptionInfo && it.total > 0L }?.ratio?.coerceIn(0f, 1f)
                 val remainingPercent = ratio?.let { ((1f - it) * 100f).toInt() }
-                val ticketShape = RoundedCornerShape(22.dp)
+                val ticketShape = RoundedCornerShape(18.dp)
                 val ticketBrush = if (dark) {
                     Brush.verticalGradient(listOf(Color(0xFF1B2431).copy(alpha = .90f), Color(0xFF151D29).copy(alpha = .84f)))
                 } else {
@@ -594,7 +576,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                             if (ratio != null && ratio > 0f) {
                                 Box(
                                     Modifier.fillMaxWidth(ratio.coerceIn(.001f, 1f)).fillMaxHeight()
-                                        .background(Brush.horizontalGradient(listOf(Color(0xFF12806F), Color(0xFF22D3EE))), CircleShape),
+                                        .background(Brush.horizontalGradient(listOf(Color(0xFF2A62E8), Color(0xFF22D3EE))), CircleShape),
                                 )
                             }
                         }
@@ -645,7 +627,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                 }
             }
             item("yaml") {
-                val yamlCardShape = RoundedCornerShape(24.dp)
+                val yamlCardShape = RoundedCornerShape(18.dp)
                 val yamlCardBrush = if (dark) {
                     Brush.verticalGradient(listOf(Color(0xFF1B2431).copy(alpha = .88f), Color(0xFF151D29).copy(alpha = .82f)))
                 } else {

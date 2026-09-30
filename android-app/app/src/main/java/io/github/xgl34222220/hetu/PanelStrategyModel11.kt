@@ -16,6 +16,9 @@ internal data class PanelOptions11(
     val descending: Boolean = false,
     val columns: Int = 2,
     val compact: Boolean = false,
+    val groupColumns: Int = 2,
+    val groupCompact: Boolean = false,
+    val nameOverflow: String = "clip",
 ) {
     companion object {
         fun read(p: SharedPreferences) = PanelOptions11(
@@ -25,8 +28,11 @@ internal data class PanelOptions11(
             p.getBoolean("proxySelectorCollapsePrevious", true),
             p.getString("proxySelectorNodeSort", "config").orEmpty(),
             p.getBoolean("proxySelectorSortDescending", false),
-            p.getInt("proxySelectorNodeColumns", 2).let { if (it == 1) 1 else 2 },
+            p.getInt("proxySelectorNodeColumns", 2).coerceIn(1, 2),
             p.getString("proxySelectorDensity", "standard") == "compact",
+            p.getInt("proxySelectorGroupColumns", 2).coerceIn(1, 2),
+            p.getString("proxySelectorGroupDensity", "standard") == "compact",
+            p.getString("proxySelectorNameOverflow", "clip").orEmpty().ifBlank { "clip" },
         )
     }
     fun save(p: SharedPreferences) {
@@ -36,8 +42,12 @@ internal data class PanelOptions11(
             .putBoolean("proxySelectorCollapsePrevious", collapsePrevious)
             .putString("proxySelectorNodeSort", sort)
             .putBoolean("proxySelectorSortDescending", descending)
-            .putInt("proxySelectorNodeColumns", columns)
-            .putString("proxySelectorDensity", if (compact) "compact" else "standard").apply()
+            .putInt("proxySelectorNodeColumns", columns.coerceIn(1, 2))
+            .putString("proxySelectorDensity", if (compact) "compact" else "standard")
+            .putInt("proxySelectorGroupColumns", groupColumns.coerceIn(1, 2))
+            .putString("proxySelectorGroupDensity", if (groupCompact) "compact" else "standard")
+            .putString("proxySelectorNameOverflow", nameOverflow.ifBlank { "clip" })
+            .apply()
     }
 }
 

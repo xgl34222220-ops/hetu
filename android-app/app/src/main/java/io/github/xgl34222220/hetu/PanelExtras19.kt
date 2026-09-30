@@ -110,7 +110,7 @@ internal fun refLogLevelColor19(level: RefLogLevel): Color {
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     return when (level) {
         RefLogLevel.Debug -> if (dark) Color(0xFF98A1AA) else Color(0xFF5D6670)
-        RefLogLevel.Info -> if (dark) Color(0xFF8AB4FF) else Color(0xFF12806F)
+        RefLogLevel.Info -> if (dark) Color(0xFF8AB4FF) else Color(0xFF2A62E8)
         RefLogLevel.Warn -> if (dark) Color(0xFFFBBF24) else Color(0xFFD97706)
         RefLogLevel.Error -> if (dark) Color(0xFFFB7185) else Color(0xFFE11D48)
     }

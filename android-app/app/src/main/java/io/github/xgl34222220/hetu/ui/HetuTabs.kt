@@ -91,10 +91,14 @@ internal fun HetuScrollTabs(
         }
     }
 
-    val capsuleFill = if (dark) Color.White.copy(alpha = .12f) else Color.White
-    val capsuleShadow = Color(0xFF3B2E7E).copy(alpha = if (dark) 0f else .07f)
-    val outline = if (dark) Color.White.copy(alpha = .10f) else Color(0xFFD9D6E8)
-    val capsuleHeight = 38.dp
+    // V20.28: match the reference panel strip — compact rounded rectangles rather
+    // than oversized pills. The selected tab is a clean surface; inactive tabs
+    // keep a confident hairline outline so all seven labels read as one control row.
+    val capsuleFill = if (dark) Color.White.copy(alpha = .13f) else Color(0xFFF9F8FD)
+    val capsuleShadow = Color(0xFF2F2857).copy(alpha = if (dark) 0f else .045f)
+    val outline = if (dark) Color.White.copy(alpha = .24f) else Color(0xFF666874).copy(alpha = .72f)
+    val capsuleHeight = 36.dp
+    val capsuleRadius = 13.dp
 
     Box(
         modifier.fillMaxWidth()
@@ -103,7 +107,7 @@ internal fun HetuScrollTabs(
             .testTag("boxproxy17-tabs"),
     ) {
         Row(
-            Modifier.padding(contentPadding).height(48.dp).selectableGroup()
+            Modifier.padding(contentPadding).height(44.dp).selectableGroup()
                 .drawBehind {
                     if (placed && right.value > left.value) {
                         val h = capsuleHeight.toPx()
@@ -113,12 +117,12 @@ internal fun HetuScrollTabs(
                         val stretch = ((w - settledW) / settledW).coerceIn(0f, 1f)
                         val drawH = h * (1f - .10f * stretch)
                         val top = (size.height - drawH) / 2f
-                        val r = CornerRadius(drawH / 2f)
-                        drawRoundRect(capsuleShadow, Offset(left.value, top + 2.dp.toPx()), Size(w, drawH), r)
+                        val r = CornerRadius(capsuleRadius.toPx())
+                        drawRoundRect(capsuleShadow, Offset(left.value, top + 1.dp.toPx()), Size(w, drawH), r)
                         drawRoundRect(capsuleFill, Offset(left.value, top), Size(w, drawH), r)
                     }
                 },
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             labels.forEachIndexed { index, label ->
@@ -135,8 +139,8 @@ internal fun HetuScrollTabs(
                 Box(
                     Modifier
                         .onPlaced { c -> if (index < bounds.size) bounds[index] = c.positionInParent().x to c.size.width.toFloat() }
-                        .height(48.dp)
-                        .hetuPressScale(source, pressedScale = .94f)
+                        .height(44.dp)
+                        .hetuPressScale(source, pressedScale = .965f)
                         .selectable(active, interactionSource = source, indication = null, role = Role.Tab) {
                             if (!active) { haptics.perform(HetuHaptic.Tick); onSelect(index) }
                         }
@@ -145,13 +149,13 @@ internal fun HetuScrollTabs(
                 ) {
                     Box(
                         Modifier.height(capsuleHeight)
-                            .border(1.dp, border, RoundedCornerShape(50))
-                            .padding(horizontal = 16.dp),
+                            .border(1.dp, border, RoundedCornerShape(capsuleRadius))
+                            .padding(horizontal = 14.dp),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            label, color = text, fontSize = 15.sp, lineHeight = 20.sp, maxLines = 1,
-                            fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                            label, color = text, fontSize = 15.sp, lineHeight = 19.sp, maxLines = 1,
+                            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
                         )
                     }
                 }

@@ -108,8 +108,9 @@ internal fun SubscriptionHealthSheet(onDismiss: () -> Unit, onSaved: () -> Unit)
                             require(core == ProxyRuntimeProfile.Core.MIHOMO || core == ProxyRuntimeProfile.Core.MIHOMO_SMART) { "健康检查表单用于 Mihomo；其他核心请使用配置编辑器" }
                             val selected = library.selected(core) ?: error("尚未选择配置")
                             val original = library.read(selected); val changed = rewriteSubscriptionHealth(original, settings)
-                            check(library.read(selected) == original) { "配置已变化，请重新打开后重试" }
-                            library.write(selected, changed)
+                            library.writeIfUnchanged(
+                                selected, ConfigEditSnapshot(core.id, selected.name, original), changed,
+                            )
                         }
                         prefs.edit().putString("subscriptionHealthUrl", settings.url).putInt("subscriptionHealthInterval", settings.interval).putInt("subscriptionHealthTimeout", settings.timeout).putInt("subscriptionHealthTolerance", settings.tolerance).apply()
                         onSaved(); onDismiss()

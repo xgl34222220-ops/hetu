@@ -19,6 +19,20 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitHorizontalTouchSlopOrCancellation
+import androidx.compose.foundation.gestures.horizontalDrag
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import kotlinx.coroutines.launch
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.animation.core.animate
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -86,14 +100,14 @@ internal val LocalHxBlur = staticCompositionLocalOf { true }
 
 /** Soft, diffuse elevation for light mode; dark mode relies on hairline borders instead. */
 @Composable
-internal fun Modifier.hxSoftShadow(shape: Shape, elevation: Dp = 7.dp): Modifier {
+internal fun Modifier.hxSoftShadow(shape: Shape, elevation: Dp = 4.dp): Modifier {
     val c = Hx.colors
     return if (c.dark) this else this.shadow(
         elevation = elevation,
         shape = shape,
         clip = false,
-        ambientColor = Color(0xFF12161A).copy(alpha = .035f),
-        spotColor = Color(0xFF12161A).copy(alpha = .07f),
+        ambientColor = Color(0xFF302B55).copy(alpha = .018f),
+        spotColor = Color(0xFF302B55).copy(alpha = .035f),
     )
 }
 
@@ -192,23 +206,33 @@ internal fun rememberHxShimmer(): Brush {
     )
 }
 
-/** Placeholder rows that mirror the shape of the content being loaded. */
+/** Placeholder rows that mirror the shape of the content being loaded (one grouped card). */
 @Composable
 internal fun HxSkeletonRows(count: Int = 5, modifier: Modifier = Modifier) {
     val brush = rememberHxShimmer()
-    Column(modifier.fillMaxWidth().padding(horizontal = Hx.gutter), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    val c = Hx.colors
+    Column(
+        modifier
+            .fillMaxWidth()
+            .padding(horizontal = Hx.gutter)
+            .clip(RoundedCornerShape(22.dp))
+            .background(c.surface),
+    ) {
         repeat(count) { i ->
+            if (i > 0) Box(Modifier.padding(start = 58.dp).fillMaxWidth().height(0.5.dp).background(c.line.copy(alpha = .5f)))
             Row(
-                Modifier.fillMaxWidth().clip(Hx.rowShape).background(Hx.colors.surface).padding(12.dp),
+                Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(Modifier.size(36.dp).clip(Hx.rowShape).background(brush))
+                Box(Modifier.size(32.dp).clip(RoundedCornerShape(10.dp)).background(brush))
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Box(Modifier.fillMaxWidth(if (i % 2 == 0) .62f else .48f).height(12.dp).clip(Hx.pillShape).background(brush))
+                    Box(Modifier.fillMaxWidth(if (i % 3 == 0) .62f else if (i % 3 == 1) .5f else .7f).height(11.dp).clip(Hx.pillShape).background(brush))
                     Spacer(Modifier.height(8.dp))
-                    Box(Modifier.fillMaxWidth(.34f).height(10.dp).clip(Hx.pillShape).background(brush))
+                    Box(Modifier.fillMaxWidth(if (i % 2 == 0) .34f else .42f).height(9.dp).clip(Hx.pillShape).background(brush))
                 }
+                Spacer(Modifier.width(12.dp))
+                Box(Modifier.size(width = 44.dp, height = 20.dp).clip(RoundedCornerShape(7.dp)).background(brush))
             }
         }
     }
@@ -220,7 +244,7 @@ internal fun HxSkeletonRows(count: Int = 5, modifier: Modifier = Modifier) {
 
 internal data class HxDockItem(val key: String, val label: String, val icon: ImageVector)
 
-internal val HxDockHeight = 64.dp
+internal val HxDockHeight = 54.dp
 
 /**
  * Floating frosted dock. The selection pill glides between items on a spring and the
@@ -234,6 +258,7 @@ internal fun HxDock(
     onSelect: (String) -> Unit,
     hazeState: HazeState?,
     modifier: Modifier = Modifier,
+    visible: Boolean = true,
 ) {
     val c = Hx.colors
     val haptics = rememberHetuHaptics()
@@ -242,55 +267,78 @@ internal fun HxDock(
     var widthPx by remember { mutableIntStateOf(0) }
     val index = items.indexOfFirst { it.key == selected }.coerceAtLeast(0)
     val itemWidth = with(density) { (widthPx / items.size.coerceAtLeast(1)).toDp() }
-    val indicatorX by animateDpAsState(
-        itemWidth * index,
-        spring(dampingRatio = .78f, stiffness = Spring.StiffnessMediumLow),
-        label = "dockIndicator",
-    )
+    // Liquid pill: the edge facing the destination leads, the other trails, so the pill
+    // stretches across and settles back into one slot.
+    val forward = rememberHxDirection(index)
+    val lead = spring<Dp>(dampingRatio = .8f, stiffness = 620f)
+    val trail = spring<Dp>(dampingRatio = .82f, stiffness = 230f)
+    val indicatorLeft by animateDpAsState(itemWidth * index, if (forward) trail else lead, label = "dockLeft")
+    val indicatorRight by animateDpAsState(itemWidth * (index + 1), if (forward) lead else trail, label = "dockRight")
+    val hide by animateFloatAsState(if (visible) 0f else 1f, spring(dampingRatio = .9f, stiffness = 380f), label = "dockHide")
     val blur = LocalHxBlur.current && hazeState != null
     Box(
         modifier
+            .graphicsLayer {
+                translationY = hide * (size.height + 40.dp.toPx())
+                alpha = 1f - hide * .6f
+            }
             .navigationBarsPadding()
-            .padding(start = 20.dp, end = 20.dp, bottom = 10.dp)
+            .padding(start = 28.dp, end = 28.dp, bottom = 8.dp)
             .fillMaxWidth()
             .height(HxDockHeight)
             .shadow(
-                elevation = 18.dp,
+                elevation = 6.dp,
                 shape = shape,
                 clip = false,
-                ambientColor = Color(0xFF12161A).copy(alpha = if (c.dark) .20f else .06f),
-                spotColor = Color(0xFF12161A).copy(alpha = if (c.dark) .30f else .12f),
+                ambientColor = Color(0xFF12161A).copy(alpha = if (c.dark) .12f else .02f),
+                spotColor = Color(0xFF12161A).copy(alpha = if (c.dark) .16f else .045f),
             )
             .clip(shape)
             .then(
                 if (blur) Modifier.hazeEffect(state = hazeState!!, style = HazeMaterials.ultraThin()) {
-                    blurRadius = 24.dp
-                    noiseFactor = .01f
+                    blurRadius = 30.dp
+                    noiseFactor = .008f
                 } else Modifier.background(c.surface),
             )
-            .background(if (blur) c.surface.copy(alpha = if (c.dark) .55f else .62f) else Color.Transparent)
-            .border(0.5.dp, if (c.dark) Color.White.copy(alpha = .08f) else Color.White.copy(alpha = .7f), shape)
-            .padding(5.dp)
+            .background(
+                if (blur) Brush.verticalGradient(
+                    if (c.dark) listOf(
+                        c.surface.copy(alpha = .24f),
+                        c.surface.copy(alpha = .12f),
+                    ) else listOf(
+                        Color.White.copy(alpha = .11f),
+                        Color(0xFFF1EEFA).copy(alpha = .035f),
+                    ),
+                ) else Brush.verticalGradient(listOf(c.surface, c.surface)),
+            )
+            .border(0.35.dp, if (c.dark) Color.White.copy(alpha = .09f) else Color.White.copy(alpha = .28f), shape)
+            .padding(4.dp)
             .onSizeChanged { widthPx = it.width },
     ) {
         if (widthPx > 0) {
             Box(
                 Modifier
-                    .offset(x = indicatorX)
-                    .width(itemWidth)
+                    .offset(x = indicatorLeft)
+                    .width((indicatorRight - indicatorLeft).coerceAtLeast(0.dp))
                     .fillMaxHeight()
                     .clip(shape)
-                    .background(c.accentSoft),
+                    .background(
+                        if (blur) Brush.verticalGradient(
+                            if (c.dark) listOf(Color.White.copy(alpha = .10f), Color.White.copy(alpha = .04f))
+                            else listOf(Color.White.copy(alpha = .16f), Color(0xFFF2EFFA).copy(alpha = .04f)),
+                        ) else Brush.verticalGradient(listOf(c.accentSoft, c.accentSoft)),
+                    )
+                    .border(0.35.dp, if (c.dark) Color.White.copy(alpha = .11f) else Color.White.copy(alpha = .34f), shape),
             )
         }
         Row(Modifier.fillMaxSize()) {
             items.forEach { item ->
                 val active = item.key == selected
-                val tint by animateColorAsState(if (active) c.accent else c.textMuted, tween(HxMotion.Medium), label = "dockTint")
+                val tint by animateColorAsState(if (active) c.accent else c.text.copy(alpha = .92f), tween(HxMotion.Medium), label = "dockTint")
                 val bounce = remember { Animatable(1f) }
                 LaunchedEffect(active) {
                     if (active) {
-                        bounce.snapTo(.82f)
+                        bounce.snapTo(.90f)
                         bounce.animateTo(1f, spring(dampingRatio = .45f, stiffness = Spring.StiffnessMedium))
                     }
                 }
@@ -312,10 +360,16 @@ internal fun HxDock(
                         item.icon,
                         contentDescription = item.label,
                         tint = tint,
-                        modifier = Modifier.size(22.dp).graphicsLayer { scaleX = bounce.value; scaleY = bounce.value },
+                        modifier = Modifier.size(20.dp).graphicsLayer { scaleX = bounce.value; scaleY = bounce.value },
                     )
                     Spacer(Modifier.height(2.dp))
-                    Text(item.label, style = MaterialTheme.typography.labelSmall, color = tint, maxLines = 1)
+                    Text(
+                        item.label,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = if (active) androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Medium,
+                        color = tint,
+                        maxLines = 1,
+                    )
                 }
             }
         }
@@ -378,3 +432,149 @@ internal fun rememberHxAurora(active: Boolean): Brush {
 
 @Suppress("unused")
 private val HxRingShape = CircleShape
+
+/* ------------------------------------------------------------------ */
+/*  Interaction helpers                                                 */
+/* ------------------------------------------------------------------ */
+
+/** Tap + optional long-press on one surface (ripple kept). */
+@OptIn(ExperimentalFoundationApi::class)
+internal fun Modifier.hxCombinedClick(
+    enabled: Boolean = true,
+    onLongClick: (() -> Unit)? = null,
+    onClick: () -> Unit,
+): Modifier = this.combinedClickable(enabled = enabled, onLongClick = onLongClick, onClick = onClick)
+
+/** Same as [hxCombinedClick] but sharing an interaction source (press scale + ripple). */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+internal fun Modifier.hxCombinedClickSource(
+    source: MutableInteractionSource,
+    enabled: Boolean = true,
+    onLongClick: (() -> Unit)? = null,
+    onClick: () -> Unit,
+): Modifier = this.combinedClickable(
+    interactionSource = source,
+    indication = androidx.compose.foundation.LocalIndication.current,
+    enabled = enabled,
+    onLongClick = onLongClick,
+    onClick = onClick,
+)
+
+private class HxDirectionHolder(var last: Int, var forward: Boolean)
+
+/** Remembers whether [index] last moved forward (to a higher index) or backward. */
+@Composable
+internal fun rememberHxDirection(index: Int): Boolean {
+    val holder = remember { HxDirectionHolder(index, true) }
+    if (index != holder.last) {
+        holder.forward = index > holder.last
+        holder.last = index
+    }
+    return holder.forward
+}
+
+/**
+ * Swipe the row to the left to reveal a destructive action. Past the threshold the
+ * action tints solid and gives a tick; releasing there runs [onAction]. Anything else
+ * springs back. Tapping keeps working normally.
+ */
+@Composable
+internal fun HxSwipeAction(
+    label: String,
+    icon: ImageVector,
+    onAction: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    content: @Composable () -> Unit,
+) {
+    val c = Hx.colors
+    val haptics = rememberHetuHaptics()
+    val density = LocalDensity.current
+    val scope = rememberCoroutineScope()
+    var offset by remember { mutableFloatStateOf(0f) }
+    var widthPx by remember { mutableIntStateOf(0) }
+    val thresholdPx = with(density) { 96.dp.toPx() }
+    var armed by remember { mutableStateOf(false) }
+    val actionTint by animateColorAsState(if (armed) Color.White else c.bad, tween(HxMotion.Short), label = "swipeTint")
+    val actionBg by animateColorAsState(if (armed) c.bad else c.badSoft, tween(HxMotion.Short), label = "swipeBg")
+
+    suspend fun settle(velocity: Float) {
+        if (armed || velocity < -2600f) {
+            haptics.perform(HetuHaptic.Confirm)
+            animate(offset, -widthPx.toFloat(), animationSpec = tween(HxMotion.Short, easing = HxMotion.Exit)) { v, _ -> offset = v }
+            armed = false
+            onAction()
+            // Normally the row is gone by now; if the action failed, bring it back.
+            delay(1400)
+            animate(offset, 0f, animationSpec = spring(dampingRatio = .8f, stiffness = Spring.StiffnessMediumLow)) { v, _ -> offset = v }
+        } else {
+            armed = false
+            animate(offset, 0f, animationSpec = spring(dampingRatio = .7f, stiffness = Spring.StiffnessMedium)) { v, _ -> offset = v }
+        }
+    }
+
+    Box(modifier.fillMaxWidth().onSizeChanged { widthPx = it.width }) {
+        if (offset < -1f) {
+            Row(
+                Modifier.matchParentSize().background(actionBg).padding(end = 20.dp),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                val reveal = (-offset / thresholdPx).coerceIn(0f, 1f)
+                Icon(
+                    icon,
+                    null,
+                    tint = actionTint,
+                    modifier = Modifier.size(20.dp).graphicsLayer {
+                        val s = .6f + .4f * reveal
+                        scaleX = s
+                        scaleY = s
+                        alpha = reveal
+                    },
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(label, style = MaterialTheme.typography.labelLarge, color = actionTint, modifier = Modifier.graphicsLayer { alpha = reveal })
+            }
+        }
+        Box(
+            Modifier
+                .graphicsLayer { translationX = offset }
+                // Only a leftward drag is claimed; rightward/vertical drags fall through to the
+                // pager or list, so rows never block page swipes.
+                .pointerInput(enabled) {
+                    if (!enabled) return@pointerInput
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        var claimed = false
+                        val start = awaitHorizontalTouchSlopOrCancellation(down.id) { change, over ->
+                            if (over < 0f || offset < -1f) {
+                                change.consume()
+                                claimed = true
+                                offset = (offset + over).coerceIn(-widthPx.toFloat(), 0f)
+                            }
+                        }
+                        if (start != null && claimed) {
+                            val tracker = VelocityTracker()
+                            tracker.addPosition(start.uptimeMillis, start.position)
+                            horizontalDrag(start.id) { change ->
+                                val delta = change.positionChange().x
+                                // Rubber-band past the threshold so the row feels attached to the finger.
+                                val resist = if (-offset > thresholdPx && delta < 0f) .45f else 1f
+                                offset = (offset + delta * resist).coerceIn(-widthPx.toFloat(), 0f)
+                                val nowArmed = -offset > thresholdPx
+                                if (nowArmed != armed) {
+                                    armed = nowArmed
+                                    haptics.perform(if (nowArmed) HetuHaptic.Tick else HetuHaptic.Tap)
+                                }
+                                tracker.addPosition(change.uptimeMillis, change.position)
+                                change.consume()
+                            }
+                            val velocity = tracker.calculateVelocity().x
+                            scope.launch { settle(velocity) }
+                        }
+                    }
+                },
+        ) { content() }
+    }
+}
