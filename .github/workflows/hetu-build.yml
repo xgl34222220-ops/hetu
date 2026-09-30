@@ -475,6 +475,27 @@ jobs:
           echo "V20.34 reference-style tools page applied"
           git diff --stat
 
+      - name: Fix V20.34 rounded shape import
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt')
+          s = p.read_text()
+          imp = 'import androidx.compose.foundation.shape.RoundedCornerShape\n'
+          if imp not in s:
+              if 'import androidx.compose.foundation.shape.' in s:
+                  first = s.index('import androidx.compose.foundation.shape.')
+                  line_end = s.index('\n', first) + 1
+                  s = s[:line_end] + imp + s[line_end:]
+              else:
+                  anchor = 'import androidx.compose.foundation.'
+                  pos = s.index(anchor)
+                  s = s[:pos] + imp + s[pos:]
+          p.write_text(s)
+          PY
+          grep -q 'import androidx.compose.foundation.shape.RoundedCornerShape' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
+
       - name: Export effective V20.34 source
         run: |
           set -euo pipefail
