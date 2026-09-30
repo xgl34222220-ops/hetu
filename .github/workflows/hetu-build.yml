@@ -590,16 +590,33 @@ jobs:
           echo "V20.40 file workbench applied"
           git diff --stat
 
-      - name: Export effective V20.40 source
+      - name: Apply V20.41 settings, tools and dock parity
         run: |
           set -euo pipefail
-          tar -czf /tmp/Hetu-V20.40-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
-          sha256sum /tmp/Hetu-V20.40-effective-source.tar.gz
+          cat updates/v2041-settings-tools-dock/p00.b64 updates/v2041-settings-tools-dock/p01.b64 updates/v2041-settings-tools-dock/p02.b64 | base64 -d > /tmp/v2041.patch.xz
+          echo 'caef4b788dc778ff7b8d3722ed1c95e67d979206bb070a16ba24e2958a23b958  /tmp/v2041.patch.xz' | sha256sum -c -
+          xz -dc /tmp/v2041.patch.xz > /tmp/v2041.patch
+          git apply --check /tmp/v2041.patch
+          git apply /tmp/v2041.patch
+          grep -q 'versionCode = 2041' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.9.1-v20"' android-app/app/build.gradle.kts
+          grep -q '"基础代理配置"' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
+          grep -q '"显示底栏面板入口"' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
+          grep -q 'PREF_TITLE_TEMPLATE' android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyStatusNotificationService.kt
+          grep -q 'height(54.dp' android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
+          echo "V20.41 settings/tools/dock parity applied"
+          git diff --stat
+
+      - name: Export effective V20.41 source
+        run: |
+          set -euo pipefail
+          tar -czf /tmp/Hetu-V20.41-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+          sha256sum /tmp/Hetu-V20.41-effective-source.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.40-effective-source
-          path: /tmp/Hetu-V20.40-effective-source.tar.gz
+          name: Hetu-V20.41-effective-source
+          path: /tmp/Hetu-V20.41-effective-source.tar.gz
           compression-level: 0
           if-no-files-found: error
 
