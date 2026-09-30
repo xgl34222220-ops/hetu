@@ -434,7 +434,7 @@ jobs:
         run: |
           set -euo pipefail
           cat updates/v2032-api-sheet/p00.b64 | base64 -d > /tmp/v2032.patch.xz
-          echo 'cee047f59eeee11ec7a3e2c0f1aaacf1567447f81fce22bac81acdb89cf2a331  /tmp/v2032.patch.xz' | sha256sum -c -
+          echo 'a6a49c16404062a6553ac18406b84df1630f4945f8bdcf625e10ddcdd82997bf  /tmp/v2032.patch.xz' | sha256sum -c -
           xz -dc /tmp/v2032.patch.xz > /tmp/v2032.patch
           git apply --check /tmp/v2032.patch
           git apply /tmp/v2032.patch
