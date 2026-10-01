@@ -7,6 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.nativeCanvas
@@ -32,6 +33,8 @@ import java.io.File
 import java.net.InetAddress
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
+import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
 
 /** Test APK only: actual Android window, real root UI, no runtime start or Root calls. */
 @RunWith(AndroidJUnit4::class)
@@ -41,12 +44,19 @@ class HetuWindowUiTest {
     private lateinit var vm: HetuViewModel
     private val server = MockWebServer()
     private val hardwareCanvasSeen = AtomicBoolean(false)
+    private val runtimeShaderSupported = AtomicReference<Boolean?>(null)
     private val requests = CopyOnWriteArrayList<String>()
     private val captures = mutableListOf<String>()
+    private val foregroundChecks = mutableListOf<JSONObject>()
     private val output get() = File(application.filesDir, "window-ui-qa").apply { mkdirs() }
     private var successful = false
+    private var emulatorConfirmed = false
 
     @Before fun prepare() {
+        check(Build.HARDWARE in setOf("ranchu", "goldfish") && Build.PRODUCT.contains("sdk")) {
+            "This fixture is restricted to an official disposable Android emulator"
+        }
+        emulatorConfirmed = true
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {
                 requests += "${request.method} ${request.path}"
@@ -78,6 +88,8 @@ class HetuWindowUiTest {
         vm.upHistory.addAll(listOf(2_000L, 4_000L, 3_000L, 5_000L, 4_000L))
         // ComponentActivity does not call HetuActivity.onStart, so VM polling never starts.
         rule.setContent {
+            val shaderSupport = isRuntimeShaderSupported()
+            SideEffect { runtimeShaderSupported.set(shaderSupport) }
             HetuAppTheme("light", dynamic = false) {
                 Box(Modifier.fillMaxSize().drawWithContent {
                     if (drawContext.canvas.nativeCanvas.isHardwareAccelerated) hardwareCanvasSeen.set(true)
@@ -93,13 +105,28 @@ class HetuWindowUiTest {
         (field.get(vm) as MutableState<T>).value = value
     }
 
-    private fun visibleTransition(action: () -> Unit) {
+    private fun assertForeground() {
+        val focus = rule.runOnIdle { rule.activity.hasWindowFocus() }
+        val root = InstrumentationRegistry.getInstrumentation().uiAutomation.rootInActiveWindow
+        val activePackage = root?.packageName?.toString()
+        root?.recycle()
+        foregroundChecks += JSONObject().put("windowFocused", focus)
+            .put("activePackage", activePackage ?: JSONObject.NULL)
+        if (!focus || activePackage != application.packageName) {
+            captureDisplay("blocked-foreground")
+            fail("Test app is obscured or not foreground: focused=$focus, activePackage=$activePackage")
+        }
+    }
+
+    private fun visibleTransition(name: String, action: () -> Unit) {
+        assertForeground()
         rule.mainClock.autoAdvance = false
         try {
             action()
-            repeat(36) {
+            repeat(36) { frame ->
                 rule.mainClock.advanceTimeByFrame()
                 android.os.SystemClock.sleep(20)
+                if (frame == 8) capture("motion-$name-middle")
             }
         } finally { rule.mainClock.autoAdvance = true }
         rule.waitForIdle()
@@ -107,6 +134,11 @@ class HetuWindowUiTest {
 
     private fun capture(name: String) {
         rule.waitForIdle()
+        assertForeground()
+        captureDisplay(name)
+    }
+
+    private fun captureDisplay(name: String) {
         // UiAutomation copies the composed Android display, including the actual GPU/SwiftShader
         // surface. Never substitute View.draw(BitmapCanvas) in this window-specific test.
         val bitmap = requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
@@ -117,6 +149,7 @@ class HetuWindowUiTest {
 
     @Test fun defaultGlassWindowRendersAndInlineNavigationCompletes() {
         rule.waitUntil(30_000) { hardwareCanvasSeen.get() }
+        assertTrue("Runtime shader capability must be available", runtimeShaderSupported.get() == true)
         rule.runOnIdle {
             assertTrue(rule.activity.window.decorView.isHardwareAccelerated)
             assertTrue(vm.blurEnabled)
@@ -125,20 +158,20 @@ class HetuWindowUiTest {
         rule.onNodeWithTag("hetu-dock", useUnmergedTree = true).assertIsDisplayed()
         rule.onNodeWithText("203.0.113.24").assertIsDisplayed()
         capture("01-home-default-glass")
-        visibleTransition { rule.onNodeWithTag("dock-tab-1", useUnmergedTree = true).performClick() }
+        visibleTransition("open-panel") { rule.onNodeWithTag("dock-tab-1", useUnmergedTree = true).performTouchInput { click() } }
         rule.onNodeWithTag("strategy-group-节点选择", useUnmergedTree = true).assertIsDisplayed()
         capture("02-strategy-default-glass")
-        visibleTransition { rule.onNodeWithTag("strategy-group-节点选择", useUnmergedTree = true).performClick() }
+        visibleTransition("expand-nodes") { rule.onNodeWithTag("strategy-group-节点选择", useUnmergedTree = true).performTouchInput { click() } }
         rule.onNodeWithTag("strategy-node-节点选择-日本测试 02", useUnmergedTree = true).assertIsDisplayed()
         rule.onNodeWithTag("hetu-dock", useUnmergedTree = true).assertIsDisplayed()
         capture("03-inline-nodes-default-glass")
-        visibleTransition { rule.onNodeWithContentDescription("收起策略 节点选择").performClick() }
+        visibleTransition("collapse-nodes") { rule.onNodeWithContentDescription("收起策略 节点选择").performTouchInput { click() } }
         rule.onNodeWithTag("strategy-expanded-节点选择", useUnmergedTree = true).assertDoesNotExist()
         capture("04-strategy-collapsed")
-        visibleTransition { rule.onNodeWithTag("panel-tab-overview", useUnmergedTree = true).performClick() }
+        visibleTransition("open-overview") { rule.onNodeWithTag("panel-tab-overview", useUnmergedTree = true).performTouchInput { click() } }
         rule.onNodeWithTag("panel-overview-traffic", useUnmergedTree = true).assertIsDisplayed()
         capture("05-overview-default-glass")
-        visibleTransition { rule.onNodeWithTag("dock-tab-2", useUnmergedTree = true).performClick() }
+        visibleTransition("open-tools") { rule.onNodeWithTag("dock-tab-2", useUnmergedTree = true).performTouchInput { click() } }
         rule.onNodeWithTag("tools-文件与脚本", useUnmergedTree = true).assertIsDisplayed()
         capture("06-tools-default-glass")
         assertTrue("only the explicitly allowed loopback preload may run", requests.all { it == "GET /providers/proxies" })
@@ -146,10 +179,13 @@ class HetuWindowUiTest {
     }
 
     @After fun reportAndClose() {
+        if (!emulatorConfirmed) return
         val report = JSONObject().put("passed", successful).put("sdk", Build.VERSION.SDK_INT)
             .put("model", Build.MODEL).put("hardwareCanvasSeen", hardwareCanvasSeen.get())
+            .put("runtimeShaderSupported", runtimeShaderSupported.get() ?: JSONObject.NULL)
             .put("captureMethod", "UiAutomation.takeScreenshot")
-            .put("defaultGlassEnabled", true).put("rootOrProxyStarted", false)
+            .put("defaultGlassEnabled", if (::vm.isInitialized) vm.blurEnabled && vm.prefs.getBoolean("liquidGlass", false) else JSONObject.NULL)
+            .put("foregroundChecks", org.json.JSONArray(foregroundChecks)).put("rootOrProxyStarted", false)
             .put("screenshots", org.json.JSONArray(captures)).put("loopbackRequests", org.json.JSONArray(requests))
             .put("limits", "Controlled UI data in androidTest. Emulator rendering does not establish phone GPU performance, FPS, or live Root/VPN connectivity.")
         File(output, "report.json").writeText(report.toString(2))

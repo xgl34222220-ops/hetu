@@ -12,6 +12,11 @@ on:
         type: boolean
         required: false
         default: false
+      compare_window_baseline:
+        description: 'Compare the fixed 4d44 APK against the ordinary AOSP image'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -28,6 +33,7 @@ jobs:
     env:
       HETU_TEST_KEYSTORE: /home/runner/.android/hetu-ui10-debug.jks
       HETU_WINDOW_QA: ${{ github.ref == 'refs/heads/test/dot-v2048-ui-safety' && (inputs.android_window_qa == true || contains(github.event.head_commit.message, '[window-qa]')) }}
+      HETU_WINDOW_BASELINE: ${{ inputs.compare_window_baseline == true || contains(github.event.head_commit.message, '[window-baseline-4d44]') }}
     steps:
       - uses: actions/checkout@v4
 
@@ -44,6 +50,7 @@ jobs:
           python3 tools/test_subscription_structure.py
           python3 tools/test_google_diagnostics.py
           python3 tools/test_start_contract.py
+          python3 tests/android_window_recording_test.py
 
       - uses: actions/setup-java@v4
         with:
@@ -197,8 +204,33 @@ jobs:
           if-no-files-found: error
 
       # Optional, explicit window QA. It does not run proxy services or alter device security.
-      - name: Compile ordinary Android window test host
+      - name: Prepare window media verification
         if: always() && steps.apk_audit.outcome == 'success' && env.HETU_WINDOW_QA == 'true'
+        id: window_media
+        run: |
+          set -euo pipefail
+          if ! command -v ffprobe >/dev/null || ! command -v ffmpeg >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends ffmpeg
+          fi
+          ffprobe -version
+          ffmpeg -version
+
+      # Keep the production APK identical to the obstructed 4d44 window run.
+      # This input is separate from the current candidate APK and its source archive.
+      - name: Read exact window comparison APK
+        if: always() && steps.window_media.outcome == 'success' && env.HETU_WINDOW_QA == 'true' && env.HETU_WINDOW_BASELINE == 'true'
+        id: window_comparison_apk
+        uses: actions/download-artifact@v4
+        with:
+          name: Hetu-QA-APK-not-release
+          path: out/window-comparison-apk
+          repository: xgl34222220-ops/hetu
+          run-id: 36795802504
+          github-token: ${{ github.token }}
+
+      - name: Compile ordinary Android window test host
+        if: always() && steps.window_media.outcome == 'success' && env.HETU_WINDOW_QA == 'true' && (env.HETU_WINDOW_BASELINE != 'true' || steps.window_comparison_apk.outcome == 'success')
         id: window_test_build
         working-directory: android-app
         run: gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:assembleDebugAndroidTest --stacktrace
@@ -206,6 +238,10 @@ jobs:
       - name: Validate default glass in an ordinary Android window
         if: always() && steps.window_test_build.outcome == 'success' && env.HETU_WINDOW_QA == 'true'
         timeout-minutes: 70
+        env:
+          HETU_WINDOW_APP_APK: ${{ env.HETU_WINDOW_BASELINE == 'true' && format('{0}/out/window-comparison-apk/Hetu-0.9.8-v20-ui-test.apk', github.workspace) || '' }}
+          HETU_WINDOW_EXPECTED_APK_SHA256: ${{ env.HETU_WINDOW_BASELINE == 'true' && '9536c61cc5f294f6e321692f2ebf57a4b83c03abc76ebbe870a0ddbfe03fd7b8' || '' }}
+          HETU_WINDOW_EXPECTED_EMULATOR_VERSION: ${{ env.HETU_WINDOW_BASELINE == 'true' && '37.1.11.0' || '' }}
         run: python3 tools/run_android_window_qa.py
 
       - uses: actions/upload-artifact@v4

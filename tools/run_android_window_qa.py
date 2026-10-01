@@ -5,9 +5,10 @@ import json
 import hashlib
 import os
 import re
-import shutil
 import subprocess
 import time
+
+from android_window_recording import SegmentedRecording, preflight_media_tools
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "out/android-window-qa"
@@ -55,22 +56,38 @@ def collect(args, *, timeout=30, output=None, check=False):
         return run(args, timeout=timeout, output=output, check=check)
     except (subprocess.TimeoutExpired, OSError) as error:
         if output:
-            with Path(output).open("ab") as stream:
-                stream.write(("\nDiagnostic collection failed: " + str(error) + "\n").encode())
+            try:
+                with Path(output).open("ab") as stream:
+                    stream.write(("\nDiagnostic collection failed: " + str(error) + "\n").encode())
+            except OSError:
+                print(f"Diagnostic collection failed: {error}", flush=True)
         return subprocess.CompletedProcess(args, 124, stdout=b"", stderr=str(error).encode())
 
 
+# Discover and execute both tools before any SDK download or emulator work. A missing
+# binary must not invalidate an otherwise expensive completed Android run afterwards.
+media_tools = preflight_media_tools(OUT, env)
 sdkmanager = sorted(SDK.glob("cmdline-tools/*/bin/sdkmanager"))[-1]
 avdmanager = sdkmanager.with_name("avdmanager")
+image_package = "system-images;android-35;default;x86_64"
 # Empty stdin deliberately declines any new license prompt. Never use `yes --licenses` here.
-run([sdkmanager, "emulator", "system-images;android-35;google_apis;x86_64"], timeout=600,
+run([sdkmanager, "emulator", image_package], timeout=600,
     output=OUT / "sdk-install.log", input=b"")
 emulator = SDK / "emulator/emulator"
 adb = SDK / "platform-tools/adb"
 if not emulator.is_file() or not adb.is_file():
     raise RuntimeError("Official emulator/platform-tools are not installed")
+run([emulator, "-version"], timeout=30, output=OUT / "emulator-version.log")
+version_text = (OUT / "emulator-version.log").read_text(errors="replace")
+version_match = re.search(r"Android emulator version ([\d.]+)", version_text)
+emulator_version = version_match.group(1) if version_match else None
+expected_emulator_version = os.environ.get("HETU_WINDOW_EXPECTED_EMULATOR_VERSION") or None
+(OUT / "emulator-identity.json").write_text(json.dumps({"version": emulator_version,
+    "expectedVersion": expected_emulator_version}, indent=2))
+if expected_emulator_version and emulator_version != expected_emulator_version:
+    raise RuntimeError("Diagnostic reproduction requires the identical emulator version; inspect emulator-version.log")
 run([avdmanager, "create", "avd", "--force", "--name", "hetu_window_qa", "--package",
-     "system-images;android-35;google_apis;x86_64", "--device", "pixel_5"], timeout=60,
+     image_package, "--device", "pixel_5"], timeout=60,
     output=OUT / "avd-create.log", input=b"no\n")
 # Preserve the Pixel 5's approximately 393 x 852 dp viewport at fewer physical pixels.
 # This changes only the disposable AVD display definition, not fonts or device security.
@@ -82,11 +99,12 @@ avd_config.write_text("\n".join(f"{key}={value}" for key, value in config.items(
 # Only use permissions already present. Never chmod/chown /dev/kvm or change groups.
 acceleration = "on" if os.access("/dev/kvm", os.R_OK | os.W_OK) else "off"
 (OUT / "environment.json").write_text(json.dumps({"avd": "hetu_window_qa", "api": 35,
-    "image": "google_apis/x86_64", "vmAcceleration": acceleration, "graphics": "software",
+    "image": "default/x86_64", "imagePackage": image_package, "emulatorVersion": emulator_version,
+    "vmAcceleration": acceleration, "graphics": "software",
     "physicalSize": [720, 1560], "densityDpi": 293, "installMode": "push-then-pm-install",
     "systemSecurityChanged": False, "fontsChanged": False, "newLicenseAccepted": False,
     "limits": "SwiftShader/software graphics in an Android hardware-accelerated window, not phone GPU or FPS validation."}, indent=2))
-app_apk = ROOT / "android-app/app/build/outputs/apk/debug/app-debug.apk"
+app_apk = Path(os.environ.get("HETU_WINDOW_APP_APK") or ROOT / "android-app/app/build/outputs/apk/debug/app-debug.apk")
 test_apk = ROOT / "android-app/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
 if not app_apk.is_file() or not test_apk.is_file():
     raise RuntimeError("Build both the reviewed app APK and its instrumentation test APK first")
@@ -94,19 +112,25 @@ app_digest = hashlib.sha256(app_apk.read_bytes()).hexdigest()
 expected_digest = os.environ.get("HETU_WINDOW_EXPECTED_APK_SHA256", "")
 if expected_digest and app_digest != expected_digest:
     raise RuntimeError("Diagnostic reproduction must use the identical previously tested production APK")
-(OUT / "apk-identity.json").write_text(json.dumps({"sha256": app_digest, "expectedSha256": expected_digest or None}, indent=2))
+(OUT / "apk-identity.json").write_text(json.dumps({"path": str(app_apk), "sha256": app_digest,
+    "expectedSha256": expected_digest or None}, indent=2))
 
 emulator_log = (OUT / "emulator.log").open("wb")
 process = subprocess.Popen([str(emulator), "-avd", "hetu_window_qa", "-port", "5556",
     "-no-window", "-no-audio", "-no-boot-anim", "-no-snapshot", "-accel", acceleration,
     "-gpu", "software", "-memory", "2048"], env=env, stdout=emulator_log, stderr=subprocess.STDOUT)
 recording = None
-record_log = None
 app_log = None
 app_log_process = None
-record_path = "/data/local/tmp/hetu-window-qa.mp4"
 ready = False
 installed = False
+captured_names = set()
+required_captures = ["report.json", "01-home-default-glass.png", "02-strategy-default-glass.png",
+                     "03-inline-nodes-default-glass.png", "04-strategy-collapsed.png",
+                     "05-overview-default-glass.png", "06-tools-default-glass.png",
+                     "motion-open-panel-middle.png", "motion-expand-nodes-middle.png",
+                     "motion-collapse-nodes-middle.png", "motion-open-overview-middle.png",
+                     "motion-open-tools-middle.png"]
 stage = "boot"
 stage_started = time.monotonic()
 
@@ -146,6 +170,25 @@ try:
         time.sleep(5)
     if not ready:
         raise RuntimeError("Android did not finish booting within the bounded 15-minute window")
+    # Read-only startup check: do not dismiss system dialogs or relax ANR policy.
+    record_stage("startup-health")
+    startup_events = run([adb, "-s", SERIAL, "logcat", "-b", "events", "-d", "-v", "brief"], timeout=30)
+    (OUT / "startup-events.log").write_bytes(startup_events.stdout + startup_events.stderr)
+    event_text = startup_events.stdout.decode(errors="replace")
+    if re.search(r"\bam_anr\b", event_text) or len(re.findall(r"\bam_crash\b", event_text)) >= 3:
+        collect([adb, "-s", SERIAL, "shell", "dumpsys", "activity", "activities"], timeout=20,
+            output=OUT / "startup-activity.txt")
+        collect([adb, "-s", SERIAL, "shell", "dumpsys", "window", "windows"], timeout=20,
+            output=OUT / "startup-window.txt")
+        collect([adb, "-s", SERIAL, "logcat", "-b", "crash", "-d", "-v", "threadtime"], timeout=20,
+            output=OUT / "startup-crash-logcat.txt")
+        screenshot = collect([adb, "-s", SERIAL, "exec-out", "screencap", "-p"], timeout=20)
+        if screenshot.returncode == 0 and capture_file(screenshot.stdout, "blocked-startup.png"):
+            try:
+                (OUT / "blocked-startup.png").write_bytes(screenshot.stdout)
+            except OSError as error:
+                print(f"Could not retain startup screenshot: {error}", flush=True)
+        raise RuntimeError("Android startup has an ANR or repeated crashes; system state retained without dismissing dialogs")
     run([adb, "-s", SERIAL, "shell", "input", "keyevent", "KEYCODE_WAKEUP"], check=False)
     run([adb, "-s", SERIAL, "shell", "input", "keyevent", "KEYCODE_MENU"], check=False)
     install(app_apk, "app")
@@ -171,15 +214,13 @@ try:
         env=env, stdout=app_log, stderr=subprocess.STDOUT)
     run([adb, "-s", SERIAL, "shell", "test", "-w", "/data/local/tmp"], timeout=15)
     record_stage("instrumentation")
-    record_log = (OUT / "screenrecord.log").open("wb")
-    recording = subprocess.Popen([str(adb), "-s", SERIAL, "shell", "screenrecord", "--time-limit", "180",
-        record_path], env=env, stdout=record_log, stderr=subprocess.STDOUT)
-    result = run([adb, "-s", SERIAL, "shell", "am", "instrument", "-w", "-r", "-e", "class",
-        APP + ".HetuWindowUiTest", TEST_PACKAGE], timeout=900, output=OUT / "instrumentation.log", check=False)
+    recording = SegmentedRecording(adb, SERIAL, OUT, env, media_tools)
+    result = recording.run([adb, "-s", SERIAL, "shell", "am", "instrument", "-w", "-r", "-e", "class",
+        APP + ".HetuWindowUiTest", TEST_PACKAGE], timeout=900, output=OUT / "instrumentation.log")
     text = (OUT / "instrumentation.log").read_text(errors="replace")
     if result.returncode or "OK (1 test)" not in text:
         raise RuntimeError("Android window validation failed; inspect instrumentation.log")
-    (OUT / "progress.json").write_text(json.dumps({"stage": stage, "status": "passed"}, indent=2))
+    recording.require_valid()
 except Exception as error:
     (OUT / "progress.json").write_text(json.dumps({"stage": stage, "status": "failed",
         "elapsedSeconds": round(time.monotonic() - stage_started, 1), "error": str(error)}, indent=2))
@@ -191,24 +232,15 @@ finally:
         collect([adb, "-s", SERIAL, "shell", "dumpsys", "activity", "exit-info", APP], timeout=30,
             output=OUT / "app-exit-info.txt")
         rejected = []
-        for name in ["report.json", "01-home-default-glass.png", "02-strategy-default-glass.png",
-                     "03-inline-nodes-default-glass.png", "04-strategy-collapsed.png",
-                     "05-overview-default-glass.png", "06-tools-default-glass.png"]:
+        for name in required_captures + ["blocked-foreground.png"]:
             # Supported debug-app sandbox access, never adb root or a permission change.
             result = collect([adb, "-s", SERIAL, "exec-out", "run-as", APP, "cat", "files/window-ui-qa/" + name], timeout=20)
             if result.returncode == 0 and capture_file(result.stdout, name):
                 (OUT / name).write_bytes(result.stdout)
+                captured_names.add(name)
             else:
                 rejected.append({"name": name, "reason": "missing or invalid file bytes", "exitCode": result.returncode})
         (OUT / "capture-status.json").write_text(json.dumps(rejected, indent=2))
-        if recording is not None and recording.poll() is None:
-            # Stop only the screenrecord process launched by this test, allowing MP4 finalization.
-            collect([adb, "-s", SERIAL, "shell", "pkill", "-INT", "screenrecord"])
-            try:
-                recording.wait(timeout=15)
-            except subprocess.TimeoutExpired:
-                recording.terminate()
-        collect([adb, "-s", SERIAL, "pull", record_path, OUT / "interaction.mp4"], timeout=30)
     if app_log_process is not None and app_log_process.poll() is None:
         app_log_process.terminate()
         try:
@@ -224,20 +256,21 @@ finally:
         except subprocess.TimeoutExpired:
             process.kill()
     emulator_log.close()
-    if record_log:
-        record_log.close()
-report = json.loads((OUT / "report.json").read_text())
-if not report.get("passed") or not report.get("hardwareCanvasSeen"):
-    raise RuntimeError("Missing successful Android hardware-window evidence")
-video = OUT / "interaction.mp4"
-if not video.is_file() or video.stat().st_size < 1024:
-    raise RuntimeError("Window screenshots exist but the requested interaction recording is missing")
-ffprobe = shutil.which("ffprobe")
-if not ffprobe:
-    raise RuntimeError("Recording retained; ffprobe is unavailable to validate it")
-probe = run([ffprobe, "-v", "error", "-show_entries", "format=duration", "-of", "json", video], timeout=30)
-video_info = json.loads(probe.stdout)
-if float(video_info.get("format", {}).get("duration", 0)) <= 0:
-    raise RuntimeError("Interaction recording has no usable video duration")
-(OUT / "video-metadata.json").write_text(json.dumps(video_info, indent=2))
-print("Android default-glass window validation passed; screenshots and recording retained")
+try:
+    missing = set(required_captures) - captured_names
+    if missing:
+        raise RuntimeError("Missing current-run Android evidence: " + ", ".join(sorted(missing)))
+    report = json.loads((OUT / "report.json").read_text())
+    foreground_checks = report.get("foregroundChecks")
+    if (report.get("passed") is not True or report.get("hardwareCanvasSeen") is not True
+            or report.get("defaultGlassEnabled") is not True
+            or report.get("runtimeShaderSupported") is not True
+            or not isinstance(foreground_checks, list) or not foreground_checks
+            or any(not isinstance(check, dict) or check.get("windowFocused") is not True
+                   or check.get("activePackage") != APP for check in foreground_checks)):
+        raise RuntimeError("Missing successful Android foreground/default-glass/hardware-window/RuntimeShader evidence")
+except Exception as error:
+    (OUT / "progress.json").write_text(json.dumps({"stage": "evidence", "status": "failed", "error": str(error)}, indent=2))
+    raise
+(OUT / "progress.json").write_text(json.dumps({"stage": "evidence", "status": "passed"}, indent=2))
+print("Android default-glass window validation passed; screenshots, video segments and recording coverage retained")
