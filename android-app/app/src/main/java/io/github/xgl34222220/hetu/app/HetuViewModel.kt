@@ -176,6 +176,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     var operationText by mutableStateOf("")
         private set
     var startupError by mutableStateOf<String?>(null)
+    private var startupPreflightRejected = false
     var refreshing by mutableStateOf(false)
         private set
     var loadedOnce by mutableStateOf(false)
@@ -375,7 +376,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             } else next
             runtimeMessage = next.message
             refreshConfigApplyMessage()
-            if (next.running) startupError = null
+            if (next.running && !startupPreflightRejected) startupError = null
             if (next.panelReady) {
                 lastAt = now
                 lastUp = next.uploadTotal
@@ -445,6 +446,8 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
     fun toggle() {
         if (operation != null) return
+        startupPreflightRejected = false
+        startupError = null
         val stopping = state.running
         // A stop consumes no config request, even if it fails and the core stays alive.
         configApplyQueued = !stopping && prefs.contains(CONFIG_APPLY_PENDING_KEY)
@@ -469,6 +472,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                 val reason = errorText(error, "操作失败")
                 // Configuration problems are known before Root is touched; report them at once.
                 val configProblem = !stopping && (error is ProxyStartPreflightException || reason.contains("占位") || reason.contains("尚未选择配置") || reason.contains("仅所选应用代理"))
+                startupPreflightRejected = configProblem
                 operationText = "确认最终运行状态…"
                 val recovered = if (configProblem || stopping) null else settleStart()
                 if (recovered != null) {
@@ -504,6 +508,8 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
     fun restart() {
         if (operation != null || !state.running) return
+        startupPreflightRejected = false
+        startupError = null
         configApplyQueued = prefs.contains(CONFIG_APPLY_PENDING_KEY)
         operation = HxRunOp.Restart
         viewModelScope.launch {
