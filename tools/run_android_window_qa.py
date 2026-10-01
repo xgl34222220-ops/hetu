@@ -8,7 +8,7 @@ import re
 import subprocess
 import time
 
-from android_window_recording import SegmentedRecording, preflight_media_tools
+from android_window_recording import SegmentedRecording, preflight_media_tools, require_reported_captures
 from android_window_readiness import home_component, home_readiness, await_home_readiness
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -133,10 +133,10 @@ installed = False
 captured_names = set()
 required_captures = ["report.json", "01-home-default-glass.png", "02-strategy-default-glass.png",
                      "03-inline-nodes-default-glass.png", "04-strategy-collapsed.png",
-                     "05-overview-default-glass.png", "06-tools-default-glass.png",
+                     "05-overview-default-glass.png", "06-tools-default-glass.png", "07-settings-default-glass.png",
                      "motion-open-panel-middle.png", "motion-expand-nodes-middle.png",
                      "motion-collapse-nodes-middle.png", "motion-open-overview-middle.png",
-                     "motion-open-tools-middle.png"]
+                     "motion-open-tools-middle.png", "motion-open-settings-middle.png"]
 stage = "boot"
 stage_started = time.monotonic()
 
@@ -304,6 +304,7 @@ try:
     if missing:
         raise RuntimeError("Missing current-run Android evidence: " + ", ".join(sorted(missing)))
     report = json.loads((OUT / "report.json").read_text())
+    require_reported_captures(report, captured_names)
     foreground_checks = report.get("foregroundChecks")
     if (report.get("passed") is not True or report.get("hardwareCanvasSeen") is not True
             or report.get("defaultGlassEnabled") is not True

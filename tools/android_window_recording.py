@@ -14,6 +14,15 @@ import time
 import uuid
 
 
+def require_reported_captures(report, captured_names):
+    """A successful test cannot stand in for screenshots the collector did not retain."""
+    reported = report.get("screenshots")
+    if (not isinstance(reported, list) or not reported
+            or any(not isinstance(name, str) for name in reported)
+            or set(reported) - captured_names):
+        raise RuntimeError("Instrumentation reported screenshots that were not retained in this artifact")
+
+
 def preflight_media_tools(out, env, *, run=subprocess.run, which=shutil.which):
     """Fail before SDK downloads or emulator launch, retaining the exact tool failure."""
     out = Path(out)

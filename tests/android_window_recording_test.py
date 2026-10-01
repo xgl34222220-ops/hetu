@@ -7,7 +7,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from android_window_recording import SegmentedRecording, preflight_media_tools
+from android_window_recording import SegmentedRecording, preflight_media_tools, require_reported_captures
 
 
 class FakeClock:
@@ -274,6 +274,24 @@ class PreflightTests(unittest.TestCase):
             tools = preflight_media_tools(directory, {}, run=run, which=lambda name: "/usr/bin/" + name)
             self.assertEqual(set(tools), {"ffprobe", "ffmpeg"})
             self.assertEqual(len(calls), 2)
+
+
+class ReportedCaptureTests(unittest.TestCase):
+    def test_newly_added_page_cannot_pass_if_old_collector_omits_it(self):
+        report = {"passed": True, "screenshots": ["home.png", "settings.png"]}
+        with self.assertRaisesRegex(RuntimeError, "not retained"):
+            require_reported_captures(report, {"report.json", "home.png"})
+
+    def test_all_recorded_pages_and_motion_frames_are_required(self):
+        names = ["home.png", "settings-middle.png", "settings.png"]
+        require_reported_captures({"screenshots": names}, set(names) | {"report.json"})
+        with self.assertRaises(RuntimeError):
+            require_reported_captures({"screenshots": names}, {"home.png", "settings.png"})
+
+    def test_empty_or_malformed_manifest_is_not_evidence(self):
+        for value in (None, [], "home.png", [None], {"home.png": True}):
+            with self.subTest(value=value), self.assertRaises(RuntimeError):
+                require_reported_captures({"screenshots": value}, {"home.png"})
 
 
 if __name__ == "__main__":

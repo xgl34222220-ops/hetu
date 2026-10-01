@@ -6,6 +6,7 @@ import android.os.Build
 import android.net.Uri
 import android.util.Base64
 import androidx.activity.ComponentActivity
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.MutableState
@@ -81,6 +82,8 @@ class HetuWindowUiTest {
             "This fixture is restricted to an official disposable Android emulator"
         }
         emulatorConfirmed = true
+        // Match the production launcher window without starting its runtime polling lifecycle.
+        rule.runOnIdle { rule.activity.enableEdgeToEdge() }
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {
                 requests += "${request.method} ${request.path}"
@@ -255,7 +258,18 @@ class HetuWindowUiTest {
 
     @After fun reportAndClose() {
         if (!emulatorConfirmed) return
+        val geometry = rule.runOnIdle {
+            val content = rule.activity.findViewById<android.view.View>(android.R.id.content)
+            val origin = IntArray(2).also(content::getLocationOnScreen)
+            val insets = androidx.core.view.ViewCompat.getRootWindowInsets(content)
+            JSONObject().put("contentOriginX", origin[0]).put("contentOriginY", origin[1])
+                .put("contentWidth", content.width).put("contentHeight", content.height)
+                .put("statusBarInsetTop", insets?.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars())?.top ?: JSONObject.NULL)
+                .put("navigationBarInsetBottom", insets?.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())?.bottom ?: JSONObject.NULL)
+                .put("density", content.resources.displayMetrics.density)
+        }
         val report = JSONObject().put("passed", successful).put("sdk", Build.VERSION.SDK_INT)
+            .put("windowGeometry", geometry).put("productionEdgeToEdgeConfigured", true)
             .put("model", Build.MODEL).put("hardwareCanvasSeen", hardwareCanvasSeen.get())
             .put("runtimeShaderSupported", runtimeShaderSupported.get() ?: JSONObject.NULL)
             .put("nativeBackupVerified", nativeBackupVerified)
