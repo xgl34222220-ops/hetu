@@ -616,7 +616,7 @@ internal object ConfigApplyIo {
 
 /** No unhandled call can fall through to Root, scripts or the public controller API. */
 @Implements(value = ProxyComposeController::class, isInAndroidSdk = false, callThroughByDefault = false)
-class ConfigApplyControllerShadow {
+internal class ConfigApplyControllerShadow {
     @Implementation fun state(continuation: Continuation<Any?>): Any = ConfigApplyIo.state()
     @Implementation fun reload(continuation: Continuation<Any?>): Any? =
         (suspend { ConfigApplyIo.action("reload") }).startCoroutineUninterceptedOrReturn(continuation)
