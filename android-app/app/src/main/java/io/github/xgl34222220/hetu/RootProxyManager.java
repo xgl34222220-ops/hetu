@@ -870,15 +870,18 @@ final class RootProxyManager {
         }catch(Exception error){report.section("网络完整性",String.valueOf(error),1000);}
         Map<String,Integer> googlePackages=new LinkedHashMap<>();
         Set<Integer> googleSharedUids=new HashSet<>();
+        Map<Integer,Set<String>> googleUidOwners=new HashMap<>();
         for(String packageName:GoogleConnectionDiagnostics.PACKAGES){
             try{
                 int uid=context.getPackageManager().getApplicationInfo(packageName,0).uid;
                 googlePackages.put(packageName,uid);
                 String[] owners=context.getPackageManager().getPackagesForUid(uid);
+                if(owners!=null)googleUidOwners.put(uid,new HashSet<>(Arrays.asList(owners)));
                 if(owners==null||owners.length!=1)googleSharedUids.add(uid);
             }catch(Exception ignored){/* Missing or invisible is reported as unknown, not absent. */}
         }
         GoogleConnectionDiagnostics google=new GoogleConnectionDiagnostics(googlePackages,googleSharedUids);
+        GoogleConnectionDiagnostics.AppSelection googleSelection=new GoogleConnectionDiagnostics.AppSelection(values,googleUidOwners);
         try{
             int wechatUid=-1;
             try{wechatUid=context.getPackageManager().getApplicationInfo("com.tencent.mm",0).uid;}catch(Exception ignored){}
@@ -922,11 +925,11 @@ final class RootProxyManager {
             }
             if(count==0)matched.append("当前未识别到微信连接；这不代表微信未联网，可能走应用绕过、OEM推送或已断连。\n");
             report.section("微信连接（仅元数据）",matched.toString(),6000);
-            report.section("Google 相关连接（仅元数据）",google.render(googleConnections,connections!=null),8000);
+            report.section("Google 相关连接（仅元数据）",google.render(googleConnections,connections!=null,googleSelection),8000);
             if(otherCount>0)report.section("其他应用连接（仅元数据）",other.toString(),2500);
         }catch(Exception e){
             report.section("微信当前连接","Controller 读取失败："+e.getMessage(),1000);
-            report.section("Google 相关连接（仅元数据）",google.render(Collections.emptyList(),false),2500);
+            report.section("Google 相关连接（仅元数据）",google.render(Collections.emptyList(),false,googleSelection),3500);
         }
         try{
             String cmd="echo '--- recent core log ---'; tail -c 9000 "+RootBridge.quote(ROOT+"/run/core.log")

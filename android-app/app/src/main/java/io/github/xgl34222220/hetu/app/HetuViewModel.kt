@@ -680,24 +680,27 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         val targets = group.nodes.map { it.name }.filter { it.uppercase() !in setOf("DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE") }.distinct()
         if (targets.isEmpty()) return
         testingGroups[group.name] = true
-        targets.forEach { testingNodes[it] = true }
         viewModelScope.launch {
             try {
-                // Mihomo's group endpoint measures the whole strategy group in one parallel core
-                // operation. This avoids serial timeout waves where every visible delay is already
-                // known but the group pill keeps spinning on a few unreachable nodes.
-                val result = repo.groupDelay(group.name)
-                val stamp = SystemClock.elapsedRealtime()
-                targets.forEach { node ->
-                    delays[node] = result[node] ?: -1L
-                    measuredAt[node] = stamp
+                // The pinned core's /group/.../delay clears forced selection on automatic
+                // groups. Probe individual nodes so measuring cannot unpin the user's route.
+                for (chunk in targets.chunked(4)) {
+                    if (!state.running) break
+                    coroutineScope {
+                        chunk.map { node -> async {
+                            // A single-node test or another group may already own this probe.
+                            if (state.running && testingNodes[node] != true) {
+                                testingNodes[node] = true
+                                try { probe(node) } finally { testingNodes.remove(node) }
+                            }
+                        } }.awaitAll()
+                    }
                 }
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
                 toast(errorText(error, "策略组测速失败"))
             } finally {
-                targets.forEach { testingNodes.remove(it) }
                 testingGroups.remove(group.name)
             }
         }

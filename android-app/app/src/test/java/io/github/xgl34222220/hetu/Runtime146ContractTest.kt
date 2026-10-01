@@ -35,7 +35,9 @@ class Runtime146ContractTest {
     }
     @Test fun uiVersionBumpDoesNotRequestRuntimeRedeployment() {
         val p = prefs()
-        assertEquals(145, ProxyRuntimeSettings.RUNTIME_REVISION)
+        // The imported V20.47 runtime baseline already records 146; UI versions
+        // must not change it or turn the obsolete 145 fixture into a redeploy request.
+        assertEquals(146, ProxyRuntimeSettings.RUNTIME_REVISION)
         assertFalse(ProxyRuntimeSettings.runtimeUpgradePending(true, 492, true))
         assertFalse(ProxyRuntimeSettings.runtimeUpgradePending(true, p))
     }

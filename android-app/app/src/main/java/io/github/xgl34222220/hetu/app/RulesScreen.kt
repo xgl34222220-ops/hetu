@@ -283,7 +283,7 @@ internal fun LazyListScope.providerListItems(vm: HetuViewModel, query: String = 
     if (showSearch) item(key = "providers-search") { HxSearchField(query, onQuery, "搜索订阅", Modifier.padding(horizontal = Hx.gutter).padding(bottom = 12.dp), autoFocus = true) }
     val providers = if (query.isBlank()) vm.providers else vm.providers.filter { p -> p.name.contains(query, true) || p.nodes.any { it.contains(query, true) } }
     if (providers.isEmpty()) {
-        item(key = "providers-empty") { HxEmpty(Icons.Rounded.CloudSync, "没有在线订阅", "在「设置 → 配置与订阅」中添加订阅链接") }
+        item(key = "providers-empty") { HxEmpty(Icons.Rounded.CloudSync, "没有在线订阅", "在「工具 → 配置与订阅」中添加订阅链接") }
     }
     itemsIndexed(providers, key = { _, item -> "pv:" + item.name }) { _, p ->
         ProviderCard(

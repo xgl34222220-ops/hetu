@@ -13,6 +13,7 @@ import org.robolectric.annotation.Implements
 import org.robolectric.annotation.Resetter
 import org.robolectric.shadow.api.Shadow
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -195,6 +196,7 @@ internal fun conceptProviders(): List<DashboardProviderUi> = listOf(
 /** Observable calls are test assertions, not claims that any runtime operation ran. */
 internal object ConceptTestIo {
     val calls = CopyOnWriteArrayList<String>()
+    val delayFailures = ConcurrentHashMap<String, Exception>()
     val selectionRequests = AtomicInteger()
     val nextSelectionGate = AtomicReference<ConceptSelectionGate?>(null)
     val nextSelectionFailure = AtomicReference<IOException?>(null)
@@ -219,6 +221,7 @@ internal object ConceptTestIo {
         selectionRequests.set(0)
         actionMode = false
         calls.clear()
+        delayFailures.clear()
         state = conceptRunningState()
         rules = conceptRules()
         ruleSets = conceptRuleSets()
@@ -356,10 +359,16 @@ class ConceptMihomoClientShadow {
     }
     @Implementation fun delay(node: String, preferredUrl: String, expected: String): Long {
         ConceptTestIo.calls += "DELAY:$node"
+        ConceptTestIo.delayFailures[node]?.let { throw it }
         return 125L
     }
     @Implementation fun providerDelay(provider: String, node: String, preferredUrl: String, expected: String): Long {
         ConceptTestIo.calls += "DELAY:$node"
+        ConceptTestIo.delayFailures[node]?.let { throw it }
         return 125L
+    }
+    @Implementation fun groupDelay(group: String): JSONObject {
+        ConceptTestIo.calls += "GROUP_DELAY:$group"
+        throw AssertionError("Group health checks can clear forced selection; UI latency tests must use individual probes")
     }
 }

@@ -72,4 +72,25 @@ class GoogleDiagnosticsIntegrationTest {
         assertFalse(google.contains("本次快照未匹配"))
         assertEquals(1, ConceptTestIo.calls.count { it == "GET /connections" })
     }
+
+    @Test fun savedApplicationSelectionIsVisibleWithoutChangingSettingsOrClaimingLiveRouting() {
+        install("com.android.vending", 10123)
+        install("com.google.android.gms", 10124)
+        shadowOf(app.packageManager).setPackagesForUid(10124, "com.google.android.gms", "private.shared.package")
+        val prefs = app.getSharedPreferences("hetu", 0)
+        prefs.edit().putString("proxyAppScope", "whitelist")
+            .putStringSet("proxyAppPackages", setOf("0:com.android.vending", "private.shared.package"))
+            .putBoolean("proxyRootSettingsDirty", true).commit()
+        val before = prefs.all.toMap()
+        ConceptTestIo.diagnosticConnectionsJson = JSONObject().put("connections", JSONArray()).toString()
+        val report = RootProxyManager(app).diagnostics()
+        val google = report.substringAfter("--- Google 相关连接（仅元数据） ---").substringBefore("\n--- ")
+        assertTrue(google.contains("仅所选应用代理"))
+        assertTrue(google.contains("com.android.vending=uid:10123；此包已列入名单"))
+        assertTrue(google.contains("同 UID 的其他应用已列入名单"))
+        assertTrue(google.contains("未证明设置已应用") && google.contains("故障原因仍未知"))
+        assertFalse(google.contains("private.shared.package"))
+        assertEquals(before, prefs.all)
+        assertEquals(1, ConceptTestIo.calls.count { it == "GET /connections" })
+    }
 }

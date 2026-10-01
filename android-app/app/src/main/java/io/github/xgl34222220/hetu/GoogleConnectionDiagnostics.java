@@ -14,6 +14,59 @@ final class GoogleConnectionDiagnostics {
     private final Map<String,Integer> installed;
     private final Set<Integer> shared;
 
+    /** Saved selection only: never presents preferences as observed packet routing. */
+    static final class AppSelection {
+        private final String scope;
+        private final Set<String> selected = new HashSet<>();
+        private final Map<Integer,Set<String>> owners = new HashMap<>();
+        private final boolean readable;
+
+        AppSelection(Map<String,?> settings, Map<Integer,Set<String>> verifiedUidOwners) {
+            Object savedScope = settings.get("proxyAppScope");
+            scope = savedScope == null ? "blacklist" : savedScope instanceof String ? (String)savedScope : "";
+            Object entries = settings.get("proxyAppPackages");
+            boolean valid = entries == null || entries instanceof Set<?>;
+            if (entries instanceof Set<?>) for (Object entry : (Set<?>)entries) {
+                if (entry instanceof String) selected.add((String)entry);
+                else valid = false;
+            }
+            readable = valid;
+            for (Map.Entry<Integer,Set<String>> entry : verifiedUidOwners.entrySet())
+                if (entry.getKey() != null && entry.getValue() != null)
+                    owners.put(entry.getKey(), new HashSet<>(entry.getValue()));
+        }
+
+        String description() {
+            String label;
+            switch (scope) {
+                case "blacklist": label = "所选应用绕过代理"; break;
+                case "whitelist": label = "仅所选应用代理"; break;
+                case "core": label = "由配置控制，分应用名单不决定接管范围"; break;
+                default: label = "范围未知";
+            }
+            return "已保存的分应用设置：" + label + "。\n"
+                    + "下列名单状态不是实际路由结果，也未证明设置已应用；核心分流、共享 UID、其他用户或委派进程可能影响路径。\n";
+        }
+
+        String membership(String name, Integer uid) {
+            if (!readable) return "名单读取异常，状态未知";
+            if (contains(name, uid)) return "此包已列入名单";
+            if (uid == null) return "此包未直接列入，UID 未核对";
+            Set<String> sameUid = owners.get(uid);
+            if (sameUid == null || !sameUid.contains(name))
+                return "此包未直接列入，同 UID 名单状态未知";
+            for (String owner : sameUid)
+                if (!name.equals(owner) && contains(owner, uid))
+                    return "同 UID 的其他应用已列入名单";
+            return "此包及已核对的同 UID 应用未列入名单";
+        }
+
+        private boolean contains(String name, Integer uid) {
+            return selected.contains(name) || uid != null && uid >= 0
+                    && selected.contains((uid / 100000) + ":" + name);
+        }
+    }
+
     GoogleConnectionDiagnostics(Map<String,Integer> verifiedPackages, Set<Integer> sharedUids) {
         installed = new LinkedHashMap<>();
         for (String name : PACKAGES) {
@@ -64,12 +117,18 @@ final class GoogleConnectionDiagnostics {
     }
 
     String render(List<Connection> snapshot, boolean available) {
+        return render(snapshot, available, null);
+    }
+
+    String render(List<Connection> snapshot, boolean available, AppSelection selection) {
         StringBuilder out = new StringBuilder("当前 Android 用户可核对的包：\n");
+        if (selection != null) out.append(selection.description());
         for (String name : PACKAGES) {
             Integer uid = installed.get(name);
             out.append(name).append('=');
             if (uid == null) out.append("未安装或当前用户不可见");
             else out.append("uid:").append(uid).append(uid<10000 ? "（系统 UID，不能单独归属请求）" : shared.contains(uid) ? "（共享或归属待核对）" : "");
+            if (selection != null) out.append("；").append(selection.membership(name, uid));
             out.append('\n');
         }
         out.append(SNAPSHOT_LIMIT).append('\n');

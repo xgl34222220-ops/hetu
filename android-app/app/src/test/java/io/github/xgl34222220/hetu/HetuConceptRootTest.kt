@@ -285,6 +285,52 @@ class HetuConceptRootTest {
         node("strategy-node-${group.name}-$name").assertIsNotSelected()
     }
 
+    @Test fun automaticGroupMeasurementUsesIndividualProbesAndKeepsThePinnedNode() {
+        render()
+        rule.runOnIdle { enableConceptActionMode(vm) }
+        val group = vm.state.groups.first { it.type == "URLTest" }
+        node("strategy-group-${group.name}").performClick()
+        rule.onNodeWithContentDescription("全部测速 ${group.name}").performClick()
+        rule.waitUntil(10_000) {
+            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+            group.nodes.all { vm.delays[it.name] == 125L } && vm.testingGroups.isEmpty() && vm.testingNodes.isEmpty()
+        }
+        assertEquals(group.nodes.map { "DELAY:${it.name}" }.toSet(),
+            ConceptTestIo.calls.filter { it.startsWith("DELAY:") }.toSet())
+        assertEquals(group.nodes.size, ConceptTestIo.calls.count { it.startsWith("DELAY:") })
+        assertFalse(ConceptTestIo.calls.any { it.startsWith("GROUP_DELAY:") })
+        assertEquals(0, conceptSelectionRequestCount())
+        assertEquals(group.now, ConceptTestIo.state.groups.first { it.name == group.name }.now)
+        node("strategy-node-${group.name}-${group.now}").assertIsSelected()
+    }
+
+    @Test fun groupMeasurementPreservesTransportFailureAndOnlyRecordsConfirmedProbeFailures() {
+        render()
+        rule.runOnIdle { enableConceptActionMode(vm) }
+        val group = vm.state.groups.first()
+        val names = group.nodes.map { it.name }
+        rule.runOnIdle {
+            names.forEach { vm.delays[it] = 88L; vm.measuredAt[it] = 9_999L }
+            ConceptTestIo.delayFailures[names[0]] = java.io.IOException("Synthetic controller transport failure")
+            ConceptTestIo.delayFailures[names[1]] = MihomoControllerClient.DelayFailure(true)
+            ConceptTestIo.delayFailures[names[2]] = MihomoControllerClient.DelayFailure(false)
+        }
+        node("strategy-group-${group.name}").performClick()
+        rule.onNodeWithContentDescription("全部测速 ${group.name}").performClick()
+        rule.waitUntil(10_000) {
+            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+            ConceptTestIo.calls.count { it.startsWith("DELAY:") } == names.size && vm.testingGroups.isEmpty() && vm.testingNodes.isEmpty()
+        }
+        assertEquals(88L, vm.delays[names[0]])
+        assertEquals(9_999L, vm.measuredAt[names[0]])
+        assertEquals(-1L, vm.delays[names[1]])
+        assertEquals(-2L, vm.delays[names[2]])
+        assertNotEquals(9_999L, vm.measuredAt[names[1]])
+        assertNotEquals(9_999L, vm.measuredAt[names[2]])
+        assertFalse(ConceptTestIo.calls.any { it.startsWith("GROUP_DELAY:") })
+        node("strategy-node-${group.name}-${group.now}").assertIsSelected()
+    }
+
     @Test fun actualHomeCpuIsUnknownUntilTwoSamplesAndAgainAfterFailureOrRestart() {
         render(tab = HxTab.Home)
         rule.runOnIdle { enableConceptActionMode(vm) }

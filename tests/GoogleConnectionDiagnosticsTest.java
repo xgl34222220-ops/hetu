@@ -65,6 +65,43 @@ public final class GoogleConnectionDiagnosticsTest {
         String privateRule=google.render(List.of(new GoogleConnectionDiagnostics.Connection(10123,"","","",-1,
                 "tcp","RuleSet","https://provider.test/sub?token=RULESECRET",List.of("DIRECT"))),true);
         check(!privateRule.contains("RULESECRET")&&privateRule.contains("[url redacted]"),"rule URLs cannot reveal subscription credentials");
+
+        Map<Integer,Set<String>> owners=Map.of(10123,Set.of("com.android.vending"),
+                10124,Set.of("com.google.android.gms","private.shared.package"));
+        GoogleConnectionDiagnostics.AppSelection blacklist=new GoogleConnectionDiagnostics.AppSelection(
+                Map.of("proxyAppScope","blacklist","proxyAppPackages",Set.of("0:com.android.vending","private.shared.package")),owners);
+        String selected=google.render(Collections.emptyList(),true,blacklist);
+        check(selected.contains("所选应用绕过代理"),"saved blacklist meaning is explicit");
+        check(selected.contains("com.android.vending=uid:10123；此包已列入名单"),"current-user qualified selection is recognized");
+        check(selected.contains("同 UID 的其他应用已列入名单"),"shared UID selection is visible without guessing originating app");
+        check(!selected.contains("private.shared.package"),"unrelated shared package names are not disclosed");
+        check(selected.contains("不是实际路由结果")&&selected.contains("未证明设置已应用"),"saved intent cannot claim current interception");
+        check(selected.contains("com.google.android.gsf=未安装或当前用户不可见；此包未直接列入，UID 未核对"),"invisible packages remain unknown");
+        GoogleConnectionDiagnostics.AppSelection otherUser=new GoogleConnectionDiagnostics.AppSelection(
+                Map.of("proxyAppScope","whitelist","proxyAppPackages",Set.of("10:com.android.vending")),owners);
+        check(otherUser.description().contains("仅所选应用代理"),"saved whitelist meaning is explicit");
+        check(otherUser.membership("com.android.vending",10123).contains("未列入"),"other user's selection is not applied to current user's UID");
+        check(otherUser.membership("com.android.vending",1010123).equals("此包已列入名单"),"matching secondary-user identity is recognized");
+        check(otherUser.membership("com.google.android.apps.bard",10125).contains("状态未知"),"missing UID ownership is not asserted complete");
+        GoogleConnectionDiagnostics.AppSelection core=new GoogleConnectionDiagnostics.AppSelection(
+                Map.of("proxyAppScope","core","proxyAppPackages",Set.of("com.android.vending")),owners);
+        check(core.description().contains("分应用名单不决定接管范围"),"core scope does not treat list as effective routing");
+        GoogleConnectionDiagnostics.AppSelection malformed=new GoogleConnectionDiagnostics.AppSelection(
+                Map.of("proxyAppScope","PRIVATE_SCOPE","proxyAppPackages","PRIVATE_LIST"),owners);
+        check(malformed.membership("com.android.vending",10123).contains("状态未知"),"wrong typed selection cannot become empty successful list");
+        check(malformed.description().contains("范围未知")&&!malformed.description().contains("PRIVATE_SCOPE"),"unknown scope value is never echoed");
+        GoogleConnectionDiagnostics.AppSelection wrongElement=new GoogleConnectionDiagnostics.AppSelection(
+                Map.of("proxyAppPackages",Set.of(42)),owners);
+        check(wrongElement.membership("com.android.vending",10123).contains("状态未知"),"wrong typed list element invalidates membership evidence");
+        Set<String> changing=new HashSet<>(Set.of("com.android.vending"));
+        Set<String> changingOwners=new HashSet<>(Set.of("com.android.vending"));
+        GoogleConnectionDiagnostics.AppSelection captured=new GoogleConnectionDiagnostics.AppSelection(
+                Map.of("proxyAppPackages",changing),Map.of(10123,changingOwners));
+        changing.clear();changingOwners.clear();
+        check(captured.membership("com.android.vending",10123).equals("此包已列入名单"),"selection is an immutable captured snapshot");
+        check(captured.description().contains("所选应用绕过代理"),"absent scope uses the production default");
+        String failedWithSelection=google.render(Collections.emptyList(),false,blacklist);
+        check(failedWithSelection.contains("此包已列入名单")&&failedWithSelection.contains("读取失败"),"controller failure still exposes saved membership without claiming an empty live snapshot");
         System.out.println("GoogleConnectionDiagnosticsTest passed: "+checks);
     }
 }
