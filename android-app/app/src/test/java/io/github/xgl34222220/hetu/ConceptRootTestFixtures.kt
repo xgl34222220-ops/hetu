@@ -312,12 +312,12 @@ class ConceptRuntimeInspectorShadow {
 
 /** In-memory API boundary. Unhandled methods cannot fall through to a real socket. */
 @Implements(value = MihomoControllerClient::class, isInAndroidSdk = false, callThroughByDefault = false)
-class ConceptMihomoClientShadow {
+internal class ConceptMihomoClientShadow {
     companion object {
         // The production factory is static. Keep it inside this same socket-free
         // boundary instead of allowing an unimplemented shadow call to return null.
         @JvmStatic @Implementation
-        private fun forLocalRuntime(context: Context): MihomoControllerClient = MihomoControllerClient(context)
+        fun forLocalRuntime(context: Context): MihomoControllerClient = MihomoControllerClient(context)
     }
 
     @Implementation fun proxies(): JSONObject {
