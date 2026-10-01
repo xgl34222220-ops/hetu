@@ -120,6 +120,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -161,9 +163,10 @@ internal fun HxPage(
     scrollToTopSignal: Int = 0,
     showScrollTop: Boolean = true,
     largeTitle: Boolean = onBack == null,
-    largeTitleStartPadding: Dp = Hx.gutter,
+    largeTitleStartPadding: Dp = 28.dp,
     largeTitleFontSizeSp: Float? = null,
     largeTitleBottomPadding: Dp = 10.dp,
+    centeredBrandTitle: Boolean = false,
     canvasColor: Color? = null,
     content: LazyListScope.() -> Unit,
 ) {
@@ -180,7 +183,7 @@ internal fun HxPage(
     val c = Hx.colors
     val pageCanvas = canvasColor ?: c.canvas
     val prominent = largeTitle && onBack == null
-    val pageBarHeight = if (prominent) maxOf(60f, 32f * LocalDensity.current.fontScale + 12f).dp else HxTopBarHeight
+    val pageBarHeight = HxTopBarHeight
     val density = LocalDensity.current
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -188,8 +191,6 @@ internal fun HxPage(
     val collapsed by remember(listState) {
         derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > thresholdPx }
     }
-    val prominentTitleSize by animateFloatAsState(if (collapsed) 22f else 26f,
-        tween(if (LocalHxMotionEnabled.current) HxMotion.Medium else 0), label = "pageTitleSize")
     // 0 → large title fully visible, 1 → scrolled away. Read only inside graphicsLayer so
     // scrolling never recomposes the page.
     val headerProgress = remember(listState) {
@@ -209,15 +210,20 @@ internal fun HxPage(
                 state = listState,
                 modifier = Modifier.fillMaxSize().hazeSource(pageHaze),
                 contentPadding = PaddingValues(
-                    top = statusTop + pageBarHeight,
+                    top = statusTop + if (centeredBrandTitle && largeTitle) 0.dp else pageBarHeight,
                     bottom = listBottom,
                 ),
             ) {
-                if (largeTitle && !prominent) item(key = "hx-page-header") {
+                if (largeTitle) item(key = "hx-page-header") {
                     Column(
                         Modifier
                             .fillMaxWidth()
-                            .padding(start = largeTitleStartPadding, end = Hx.gutter, bottom = largeTitleBottomPadding)
+                            .padding(
+                                start = if (centeredBrandTitle) Hx.gutter else largeTitleStartPadding,
+                                end = Hx.gutter,
+                                top = if (centeredBrandTitle) 34.dp else if (prominent) 12.dp else 0.dp,
+                                bottom = if (centeredBrandTitle) 30.dp else if (prominent) 20.dp else largeTitleBottomPadding,
+                            )
                             .graphicsLayer {
                                 val p = headerProgress.value
                                 alpha = 1f - p * .92f
@@ -230,13 +236,16 @@ internal fun HxPage(
                     ) {
                         Text(
                             title,
+                            modifier = Modifier.fillMaxWidth().testTag("hx-large-title")
+                                .then(if (collapsed) Modifier.clearAndSetSemantics {} else Modifier),
                             style = MaterialTheme.typography.headlineMedium.copy(
-                                fontSize = largeTitleFontSizeSp?.sp ?: MaterialTheme.typography.headlineMedium.fontSize,
-                                lineHeight = largeTitleFontSizeSp?.let { (it + 8f).sp } ?: MaterialTheme.typography.headlineMedium.lineHeight,
+                                fontSize = if (centeredBrandTitle) 22.sp else largeTitleFontSizeSp?.sp ?: 34.sp,
+                                lineHeight = if (centeredBrandTitle) 30.sp else largeTitleFontSizeSp?.let { (it + 8f).sp } ?: 44.sp,
                                 letterSpacing = (-0.35).sp,
                             ),
+                            textAlign = if (centeredBrandTitle) TextAlign.Center else TextAlign.Start,
                             color = c.text,
-                            maxLines = 1,
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
                         if (!subtitle.isNullOrBlank()) {
@@ -311,16 +320,17 @@ internal fun HxPage(
                 Text(
                     title,
                     modifier = Modifier
-                        .align(if (prominent) Alignment.CenterStart else Alignment.Center)
-                        .padding(horizontal = if (prominent) Hx.gutter - 4.dp else 72.dp)
+                        .align(Alignment.Center)
+                        .padding(horizontal = 72.dp)
+                        .then(if (largeTitle && !collapsed) Modifier.clearAndSetSemantics {} else Modifier)
                         .graphicsLayer {
-                            alpha = if (prominent) 1f else barAlpha
-                            translationY = if (prominent) 0f else (1f - barAlpha) * 8.dp.toPx()
-                            val s = if (prominent) 1f else .94f + .06f * barAlpha
+                            alpha = barAlpha
+                            translationY = (1f - barAlpha) * 8.dp.toPx()
+                            val s = .94f + .06f * barAlpha
                             scaleX = s
                             scaleY = s
                         },
-                    style = if (prominent) MaterialTheme.typography.headlineMedium.copy(fontSize = prominentTitleSize.sp, lineHeight = (prominentTitleSize + 6f).sp) else MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = c.text,
                     maxLines = 1,
@@ -568,6 +578,7 @@ internal fun HxRow(
     danger: Boolean = false,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
+    spacious: Boolean = false,
     trailing: @Composable (RowScope.() -> Unit)? = null,
 ) {
     val c = Hx.colors
@@ -583,26 +594,28 @@ internal fun HxRow(
                     onLongClick = onLongClick?.let { long -> { haptics.perform(HetuHaptic.LongPress); long() } },
                 ) else Modifier,
             )
-            .heightIn(min = 64.dp)
-            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .heightIn(min = if (spacious) 72.dp else 64.dp)
+            .padding(horizontal = if (spacious) 20.dp else 16.dp, vertical = 12.dp)
             .graphicsLayer { alpha = contentAlpha },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {
-            HxIconBadge(icon, if (danger) c.bad else iconTint)
-            Spacer(Modifier.width(9.dp))
+            if (spacious) Icon(icon, null, tint = if (danger) c.bad else c.text, modifier = Modifier.size(26.dp))
+            else HxIconBadge(icon, if (danger) c.bad else iconTint)
+            Spacer(Modifier.width(if (spacious) 24.dp else 9.dp))
         }
         Column(Modifier.weight(1f)) {
             Text(
                 title,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
+                style = if (spacious) MaterialTheme.typography.titleMedium.copy(fontSize = 17.sp, lineHeight = 23.sp) else MaterialTheme.typography.bodyLarge,
+                fontWeight = if (spacious) FontWeight.SemiBold else FontWeight.Medium,
                 color = if (danger) c.bad else c.text,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
             if (!subtitle.isNullOrBlank()) {
-                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = c.textMuted, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                Text(subtitle, style = if (spacious) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodySmall,
+                    color = c.textMuted, maxLines = 3, overflow = TextOverflow.Ellipsis)
             }
         }
         if (trailing != null) {
@@ -1308,13 +1321,13 @@ internal fun HxButton(
 
 /** Small circular icon action used in top bars. */
 @Composable
-internal fun HxBarAction(icon: ImageVector, description: String, onClick: () -> Unit, busy: Boolean = false, enabled: Boolean = true) {
+internal fun HxBarAction(icon: ImageVector, description: String, onClick: () -> Unit, busy: Boolean = false, enabled: Boolean = true, plain: Boolean = false) {
     val c = Hx.colors
     val haptics = rememberHetuHaptics()
     val tint by animateColorAsState(if (enabled) c.text else c.textFaint, tween(HxMotion.Medium), label = "barTint")
     IconButton(onClick = { haptics.perform(HetuHaptic.Tap); onClick() }, enabled = enabled && !busy, modifier = Modifier.size(48.dp)) {
-        Box(Modifier.size(36.dp).background(c.surface.copy(alpha = .78f), CircleShape)
-            .border(.8.dp, if (c.dark) c.line else Color.White, CircleShape), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(36.dp).then(if (plain) Modifier else Modifier.background(c.surface.copy(alpha = .78f), CircleShape)
+            .border(.8.dp, if (c.dark) c.line else Color.White, CircleShape)), contentAlignment = Alignment.Center) {
         // Icon swaps (search ↔ close search, idle ↔ busy) rotate/scale through instead of blinking.
         AnimatedContent(
             targetState = if (busy) null else icon,
@@ -1325,7 +1338,7 @@ internal fun HxBarAction(icon: ImageVector, description: String, onClick: () -> 
             contentAlignment = Alignment.Center,
             label = "barAction",
         ) { target ->
-            if (target == null) HxSpinner(16.dp) else Icon(target, description, tint = tint, modifier = Modifier.size(20.dp))
+            if (target == null) HxSpinner(16.dp) else Icon(target, description, tint = tint, modifier = Modifier.size(if (plain) 26.dp else 20.dp))
         }
         }
     }

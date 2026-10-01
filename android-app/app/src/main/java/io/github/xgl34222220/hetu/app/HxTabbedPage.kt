@@ -70,6 +70,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -139,17 +140,16 @@ internal fun HxTabbedPage(
 ) {
     val host = remember { HxEmbedHost() }
     val shownSubtitle = if (showSubtitle) (host.subtitles[selected] ?: subtitle) else null
-    val stackedActions = panelReferenceStyle && LocalDensity.current.fontScale > 1.3f
-    val topBarHeight = if (stackedActions) (40f * LocalDensity.current.fontScale + 48f).dp else if (panelReferenceStyle) 60.dp else if (minimalHeader) 48.dp else HxTopBarHeight
+    val topBarHeight = if (panelReferenceStyle || minimalHeader) 48.dp else HxTopBarHeight
     val c = Hx.colors
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val listBottom = (if (bottomPadding > 0.dp) bottomPadding else navInset) + 24.dp
-    val tabsHeight = if (panelReferenceStyle) maxOf(52f, 20f * density.fontScale + 20f).dp else 42.dp
+    val tabsHeight = if (panelReferenceStyle) maxOf(56f, 22f * density.fontScale + 24f).dp else 42.dp
     val headerOpenHeight = when {
-        panelReferenceStyle -> 0.dp
+        panelReferenceStyle -> maxOf(62f, 44f * density.fontScale + 18f).dp
         minimalHeader && shownSubtitle.isNullOrBlank() -> 52.dp
         minimalHeader -> 70.dp
         shownSubtitle.isNullOrBlank() -> 66.dp
@@ -211,9 +211,7 @@ internal fun HxTabbedPage(
         }
     }
 
-    val collapse = if (panelReferenceStyle) { if (listStates[selected]?.let { it.firstVisibleItemIndex > 0 || it.firstVisibleItemScrollOffset > 0 } == true) 1f else 0f } else if (headerHeightPx > 0f) (fold / headerHeightPx).coerceIn(0f, 1f) else 0f
-    val referenceTitleSize by animateFloatAsState(if (collapse > 0f) 22f else 26f,
-        tween(if (LocalHxMotionEnabled.current) HxMotion.Medium else 0), label = "panelTitleSize")
+    val collapse = if (headerHeightPx > 0f) (fold / headerHeightPx).coerceIn(0f, 1f) else 0f
     val visibleHeader = with(density) { (headerHeightPx - fold).coerceAtLeast(0f).toDp() }
     val contentTop = statusTop + topBarHeight + tabsHeight + visibleHeader + 2.dp
     val pageCanvas = c.canvas
@@ -281,26 +279,24 @@ internal fun HxTabbedPage(
             Text(
                 title,
                 modifier = Modifier
-                    .align(if (stackedActions) Alignment.TopStart else if (panelReferenceStyle) Alignment.CenterStart else Alignment.Center)
-                    .padding(horizontal = if (panelReferenceStyle) 2.dp else 96.dp)
+                    .align(Alignment.Center)
+                    .padding(horizontal = 104.dp)
+                    .then(if (collapse < .9f) Modifier.clearAndSetSemantics {} else Modifier)
                     .graphicsLayer {
-                        alpha = if (panelReferenceStyle) 1f else ((collapse - .45f) / .55f).coerceIn(0f, 1f)
+                        alpha = ((collapse - .45f) / .55f).coerceIn(0f, 1f)
                         translationY = (1f - alpha) * 6.dp.toPx()
                     },
-                style = if (panelReferenceStyle) MaterialTheme.typography.headlineMedium.copy(fontSize = referenceTitleSize.sp, lineHeight = (referenceTitleSize + 6f).sp) else MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = c.text,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
             )
-            if (!panelReferenceStyle) {
-                Row(Modifier.align(Alignment.CenterStart), verticalAlignment = Alignment.CenterVertically) {
-                    host.leadingActions[selected]?.invoke(this)
-                }
+            Row(Modifier.align(Alignment.CenterStart), verticalAlignment = Alignment.CenterVertically) {
+                host.leadingActions[selected]?.invoke(this)
             }
-            Row(Modifier.align(if (stackedActions) Alignment.BottomEnd else Alignment.CenterEnd), verticalAlignment = Alignment.CenterVertically) {
-                if (panelReferenceStyle) host.leadingActions[selected]?.invoke(this)
+            Row(Modifier.align(Alignment.CenterEnd), verticalAlignment = Alignment.CenterVertically) {
                 host.actions[selected]?.invoke(this)
                 actions()
             }
@@ -330,6 +326,7 @@ internal fun HxTabbedPage(
             ) {
                 Text(
                     title,
+                    modifier = Modifier.testTag("panel-large-title").then(if (collapse >= .9f) Modifier.clearAndSetSemantics {} else Modifier),
                     style = MaterialTheme.typography.headlineMedium.copy(fontSize = if (panelReferenceStyle) 36.sp else 32.sp, lineHeight = if (panelReferenceStyle) 44.sp else MaterialTheme.typography.headlineMedium.lineHeight, letterSpacing = (-0.6).sp),
                     fontWeight = FontWeight.Bold,
                     color = c.text,
@@ -412,7 +409,7 @@ internal fun HxChipTabs(tabs: List<HxPageTab>, pagerState: PagerState, reference
             .horizontalScroll(scroll)
             .padding(horizontal = if (referenceStyle) 12.dp else Hx.gutter)
             .padding(bottom = if (referenceStyle) 4.dp else 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(if (referenceStyle) 5.dp else 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         tabs.forEachIndexed { index, tab ->
             val sel = (1f - abs(position - index)).coerceIn(0f, 1f)
@@ -423,7 +420,7 @@ internal fun HxChipTabs(tabs: List<HxPageTab>, pagerState: PagerState, reference
                     .hxPressScale(source, .93f)
                     .testTag("panel-tab-${tab.key}")
                     .semantics { selected = pagerState.targetPage == index }
-                    .heightIn(min = if (referenceStyle) 40.dp else 38.dp)
+                    .heightIn(min = if (referenceStyle) 48.dp else 38.dp)
                     .clip(if (referenceStyle) RoundedCornerShape(14.dp) else Hx.pillShape)
                     .background(if (referenceStyle) lerp(c.surface.copy(alpha = .52f), refSelected, sel) else lerp(Color.Transparent, c.surface, sel))
                     .border(
@@ -435,14 +432,14 @@ internal fun HxChipTabs(tabs: List<HxPageTab>, pagerState: PagerState, reference
                         haptics.perform(HetuHaptic.Tick)
                         onSelect(index)
                     }
-                    .padding(horizontal = if (referenceStyle) 11.dp else 17.dp, vertical = 8.dp),
+                    .padding(horizontal = if (referenceStyle) 14.dp else 17.dp, vertical = 8.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     tab.label,
-                    style = MaterialTheme.typography.labelLarge.copy(fontSize = if (referenceStyle) 12.sp else 15.sp),
+                    style = MaterialTheme.typography.labelLarge.copy(fontSize = 15.sp),
                     fontWeight = if (sel > .5f) FontWeight.SemiBold else FontWeight.Medium,
-                    color = if (referenceStyle) lerp(c.textMuted, c.accent, sel) else lerp(c.textMuted, c.text, sel),
+                    color = lerp(c.textMuted, c.text, sel),
                     maxLines = 1,
                 )
             }

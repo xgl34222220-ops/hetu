@@ -226,13 +226,13 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
                 HxBarAction(if (searching) Icons.Rounded.SearchOff else Icons.Rounded.Search, "搜索", onClick = {
                     searching = !searching
                     if (!searching) query = ""
-                })
-                Box(Modifier.hxAnchorSource()) { HxBarAction(Icons.Rounded.FilterList, "筛选", onClick = { showFilter = true }) }
+                }, plain = true)
+                Box(Modifier.hxAnchorSource()) { HxBarAction(Icons.Rounded.FilterList, "筛选", onClick = { showFilter = true }, plain = true) }
             }
         },
         actions = {
-            if (state.running) HxBarAction(Icons.Rounded.Sort, "排序与布局", { showLayout = true })
-            HxBarAction(Icons.Rounded.Settings, "测速与 API", onClick = { showApi = true })
+            if (state.running) HxBarAction(Icons.Rounded.Sort, "排序与布局", { showLayout = true }, plain = true)
+            HxBarAction(Icons.Rounded.Settings, "测速与 API", onClick = { showApi = true }, plain = true)
         },
         overlay = {
             AnimatedVisibility(
@@ -286,10 +286,7 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
         }
 
         item(key = "strategy-summary") {
-            Row(Modifier.fillMaxWidth().padding(horizontal = Hx.gutter + 4.dp).padding(top = 4.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("策略分组", style = MaterialTheme.typography.titleMedium, color = c.text, modifier = Modifier.weight(1f))
-                Text("共 ${visibleGroups.size} 个分组", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
-            }
+            Spacer(Modifier.height(12.dp))
         }
         entries.forEach { entry ->
             val type = when (entry) {
@@ -437,33 +434,32 @@ private fun StrategyGroupCard(
     val source = remember { MutableInteractionSource() }
     val shape = RoundedCornerShape(20.dp)
     val fill by animateColorAsState(if (expanded) c.accentSoft else c.surface.copy(alpha = .84f), HxMotion.enter(), label = "groupFill")
-    Column(
-        modifier.heightIn(min = if (compact) 112.dp else 120.dp)
+    Box(
+        modifier.heightIn(min = if (compact) 86.dp else 92.dp)
             .testTag("strategy-group-${group.name}")
             .semantics { stateDescription = if (expanded) "已展开" else "已收起" }
             .hxPressScale(source).clip(shape).background(fill)
-            .border(if (expanded) 1.dp else .8.dp, if (expanded) c.accent.copy(alpha = .6f) else c.line.copy(alpha = .7f), shape)
-            .hxCombinedClickSource(source, onLongClick = { vm.testGroup(group) }, onClick = onClick)
-            .padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp),
+            .then(if (expanded) Modifier.border(1.dp, c.accent.copy(alpha = .6f), shape) else Modifier)
+            .hxCombinedClickSource(source, onLongClick = { vm.testGroup(group) }, onClick = onClick),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(group.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = c.text, maxLines = nameLines, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-            Spacer(Modifier.width(6.dp))
-            if (expanded) Icon(Icons.Rounded.ExpandLess, "收起 ${group.name}", tint = c.accent, modifier = Modifier.size(28.dp))
-            else HxGroupIcon(group, Modifier.size(28.dp))
-        }
-        Text(group.now.ifBlank { "未选择" }, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium,
-            color = c.text, maxLines = nameLines, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.fillMaxWidth().testTag("strategy-current-${group.name}"))
-        Spacer(Modifier.weight(1f))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(group.type, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Normal, color = c.textMuted)
-                Text("$online/${group.nodes.size}", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Normal, color = c.textMuted)
+        Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 11.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(group.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = c.text,
+                        maxLines = nameLines, overflow = TextOverflow.Ellipsis)
+                    Text("${group.type}  $online/${group.nodes.size}", style = MaterialTheme.typography.bodySmall,
+                        color = c.textMuted, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+                Spacer(Modifier.width(6.dp))
+                if (expanded) Icon(Icons.Rounded.ExpandLess, "收起 ${group.name}", tint = c.accent, modifier = Modifier.size(34.dp))
+                else HxGroupIcon(group, Modifier.size(34.dp))
             }
-            Spacer(Modifier.width(4.dp))
-            StrategyCompactDelayPill(delay, testing) { vm.testGroup(group) }
+            Spacer(Modifier.height(if (compact) 6.dp else 8.dp))
+            Text(group.now.ifBlank { "未选择" }, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium,
+                color = c.text, maxLines = if (nameOverflow == "wrap") Int.MAX_VALUE else maxOf(3, nameLines), overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth().padding(end = 58.dp).testTag("strategy-current-${group.name}"))
         }
+        StrategyCompactDelayPill(delay, testing, Modifier.align(Alignment.BottomEnd).padding(end = 8.dp)) { vm.testGroup(group) }
     }
 }
 

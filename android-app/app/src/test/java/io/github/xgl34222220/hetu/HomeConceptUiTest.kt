@@ -70,18 +70,19 @@ class HomeConceptUiTest {
         }
         bitmap.recycle()
     }
-    @Test fun runningHomeHasSingleDirectStopAndFullWidthAddress() {
+    @Test fun runningHomeHasSingleDirectStopAndApprovedInformationGrid() {
         running(); render()
         rule.onNodeWithText("停止").assertIsDisplayed()
         rule.onAllNodesWithText("停止").assertCountEquals(1)
         rule.onNodeWithText("203.0.113.24").assertIsDisplayed()
-        rule.onNodeWithText("上传速度").assertExists()
-        rule.onNodeWithText("下载速度").assertExists()
+        rule.onNodeWithText("上行").assertExists()
+        rule.onNodeWithText("下行").assertExists()
         rule.onNodeWithText("WebUI").assertDoesNotExist()
         capture("concept-home-running")
         rule.onNodeWithContentDescription("运行控制").performClick()
-        rule.onNodeWithText("重载配置").assertIsDisplayed()
-        rule.onNodeWithText("重启核心").assertIsDisplayed()
+        rule.onNodeWithContentDescription("重载配置").assertIsDisplayed()
+        rule.onNodeWithContentDescription("重启核心").assertIsDisplayed()
+        rule.onNodeWithText("规则").assertIsDisplayed()
     }
     @Test fun detailsOpenDistinctRouteWhileCardSwitchesWanLan() {
         running(); render()
@@ -89,7 +90,7 @@ class HomeConceptUiTest {
         assertEquals(HxRoute.PublicIp, nav.current)
         nav.pop()
         rule.onNodeWithText("203.0.113.24").performClick()
-        rule.onNodeWithText("局域网 IP").assertExists()
+        rule.onNodeWithContentDescription("局域网 IP").assertExists()
         rule.onNodeWithText("192.0.2.10").assertExists()
     }
     @Test fun ipDetailsShowUnknownInsteadOfMockMetadataAndSwitchLan() {

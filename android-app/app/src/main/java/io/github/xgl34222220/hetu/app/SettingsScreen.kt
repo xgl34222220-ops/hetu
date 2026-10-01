@@ -155,21 +155,30 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp) {
     val startOnPanel = prefs.getBoolean("startOnPanel", false)
 
     HxPage(title = "设置", scrollToTopSignal = vm.reselect, bottomPadding = bottomPadding) {
-        val rows = listOf(
-            Triple("基础代理配置", "核心 · 模式 · IPv6 · 自动覆写", Icons.Rounded.Tune) to { nav.push(HxRoute.Network) },
-            Triple("高级代理配置", "性能 · TCP/UDP · DNS · 资源限制", Icons.Rounded.AltRoute) to { nav.push(HxRoute.AdvancedNetwork) },
-            Triple("语言与主题", "系统语言 · 外观主题 · 颜色", Icons.Rounded.Palette) to { nav.push(HxRoute.Theme) },
-            Triple("备份与恢复", "配置备份 · 从备份恢复", Icons.Rounded.CloudSync) to { nav.push(HxRoute.Backup) },
-            Triple("开机启动与下载", "开机自启 · 后台下载", Icons.Rounded.RestartAlt) to { nav.push(HxRoute.Startup) },
-            Triple("通知设置", "状态通知 · 通知内容 · 常用操作", Icons.Rounded.Notifications) to { nav.push(HxRoute.Notifications) },
-            Triple("默认面板", "启动后默认打开的功能页面", Icons.Rounded.GridView) to { nav.push(HxRoute.PanelPreferences) },
-            Triple("关于", "版本信息 · 开源许可 · 致谢", Icons.Rounded.Info) to { nav.push(HxRoute.About) },
+        val groups = listOf(
+            listOf(
+                Triple("基础代理配置", "核心、模式与当前配置", Icons.Rounded.Tune) to { nav.push(HxRoute.Network) },
+                Triple("高级代理配置", "性能、DNS 与资源限制", Icons.Rounded.AltRoute) to { nav.push(HxRoute.AdvancedNetwork) },
+            ),
+            listOf(
+                Triple("语言与主题", "显示语言、主题与显示", Icons.Rounded.Palette) to { nav.push(HxRoute.Theme) },
+                Triple("默认面板", "选择面板与显示偏好", Icons.Rounded.GridView) to { nav.push(HxRoute.PanelPreferences) },
+            ),
+            listOf(
+                Triple("备份与恢复", "导出与恢复应用设置", Icons.Rounded.CloudSync) to { nav.push(HxRoute.Backup) },
+                Triple("开机启动与下载", "启动设置与资源下载", Icons.Rounded.RestartAlt) to { nav.push(HxRoute.Startup) },
+                Triple("通知设置", "管理运行状态提醒", Icons.Rounded.Notifications) to { nav.push(HxRoute.Notifications) },
+            ),
+            listOf(Triple("关于", "版本与开源信息", Icons.Rounded.Info) to { nav.push(HxRoute.About) }),
         )
-        rows.forEach { (row, action) ->
-            item(key = row.first) {
-                HxSection {
-                    HxGroup(Modifier.testTag("settings-${row.first}")) {
-                        HxRow(row.first, subtitle = row.second, icon = row.third, onClick = action) { HxChevron() }
+        groups.forEachIndexed { index, rows ->
+            item(key = "settings-group-$index") {
+                HxSection(modifier = Modifier.padding(bottom = 4.dp)) {
+                    HxGroup(Modifier.testTag("settings-group-$index")) {
+                        rows.forEach { (row, action) ->
+                            HxRow(row.first, modifier = Modifier.testTag("settings-${row.first}"), subtitle = row.second,
+                                icon = row.third, onClick = action, spacious = true) { HxChevron() }
+                        }
                     }
                 }
             }

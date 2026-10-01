@@ -60,12 +60,12 @@ internal data class HxColors(
 )
 
 private val LightHx = HxColors(
-    canvas = Color(0xFFE9EEFF),
-    surface = Color(0xFFF9FBFF),
-    surfaceMuted = Color(0xFFEDF2FF),
+    canvas = Color(0xFFEBEDFA),
+    surface = Color(0xFFFAFAFF),
+    surfaceMuted = Color(0xFFE6E9F7),
     line = Color(0xFFDCE5FC),
-    text = Color(0xFF111932),
-    textMuted = Color(0xFF596A95),
+    text = Color(0xFF141722),
+    textMuted = Color(0xFF696D7F),
     textFaint = Color(0xFF8491B1),
     accent = Color(0xFF1768FF),
     accentSoft = Color(0xFFE0EBFF),
@@ -106,7 +106,7 @@ internal object Hx {
         @Composable get() = LocalHx.current
 
     /** Spacing scale – every gap in the app is one of these. */
-    val gutter = 16.dp
+    val gutter = 14.dp
     val gap = 12.dp
     val gapSmall = 7.dp
 

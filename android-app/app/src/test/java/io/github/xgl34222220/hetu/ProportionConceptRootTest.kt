@@ -76,12 +76,12 @@ class ProportionConceptRootTest {
     }
     @Test fun homeMetricsUseAlignedCardsWithValidCpuAndResidentMemory() {
         render(HxTab.Home)
-        sameHeight("home-upload-card", "home-download-card")
-        sameHeight("home-cpu-card", "home-memory-card")
+        sameHeight("home-address-card", "home-speed-card")
+        sameHeight("home-subscription-card", "home-resources-card")
         rule.onNodeWithText("6.2%").assertExists()
         capture("01-home")
-        tag("home-cpu-card").performScrollTo()
-        sameHeight("home-cpu-card", "home-memory-card")
+        tag("home-resources-card").performScrollTo()
+        sameHeight("home-memory-row", "home-cpu-row")
         capture("02-home-scrolled")
     }
     @Test fun overviewPairsAlignAndCompositeTransportMetadataCountsCorrectly() {
@@ -117,13 +117,27 @@ class ProportionConceptRootTest {
     @Test @Config(qualifiers = "w320dp-h820dp-mdpi")
     fun twoHundredPercentFontStacksResourceCardsWithoutSplittingUnitsIntoNarrowColumns() {
         render(HxTab.Home, scale = 2f)
-        tag("home-memory-card").performScrollTo()
-        tag("home-memory-card").performTouchInput { swipeUp() }
-        val cpu = tag("home-cpu-card").getUnclippedBoundsInRoot()
-        val memory = tag("home-memory-card").getUnclippedBoundsInRoot()
-        assertTrue(memory.top >= cpu.bottom)
-        assertTrue((memory.right - memory.left) >= 288.dp)
+        tag("home-resources-card").performScrollTo()
+        tag("home-resources-card").performTouchInput { swipeUp() }
+        val cpu = tag("home-cpu-row").getUnclippedBoundsInRoot()
+        val memory = tag("home-memory-row").getUnclippedBoundsInRoot()
+        val resources = tag("home-resources-card").getUnclippedBoundsInRoot()
+        assertTrue(cpu.top >= memory.bottom)
+        assertTrue((resources.right - resources.left) >= 288.dp)
         rule.onNodeWithText("96.0 MB").assertIsDisplayed()
         capture("05-home-320dp-200pct")
+    }
+
+    @Test fun settingsUsesFourSharedContainersForItsEightExistingRoutes() {
+        render(HxTab.Settings)
+        val first = tag("settings-group-0").getUnclippedBoundsInRoot()
+        val basic = tag("settings-基础代理配置").getUnclippedBoundsInRoot()
+        val advanced = tag("settings-高级代理配置").getUnclippedBoundsInRoot()
+        assertTrue(basic.top >= first.top && advanced.bottom <= first.bottom)
+        assertTrue(advanced.top >= basic.bottom)
+        assertEquals(first.left, basic.left)
+        tag("settings-group-3").performScrollTo().assertExists()
+        tag("settings-关于").assertIsDisplayed()
+        capture("06-settings-groups")
     }
 }
