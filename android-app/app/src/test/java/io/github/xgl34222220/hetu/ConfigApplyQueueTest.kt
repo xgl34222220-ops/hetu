@@ -378,7 +378,7 @@ class ConfigApplyQueueTest {
         val start = ConfigApplyIo.expect("start")
         start.preflightFailure = ProxyStartPreflightException("Sing-Box 的运行后端还未接入")
         vm.toggle(); started(start); start.release.countDown(); finished(vm)
-        assertTrue(vm.startupError.contains("Sing-Box"))
+        assertTrue(vm.startupError?.contains("Sing-Box") == true)
         assertTrue("Keep reporting the actual older process without claiming this start succeeded", vm.state.running)
         assertEquals("sing-box", prefs.getString("proxyBaseCore", ""))
         assertEquals("tun", prefs.getString("proxyBaseMode", ""))
