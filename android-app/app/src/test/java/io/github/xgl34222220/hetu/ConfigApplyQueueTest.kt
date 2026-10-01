@@ -364,6 +364,30 @@ class ConfigApplyQueueTest {
         assertFalse(messages.any { it.contains("已生效") })
     }
 
+    @Test fun unavailableCoreCannotUseAnOlderRunningProcessToAcknowledgeItsStart() {
+        ConfigApplyIo.running = false
+        prefs.edit().putBoolean("proxyUiLastRunning", false)
+            .putString("proxyBaseCore", "sing-box")
+            .putString("proxyBaseMode", "tun")
+            .putString("proxyUiConfigApplyPending", "preserve-request").commit()
+        val vm = vm()
+        assertFalse(vm.state.running)
+        // Another operation's existing process is observable during final read-back.
+        // It must not turn the rejected sing-box request into a successful start.
+        ConfigApplyIo.running = true
+        val start = ConfigApplyIo.expect("start")
+        start.preflightFailure = ProxyStartPreflightException("Sing-Box 的运行后端还未接入")
+        vm.toggle(); started(start); start.release.countDown(); finished(vm)
+        assertTrue(vm.startupError.contains("Sing-Box"))
+        assertTrue("Keep reporting the actual older process without claiming this start succeeded", vm.state.running)
+        assertEquals("sing-box", prefs.getString("proxyBaseCore", ""))
+        assertEquals("tun", prefs.getString("proxyBaseMode", ""))
+        assertEquals("preserve-request", prefs.getString("proxyUiConfigApplyPending", ""))
+        assertEquals(listOf("start:initial"), ConfigApplyIo.calls)
+        assertEquals(yaml("initial"), ConfigApplyIo.applied)
+        assertFalse(messages.any { it == "代理已启动" || it.contains("已生效") })
+    }
+
     @Test fun saveDuringFinalStateReadBackCannotFallBetweenWorkers() {
         val vm = vm()
         val a = ConfigApplyIo.expect("reload")
@@ -421,6 +445,7 @@ internal class ConfigApplyGate(
 ) {
     val entered = CountDownLatch(1)
     val release = CountDownLatch(1)
+    var preflightFailure: ProxyStartPreflightException? = null
 }
 
 internal object ConfigApplyIo {
@@ -470,6 +495,7 @@ internal object ConfigApplyIo {
                 calls += "$operation:${captured.lineSequence().first().removePrefix("# ")}"
                 gate.entered.countDown()
                 if (!gate.release.await(8, TimeUnit.SECONDS)) throw IOException("Unreleased test gate: $operation")
+                gate.preflightFailure?.let { throw it }
                 gate.failure?.let { throw IOException(it) }
                 when (operation) {
                     "reload" -> { check(running); applied = captured }

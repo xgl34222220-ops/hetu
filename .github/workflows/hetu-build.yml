@@ -43,6 +43,7 @@ jobs:
           javac -d /tmp/hetu-snapshot-tests android-app/app/src/main/java/io/github/xgl34222220/hetu/ConfigEditSnapshot.java tests/ConfigEditSnapshotTest.java
           java -cp /tmp/hetu-snapshot-tests io.github.xgl34222220.hetu.ConfigEditSnapshotTest
           python3 tools/test_config_edit_library.py
+          python3 tools/test_subscription_source_snapshot.py
           python3 tools/test_subscription_structure.py
           python3 tools/test_google_diagnostics.py
           python3 tools/test_start_contract.py
@@ -90,6 +91,7 @@ jobs:
           python3 tools/test_config_download.py --kotlin-lib "$hetu_gradle_lib"
           python3 tools/test_group_measurement.py --kotlin-lib "$hetu_gradle_lib"
           python3 tools/test_window_foreground.py --kotlin-lib "$hetu_gradle_lib"
+          python3 tools/test_controller_start_selection.py --kotlin-lib "$hetu_gradle_lib"
 
       # The Mihomo native core and runtime assets are not committed; take the exact,
       # hash-verified payload from the published UI15 APK (unchanged since then).

@@ -112,6 +112,9 @@ internal data class ProxyComposeState(
     val trafficMode: String = "",
 )
 
+/** Rejected before hooks or Root IO; an older running process cannot satisfy this request. */
+internal class ProxyStartPreflightException(message: String) : IllegalStateException(message)
+
 internal class ProxyComposeController(context: Context) {
     private val app = context.applicationContext
     private val prefs = app.getSharedPreferences("hetu", Context.MODE_PRIVATE)
@@ -281,25 +284,19 @@ internal class ProxyComposeController(context: Context) {
 
     suspend fun ensureRuntimeFiles(): String = withContext(Dispatchers.IO) {
         LegacyAppMigrator.migrateIfNeeded(app)
-        var core = ProxyRuntimeProfile.load(prefs).core
-        if (core == ProxyRuntimeProfile.Core.MIHOMO_SMART && !ProxyCoreStore(app).installed(core)) {
-            core = ProxyRuntimeProfile.Core.MIHOMO
-        }
+        val core = ProxyRuntimeProfile.load(prefs).core
         root.ensureRuntimeBase(core)
     }
 
     suspend fun start(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
         LegacyAppMigrator.migrateIfNeeded(app)
-        var profile = ProxyRuntimeProfile.load(prefs)
-        if (!profile.capability().available) {
-            onProgress("检测到旧版本遗留的不可用核心/模式，回退到 Mihomo · TPROXY…")
-            prefs.edit().putString("proxyBaseCore", "mihomo").putString("proxyBaseMode", "tproxy").apply()
-            profile = ProxyRuntimeProfile.load(prefs)
-        }
+        val profile = ProxyRuntimeProfile.load(prefs)
+        val capability = profile.capability()
+        if (!capability.available) throw ProxyStartPreflightException(
+            "无法启动 ${profile.summary()}：${capability.reason}。请在基础代理配置中选择可用的核心和模式。",
+        )
         if (profile.core == ProxyRuntimeProfile.Core.MIHOMO_SMART && !ProxyCoreStore(app).installed(profile.core)) {
-            onProgress("Mihomo Smart 尚未安装，先使用内置 Mihomo 启动…")
-            prefs.edit().putString("proxyBaseCore", "mihomo").apply()
-            profile = ProxyRuntimeProfile.load(prefs)
+            throw ProxyStartPreflightException("Mihomo Smart 尚未安装。请先在核心管理中安装，或手动选择 Mihomo。")
         }
         val selected = configs.selected(profile.core) ?: error("尚未选择配置")
         if (!configs.hasConfiguredSubscription(selected)) {

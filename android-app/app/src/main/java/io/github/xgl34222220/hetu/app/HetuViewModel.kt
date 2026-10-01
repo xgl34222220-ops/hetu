@@ -468,7 +468,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             } catch (error: Exception) {
                 val reason = errorText(error, "操作失败")
                 // Configuration problems are known before Root is touched; report them at once.
-                val configProblem = !stopping && (reason.contains("占位") || reason.contains("尚未选择配置") || reason.contains("仅所选应用代理"))
+                val configProblem = !stopping && (error is ProxyStartPreflightException || reason.contains("占位") || reason.contains("尚未选择配置") || reason.contains("仅所选应用代理"))
                 operationText = "确认最终运行状态…"
                 val recovered = if (configProblem || stopping) null else settleStart()
                 if (recovered != null) {

@@ -186,7 +186,10 @@ final class RootProxyManager {
         CONTROL_LOCK.lock();
         try{
         ProxyRuntimeProfile.Core core=requestedCore;
-        if(core==ProxyRuntimeProfile.Core.MIHOMO_SMART&&!cores.installed(core))core=ProxyRuntimeProfile.Core.MIHOMO;
+        if(core!=ProxyRuntimeProfile.Core.MIHOMO&&core!=ProxyRuntimeProfile.Core.MIHOMO_SMART)
+            throw new IOException(core.label+" 的运行后端还未接入，未替换当前运行文件");
+        if(core==ProxyRuntimeProfile.Core.MIHOMO_SMART&&!cores.installed(core))
+            throw new IOException("Mihomo Smart 尚未安装，未替换当前运行文件");
         File stage=new File(context.getCacheDir(),"hetu-runtime-init");
         if(!stage.isDirectory()&&!stage.mkdirs())throw new IOException("无法创建河图运行初始化目录");
         File script=new File(stage,"hetu-root.sh");

@@ -28,6 +28,26 @@ final class ProxyConfigLibrary {
 
     static final class Entry {final ProxyRuntimeProfile.Core core;final String name;final File file;Entry(ProxyRuntimeProfile.Core c,String n,File f){core=c;name=n;file=f;}}
     static final class Subscription {final String name,url;final boolean placeholder;Subscription(String n,String u){name=n;url=u;placeholder=u.contains(PLACEHOLDER);}}
+    /** One in-memory form baseline. Never serialize or log the source or provider URLs. */
+    static final class SubscriptionEditSnapshot {
+        final ProxyRuntimeProfile.Core core;
+        final ConfigEditSnapshot source;
+        final List<Subscription> subscriptions;
+        private SubscriptionEditSnapshot(ProxyRuntimeProfile.Core core,String name,String text,List<Subscription> subscriptions){
+            this.core=core;this.source=new ConfigEditSnapshot(core.id,name,text);
+            this.subscriptions=Collections.unmodifiableList(new ArrayList<>(subscriptions));
+        }
+    }
+    /** Source identity and revision only; this receipt contains no configuration text or URL. */
+    static final class SourceVersion {
+        final String coreId,name,sha256;
+        private SourceVersion(String coreId,String name,String text)throws IOException{
+            this.coreId=coreId;this.name=name;this.sha256=sourceDigest(text);
+        }
+        boolean matches(String coreId,String name,String text)throws IOException{
+            return this.coreId.equals(coreId)&&this.name.equals(name)&&sha256.equals(sourceDigest(text));
+        }
+    }
     private static final class Section {final int start,end;Section(int s,int e){start=s;end=e;}}
     private static final class CollatorHolder {static final java.text.Collator ORDER=java.text.Collator.getInstance(Locale.CHINA);}
 
@@ -266,7 +286,11 @@ final class ProxyConfigLibrary {
 
     List<Subscription> subscriptions(Entry e)throws IOException{
         synchronized (WRITE_LOCK) {
-            YamlSource source=new YamlSource(read(e));
+            return parseSubscriptions(read(e));
+        }
+    }
+    private static List<Subscription> parseSubscriptions(String text)throws IOException{
+            YamlSource source=new YamlSource(text);
             ArrayList<Subscription> out=new ArrayList<>();
             for(Provider provider:source.providers()){
                 Field field=provider.field("url");
@@ -275,7 +299,69 @@ final class ProxyConfigLibrary {
                 if(!url.isEmpty())out.add(new Subscription(provider.name,url));
             }
             return out;
+    }
+
+    SubscriptionEditSnapshot subscriptionEditSnapshot(ProxyRuntimeProfile.Core core)throws IOException{
+        synchronized (WRITE_LOCK) {
+            requireActiveCore(core);
+            Entry entry=selected(core);
+            if(entry==null)throw new IOException("尚未选择配置");
+            String text=read(entry);
+            return new SubscriptionEditSnapshot(core,entry.name,text,parseSubscriptions(text));
         }
+    }
+
+    SourceVersion updateSubscriptionIfUnchanged(SubscriptionEditSnapshot opened,String name,String url)throws IOException{
+        synchronized (WRITE_LOCK) {
+            Entry entry=requireCurrentSubscriptionSource(opened);
+            String updated=updateSubscriptionText(opened.source.originalText,name,url);
+            return commitSubscriptionSource(entry,opened,updated);
+        }
+    }
+    SourceVersion addSubscriptionIfUnchanged(SubscriptionEditSnapshot opened,String name,String url)throws IOException{
+        synchronized (WRITE_LOCK) {
+            Entry entry=requireCurrentSubscriptionSource(opened);
+            String updated=addSubscriptionText(opened.source.originalText,name,url);
+            return commitSubscriptionSource(entry,opened,updated);
+        }
+    }
+    SourceVersion deleteSubscriptionIfUnchanged(SubscriptionEditSnapshot opened,String name)throws IOException{
+        synchronized (WRITE_LOCK) {
+            Entry entry=requireCurrentSubscriptionSource(opened);
+            String updated=deleteSubscriptionText(opened.source.originalText,name);
+            return commitSubscriptionSource(entry,opened,updated);
+        }
+    }
+    private void requireActiveCore(ProxyRuntimeProfile.Core core)throws IOException{
+        if(core==null||!core.id.equals(prefs.getString("proxyBaseCore","mihomo")))
+            throw new IOException("当前核心已切换，未保存任何文件。请返回后重新打开配置。");
+    }
+    private Entry requireCurrentSubscriptionSource(SubscriptionEditSnapshot opened)throws IOException{
+        if(opened==null)throw new IOException("缺少订阅编辑快照，请重新打开配置。");
+        requireActiveCore(opened.core);
+        String name=opened.source.name;
+        if(!name.equals(safeName(name))||!name.equals(prefs.getString(key(opened.core),"")))
+            throw new IOException("当前配置已切换，未保存任何文件。请返回后重新打开配置。");
+        // Resolve the captured identity directly. A read of selected() could initialize a
+        // different fallback source after removal and must not redirect a stale form.
+        Entry entry=new Entry(opened.core,name,new File(dir(opened.core),name));
+        opened.source.requireUnchanged(entry.core.id,entry.name,read(entry));
+        return entry;
+    }
+    private SourceVersion commitSubscriptionSource(Entry entry,SubscriptionEditSnapshot opened,String text)throws IOException{
+        // Recheck after structural parsing; all cooperating library writers share this lock.
+        requireCurrentSubscriptionSource(opened);
+        SourceVersion receipt=new SourceVersion(entry.core.id,entry.name,text);
+        writeIfUnchanged(entry,opened.source,text);
+        return receipt;
+    }
+    private static String sourceDigest(String text)throws IOException{
+        try{
+            byte[] bytes=java.security.MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8));
+            StringBuilder out=new StringBuilder(64);
+            for(byte b:bytes){int value=b&255;out.append(Character.forDigit(value>>>4,16)).append(Character.forDigit(value&15,16));}
+            return out.toString();
+        }catch(java.security.NoSuchAlgorithmException impossible){throw new IOException("无法验证配置版本",impossible);}
     }
     boolean hasConfiguredSubscription(Entry e)throws IOException{
         synchronized (WRITE_LOCK) {
@@ -285,22 +371,29 @@ final class ProxyConfigLibrary {
 
     void updateSubscription(Entry e,String name,String url)throws IOException{
         synchronized (WRITE_LOCK) {
+            write(e,updateSubscriptionText(read(e),name,url));
+        }
+    }
+    private static String updateSubscriptionText(String text,String name,String url)throws IOException{
             String n=providerName(name),u=subscriptionUrl(url);
-            YamlSource source=new YamlSource(read(e));
+            YamlSource source=new YamlSource(text);
             Provider provider=source.provider(n);
             Field field=provider.field("url");
             if(field==null)throw unsupported("订阅没有直接 url 字段（可能来自模板继承）");
             // Replace this field's spelling, including a scalar alias, never its anchor.
             source.scalar(field);
             source.edit(field.start,field.end,"'"+yamlSingle(u)+"'");
-            write(e,source.result());
-        }
+            return source.result();
     }
 
     void addSubscription(Entry e,String name,String url)throws IOException{
         synchronized (WRITE_LOCK) {
+            write(e,addSubscriptionText(read(e),name,url));
+        }
+    }
+    private static String addSubscriptionText(String text,String name,String url)throws IOException{
             String n=providerName(name),u=subscriptionUrl(url);
-            YamlSource source=new YamlSource(read(e));
+            YamlSource source=new YamlSource(text);
             List<Provider> providers=source.providers();
             LinkedHashSet<String> existing=new LinkedHashSet<>();
             for(Provider provider:providers){if(provider.name.equals(n))throw new IOException("订阅名称已存在");existing.add(provider.name);}
@@ -318,21 +411,23 @@ final class ProxyConfigLibrary {
             if("{}".equals(header.value))source.edit(header.start,header.end,"");
             int at=section.end==source.lines.size()?source.text.length():source.lines.get(section.end).start;
             source.edit(at,at,(at>0&&source.text.charAt(at-1)!='\n'&&source.text.charAt(at-1)!='\r'?nl:"")+block);
-            write(e,source.result());
-        }
+            return source.result();
     }
 
     void deleteSubscription(Entry e,String name)throws IOException{
         synchronized (WRITE_LOCK) {
-            String n=providerName(name);YamlSource source=new YamlSource(read(e));
+            write(e,deleteSubscriptionText(read(e),name));
+        }
+    }
+    private static String deleteSubscriptionText(String text,String name)throws IOException{
+            String n=providerName(name);YamlSource source=new YamlSource(text);
             Provider provider=source.provider(n);
-            if(subscriptions(e).size()<=1)throw new IOException("至少保留一个订阅槽位；也可以直接使用 YAML 编辑器重构配置");
+            if(parseSubscriptions(text).size()<=1)throw new IOException("至少保留一个订阅槽位；也可以直接使用 YAML 编辑器重构配置");
             if(source.hasReferencedAnchor(provider.begin,provider.end))
                 throw unsupported("其他配置仍引用这个订阅的锚点");
             source.editUses(Collections.singleton(n),n,true);
             for(int i=provider.begin;i<provider.end;i++)source.removeLine(source.lines.get(i));
-            write(e,source.result());
-        }
+            return source.result();
     }
 
     private static String uniqueName(File dir,String requested)throws IOException{
