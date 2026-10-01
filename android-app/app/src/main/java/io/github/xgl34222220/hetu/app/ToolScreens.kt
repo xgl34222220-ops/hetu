@@ -888,7 +888,7 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                     HxDivider()
                     HxRow(
                         "消息与网络诊断",
-                        subtitle = "微信连接、保活、分流与最近运行事件",
+                        subtitle = "Google / 微信连接、分流与最近运行事件",
                         icon = Icons.Rounded.Router,
                         iconTint = c.textMuted,
                         onClick = { task("diag") { sheet = "消息与网络诊断" to vm.controller.diagnostics() } },

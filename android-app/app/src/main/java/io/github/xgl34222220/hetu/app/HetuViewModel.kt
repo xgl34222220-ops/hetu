@@ -681,11 +681,11 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                     siteDelays = measured
                     ProxyLatencyTargets.persistLast(prefs, measured)
                 }
-                if (measured.values.none { it > 0L }) toast("站点测速失败，请检查网络")
+                if (measured.values.none { it > 0L }) toast("本机直测失败，请检查当前网络")
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                toast(errorText(error, "测速失败"))
+                toast(errorText(error, "本机直测失败"))
             } finally {
                 siteTesting = false
             }

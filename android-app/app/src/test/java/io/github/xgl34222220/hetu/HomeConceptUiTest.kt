@@ -106,12 +106,29 @@ class HomeConceptUiTest {
         rule.onNodeWithText("启动").assertIsDisplayed()
         rule.onNodeWithText("203.0.113.24").assertDoesNotExist()
         capture("concept-home-large-font")
+        rule.onNodeWithText("本机直测").performScrollTo().assertIsDisplayed()
+        val settings = rule.onNodeWithContentDescription("本机直测设置").getUnclippedBoundsInRoot()
+        assertTrue(settings.bottom - settings.top >= 48.dp)
+        assertTrue(settings.right - settings.left >= 48.dp)
+        rule.onNodeWithText("河图进程请求，未指定代理节点").assertIsDisplayed()
+        capture("concept-home-direct-measurement-large-font")
     }
     @Test fun resourcesUseRealSampleAndNoInventedHourHistory() {
         running(); render { CoreDetails(vm) {} }
         rule.onAllNodesWithText("本次查看").assertCountEquals(2)
         rule.onNodeWithText("过去 1 小时").assertDoesNotExist()
         capture("concept-resources")
+    }
+    @Test fun directSiteMeasurementsDiscloseTheirPathWithoutImplyingGoogleAppConnectivity() {
+        running()
+        seed("siteDelays", mapOf("Google" to 25L))
+        render()
+        rule.onNodeWithText("本机直测").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("河图进程请求，未指定代理节点").assertIsDisplayed()
+        rule.onNodeWithText("结果不代表其他应用的代理路径").assertIsDisplayed()
+        rule.onNodeWithContentDescription("重新本机直测").assertExists()
+        rule.onNodeWithContentDescription("本机直测设置").assertExists()
+        capture("concept-home-direct-measurement-path")
     }
     @Test fun missingCpuSamplesHideTheNumberAndBreakTheRecordedCurve() {
         running()

@@ -210,7 +210,7 @@ private fun Bento(
             )
             .padding(horizontal = 13.dp, vertical = 11.dp),
     ) {
-        Row(Modifier.fillMaxWidth().height(22.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().heightIn(min = 22.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = c.text, modifier = Modifier.weight(1f))
             if (trailing != null) trailing()
         }
@@ -466,23 +466,26 @@ private fun HomeLatencyCard(vm: HetuViewModel) {
     val targets = ProxyLatencyTargets.load(vm.prefs)
     HxSection {
         Bento(
-            "延迟",
+            "本机直测",
             trailing = {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                     HomeHeaderIcon(
                         icon = Icons.Rounded.Tune,
-                        contentDescription = "延迟设置",
+                        contentDescription = "本机直测设置",
                         enabled = true,
                     ) { context.startActivity(Intent(context, ProxyLatencyTargetsActivity::class.java)) }
                     HomeHeaderIcon(
                         icon = Icons.Rounded.Sync,
-                        contentDescription = "重新测速",
+                        contentDescription = "重新本机直测",
                         enabled = running && !vm.siteTesting,
                         spinning = vm.siteTesting,
                     ) { vm.measureSites() }
                 }
             },
         ) {
+            Text("河图进程请求，未指定代理节点", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
+            Text("结果不代表其他应用的代理路径", style = MaterialTheme.typography.bodySmall, color = c.textFaint)
+            Spacer(Modifier.height(8.dp))
             Row(Modifier.fillMaxWidth()) {
                 targets.forEachIndexed { index, target ->
                     if (index > 0) Box(Modifier.padding(vertical = 6.dp).width(0.5.dp).height(30.dp).background(c.line))
@@ -523,7 +526,7 @@ private fun HomeHeaderIcon(
     val source = remember { MutableInteractionSource() }
     Box(
         Modifier
-            .size(30.dp)
+            .size(48.dp)
             .clip(CircleShape)
             .clickable(interactionSource = source, indication = null, enabled = enabled) { onClick() },
         contentAlignment = Alignment.Center,
@@ -1035,7 +1038,10 @@ private fun HomeOutboundNode(vm: HetuViewModel, group: ProxyGroupUi?) {
                 }
                 if (group != null && vm.state.running) {
                     Spacer(Modifier.width(8.dp))
-                    HxDelayPill(delay, testing) { vm.testGroup(group) }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("节点测速", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
+                        HxDelayPill(delay, testing) { vm.testGroup(group) }
+                    }
                     Spacer(Modifier.width(3.dp))
                 }
                 HxChevron()
@@ -1084,7 +1090,7 @@ private fun HomeShortcuts(vm: HetuViewModel) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 HomeTile(
                     icon = Icons.Rounded.Speed,
-                    title = "站点延迟",
+                    title = "本机直测",
                     value = when {
                         vm.siteTesting -> "测速中…"
                         !running -> "启动后可测"
@@ -1587,8 +1593,8 @@ private fun NetworkCard(vm: HetuViewModel) {
             }
             HxDivider()
             HxRow(
-                "站点延迟",
-                subtitle = if (running) "点按重新测试" else "启动代理后可测试",
+                "本机直测",
+                subtitle = "河图进程请求，未指定代理节点",
                 icon = Icons.Rounded.Speed,
                 iconTint = c.warn,
                 enabled = running,

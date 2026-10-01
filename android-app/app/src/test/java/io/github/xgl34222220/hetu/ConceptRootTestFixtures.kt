@@ -207,6 +207,8 @@ internal object ConceptTestIo {
     @Volatile var runtimeSample: ProxyRuntimeSnapshot? = null
     @Volatile var runtimeFailure: Exception? = null
     @Volatile var processSampleJson: String? = null
+    @Volatile var diagnosticConnectionsJson: String? = null
+    @Volatile var diagnosticConnectionsFailure: IOException? = null
     const val logText = "[INFO] 连接已建立 example.invalid:443\n[WARN] 规则未匹配，使用 MATCH\n[ERROR] 测试连接已超时\n"
 
     fun reset() {
@@ -224,6 +226,8 @@ internal object ConceptTestIo {
         runtimeSample = null
         runtimeFailure = null
         processSampleJson = null
+        diagnosticConnectionsJson = null
+        diagnosticConnectionsFailure = null
     }
 
     fun stoppedRoot() = JSONObject().put("ok", true).put("running", false)
@@ -318,6 +322,9 @@ class ConceptMihomoClientShadow {
     }))
 
     @Implementation fun connections(): JSONObject {
+        ConceptTestIo.calls += "GET /connections"
+        ConceptTestIo.diagnosticConnectionsFailure?.let { throw it }
+        ConceptTestIo.diagnosticConnectionsJson?.let { return JSONObject(it) }
         val snapshot = ConceptTestIo.state
         val entries = if (!ConceptTestIo.actionMode) emptyList() else snapshot.connections.map { connection ->
             JSONObject().put("id", connection.id).put("rule", connection.rule).put("rulePayload", connection.rulePayload)

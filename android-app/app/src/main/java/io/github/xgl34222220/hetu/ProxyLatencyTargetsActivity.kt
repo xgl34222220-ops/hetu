@@ -52,7 +52,7 @@ private fun ProxyLatencyTargetsScreen(onBack: () -> Unit) {
         containerColor = tokens.pageBackground,
         topBar = {
             Column(Modifier.statusBarsPadding().padding(horizontal = 8.dp)) {
-                HetuPageHeader("延迟目标", onBack, "首页测速与自动刷新使用这些地址")
+                HetuPageHeader("本机直测目标", onBack, "河图进程请求，未指定代理节点")
             }
         },
     ) { padding ->

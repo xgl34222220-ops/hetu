@@ -868,6 +868,17 @@ final class RootProxyManager {
             RootBridge.Result repairs=RootBridge.rootShell(context,"tail -n 30 "+RootBridge.quote(ROOT+"/run/network-repair.log")+" 2>/dev/null; true",3000L);
             report.section("网络原位修复记录",repairs.output,5000);
         }catch(Exception error){report.section("网络完整性",String.valueOf(error),1000);}
+        Map<String,Integer> googlePackages=new LinkedHashMap<>();
+        Set<Integer> googleSharedUids=new HashSet<>();
+        for(String packageName:GoogleConnectionDiagnostics.PACKAGES){
+            try{
+                int uid=context.getPackageManager().getApplicationInfo(packageName,0).uid;
+                googlePackages.put(packageName,uid);
+                String[] owners=context.getPackageManager().getPackagesForUid(uid);
+                if(owners==null||owners.length!=1)googleSharedUids.add(uid);
+            }catch(Exception ignored){/* Missing or invisible is reported as unknown, not absent. */}
+        }
+        GoogleConnectionDiagnostics google=new GoogleConnectionDiagnostics(googlePackages,googleSharedUids);
         try{
             int wechatUid=-1;
             try{wechatUid=context.getPackageManager().getApplicationInfo("com.tencent.mm",0).uid;}catch(Exception ignored){}
@@ -875,18 +886,28 @@ final class RootProxyManager {
             StringBuilder matched=new StringBuilder("WeChat UID=").append(wechatUid).append('\n');
             int count=0,otherCount=0;
             StringBuilder other=new StringBuilder();
+            List<GoogleConnectionDiagnostics.Connection> googleConnections=new ArrayList<>();
             for(int i=0;connections!=null&&i<connections.length();i++){
                 JSONObject connection=connections.optJSONObject(i);
                 JSONObject metadata=connection==null?null:connection.optJSONObject("metadata");
                 if(metadata==null)continue;
+                List<String> chainNames=new ArrayList<>();
+                JSONArray chain=connection.optJSONArray("chains");
+                for(int j=0;chain!=null&&j<Math.min(chain.length(),7);j++)chainNames.add(chain.optString(j,""));
+                GoogleConnectionDiagnostics.Connection googleConnection=new GoogleConnectionDiagnostics.Connection(
+                        metadata.optInt("uid",-1),metadata.optString("process",""),metadata.optString("host",""),
+                        metadata.optString("destinationIP",""),metadata.optInt("destinationPort",-1),
+                        metadata.optString("network",""),connection.optString("rule",""),connection.optString("rulePayload",""),chainNames);
+                boolean googleMatch=!google.match(googleConnection).isEmpty();
+                if(googleMatch)googleConnections.add(googleConnection);
                 String destination=metadata.optString("host","").toLowerCase(java.util.Locale.ROOT);
                 String process=metadata.optString("process","").toLowerCase(java.util.Locale.ROOT);
-                boolean affected=destination.contains("github")||destination.contains("google")||destination.contains("gstatic")
+                boolean affected=destination.contains("github")
                         ||destination.contains("telegram")||destination.contains("twitter")||destination.equals("x.com")
                         ||destination.endsWith(".x.com")||process.contains("telegram")||process.contains("twitter")||process.contains("chrome");
                 boolean wechat=DiagnosticReport.isWechat(metadata.optString("process"),metadata.optString("host"),metadata.optInt("uid",-1),wechatUid);
                 // Busy browsers must not consume the quota before WeChat is inspected.
-                if(wechat ? count>=25 : !affected||otherCount>=10)continue;
+                if(wechat ? count>=25 : googleMatch||!affected||otherCount>=10)continue;
                 StringBuilder destinationText=wechat?matched:other;
                 int number=wechat?++count:++otherCount;
                 destinationText.append("#").append(number).append(" process=").append(metadata.optString("process"))
@@ -901,8 +922,12 @@ final class RootProxyManager {
             }
             if(count==0)matched.append("当前未识别到微信连接；这不代表微信未联网，可能走应用绕过、OEM推送或已断连。\n");
             report.section("微信连接（仅元数据）",matched.toString(),6000);
+            report.section("Google 相关连接（仅元数据）",google.render(googleConnections,connections!=null),8000);
             if(otherCount>0)report.section("其他应用连接（仅元数据）",other.toString(),2500);
-        }catch(Exception e){report.section("微信当前连接","Controller 读取失败："+e.getMessage(),1000);}
+        }catch(Exception e){
+            report.section("微信当前连接","Controller 读取失败："+e.getMessage(),1000);
+            report.section("Google 相关连接（仅元数据）",google.render(Collections.emptyList(),false),2500);
+        }
         try{
             String cmd="echo '--- recent core log ---'; tail -c 9000 "+RootBridge.quote(ROOT+"/run/core.log")
                     +" 2>/dev/null; echo; echo '--- last crash ---'; tail -c 1500 "+RootBridge.quote(ROOT+"/run/last-crash")+" 2>/dev/null; true";
