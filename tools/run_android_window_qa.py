@@ -9,6 +9,7 @@ import subprocess
 import time
 
 from android_window_recording import SegmentedRecording, preflight_media_tools
+from android_window_readiness import home_component, home_readiness
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "out/android-window-qa"
@@ -196,6 +197,39 @@ try:
         raise RuntimeError("Android startup has an ANR or repeated crashes; system state retained without dismissing dialogs")
     run([adb, "-s", SERIAL, "shell", "input", "keyevent", "KEYCODE_WAKEUP"], check=False)
     run([adb, "-s", SERIAL, "shell", "input", "keyevent", "KEYCODE_MENU"], check=False)
+    # A boot property may precede the launcher's first frame and first-boot work.
+    # Observe actual readiness instead of racing Quickstep or waiting an arbitrary delay.
+    record_stage("home-readiness")
+    resolution = run([adb, "-s", SERIAL, "shell", "cmd", "package", "resolve-activity", "--brief",
+        "-a", "android.intent.action.MAIN", "-c", "android.intent.category.HOME"], timeout=20)
+    (OUT / "home-resolution.txt").write_bytes(resolution.stdout + resolution.stderr)
+    component = home_component(resolution.stdout.decode(errors="replace"))
+    if component is None:
+        raise RuntimeError("The ordinary AOSP home activity could not be resolved; inspect home-resolution.txt")
+    home_deadline = time.monotonic() + 180
+    while True:
+        home_text = {}
+        for key, args in {
+            "events": ["logcat", "-b", "events", "-d", "-v", "brief"],
+            "activity": ["shell", "dumpsys", "activity", "activities"],
+            "windows": ["shell", "dumpsys", "window"],
+        }.items():
+            result = run([adb, "-s", SERIAL] + args, timeout=20)
+            home_text[key] = result.stdout.decode(errors="replace")
+            (OUT / ("home-" + key + ".txt")).write_bytes(result.stdout + result.stderr)
+        home_state = home_readiness(component, **home_text)
+        (OUT / "home-readiness.json").write_text(json.dumps(home_state, indent=2))
+        if home_state["anrEvents"] or home_state["crashCount"] >= 3:
+            raise RuntimeError("Android home readiness failed with an ANR or crash loop; no app installed")
+        if home_state["ready"]:
+            break
+        if time.monotonic() >= home_deadline:
+            raise RuntimeError("Android home did not complete its first frame and foreground checks within 180 seconds")
+        time.sleep(1)
+    screenshot = run([adb, "-s", SERIAL, "exec-out", "screencap", "-p"], timeout=20)
+    if not capture_file(screenshot.stdout, "home-ready.png"):
+        raise RuntimeError("Could not retain the home readiness screenshot")
+    (OUT / "home-ready.png").write_bytes(screenshot.stdout)
     install(app_apk, "app")
     installed = True
     install(test_apk, "test")
@@ -231,6 +265,18 @@ except Exception as error:
         "elapsedSeconds": round(time.monotonic() - stage_started, 1), "error": str(error)}, indent=2))
     raise
 finally:
+    if ready:
+        # Retain late system ANRs as well as application errors. These are fresh test devices.
+        collect([adb, "-s", SERIAL, "logcat", "-b", "events", "-d", "-v", "threadtime"], timeout=20,
+            output=OUT / "final-events.log")
+        collect([adb, "-s", SERIAL, "logcat", "-b", "system", "-b", "main", "-d", "-t", "4000", "-v", "threadtime"], timeout=20,
+            output=OUT / "final-system.log")
+        collect([adb, "-s", SERIAL, "shell", "dumpsys", "activity", "lastanr"], timeout=20,
+            output=OUT / "last-anr.txt")
+        if not installed:
+            screenshot = collect([adb, "-s", SERIAL, "exec-out", "screencap", "-p"], timeout=20)
+            if screenshot.returncode == 0 and capture_file(screenshot.stdout, "blocked-startup.png"):
+                (OUT / "blocked-startup.png").write_bytes(screenshot.stdout)
     if ready and installed:
         collect([adb, "-s", SERIAL, "logcat", "-b", "crash", "-d", "-v", "threadtime"], timeout=30,
             output=OUT / "crash-logcat.txt")

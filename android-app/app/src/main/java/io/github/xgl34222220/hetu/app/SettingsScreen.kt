@@ -11,6 +11,16 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material.icons.rounded.BrightnessAuto
+import androidx.compose.material.icons.rounded.LightMode
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -493,38 +503,92 @@ private fun SettingsIdentityCard(vm: HetuViewModel, onClick: () -> Unit) {
 }
 
 
-/** Accent colour swatches; the chosen one grows and shows a check. */
+/** The three appearance modes share one selection group; large text gets full-width cards. */
+@Composable
+private fun HxAppearanceModes(vm: HetuViewModel) {
+    val c = Hx.colors
+    val modes = listOf(
+        Triple("system", "跟随系统", Icons.Rounded.BrightnessAuto),
+        Triple("light", "浅色模式", Icons.Rounded.LightMode),
+        Triple("dark", "深色模式", Icons.Rounded.DarkMode),
+    )
+    val captions = listOf("与系统设置保持一致", "始终使用浅色主题", "始终使用深色主题")
+    val fontScale = LocalDensity.current.fontScale
+    @Composable fun Mode(index: Int, modifier: Modifier = Modifier) {
+        val (value, label, icon) = modes[index]
+        val selected = vm.appearance == value
+        val source = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+        androidx.compose.material3.Surface(
+            modifier = modifier.testTag("theme-mode-$value")
+                .hxPressScale(source)
+                .selectable(selected, role = Role.RadioButton, interactionSource = source,
+                    indication = androidx.compose.foundation.LocalIndication.current) { vm.setAppearanceMode(value) },
+            shape = RoundedCornerShape(20.dp),
+            color = if (selected) c.accentSoft else c.surface,
+            border = androidx.compose.foundation.BorderStroke(if (selected) 1.5.dp else .8.dp,
+                if (selected) c.accent else c.line),
+        ) {
+            Column(Modifier.padding(12.dp).heightIn(min = 124.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    HxIconBadge(icon, if (selected) c.accent else c.textMuted)
+                    Spacer(Modifier.weight(1f))
+                    if (selected) Icon(Icons.Rounded.Check, null, Modifier.size(18.dp), tint = c.accent)
+                }
+                Spacer(Modifier.height(12.dp))
+                Text(label, style = MaterialTheme.typography.titleSmall, color = c.text)
+                Spacer(Modifier.height(5.dp))
+                Text(captions[index], style = MaterialTheme.typography.bodySmall, color = c.textMuted)
+            }
+        }
+    }
+    HxSection("主题模式") {
+        BoxWithConstraints(Modifier.fillMaxWidth().selectableGroup()) {
+            if (fontScale > 1.3f || maxWidth < 310.dp) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    modes.indices.forEach { Mode(it, Modifier.fillMaxWidth()) }
+                }
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    modes.indices.forEach { Mode(it, Modifier.weight(1f)) }
+                }
+            }
+        }
+    }
+}
+
+/** Keep all existing accents, with separate 48 dp targets instead of crowded tiny circles. */
 @Composable
 private fun HxAccentSwatches(vm: HetuViewModel) {
     val c = Hx.colors
     val haptics = io.github.xgl34222220.hetu.ui.rememberHetuHaptics()
-    val swatches = listOf("#2A62E8", "#12806F", "#0EA5E9", "#4F46E5", "#8B5CF6", "#EC4899", "#EF4444", "#F59E0B")
-    Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+    val swatches = listOf("#2A62E8" to "冰蓝", "#12806F" to "墨绿", "#0EA5E9" to "湖蓝", "#4F46E5" to "靛蓝",
+        "#8B5CF6" to "紫色", "#EC4899" to "粉色", "#EF4444" to "红色", "#F59E0B" to "琥珀")
+    Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp).selectableGroup()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             HxIconBadge(Icons.Rounded.ColorLens, c.textMuted)
             Spacer(Modifier.width(10.dp))
             Text("强调色", style = MaterialTheme.typography.bodyLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = c.text)
         }
-        Spacer(Modifier.height(12.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            swatches.forEach { hex ->
-                val color = androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(hex))
-                val selected = vm.accentChoice.equals(hex, true)
-                val scale by androidx.compose.animation.core.animateFloatAsState(if (selected) 1f else .82f, HxMotion.pop(), label = "swatch")
-                Box(
-                    Modifier
-                        .size(34.dp)
-                        .graphicsLayer { scaleX = scale; scaleY = scale }
-                        .clip(CircleShape)
-                        .background(color)
-                        .then(if (selected) Modifier.border(3.dp, c.surface, CircleShape) else Modifier)
-                        .clickable {
+        Spacer(Modifier.height(8.dp))
+        swatches.chunked(4).forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
+                row.forEach { (hex, name) ->
+                    val color = Color(android.graphics.Color.parseColor(hex))
+                    val selected = vm.accentChoice.equals(hex, true)
+                    val scale by androidx.compose.animation.core.animateFloatAsState(if (selected) 1f else .82f, HxMotion.pop(), label = "swatch")
+                    Box(Modifier.size(48.dp).testTag("theme-color-$hex")
+                        .semantics { contentDescription = "强调色：$name" }
+                        .selectable(selected, role = Role.RadioButton) {
                             haptics.perform(io.github.xgl34222220.hetu.ui.HetuHaptic.Tick)
                             vm.setAccent(hex)
-                        },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (selected) Icon(Icons.Rounded.Check, null, tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(16.dp))
+                        }, contentAlignment = Alignment.Center) {
+                        Box(Modifier.size(34.dp).graphicsLayer { scaleX = scale; scaleY = scale }
+                            .clip(CircleShape).background(color)
+                            .then(if (selected) Modifier.border(3.dp, c.surface, CircleShape) else Modifier),
+                            contentAlignment = Alignment.Center) {
+                            if (selected) Icon(Icons.Rounded.Check, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                        }
+                    }
                 }
             }
         }
@@ -572,19 +636,14 @@ internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
         item(key = "language") {
             HxSection { HxGroup { HxNavRow("语言", icon = Icons.Rounded.Public, value = when (prefs.getString("appLanguage", "system")) { "zh-CN" -> "简体中文"; "zh-TW" -> "繁體中文"; "en" -> "English"; "ru" -> "Русский"; else -> "跟随系统" }) { choice = "language" } } }
         }
+        item(key = "appearance-modes") { HxAppearanceModes(vm) }
         item(key = "theme") {
             HxSection {
                 HxGroup {
-                    HxNavRow("界面风格", subtitle = "河图的 Miuix / Liquid Glass 界面体系", icon = Icons.Rounded.GridView, iconTint = c.textMuted, value = "Miuix") { vm.toast("当前使用 Miuix 界面风格") }
-                    HxDivider()
-                    HxNavRow("主题模式", icon = Icons.Rounded.DarkMode, iconTint = c.textMuted, value = when (vm.appearance) {
-                        "light" -> "浅色"; "dark" -> "深色"; else -> "跟随系统"
-                    }, dropdown = true) { choice = "appearance" }
                     if (Build.VERSION.SDK_INT >= 31) {
+                        HxSwitchRow("Monet 动态取色", vm.dynamicColor, { vm.setDynamic(it); vm.bumpSettings(); revision++ }, subtitle = "使用系统壁纸的配色", icon = Icons.Rounded.Palette)
                         HxDivider()
-                        HxSwitchRow("Monet 动态取色", vm.dynamicColor, { vm.setDynamic(it); vm.bumpSettings(); revision++ }, subtitle = "Android 12+ 使用系统动态色", icon = Icons.Rounded.Palette)
                     }
-                    HxDivider()
                     HxSwitchRow("深色纯黑背景", vm.pureBlack, { vm.updatePureBlack(it); vm.bumpSettings(); revision++ }, subtitle = "OLED 模式使用纯黑画布", icon = Icons.Rounded.Contrast, iconTint = c.textMuted)
                     if (!vm.dynamicColor) {
                         HxDivider()
@@ -602,7 +661,7 @@ internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
                     HxDivider()
                     HxSwitchRow("悬浮底栏", floating, { setBool("floatingBottomBar", it) }, subtitle = "关闭后底栏吸附屏幕底部", icon = Icons.Rounded.Dashboard, iconTint = c.textMuted)
                     HxDivider()
-                    HxSwitchRow("底栏液态玻璃", liquid, { setBool("liquidGlass", it) }, subtitle = "Runtime Shader 可用时启用折射与高光", icon = Icons.Rounded.BlurOn, iconTint = c.accent, enabled = blur)
+                    HxSwitchRow("底栏液态玻璃", liquid, { setBool("liquidGlass", it) }, subtitle = "为底栏加入通透的折射与高光", icon = Icons.Rounded.BlurOn, iconTint = c.accent, enabled = blur)
                 }
             }
         }
@@ -617,25 +676,15 @@ internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
                         }
                     }
                     HxDivider()
-                    HxNavRow("界面缩放", subtitle = "全局按比例调整页面、Dock、Sheet 与字体", icon = Icons.Rounded.GridView, iconTint = c.textMuted, value = "${(uiScale * 100).toInt()}%", dropdown = true) { choice = "scale" }
+                    HxNavRow("界面缩放", subtitle = "统一调整界面和文字大小", icon = Icons.Rounded.GridView, iconTint = c.textMuted, value = "${(uiScale * 100).toInt()}%", dropdown = true) { choice = "scale" }
                 }
             }
-        }
-        item(key = "note") {
-            HxBanner("这些设置只影响界面层；代理核心、规则、订阅与运行配置不会被修改。", tone = HxTone.Accent, modifier = Modifier.padding(horizontal = Hx.gutter))
         }
     }
 
     when (choice) {
         "language" -> HxChoiceSheet("语言", listOf(HxChoice("system", "跟随系统"), HxChoice("zh-CN", "简体中文"), HxChoice("zh-TW", "繁體中文"), HxChoice("en", "English"), HxChoice("ru", "Русский")), prefs.getString("appLanguage", "system"), onPick = { setString("appLanguage", it); choice = null }, onDismiss = { choice = null })
 
-        "appearance" -> HxChoiceSheet(
-            title = "主题模式",
-            choices = listOf(HxChoice("system", "跟随系统"), HxChoice("light", "浅色"), HxChoice("dark", "深色")),
-            selected = vm.appearance,
-            onPick = { vm.setAppearanceMode(it); vm.bumpSettings(); revision++; choice = null },
-            onDismiss = { choice = null },
-        )
         "topBlur" -> HxChoiceSheet(
             title = "顶栏模糊样式",
             choices = listOf(
@@ -652,7 +701,7 @@ internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
             selected = uiScale.toString(),
             onPick = { value -> prefs.edit().putFloat("uiScale", value.toFloat()).apply(); vm.bumpSettings(); revision++; choice = null },
             onDismiss = { choice = null },
-            footer = "缩放通过 Compose Density 全局应用，不会单独挤压某一个页面。",
+            footer = "调整后应用到所有页面与弹窗。",
         )
     }
 }

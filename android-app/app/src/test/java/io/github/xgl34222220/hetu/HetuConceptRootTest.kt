@@ -40,14 +40,14 @@ class HetuConceptRootTest {
         vm = newConceptTestVm(app)
     }
     @After fun close() { if (::vm.isInitialized) rule.runOnIdle { closeConceptTestVm(vm) } }
-    private fun render(tab: HxTab = HxTab.Panel, section: String = "proxies", fontScale: Float = 1f, dark: Boolean = false, running: Boolean = true, motion: Boolean = false) {
+    private fun render(tab: HxTab = HxTab.Panel, section: String = "proxies", fontScale: Float = 1f, dark: Boolean = false, running: Boolean = true, motion: Boolean = false, followAppearance: Boolean = false) {
         if (running) setConceptState(vm, conceptRunningState())
         setConceptValue(vm, "rules", conceptRules())
         setConceptValue(vm, "ruleSets", conceptRuleSets())
         vm.openPanel(section)
         vm.tab = tab
         rule.setContent {
-            HetuAppTheme(if (dark) "dark" else "light", dynamic = false) {
+            HetuAppTheme(if (followAppearance) vm.appearance else if (dark) "dark" else "light", dynamic = false) {
                 val density = LocalDensity.current
                 CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale), LocalHxMotionEnabled provides motion) {
                     HetuRoot(vm)
@@ -343,6 +343,51 @@ class HetuConceptRootTest {
         node("hetu-route-notifications").assertExists()
         back()
         node("hetu-route-main").assertExists()
+    }
+
+    @Test fun themeModeCardsSelectPersistAndReplaceTheOldChooser() {
+        rule.runOnIdle { vm.setDynamic(false); vm.setAppearanceMode("light") }
+        render(tab = HxTab.Settings, running = false, followAppearance = true)
+        node("settings-语言与主题").performScrollTo().performClick()
+        node("hetu-route-theme").assertExists()
+        node("theme-mode-light").assertIsSelected()
+        node("theme-mode-system").assertIsNotSelected()
+        node("theme-mode-dark").assertIsNotSelected()
+        rule.onAllNodesWithText("主题模式").assertCountEquals(1)
+        screenshot("16-root-theme-modes-light")
+        node("theme-mode-dark").performTouchInput { click() }
+        node("theme-mode-dark").assertIsSelected()
+        assertEquals("dark", vm.prefs.getString("appearance", null))
+        assertEquals("dark", vm.appearance)
+        screenshot("17-root-theme-modes-dark")
+        node("theme-mode-system").performTouchInput { click() }
+        assertEquals("system", vm.prefs.getString("appearance", null))
+        node("theme-mode-system").assertIsSelected()
+    }
+
+    @Test fun largeFontThemeCardsStackAndEveryAccentHasAnIndependentTouchTarget() {
+        rule.runOnIdle { vm.setDynamic(false); vm.setAppearanceMode("light") }
+        render(tab = HxTab.Settings, running = false, fontScale = 1.8f, followAppearance = true)
+        node("settings-语言与主题").performScrollTo().performClick()
+        listOf("system", "light", "dark").forEach { mode ->
+            val item = node("theme-mode-$mode").performScrollTo().assertIsDisplayed()
+            val bounds = item.getUnclippedBoundsInRoot()
+            assertTrue("large text mode card must use the whole row", bounds.right - bounds.left >= 300.dp)
+        }
+        screenshot("18-root-theme-modes-large-font")
+        val colors = listOf("#2A62E8", "#12806F", "#0EA5E9", "#4F46E5", "#8B5CF6", "#EC4899", "#EF4444", "#F59E0B")
+        colors.forEach { hex ->
+            val item = node("theme-color-$hex").performScrollTo().assertIsDisplayed()
+            val bounds = item.getUnclippedBoundsInRoot()
+            assertTrue(bounds.right - bounds.left >= 48.dp)
+            assertTrue(bounds.bottom - bounds.top >= 48.dp)
+            item.performTouchInput { click() }.assertIsSelected()
+            assertEquals(hex, vm.accentChoice)
+        }
+        val first = node("theme-color-#2A62E8").getUnclippedBoundsInRoot()
+        val next = node("theme-color-#12806F").getUnclippedBoundsInRoot()
+        assertTrue("accent targets must not overlap", first.right <= next.left)
+        screenshot("19-root-theme-accent-targets-large-font")
     }
 
     @Test fun groupedToolsOpenTheCanonicalConfigLibraryAndBackReturnsToTools() {
