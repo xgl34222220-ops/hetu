@@ -2,12 +2,18 @@ package io.github.xgl34222220.hetu;
 
 import org.json.JSONObject;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
+import org.robolectric.annotation.Config;
+import android.app.Application;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 import static org.junit.Assert.*;
 
+@RunWith(RobolectricTestRunner.class)
+@Config(sdk = 35, application = Application.class)
 public class ConcurrentCoreDiagnosticsTest {
     private static final String BOOT = "00000000-0000-4000-8000-000000000001";
     private static final String HEADER = "inventory\t1\nboot\t" + BOOT + "\n";

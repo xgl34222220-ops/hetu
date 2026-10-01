@@ -116,7 +116,7 @@ class ControllerEndpointRoutingTest {
         val reload = request(local)
         assertEquals("PUT", reload.method)
         assertEquals("/configs?force=true", reload.path)
-        assertTrue(reload.body.readUtf8().contains("/data/adb/hetu/run/state/startup-config"))
+        assertEquals("/data/adb/hetu/run/state/startup-config", JSONObject(reload.body.readUtf8()).getString("path"))
         assertEquals("Bearer synthetic-local-secret", reload.getHeader("Authorization"))
         assertEquals(0, panel.requestCount)
     }
