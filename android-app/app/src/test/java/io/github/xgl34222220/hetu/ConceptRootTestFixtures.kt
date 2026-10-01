@@ -224,6 +224,7 @@ internal object ConceptTestIo {
     @Volatile var processSampleJson: String? = null
     @Volatile var diagnosticConnectionsJson: String? = null
     @Volatile var diagnosticConnectionsFailure: IOException? = null
+    @Volatile var diagnosticInventoryText: String? = null
     const val logText = "[INFO] 连接已建立 example.invalid:443\n[WARN] 规则未匹配，使用 MATCH\n[ERROR] 测试连接已超时\n"
 
     fun reset() {
@@ -248,6 +249,7 @@ internal object ConceptTestIo {
         processSampleJson = null
         diagnosticConnectionsJson = null
         diagnosticConnectionsFailure = null
+        diagnosticInventoryText = null
     }
 
     fun stoppedRoot() = JSONObject().put("ok", true).put("running", false)
@@ -275,6 +277,8 @@ class ConceptRootBridgeShadow {
         fun rootShell(context: Context, command: String, timeoutMs: Long): RootBridge.Result {
             ConceptTestIo.calls += "root:blocked"
             return when {
+                command.contains("# Read-only, bounded process metadata.") -> ConceptTestIo.diagnosticInventoryText
+                    ?.let { RootBridge.Result(0, it) } ?: RootBridge.Result(126, "inventory unavailable")
                 command.startsWith("P=") && command.contains("/proc/uptime") -> ConceptTestIo.processSampleJson
                     ?.let { RootBridge.Result(0, it) } ?: RootBridge.Result(1, "sample unavailable")
                 command.startsWith("echo '--- controller-port ---';") -> RootBridge.Result(0, ConceptTestIo.logText)

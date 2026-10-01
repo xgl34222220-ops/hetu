@@ -58,7 +58,7 @@ internal data class ProxyRuntimeSnapshot(
 /** Lightweight runtime inspector used by the proxy dashboard. */
 internal class ProxyRuntimeInspector(context: Context) {
     private val app = context.applicationContext
-    private val api = MihomoControllerClient(app)
+    private val api = MihomoControllerClient.forLocalRuntime(app)
     private val prefs = app.getSharedPreferences("hetu", Context.MODE_PRIVATE)
     private val processSampleLock = Any()
     @Volatile private var processSampleAt = 0L

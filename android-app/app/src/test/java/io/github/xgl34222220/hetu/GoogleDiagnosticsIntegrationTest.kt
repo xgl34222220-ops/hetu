@@ -45,6 +45,27 @@ class GoogleDiagnosticsIntegrationTest {
         .put("rule", "RuleSet").put("rulePayload", "synthetic-google-rules")
         .put("chains", JSONArray().put(chain)).put("headers", JSONObject().put("Authorization", "PRIVATE_TOKEN"))
 
+    @Test fun existingDiagnosticEntryReadsBoundCoreInventoryWithoutChangingPreferences() {
+        install("com.example.otherproxy", 10125)
+        val boot = "00000000-0000-4000-8000-000000000001"
+        val prefs = app.getSharedPreferences("hetu", 0)
+        prefs.edit().putString(RuntimeIdentity.RECORD_KEY, JSONObject().put("running", true)
+            .put("pid", 101).put("processStartTicks", "100").put("bootId", boot).toString()).commit()
+        ProxyConfigLibrary(app).selected(ProxyRuntimeProfile.Core.MIHOMO)
+        val before = prefs.all.toMap()
+        ConceptTestIo.diagnosticInventoryText = "inventory\t1\nboot\t$boot\n" +
+            "process\t101\t100\t0\t1\tmihomo\tcore\thetu\tinit\n" +
+            "process\t202\t200\t10125\t1\tmihomo\tmihomo\tapp-private\tinit\ncomplete\t2\t0\t0\n"
+        val report = RootProxyManager(app).diagnostics()
+        val section = report.substringAfter("--- 代理核心并存（只读） ---").substringBefore("\n--- ")
+        assertTrue(section.contains("河图已绑定启动进程"))
+        assertTrue(section.contains("2 个代理核心候选进程同时存在"))
+        assertTrue(section.contains("com.example.otherproxy（系统UID映射）"))
+        assertTrue(section.contains("不证明网站可达"))
+        assertEquals(before, prefs.all)
+        assertFalse(ConceptTestIo.calls.any { it.startsWith("PUT ") || it.startsWith("DELETE ") })
+    }
+
     @Test fun verifiedPlayUidWithoutDnsNameUsesAnIndependentQuotaAndOneSnapshot() {
         install("com.android.vending", 10123)
         val entries = JSONArray()

@@ -267,7 +267,13 @@ class ConfigWorkflowConceptTest {
         awaitTag("config-library-card")
         assertEquals("https://example.invalid/updated", library.subscriptions(entry).single().url)
         awaitTag("config-subscription-main")
+        // The refreshed row can exist while the save's VM refresh still holds busy.
+        rule.waitUntil(5_000) {
+            rule.onAllNodes(hasTestTag("config-subscription-main") and isEnabled(), useUnmergedTree = true)
+                .fetchSemanticsNodes().isNotEmpty()
+        }
         node("config-subscription-main").performScrollTo().performClick()
+        awaitTag("config-subscription-url")
         node("config-subscription-url").assertTextContains("https://example.invalid/updated")
         node("config-subscription-url").performTextReplacement("https://example.invalid/discard")
         back(); rule.onNodeWithText("放弃", substring = false).performClick()

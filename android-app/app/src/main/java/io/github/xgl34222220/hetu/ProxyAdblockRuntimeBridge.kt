@@ -12,7 +12,7 @@ internal object ProxyAdblockRuntimeBridge {
         val manager = RootProxyManager(app)
         if (!manager.status().optBoolean("running", false)) return "设置已保存，下次启动代理时生效"
         manager.reloadCurrentConfig()
-        val mode = MihomoControllerClient(app).configs().optString("mode", "")
+        val mode = MihomoControllerClient.forLocalRuntime(app).configs().optString("mode", "")
         return when {
             !enabled -> "广告过滤已关闭"
             AdblockRuleInspection.isRuleMode(mode) -> "广告过滤已开启，运行规则已确认加载"

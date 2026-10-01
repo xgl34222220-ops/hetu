@@ -889,6 +889,23 @@ final class RootProxyManager {
             RootBridge.Result r=RootBridge.rootShell(context,cmd,12000L);
             report.section("Root 网络状态","exit="+r.code+"\n"+r.output,18000);
         }catch(Exception e){report.section("Root 网络状态",String.valueOf(e),1000);}
+        try {
+            ByteArrayOutputStream inventory = new ByteArrayOutputStream();
+            try (InputStream input = context.getAssets().open("hetu-core-inventory.sh")) {
+                byte[] block = new byte[4096]; int count;
+                while ((count = input.read(block)) != -1) {
+                    if (inventory.size() + count > 65536) throw new IOException("只读诊断脚本大小异常");
+                    inventory.write(block, 0, count);
+                }
+            }
+            RootBridge.Result snapshot = RootBridge.rootShell(context,
+                    "set --\n" + inventory.toString(StandardCharsets.UTF_8.name()), 8000L);
+            report.section("代理核心并存（只读）", ConcurrentCoreDiagnostics.render(snapshot.output, snapshot.code,
+                    prefs.getString(RuntimeIdentity.RECORD_KEY, ""),
+                    uid -> context.getPackageManager().getPackagesForUid(uid)), 8000);
+        } catch (Exception error) {
+            report.section("代理核心并存（只读）", "读取未完成，当前并存状态未知。\n" + ConcurrentCoreDiagnostics.LIMITS, 1000);
+        }
         try{
             String cmd="echo '--- IPv4 UDP 443 policy counters ---'; iptables -w 1 -t filter -nvxL HETU_QUICOUT 2>/dev/null; "
                     +"echo '--- IPv6 UDP 443 policy counters ---'; ip6tables -w 1 -t filter -nvxL HETU_QUICOUT 2>/dev/null; true";
@@ -969,6 +986,17 @@ final class RootProxyManager {
             RootBridge.Result logs=RootBridge.rootShell(context,cmd,5000L);
             report.section("最近核心日志",logs.output,10000);
         }catch(Exception e){report.section("最近核心日志",String.valueOf(e),1000);}
+        try {
+            // Read a bounded older window before filtering so a flood of unrelated
+            // ad rejections cannot consume the ordinary last-9000-byte excerpt.
+            String focused = ConcurrentCoreDiagnostics.focusedLogCommand(ROOT + "/run/core.log");
+            RootBridge.Result lines = RootBridge.rootShell(context, focused, 5000L);
+            if (lines.code != 0) throw new IOException("日志窗口读取失败");
+            report.section("重点域名近期日志（有界窗口）", "仅查最近256 KiB中的GitHub/Google相关日志，最多24行。"
+                    + "未匹配可能是已越过窗口或核心未产生日志，不代表没有请求或失败。\n" + lines.output, 7000);
+        } catch (Exception error) {
+            report.section("重点域名近期日志（有界窗口）", "读取未完成，目标请求状态未知。", 1000);
+        }
         try {
             ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
             ProxyConfigLibrary.Entry source=configs.selected(profile.core);

@@ -27,6 +27,10 @@ stubs = {
 manager = (source / 'RootProxyManager.java').read_text()
 assert not re.search(r'new\s+MihomoControllerClient\s*\(', manager), 'Root maintenance must not use the panel-selected client'
 assert manager.count('MihomoControllerClient.forLocalRuntime(context)') >= 4
+for name in ('ProxyRuntimeInspector.kt', 'ProxyAdblockRuntimeBridge.kt'):
+    text = (source / name).read_text()
+    assert 'MihomoControllerClient.forLocalRuntime(app)' in text, name
+    assert 'MihomoControllerClient(app)' not in text, name
 with tempfile.TemporaryDirectory(prefix='hetu-controller-endpoints-') as output:
     directory = Path(output)
     for name, text in stubs.items():
@@ -34,4 +38,4 @@ with tempfile.TemporaryDirectory(prefix='hetu-controller-endpoints-') as output:
     sources = [*directory.glob('*.java'), source / 'MihomoControllerClient.java', root / 'tests/ControllerEndpointTest.java']
     subprocess.run([javac, '--release', '17', '-encoding', 'UTF-8', '-cp', str(args.json_jar), '-d', output, *map(str, sources)], check=True)
     subprocess.run([java, '-cp', output + os.pathsep + str(args.json_jar), 'io.github.xgl34222220.hetu.ControllerEndpointTest'], check=True)
-print('Root client scope: all 4 current call sites use the local-only factory')
+print('Local client scope: all 4 Root calls, runtime reload and adblock confirmation use the local-only factory')

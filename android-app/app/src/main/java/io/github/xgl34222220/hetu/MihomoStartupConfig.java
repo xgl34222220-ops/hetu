@@ -82,7 +82,8 @@ final class MihomoStartupConfig {
         String yaml=normalize(source);
         yaml=RuntimeCompatibility14.migrateFingerprint(yaml);
         yaml=sanitizeStrictDomainCompatibility(yaml);
-        yaml=normalizeDeprecatedEncryptedDns(yaml);
+        // Resolver endpoints belong to the selected configuration. A failed or
+        // retired endpoint must not silently switch providers in the runtime copy.
         // Runtime mode is authoritative. The selected source config remains byte-for-byte untouched.
         yaml=removeTopLevelKey(yaml,"listeners");
         yaml=removeTopLevelScalar(yaml,"global-client-fingerprint");
@@ -357,17 +358,6 @@ final class MihomoStartupConfig {
     }
 
     private static String yamlQuote(String value){return value==null?"":value.replace("'","''");}
-
-    /**
-     * Runtime-only compatibility for public DNS providers that retired raw-IP DoH access.
-     * The user's selected YAML remains byte-for-byte unchanged. Using 223.6.6.6 here keeps
-     * bootstrap encrypted without creating a resolver-domain bootstrap loop.
-     */
-    private static String normalizeDeprecatedEncryptedDns(String source){
-        return source
-                .replace("https://1.12.12.12/dns-query","https://223.6.6.6/dns-query")
-                .replace("https://120.53.53.53/dns-query","https://223.6.6.6/dns-query");
-    }
 
     /** Merge the local effective Hetu ad-block snapshot into the private startup copy. */
     private static String ensureAdblock(String source)throws IOException{
