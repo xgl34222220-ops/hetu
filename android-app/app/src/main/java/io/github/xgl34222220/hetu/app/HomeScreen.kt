@@ -195,6 +195,7 @@ private fun Bento(
     trailing: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
+    headerSupportingContent: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val c = Hx.colors
@@ -217,7 +218,10 @@ private fun Bento(
             .padding(horizontal = 13.dp, vertical = 11.dp),
     ) {
         Row(Modifier.fillMaxWidth().heightIn(min = 22.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = c.text, modifier = Modifier.weight(1f))
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = c.text)
+                headerSupportingContent?.invoke()
+            }
             if (trailing != null) trailing()
         }
         Spacer(Modifier.height(6.dp))
@@ -271,7 +275,7 @@ private fun HomeHero(vm: HetuViewModel) {
             if (!largeFont) Icon(if (running) Icons.Rounded.TaskAlt else Icons.Rounded.PowerSettingsNew,
                 null, tint = tint.copy(alpha = .88f), modifier = Modifier.align(Alignment.BottomEnd)
                     .offset(x = 22.dp, y = 25.dp).size(134.dp))
-            Column(Modifier.fillMaxWidth().padding(20.dp).padding(end = if (largeFont) 0.dp else 62.dp)) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp).padding(end = if (largeFont) 0.dp else 62.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     HxDot(tint, 10.dp)
                     Spacer(Modifier.width(8.dp))
@@ -330,7 +334,7 @@ private fun HomeHero(vm: HetuViewModel) {
 @Composable
 private fun HomeCurrentNodeSummary(vm: HetuViewModel, group: ProxyGroupUi?) {
     val c = Hx.colors
-    val known = vm.state.running && group != null && group.now.isNotBlank()
+    val known = vm.state.running && vm.state.panelReady && group != null && group.now.isNotBlank()
     HxSection {
         HxCard(onClick = { vm.openPanel("proxies") }, padding = PaddingValues(horizontal = 18.dp, vertical = 14.dp)) {
             Row(Modifier.heightIn(min = 42.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -414,7 +418,7 @@ private fun HeroAction(label: String, color: Color, busy: Boolean, enabled: Bool
         contentAlignment = Alignment.Center,
     ) {
         if (busy) HxSpinner(16.dp, color)
-        else Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = color)
+        else Text(label, style = MaterialTheme.typography.titleSmall.copy(fontSize = 17.sp, lineHeight = 23.sp), fontWeight = FontWeight.Bold, color = color)
     }
 }
 
@@ -511,6 +515,10 @@ private fun HomeLatencyCard(vm: HetuViewModel) {
     HxSection {
         Bento(
             "本机直测",
+            headerSupportingContent = {
+                Text("河图进程请求，未指定代理节点", style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 14.sp), color = c.textMuted)
+                Text("结果不代表其他应用的代理路径", style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 14.sp), color = c.textFaint)
+            },
             trailing = {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                     HomeHeaderIcon(
@@ -527,9 +535,6 @@ private fun HomeLatencyCard(vm: HetuViewModel) {
                 }
             },
         ) {
-            Text("河图进程请求，未指定代理节点", style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 16.sp), fontWeight = FontWeight.Normal, color = c.textMuted)
-            Text("结果不代表其他应用的代理路径", style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 16.sp), fontWeight = FontWeight.Normal, color = c.textFaint)
-            Spacer(Modifier.height(8.dp))
             Row(Modifier.fillMaxWidth()) {
                 targets.forEachIndexed { index, target ->
                     if (index > 0) Box(Modifier.padding(vertical = 6.dp).width(0.5.dp).height(30.dp).background(c.line))
@@ -616,7 +621,7 @@ private fun HomeWanCard(
                 onClick = { haptics.perform(HetuHaptic.Tap); showLan = !showLan },
                 onLongClick = address?.let { value -> { haptics.perform(HetuHaptic.LongPress); hxCopy(context, if (showLan) "LAN IP" else "出口 IP", value) } },
             )
-            .padding(horizontal = 15.dp, vertical = 13.dp),
+            .padding(horizontal = 15.dp, vertical = 8.dp),
     ) {
         Row(Modifier.fillMaxWidth().heightIn(min = 36.dp), verticalAlignment = Alignment.CenterVertically) {
             AnimatedContent(
@@ -645,7 +650,7 @@ private fun HomeWanCard(
                 }
             }
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(4.dp))
         AnimatedContent(
             targetState = address ?: "—",
             transitionSpec = {
@@ -663,7 +668,7 @@ private fun HomeWanCard(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(4.dp))
         AnimatedContent(
             targetState = showLan,
             transitionSpec = { fadeIn(tween(HxMotion.Medium)).togetherWith(fadeOut(tween(HxMotion.Short))) },
@@ -773,7 +778,10 @@ private fun HomeResourceCard(vm: HetuViewModel, modifier: Modifier, onOpen: () -
         BentoLine("CPU", if (running && vm.cpuSampleAvailable) String.format(java.util.Locale.US, "%.1f%%", vm.cpuPercent) else "—",
             modifier = Modifier.testTag("home-cpu-row"))
         Spacer(Modifier.weight(1f))
-        if (running && vm.cpuSampleAvailable) HxProgressBar((vm.cpuPercent / 100f).coerceIn(0f, 1f), c.accent, Modifier.padding(top = 8.dp), height = 5.dp)
+        Box(Modifier.fillMaxWidth().heightIn(min = 18.dp), contentAlignment = Alignment.BottomStart) {
+            if (running && vm.cpuSampleAvailable) HxProgressBar((vm.cpuPercent / 100f).coerceIn(0f, 1f), c.accent, height = 5.dp)
+            else Text(if (running) "等待有效采样" else "核心未运行", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
+        }
     }
 }
 

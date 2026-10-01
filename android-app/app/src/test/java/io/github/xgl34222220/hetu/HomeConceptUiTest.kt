@@ -93,6 +93,15 @@ class HomeConceptUiTest {
         rule.onNodeWithContentDescription("局域网 IP").assertExists()
         rule.onNodeWithText("192.0.2.10").assertExists()
     }
+    @Test fun cachedNodeDoesNotLookConfirmedAfterControllerReadFails() {
+        seed("state", conceptRunningState().copy(panelReady = false))
+        render()
+        rule.onNodeWithText("节点信息未确认").assertIsDisplayed()
+        rule.onNodeWithText("已选择").assertDoesNotExist()
+        rule.runOnIdle { seed("state", vm.state.copy(panelReady = true)) }
+        rule.onNodeWithText("已选择").assertIsDisplayed()
+        rule.onNodeWithText("节点信息未确认").assertDoesNotExist()
+    }
     @Test fun ipDetailsShowUnknownInsteadOfMockMetadataAndSwitchLan() {
         running(); render { PublicIpDetails(vm) {} }
         rule.onNodeWithText("203.0.113.24").assertIsDisplayed()

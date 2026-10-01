@@ -127,7 +127,9 @@ class HetuConceptRootTest {
         val b = node("strategy-group-$second").getUnclippedBoundsInRoot()
         assertEquals(a.top, b.top)
         assertTrue(a.right < b.left)
-        assertTrue("group must have readable height", (a.bottom - a.top) >= 110.dp)
+        assertTrue("compact group keeps three readable content rows", (a.bottom - a.top) >= 92.dp)
+        node("strategy-current-$first").assertIsDisplayed()
+        node("strategy-current-$second").assertIsDisplayed()
         screenshot("01-root-strategy-groups")
     }
 
@@ -165,11 +167,15 @@ class HetuConceptRootTest {
     }
 
     @Test @Config(qualifiers = "w320dp-h820dp-mdpi")
-    fun twoHundredPercentFontStacksPanelActionsBelowTheTitle() {
+    fun twoHundredPercentFontKeepsTopActionsSeparateFromTheLargeTitle() {
         render(fontScale = 2f)
         val search = rule.onNodeWithContentDescription("搜索").fetchSemanticsNode().boundsInRoot
         val title = rule.onAllNodesWithText("面板").fetchSemanticsNodes().map { it.boundsInRoot }.minBy { it.top }
-        assertTrue("actions must be below large title", search.top >= title.bottom)
+        assertTrue("approved top toolbar must not overlap the large title", search.bottom <= title.top)
+        for (label in listOf("搜索", "筛选", "排序与布局", "测速与 API")) {
+            val bounds = rule.onNodeWithContentDescription(label).getUnclippedBoundsInRoot()
+            assertTrue(bounds.bottom - bounds.top >= 48.dp && bounds.right - bounds.left >= 48.dp)
+        }
         node("panel-tab-proxies").assertIsDisplayed()
         screenshot("03b-root-narrow-200-percent-font")
     }
@@ -340,6 +346,7 @@ class HetuConceptRootTest {
     @Test fun actualHomeCpuIsUnknownUntilTwoSamplesAndAgainAfterFailureOrRestart() {
         render(tab = HxTab.Home)
         rule.runOnIdle { enableConceptActionMode(vm) }
+        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("home-resources-card"))
         fun sample(at: Long, pid: Int = 42) = rule.runOnIdle {
             ConceptTestIo.runtimeFailure = null
             ConceptTestIo.runtimeSample = ProxyRuntimeSnapshot(running = true, pid = pid,

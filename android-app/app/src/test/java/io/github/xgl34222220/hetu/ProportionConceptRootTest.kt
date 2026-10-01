@@ -81,7 +81,12 @@ class ProportionConceptRootTest {
         rule.onNodeWithText("6.2%").assertExists()
         capture("01-home")
         tag("home-resources-card").performScrollTo()
-        sameHeight("home-memory-row", "home-cpu-row")
+        val memory = tag("home-memory-row").getUnclippedBoundsInRoot()
+        val cpu = tag("home-cpu-row").getUnclippedBoundsInRoot()
+        assertEquals(memory.bottom - memory.top, cpu.bottom - cpu.top)
+        assertEquals(memory.left, cpu.left)
+        assertEquals(memory.right, cpu.right)
+        assertTrue("resource rows stack without overlap", cpu.top >= memory.bottom)
         capture("02-home-scrolled")
     }
     @Test fun overviewPairsAlignAndCompositeTransportMetadataCountsCorrectly() {
@@ -117,7 +122,7 @@ class ProportionConceptRootTest {
     @Test @Config(qualifiers = "w320dp-h820dp-mdpi")
     fun twoHundredPercentFontStacksResourceCardsWithoutSplittingUnitsIntoNarrowColumns() {
         render(HxTab.Home, scale = 2f)
-        tag("home-resources-card").performScrollTo()
+        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("home-resources-card"))
         tag("home-resources-card").performTouchInput { swipeUp() }
         val cpu = tag("home-cpu-row").getUnclippedBoundsInRoot()
         val memory = tag("home-memory-row").getUnclippedBoundsInRoot()
@@ -130,6 +135,7 @@ class ProportionConceptRootTest {
 
     @Test fun settingsUsesFourSharedContainersForItsEightExistingRoutes() {
         render(HxTab.Settings)
+        capture("06-settings-initial")
         val first = tag("settings-group-0").getUnclippedBoundsInRoot()
         val basic = tag("settings-基础代理配置").getUnclippedBoundsInRoot()
         val advanced = tag("settings-高级代理配置").getUnclippedBoundsInRoot()
