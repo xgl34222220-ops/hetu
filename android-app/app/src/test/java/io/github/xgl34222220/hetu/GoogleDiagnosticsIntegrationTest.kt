@@ -28,6 +28,7 @@ class GoogleDiagnosticsIntegrationTest {
         val marker = RootBridge::class.java.getDeclaredConstructor().apply { isAccessible = true }.newInstance()
         assertTrue(Shadow.extract<Any>(marker) is ConceptRootBridgeShadow)
         assertTrue(Shadow.extract<Any>(MihomoControllerClient(app)) is ConceptMihomoClientShadow)
+        assertTrue(Shadow.extract<Any>(MihomoControllerClient.forLocalRuntime(app)) is ConceptMihomoClientShadow)
     }
     private fun install(name: String, uidValue: Int) {
         shadowOf(app.packageManager).installPackage(PackageInfo().apply {
