@@ -81,6 +81,9 @@ class GoogleDiagnosticsIntegrationTest {
         prefs.edit().putString("proxyAppScope", "whitelist")
             .putStringSet("proxyAppPackages", setOf("0:com.android.vending", "private.shared.package"))
             .putBoolean("proxyRootSettingsDirty", true).commit()
+        // Establish the normal configured-app baseline before checking that
+        // diagnostics leave it unchanged; the library lazily seeds a bundled file.
+        ProxyConfigLibrary(app).selected(ProxyRuntimeProfile.Core.MIHOMO)
         val before = prefs.all.toMap()
         ConceptTestIo.diagnosticConnectionsJson = JSONObject().put("connections", JSONArray()).toString()
         val report = RootProxyManager(app).diagnostics()

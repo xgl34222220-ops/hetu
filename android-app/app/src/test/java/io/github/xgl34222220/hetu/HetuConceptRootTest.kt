@@ -309,8 +309,14 @@ class HetuConceptRootTest {
         rule.runOnIdle { enableConceptActionMode(vm) }
         val group = vm.state.groups.first()
         val names = group.nodes.map { it.name }
+        // Inspect timestamp retention without widening the production VM API.
+        @Suppress("UNCHECKED_CAST")
+        val stamps = HetuViewModel::class.java.getDeclaredField("measuredAt").run {
+            isAccessible = true
+            get(vm) as MutableMap<String, Long>
+        }
         rule.runOnIdle {
-            names.forEach { vm.delays[it] = 88L; vm.measuredAt[it] = 9_999L }
+            names.forEach { vm.delays[it] = 88L; stamps[it] = 9_999L }
             ConceptTestIo.delayFailures[names[0]] = java.io.IOException("Synthetic controller transport failure")
             ConceptTestIo.delayFailures[names[1]] = MihomoControllerClient.DelayFailure(true)
             ConceptTestIo.delayFailures[names[2]] = MihomoControllerClient.DelayFailure(false)
@@ -322,11 +328,11 @@ class HetuConceptRootTest {
             ConceptTestIo.calls.count { it.startsWith("DELAY:") } == names.size && vm.testingGroups.isEmpty() && vm.testingNodes.isEmpty()
         }
         assertEquals(88L, vm.delays[names[0]])
-        assertEquals(9_999L, vm.measuredAt[names[0]])
+        assertEquals(9_999L, stamps[names[0]])
         assertEquals(-1L, vm.delays[names[1]])
         assertEquals(-2L, vm.delays[names[2]])
-        assertNotEquals(9_999L, vm.measuredAt[names[1]])
-        assertNotEquals(9_999L, vm.measuredAt[names[2]])
+        assertNotEquals(9_999L, stamps[names[1]])
+        assertNotEquals(9_999L, stamps[names[2]])
         assertFalse(ConceptTestIo.calls.any { it.startsWith("GROUP_DELAY:") })
         node("strategy-node-${group.name}-${group.now}").assertIsSelected()
     }
