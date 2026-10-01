@@ -48,7 +48,7 @@ internal fun HxBackupScreen(vm: HetuViewModel, onBack: () -> Unit) {
         item("privacy") { HxSection { HxBanner("备份文件可能包含配置中的订阅链接与认证信息，请保存在可信位置。", HxTone.Warn) } }
     }
     restoreUri?.let { uri -> HxConfirmDialog(
-        title = "恢复备份？", message = "将写入备份中的设置与配置。正在运行的代理不会自动重启。", confirmLabel = "恢复",
+        title = "恢复备份？", message = "将写入备份中的设置与配置。同名但内容不同的配置会保留为恢复副本。正在运行的代理不会自动重启。", confirmLabel = "恢复",
         onDismiss = { restoreUri = null }, onConfirm = {
             restoreUri = null
             scope.launch {

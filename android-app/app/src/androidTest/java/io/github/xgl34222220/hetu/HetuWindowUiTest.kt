@@ -3,6 +3,8 @@ package io.github.xgl34222220.hetu
 import android.app.Application
 import android.graphics.Bitmap
 import android.os.Build
+import android.net.Uri
+import android.util.Base64
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,6 +20,8 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -70,6 +74,7 @@ class HetuWindowUiTest {
     private val output get() = File(application.filesDir, "window-ui-qa").apply { mkdirs() }
     private var successful = false
     private var emulatorConfirmed = false
+    private var nativeBackupVerified = false
 
     @Before fun prepare() {
         check(Build.HARDWARE in setOf("ranchu", "goldfish") && Build.PRODUCT.contains("sdk")) {
@@ -96,6 +101,7 @@ class HetuWindowUiTest {
             .putBoolean("proxyCustomApiEnabled", true).putString("proxyCustomApiHost", "127.0.0.1")
             .putInt("proxyCustomApiPort", server.port).putString("proxyCustomApiSecret", "")
             .commit()
+        verifyBackupOnAndroidFilesystem()
         vm = HetuViewModel(application)
         val nodes = listOf(ProxyNodeUi("香港测试 01", "VLESS", true, 42), ProxyNodeUi("日本测试 02", "Trojan", true, 76), ProxyNodeUi("未知延迟节点", "VLESS"))
         seed("state", ProxyComposeState(running = true, panelReady = true, trafficMode = "rule", config = "Android 窗口测试.yaml",
@@ -116,6 +122,36 @@ class HetuWindowUiTest {
                 }) { HetuRoot(vm) }
             }
         }
+    }
+
+    private fun verifyBackupOnAndroidFilesystem() = runBlocking(Dispatchers.IO) {
+        // Fresh official emulator only, before the VM can issue even its loopback preload.
+        val prefs = application.getSharedPreferences("hetu", 0)
+        val library = ProxyConfigLibrary(application)
+        val core = ProxyRuntimeProfile.Core.MIHOMO
+        val name = "window-restore.yaml"
+        val original = "# original window fixture\nproxies: []\nrules: []\n"
+        val restored = "# restored window fixture\nproxies: []\nrules: []\n"
+        val entry = library.importConfig(core, name, original.byteInputStream())
+        val backup = File(application.filesDir, "window-backup.json")
+        backup.writeText(JSONObject().put("schema", 1)
+            .put("settings", JSONObject().put("proxySelectedConfig.${core.id}", JSONObject().put("t", "s").put("v", name)))
+            .put("configs", org.json.JSONArray().put(JSONObject().put("core", core.id).put("name", name)
+                .put("data", Base64.encodeToString(restored.toByteArray(), Base64.NO_WRAP)))).toString())
+        assertEquals(1, HetuSettingsBackup.restore(application, Uri.fromFile(backup)))
+        assertEquals(original, library.read(entry))
+        val selected = requireNotNull(library.selected(core))
+        assertNotEquals(name, selected.name)
+        assertEquals(restored, library.read(selected))
+        prefs.edit().putString("proxyCustomApiSecret", "synthetic-window-secret").commit()
+        val before = prefs.all
+        backup.writeText(JSONObject().put("schema", 1)
+            .put("settings", JSONObject().put("proxyCustomApiHost", JSONObject().put("t", "s").put("v", "replacement.invalid")))
+            .put("configs", org.json.JSONArray()).toString())
+        assertTrue(runCatching { HetuSettingsBackup.restore(application, Uri.fromFile(backup)) }.isFailure)
+        assertEquals(before, prefs.all)
+        prefs.edit().putString("proxyCustomApiSecret", "").commit()
+        nativeBackupVerified = true
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -215,6 +251,7 @@ class HetuWindowUiTest {
         val report = JSONObject().put("passed", successful).put("sdk", Build.VERSION.SDK_INT)
             .put("model", Build.MODEL).put("hardwareCanvasSeen", hardwareCanvasSeen.get())
             .put("runtimeShaderSupported", runtimeShaderSupported.get() ?: JSONObject.NULL)
+            .put("nativeBackupVerified", nativeBackupVerified)
             .put("captureMethod", "UiAutomation.takeScreenshot")
             .put("defaultGlassEnabled", if (::vm.isInitialized) vm.blurEnabled && vm.prefs.getBoolean("liquidGlass", false) else JSONObject.NULL)
             .put("foregroundChecks", org.json.JSONArray(foregroundChecks)).put("rootOrProxyStarted", false)

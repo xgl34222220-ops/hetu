@@ -75,6 +75,138 @@ final class ProxyConfigLibrary {
         }
     }
 
+    static final class RestoreItem {
+        final ProxyRuntimeProfile.Core core;
+        final String name;
+        final byte[] bytes;
+        RestoreItem(ProxyRuntimeProfile.Core core, String name, byte[] bytes) {
+            this.core=core;this.name=name;this.bytes=bytes.clone();
+        }
+    }
+    interface RestoreCommit {
+        void commit(Map<ProxyRuntimeProfile.Core,String> selections) throws IOException;
+    }
+    static final class RestoreCommitUncertain extends IOException {
+        RestoreCommitUncertain(String message,Throwable cause){super(message,cause);}
+    }
+    private static final class RestoreWrite {
+        final RestoreItem item;final File target;final Path staged;
+        boolean installed;
+        RestoreWrite(RestoreItem item,File target,Path staged){this.item=item;this.target=target;this.staged=staged;}
+    }
+
+    /** Restore without replacing existing sources or selecting each imported file.
+     * All validation/staging precedes installation. Ordinary library operations share
+     * this lock, including CAS and rename. A crash can leave extra restored/staged
+     * files: this is not a crash-atomic transaction across files and preferences.
+     * Original files are never overwritten, so they do not depend on rollback.
+     */
+    void restoreBatch(List<RestoreItem> items, Map<ProxyRuntimeProfile.Core,String> selections,
+                      RestoreCommit commit) throws IOException {
+        synchronized (WRITE_LOCK) {
+            Set<String> identities=new HashSet<>();
+            Map<ProxyRuntimeProfile.Core,Map<String,String>> names=new EnumMap<>(ProxyRuntimeProfile.Core.class);
+            List<RestoreItem> copies=new ArrayList<>();List<File> targets=new ArrayList<>();
+            Set<File> reserved=new HashSet<>();
+            for(RestoreItem item:items){
+                if(item==null||item.core==null||!safeName(item.name).equals(item.name)||!coreAccepts(item.core,item.name))
+                    throw new IOException("备份配置名称或格式无效");
+                if(!identities.add(item.core.id+"/"+item.name))throw new IOException("备份包含重复配置");
+                if(item.bytes.length==0||item.bytes.length>LIMIT)throw new IOException("备份配置大小无效");
+                try{if(StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
+                        .decode(java.nio.ByteBuffer.wrap(item.bytes)).toString().trim().isEmpty())throw new IOException("备份配置为空");}
+                catch(CharacterCodingException invalid){throw new IOException("配置必须是 UTF-8 文本",invalid);}
+                File target=new File(dir(item.core),item.name);
+                boolean identical=sameBytes(target,item.bytes);
+                if(!identical){
+                    target=restoreTarget(dir(item.core),item.name,item.bytes,reserved);
+                    if(!sameBytes(target,item.bytes)){copies.add(item);targets.add(target);reserved.add(target);}
+                }
+                names.computeIfAbsent(item.core,ignored->new HashMap<>()).put(item.name,target.getName());
+            }
+            Map<ProxyRuntimeProfile.Core,String> resolved=new EnumMap<>(ProxyRuntimeProfile.Core.class);
+            for(Map.Entry<ProxyRuntimeProfile.Core,String> selection:selections.entrySet()){
+                ProxyRuntimeProfile.Core core=selection.getKey();String name=selection.getValue();
+                if(core==null||name==null)throw new IOException("备份中的已选配置无效");
+                if(name.isEmpty()){resolved.put(core,name);continue;}
+                if(!safeName(name).equals(name)||!coreAccepts(core,name))throw new IOException("备份中的已选配置无效");
+                String mapped=names.getOrDefault(core,Collections.emptyMap()).get(name);
+                if(mapped==null){
+                    File target=new File(dir(core),name);
+                    if(!target.isFile()||Files.isSymbolicLink(target.toPath()))throw new IOException("备份中的已选配置不存在："+name);
+                    mapped=name;
+                }
+                resolved.put(core,mapped);
+            }
+            if(copies.isEmpty()){commit.commit(Collections.unmodifiableMap(resolved));return;}
+            if(!root.isDirectory()&&!root.mkdirs())throw new IOException("无法创建配置目录");
+            Path staging=Files.createTempDirectory(root.toPath(),".restore-");
+            List<RestoreWrite> writes=new ArrayList<>();
+            try{
+                for(int i=0;i<copies.size();i++){
+                    RestoreItem item=copies.get(i);File target=targets.get(i);
+                    File parent=target.getParentFile();
+                    if(!parent.isDirectory()&&!parent.mkdirs())throw new IOException("无法创建配置目录");
+                    Path staged=staging.resolve(Integer.toString(i));
+                    writes.add(new RestoreWrite(item,target,staged));
+                    try(FileOutputStream out=new FileOutputStream(staged.toFile())){out.write(item.bytes);out.getFD().sync();}
+                }
+                for(RestoreWrite write:writes){
+                    // A hard link atomically creates a new name and fails if anyone has
+                    // taken it. ATOMIC_MOVE can replace an existing target on Unix.
+                    Files.createLink(write.target.toPath(),write.staged);
+                    write.installed=true;
+                }
+                commit.commit(Collections.unmodifiableMap(resolved));
+            }catch(IOException|RuntimeException failure){
+                for(int i=writes.size()-1;!(failure instanceof RestoreCommitUncertain)&&i>=0;i--){
+                    RestoreWrite write=writes.get(i);if(!write.installed)continue;
+                    try{
+                        if(!Files.isSymbolicLink(write.target.toPath())&&Files.isSameFile(write.staged,write.target.toPath())
+                                &&sameBytes(write.target,write.item.bytes))
+                            Files.delete(write.target.toPath());
+                        else failure.addSuppressed(new IOException("恢复期间配置已变化，保留文件："+write.target.getName()));
+                    }catch(IOException rollback){failure.addSuppressed(rollback);}
+                }
+                throw failure;
+            }finally{
+                // These are private staging links only. Failed cleanup leaves copies,
+                // never the only copy of a pre-existing user configuration.
+                for(RestoreWrite write:writes)try{Files.deleteIfExists(write.staged);}catch(IOException ignored){}
+                try{Files.deleteIfExists(staging);}catch(IOException ignored){}
+            }
+        }
+    }
+
+    private static boolean sameBytes(File target,byte[] bytes)throws IOException {
+        if(bytes.length>LIMIT||!target.isFile()||Files.isSymbolicLink(target.toPath())||target.length()!=bytes.length)return false;
+        // A concurrent in-place edit can grow the file after length() is checked.
+        // Compare at most the expected (bounded) bytes plus one EOF probe.
+        try(InputStream in=Files.newInputStream(target.toPath(),LinkOption.NOFOLLOW_LINKS)){
+            byte[] buffer=new byte[8192];int offset=0;
+            while(offset<bytes.length){
+                int count=in.read(buffer,0,Math.min(buffer.length,bytes.length-offset));
+                if(count<0)return false;
+                for(int i=0;i<count;i++)if(buffer[i]!=bytes[offset+i])return false;
+                offset+=count;
+            }
+            return in.read()==-1;
+        }
+    }
+
+    private static File restoreTarget(File dir,String requested,byte[] bytes,Set<File> reserved)throws IOException {
+        File target=new File(dir,requested);
+        if(!reserved.contains(target)&&(!Files.exists(target.toPath(),LinkOption.NOFOLLOW_LINKS)||sameBytes(target,bytes)))return target;
+        int dot=requested.lastIndexOf('.');String base=requested.substring(0,dot),ext=requested.substring(dot);
+        for(int i=2;i<=999;i++){
+            String suffix=" ("+i+")"+ext;
+            String candidate=base.substring(0,Math.min(base.length(),120-suffix.length()))+suffix;
+            target=new File(dir,candidate);
+            if(!reserved.contains(target)&&(!Files.exists(target.toPath(),LinkOption.NOFOLLOW_LINKS)||sameBytes(target,bytes)))return target;
+        }
+        throw new IOException("同名配置过多，请先整理配置库");
+    }
+
     String read(Entry e)throws IOException{
         synchronized (WRITE_LOCK) {
             if(e==null||!e.file.isFile())throw new IOException("尚未选择配置");byte[] b=Files.readAllBytes(e.file.toPath());if(b.length>LIMIT)throw new IOException("配置超过 4 MiB");try{return StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT).decode(java.nio.ByteBuffer.wrap(b)).toString();}catch(CharacterCodingException x){throw new IOException("配置必须是 UTF-8 文本");}

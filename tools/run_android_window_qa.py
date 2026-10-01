@@ -308,6 +308,7 @@ try:
     if (report.get("passed") is not True or report.get("hardwareCanvasSeen") is not True
             or report.get("defaultGlassEnabled") is not True
             or report.get("runtimeShaderSupported") is not True
+            or report.get("nativeBackupVerified") is not True
             or not isinstance(foreground_checks, list) or not foreground_checks
             or any(not isinstance(check, dict) or check.get("windowFocused") is not True
                    or check.get("activePackage") != APP for check in foreground_checks)):

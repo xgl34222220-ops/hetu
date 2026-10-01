@@ -1,13 +1,16 @@
 package io.github.xgl34222220.hetu
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.net.Uri
 import android.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.ByteArrayInputStream
+import java.io.IOException
+import java.nio.ByteBuffer
+import java.nio.charset.CodingErrorAction
 
 internal object HetuSettingsBackup {
     private const val SCHEMA = 1
@@ -75,6 +78,51 @@ internal object HetuSettingsBackup {
     private fun allowed(key: String): Boolean =
         key !in excluded && (key in exactKeys || prefixes.any(key::startsWith))
 
+    // Types consumed by current production preferences. Dynamic/legacy prefix keys
+    // also have to match any existing stored type; their unknown semantics are not
+    // inferred from a backup. No coercion between SharedPreferences value types.
+    private val knownTypes = buildMap<String, String> {
+        listOf(
+            "accentHex", "appLanguage", "appearance",
+            "colorPalette", "colorStandard", "defaultPanelSection",
+            "defaultPanelTab", "downloadMirrorPrefix", "overviewRankDimension",
+            "overviewRankSort", "proxyAppScope", "proxyBaseCore",
+            "proxyBaseIpv6", "proxyBaseMode", "proxyCustomApiHost",
+            "proxyCustomDelayUrl", "proxySelectorDensity", "proxySelectorGroupDensity",
+            "proxySelectorNameOverflow", "proxySelectorNodeSort", "proxyStatusNotificationAction1",
+            "proxyStatusNotificationAction2", "proxyStatusNotificationAction3", "proxyStatusNotificationActionLabel1",
+            "proxyStatusNotificationActionLabel2", "proxyStatusNotificationActionLabel3", "proxyStatusNotificationClickTarget",
+            "proxyStatusNotificationError", "proxyStatusNotificationTemplate", "proxyStatusNotificationTitleTemplate",
+            "proxyWebPanelLocalMode", "proxyWebPanelSelected", "proxyWebPanelsJson",
+            "subscriptionHealthUrl", "topBarBlurStyle", "uiStyle",
+        ).forEach { put(it, "s") }
+        listOf(
+            "downloadMirrorEnabled", "enableBlur", "enableMonet",
+            "floatingBottomBar", "liquidGlass", "logAutoRefresh",
+            "logCardView", "predictiveBackAnimation", "predictiveBackFollowEdge",
+            "proxyApiHistoryEnabled", "proxyBaseAutoOverwrite", "proxyCnIpDirect",
+            "proxyCustomApiEnabled", "proxyCustomDelayUrlEnabled", "proxyRootAutoStart",
+            "proxySelectorCollapsePrevious", "proxySelectorDetectIpv6", "proxySelectorDisconnectOnSelect",
+            "proxySelectorExpandSelectedInSheet", "proxySelectorGroupByProvider", "proxySelectorShowGlobalByMode",
+            "proxySelectorShowHidden", "proxySelectorSortDescending", "proxySharedNetwork",
+            "proxyStatusNotificationEnabled", "pureBlackDark", "showPanelDock",
+            "showPanelTab", "startOnPanel",
+        ).forEach { put(it, "b") }
+        listOf(
+            "latencyAutoRefreshSeconds", "proxyApiHistoryMaxMb", "proxyApiHistoryRetentionDays",
+            "proxyCustomApiPort", "proxySelectorGroupColumns", "proxySelectorNodeColumns",
+            "proxyStatusNotificationRefreshSeconds", "subscriptionHealthInterval", "subscriptionHealthTimeout",
+            "subscriptionHealthTolerance",
+        ).forEach { put(it, "i") }
+        listOf(
+            "uiScale",
+        ).forEach { put(it, "f") }
+        listOf(
+            "proxyAppPackages", "proxyBypassCidrs", "proxyBypassInterfaces",
+            "proxySharedBypassMacs",
+        ).forEach { put(it, "ss") }
+    }
+
     suspend fun export(context: Context, uri: Uri): Int = withContext(Dispatchers.IO) {
         val app = context.applicationContext
         val prefs = app.getSharedPreferences("hetu", 0)
@@ -137,57 +185,204 @@ internal object HetuSettingsBackup {
                 require(total <= MAX_BYTES) { "备份文件超过 16 MiB" }
                 out.write(buffer, 0, n)
             }
-            out.toString(Charsets.UTF_8.name())
+            decodeUtf8(out.toByteArray())
         } ?: error("无法读取备份文件")
 
-        val root = JSONObject(raw)
-        require(root.optInt("schema", -1) == SCHEMA) { "不支持的河图备份版本" }
+        // Validate the entire document before constructing the library (which can migrate
+        // legacy storage), writing preferences, or importing a single configuration.
+        val backup = validate(JSONObject(raw))
         val prefs = app.getSharedPreferences("hetu", 0)
-        val settings = root.optJSONObject("settings") ?: JSONObject()
-        val editor = prefs.edit()
+        validatePreferenceState(backup, prefs.all)
+        val library = ProxyConfigLibrary(app)
+        library.restoreBatch(backup.configs, backup.selections) { selections ->
+            validatePreferenceState(backup, prefs.all)
+            val values = LinkedHashMap(backup.settings)
+            selections.forEach { (core, name) -> values["proxySelectedConfig.${core.id}"] = name }
+            commitSettings(prefs, values)
+        }
+        backup.configs.size
+    }
+
+    private data class ValidatedBackup(
+        val settings: Map<String, Any>,
+        val configs: List<ProxyConfigLibrary.RestoreItem>,
+        val selections: Map<ProxyRuntimeProfile.Core, String>,
+    )
+
+    private fun validate(root: JSONObject): ValidatedBackup {
+        require(root.get("schema") == SCHEMA) { "不支持的河图备份版本" }
+        val settings = root.getJSONObject("settings")
+        val values = linkedMapOf<String, Any>()
+        val selections = linkedMapOf<ProxyRuntimeProfile.Core, String>()
         val keys = settings.keys()
         while (keys.hasNext()) {
             val key = keys.next()
+            // These keys are intentionally outside the backup's restore contract.
             if (!allowed(key)) continue
-            val item = settings.optJSONObject(key) ?: continue
-            when (item.optString("t")) {
-                "s" -> editor.putString(key, item.optString("v", ""))
-                "b" -> editor.putBoolean(key, item.optBoolean("v", false))
-                "i" -> editor.putInt(key, item.optInt("v", 0))
-                "l" -> editor.putLong(key, item.optLong("v", 0L))
-                "f" -> editor.putFloat(key, item.optDouble("v", 0.0).toFloat())
-                "ss" -> {
-                    val array = item.optJSONArray("v") ?: JSONArray()
-                    val values = LinkedHashSet<String>()
-                    for (i in 0 until array.length()) {
-                        array.optString(i).takeIf(String::isNotBlank)?.let(values::add)
-                    }
-                    editor.putStringSet(key, values)
+            val item = settings.getJSONObject(key)
+            val value = item.get("v")
+            val decoded: Any = when (item.getString("t")) {
+                "s" -> { require(value is String) { "备份设置 $key 不是文本" }; value }
+                "b" -> { require(value is Boolean) { "备份设置 $key 不是布尔值" }; value }
+                "i" -> {
+                    require(value is Int || value is Long) { "备份设置 $key 不是整数" }
+                    val number = (value as Number).toLong()
+                    require(number in Int.MIN_VALUE..Int.MAX_VALUE) { "备份设置 $key 超出整数范围" }
+                    number.toInt()
                 }
+                "l" -> {
+                    require(value is Int || value is Long) { "备份设置 $key 不是长整数" }
+                    (value as Number).toLong()
+                }
+                "f" -> {
+                    require(value is Number && value.toDouble().isFinite() && value.toFloat().isFinite()) {
+                        "备份设置 $key 不是有效浮点数"
+                    }
+                    value.toFloat()
+                }
+                "ss" -> {
+                    require(value is JSONArray) { "备份设置 $key 不是文本集合" }
+                    linkedSetOf<String>().apply {
+                        for (i in 0 until value.length()) {
+                            val entry = value.get(i)
+                            require(entry is String) { "备份设置 $key 含非文本值" }
+                            add(entry)
+                        }
+                    }
+                }
+                else -> error("备份设置 $key 的类型不受支持")
             }
-        }
-        editor.apply()
-
-        val library = ProxyConfigLibrary(app)
-        val configs = root.optJSONArray("configs") ?: JSONArray()
-        var restored = 0
-        for (i in 0 until configs.length()) {
-            val item = configs.optJSONObject(i) ?: continue
-            val coreId = item.optString("core")
-            val core = ProxyRuntimeProfile.Core.values().firstOrNull { it.id == coreId } ?: continue
-            val name = item.optString("name")
-            if (!runCatching { ProxyConfigLibrary.safeName(name) }.isSuccess) continue
-            val bytes = runCatching { Base64.decode(item.optString("data"), Base64.DEFAULT) }.getOrNull() ?: continue
-            if (bytes.isEmpty() || bytes.size > 4 * 1024 * 1024) continue
-            val text = runCatching { bytes.toString(Charsets.UTF_8) }.getOrNull() ?: continue
-            val existing = library.list(core).firstOrNull { it.name == name }
-            if (existing != null) {
-                library.write(existing, text)
+            if (key.startsWith("proxySelectedConfig.")) {
+                val coreId = key.removePrefix("proxySelectedConfig.")
+                val core = ProxyRuntimeProfile.Core.values().firstOrNull { it.id == coreId }
+                    ?: error("备份选择了未知核心")
+                require(decoded is String) { "备份中的已选配置名称无效" }
+                if (decoded.isNotEmpty()) validateName(core, decoded)
+                selections[core] = decoded
             } else {
-                library.importConfig(core, name, ByteArrayInputStream(bytes))
+                values[key] = decoded
             }
-            restored++
         }
-        restored
+        val array = root.getJSONArray("configs")
+        val configs = ArrayList<ProxyConfigLibrary.RestoreItem>(array.length())
+        val seen = hashSetOf<Pair<ProxyRuntimeProfile.Core, String>>()
+        for (i in 0 until array.length()) {
+            val item = array.getJSONObject(i)
+            val coreId = item.get("core")
+            val core = ProxyRuntimeProfile.Core.values().firstOrNull { it.id == coreId }
+                ?: error("备份配置 ${i + 1} 的核心不受支持")
+            val name = item.get("name")
+            require(name is String) { "备份配置 ${i + 1} 的名称无效" }
+            validateName(core, name)
+            require(seen.add(core to name)) { "备份包含重复配置：$name" }
+            val data = item.get("data")
+            require(data is String) { "备份配置 $name 的内容无效" }
+            val bytes = Base64.decode(data, Base64.DEFAULT)
+            require(bytes.isNotEmpty() && bytes.size <= 4 * 1024 * 1024) { "备份配置 $name 的大小无效" }
+            require(decodeUtf8(bytes).isNotBlank()) { "备份配置 $name 不能为空" }
+            configs += ProxyConfigLibrary.RestoreItem(core, name, bytes)
+        }
+        selections.forEach { (core, name) ->
+            require(name.isEmpty() || core to name in seen) { "备份缺少已选配置：$name" }
+        }
+        return ValidatedBackup(values, configs, selections)
+    }
+
+    private fun valueType(value: Any?): String? = when (value) {
+        is String -> "s"
+        is Boolean -> "b"
+        is Int -> "i"
+        is Long -> "l"
+        is Float -> "f"
+        is Set<*> -> "ss"
+        else -> null
+    }
+
+    private fun validatePreferenceState(backup: ValidatedBackup, current: Map<String, *>) {
+        val values = LinkedHashMap(backup.settings)
+        backup.selections.forEach { (core, name) -> values["proxySelectedConfig.${core.id}"] = name }
+        values.forEach { (key, value) ->
+            val expected = if (key.startsWith("proxySelectedConfig.")) "s" else knownTypes[key]
+            val actual = valueType(value)
+            require(expected == null || actual == expected) { "备份设置 $key 的类型与当前应用不兼容" }
+            require(!current.containsKey(key) || valueType(current[key]) == actual) {
+                "备份设置 $key 的类型与已有设置不兼容"
+            }
+        }
+        // Custom API secrets are deliberately excluded from backups. Do not bind a
+        // retained credential to another destination, including while API is disabled.
+        val endpointKeys = setOf("proxyCustomApiHost", "proxyCustomApiPort", "proxyCustomApiEnabled")
+        if (values.keys.none { it in endpointKeys }) return
+        val secret = current["proxyCustomApiSecret"]
+        require(secret == null || secret is String) { "请先检查 API 连接设置后再恢复备份" }
+        if (secret !is String || secret.isBlank()) return
+        fun endpoint(state: Map<String, *>): Pair<String, Int> {
+            val host = state["proxyCustomApiHost"] ?: "127.0.0.1"
+            val port = state["proxyCustomApiPort"] ?: 9090
+            require(host is String && port is Int) { "请先检查 API 连接设置后再恢复备份" }
+            val trimmed = host.trim()
+            require(trimmed.isNotEmpty() && trimmed.length <= 253 && trimmed.matches(Regex("[A-Za-z0-9.-]+"))) {
+                "请先检查 API 连接设置后再恢复备份"
+            }
+            return trimmed.lowercase(java.util.Locale.ROOT) to port.takeIf { it in 1024..65535 }.let { it ?: 9090 }
+        }
+        require(endpoint(current) == endpoint(current + values)) {
+            "备份中的 API 地址或端口与现有 Secret 不匹配，请先检查 API 连接设置后再恢复备份"
+        }
+    }
+
+    private fun validateName(core: ProxyRuntimeProfile.Core, name: String) {
+        require(ProxyConfigLibrary.safeName(name) == name && ProxyConfigLibrary.coreAccepts(core, name)) {
+            "备份配置名称或格式无效：$name"
+        }
+    }
+
+    private fun decodeUtf8(bytes: ByteArray): String = Charsets.UTF_8.newDecoder()
+        .onMalformedInput(CodingErrorAction.REPORT)
+        .onUnmappableCharacter(CodingErrorAction.REPORT)
+        .decode(ByteBuffer.wrap(bytes)).toString()
+
+    private fun SharedPreferences.Editor.putValue(key: String, value: Any?) {
+        when (value) {
+            null -> remove(key)
+            is String -> putString(key, value)
+            is Boolean -> putBoolean(key, value)
+            is Int -> putInt(key, value)
+            is Long -> putLong(key, value)
+            is Float -> putFloat(key, value)
+            is Set<*> -> putStringSet(key, value.filterIsInstance<String>().toSet())
+            else -> error("不支持的设置值")
+        }
+    }
+
+    private fun commitSettings(prefs: SharedPreferences, values: Map<String, Any>) {
+        if (values.isEmpty()) return
+        val before = prefs.all
+        val editor = prefs.edit()
+        values.forEach { (key, value) -> editor.putValue(key, value) }
+        // commit reports disk failures; apply would report success before persistence.
+        val failure = try {
+            if (editor.commit()) return
+            IOException("无法保存备份设置")
+        } catch (error: RuntimeException) {
+            IOException("无法保存备份设置", error)
+        }
+        val recovered = try {
+            val current = prefs.all
+            val rollback = prefs.edit()
+            values.forEach { (key, value) ->
+                // SharedPreferences has no compare-and-set API. Preserve any newer
+                // value already visible here; ordinary config selection uses WRITE_LOCK.
+                if (current[key] == value) rollback.putValue(key, before[key])
+            }
+            rollback.commit()
+        } catch (error: RuntimeException) {
+            failure.addSuppressed(error)
+            false
+        }
+        if (!recovered) throw ProxyConfigLibrary.RestoreCommitUncertain(
+            "无法保存备份设置，设置回退未能确认；原有配置与恢复副本均已保留", failure,
+        )
+        throw IOException("无法保存备份设置，已回退未变化的设置；原有配置文件已保留", failure)
     }
 }
