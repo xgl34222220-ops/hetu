@@ -45,3 +45,20 @@ def home_readiness(component, events, activity, windows):
     result['ready'] = (all(result[key] for key in ('homeComponent', 'homeFirstFrameComplete', 'homeActivityResumed', 'homeWindowFocused'))
                        and not problems and len(crashes) < 3)
     return result
+
+
+def await_home_readiness(read, clock, pause, timeout_seconds=180):
+    """Keep unresolved/setup HOME states inside the same bound; never skip an ANR."""
+    if timeout_seconds < 0:
+        raise ValueError('timeout must be nonnegative')
+    started = clock()
+    while True:
+        state = read()
+        if state['anrEvents'] or state['crashCount'] >= 3:
+            raise RuntimeError('Android home readiness failed with an ANR or crash loop; no app installed')
+        if state['ready']:
+            return state
+        remaining = timeout_seconds - (clock() - started)
+        if remaining <= 0:
+            raise RuntimeError('Android home did not complete initialization, its first frame and foreground checks within the bounded wait')
+        pause(min(1, remaining))

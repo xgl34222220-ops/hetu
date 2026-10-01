@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
-from android_window_readiness import component_name, home_component, home_readiness
+from android_window_readiness import component_name, home_component, home_readiness, await_home_readiness
 
 
 class HomeReadinessTest(unittest.TestCase):
@@ -56,6 +56,37 @@ class HomeReadinessTest(unittest.TestCase):
                             drawn.replace('isOnScreen=true', 'isOnScreen=false'),
                             drawn.replace('Window #2 Window{abc u0 ' + self.component, 'Window #2 Window{abc u0 com.android.settings/.FallbackHome')]:
             self.assertFalse(self.result(events='', windows=replacement)['ready'])
+
+    def test_setup_activity_is_waited_for_until_real_home_is_ready(self):
+        now = [0]
+        calls = []
+        states = [self.result(component=home_component('com.android.sdksetup/.DefaultActivity')), self.result()]
+        def read():
+            calls.append(now[0])
+            return states.pop(0)
+        actual = await_home_readiness(read, lambda: now[0], lambda step: now.__setitem__(0, now[0] + step), 180)
+        self.assertTrue(actual['ready'])
+        self.assertEqual(calls, [0, 1])
+
+    def test_unresolved_home_has_a_real_bounded_timeout(self):
+        now = [0]
+        calls = []
+        def read():
+            calls.append(now[0])
+            return self.result(component=None)
+        with self.assertRaisesRegex(RuntimeError, 'bounded wait'):
+            await_home_readiness(read, lambda: now[0], lambda step: now.__setitem__(0, now[0] + step), 2)
+        self.assertEqual(calls, [0, 1, 2])
+
+    def test_anr_stops_wait_without_install_or_dismissal(self):
+        with self.assertRaisesRegex(RuntimeError, 'ANR'):
+            await_home_readiness(lambda: self.result(events=self.events + 'I/am_anr: [launcher]'), lambda: 0,
+                                lambda step: self.fail('must not wait past ANR'), 180)
+
+    def test_home_resolution_failure_is_not_treated_as_ready(self):
+        with self.assertRaisesRegex(RuntimeError, 'bounded wait'):
+            await_home_readiness(lambda: self.result(component=None), lambda: 0,
+                                lambda step: self.fail('zero bound must stop'), 0)
 
     def test_component_resolution_is_strict(self):
         self.assertEqual(home_component('priority=0\ncom.android.launcher3/.uioverrides.QuickstepLauncher\n'), self.component)

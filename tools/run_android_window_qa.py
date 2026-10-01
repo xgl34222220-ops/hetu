@@ -9,7 +9,7 @@ import subprocess
 import time
 
 from android_window_recording import SegmentedRecording, preflight_media_tools
-from android_window_readiness import home_component, home_readiness
+from android_window_readiness import home_component, home_readiness, await_home_readiness
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "out/android-window-qa"
@@ -195,19 +195,14 @@ try:
             except OSError as error:
                 print(f"Could not retain startup screenshot: {error}", flush=True)
         raise RuntimeError("Android startup has an ANR or repeated crashes; system state retained without dismissing dialogs")
-    run([adb, "-s", SERIAL, "shell", "input", "keyevent", "KEYCODE_WAKEUP"], check=False)
-    run([adb, "-s", SERIAL, "shell", "input", "keyevent", "KEYCODE_MENU"], check=False)
     # A boot property may precede the launcher's first frame and first-boot work.
     # Observe actual readiness instead of racing Quickstep or waiting an arbitrary delay.
     record_stage("home-readiness")
-    resolution = run([adb, "-s", SERIAL, "shell", "cmd", "package", "resolve-activity", "--brief",
-        "-a", "android.intent.action.MAIN", "-c", "android.intent.category.HOME"], timeout=20)
-    (OUT / "home-resolution.txt").write_bytes(resolution.stdout + resolution.stderr)
-    component = home_component(resolution.stdout.decode(errors="replace"))
-    if component is None:
-        raise RuntimeError("The ordinary AOSP home activity could not be resolved; inspect home-resolution.txt")
-    home_deadline = time.monotonic() + 180
-    while True:
+    def read_home_state():
+        resolution = run([adb, "-s", SERIAL, "shell", "cmd", "package", "resolve-activity", "--brief",
+            "-a", "android.intent.action.MAIN", "-c", "android.intent.category.HOME"], timeout=20)
+        (OUT / "home-resolution.txt").write_bytes(resolution.stdout + resolution.stderr)
+        component = home_component(resolution.stdout.decode(errors="replace"))
         home_text = {}
         for key, args in {
             "events": ["logcat", "-b", "events", "-d", "-v", "brief"],
@@ -219,13 +214,10 @@ try:
             (OUT / ("home-" + key + ".txt")).write_bytes(result.stdout + result.stderr)
         home_state = home_readiness(component, **home_text)
         (OUT / "home-readiness.json").write_text(json.dumps(home_state, indent=2))
-        if home_state["anrEvents"] or home_state["crashCount"] >= 3:
-            raise RuntimeError("Android home readiness failed with an ANR or crash loop; no app installed")
-        if home_state["ready"]:
-            break
-        if time.monotonic() >= home_deadline:
-            raise RuntimeError("Android home did not complete its first frame and foreground checks within 180 seconds")
-        time.sleep(1)
+        return home_state
+    # Do not inject MENU into a launcher that has not finished starting.
+    # The fresh SDK image completes its own initialization and home selection.
+    await_home_readiness(read_home_state, time.monotonic, time.sleep, timeout_seconds=180)
     screenshot = run([adb, "-s", SERIAL, "exec-out", "screencap", "-p"], timeout=20)
     if not capture_file(screenshot.stdout, "home-ready.png"):
         raise RuntimeError("Could not retain the home readiness screenshot")

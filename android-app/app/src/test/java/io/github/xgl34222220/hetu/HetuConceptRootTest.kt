@@ -47,7 +47,8 @@ class HetuConceptRootTest {
         vm.openPanel(section)
         vm.tab = tab
         rule.setContent {
-            HetuAppTheme(if (followAppearance) vm.appearance else if (dark) "dark" else "light", dynamic = false) {
+            HetuAppTheme(if (followAppearance) vm.appearance else if (dark) "dark" else "light", dynamic = false,
+                accentHex = if (followAppearance) vm.accentHex else "", pureBlack = followAppearance && vm.pureBlack) {
                 val density = LocalDensity.current
                 CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale), LocalHxMotionEnabled provides motion) {
                     HetuRoot(vm)

@@ -512,11 +512,18 @@ private fun HxAppearanceModes(vm: HetuViewModel) {
         Triple("light", "浅色模式", Icons.Rounded.LightMode),
         Triple("dark", "深色模式", Icons.Rounded.DarkMode),
     )
-    val captions = listOf("与系统设置保持一致", "始终使用浅色主题", "始终使用深色主题")
+    val captions = listOf("与系统设置\n保持一致", "始终使用\n浅色主题", "始终使用\n深色主题")
     val fontScale = LocalDensity.current.fontScale
     @Composable fun Mode(index: Int, modifier: Modifier = Modifier) {
         val (value, label, icon) = modes[index]
         val selected = vm.appearance == value
+        val motion = LocalHxMotionEnabled.current
+        val fillColor by androidx.compose.animation.animateColorAsState(
+            if (selected) c.accentSoft else c.surface,
+            if (motion) HxMotion.enter<Color>(HxMotion.Short) else androidx.compose.animation.core.snap(), label = "theme-mode-fill-$value")
+        val borderColor by androidx.compose.animation.animateColorAsState(
+            if (selected) c.accent else c.line,
+            if (motion) HxMotion.enter<Color>(HxMotion.Short) else androidx.compose.animation.core.snap(), label = "theme-mode-border-$value")
         val source = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
         androidx.compose.material3.Surface(
             modifier = modifier.testTag("theme-mode-$value")
@@ -524,9 +531,8 @@ private fun HxAppearanceModes(vm: HetuViewModel) {
                 .selectable(selected, role = Role.RadioButton, interactionSource = source,
                     indication = androidx.compose.foundation.LocalIndication.current) { vm.setAppearanceMode(value) },
             shape = RoundedCornerShape(20.dp),
-            color = if (selected) c.accentSoft else c.surface,
-            border = androidx.compose.foundation.BorderStroke(if (selected) 1.5.dp else .8.dp,
-                if (selected) c.accent else c.line),
+            color = fillColor,
+            border = androidx.compose.foundation.BorderStroke(if (selected) 1.5.dp else .8.dp, borderColor),
         ) {
             Column(Modifier.padding(12.dp).heightIn(min = 124.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -575,7 +581,8 @@ private fun HxAccentSwatches(vm: HetuViewModel) {
                 row.forEach { (hex, name) ->
                     val color = Color(android.graphics.Color.parseColor(hex))
                     val selected = vm.accentChoice.equals(hex, true)
-                    val scale by androidx.compose.animation.core.animateFloatAsState(if (selected) 1f else .82f, HxMotion.pop(), label = "swatch")
+                    val scale by androidx.compose.animation.core.animateFloatAsState(if (selected) 1f else .82f,
+                        if (LocalHxMotionEnabled.current) HxMotion.pop<Float>() else androidx.compose.animation.core.snap(), label = "swatch")
                     Box(Modifier.size(48.dp).testTag("theme-color-$hex")
                         .semantics { contentDescription = "强调色：$name" }
                         .selectable(selected, role = Role.RadioButton) {
