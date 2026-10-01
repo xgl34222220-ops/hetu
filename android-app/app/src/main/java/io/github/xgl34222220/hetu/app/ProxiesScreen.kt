@@ -29,6 +29,8 @@ import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
 import android.content.Intent
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.OutlinedTextField
@@ -149,6 +151,7 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
     var showFilter by remember { mutableStateOf(false) }
     var showLayout by remember { mutableStateOf(false) }
     var showApi by remember { mutableStateOf(false) }
+    var detailsNode by remember { mutableStateOf<ProxyNodeUi?>(null) }
     // Layout controls are real: strategy and node grids each honor their own preference.
     val forceSingleColumn = LocalDensity.current.fontScale > 1.3f
     val groupColumns = if (forceSingleColumn) 1 else options.groupColumns.coerceIn(1, 2)
@@ -345,6 +348,7 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
                                 compact = options.compact,
                                 nameOverflow = options.nameOverflow,
                                 modifier = Modifier.weight(1f),
+                                onDetails = { detailsNode = node },
                             )
                         }
                         repeat(nodeColumns - entry.nodes.size) { Spacer(Modifier.weight(1f)) }
@@ -404,6 +408,9 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
     }
 
     if (showApi) ApiSettingsSheet(vm, onDismiss = { showApi = false })
+    detailsNode?.let { node ->
+        StrategyNodeDetails(node, onDismiss = { detailsNode = null })
+    }
 }
 
 
@@ -487,6 +494,7 @@ private fun StrategyNodeCard(
     compact: Boolean,
     nameOverflow: String,
     modifier: Modifier,
+    onDetails: () -> Unit,
 ) {
     val c = Hx.colors
     val haptics = rememberHetuHaptics()
@@ -524,13 +532,13 @@ private fun StrategyNodeCard(
             .border(.7.dp, border, shape)
             .hxCombinedClickSource(
                 source = source,
-                enabled = selectable && pending == null,
+                enabled = vm.state.running,
                 onLongClick = {
                     haptics.perform(HetuHaptic.LongPress)
-                    vm.testNode(node.name)
+                    onDetails()
                 },
                 onClick = {
-                    if (!selected) {
+                    if (selectable && pending == null && !selected) {
                         haptics.perform(HetuHaptic.Confirm)
                         vm.select(group.name, node.name)
                     }
@@ -569,13 +577,35 @@ private fun StrategyNodeCard(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            StrategyCompactDelayPill(delay, testing) { vm.testNode(node.name) }
+            StrategyCompactDelayPill(delay, testing, Modifier.testTag("strategy-delay-${group.name}-${node.name}")) { vm.testNode(node.name) }
         }
     }
 }
 
 @Composable
-private fun StrategyCompactDelayPill(delay: Long?, testing: Boolean, onClick: () -> Unit) {
+private fun StrategyNodeDetails(node: ProxyNodeUi, onDismiss: () -> Unit) {
+    val c = Hx.colors
+    HxSheet(onDismiss = onDismiss) {
+        val close = LocalHxSheetClose.current
+        Row(Modifier.fillMaxWidth().padding(start = 22.dp, end = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("节点信息", style = MaterialTheme.typography.titleLarge, color = c.text, modifier = Modifier.weight(1f))
+            HxBarAction(Icons.Rounded.Close, "关闭节点信息", { close(onDismiss) })
+        }
+        SelectionContainer {
+            Column(Modifier.fillMaxWidth().heightIn(max = 520.dp).verticalScroll(rememberScrollState())
+                .testTag("strategy-node-details").padding(horizontal = 22.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(node.name, style = MaterialTheme.typography.titleMedium, color = c.text)
+                Text("协议：${node.type.ifBlank { "未知" }}", style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
+                Text("提供商：${node.provider.ifBlank { "未提供" }}", style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
+                if (node.udp) Text("支持 UDP", style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
+            }
+        }
+    }
+}
+
+@Composable
+private fun StrategyCompactDelayPill(delay: Long?, testing: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val c = Hx.colors
     val bg = when {
         testing || delay == null || delay == 0L -> c.surface
@@ -593,7 +623,7 @@ private fun StrategyCompactDelayPill(delay: Long?, testing: Boolean, onClick: ()
     }
     val source = remember { MutableInteractionSource() }
     Box(
-        Modifier
+        modifier
             .hxPressScale(source, .92f)
             .clip(Hx.pillShape)
             .background(bg)

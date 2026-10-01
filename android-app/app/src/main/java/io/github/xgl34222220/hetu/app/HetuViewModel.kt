@@ -160,6 +160,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         private set
     var cpuPercent by mutableFloatStateOf(0f)
         private set
+    var cpuSampleAvailable by mutableStateOf(false)
+        private set
+    var cpuSampledAtElapsed by mutableLongStateOf(0L)
+        private set
     var operation by mutableStateOf<HxRunOp?>(null)
         private set
     var operationText by mutableStateOf("")
@@ -223,8 +227,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     private var lastUp = 0L
     private var lastDown = 0L
     private var lastAt = 0L
-    private var lastProcessTicks = 0L
-    private var lastSystemTicks = 0L
+    private val cpuSamples = CpuSampleTracker()
     private var lastLocalTxBytes = -1L
     private var lastLocalRxBytes = -1L
     private var lastLocalAt = 0L
@@ -335,15 +338,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             syncCoreLatencyResults(next.groups, delays, measuredAt, startedAt)
 
             val sampled = if (next.running) {
-                try { inspector.sample() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { runtime }
+                try { inspector.sample() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { runtime.copy(processSampleValid = false) }
             } else ProxyRuntimeSnapshot()
-            if (next.running && lastSystemTicks > 0L && sampled.systemTicks > lastSystemTicks && sampled.processTicks >= lastProcessTicks) {
-                val cores = Runtime.getRuntime().availableProcessors().coerceAtLeast(1)
-                cpuPercent = ((sampled.processTicks - lastProcessTicks).toDouble() /
-                    (sampled.systemTicks - lastSystemTicks).toDouble() * 100.0 * cores).toFloat().coerceIn(0f, 100f)
-            } else if (!next.running) cpuPercent = 0f
-            lastProcessTicks = sampled.processTicks
-            lastSystemTicks = sampled.systemTicks
+            val cpu = cpuSamples.update(CpuCounterSample(sampled.pid, sampled.processTicks, sampled.systemTicks,
+                sampled.elapsedSeconds, sampled.processSampleAtElapsed, sampled.processSampleValid), next.running,
+                Runtime.getRuntime().availableProcessors())
+            cpuSampleAvailable = cpu != null
+            cpuPercent = cpu?.percent ?: 0f
+            cpuSampledAtElapsed = cpu?.sampledAt ?: 0L
             runtime = sampled
 
             if (!next.running) {
@@ -375,6 +377,9 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (_: Exception) {
+            cpuSamples.clear()
+            cpuSampleAvailable = false
+            cpuSampledAtElapsed = 0L
             // Polling errors are shown through state.message on the next good read.
         }
     }

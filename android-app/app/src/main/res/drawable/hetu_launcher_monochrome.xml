@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <!-- The approved loop and two-node silhouette, simplified only for system tinting. -->
+    <group android:pivotX="54" android:pivotY="54" android:scaleX="0.625" android:scaleY="0.625">
+        <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd"
+            android:pathData="M34,22 C47,14 56,10 66,16 C85,23 99,43 98,61 C101,74 92,91 79,88 C62,98 46,99 31,88 C12,74 5,51 12,34 C17,22 24,17 34,22 Z M31,35 C43,24 55,23 64,29 C77,37 88,49 88,61 C80,51 70,43 58,40 C48,36 38,36 31,38 Z M32,55 C43,59 50,70 62,73 C70,76 78,74 84,75 C74,88 57,92 43,84 C31,77 27,63 32,55 Z" />
+        <path android:fillColor="#FFFFFFFF" android:pathData="M18,28 A10,10 0,1 1,38 28 A10,10 0,1 1,18 28 Z M71,76 A11,11 0,1 1,93 76 A11,11 0,1 1,71 76 Z" />
+    </group>
+</vector>

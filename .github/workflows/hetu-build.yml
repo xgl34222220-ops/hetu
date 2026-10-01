@@ -24,7 +24,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 70
+    timeout-minutes: 85
     env:
       HETU_TEST_KEYSTORE: /home/runner/.android/hetu-ui10-debug.jks
       HETU_WINDOW_QA: ${{ github.ref == 'refs/heads/test/dot-v2048-ui-safety' && (inputs.android_window_qa == true || contains(github.event.head_commit.message, '[window-qa]')) }}
@@ -41,6 +41,7 @@ jobs:
           javac -d /tmp/hetu-snapshot-tests android-app/app/src/main/java/io/github/xgl34222220/hetu/ConfigEditSnapshot.java tests/ConfigEditSnapshotTest.java
           java -cp /tmp/hetu-snapshot-tests io.github.xgl34222220.hetu.ConfigEditSnapshotTest
           python3 tools/test_config_edit_library.py
+          python3 tools/test_start_contract.py
 
       - uses: actions/setup-java@v4
         with:
@@ -120,7 +121,7 @@ jobs:
         if: success()
         working-directory: android-app
         run: |
-          gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:testDebugUnitTest --tests '*HetuConceptRootTest' --tests '*HomeConceptUiTest' --tests '*ConfigEditorSafetyTest' --stacktrace
+          gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:testDebugUnitTest --tests '*HetuConceptRootTest' --tests '*HomeConceptUiTest' --tests '*ConfigEditorSafetyTest' --tests '*CpuSampleTrackerTest' --tests '*RuntimeCpuSamplingTest' --tests '*LauncherIconTest' --stacktrace
 
       - name: Archive first actual launcher frames
         if: always() && steps.build.outcome == 'success'
@@ -148,6 +149,7 @@ jobs:
         if: always() && steps.build.outcome == 'success'
         run: |
           python3 tools/verify_runtime_source.py android-app/app/build/outputs/apk/debug/app-debug.apk
+          python3 tools/test_start_contract.py --apk android-app/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Export exact source
         if: always()
@@ -201,9 +203,7 @@ jobs:
 
       - name: Validate default glass in an ordinary Android window
         if: always() && steps.window_test_build.outcome == 'success' && env.HETU_WINDOW_QA == 'true'
-        timeout-minutes: 55
-        env:
-          HETU_WINDOW_EXPECTED_APK_SHA256: f10a805597c1dfe3145f5203e00acb800b9e8898bf9c32bc363f44e6a0e48f33
+        timeout-minutes: 70
         run: python3 tools/run_android_window_qa.py
 
       - uses: actions/upload-artifact@v4

@@ -51,6 +51,8 @@ internal data class ProxyRuntimeSnapshot(
     val wanState: String = "idle",
     val wanCheckedAt: Long = 0L,
     val wanError: String = "",
+    val processSampleAtElapsed: Long = 0L,
+    val processSampleValid: Boolean = false,
 )
 
 /** Lightweight runtime inspector used by the proxy dashboard. */
@@ -63,6 +65,7 @@ internal class ProxyRuntimeInspector(context: Context) {
     @Volatile private var processSampleStartupAt = Long.MIN_VALUE
     @Volatile private var processSampleJson: JSONObject? = null
     private val processSampleTtlMs = 8_000L
+    private data class ProcessSample(val json: JSONObject?, val at: Long, val valid: Boolean)
 
     suspend fun sample(): ProxyRuntimeSnapshot = withContext(Dispatchers.IO) {
         val command = """
@@ -75,12 +78,12 @@ internal class ProxyRuntimeInspector(context: Context) {
               case "${'$'}START" in ''|*[!0-9]*) START=0;; esac
               ELAPSED=0
               if [ "${'$'}UP" -ge "${'$'}START" ]; then ELAPSED=${'$'}((UP-START)); fi
-              PT=${'$'}(awk '{print ${'$'}14+${'$'}15}' /proc/${'$'}P/stat 2>/dev/null || echo 0)
+              PT=${'$'}(awk '{print ${'$'}14+${'$'}15}' /proc/${'$'}P/stat 2>/dev/null || echo -1)
               ST=${'$'}(awk '/^cpu /{s=0; for(i=2;i<=NF;i++)s+=${'$'}i; print s; exit}' /proc/stat 2>/dev/null || echo 0)
               RKB=${'$'}(awk '/^VmRSS:/{print ${'$'}2; exit}' /proc/${'$'}P/status 2>/dev/null || echo 0)
               CPU=${'$'}(awk '{print ${'$'}39}' /proc/${'$'}P/stat 2>/dev/null || echo -1)
               AFF=${'$'}(awk '/^Cpus_allowed_list:/{print ${'$'}2; exit}' /proc/${'$'}P/status 2>/dev/null || echo -)
-              case "${'$'}PT" in ''|*[!0-9]*) PT=0;; esac
+              case "${'$'}PT" in ''|*[!0-9]*) PT=-1;; esac
               case "${'$'}ST" in ''|*[!0-9]*) ST=0;; esac
               case "${'$'}RKB" in ''|*[!0-9]*) RKB=0;; esac
               case "${'$'}CPU" in ''|*[!0-9-]*) CPU=-1;; esac
@@ -92,14 +95,13 @@ internal class ProxyRuntimeInspector(context: Context) {
         val wanted = prefs.getBoolean("proxyRootWanted", false)
         val startupAt = prefs.getLong("proxyRootLastStartupAt", 0L)
         val sampleNow = SystemClock.elapsedRealtime()
-        val json = if (!wanted) {
-            JSONObject().put("running", false).put("pid", 0).put("elapsed", 0)
-                .put("processTicks", 0).put("systemTicks", 0).put("rssBytes", 0)
+        val process = if (!wanted) {
+            ProcessSample(null, 0L, false)
         } else synchronized(processSampleLock) {
             val age = sampleNow - processSampleAt
             val cached = processSampleJson
             if (cached != null && processSampleStartupAt == startupAt && age >= 0L && age <= processSampleTtlMs) {
-                cached
+                ProcessSample(cached, processSampleAt, true)
             } else {
                 val result = RootBridge.rootShell(app, command, 8_000L)
                 val fresh = if (result.ok()) runCatching { JSONObject(result.output.trim()) }.getOrNull() else null
@@ -107,12 +109,14 @@ internal class ProxyRuntimeInspector(context: Context) {
                     processSampleJson = fresh
                     processSampleAt = sampleNow
                     processSampleStartupAt = startupAt
-                    fresh
+                    ProcessSample(fresh, sampleNow, true)
                 } else {
-                    cached
+                    // Retain useful cached metadata, but never call it a new CPU observation.
+                    ProcessSample(cached, processSampleAt, false)
                 }
             }
         }
+        val json = process.json
         val local = localNetwork()
         val wan = publicNetwork()
         val lookup = wanLookup.view()
@@ -138,6 +142,9 @@ internal class ProxyRuntimeInspector(context: Context) {
             wanCheckedAt = if (lookup.succeededAt > 0L) System.currentTimeMillis() - (SystemClock.elapsedRealtime() - lookup.succeededAt) else 0L,
             wanError = if (lookup.failure.isNotBlank() && prefs.getBoolean("proxyRootRuntimeRefreshPending", false))
                 "运行组件待应用，可手动重启代理" else if (lookup.failure.isNotBlank()) "出口检测失败，稍后自动重试" else "",
+            processSampleAtElapsed = process.at,
+            processSampleValid = process.valid && json?.optBoolean("running", false) == true &&
+                json.optInt("pid", 0) > 0 && json.optLong("processTicks", -1L) >= 0L && json.optLong("systemTicks", 0L) > 0L,
         )
     }
 

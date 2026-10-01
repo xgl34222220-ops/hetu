@@ -1336,7 +1336,10 @@ health_json(){ (
 
 case "${1:-status}" in
   preflight) { [ "$#" = 19 ] || [ "$#" = 20 ]; } || fail "参数错误"; preflight "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}" "${18}" "${19}" "${20:-}";;
-  start) { [ "$#" = 23 ] || [ "$#" = 24 ]; } || fail "参数错误"; root; start "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}" "${18}" "${19}" "${20}" "${21}" "${22}" "${23}" "${24:-}";;
+  # Legacy callers omit only the optional shared-MAC argument. Current callers
+  # provide all 30 start arguments, including DNS and process-control settings.
+  # Shift the action once and preserve every argument, including empty values.
+  start) case "$#" in 23) set -- "$@" "";; 24|31) ;; *) fail "参数错误";; esac; root; shift; start "$@";;
   stop) root; acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"; stopwatchdog; cleanup; stopcore; restorev6 || fail "核心已停止，但 IPv6 原状态恢复失败，请重试停止"; rm -f "$SESSION"; ok "Root 代理已停止并恢复网络状态";;
   status) status;;
   network-health) health_json;;

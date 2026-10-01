@@ -151,6 +151,16 @@ try:
     install(app_apk, "app")
     installed = True
     install(test_apk, "test")
+    # CPU-only emulation can spend Android's startup budget verifying these large debug
+    # APKs. Precompile only our two installed packages through the public shell command;
+    # never relax the system's ANR policy or change emulator permissions.
+    for package, label, limit in [(APP, "app", 900), (APP + ".test", "test", 600)]:
+        record_stage("compile-" + label)
+        path = OUT / ("compile-" + label + ".log")
+        run([adb, "-s", SERIAL, "shell", "cmd", "package", "compile", "-f", "-m", "speed", package],
+            timeout=limit, output=path)
+        if "Success" not in path.read_text(errors="replace"):
+            raise RuntimeError("Package manager did not confirm test-package compilation: " + label)
     # Capture from before process launch; pidof after a fatal exit loses the useful stack.
     packages = run([adb, "-s", SERIAL, "shell", "cmd", "package", "list", "packages", "-U", APP], timeout=30).stdout.decode()
     uids = [uid for package, uid in re.findall(r"package:(\S+)\s+uid:(\d+)", packages) if package in (APP, APP + ".test")]

@@ -204,6 +204,9 @@ internal object ConceptTestIo {
     @Volatile var rules = conceptRules()
     @Volatile var ruleSets = conceptRuleSets()
     @Volatile var providers = conceptProviders()
+    @Volatile var runtimeSample: ProxyRuntimeSnapshot? = null
+    @Volatile var runtimeFailure: Exception? = null
+    @Volatile var processSampleJson: String? = null
     const val logText = "[INFO] 连接已建立 example.invalid:443\n[WARN] 规则未匹配，使用 MATCH\n[ERROR] 测试连接已超时\n"
 
     fun reset() {
@@ -218,6 +221,9 @@ internal object ConceptTestIo {
         rules = conceptRules()
         ruleSets = conceptRuleSets()
         providers = conceptProviders()
+        runtimeSample = null
+        runtimeFailure = null
+        processSampleJson = null
     }
 
     fun stoppedRoot() = JSONObject().put("ok", true).put("running", false)
@@ -245,6 +251,8 @@ class ConceptRootBridgeShadow {
         fun rootShell(context: Context, command: String, timeoutMs: Long): RootBridge.Result {
             ConceptTestIo.calls += "root:blocked"
             return when {
+                command.startsWith("P=") && command.contains("/proc/uptime") -> ConceptTestIo.processSampleJson
+                    ?.let { RootBridge.Result(0, it) } ?: RootBridge.Result(1, "sample unavailable")
                 command.startsWith("echo '--- controller-port ---';") -> RootBridge.Result(0, ConceptTestIo.logText)
                 command.startsWith("if [ -x ") && command.contains(" 'status';") ->
                     RootBridge.Result(0, ConceptTestIo.runtimeRoot().toString())
@@ -270,7 +278,8 @@ class ConceptRuntimeInspectorShadow {
     @Implementation
     fun sample(continuation: Continuation<Any?>): Any {
         ConceptTestIo.calls += "inspector:sample"
-        return ProxyRuntimeSnapshot(running = ConceptTestIo.actionMode && ConceptTestIo.state.running)
+        ConceptTestIo.runtimeFailure?.let { throw it }
+        return ConceptTestIo.runtimeSample ?: ProxyRuntimeSnapshot(running = ConceptTestIo.actionMode && ConceptTestIo.state.running)
     }
 
     @Implementation
@@ -337,5 +346,13 @@ class ConceptMihomoClientShadow {
     @Implementation fun setTrafficMode(mode: String) {
         ConceptTestIo.calls += "PATCH /configs:$mode"
         ConceptTestIo.state = ConceptTestIo.state.copy(trafficMode = mode)
+    }
+    @Implementation fun delay(node: String, preferredUrl: String, expected: String): Long {
+        ConceptTestIo.calls += "DELAY:$node"
+        return 125L
+    }
+    @Implementation fun providerDelay(provider: String, node: String, preferredUrl: String, expected: String): Long {
+        ConceptTestIo.calls += "DELAY:$node"
+        return 125L
     }
 }

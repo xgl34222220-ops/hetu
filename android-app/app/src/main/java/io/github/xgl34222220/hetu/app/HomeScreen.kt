@@ -342,12 +342,13 @@ private fun HomeResourceTile(vm: HetuViewModel, cpu: Boolean, modifier: Modifier
             Spacer(Modifier.width(9.dp))
             Column(Modifier.weight(1f)) {
                 Text(if (cpu) "CPU 占用" else "内存占用", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
-                Text(if (!running) "—" else if (cpu) String.format(java.util.Locale.US, "%.1f%%", vm.cpuPercent)
+                Text(if (!running || cpu && !vm.cpuSampleAvailable) "—" else if (cpu) String.format(java.util.Locale.US, "%.1f%%", vm.cpuPercent)
                     else if (memory > 0) HxFormat.bytes(memory) else "—", style = MaterialTheme.typography.titleMedium.merge(HxNumberStyle), color = c.text)
             }
         }
         Spacer(Modifier.height(8.dp))
-        if (cpu) HxProgressBar(if (running) (vm.cpuPercent / 100f).coerceIn(0f, 1f) else 0f, c.accent, height = 5.dp)
+        if (cpu && running && vm.cpuSampleAvailable) HxProgressBar((vm.cpuPercent / 100f).coerceIn(0f, 1f), c.accent, height = 5.dp)
+        else if (cpu) Text(if (running) "等待有效采样" else "核心未运行", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
         else Text("核心实际驻留", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
     }
 }
@@ -722,8 +723,8 @@ private fun HomeResourceCard(vm: HetuViewModel, modifier: Modifier, onOpen: () -
     Bento("资源占用", modifier = modifier.fillMaxHeight(), onClick = if (running) onOpen else null) {
         BentoLine("内存", if (running && memory > 0) HxFormat.bytes(memory) else "—")
         HxProgressBar(if (running) (memory / (512f * 1024 * 1024)).coerceIn(0f, 1f) else 0f, c.accent, Modifier.padding(vertical = 3.dp), height = 3.dp)
-        BentoLine("CPU", if (running) String.format(java.util.Locale.US, "%.1f%%", vm.cpuPercent) else "—")
-        HxProgressBar(if (running) (vm.cpuPercent / 100f).coerceIn(0f, 1f) else 0f, c.accent, Modifier.padding(top = 3.dp), height = 3.dp)
+        BentoLine("CPU", if (running && vm.cpuSampleAvailable) String.format(java.util.Locale.US, "%.1f%%", vm.cpuPercent) else "—")
+        if (running && vm.cpuSampleAvailable) HxProgressBar((vm.cpuPercent / 100f).coerceIn(0f, 1f), c.accent, Modifier.padding(top = 3.dp), height = 3.dp)
     }
 }
 
@@ -905,7 +906,7 @@ private fun HomeLiveNetwork(vm: HetuViewModel) {
             ) {
                 HomeMiniStat(
                     "CPU",
-                    if (running) String.format(java.util.Locale.US, "%.1f%%", vm.cpuPercent) else "—",
+                    if (running && vm.cpuSampleAvailable) String.format(java.util.Locale.US, "%.1f%%", vm.cpuPercent) else "—",
                     Modifier.weight(1f),
                 )
                 HomeMiniStat(
@@ -1229,15 +1230,26 @@ internal fun CoreDetails(vm: HetuViewModel, onDismiss: () -> Unit) {
     val c = Hx.colors
     val state = vm.state
     val memory = if (vm.runtime.rssBytes > 0) vm.runtime.rssBytes else state.memoryBytes
-    val cpuSamples = remember(vm) { androidx.compose.runtime.mutableStateListOf<Long>() }
-    val memorySamples = remember(vm) { androidx.compose.runtime.mutableStateListOf<Long>() }
-    LaunchedEffect(vm.runtime) {
-        if (state.running && vm.runtime.pid > 0) {
-            cpuSamples.add((vm.cpuPercent.coerceAtLeast(0f) * 100).toLong())
-            memorySamples.add(memory.coerceAtLeast(0))
+    val cpuSamples = remember(vm) { androidx.compose.runtime.mutableStateListOf<Long?>() }
+    val memorySamples = remember(vm) { androidx.compose.runtime.mutableStateListOf<Long?>() }
+    var lastCpuSampleAt by remember(vm) { mutableStateOf(0L) }
+    var lastMemorySampleAt by remember(vm) { mutableStateOf(0L) }
+    var lastMemoryPid by remember(vm) { mutableStateOf(0) }
+    LaunchedEffect(state.running, vm.cpuSampleAvailable, vm.cpuSampledAtElapsed, vm.runtime.processSampleValid, vm.runtime.processSampleAtElapsed) {
+        if (state.running) {
+            if (vm.cpuSampleAvailable && vm.cpuSampledAtElapsed != lastCpuSampleAt) {
+                cpuSamples.add((vm.cpuPercent.coerceAtLeast(0f) * 100).toLong())
+                lastCpuSampleAt = vm.cpuSampledAtElapsed
+            } else if (!vm.cpuSampleAvailable && cpuSamples.lastOrNull() != null) cpuSamples.add(null)
+            if (vm.runtime.processSampleValid && memory > 0 && vm.runtime.processSampleAtElapsed != lastMemorySampleAt) {
+                if (lastMemoryPid != 0 && lastMemoryPid != vm.runtime.pid && memorySamples.lastOrNull() != null) memorySamples.add(null)
+                memorySamples.add(memory)
+                lastMemorySampleAt = vm.runtime.processSampleAtElapsed
+                lastMemoryPid = vm.runtime.pid
+            } else if ((!vm.runtime.processSampleValid || memory <= 0) && memorySamples.lastOrNull() != null) memorySamples.add(null)
             while (cpuSamples.size > 40) cpuSamples.removeAt(0)
             while (memorySamples.size > 40) memorySamples.removeAt(0)
-        } else { cpuSamples.clear(); memorySamples.clear() }
+        } else { cpuSamples.clear(); memorySamples.clear(); lastCpuSampleAt = 0L; lastMemorySampleAt = 0L; lastMemoryPid = 0 }
     }
     val rows = listOf(
         "运行时长" to if (state.running) HxFormat.duration(vm.runtime.elapsedSeconds) else "—",
@@ -1250,7 +1262,7 @@ internal fun CoreDetails(vm: HetuViewModel, onDismiss: () -> Unit) {
         "活动连接" to if (state.running) state.connections.size.toString() else "—",
     )
     HxPage(title = "资源占用", onBack = onDismiss, largeTitle = false) {
-        item { ResourceDetailChart("CPU", if (state.running) String.format(java.util.Locale.US, "%.1f%%", vm.cpuPercent) else "—", cpuSamples.toList(), c.accent) }
+        item { ResourceDetailChart("CPU", if (state.running && vm.cpuSampleAvailable) String.format(java.util.Locale.US, "%.1f%%", vm.cpuPercent) else "—", cpuSamples.toList(), c.accent) }
         item { ResourceDetailChart("内存", if (state.running && memory > 0) HxFormat.bytes(memory) else "—", memorySamples.toList(), c.good) }
         item {
             HxSection {
@@ -1268,7 +1280,7 @@ internal fun CoreDetails(vm: HetuViewModel, onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun ResourceDetailChart(title: String, value: String, samples: List<Long>, tint: Color) {
+private fun ResourceDetailChart(title: String, value: String, samples: List<Long?>, tint: Color) {
     HxSection {
         HxCard {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1279,9 +1291,34 @@ private fun ResourceDetailChart(title: String, value: String, samples: List<Long
                 Text("本次查看", style = MaterialTheme.typography.bodySmall, color = Hx.colors.textMuted)
             }
             Spacer(Modifier.height(16.dp))
-            if (samples.size > 1) HxTrafficChart(samples, emptyList(), tint, tint, Modifier.fillMaxWidth().height(76.dp))
+            if (samples.count { it != null } > 1) ResourceHistoryChart(samples, tint, Modifier.fillMaxWidth().height(76.dp))
             else Box(Modifier.fillMaxWidth().height(76.dp), contentAlignment = Alignment.Center) {
                 Text("等待连续运行采样", style = MaterialTheme.typography.bodySmall, color = Hx.colors.textFaint)
+            }
+            if (samples.any { it == null }) Text("断开处为缺测", style = MaterialTheme.typography.labelSmall, color = Hx.colors.textFaint)
+        }
+    }
+}
+
+/** Missing observations split paths; they are never plotted as zero or joined across a gap. */
+@Composable
+private fun ResourceHistoryChart(samples: List<Long?>, tint: Color, modifier: Modifier) {
+    val segments = remember(samples) { resourceSampleSegments(samples) }
+    Canvas(modifier) {
+        val maximum = samples.filterNotNull().maxOrNull()?.coerceAtLeast(1L) ?: 1L
+        fun point(sample: IndexedValue<Long>) = Offset(
+            sample.index.toFloat() / (samples.size - 1).coerceAtLeast(1) * size.width,
+            size.height - 2.dp.toPx() - sample.value.toFloat() / maximum * (size.height - 4.dp.toPx()),
+        )
+        segments.forEach { segment ->
+            if (segment.size == 1) drawCircle(tint, 2.dp.toPx(), point(segment.first()))
+            else {
+                val path = Path()
+                segment.forEachIndexed { index, sample ->
+                    val p = point(sample)
+                    if (index == 0) path.moveTo(p.x, p.y) else path.lineTo(p.x, p.y)
+                }
+                drawPath(path, tint, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
             }
         }
     }
@@ -1446,7 +1483,7 @@ private fun TrafficCard(vm: HetuViewModel) {
             Row {
                 val memory = if (vm.runtime.rssBytes > 0) vm.runtime.rssBytes else vm.state.memoryBytes
                 HxMetric("内存", if (running && memory > 0) HxFormat.bytes(memory) else "—", Modifier.weight(1f))
-                HxMetric("CPU", if (running) String.format(java.util.Locale.US, "%.1f%%", vm.cpuPercent) else "—", Modifier.weight(1f))
+                HxMetric("CPU", if (running && vm.cpuSampleAvailable) String.format(java.util.Locale.US, "%.1f%%", vm.cpuPercent) else "—", Modifier.weight(1f))
                 HxMetric("运行", if (running) HxFormat.duration(vm.runtime.elapsedSeconds) else "—", Modifier.weight(.8f))
             }
         }

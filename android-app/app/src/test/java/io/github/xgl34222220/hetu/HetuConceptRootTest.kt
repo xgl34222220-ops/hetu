@@ -230,6 +230,100 @@ class HetuConceptRootTest {
         node("strategy-node-${group.name}-${group.nodes[1].name}").assertIsNotSelected()
     }
 
+    @Test fun longPressShowsCompleteNodeMetadataWithoutMeasuringOrSelecting() {
+        val longName = "香港测试专线 · 完整名称不可省略 · 原始节点标识 0123456789"
+        val target = ProxyNodeUi(longName, "VLESS", true, 88, "测试订阅提供商")
+        val original = conceptRunningState()
+        val group = original.groups.first().copy(nodes = original.groups.first().nodes + target)
+        rule.runOnIdle { setConceptState(vm, original.copy(groups = listOf(group))) }
+        render(running = false)
+        node("strategy-group-${group.name}").performClick()
+        val next = node("strategy-node-${group.name}-$longName")
+        next.performScrollTo().performTouchInput { longClick() }
+        node("strategy-node-details").assertIsDisplayed()
+        rule.onAllNodesWithText(longName).filter(hasAnyAncestor(hasTestTag("strategy-node-details"))).assertCountEquals(1)
+        rule.onNodeWithText("协议：VLESS").assertIsDisplayed()
+        rule.onNodeWithText("提供商：测试订阅提供商").assertIsDisplayed()
+        assertEquals(0, conceptSelectionRequestCount())
+        assertTrue(ConceptTestIo.calls.none { it.startsWith("DELAY:") })
+        assertTrue(vm.delays.isEmpty())
+        // ModalBottomSheet owns a separate window. Draw that actual dialog's decorView,
+        // not the activity beneath it; this remains software-rendered layout evidence.
+        rule.runOnIdle {
+            val dialog = requireNotNull(org.robolectric.shadows.ShadowDialog.getLatestDialog())
+            assertTrue(dialog.isShowing)
+            val view = requireNotNull(dialog.window).decorView
+            assertTrue(view.width > 0 && view.height > 0)
+            val detailsBitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+            view.draw(Canvas(detailsBitmap))
+            val detailsFile = File("build/outputs/hetu-concept-root/14-root-complete-node-details.png")
+            detailsFile.parentFile!!.mkdirs()
+            detailsFile.outputStream().use { detailsBitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            detailsBitmap.recycle()
+        }
+        rule.onNodeWithContentDescription("关闭节点信息").performClick()
+        node("strategy-node-details").assertDoesNotExist()
+        node("strategy-node-${group.name}-${group.now}").assertIsSelected()
+        next.assertIsNotSelected()
+    }
+
+    @Test fun independentDelayTargetMeasuresTheRawNodeWithoutSelectingIt() {
+        render()
+        rule.runOnIdle { enableConceptActionMode(vm) }
+        val group = vm.state.groups.first()
+        val name = group.nodes[1].name
+        node("strategy-group-${group.name}").performClick()
+        node("strategy-delay-${group.name}-$name").performTouchInput { click() }
+        rule.waitUntil(10_000) {
+            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+            vm.delays[name] == 125L && vm.testingNodes.isEmpty()
+        }
+        assertEquals(listOf("DELAY:$name"), ConceptTestIo.calls.filter { it.startsWith("DELAY:") })
+        assertEquals(0, conceptSelectionRequestCount())
+        node("strategy-node-${group.name}-${group.now}").assertIsSelected()
+        node("strategy-node-${group.name}-$name").assertIsNotSelected()
+    }
+
+    @Test fun actualHomeCpuIsUnknownUntilTwoSamplesAndAgainAfterFailureOrRestart() {
+        render(tab = HxTab.Home)
+        rule.runOnIdle { enableConceptActionMode(vm) }
+        fun sample(at: Long, pid: Int = 42) = rule.runOnIdle {
+            ConceptTestIo.runtimeFailure = null
+            ConceptTestIo.runtimeSample = ProxyRuntimeSnapshot(running = true, pid = pid,
+                elapsedSeconds = at / 1000, processTicks = 100L, systemTicks = at,
+                processSampleAtElapsed = at, processSampleValid = true)
+            kotlinx.coroutines.runBlocking { vm.refreshNow() }
+        }
+        rule.onNodeWithText("等待有效采样").assertExists()
+        rule.onNodeWithText("0.0%").assertDoesNotExist()
+        sample(1_000)
+        assertFalse(vm.cpuSampleAvailable)
+        sample(2_000)
+        assertTrue(vm.cpuSampleAvailable)
+        rule.onNodeWithText("0.0%").assertExists() // A measured idle interval is a real zero.
+        rule.runOnIdle {
+            ConceptTestIo.runtimeFailure = java.io.IOException("CPU sample unavailable")
+            kotlinx.coroutines.runBlocking { vm.refreshNow() }
+        }
+        assertFalse(vm.cpuSampleAvailable)
+        rule.onNodeWithText("0.0%").assertDoesNotExist()
+        rule.onNodeWithText("等待有效采样").assertExists()
+        sample(3_000)
+        assertFalse(vm.cpuSampleAvailable)
+        sample(4_000)
+        assertTrue(vm.cpuSampleAvailable)
+        sample(5_000, pid = 43)
+        assertFalse(vm.cpuSampleAvailable)
+        sample(6_000, pid = 43)
+        assertTrue(vm.cpuSampleAvailable)
+        rule.runOnIdle {
+            ConceptTestIo.state = ConceptTestIo.state.copy(running = false)
+            kotlinx.coroutines.runBlocking { vm.refreshNow() }
+        }
+        assertFalse(vm.cpuSampleAvailable)
+        rule.onNodeWithText("0.0%").assertDoesNotExist()
+    }
+
     @Test fun settingsHasOneOwnerPerFeatureAndBasicConfigurationHasNoSecondImporter() {
         render(tab = HxTab.Settings, running = false)
         node("settings-基础代理配置").performTouchInput { click() }

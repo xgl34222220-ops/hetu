@@ -15,6 +15,7 @@ import androidx.test.core.app.ApplicationProvider
 import io.github.xgl34222220.hetu.ui.LocalHetuMotionEnabled
 import org.junit.Assert.*
 import org.junit.Before
+import org.junit.After
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -36,6 +37,7 @@ class HomeConceptUiTest {
         app.getSharedPreferences("hetu", 0).edit().clear().commit()
         vm = newConceptTestVm(app)
     }
+    @After fun close() { if (::vm.isInitialized) rule.runOnIdle { closeConceptTestVm(vm) } }
     @Suppress("UNCHECKED_CAST")
     private fun <T> seed(name: String, value: T) {
         val field = HetuViewModel::class.java.getDeclaredField(name + "\$delegate")
@@ -110,5 +112,25 @@ class HomeConceptUiTest {
         rule.onAllNodesWithText("本次查看").assertCountEquals(2)
         rule.onNodeWithText("过去 1 小时").assertDoesNotExist()
         capture("concept-resources")
+    }
+    @Test fun missingCpuSamplesHideTheNumberAndBreakTheRecordedCurve() {
+        running()
+        fun sample(at: Long, value: Float, available: Boolean = true) = rule.runOnIdle {
+            seed("cpuPercent", value)
+            seed("cpuSampleAvailable", available)
+            seed("cpuSampledAtElapsed", if (available) at else 0L)
+            seed("runtime", vm.runtime.copy(processSampleAtElapsed = at, processSampleValid = available))
+        }
+        sample(1_000, 10f)
+        render { CoreDetails(vm) {} }
+        sample(2_000, 20f)
+        rule.onNodeWithText("20.0%").assertExists()
+        sample(2_000, 20f, available = false)
+        rule.onNodeWithText("20.0%").assertDoesNotExist()
+        rule.onNodeWithText("0.0%").assertDoesNotExist()
+        rule.onAllNodesWithText("断开处为缺测").assertCountEquals(2)
+        sample(4_000, 15f)
+        rule.onNodeWithText("15.0%").assertExists()
+        capture("concept-resources-with-sample-gap")
     }
 }
