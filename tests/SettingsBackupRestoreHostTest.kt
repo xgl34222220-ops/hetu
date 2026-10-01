@@ -89,17 +89,19 @@ fun main(args: Array<String>){
  val failure=restore(uncertain,s,JSONArray().put(item("first.yaml","restored"))).exceptionOrNull()
  verify(failure is ProxyConfigLibrary.RestoreCommitUncertain && failure.message!!.contains("未能确认"),"unconfirmed preference rollback explicit")
  verify(file(uncertain,"first.yaml").readText()=="original"&&file(uncertain,"first (2).yaml").readText()=="restored","uncertain rollback retains originals and copies")
- for(mode in listOf("inplace","grown-file","replacement","same-content-replacement","symlink")){
+ for(mode in listOf("inplace","incomplete-copy","grown-file","replacement","same-content-replacement","symlink")){
   val c=fixture("changed-$mode");imported(c,"first.yaml");c.prefs.failures=1
   var changed=false
   c.prefs.onCommit=Runnable{if(!changed){changed=true;val target=file(c,"first (2).yaml");when(mode){
    "inplace"->target.writeText("concurrent change")
+   "incomplete-copy"->java.io.RandomAccessFile(target,"rw").use{it.setLength(2L)}
    "grown-file"->java.io.RandomAccessFile(target,"rw").use{it.setLength(64L*1024*1024)}
    "replacement","same-content-replacement"->{val newer=File(c.files,"replacement");newer.writeText(if(mode=="replacement")"concurrent change" else "restored");Files.move(newer.toPath(),target.toPath(),StandardCopyOption.REPLACE_EXISTING)}
    "symlink"->{val newer=File(c.files,"replacement");newer.writeText("restored");target.delete();Files.createSymbolicLink(target.toPath(),newer.toPath())}
   }}}
   verify(restore(c,s,JSONArray().put(item("first.yaml","restored"))).isFailure,"$mode commit failure surfaced")
   verify(file(c,"first (2).yaml").exists()&&file(c,"first.yaml").readText()=="original","$mode changed copy retained")
+  if(mode=="incomplete-copy")verify(file(c,"first (2).yaml").length()==2L&&selected(c)=="first.yaml","incomplete owned copy is retained conservatively and old selection survives")
   if(mode=="grown-file")verify(file(c,"first (2).yaml").length()==64L*1024*1024,"rollback retains a larger concurrent file without reading it into memory")
  }
  val staging=fixture("staging-failure");imported(staging,"old.yaml");File(staging.files,"hetu/configs/xray").writeText("directory obstruction")

@@ -91,14 +91,15 @@ final class ProxyConfigLibrary {
     }
     private static final class RestoreWrite {
         final RestoreItem item;final File target;final Path staged;
-        boolean installed;
+        boolean installed;Object fileKey;
         RestoreWrite(RestoreItem item,File target,Path staged){this.item=item;this.target=target;this.staged=staged;}
     }
 
     /** Restore without replacing existing sources or selecting each imported file.
      * All validation/staging precedes installation. Ordinary library operations share
      * this lock, including CAS and rename. A crash can leave extra restored/staged
-     * files: this is not a crash-atomic transaction across files and preferences.
+     * files, including an incomplete new copy if copying is interrupted. This is
+     * not a crash-atomic transaction across files and preferences.
      * Original files are never overwritten, so they do not depend on rollback.
      */
     void restoreBatch(List<RestoreItem> items, Map<ProxyRuntimeProfile.Core,String> selections,
@@ -152,17 +153,30 @@ final class ProxyConfigLibrary {
                     try(FileOutputStream out=new FileOutputStream(staged.toFile())){out.write(item.bytes);out.getFD().sync();}
                 }
                 for(RestoreWrite write:writes){
-                    // A hard link atomically creates a new name and fails if anyone has
-                    // taken it. ATOMIC_MOVE can replace an existing target on Unix.
-                    Files.createLink(write.target.toPath(),write.staged);
-                    write.installed=true;
+                    // CREATE_NEW atomically reserves a previously absent path. Hard
+                    // links are denied in an ordinary Android app sandbox, while an
+                    // ATOMIC_MOVE may replace a concurrently created destination.
+                    try(java.nio.channels.FileChannel out=java.nio.channels.FileChannel.open(write.target.toPath(),
+                            StandardOpenOption.CREATE_NEW,StandardOpenOption.WRITE,LinkOption.NOFOLLOW_LINKS)){
+                        write.installed=true;
+                        write.fileKey=Files.readAttributes(write.target.toPath(),
+                                java.nio.file.attribute.BasicFileAttributes.class,LinkOption.NOFOLLOW_LINKS).fileKey();
+                        for(int offset=0;offset<write.item.bytes.length;offset+=8192){
+                            java.nio.ByteBuffer part=java.nio.ByteBuffer.wrap(write.item.bytes,offset,
+                                    Math.min(8192,write.item.bytes.length-offset));
+                            while(part.hasRemaining())out.write(part);
+                        }
+                        out.force(true);
+                    }
                 }
                 commit.commit(Collections.unmodifiableMap(resolved));
             }catch(IOException|RuntimeException failure){
                 for(int i=writes.size()-1;!(failure instanceof RestoreCommitUncertain)&&i>=0;i--){
                     RestoreWrite write=writes.get(i);if(!write.installed)continue;
                     try{
-                        if(!Files.isSymbolicLink(write.target.toPath())&&Files.isSameFile(write.staged,write.target.toPath())
+                        java.nio.file.attribute.BasicFileAttributes current=Files.readAttributes(write.target.toPath(),
+                                java.nio.file.attribute.BasicFileAttributes.class,LinkOption.NOFOLLOW_LINKS);
+                        if(write.fileKey!=null&&write.fileKey.equals(current.fileKey())&&current.isRegularFile()
                                 &&sameBytes(write.target,write.item.bytes))
                             Files.delete(write.target.toPath());
                         else failure.addSuppressed(new IOException("恢复期间配置已变化，保留文件："+write.target.getName()));
@@ -170,7 +184,7 @@ final class ProxyConfigLibrary {
                 }
                 throw failure;
             }finally{
-                // These are private staging links only. Failed cleanup leaves copies,
+                // These are private staging files only. Failed cleanup leaves copies,
                 // never the only copy of a pre-existing user configuration.
                 for(RestoreWrite write:writes)try{Files.deleteIfExists(write.staged);}catch(IOException ignored){}
                 try{Files.deleteIfExists(staging);}catch(IOException ignored){}

@@ -148,7 +148,9 @@ class HetuWindowUiTest {
         backup.writeText(JSONObject().put("schema", 1)
             .put("settings", JSONObject().put("proxyCustomApiHost", JSONObject().put("t", "s").put("v", "replacement.invalid")))
             .put("configs", org.json.JSONArray()).toString())
-        assertTrue(runCatching { HetuSettingsBackup.restore(application, Uri.fromFile(backup)) }.isFailure)
+        val rejected = runCatching { HetuSettingsBackup.restore(application, Uri.fromFile(backup)) }.exceptionOrNull()
+        assertNotNull(rejected)
+        assertTrue("The endpoint guard must cause rejection", rejected?.message.orEmpty().contains("API 地址或端口"))
         assertEquals(before, prefs.all)
         prefs.edit().putString("proxyCustomApiSecret", "").commit()
         nativeBackupVerified = true
