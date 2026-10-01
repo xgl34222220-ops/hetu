@@ -94,7 +94,7 @@ final class GoogleConnectionDiagnostics {
     }
 
     String match(Connection c) {
-        if (c.uid >= 10000 && installed.containsValue(c.uid))
+        if (c.uid >= 0 && c.uid % 100000 >= 10000 && installed.containsValue(c.uid))
             return shared.contains(c.uid) ? "共享或归属待核对 UID（无法归属具体应用）" : "已核对包名的 UID";
         String process = c.process == null ? "" : c.process;
         int colon = process.indexOf(':');
@@ -103,7 +103,7 @@ final class GoogleConnectionDiagnostics {
         // A contradictory socket UID is not proof of this package's ownership.
         if (expected != null && c.uid < 0)
             return "已安装包的进程名线索（连接 UID 未知）";
-        if (expected != null && c.uid == expected && c.uid < 10000)
+        if (expected != null && c.uid == expected && c.uid % 100000 < 10000)
             return "已安装包的进程名线索（系统 UID 不足以归属请求）";
         if (googleHost(c.host)) return "Google 域名线索（应用归属未证实）";
         return "";
@@ -127,7 +127,7 @@ final class GoogleConnectionDiagnostics {
             Integer uid = installed.get(name);
             out.append(name).append('=');
             if (uid == null) out.append("未安装或当前用户不可见");
-            else out.append("uid:").append(uid).append(uid<10000 ? "（系统 UID，不能单独归属请求）" : shared.contains(uid) ? "（共享或归属待核对）" : "");
+            else out.append("uid:").append(uid).append(uid % 100000 < 10000 ? "（系统 UID，不能单独归属请求）" : shared.contains(uid) ? "（共享或归属待核对）" : "");
             if (selection != null) out.append("；").append(selection.membership(name, uid));
             out.append('\n');
         }

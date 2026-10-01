@@ -26,6 +26,12 @@ public final class GoogleConnectionDiagnosticsTest {
         check(system.render(Collections.emptyList(),true).contains("com.google.android.gms=uid:1000"),"visible system-UID package is not falsely reported missing");
         check(system.match(connection(1000,"","","DIRECT")).isEmpty(),"system UID alone must not classify every system service as Google");
         check(system.match(connection(1000,"com.google.android.gms:persistent","","DIRECT")).contains("系统 UID"),"system-UID process evidence is qualified separately");
+        GoogleConnectionDiagnostics secondarySystem=new GoogleConnectionDiagnostics(Map.of("com.google.android.gms",1001000),Set.of());
+        check(secondarySystem.match(connection(1001000,"","","DIRECT")).isEmpty(),"secondary user's system appId cannot identify every system socket as Google");
+        check(secondarySystem.match(connection(1001000,"com.google.android.gms:persistent","","DIRECT")).contains("系统 UID"),"secondary-user exact process evidence still remains qualified");
+        check(secondarySystem.render(Collections.emptyList(),true).contains("uid:1001000（系统 UID"),"secondary-user system UID is labelled by appId");
+        GoogleConnectionDiagnostics secondaryApp=new GoogleConnectionDiagnostics(Map.of("com.android.vending",1010123),Set.of());
+        check(secondaryApp.match(connection(1010123,"","","DIRECT")).equals("已核对包名的 UID"),"secondary user's ordinary app UID remains identifiable");
         for(String host:new String[]{"play.google.com","GOOGLEAPIS.COM.","r1.gvt1.com","lh3.ggpht.com","gstatic.com","a.googleusercontent.com"}) {
             check(GoogleConnectionDiagnostics.googleHost(host),"Google domain boundary: "+host);
             check(google.match(connection(20000,"unrelated.app",host)).contains("未证实"),"host clues do not assert app identity");

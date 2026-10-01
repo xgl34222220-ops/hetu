@@ -637,12 +637,26 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     /* ---------------- proxies ---------------- */
 
     fun select(group: String, node: String) {
-        if (pendingSelection.containsKey(group)) return
+        if (!state.running || operation != null || pendingSelection.containsKey(group)) return
+        val current = state.groups.firstOrNull { it.name == group } ?: return
+        if (!HxFormat.isSelectable(current.type) || current.now == node || current.nodes.none { it.name == node }) return
         pendingSelection[group] = node
         viewModelScope.launch {
             try {
+                if (!state.running || operation != null) return@launch
                 repo.select(group, node, prefs.getBoolean("proxySelectorDisconnectOnSelect", false))
-                refreshNow()
+                if (!state.running || operation != null) return@launch
+                // Polling tolerates partial reads; an explicit switch needs an actual
+                // core response. A failed read leaves the last observed check intact.
+                val actual = try { repo.selectedNode(group) }
+                catch (cancel: CancellationException) { throw cancel }
+                catch (error: Exception) {
+                    toast("切换结果尚未确认：" + errorText(error, "读取当前节点失败"))
+                    return@launch
+                }
+                if (!state.running || operation != null) return@launch
+                state = state.copy(groups = state.groups.map { if (it.name == group) it.copy(now = actual) else it })
+                check(actual == node) { "核心尚未确认所选节点，当前为 $actual" }
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {

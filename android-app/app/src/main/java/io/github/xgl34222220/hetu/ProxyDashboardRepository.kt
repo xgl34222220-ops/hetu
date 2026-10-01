@@ -87,6 +87,11 @@ internal class ProxyDashboardRepository(context: Context) {
 
     suspend fun state(): ProxyComposeState = controller.state()
     suspend fun rules(): List<ProxyRuleUi> = controller.rules()
+    /** Strict read-back for a switch; state() deliberately tolerates partial API failures. */
+    suspend fun selectedNode(group: String): String = withContext(Dispatchers.IO) {
+        api.proxies().optJSONObject(group)?.optString("now")?.takeIf { it.isNotBlank() }
+            ?: throw IOException("无法读取策略组「$group」的当前节点")
+    }
     suspend fun select(group: String, node: String, disconnectPrevious: Boolean = false) = withContext(Dispatchers.IO) {
         // Take a live snapshot before switching. A cached UI list includes unrelated
         // DIRECT/message transports, and a post-switch list can include new sessions.

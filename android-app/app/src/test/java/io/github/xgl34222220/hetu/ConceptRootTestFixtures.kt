@@ -62,6 +62,15 @@ internal fun failNextConceptSelection(message: String = "测试选择失败") {
     check(ConceptTestIo.nextSelectionFailure.compareAndSet(null, IOException(message))) { "A one-shot selection failure is already armed" }
 }
 
+/** Hold the API read separately from the PUT acknowledgement. */
+internal fun blockNextConceptProxyRead(timeoutMs: Long = 10_000L): ConceptSelectionGate {
+    require(timeoutMs in 1_000L..20_000L)
+    val gate = ConceptSelectionGate(timeoutMs)
+    check(ConceptTestIo.nextProxyReadGate.compareAndSet(null, gate)) { "A proxy read gate is already armed" }
+    ConceptTestIo.selectionGates += gate
+    return gate
+}
+
 internal fun conceptSelectionRequestCount(): Int = ConceptTestIo.selectionRequests.get()
 
 /** Explicitly enable production controller/VM read-back against the in-memory backend. */
@@ -200,6 +209,10 @@ internal object ConceptTestIo {
     val selectionRequests = AtomicInteger()
     val nextSelectionGate = AtomicReference<ConceptSelectionGate?>(null)
     val nextSelectionFailure = AtomicReference<IOException?>(null)
+    val nextSelectionResultNode = AtomicReference<String?>(null)
+    val nextProxyReadGate = AtomicReference<ConceptSelectionGate?>(null)
+    val nextProxyReadFailure = AtomicReference<IOException?>(null)
+    val nextProxyReadJson = AtomicReference<String?>(null)
     val selectionGates = CopyOnWriteArrayList<ConceptSelectionGate>()
     @Volatile var actionMode = false
     @Volatile var state = conceptRunningState()
@@ -218,6 +231,10 @@ internal object ConceptTestIo {
         selectionGates.clear()
         nextSelectionGate.set(null)
         nextSelectionFailure.set(null)
+        nextSelectionResultNode.set(null)
+        nextProxyReadGate.set(null)
+        nextProxyReadFailure.set(null)
+        nextProxyReadJson.set(null)
         selectionRequests.set(0)
         actionMode = false
         calls.clear()
@@ -296,11 +313,18 @@ class ConceptRuntimeInspectorShadow {
 /** In-memory API boundary. Unhandled methods cannot fall through to a real socket. */
 @Implements(value = MihomoControllerClient::class, isInAndroidSdk = false, callThroughByDefault = false)
 class ConceptMihomoClientShadow {
-    @Implementation fun proxies(): JSONObject = JSONObject().also { out ->
-        ConceptTestIo.state.groups.forEach { group ->
-            out.put(group.name, JSONObject().put("type", group.type).put("now", group.now)
-                .put("all", JSONArray(group.nodes.map { it.name })))
-            group.nodes.forEach { node -> out.put(node.name, JSONObject().put("type", node.type).put("udp", node.udp)) }
+    @Implementation fun proxies(): JSONObject {
+        ConceptTestIo.calls += "GET /proxies"
+        val gate = ConceptTestIo.nextProxyReadGate.getAndSet(null)
+        try { gate?.awaitOutcome() } finally { if (gate != null) ConceptTestIo.selectionGates.remove(gate) }
+        ConceptTestIo.nextProxyReadFailure.getAndSet(null)?.let { throw it }
+        ConceptTestIo.nextProxyReadJson.getAndSet(null)?.let { return JSONObject(it) }
+        return JSONObject().also { out ->
+            ConceptTestIo.state.groups.forEach { group ->
+                out.put(group.name, JSONObject().put("type", group.type).put("now", group.now)
+                    .put("all", JSONArray(group.nodes.map { it.name })))
+                group.nodes.forEach { node -> out.put(node.name, JSONObject().put("type", node.type).put("udp", node.udp)) }
+            }
         }
     }
 
@@ -349,9 +373,10 @@ class ConceptMihomoClientShadow {
         ConceptTestIo.selectionRequests.incrementAndGet()
         val gate = ConceptTestIo.nextSelectionGate.getAndSet(null)
         val failure = ConceptTestIo.nextSelectionFailure.getAndSet(null)
+        val actual = ConceptTestIo.nextSelectionResultNode.getAndSet(null) ?: node
         try { gate?.awaitOutcome() } finally { if (gate != null) ConceptTestIo.selectionGates.remove(gate) }
         failure?.let { throw it }
-        ConceptTestIo.state = ConceptTestIo.state.copy(groups = ConceptTestIo.state.groups.map { if (it.name == group) it.copy(now = node) else it })
+        ConceptTestIo.state = ConceptTestIo.state.copy(groups = ConceptTestIo.state.groups.map { if (it.name == group) it.copy(now = actual) else it })
     }
     @Implementation fun setTrafficMode(mode: String) {
         ConceptTestIo.calls += "PATCH /configs:$mode"
