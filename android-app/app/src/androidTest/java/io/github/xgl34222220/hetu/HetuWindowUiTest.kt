@@ -36,6 +36,25 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
 
+/** Wait only for a not-yet-available accessibility tree; a real obstruction fails immediately. */
+internal fun awaitWindowForeground(
+    read: () -> Pair<Boolean, String?>,
+    clock: () -> Long,
+    pause: (Long) -> Unit,
+    timeoutMillis: Long = 5_000,
+): List<Pair<Boolean, String?>> {
+    require(timeoutMillis >= 0)
+    val started = clock()
+    val attempts = mutableListOf<Pair<Boolean, String?>>()
+    while (true) {
+        val snapshot = read()
+        attempts += snapshot
+        val remaining = timeoutMillis - (clock() - started)
+        if (!snapshot.first || snapshot.second != null || remaining <= 0) return attempts
+        pause(minOf(50L, remaining))
+    }
+}
+
 /** Test APK only: actual Android window, real root UI, no runtime start or Root calls. */
 @RunWith(AndroidJUnit4::class)
 class HetuWindowUiTest {
@@ -106,12 +125,25 @@ class HetuWindowUiTest {
     }
 
     private fun assertForeground() {
-        val focus = rule.runOnIdle { rule.activity.hasWindowFocus() }
-        val root = InstrumentationRegistry.getInstrumentation().uiAutomation.rootInActiveWindow
-        val activePackage = root?.packageName?.toString()
-        root?.recycle()
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        val attempts = awaitWindowForeground(
+            read = {
+                val before = rule.runOnIdle { rule.activity.hasWindowFocus() }
+                val root = automation.rootInActiveWindow
+                val activePackage = root?.packageName?.toString()
+                root?.recycle()
+                val after = rule.runOnIdle { rule.activity.hasWindowFocus() }
+                (before && after) to activePackage
+            },
+            clock = { android.os.SystemClock.uptimeMillis() },
+            pause = { android.os.SystemClock.sleep(it) },
+        )
+        val (focus, activePackage) = attempts.last()
         foregroundChecks += JSONObject().put("windowFocused", focus)
             .put("activePackage", activePackage ?: JSONObject.NULL)
+            .put("treeReadAttempts", org.json.JSONArray(attempts.map { (focused, pkg) ->
+                JSONObject().put("windowFocused", focused).put("activePackage", pkg ?: JSONObject.NULL)
+            }))
         if (!focus || activePackage != application.packageName) {
             captureDisplay("blocked-foreground")
             fail("Test app is obscured or not foreground: focused=$focus, activePackage=$activePackage")

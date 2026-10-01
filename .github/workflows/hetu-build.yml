@@ -93,6 +93,7 @@ jobs:
           hetu_gradle_bin=$(readlink -f "$(command -v gradle)")
           hetu_gradle_lib=$(dirname "$(dirname "$hetu_gradle_bin")")/lib
           python3 tools/test_config_download.py --kotlin-lib "$hetu_gradle_lib"
+          python3 tools/test_window_foreground.py --kotlin-lib "$hetu_gradle_lib"
 
       # The Mihomo native core and runtime assets are not committed; take the exact,
       # hash-verified payload from the published UI15 APK (unchanged since then).
