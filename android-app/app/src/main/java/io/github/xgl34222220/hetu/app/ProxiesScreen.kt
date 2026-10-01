@@ -309,6 +309,7 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
                     is PxGroupRow -> Row(
                         motion
                             .fillMaxWidth()
+                            .height(IntrinsicSize.Min)
                             .padding(horizontal = Hx.gutter)
                             .padding(bottom = 10.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -320,7 +321,7 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
                                 expanded = group.name in expandedNames,
                                 compact = options.groupCompact,
                                 nameOverflow = options.nameOverflow,
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier.weight(1f).fillMaxHeight(),
                                 onClick = { toggleGroup(group) },
                             )
                         }
@@ -443,7 +444,7 @@ private fun StrategyGroupCard(
             .hxPressScale(source).clip(shape).background(fill)
             .border(if (expanded) 1.dp else .8.dp, if (expanded) c.accent.copy(alpha = .6f) else c.line.copy(alpha = .7f), shape)
             .hxCombinedClickSource(source, onLongClick = { vm.testGroup(group) }, onClick = onClick)
-            .padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp),
+            .padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(group.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = c.text, maxLines = nameLines, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
@@ -454,6 +455,7 @@ private fun StrategyGroupCard(
         Text(group.now.ifBlank { "未选择" }, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium,
             color = c.text, maxLines = nameLines, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.fillMaxWidth().testTag("strategy-current-${group.name}"))
+        Spacer(Modifier.weight(1f))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(group.type, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Normal, color = c.textMuted)

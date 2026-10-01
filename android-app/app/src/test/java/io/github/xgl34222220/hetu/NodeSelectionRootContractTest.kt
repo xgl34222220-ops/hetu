@@ -72,6 +72,16 @@ class NodeSelectionRootContractTest {
         shadowOf(Looper.getMainLooper()).idle()
         vm.pendingSelection.isEmpty()
     }
+    private fun awaitStarted(gate: ConceptSelectionGate) = rule.waitUntil(10_000) {
+        // PUT completion resumes on Main before it can issue the controlled GET.
+        // Pump the paused test looper instead of blocking that continuation on a latch.
+        shadowOf(Looper.getMainLooper()).idle()
+        gate.awaitStarted(1L)
+    }
+    private fun assertStoppedVisible() {
+        val messages = rule.onAllNodesWithText("代理未运行")
+        assertTrue("one active stopped state must be visible", messages.fetchSemanticsNodes().indices.any { messages[it].isDisplayed() })
+    }
     private fun assertObserved(group: ProxyGroupUi, actual: String, requested: String) {
         assertEquals(actual, vm.state.groups.first { it.name == group.name }.now)
         rule.onNode(hasText(actual) and hasAnyAncestor(hasTestTag("strategy-group-${group.name}")),
@@ -86,7 +96,7 @@ class NodeSelectionRootContractTest {
         val group = vm.state.groups.first()
         setConceptState(vm, vm.state.copy(running = false))
         render()
-        rule.onNodeWithText("代理未运行").assertIsDisplayed()
+        assertStoppedVisible()
         tag("strategy-group-${group.name}").assertDoesNotExist()
         rule.runOnIdle { vm.select(group.name, group.nodes[1].name) }
         rule.waitForIdle()
@@ -102,7 +112,7 @@ class NodeSelectionRootContractTest {
         NodeSelectionStopIo.nextGate.set(stop)
         render(HxTab.Home)
         rule.onNodeWithText("停止").performClick()
-        assertTrue("the actual VM stop must reach its isolated controller", stop.awaitStarted())
+        awaitStarted(stop)
         assertEquals(HxRunOp.Stop, vm.operation)
         assertTrue("exercise the transition before running becomes false", vm.state.running)
         tag("dock-tab-1").performClick()
@@ -116,7 +126,7 @@ class NodeSelectionRootContractTest {
             shadowOf(Looper.getMainLooper()).idle()
             vm.operation == null && !vm.state.running
         }
-        rule.onNodeWithText("代理未运行").assertIsDisplayed()
+        assertStoppedVisible()
         rule.runOnIdle { vm.select(group.name, group.nodes[1].name) }
         assertEquals(0, conceptSelectionRequestCount())
         assertEquals(1, ConceptTestIo.calls.count { it == "controller:stop" })
@@ -136,14 +146,14 @@ class NodeSelectionRootContractTest {
         val selection = if (holdingReadback) blockNextConceptProxyRead(20_000L)
             else blockNextConceptSelection(20_000L)
         node(group, requested).performClick()
-        assertTrue(selection.awaitStarted())
+        awaitStarted(selection)
         rule.onNodeWithContentDescription("收起策略 ${group.name}").performClick()
         val stop = ConceptSelectionGate(20_000L)
         ConceptTestIo.selectionGates += stop
         NodeSelectionStopIo.nextGate.set(stop)
         tag("dock-tab-0").performClick()
         rule.onNodeWithText("停止").performClick()
-        assertTrue(stop.awaitStarted())
+        awaitStarted(stop)
         assertEquals(HxRunOp.Stop, vm.operation)
         selection.succeed()
         finished()
@@ -263,7 +273,7 @@ class NodeSelectionRootContractTest {
         expand(group)
         val readback = blockNextConceptProxyRead(20_000L)
         node(group, requested).performClick()
-        assertTrue("PUT must finish before the controlled GET is held", readback.awaitStarted())
+        awaitStarted(readback)
         assertEquals(requested, vm.pendingSelection[group.name])
         assertObserved(group, group.now, requested)
         rule.onNodeWithContentDescription("收起策略 ${group.name}").performClick()
@@ -293,7 +303,7 @@ class NodeSelectionRootContractTest {
         expand(group)
         val readback = blockNextConceptProxyRead()
         node(group, requested).performClick()
-        assertTrue(readback.awaitStarted())
+        awaitStarted(readback)
         readback.cancel()
         finished()
         assertObserved(group, group.now, requested)

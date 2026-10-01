@@ -28,6 +28,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.shadows.ShadowDialog
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
@@ -94,6 +95,8 @@ class ConfigWorkflowConceptTest {
         rule.waitForIdle()
     }
     private fun back() { rule.runOnIdle { rule.activity.onBackPressedDispatcher.onBackPressed() }; rule.waitForIdle() }
+    private fun cancelDialog() = rule.onNode(hasText("取消", substring = false) and hasAnyAncestor(isDialog()))
+        .assertIsDisplayed().performClick()
     private fun renderLibrary(fontScale: Float = 1f, motion: Boolean = false) {
         vm.tab = HxTab.Tools
         rule.setContent {
@@ -104,7 +107,8 @@ class ConfigWorkflowConceptTest {
                 }
             }
         }
-        node("tool-配置管理").performScrollTo().performClick()
+        rule.onNode(hasScrollAction()).performScrollToNode(hasTestTag("tool-配置管理"))
+        node("tool-配置管理").performClick()
         awaitTag("config-entry-${entry.name}")
     }
     private fun renderEditor(fontScale: Float = 1f) {
@@ -143,7 +147,8 @@ class ConfigWorkflowConceptTest {
     private fun screenshot(name: String) {
         rule.waitForIdle()
         rule.runOnIdle {
-            val view = rule.activity.window.decorView
+            val view = ShadowDialog.getLatestDialog()?.takeIf { it.isShowing }?.window?.decorView
+                ?: rule.activity.window.decorView
             assertTrue(view.width > 0 && view.height > 0)
             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
             view.draw(Canvas(bitmap))
@@ -191,7 +196,7 @@ class ConfigWorkflowConceptTest {
         screenshot("03-import-link-page")
         back()
         rule.onNodeWithText("放弃填写？").assertIsDisplayed()
-        rule.onNodeWithText("取消").performClick()
+        cancelDialog()
         node("config-import-url").assertTextContains("https://example.invalid/new.yaml")
         back(); rule.onNodeWithText("放弃", substring = false).performClick()
         awaitTag("config-library-card")
@@ -252,7 +257,7 @@ class ConfigWorkflowConceptTest {
         awaitTag("config-subscription-page")
         screenshot("04-subscription-editor")
         node("config-subscription-url").performTextReplacement("https://example.invalid/updated")
-        back(); rule.onNodeWithText("取消").performClick()
+        back(); cancelDialog()
         node("config-subscription-url").assertTextContains("https://example.invalid/updated")
         assertEquals(source, library.read(entry))
         node("config-subscription-save").performScrollTo().performClick()
@@ -286,7 +291,7 @@ class ConfigWorkflowConceptTest {
         rule.onNodeWithText("处理冲突").performClick()
         rule.onNodeWithText("重新读取", substring = false).performClick()
         rule.onNodeWithText("放弃草稿并重新读取？").assertIsDisplayed()
-        rule.onNodeWithText("取消", substring = false).performClick()
+        cancelDialog()
         assertEquals("# local draft\n" + source, editorText())
         assertEquals("# external change\n" + source, library.read(entry))
     }
@@ -349,7 +354,7 @@ class ConfigWorkflowConceptTest {
         assertTrue((bounds.right - bounds.left) >= 48.dp && (bounds.bottom - bounds.top) >= 48.dp)
         screenshot("06-import-320dp-200pct")
         back()
-        rule.onNodeWithText("取消", substring = false).assertIsDisplayed().performClick()
+        cancelDialog()
         node("config-import-page").assertExists()
     }
 
@@ -377,7 +382,7 @@ class ConfigWorkflowConceptTest {
         assertTrue((bounds.right - bounds.left) >= 48.dp && (bounds.bottom - bounds.top) >= 48.dp)
         screenshot("10-subscription-320dp-200pct")
         back()
-        rule.onNodeWithText("取消", substring = false).assertIsDisplayed().performClick()
+        cancelDialog()
         node("config-subscription-url").performScrollTo().assertTextContains("https://example.invalid/large-font")
     }
 

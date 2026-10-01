@@ -138,7 +138,13 @@ internal fun HomeScreen(vm: HetuViewModel, bottomPadding: Dp) {
             }
         }
         item(key = "resources") {
-            BentoRow(Modifier.hxEnter(stagger, 3)) {
+            if (androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f) {
+                HxSection(modifier = Modifier.hxEnter(stagger, 3)) {
+                    HomeResourceTile(vm, cpu = true, Modifier.fillMaxWidth()) { nav.push(HxRoute.Resources) }
+                    Spacer(Modifier.height(10.dp))
+                    HomeResourceTile(vm, cpu = false, Modifier.fillMaxWidth()) { nav.push(HxRoute.Resources) }
+                }
+            } else BentoRow(Modifier.hxEnter(stagger, 3)) {
                 HomeResourceTile(vm, cpu = true, Modifier.weight(1f)) { nav.push(HxRoute.Resources) }
                 HomeResourceTile(vm, cpu = false, Modifier.weight(1f)) { nav.push(HxRoute.Resources) }
             }

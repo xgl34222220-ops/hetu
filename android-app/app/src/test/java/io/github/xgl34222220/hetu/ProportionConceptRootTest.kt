@@ -41,6 +41,10 @@ class ProportionConceptRootTest {
             rssBytes = 96L * 1024 * 1024, wanAddress = "203.0.113.24", wanCountry = "测试地区", wanCountryCode = "SG"))
         setConceptValue(vm, "cpuSampleAvailable", true)
         setConceptValue(vm, "cpuPercent", 6.2f)
+        setConceptValue(vm, "upRate", 312345L)
+        setConceptValue(vm, "downRate", 1456123L)
+        setConceptValue(vm, "localUpRate", 312345L)
+        setConceptValue(vm, "localDownRate", 1456123L)
     }
     @After fun close() { if (::vm.isInitialized) rule.runOnIdle { closeConceptTestVm(vm) } }
     private fun tag(value: String) = rule.onNodeWithTag(value, useUnmergedTree = true)
@@ -103,6 +107,7 @@ class ProportionConceptRootTest {
         val a = tag("strategy-group-${changed.name}").getUnclippedBoundsInRoot()
         val b = tag("strategy-group-${vm.state.groups[1].name}").getUnclippedBoundsInRoot()
         assertTrue("normal scale retains two columns", b.left >= a.right)
+        assertEquals("wrapped and short names retain aligned card bottoms", a.bottom, b.bottom)
         for (label in listOf("搜索", "筛选", "排序与布局", "测速与 API")) {
             val bounds = rule.onNodeWithContentDescription(label).getUnclippedBoundsInRoot()
             assertTrue((bounds.bottom - bounds.top) >= 48.dp && (bounds.right - bounds.left) >= 48.dp)
@@ -110,11 +115,15 @@ class ProportionConceptRootTest {
         capture("04-strategies")
     }
     @Test @Config(qualifiers = "w320dp-h820dp-mdpi")
-    fun twoHundredPercentFontRetainsAlignedResourceCardsAndReadableValues() {
+    fun twoHundredPercentFontStacksResourceCardsWithoutSplittingUnitsIntoNarrowColumns() {
         render(HxTab.Home, scale = 2f)
-        tag("home-cpu-card").performScrollTo()
-        sameHeight("home-cpu-card", "home-memory-card")
-        rule.onNodeWithText("6.2%").assertIsDisplayed()
+        tag("home-memory-card").performScrollTo()
+        tag("home-memory-card").performTouchInput { swipeUp() }
+        val cpu = tag("home-cpu-card").getUnclippedBoundsInRoot()
+        val memory = tag("home-memory-card").getUnclippedBoundsInRoot()
+        assertTrue(memory.top >= cpu.bottom)
+        assertTrue((memory.right - memory.left) >= 288.dp)
+        rule.onNodeWithText("96.0 MB").assertIsDisplayed()
         capture("05-home-320dp-200pct")
     }
 }
