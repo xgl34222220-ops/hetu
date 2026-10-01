@@ -282,11 +282,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         return ProxyComposeState(
             running = running,
             message = configApplyMessage(running),
-            core = profile.core.label,
-            mode = profile.mode.label,
+            core = if (running) RuntimeIdentity.UNKNOWN else profile.core.label,
+            mode = if (running) RuntimeIdentity.UNKNOWN else profile.mode.label,
+            selectedCore = profile.core.label,
+            selectedMode = profile.mode.label,
+            selectedConfig = cachedConfig,
             ipv6 = profile.ipv6.id,
             autoOverwrite = profile.autoOverwrite,
-            config = prefs.getString("proxyUiLastConfig", cachedConfig) ?: cachedConfig,
+            config = if (running) RuntimeIdentity.UNKNOWN else cachedConfig,
         )
     }
 

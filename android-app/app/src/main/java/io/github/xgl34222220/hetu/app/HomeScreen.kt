@@ -1287,7 +1287,7 @@ internal fun CoreDetails(vm: HetuViewModel, onDismiss: () -> Unit) {
         "核心版本" to vm.coreVersion.ifBlank { state.core.ifBlank { "—" } },
         "CPU 核心分配" to vm.runtime.cpuAffinity.ifBlank { "—" },
         "当前 CPU" to (if (vm.runtime.currentCpu >= 0) "CPU ${vm.runtime.currentCpu}" else "—"),
-        "模式" to "${state.mode} · ${state.trafficMode.ifBlank { "rule" }}",
+        "模式" to "${state.mode} · ${state.trafficMode.ifBlank { "未确认" }}",
         "启动配置" to state.config,
         "活动连接" to if (state.running) state.connections.size.toString() else "—",
     )

@@ -398,6 +398,11 @@ final class RootProxyManager {
             if(liveFingerprint!=null&&!liveFingerprint.isEmpty()&&!liveFingerprint.equals(nextFingerprint))
                 throw new IOException("运行模式、应用范围、DNS、IPv6、TCP/UDP 或绕过策略已变化，请使用「重启」应用这些网络层设置");
 
+            String previousIdentity=prefs.getString(RuntimeIdentity.RECORD_KEY,"");
+            // From the first file/API mutation until confirmed completion, neither
+            // the previous nor the requested source is an established runtime fact.
+            prefs.edit().remove(RuntimeIdentity.RECORD_KEY).remove(RuntimeIdentity.OBSERVATION_KEY)
+                    .putLong("proxyRootHealthProbeElapsed",0L).apply();
             installHotReloadFiles(p);
             MihomoControllerClient controller=new MihomoControllerClient(context);
             boolean effective=false;
@@ -415,7 +420,17 @@ final class RootProxyManager {
                 throw error;
             }
             RootBridge.rootShell(context,"rm -f "+RootBridge.quote(CONFIG+".before-reload"),3000L);
+            // Associate this source only with the same observed process. A missing
+            // identity check cannot turn a selected filename into a runtime fact.
+            String completedIdentity="";
+            try {
+                completedIdentity=RuntimeIdentity.reloaded(runJsonWithTimeout(4000L,"process-identity"),
+                        previousIdentity,profile.core.id,profile.mode.id,p.source.name);
+            } catch(Exception unavailable) { /* Reload succeeded; identity remains unconfirmed. */ }
             prefs.edit()
+                    .putString(RuntimeIdentity.RECORD_KEY,completedIdentity)
+                    .putLong("proxyRootHealthProbeElapsed",0L)
+                    .remove(RuntimeIdentity.OBSERVATION_KEY)
                     .putString("proxyRootTopologyFingerprint",nextFingerprint)
                     .putString("proxyRootAppliedSettings",p.settingsSignature)
                     .putInt("proxyAdblockLastRuleCount",p.adblock==null?0:p.adblock.count)
@@ -632,6 +647,7 @@ final class RootProxyManager {
         String ioWeight=prefs.getBoolean("proxyIoWeightEnabled",false)?prefs.getString("proxyIoWeight","4"):"";
         String vendorClean=bit(prefs.getBoolean("proxyVendorFirewallCleanup",false));
         JSONObject result;
+        prefs.edit().remove(RuntimeIdentity.OBSERVATION_KEY).putLong("proxyRootHealthProbeElapsed",0L).apply();
         try{result=runJsonWithTimeout(125000L,"start",
                 BIN,CONFIG,profile.mode.id,String.valueOf(p.tproxyPort),String.valueOf(p.redirectPort),profile.ipv6.id,
                 bit(profile.tcp),bit(profile.udp),runtimeDns,bit(profile.quicBlocked),
@@ -701,6 +717,8 @@ final class RootProxyManager {
         prefs.edit()
                 .putBoolean("proxyRootWanted",true)
                 .putBoolean("proxyRootRuntimeRunning",true)
+                .putString(RuntimeIdentity.RECORD_KEY,RuntimeIdentity.completed(result,profile.core.id,profile.mode.id,p.source.name))
+                .remove(RuntimeIdentity.OBSERVATION_KEY)
                 .putBoolean("proxyAdblockCounterArmed",profile.adblockChain)
                 .putInt("proxyAutoDirectPackageCount",policy.directPackages.size())
                 .putBoolean("proxyAdblockLastEffective",profile.adblockChain)

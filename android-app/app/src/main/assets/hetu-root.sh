@@ -53,6 +53,42 @@ KOUT=HETU_KOUT
 KFWD=HETU_KFWD
 
 ok(){ printf '{"ok":true,"message":"%s"}\n' "$1"; }
+# These readers never alter process or network state. A missing fact stays empty.
+process_start_ticks(){ (
+  case "${1:-}" in ''|*[!0-9]*|0) exit 1;; esac
+  PS_RAW=$(cat "/proc/$1/stat" 2>/dev/null) || exit 1
+  case "$PS_RAW" in "$1 ("*') '*) ;; *) exit 1;; esac
+  # comm may contain spaces and closing parentheses; remove through the last ') '.
+  PS_FIELDS=${PS_RAW##*) }; set -f; set -- $PS_FIELDS
+  [ "$#" -ge 20 ] || exit 1
+  shift 19; case "$1" in ''|*[!0-9]*|0) exit 1;; esac
+  printf '%s' "$1"
+); }
+process_boot_id(){ (
+  PB_VALUE=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null) || exit 1
+  [ "${#PB_VALUE}" = 36 ] || exit 1
+  printf '%s' "$PB_VALUE" | grep -Eq '^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$' || exit 1
+  printf '%s' "$PB_VALUE"
+); }
+start_ok(){
+  SO_TICKS=$(process_start_ticks "$START_PID" 2>/dev/null || true)
+  SO_BOOT=$(process_boot_id 2>/dev/null || true)
+  if [ -z "$START_PROCESS_TICKS" ] || [ "$SO_TICKS" != "$START_PROCESS_TICKS" ] || [ "$SO_BOOT" != "$START_BOOT_ID" ]; then SO_TICKS=""; SO_BOOT=""; fi
+  printf '{"ok":true,"running":true,"pid":%s,"processStartTicks":"%s","bootId":"%s","message":"%s"}\n' "$START_PID" "$SO_TICKS" "$SO_BOOT" "$1"
+}
+process_identity_json(){
+  root
+  PI_PID=$(cat "$PIDFILE" 2>/dev/null || true); PI_RUNNING=false
+  case "$PI_PID" in ''|*[!0-9]*|0) PI_PID=0;; *) if core_maybe_alive "$PI_PID" && kill -0 "$PI_PID" 2>/dev/null; then PI_RUNNING=true; fi;; esac
+  PI_TICKS=""; PI_BOOT=""; PI_MODE=""
+  if [ "$PI_RUNNING" = true ]; then
+    PI_TICKS=$(process_start_ticks "$PI_PID" 2>/dev/null || true)
+    PI_BOOT=$(process_boot_id 2>/dev/null || true)
+    PI_MODE=$(cat "$MODEFILE" 2>/dev/null || true)
+    case "$PI_MODE" in tproxy|redirect|enhance|tun|ebpf) ;; *) PI_MODE="";; esac
+  fi
+  printf '{"ok":true,"running":%s,"pid":%s,"processStartTicks":"%s","bootId":"%s","mode":"%s"}\n' "$PI_RUNNING" "$PI_PID" "$PI_TICKS" "$PI_BOOT" "$PI_MODE"
+}
 start_stage(){ mkdir -p "$RUN" >/dev/null 2>&1 || true; printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$1" > "$START_STATE" 2>/dev/null || true; STAGE_UPTIME=unknown; read -r STAGE_UPTIME STAGE_UNUSED < /proc/uptime 2>/dev/null || true; printf '%s %s\n' "$STAGE_UPTIME" "$1" >> "$START_TIMING" 2>/dev/null || true; }
 fail(){ MSG="$1"; mkdir -p "$RUN" >/dev/null 2>&1 || true; printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$MSG" > "$START_ERROR" 2>/dev/null || true; printf '{"ok":false,"message":"%s"}\n' "$MSG"; exit 1; }
 root(){ [ "$(id -u)" = 0 ] || fail "需要 Root 权限"; }
@@ -949,6 +985,8 @@ start(){
   start_stage "launch-core"
   : > "$LOG"
   if [ -n "$START_MEM" ]; then MEM_KB=$(mem_to_kb "$START_MEM") || fail "内存限制格式无效（示例 100M）"; [ "$MEM_KB" -ge 65536 ] || fail "内存限制不能低于 64M"; (ulimit -v "$MEM_KB" 2>/dev/null || exit 126; exec "$START_BIN" -d "$RUN" -f "$START_CFG") >>"$LOG" 2>&1 & START_PID=$!; else "$START_BIN" -d "$RUN" -f "$START_CFG" >>"$LOG" 2>&1 & START_PID=$!; fi
+  START_PROCESS_TICKS=$(process_start_ticks "$START_PID" 2>/dev/null || true)
+  START_BOOT_ID=$(process_boot_id 2>/dev/null || true)
   printf '%s\n' "$START_PID" > "$PIDFILE"; printf '%s\n' "$START_MODE" > "$MODEFILE"; apply_core_controls "$START_PID" "$START_PERF" "$START_CPU" "$START_IO"; write_session "$START_MODE" "$START_V6" "$START_DNS" "$START_DP" "$START_SCOPE" "$START_SHARE" "$START_KILL" "$START_CP" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS"
   start_stage "wait-listeners"
   wait_ready "$START_PID" "$START_MODE" "$START_TP" "$START_RP" "$START_TCP" "$START_UDP" "$START_DNS" "$START_DP" "$START_CP"; READY_RC=$?
@@ -998,7 +1036,7 @@ start(){
   start_watchdog "$START_PID" "$START_KILL" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS"
   rm -f "$START_ERROR"; start_stage "running"
   DESC="tcp=$START_TCP,udp=$START_UDP,dns=$START_DNS,ipv6=$START_V6,scope=$START_SCOPE,share=$START_SHARE,kill=$START_KILL,quicBlock=$START_QUIC,directUids=$START_DIRECT_UIDS,directGids=$START_DIRECT_GIDS,sharedMacs=$START_SHARED_MACS"
-  if [ -n "$MARK" ]; then ok "Root $START_MODE 已启动（$DESC，mark=$MARK，table=$TABLE）"; else ok "Root $START_MODE 已启动（$DESC）"; fi
+  if [ -n "$MARK" ]; then start_ok "Root $START_MODE 已启动（$DESC，mark=$MARK，table=$TABLE）"; else start_ok "Root $START_MODE 已启动（$DESC）"; fi
 }
 
 status(){
@@ -1014,6 +1052,11 @@ status(){
   fi
 
   STATUS_MODE=$(cat "$MODEFILE" 2>/dev/null || echo none)
+  STATUS_TICKS=""; STATUS_BOOT=""
+  if [ "$STATUS_RUNNING" = true ]; then
+    STATUS_TICKS=$(process_start_ticks "$STATUS_PID" 2>/dev/null || true)
+    STATUS_BOOT=$(process_boot_id 2>/dev/null || true)
+  fi
   SCOPEV=$(sed -n 's/^APP_SCOPE=//p' "$SESSION" 2>/dev/null | head -n 1)
   DIRECTV=$(sed -n 's/^DIRECT_UIDS=//p' "$SESSION" 2>/dev/null | head -n 1)
   DIRECTGIDV=$(sed -n 's/^DIRECT_GIDS=//p' "$SESSION" 2>/dev/null | head -n 1)
@@ -1136,7 +1179,7 @@ status(){
   if [ "$STATUS_RUNNING" = true ] && [ "$H_STATE" = healthy ] && [ "$WD" = true ]; then HEALTH=true; fi
   SM=""; ST=""; if loadnet >/dev/null 2>&1; then SM="$MARK"; ST="$TABLE"; fi
   SP=$(state_value PREF 2>/dev/null || true)
-  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":false,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","log":"%s","configCheckLog":"%s"}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$LOG" "$CHECKLOG"
+  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"processStartTicks":"%s","bootId":"%s","mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":false,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","log":"%s","configCheckLog":"%s"}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_TICKS" "$STATUS_BOOT" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$LOG" "$CHECKLOG"
 }
 
 # Session-bound network integrity. No remote reachability failure restarts the core.
@@ -1342,6 +1385,7 @@ case "${1:-status}" in
   start) case "$#" in 23) set -- "$@" "";; 24|31) ;; *) fail "参数错误";; esac; root; shift; start "$@";;
   stop) root; acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"; stopwatchdog; cleanup; stopcore; restorev6 || fail "核心已停止，但 IPv6 原状态恢复失败，请重试停止"; rm -f "$SESSION"; ok "Root 代理已停止并恢复网络状态";;
   status) status;;
+  process-identity) [ "$#" = 1 ] || fail "参数错误"; process_identity_json;;
   network-health) health_json;;
   repair-network) [ "$#" = 2 ] || exit 1; root; health_repair "$2";;
   watchdog) { [ "$#" = 10 ] || [ "$#" = 11 ]; } || exit 0; root; watchdog "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11:-}";;

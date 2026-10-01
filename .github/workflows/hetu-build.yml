@@ -47,6 +47,7 @@ jobs:
           python3 tools/test_subscription_structure.py
           python3 tools/test_google_diagnostics.py
           python3 tools/test_start_contract.py
+          python3 tests/runtime_identity_script_test.py
           python3 tests/android_window_recording_test.py
           python3 tests/android_kvm_access_test.py
           python3 tests/android_window_readiness_test.py
@@ -138,7 +139,7 @@ jobs:
         if: success()
         working-directory: android-app
         run: |
-          gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:testDebugUnitTest --tests '*HetuConceptRootTest' --tests '*HomeConceptUiTest' --tests '*ConfigEditorSafetyTest' --tests '*CpuSampleTrackerTest' --tests '*RuntimeCpuSamplingTest' --tests '*LauncherIconTest' --tests '*GoogleDiagnosticsIntegrationTest' --tests '*ConfigApplyQueueTest' --tests '*SettingsBackupRestoreTest' --tests '*ConfigWorkflowConceptTest' --tests '*NodeSelectionRootContractTest' --tests '*ProportionConceptRootTest' --stacktrace
+          gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:testDebugUnitTest --tests '*HetuConceptRootTest' --tests '*HomeConceptUiTest' --tests '*ConfigEditorSafetyTest' --tests '*CpuSampleTrackerTest' --tests '*RuntimeCpuSamplingTest' --tests '*LauncherIconTest' --tests '*GoogleDiagnosticsIntegrationTest' --tests '*ConfigApplyQueueTest' --tests '*SettingsBackupRestoreTest' --tests '*ConfigWorkflowConceptTest' --tests '*NodeSelectionRootContractTest' --tests '*ProportionConceptRootTest' --tests '*RuntimeIdentityControllerTest' --stacktrace
 
       - name: Archive first actual launcher frames
         if: always() && steps.build.outcome == 'success'

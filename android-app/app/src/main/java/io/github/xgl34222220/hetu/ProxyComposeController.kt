@@ -84,6 +84,10 @@ internal data class ProxyComposeState(
     val running: Boolean = false,
     val core: String = "Mihomo",
     val mode: String = "TPROXY",
+    val selectedCore: String = "",
+    val selectedMode: String = "",
+    val selectedConfig: String = "",
+    val runtimeIdentityConfirmed: Boolean = false,
     val ipv6: String = "enable",
     val effectiveIpv6: String = "",
     val ipv6Disabled: Boolean = false,
@@ -139,10 +143,6 @@ internal class ProxyComposeController(context: Context) {
     suspend fun state(): ProxyComposeState = withContext(Dispatchers.IO) {
         val profile = ProxyRuntimeProfile.load(prefs)
         val selected = configs.selected(profile.core)
-        val iconMap = try {
-            if (selected == null) emptyMap() else parseGroupIcons(configs.read(selected))
-        } catch (_: Exception) { emptyMap() }
-
         val fastRunning = ProxyStatusBridge.rootProxyRunning(app)
         val nowElapsed = android.os.SystemClock.elapsedRealtime()
         val lastStartupAt = prefs.getLong("proxyRootLastStartupAt", 0L)
@@ -159,6 +159,7 @@ internal class ProxyComposeController(context: Context) {
                 root.status().also { live ->
                     prefs.edit()
                         .putLong("proxyRootHealthProbeElapsed", nowElapsed)
+                        .putString(RuntimeIdentity.OBSERVATION_KEY, RuntimeIdentity.observation(live).toString())
                         .putInt("proxyRootRuntimeSchema", live.optInt("runtimeSchema", 0))
                         .putBoolean("proxyRootIpv4Rules", live.optBoolean("ipv4Rules", false))
                         .putBoolean("proxyRootIpv6Rules", live.optBoolean("ipv6Rules", false))
@@ -193,7 +194,7 @@ internal class ProxyComposeController(context: Context) {
                 else JSONObject().put("running", false).put("message", userSafeRuntimeMessage(error.message))
             }
         } else {
-            JSONObject()
+            RuntimeIdentity.cachedObservation(prefs.getString(RuntimeIdentity.OBSERVATION_KEY, ""))
                 .put("running", true)
                 .put("runtimeSchema", prefs.getInt("proxyRootRuntimeSchema", 0))
                 .put("ipv4Rules", prefs.getBoolean("proxyRootIpv4Rules", false))
@@ -209,6 +210,11 @@ internal class ProxyComposeController(context: Context) {
                 .put("dataPlaneHealthy", prefs.getBoolean("proxyRootDataPlaneHealthy", false))
         }
         val running = status.optBoolean("running", fastRunning) || fastRunning
+        val identity = RuntimeIdentity.resolve(status, prefs.getString(RuntimeIdentity.RECORD_KEY, ""))
+        val iconMap = try {
+            if (selected == null || (running && (!identity.confirmed || identity.coreId != selected.core.id || identity.source != selected.name))) emptyMap()
+            else parseGroupIcons(configs.read(selected))
+        } catch (_: Exception) { emptyMap() }
         prefs.edit().putBoolean("proxyRootRuntimeRunning", running).apply()
         var groups = emptyList<ProxyGroupUi>()
         var connections = emptyList<ProxyConnectionUi>()
@@ -236,8 +242,12 @@ internal class ProxyComposeController(context: Context) {
         }
         ProxyComposeState(
             running = running,
-            core = profile.core.label,
-            mode = profile.mode.label,
+            core = if (running) identity.core else profile.core.label,
+            mode = if (running) identity.mode else profile.mode.label,
+            selectedCore = profile.core.label,
+            selectedMode = profile.mode.label,
+            selectedConfig = selected?.name ?: "尚未选择配置",
+            runtimeIdentityConfirmed = running && identity.confirmed,
             ipv6 = profile.ipv6.id,
             effectiveIpv6 = if (running) status.optString("ipv6Mode", "") else "",
             ipv6Disabled = running && !status.optBoolean("healthProbeFailed", false) && status.optBoolean("ipv6DisabledByHetu", false),
@@ -246,7 +256,7 @@ internal class ProxyComposeController(context: Context) {
                 else status.optBoolean("ipv6DisableGuard", false),
             runtimeSettingsPending = ProxyRuntimeSettings.pending(running, prefs),
             autoOverwrite = profile.autoOverwrite,
-            config = selected?.name ?: "尚未选择配置",
+            config = if (running) identity.source else selected?.name ?: "尚未选择配置",
             message = when {
                 !running -> listOf(
                     userSafeRuntimeMessage(status.optString("message", "")),

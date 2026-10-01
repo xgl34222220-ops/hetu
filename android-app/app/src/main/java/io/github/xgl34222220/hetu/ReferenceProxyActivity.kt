@@ -204,14 +204,18 @@ private fun RefProxyShell(resumeRevision: Int, requestedStartPage: String?, star
     val pageStateHolder = rememberSaveableStateHolder()
     BackHandler(enabled = page != RefProxyPage.Home && !panelDetailVisible) { page = RefProxyPage.Home }
     var state by remember {
+        val wasRunning = prefs.getBoolean("proxyUiLastRunning", prefs.getBoolean("proxyRootWanted", false))
         mutableStateOf(
             ProxyComposeState(
-                running = prefs.getBoolean("proxyUiLastRunning", prefs.getBoolean("proxyRootWanted", false)),
-                core = prefs.getString("proxyUiLastCore", startupProfile.core.label) ?: startupProfile.core.label,
-                mode = prefs.getString("proxyUiLastMode", startupProfile.mode.label) ?: startupProfile.mode.label,
+                running = wasRunning,
+                core = if (wasRunning) RuntimeIdentity.UNKNOWN else startupProfile.core.label,
+                mode = if (wasRunning) RuntimeIdentity.UNKNOWN else startupProfile.mode.label,
+                selectedCore = startupProfile.core.label,
+                selectedMode = startupProfile.mode.label,
+                selectedConfig = startupConfig,
                 ipv6 = startupProfile.ipv6.id,
                 autoOverwrite = startupProfile.autoOverwrite,
-                config = prefs.getString("proxyUiLastConfig", startupConfig) ?: startupConfig,
+                config = if (wasRunning) RuntimeIdentity.UNKNOWN else startupConfig,
             ),
         )
     }
@@ -4279,11 +4283,11 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
         item { Box(Modifier.hetuStaggerIn(stagger, 3)) { RefSectionLabel("核心与运行") } }
         item { Box(Modifier.hetuStaggerIn(stagger, 4)) {
             RefGroup {
-                RefValueRow("运行核心", state.core, Icons.Rounded.Memory, Color(0xFF334155), highlightValue = true) {
+                RefValueRow("运行核心", state.selectedCore.ifBlank { state.core }, Icons.Rounded.Memory, Color(0xFF334155), highlightValue = true) {
                     context.startActivity(Intent(context, ProxyRuntimeCoreSettingsActivity::class.java))
                 }
                 RefDivider()
-                RefValueRow("运行模式", state.mode, Icons.Rounded.Tune, Color(0xFF2A62E8), highlightValue = true) { modePicker = true }
+                RefValueRow("运行模式", state.selectedMode.ifBlank { state.mode }, Icons.Rounded.Tune, Color(0xFF2A62E8), highlightValue = true) { modePicker = true }
                 RefDivider()
                 RefValueRow("IPv6", ProxyRuntimeSettings.ipv6Label(state.ipv6) +
                     if (state.running && state.effectiveIpv6.isNotBlank() && state.effectiveIpv6 != state.ipv6) " · 待应用" else "",
