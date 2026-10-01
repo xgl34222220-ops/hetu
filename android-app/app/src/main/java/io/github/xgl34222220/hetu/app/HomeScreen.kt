@@ -132,7 +132,13 @@ internal fun HomeScreen(vm: HetuViewModel, bottomPadding: Dp) {
             }
         }
         item(key = "traffic") {
-            BentoRow(Modifier.hxEnter(stagger, 2)) {
+            if (androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f) {
+                HxSection(modifier = Modifier.hxEnter(stagger, 2)) {
+                    HomeFlowTile(vm, upload = true, Modifier.fillMaxWidth()) { showSpeedSource = true }
+                    Spacer(Modifier.height(10.dp))
+                    HomeFlowTile(vm, upload = false, Modifier.fillMaxWidth()) { showSpeedSource = true }
+                }
+            } else BentoRow(Modifier.hxEnter(stagger, 2)) {
                 HomeFlowTile(vm, upload = true, Modifier.weight(1f)) { showSpeedSource = true }
                 HomeFlowTile(vm, upload = false, Modifier.weight(1f)) { showSpeedSource = true }
             }
@@ -1004,6 +1010,7 @@ private fun HomeMiniStat(label: String, value: String, modifier: Modifier = Modi
 @Composable
 private fun HomeOutboundNode(vm: HetuViewModel, group: ProxyGroupUi?) {
     val c = Hx.colors
+    val wideText = androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f
     val selected = group?.now.orEmpty()
     val node = group?.nodes?.firstOrNull { it.name == selected }
     val delay = if (selected.isNotBlank()) vm.delays[selected] ?: node?.lastDelay else null
@@ -1034,7 +1041,7 @@ private fun HomeOutboundNode(vm: HetuViewModel, group: ProxyGroupUi?) {
                             name,
                             style = MaterialTheme.typography.titleMedium,
                             color = c.text,
-                            maxLines = 1,
+                            maxLines = if (wideText) 3 else 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
@@ -1042,11 +1049,11 @@ private fun HomeOutboundNode(vm: HetuViewModel, group: ProxyGroupUi?) {
                         listOfNotNull(node?.type?.uppercase(), group?.name).joinToString(" · ").ifBlank { vm.state.config },
                         style = MaterialTheme.typography.bodySmall,
                         color = c.textMuted,
-                        maxLines = 1,
+                        maxLines = if (wideText) 3 else 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                if (group != null && vm.state.running) {
+                if (!wideText && group != null && vm.state.running) {
                     Spacer(Modifier.width(8.dp))
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("节点测速", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
@@ -1055,6 +1062,13 @@ private fun HomeOutboundNode(vm: HetuViewModel, group: ProxyGroupUi?) {
                     Spacer(Modifier.width(3.dp))
                 }
                 HxChevron()
+            }
+            if (wideText && group != null && vm.state.running) {
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("节点测速", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
+                    HxDelayPill(delay, testing) { vm.testGroup(group) }
+                }
             }
         }
     }

@@ -107,7 +107,7 @@ class ConfigWorkflowConceptTest {
                 }
             }
         }
-        rule.onNode(hasScrollAction()).performScrollToNode(hasTestTag("tool-配置管理"))
+        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("tool-配置管理"))
         node("tool-配置管理").performClick()
         awaitTag("config-entry-${entry.name}")
     }
@@ -349,6 +349,7 @@ class ConfigWorkflowConceptTest {
         renderLibrary(fontScale = 2f); openImport()
         rule.onNodeWithText("从链接导入").performScrollTo().performClick()
         node("config-import-url").performScrollTo().performTextInput("https://example.invalid/large.yaml")
+        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("config-import-submit"))
         node("config-import-submit").performScrollTo().assertIsDisplayed()
         val bounds = node("config-import-submit").getUnclippedBoundsInRoot()
         assertTrue((bounds.right - bounds.left) >= 48.dp && (bounds.bottom - bounds.top) >= 48.dp)

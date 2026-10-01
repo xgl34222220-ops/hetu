@@ -459,7 +459,7 @@ private fun StrategyGroupCard(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(group.type, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Normal, color = c.textMuted)
-                Text("$online/${group.nodes.size}", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Normal, color = c.textFaint)
+                Text("$online/${group.nodes.size}", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Normal, color = c.textMuted)
             }
             Spacer(Modifier.width(4.dp))
             StrategyCompactDelayPill(delay, testing) { vm.testGroup(group) }

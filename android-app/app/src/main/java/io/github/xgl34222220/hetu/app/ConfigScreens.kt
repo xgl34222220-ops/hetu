@@ -426,8 +426,9 @@ internal fun ConfigImportPage(
                                 icon = Icons.Rounded.FileOpen, enabled = !busy, filled = false, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp))
                         }
                         Spacer(Modifier.height(18.dp))
-                        HxBanner("导入后保存为新配置并设为当前。代理运行时会尝试应用。支持 UTF-8 配置，最大 4 MiB。" +
-                            if (fromLink) "链接须直接返回 Clash / Mihomo YAML；节点订阅请使用订阅管理。" else "")
+                        Text("导入后设为当前配置。支持 UTF-8，最大 4 MiB。" +
+                            if (fromLink) "链接需直接返回 YAML 文件。" else "",
+                            style = MaterialTheme.typography.bodySmall, color = c.textMuted)
                         (formError ?: error)?.let {
                             Spacer(Modifier.height(12.dp))
                             Text(it, style = MaterialTheme.typography.bodyMedium, color = c.bad, modifier = Modifier.testTag("config-form-error"))
@@ -489,7 +490,7 @@ internal fun ConfigSubscriptionPage(
                         Spacer(Modifier.height(18.dp))
                         ConfigFormField("订阅链接", url, "https://", "config-subscription-url", busy, urlKeyboard = true) { url = it; formError = null }
                         Spacer(Modifier.height(18.dp))
-                        HxBanner("保存后更新当前配置，运行中的代理会尝试应用。订阅状态与更新结果可在面板的「订阅」中查看。")
+                        Text("保存到当前配置，运行时会尝试应用。", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
                         (formError ?: error)?.let {
                             Spacer(Modifier.height(12.dp))
                             Text(it, style = MaterialTheme.typography.bodyMedium, color = c.bad, modifier = Modifier.testTag("config-form-error"))
