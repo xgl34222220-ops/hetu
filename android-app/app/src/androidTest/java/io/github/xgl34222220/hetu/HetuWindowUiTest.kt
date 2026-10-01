@@ -244,6 +244,11 @@ class HetuWindowUiTest {
         visibleTransition("open-tools") { rule.onNodeWithTag("dock-tab-2", useUnmergedTree = true).performTouchInput { click() } }
         rule.onNodeWithTag("tools-文件与脚本", useUnmergedTree = true).assertIsDisplayed()
         capture("06-tools-default-glass")
+        visibleTransition("open-settings") { rule.onNodeWithTag("dock-tab-3", useUnmergedTree = true).performTouchInput { click() } }
+        rule.onNodeWithTag("settings-group-0", useUnmergedTree = true).assertIsDisplayed()
+        rule.onNodeWithTag("settings-基础代理配置", useUnmergedTree = true).assertIsDisplayed()
+        rule.onNodeWithTag("settings-关于", useUnmergedTree = true).assertIsDisplayed()
+        capture("07-settings-default-glass")
         assertTrue("only the explicitly allowed loopback preload may run", requests.all { it == "GET /providers/proxies" })
         successful = true
     }
