@@ -317,7 +317,7 @@ class ConceptMihomoClientShadow {
         // The production factory is static. Keep it inside this same socket-free
         // boundary instead of allowing an unimplemented shadow call to return null.
         @JvmStatic @Implementation
-        fun forLocalRuntime(context: Context): MihomoControllerClient = MihomoControllerClient(context)
+        private fun forLocalRuntime(context: Context): MihomoControllerClient = MihomoControllerClient(context)
     }
 
     @Implementation fun proxies(): JSONObject {
