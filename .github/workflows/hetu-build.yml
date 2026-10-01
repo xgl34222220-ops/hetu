@@ -224,6 +224,7 @@ jobs:
           ffmpeg -version
 
       # Final candidate QA always installs the APK compiled and audited in this job.
+      # Proportion recheck: production sources are frozen from e0cbba77535fca068043aa05fccfd69ad810cf4c.
       - name: Compile ordinary Android window test host
         if: always() && steps.window_media.outcome == 'success' && env.HETU_WINDOW_QA == 'true'
         id: window_test_build
