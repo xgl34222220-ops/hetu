@@ -91,7 +91,9 @@ public final class RootTproxyActivity extends Activity {
         ProxyRuntimeProfile.Core[] values=ProxyRuntimeProfile.Core.values();String[] labels=new String[values.length];int selected=0;
         for(int i=0;i<values.length;i++){labels[i]=values[i].label;if(values[i]==profile().core)selected=i;}
         new AlertDialog.Builder(this).setTitle("核心选择").setSingleChoiceItems(labels,selected,(d,w)->{
-            ProxyRuntimeProfile.Core chosen=values[w];prefs.edit().putString("proxyBaseCore",chosen.id).apply();d.dismiss();changed("proxyBaseCore");refresh();
+            ProxyRuntimeProfile.Core chosen=values[w];
+            try{ProxyConfigLibrary.selectCore(prefs,chosen.id);}catch(IOException busy){toast(safe(busy));return;}
+            d.dismiss();changed("proxyBaseCore");refresh();
             if(chosen!=ProxyRuntimeProfile.Core.MIHOMO&&!cores.installed(chosen))toast(chosen.label+" 尚未安装或后端未接入");
         }).setNegativeButton("取消",null).show();
     }

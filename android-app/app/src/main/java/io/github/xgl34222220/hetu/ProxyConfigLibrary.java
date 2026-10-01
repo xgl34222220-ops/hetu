@@ -12,6 +12,10 @@ final class ProxyConfigLibrary {
     private static final String PLACEHOLDER="example.invalid/hetu-subscription-";
     private static final int LIMIT=4*1024*1024;
     private static final Object WRITE_LOCK = new Object();
+    // Runtime apply may retain this lease across worker-thread IO, but never WRITE_LOCK.
+    // UI identity changes only tryLock, so they report busy instead of waiting on Root.
+    private static final java.util.concurrent.locks.ReentrantLock IDENTITY_LOCK =
+            new java.util.concurrent.locks.ReentrantLock();
     private final File root;
     private final SharedPreferences prefs;
     ProxyConfigLibrary(Context c){
@@ -44,9 +48,66 @@ final class ProxyConfigLibrary {
         private SourceVersion(String coreId,String name,String text)throws IOException{
             this.coreId=coreId;this.name=name;this.sha256=sourceDigest(text);
         }
+        private SourceVersion(String coreId,String name,String sha256,boolean validatedDigest){
+            this.coreId=coreId;this.name=name;this.sha256=sha256;
+        }
+        static SourceVersion restored(String coreId,String name,String sha256)throws IOException{
+            ProxyRuntimeProfile.Core core=null;
+            for(ProxyRuntimeProfile.Core value:ProxyRuntimeProfile.Core.values())if(value.id.equals(coreId))core=value;
+            if(core==null||name==null||!safeName(name).equals(name)||!coreAccepts(core,name)||sha256==null||!sha256.matches("[a-f0-9]{64}"))
+                throw new IOException("待应用配置的身份记录无效，请重新保存配置");
+            return new SourceVersion(coreId,name,sha256,true);
+        }
         boolean matches(String coreId,String name,String text)throws IOException{
             return this.coreId.equals(coreId)&&this.name.equals(name)&&sha256.equals(sourceDigest(text));
         }
+    }
+    static final class IdentityLease implements AutoCloseable {
+        private boolean closed;
+        private IdentityLease(){}
+        @Override public void close(){if(!closed){IDENTITY_LOCK.unlock();closed=true;}}
+    }
+    static IdentityLease tryIdentityChange()throws IOException{
+        if(!IDENTITY_LOCK.tryLock())throw new IOException("配置来源正在处理中，请完成后重试。");
+        return new IdentityLease();
+    }
+    static void selectCore(SharedPreferences prefs,String coreId)throws IOException{
+        boolean known=false;for(ProxyRuntimeProfile.Core core:ProxyRuntimeProfile.Core.values())if(core.id.equals(coreId))known=true;
+        if(!known)throw new IOException("未知运行核心，未改变当前选择");
+        try(IdentityLease identityLease=tryIdentityChange()){
+            synchronized(WRITE_LOCK){prefs.edit().putString("proxyBaseCore",coreId).apply();}
+        }
+    }
+    static void commitIdentityPreferences(SharedPreferences.Editor edit)throws IOException{
+        try(IdentityLease identityLease=tryIdentityChange()){
+            synchronized(WRITE_LOCK){edit.apply();}
+        }
+    }
+    /** A frozen source for one worker-thread apply. Close on the acquiring thread. */
+    static final class SourceApplication implements AutoCloseable {
+        final Entry entry;final String text;
+        private final IdentityLease lease;
+        private SourceApplication(Entry entry,String text,IdentityLease lease){this.entry=entry;this.text=text;this.lease=lease;}
+        @Override public void close(){lease.close();}
+    }
+    SourceApplication beginSourceApplication(SourceVersion expected)throws IOException{
+        IdentityLease lease=tryIdentityChange();
+        boolean retained=false;
+        try{
+            synchronized(WRITE_LOCK){
+                if(expected==null)throw new IOException("缺少配置应用版本，未应用");
+                ProxyRuntimeProfile.Core core=null;
+                for(ProxyRuntimeProfile.Core candidate:ProxyRuntimeProfile.Core.values())if(candidate.id.equals(expected.coreId))core=candidate;
+                requireActiveCore(core);
+                if(!expected.name.equals(safeName(expected.name))||!expected.name.equals(prefs.getString(key(core),"")))
+                    throw new IOException("当前配置已切换，已保存的配置未应用");
+                Entry entry=new Entry(core,expected.name,new File(dir(core),expected.name));
+                String text=read(entry);
+                if(!expected.matches(core.id,entry.name,text))throw new IOException("配置内容已再次变化，本次应用已过期");
+                SourceApplication application=new SourceApplication(entry,text,lease);
+                retained=true;return application;
+            }
+        }finally{if(!retained)lease.close();}
     }
     private static final class Section {final int start,end;Section(int s,int e){start=s;end=e;}}
     private static final class CollatorHolder {static final java.text.Collator ORDER=java.text.Collator.getInstance(Locale.CHINA);}
@@ -55,14 +116,16 @@ final class ProxyConfigLibrary {
     private String key(ProxyRuntimeProfile.Core core){return "proxySelectedConfig."+core.id;}
 
     private void ensureBundled(ProxyRuntimeProfile.Core core){
-        synchronized (WRITE_LOCK) {
+        try(IdentityLease identityLease=tryIdentityChange()){
+          synchronized (WRITE_LOCK) {
             if(core!=ProxyRuntimeProfile.Core.MIHOMO&&core!=ProxyRuntimeProfile.Core.MIHOMO_SMART)return;
             try{
             File d=dir(core);if(!d.isDirectory()&&!d.mkdirs())return;File target=new File(d,BUNDLED_NAME);
             if(!target.isFile())try(InputStream in=BundledProxyConfig.open()){writeStreamAtomic(target,in);}
             String selected=prefs.getString(key(core),"");if(selected.isEmpty()||!new File(d,selected).isFile())prefs.edit().putString(key(core),BUNDLED_NAME).apply();
             }catch(Exception ignored){}
-        }
+          }
+        }catch(IOException busy){/* Reading an existing selection never waits for runtime IO. */}
     }
 
     List<Entry> list(ProxyRuntimeProfile.Core core){
@@ -76,12 +139,15 @@ final class ProxyConfigLibrary {
         }
     }
     void select(ProxyRuntimeProfile.Core core,String name)throws IOException{
+        try(IdentityLease identityLease=tryIdentityChange()){
         synchronized (WRITE_LOCK) {
             ensureBundled(core);String n=safeName(name);File f=new File(dir(core),n);if(!f.isFile()||!coreAccepts(core,n))throw new IOException("配置不存在或格式不属于当前核心");prefs.edit().putString(key(core),n).apply();
+        }
         }
     }
 
     Entry importConfig(ProxyRuntimeProfile.Core core,String requestedName,InputStream source)throws IOException{
+        try(IdentityLease identityLease=tryIdentityChange()){
         synchronized (WRITE_LOCK) {
             if(source==null)throw new IOException("无法读取配置文件");
             File d=dir(core);if(!d.isDirectory()&&!d.mkdirs())throw new IOException("无法创建配置目录");
@@ -92,6 +158,7 @@ final class ProxyConfigLibrary {
             writeStreamAtomic(target,source);
             prefs.edit().putString(key(core),n).apply();
             return new Entry(core,n,target);
+        }
         }
     }
 
@@ -124,6 +191,7 @@ final class ProxyConfigLibrary {
      */
     void restoreBatch(List<RestoreItem> items, Map<ProxyRuntimeProfile.Core,String> selections,
                       RestoreCommit commit) throws IOException {
+        try(IdentityLease identityLease=tryIdentityChange()){
         synchronized (WRITE_LOCK) {
             Set<String> identities=new HashSet<>();
             Map<ProxyRuntimeProfile.Core,Map<String,String>> names=new EnumMap<>(ProxyRuntimeProfile.Core.class);
@@ -210,6 +278,7 @@ final class ProxyConfigLibrary {
                 try{Files.deleteIfExists(staging);}catch(IOException ignored){}
             }
         }
+        }
     }
 
     private static boolean sameBytes(File target,byte[] bytes)throws IOException {
@@ -260,6 +329,7 @@ final class ProxyConfigLibrary {
     }
 
     void delete(Entry e)throws IOException{
+        try(IdentityLease identityLease=tryIdentityChange()){
         synchronized (WRITE_LOCK) {
             if(e==null)return;
             if(BUNDLED_NAME.equals(e.name))throw new IOException("内置配置不能删除，可以切换到其他配置");
@@ -267,8 +337,10 @@ final class ProxyConfigLibrary {
             if(e.name.equals(prefs.getString(key(e.core),"")))prefs.edit().remove(key(e.core)).apply();
             ensureBundled(e.core);
         }
+        }
     }
     Entry rename(Entry e,String requestedName)throws IOException{
+        try(IdentityLease identityLease=tryIdentityChange()){
         synchronized (WRITE_LOCK) {
         if(e==null||!e.file.isFile())throw new IOException("配置不存在");
         if(BUNDLED_NAME.equals(e.name))throw new IOException("内置配置不能重命名");
@@ -282,6 +354,7 @@ final class ProxyConfigLibrary {
         if(e.name.equals(prefs.getString(key(e.core),"")))prefs.edit().putString(key(e.core),n).apply();
         return new Entry(e.core,n,target);
             }
+        }
     }
 
     List<Subscription> subscriptions(Entry e)throws IOException{

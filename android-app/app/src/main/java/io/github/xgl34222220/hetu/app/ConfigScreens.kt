@@ -107,7 +107,7 @@ import java.net.URL
 private sealed interface ConfigWorkflowPage {
     data object Library : ConfigWorkflowPage
     data object Import : ConfigWorkflowPage
-    data class Subscription(val subscription: ProxySubscriptionUi?) : ConfigWorkflowPage
+    data class Subscription(val snapshot: ProxyConfigLibrary.SubscriptionEditSnapshot, val subscription: ProxySubscriptionUi?) : ConfigWorkflowPage
 }
 
 @Composable
@@ -121,6 +121,7 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
     var revision by remember { mutableIntStateOf(0) }
     var configs by remember { mutableStateOf<List<ProxyConfigUi>>(emptyList()) }
     var subscriptions by remember { mutableStateOf<List<ProxySubscriptionUi>>(emptyList()) }
+    var subscriptionSnapshot by remember { mutableStateOf<ProxyConfigLibrary.SubscriptionEditSnapshot?>(null) }
     var loading by remember { mutableStateOf(true) }
     var busy by remember { mutableStateOf(false) }
     var page by remember { mutableStateOf<ConfigWorkflowPage>(ConfigWorkflowPage.Library) }
@@ -129,14 +130,18 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
     var confirmDelete by remember { mutableStateOf<ProxyConfigUi?>(null) }
     var renameConfig by remember { mutableStateOf<ProxyConfigUi?>(null) }
     var exportBytes by remember { mutableStateOf<ByteArray?>(null) }
-    var deleteSub by remember { mutableStateOf<ProxySubscriptionUi?>(null) }
+    var deleteSub by remember { mutableStateOf<ConfigWorkflowPage.Subscription?>(null) }
     val haptics = io.github.xgl34222220.hetu.ui.rememberHetuHaptics()
 
     LaunchedEffect(revision) {
         loading = true
+        subscriptionSnapshot = null
+        subscriptions = emptyList()
         try {
             configs = vm.controller.configLibrary()
-            subscriptions = vm.controller.subscriptions()
+            val opened = vm.controller.subscriptionEditSnapshot()
+            subscriptions = opened.subscriptions.map { ProxySubscriptionUi(it.name, it.url, it.placeholder) }
+            subscriptionSnapshot = opened
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (error: Exception) {
@@ -150,18 +155,20 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
         action: String,
         applyToRuntime: Boolean,
         closeWorkflow: Boolean = false,
-        block: suspend () -> Unit,
+        block: suspend () -> Any?,
     ) {
         if (busy) return
         busy = true
         workflowError = null
         scope.launch {
             try {
-                block()
+                val committed = block()
                 revision++
                 if (closeWorkflow) page = ConfigWorkflowPage.Library
                 vm.refreshNow()
-                if (applyToRuntime) vm.applyConfigChange(action) else vm.toast(action)
+                // Bound subscription mutations return only source identity/revision,
+                // never their URLs or YAML. Other actions keep their existing path.
+                if (applyToRuntime) vm.applyConfigChange(action, committed as? ProxyConfigLibrary.SourceVersion) else vm.toast(action)
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
@@ -177,6 +184,11 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
         if (busy) return
         workflowError = null
         page = next
+    }
+
+    fun openSubscription(subscription: ProxySubscriptionUi?) {
+        val opened = subscriptionSnapshot ?: return
+        open(ConfigWorkflowPage.Subscription(opened, subscription))
     }
 
     val exportFile = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
@@ -227,8 +239,8 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
                 onBack = { open(ConfigWorkflowPage.Library) },
                 onSave = { name, url ->
                     perform(if (shown.subscription == null) "订阅已添加" else "订阅已保存", applyToRuntime = true, closeWorkflow = true) {
-                        if (shown.subscription == null) vm.controller.addSubscription(name, url)
-                        else vm.controller.updateSubscription(shown.subscription.name, url)
+                        if (shown.subscription == null) vm.controller.addSubscription(shown.snapshot, name, url)
+                        else vm.controller.updateSubscription(shown.snapshot, shown.subscription.name, url)
                     }
                 },
             )
@@ -292,7 +304,7 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
                         HxCard(Modifier.fillMaxWidth().testTag("config-subscriptions-card")) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text("订阅管理", style = MaterialTheme.typography.titleMedium, color = c.text, modifier = Modifier.weight(1f))
-                                HxBarAction(Icons.Rounded.Add, "添加订阅", onClick = { open(ConfigWorkflowPage.Subscription(null)) }, enabled = !busy && !loading)
+                                HxBarAction(Icons.Rounded.Add, "添加订阅", onClick = { openSubscription(null) }, enabled = !busy && !loading && subscriptionSnapshot != null)
                             }
                             Text("当前配置的 proxy-providers", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
                             Spacer(Modifier.height(12.dp))
@@ -304,7 +316,7 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
                                 Row(
                                     Modifier.fillMaxWidth().testTag("config-subscription-${sub.name}").clip(Hx.rowShape)
                                         .background(c.surfaceMuted.copy(alpha = .55f))
-                                        .clickable(enabled = !busy) { open(ConfigWorkflowPage.Subscription(sub)) }
+                                        .clickable(enabled = !busy && !loading) { openSubscription(sub) }
                                         .padding(start = 12.dp, top = 10.dp, bottom = 10.dp, end = 2.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
@@ -314,7 +326,7 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
                                         Text(sub.name, style = MaterialTheme.typography.bodyLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = c.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                         Text(if (sub.placeholder) "尚未填写订阅链接" else maskUrl(sub.url), style = MaterialTheme.typography.bodySmall, color = c.textMuted, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                     }
-                                    IconButton(onClick = { deleteSub = sub }, enabled = !busy, modifier = Modifier.size(48.dp)) {
+                                    IconButton(onClick = { subscriptionSnapshot?.let { deleteSub = ConfigWorkflowPage.Subscription(it, sub) } }, enabled = !busy && !loading, modifier = Modifier.size(48.dp)) {
                                         Icon(Icons.Rounded.DeleteOutline, "删除订阅 ${sub.name}", tint = c.textFaint)
                                     }
                                 }
@@ -364,9 +376,10 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
             onConfirm = { confirmDelete = null; perform("已删除", applyToRuntime = false) { vm.controller.deleteConfig(config.name) } },
             onDismiss = { confirmDelete = null })
     }
-    deleteSub?.let { sub ->
-        HxConfirmDialog(title = "删除订阅？", message = "从当前配置中移除「${sub.name}」及其在策略组中的引用。", confirmLabel = "删除", danger = true,
-            onConfirm = { deleteSub = null; perform("订阅已删除", applyToRuntime = true) { vm.controller.deleteSubscription(sub.name) } },
+    deleteSub?.let { opened ->
+        val sub = requireNotNull(opened.subscription)
+        HxConfirmDialog(title = "删除订阅？", message = "从「${opened.snapshot.source.name}」中移除「${sub.name}」及其在策略组中的引用。", confirmLabel = "删除", danger = true,
+            onConfirm = { deleteSub = null; perform("订阅已删除", applyToRuntime = true) { vm.controller.deleteSubscription(opened.snapshot, sub.name) } },
             onDismiss = { deleteSub = null })
     }
 }

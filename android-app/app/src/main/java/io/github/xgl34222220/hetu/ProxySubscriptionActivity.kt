@@ -148,6 +148,8 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
 
     var revision by remember { mutableIntStateOf(0) }
     var subscriptions by remember { mutableStateOf(emptyList<ProxySubscriptionUi>()) }
+    var subscriptionSource by remember { mutableStateOf<ProxyConfigLibrary.SubscriptionEditSnapshot?>(null) }
+    var editingSource by remember { mutableStateOf<ProxyConfigLibrary.SubscriptionEditSnapshot?>(null) }
     var configLibrary by remember { mutableStateOf(emptyList<ProxyConfigUi>()) }
     var configName by remember { mutableStateOf("加载中…") }
     var liveProviders by remember { mutableStateOf<Map<String, DashboardProviderUi>>(emptyMap()) }
@@ -190,10 +192,11 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
             try {
                 val freshProviders = runCatching { dashboardRepo.refreshSubscriptions() }.getOrDefault(emptyList())
-                val overview = controller.configOverview()
+                val opened = controller.subscriptionEditSnapshot()
                 val library = controller.configLibrary()
-                configName = overview.first
-                subscriptions = overview.second
+                configName = opened.source.name
+                subscriptions = opened.subscriptions.map { ProxySubscriptionUi(it.name, it.url, it.placeholder) }
+                subscriptionSource = opened
                 configLibrary = library
                 liveProviders = if (freshProviders.isNotEmpty()) freshProviders.associateBy { it.name }
                     else runCatching { dashboardRepo.providers() }.getOrDefault(emptyList()).associateBy { it.name }
@@ -208,18 +211,20 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
 
     LaunchedEffect(revision) {
         loading = true
+        subscriptionSource = null
         runCatching {
-            val overview = controller.configOverview()
+            val opened = controller.subscriptionEditSnapshot()
             val library = controller.configLibrary()
             val providerMap = runCatching { dashboardRepo.providers() }
                 .getOrDefault(emptyList())
                 .associateBy { it.name }
-            Triple(overview, library, providerMap)
+            Triple(opened, library, providerMap)
         }
             .onSuccess { result ->
-                val overview = result.first
-                configName = overview.first
-                subscriptions = overview.second
+                val opened = result.first
+                configName = opened.source.name
+                subscriptions = opened.subscriptions.map { ProxySubscriptionUi(it.name, it.url, it.placeholder) }
+                subscriptionSource = opened
                 configLibrary = result.second
                 liveProviders = result.third
                 if (message.startsWith("读取订阅失败") || message.startsWith("读取配置失败")) message = ""
@@ -347,12 +352,14 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                             }
                             Button(
                                 onClick = {
+                                    editingSource = subscriptionSource
                                     addingSubscription = true
                                     editSubscription = null
                                     editorName = ""
                                     editorUrl = ""
                                     editorError = ""
                                 },
+                                enabled = !loading && subscriptionSource != null,
                                 modifier = Modifier.weight(1f).height(46.dp),
                                 shape = CircleShape,
                             ) {
@@ -533,7 +540,8 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                             ticketShape,
                         )
                         .clip(ticketShape)
-                        .clickable {
+                        .clickable(enabled = !loading && subscriptionSource != null) {
+                            editingSource = subscriptionSource
                             addingSubscription = false
                             editSubscription = item
                             editorName = item.name
@@ -730,7 +738,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                         onClick = {
                             savingSubscription = true
                             scope.launch {
-                                runCatching { controller.deleteSubscription(existing.name) }
+                                runCatching { controller.deleteSubscription(requireNotNull(editingSource) { "编辑来源已失效，请重新打开订阅" }, existing.name) }
                                     .onSuccess {
                                         addingSubscription = false
                                         editSubscription = null
@@ -761,8 +769,8 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
                         onClick = {
                             savingSubscription = true
                             scope.launch {
-                                val result = if (existing == null) runCatching { controller.addSubscription(editorName, editorUrl) }
-                                else runCatching { controller.updateSubscription(existing.name, editorUrl) }
+                                val result = if (existing == null) runCatching { controller.addSubscription(requireNotNull(editingSource) { "编辑来源已失效，请重新打开订阅" }, editorName, editorUrl) }
+                                else runCatching { controller.updateSubscription(requireNotNull(editingSource) { "编辑来源已失效，请重新打开订阅" }, existing.name, editorUrl) }
                                 result.onSuccess {
                                     addingSubscription = false
                                     editSubscription = null

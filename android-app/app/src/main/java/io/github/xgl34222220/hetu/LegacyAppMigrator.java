@@ -101,8 +101,8 @@ final class LegacyAppMigrator {
                         .putBoolean("hetuLegacyAppDataMigrated", true)
                         .putInt("hetuLegacyImportedConfigCount", imported)
                         .putLong("hetuLegacyAppDataMigratedAt", System.currentTimeMillis())
-                        .remove("hetuLegacyMigrationError")
-                        .apply();
+                        .remove("hetuLegacyMigrationError");
+                ProxyConfigLibrary.commitIdentityPreferences(edit);
                 deleteTree(stage);
             } catch (Exception e) {
                 prefs.edit().putString("hetuLegacyMigrationError",

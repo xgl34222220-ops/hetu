@@ -65,16 +65,21 @@ private fun RuntimeCoreSettingsPage(onBack: () -> Unit) {
     val prefs = remember { context.getSharedPreferences("hetu", 0) }
     var revision by remember { mutableIntStateOf(0) }
     val profile = remember(revision) { ProxyRuntimeProfile.load(prefs) }
+    fun chooseCore(id: String) {
+        runCatching { ProxyConfigLibrary.selectCore(prefs, id) }
+            .onSuccess { revision++ }
+            .onFailure { android.widget.Toast.makeText(context, it.message ?: "核心选择未改变，请稍后重试", android.widget.Toast.LENGTH_LONG).show() }
+    }
     FocusedSettingsScaffold("运行核心", "选择真正负责 Root 代理运行的核心", onBack) {
         item { FocusedNotice("修改运行核心后，下次启动或重启代理生效。这里仅负责核心选择；下载、更新和维护在“内核管理”中完成。") }
         item {
             FocusedGroup {
                 FocusedChoiceRow(Icons.Rounded.Memory, Color(0xFF2A62E8), "Mihomo", "标准 Mihomo 运行核心", profile.core == ProxyRuntimeProfile.Core.MIHOMO) {
-                    prefs.edit().putString("proxyBaseCore", "mihomo").apply(); revision++
+                    chooseCore("mihomo")
                 }
                 FocusedDivider()
                 FocusedChoiceRow(Icons.Rounded.AutoAwesome, Color(0xFF8B5CF6), "Mihomo Smart", "Smart 运行配置入口", profile.core == ProxyRuntimeProfile.Core.MIHOMO_SMART) {
-                    prefs.edit().putString("proxyBaseCore", "mihomo-smart").apply(); revision++
+                    chooseCore("mihomo-smart")
                 }
             }
         }

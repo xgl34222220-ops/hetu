@@ -54,6 +54,7 @@ class ConfigApplyQueueTest {
         library = ProxyConfigLibrary(app)
         entry = library.importConfig(ProxyRuntimeProfile.Core.MIHOMO, "apply-queue.yaml", yaml("initial").byteInputStream())
         ConfigApplyIo.source = { library.read(requireNotNull(library.selected(ProxyRuntimeProfile.Core.MIHOMO))) }
+        ConfigApplyIo.openSource = library::beginSourceApplication
         ConfigApplyIo.applied = yaml("initial")
     }
 
@@ -82,6 +83,16 @@ class ConfigApplyQueueTest {
         val snapshot = ConfigEditSnapshot(entry.core.id, entry.name, library.read(entry))
         library.writeIfUnchanged(entry, snapshot, yaml(version))
         vm.applyConfigChange("配置已保存")
+    }
+
+    private fun saveBound(vm: HetuViewModel, version: String): ProxyConfigLibrary.SourceVersion {
+        val source = yaml(version)
+        library.writeIfUnchanged(entry, ConfigEditSnapshot(entry.core.id, entry.name, library.read(entry)), source)
+        val digest = java.security.MessageDigest.getInstance("SHA-256").digest(source.toByteArray())
+            .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+        val receipt = ProxyConfigLibrary.SourceVersion.restored(entry.core.id, entry.name, digest)
+        vm.applyConfigChange("配置已保存", receipt)
+        return receipt
     }
 
     private fun pumpUntil(condition: () -> Boolean) {
@@ -388,6 +399,89 @@ class ConfigApplyQueueTest {
         assertFalse(messages.any { it == "代理已启动" || it.contains("已生效") })
     }
 
+    @Test fun sourceReceiptsKeepFrozenApplyBytesAndCoalesceASecondSave() {
+        val vm = vm()
+        val a = ConfigApplyIo.expect("reload")
+        val b = ConfigApplyIo.expect("reload")
+        val receiptA = saveBound(vm, "A"); started(a)
+        val receiptB = saveBound(vm, "B")
+        assertEquals(yaml("initial"), ConfigApplyIo.applied)
+        assertEquals(listOf("reload:A"), ConfigApplyIo.calls)
+        a.release.countDown(); started(b)
+        assertEquals(yaml("A"), ConfigApplyIo.applied)
+        assertEquals(listOf(receiptA.sha256, receiptB.sha256), ConfigApplyIo.boundRequests.map { it.sha256 })
+        assertEquals(receiptB.sha256, prefs.getString("proxyUiConfigApplySourceHash", ""))
+        b.release.countDown(); finished(vm)
+        assertEquals(yaml("B"), ConfigApplyIo.applied)
+        assertFalse(prefs.contains("proxyUiConfigApplyPending"))
+        assertFalse(prefs.contains("proxyUiConfigApplySourceHash"))
+    }
+
+    @Test fun aQueuedReceiptCannotApplyAnotherConfigAfterStartCompletes() {
+        ConfigApplyIo.running = false
+        prefs.edit().putBoolean("proxyUiLastRunning", false).commit()
+        val vm = vm()
+        val start = ConfigApplyIo.expect("start")
+        vm.toggle(); started(start)
+        val saved = saveBound(vm, "A")
+        val other = library.importConfig(ProxyRuntimeProfile.Core.MIHOMO, "other-B.yaml", yaml("B").byteInputStream())
+        start.release.countDown(); finished(vm)
+        assertEquals(listOf("start:initial"), ConfigApplyIo.calls)
+        assertEquals(saved.name, ConfigApplyIo.boundRequests.single().name)
+        assertEquals(yaml("initial"), ConfigApplyIo.applied)
+        assertEquals(other.name, library.selected(ProxyRuntimeProfile.Core.MIHOMO)?.name)
+        assertEquals(saved.sha256, prefs.getString("proxyUiConfigApplySourceHash", ""))
+        assertTrue(prefs.contains("proxyUiConfigApplyPending"))
+        assertTrue(vm.state.message.contains("当前配置已切换"))
+        assertFalse(messages.contains("运行配置已热重载"))
+    }
+
+    @Test fun successfulStartDoesNotAcknowledgeABoundReceiptBeforeItsCheckedReload() {
+        ConfigApplyIo.running = false
+        prefs.edit().putBoolean("proxyUiLastRunning", false).commit()
+        val vm = vm()
+        val receipt = saveBound(vm, "A")
+        val start = ConfigApplyIo.expect("start")
+        val reload = ConfigApplyIo.expect("reload")
+        vm.toggle(); started(start); start.release.countDown(); started(reload)
+        assertEquals(receipt.sha256, prefs.getString("proxyUiConfigApplySourceHash", ""))
+        assertTrue(prefs.contains("proxyUiConfigApplyPending"))
+        reload.release.countDown(); finished(vm)
+        assertEquals(listOf("start:A", "reload:A"), ConfigApplyIo.calls)
+        assertFalse(prefs.contains("proxyUiConfigApplyPending"))
+    }
+
+    @Test fun rebuiltVmRetainsTheBoundSourceInsteadOfRetryingTheCurrentSelection() {
+        ConfigApplyIo.running = false
+        prefs.edit().putBoolean("proxyUiLastRunning", false).commit()
+        val original = vm()
+        val receipt = saveBound(original, "A")
+        stores.single().clear()
+        library.importConfig(ProxyRuntimeProfile.Core.MIHOMO, "new-selection.yaml", yaml("B").byteInputStream())
+        ConfigApplyIo.running = true
+        prefs.edit().putBoolean("proxyUiLastRunning", true).commit()
+        val rebuilt = vm()
+        rebuilt.reload(); finished(rebuilt)
+        assertTrue(ConfigApplyIo.calls.isEmpty())
+        assertEquals(receipt.name, ConfigApplyIo.boundRequests.single().name)
+        assertEquals(yaml("initial"), ConfigApplyIo.applied)
+        assertTrue(prefs.contains("proxyUiConfigApplyPending"))
+        assertTrue(rebuilt.state.message.contains("当前配置已切换"))
+    }
+
+    @Test fun invalidReceiptCannotSilentlyBecomeAnUnboundReload() {
+        val vm = vm()
+        prefs.edit().putString("proxyUiConfigApplyPending", "bad-receipt")
+            .putString("proxyUiConfigApplySourceCore", "mihomo")
+            .putString("proxyUiConfigApplySourceName", entry.name)
+            .putString("proxyUiConfigApplySourceHash", "not-a-sha256").commit()
+        vm.reload(); finished(vm)
+        assertTrue(ConfigApplyIo.calls.isEmpty())
+        assertTrue(ConfigApplyIo.boundRequests.isEmpty())
+        assertEquals("bad-receipt", prefs.getString("proxyUiConfigApplyPending", ""))
+        assertFalse(messages.contains("运行配置已热重载"))
+    }
+
     @Test fun saveDuringFinalStateReadBackCannotFallBetweenWorkers() {
         val vm = vm()
         val a = ConfigApplyIo.expect("reload")
@@ -452,6 +546,7 @@ internal object ConfigApplyIo {
     val calls = CopyOnWriteArrayList<String>()
     val unexpected = CopyOnWriteArrayList<String>()
     val gates = CopyOnWriteArrayList<ConfigApplyGate>()
+    val boundRequests = CopyOnWriteArrayList<ProxyConfigLibrary.SourceVersion>()
     private val lock = ReentrantLock()
     private var consumed = 0
     @Volatile var running = true
@@ -461,9 +556,10 @@ internal object ConfigApplyIo {
     @Volatile var nextStateFailure: IOException? = null
     @Volatile var stateMessage = ""
     var source: () -> String = { error("Source not installed") }
+    var openSource: (ProxyConfigLibrary.SourceVersion) -> ProxyConfigLibrary.SourceApplication = { error("Source lease not installed") }
 
     fun reset() {
-        calls.clear(); unexpected.clear(); gates.clear(); consumed = 0
+        calls.clear(); unexpected.clear(); gates.clear(); boundRequests.clear(); consumed = 0
         running = true; active = 0; applied = ""; nextStateGate = null
         nextStateFailure = null; stateMessage = ""
     }
@@ -482,7 +578,15 @@ internal object ConfigApplyIo {
         state()
     }
 
-    suspend fun action(operation: String): Any = withContext(Dispatchers.IO) {
+    suspend fun action(operation: String): Any = withContext(Dispatchers.IO) { blockingAction(operation) }
+
+    suspend fun boundAction(receipt: ProxyConfigLibrary.SourceVersion): Any = withContext(Dispatchers.IO) {
+        boundRequests += receipt
+        // Like Root's synchronous transaction, acquire/use/close on one IO thread.
+        openSource(receipt).use { application -> blockingAction("reload", application.text) }
+    }
+
+    private fun blockingAction(operation: String, frozenSource: String? = null): Any =
         lock.withLock {
             active++
             try {
@@ -491,7 +595,7 @@ internal object ConfigApplyIo {
                     unexpected += operation
                     throw IOException("Unplanned test IO: $operation")
                 }
-                val captured = source()
+                val captured = frozenSource ?: source()
                 calls += "$operation:${captured.lineSequence().first().removePrefix("# ")}"
                 gate.entered.countDown()
                 if (!gate.release.await(8, TimeUnit.SECONDS)) throw IOException("Unreleased test gate: $operation")
@@ -508,7 +612,6 @@ internal object ConfigApplyIo {
                 if (operation == "reload") "运行配置已热重载" else JSONObject().put("ok", true).put("alreadyRunning", gate.alreadyRunning).put("cancelled", gate.cancelled)
             } finally { active-- }
         }
-    }
 }
 
 /** No unhandled call can fall through to Root, scripts or the public controller API. */
@@ -517,6 +620,8 @@ class ConfigApplyControllerShadow {
     @Implementation fun state(continuation: Continuation<Any?>): Any = ConfigApplyIo.state()
     @Implementation fun reload(continuation: Continuation<Any?>): Any? =
         (suspend { ConfigApplyIo.action("reload") }).startCoroutineUninterceptedOrReturn(continuation)
+    @Implementation fun reload(source: ProxyConfigLibrary.SourceVersion, continuation: Continuation<Any?>): Any? =
+        (suspend { ConfigApplyIo.boundAction(source) }).startCoroutineUninterceptedOrReturn(continuation)
     @Implementation fun start(progress: (String) -> Unit, continuation: Continuation<Any?>): Any? =
         (suspend { ConfigApplyIo.action("start") }).startCoroutineUninterceptedOrReturn(continuation)
     @Implementation fun restart(progress: (String) -> Unit, continuation: Continuation<Any?>): Any? =

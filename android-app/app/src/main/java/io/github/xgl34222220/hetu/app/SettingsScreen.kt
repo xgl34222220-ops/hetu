@@ -358,7 +358,15 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
         revision++
         vm.bumpSettings()
     }
-    fun putString(key: String, value: String) { prefs.edit().putString(key, value).apply(); changed(key) }
+    fun putString(key: String, value: String) {
+        try {
+            if (key == "proxyBaseCore") ProxyConfigLibrary.selectCore(prefs, value)
+            else prefs.edit().putString(key, value).apply()
+            changed(key)
+        } catch (failure: java.io.IOException) {
+            vm.toast(failure.message ?: "核心选择未改变，请稍后重试")
+        }
+    }
     fun putBool(key: String, value: Boolean) { prefs.edit().putBoolean(key, value).apply(); changed(key) }
     val c = Hx.colors
 

@@ -305,6 +305,10 @@ final class RootProxyManager {
     }
 
     private Prepared prepare(ProxyRuntimeProfile profile,int fixedControllerPort)throws Exception{
+        return prepare(profile,fixedControllerPort,null);
+    }
+
+    private Prepared prepare(ProxyRuntimeProfile profile,int fixedControllerPort,ProxyConfigLibrary.SourceApplication frozen)throws Exception{
         RootBridge.requireWorkerThread();
         String settingsSignature=ProxyRuntimeSettings.signature(profile,prefs.getAll());
         if(profile.core!=ProxyRuntimeProfile.Core.MIHOMO&&profile.core!=ProxyRuntimeProfile.Core.MIHOMO_SMART)
@@ -315,9 +319,10 @@ final class RootProxyManager {
                 profile.mode!=ProxyRuntimeProfile.Mode.TUN&&profile.mode!=ProxyRuntimeProfile.Mode.EBPF)
             throw new IOException(profile.mode.label+" 的统一 Root 后端还未接入");
 
-        ProxyConfigLibrary.Entry selected=configs.selected(profile.core);
+        if(frozen!=null&&frozen.entry.core!=profile.core)throw new IOException("配置应用核心已变化，本次未应用");
+        ProxyConfigLibrary.Entry selected=frozen==null?configs.selected(profile.core):frozen.entry;
         if(selected==null)throw new IOException("请先为 "+profile.core.label+" 选择配置文件");
-        String source=configs.read(selected);
+        String source=frozen==null?configs.read(selected):frozen.text;
         if(source==null||source.trim().isEmpty())throw new IOException("源配置为空");
         if(source.getBytes(StandardCharsets.UTF_8).length>4*1024*1024)throw new IOException("配置超过 4 MiB");
         // Source YAML rule order is authoritative. PROCESS-NAME ... DIRECT remains inside
@@ -375,13 +380,19 @@ final class RootProxyManager {
     }
 
     String reloadCurrentConfig()throws Exception{
+        return reloadCurrentConfig(null);
+    }
+
+    String reloadCurrentConfig(ProxyConfigLibrary.SourceVersion expected)throws Exception{
         CONTROL_LOCK.lock();
+        ProxyConfigLibrary.SourceApplication frozen=null;
         try{
             RootBridge.requireWorkerThread();
+            if(expected!=null)frozen=configs.beginSourceApplication(expected);
             if(!coreAliveFast())throw new IOException("代理未运行，无法热重载");
             ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
             int port=prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT);
-            Prepared p=prepare(profile,port);
+            Prepared p=prepare(profile,port,frozen);
             String nextFingerprint=topologyFingerprint(profile,p.policy);
             String liveFingerprint=prefs.getString("proxyRootTopologyFingerprint","");
             if(liveFingerprint!=null&&!liveFingerprint.isEmpty()&&!liveFingerprint.equals(nextFingerprint))
@@ -415,7 +426,7 @@ final class RootProxyManager {
                     .apply();
             return "运行配置已热重载";
         }finally{
-            CONTROL_LOCK.unlock();
+            try{if(frozen!=null)frozen.close();}finally{CONTROL_LOCK.unlock();}
         }
     }
 

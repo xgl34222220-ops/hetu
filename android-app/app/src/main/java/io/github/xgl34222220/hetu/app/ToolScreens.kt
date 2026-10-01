@@ -455,10 +455,13 @@ internal fun RuntimeCoreScreen(vm: HetuViewModel, onBack: () -> Unit, onOpenCore
                             iconTint = c.textMuted,
                             enabled = installed,
                             onClick = {
-                                prefs.edit().putString("proxyBaseCore", core.id).apply()
-                                ProxyRuntimeSettings.markDirty(prefs, "proxyBaseCore")
-                                vm.bumpSettings()
-                                revision++
+                                runCatching { ProxyConfigLibrary.selectCore(prefs, core.id) }
+                                    .onSuccess {
+                                        ProxyRuntimeSettings.markDirty(prefs, "proxyBaseCore")
+                                        vm.bumpSettings()
+                                        revision++
+                                    }
+                                    .onFailure { vm.toast(it.message ?: "核心选择未改变，请稍后重试") }
                             },
                         ) { HxSelectMark(profile.core == core) }
                     }

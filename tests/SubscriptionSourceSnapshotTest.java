@@ -73,6 +73,11 @@ public final class SubscriptionSourceSnapshotTest {
         for(java.lang.reflect.Field field:ProxyConfigLibrary.SourceVersion.class.getDeclaredFields())receiptFields.add(field.getName());
         check(receiptFields.equals(Set.of("coreId","name","sha256")),"receipt stores no YAML or subscription URL");
         check(receipt.sha256.matches("[a-f0-9]{64}"),"receipt uses SHA-256");
+        check(ProxyConfigLibrary.SourceVersion.restored(receipt.coreId,receipt.name,receipt.sha256).matches(CORE.id,a.name,updated),"persisted receipt round trip retains identity");
+        reject(()->ProxyConfigLibrary.SourceVersion.restored("unknown",a.name,receipt.sha256),"unknown receipt core accepted");
+        reject(()->ProxyConfigLibrary.SourceVersion.restored(CORE.id,"../other.yaml",receipt.sha256),"receipt path traversal accepted");
+        reject(()->ProxyConfigLibrary.SourceVersion.restored(CORE.id,a.name,"bad-digest"),"malformed receipt hash accepted");
+        reject(()->ProxyConfigLibrary.SourceVersion.restored(CORE.id,null,receipt.sha256),"partial receipt accepted");
         reject(()->two.updateSubscriptionIfUnchanged(opened,"sample","https://example.invalid/stale"),"old form overwrote newer URL");
         unchanged(one,a,updated,"stale update leaves committed bytes unchanged");
 
@@ -155,6 +160,57 @@ public final class SubscriptionSourceSnapshotTest {
                 check(one.read(ra).contains(saved.get()?"https://example.invalid/winner":"https://example.invalid/original"),"A reflects only committed save");
             }
         }finally{pool.shutdownNow();}
-        System.out.println("SubscriptionSourceSnapshotTest passed: "+checks+" checks; source API only, runtime apply is not exercised");
+        verifyApplicationLease(host,one,two);
+        System.out.println("SubscriptionSourceSnapshotTest passed: "+checks+" checks; source/lease APIs only, Root apply is not exercised");
+    }
+
+    private static void verifyApplicationLease(Host host,ProxyConfigLibrary one,ProxyConfigLibrary two)throws Exception{
+        ProxyConfigLibrary.Entry other=create(one,"lease-other.yaml");
+        ProxyConfigLibrary.Entry active=create(one,"lease-active.yaml");
+        ProxyConfigLibrary.selectCore(host.prefs,CORE.id);
+        ProxyConfigLibrary.SourceVersion old=one.updateSubscriptionIfUnchanged(one.subscriptionEditSnapshot(CORE),"sample","https://example.invalid/apply-old");
+        String captured=one.read(active);
+        ExecutorService worker=Executors.newSingleThreadExecutor();
+        ProxyConfigLibrary.SourceVersion latest;
+        try{
+            try(ProxyConfigLibrary.SourceApplication application=one.beginSourceApplication(old)){
+                check(application.entry.name.equals(active.name)&&application.text.equals(captured),"apply lease captures exact receipt revision");
+                worker.submit(()->{
+                    reject(()->two.select(CORE,other.name),"switch during apply lease");
+                    reject(()->create(two,"should-not-exist.yaml"),"import during apply lease");
+                    reject(()->two.rename(active,"should-not-rename.yaml"),"rename during apply lease");
+                    reject(()->two.delete(active),"delete during apply lease");
+                    reject(()->ProxyConfigLibrary.selectCore(host.prefs,"mihomo-smart"),"core switch during apply lease");
+                    reject(()->ProxyConfigLibrary.commitIdentityPreferences(host.prefs.edit().putString("proxyBaseCore","mihomo-smart")),"migration preferences during apply lease");
+                    reject(()->two.restoreBatch(Collections.emptyList(),Map.of(CORE,other.name),selections->{throw new AssertionError("restore commit reached");}),"restore during apply lease");
+                    reject(()->two.beginSourceApplication(old),"overlapping apply lease");
+                    check(two.selected(CORE).name.equals(active.name),"read remains available during worker IO");
+                    check(two.list(CORE).stream().noneMatch(e->e.name.startsWith("should-not-")),"rejected identity operations leave no files");
+                    return null;
+                }).get(3,TimeUnit.SECONDS);
+                check(host.prefs.getString("proxyBaseCore","").equals(CORE.id),"core preference preserved during lease");
+                latest=worker.submit(()->two.updateSubscriptionIfUnchanged(two.subscriptionEditSnapshot(CORE),"sample","https://example.invalid/apply-new")).get(3,TimeUnit.SECONDS);
+                check(one.read(active).contains("apply-new"),"same-source save can complete while Root would use frozen source");
+                check(application.text.equals(captured),"concurrent source save cannot mutate frozen apply bytes");
+            }
+            reject(()->one.beginSourceApplication(old),"stale receipt cannot prepare changed source");
+            try(ProxyConfigLibrary.SourceApplication next=one.beginSourceApplication(latest)){
+                check(next.text.contains("apply-new"),"new receipt prepares new revision");
+            }
+            worker.submit(()->{two.select(CORE,other.name);return null;}).get(3,TimeUnit.SECONDS);
+            reject(()->one.beginSourceApplication(latest),"switched identity cannot prepare old source");
+            // Every failed acquire must release its lease for a later UI action.
+            worker.submit(()->{two.select(CORE,active.name);return null;}).get(3,TimeUnit.SECONDS);
+            try{
+                try(ProxyConfigLibrary.SourceApplication ignored=one.beginSourceApplication(latest)){
+                    throw new IOException("synthetic apply failure");
+                }
+            }catch(IOException expected){checks++;}
+            worker.submit(()->{ProxyConfigLibrary.selectCore(host.prefs,"mihomo-smart");return null;}).get(3,TimeUnit.SECONDS);
+            check(host.prefs.getString("proxyBaseCore","").equals("mihomo-smart"),"failed apply closes lease and permits identity changes");
+            ProxyConfigLibrary.selectCore(host.prefs,CORE.id);
+            reject(()->ProxyConfigLibrary.selectCore(host.prefs,"not-a-core"),"unknown core accepted");
+            check(host.prefs.getString("proxyBaseCore","").equals(CORE.id),"unknown core retains previous identity");
+        }finally{worker.shutdownNow();}
     }
 }

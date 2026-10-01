@@ -311,6 +311,10 @@ internal class ProxyComposeController(context: Context) {
         root.reloadCurrentConfig()
     }
 
+    suspend fun reload(source: ProxyConfigLibrary.SourceVersion): String = withContext(Dispatchers.IO) {
+        root.reloadCurrentConfig(source)
+    }
+
     suspend fun restart(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
         LegacyAppMigrator.migrateIfNeeded(app)
         val profile = ProxyRuntimeProfile.load(prefs)
@@ -390,7 +394,7 @@ internal class ProxyComposeController(context: Context) {
         "disable" to "禁用本机 IPv6",
     )
 
-    fun setCore(id: String) { prefs.edit().putString("proxyBaseCore", id).apply() }
+    fun setCore(id: String) { ProxyConfigLibrary.selectCore(prefs, id) }
     fun setMode(id: String) { prefs.edit().putString("proxyBaseMode", id).apply() }
     fun setIpv6(id: String) { prefs.edit().putString("proxyBaseIpv6", id).apply() }
     fun setAutoOverwrite(value: Boolean) { prefs.edit().putBoolean("proxyBaseAutoOverwrite", value).apply() }
@@ -445,13 +449,29 @@ internal class ProxyComposeController(context: Context) {
 
     suspend fun importConfig(uri: Uri, displayName: String): String = withContext(Dispatchers.IO) {
         val input = app.contentResolver.openInputStream(uri) ?: error("无法读取配置文件")
-        configs.importConfig(ProxyRuntimeProfile.load(prefs).core, displayName, input).name
+        input.use { configs.importConfig(ProxyRuntimeProfile.load(prefs).core, displayName, it).name }
     }
 
     suspend fun subscriptions(): List<ProxySubscriptionUi> = withContext(Dispatchers.IO) {
         val profile = ProxyRuntimeProfile.load(prefs)
         val entry = configs.selected(profile.core) ?: return@withContext emptyList()
         configs.subscriptions(entry).map { ProxySubscriptionUi(it.name, it.url, it.placeholder) }
+    }
+
+    suspend fun subscriptionEditSnapshot(): ProxyConfigLibrary.SubscriptionEditSnapshot = withContext(Dispatchers.IO) {
+        configs.subscriptionEditSnapshot(ProxyRuntimeProfile.load(prefs).core)
+    }
+
+    suspend fun updateSubscription(opened: ProxyConfigLibrary.SubscriptionEditSnapshot, name: String, url: String): ProxyConfigLibrary.SourceVersion = withContext(Dispatchers.IO) {
+        configs.updateSubscriptionIfUnchanged(opened, name, url)
+    }
+
+    suspend fun addSubscription(opened: ProxyConfigLibrary.SubscriptionEditSnapshot, name: String, url: String): ProxyConfigLibrary.SourceVersion = withContext(Dispatchers.IO) {
+        configs.addSubscriptionIfUnchanged(opened, name, url)
+    }
+
+    suspend fun deleteSubscription(opened: ProxyConfigLibrary.SubscriptionEditSnapshot, name: String): ProxyConfigLibrary.SourceVersion = withContext(Dispatchers.IO) {
+        configs.deleteSubscriptionIfUnchanged(opened, name)
     }
 
     suspend fun updateSubscription(name: String, url: String) = withContext(Dispatchers.IO) {

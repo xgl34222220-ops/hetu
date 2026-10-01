@@ -263,6 +263,7 @@ class ConfigWorkflowConceptTest {
         node("config-subscription-save").performScrollTo().performClick()
         awaitTag("config-library-card")
         assertEquals("https://example.invalid/updated", library.subscriptions(entry).single().url)
+        awaitTag("config-subscription-main")
         node("config-subscription-main").performScrollTo().performClick()
         node("config-subscription-url").assertTextContains("https://example.invalid/updated")
         node("config-subscription-url").performTextReplacement("https://example.invalid/discard")
@@ -281,6 +282,38 @@ class ConfigWorkflowConceptTest {
         node("config-form-error").performScrollTo().assertTextEquals("订阅名称已存在")
         node("config-subscription-url").performScrollTo().assertTextContains("https://example.invalid/duplicate")
         assertEquals(source, library.read(entry))
+    }
+
+    @Test fun subscriptionFormKeepsItsOriginalSourceWhenAnotherConfigBecomesCurrent() {
+        renderLibrary()
+        node("config-subscription-main").performScrollTo().performClick()
+        awaitTag("config-subscription-page")
+        node("config-subscription-url").performTextReplacement("https://example.invalid/draft-for-A")
+        lateinit var other: ProxyConfigLibrary.Entry
+        rule.runOnIdle { other = library.importConfig(core, "other-source.yaml", source.byteInputStream()) }
+        node("config-subscription-save").performScrollTo().performClick()
+        awaitTag("config-form-error")
+        node("config-form-error").performScrollTo().assertTextContains("当前配置已切换", substring = true)
+        node("config-subscription-url").performScrollTo().assertTextContains("https://example.invalid/draft-for-A")
+        assertEquals(source, library.read(entry))
+        assertEquals(source, library.read(other))
+        assertEquals(other.name, library.selected(core)?.name)
+        assertFalse(vm.prefs.contains("proxyUiConfigApplyPending"))
+    }
+
+    @Test fun subscriptionFormRejectsChangedSourceBytesAndRetainsItsDraft() {
+        renderLibrary()
+        node("config-subscription-main").performScrollTo().performClick()
+        awaitTag("config-subscription-page")
+        node("config-subscription-url").performTextReplacement("https://example.invalid/stale-draft")
+        val external = source.replace("example.invalid/original", "example.invalid/another-editor")
+        rule.runOnIdle { library.write(entry, external) }
+        node("config-subscription-save").performScrollTo().performClick()
+        awaitTag("config-form-error")
+        node("config-subscription-page").assertExists()
+        node("config-subscription-url").performScrollTo().assertTextContains("https://example.invalid/stale-draft")
+        assertEquals(external, library.read(entry))
+        assertFalse(vm.prefs.contains("proxyUiConfigApplyPending"))
     }
 
     @Test fun conflictKeepsDirtyDraftByDefaultAndCancelDoesNotReload() {
