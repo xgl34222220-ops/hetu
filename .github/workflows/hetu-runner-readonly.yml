@@ -1,0 +1,65 @@
+name: Hetu runner read-only probe
+
+on:
+  push:
+    branches: ['test/dot-v2048-ui-safety']
+    paths: ['.github/workflows/hetu-runner-readonly.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Inspect existing KVM access without changing it
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import grp, json, os, pwd, shutil, stat, subprocess
+          output = Path('runner-readonly')
+          output.mkdir()
+          user = pwd.getpwuid(os.getuid()).pw_name
+          groups = sorted(set([os.getgid(), *os.getgroups()]))
+          result = {'uid': os.getuid(), 'user': user, 'primaryGid': os.getgid(),
+                    'groups': [{'gid': gid, 'name': grp.getgrgid(gid).gr_name} for gid in groups],
+                    'permissionChanges': False, 'packagesInstalled': False, 'vmStarted': False}
+          device = Path('/dev/kvm')
+          result['kvm'] = {'exists': device.exists(), 'readable': os.access(device, os.R_OK),
+                           'writable': os.access(device, os.W_OK)}
+          if device.exists():
+              info = device.stat()
+              result['kvm'].update({'characterDevice': stat.S_ISCHR(info.st_mode),
+                                   'mode': oct(stat.S_IMODE(info.st_mode)), 'uid': info.st_uid,
+                                   'owner': pwd.getpwuid(info.st_uid).pw_name, 'gid': info.st_gid,
+                                   'group': grp.getgrgid(info.st_gid).gr_name})
+          getfacl = shutil.which('getfacl')
+          result['getfaclAvailable'] = bool(getfacl)
+          if getfacl and device.exists():
+              acl = subprocess.run([getfacl, '-p', str(device)], capture_output=True, text=True, timeout=10)
+              (output / 'kvm-acl.txt').write_text(acl.stdout + acl.stderr)
+              result['aclReadExitCode'] = acl.returncode
+          result['setfaclAvailable'] = bool(shutil.which('setfacl'))
+          cpuinfo = Path('/proc/cpuinfo').read_text()
+          result['cpuVirtualizationFlag'] = any(flag in cpuinfo.split() for flag in ('vmx', 'svm'))
+          emulator = Path(os.environ.get('ANDROID_HOME', '/usr/local/lib/android/sdk')) / 'emulator/emulator'
+          result['emulatorInstalled'] = emulator.is_file()
+          if emulator.is_file():
+              try:
+                  check = subprocess.run([str(emulator), '-accel-check'], capture_output=True, text=True, timeout=30)
+                  (output / 'acceleration-check.txt').write_text(check.stdout + check.stderr)
+                  result['accelerationCheckExitCode'] = check.returncode
+              except subprocess.TimeoutExpired:
+                  result['accelerationCheckTimedOut'] = True
+          (output / 'result.json').write_text(json.dumps(result, indent=2))
+          print(json.dumps(result, indent=2))
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Hetu-runner-readonly
+          path: runner-readonly/
+          if-no-files-found: error
