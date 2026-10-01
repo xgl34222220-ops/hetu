@@ -270,7 +270,7 @@ final class RootProxyManager {
 
             int port=liveControllerPort(state);
             if(port>0)prefs.edit().putInt("proxyControllerPort",port).apply();
-            MihomoControllerClient controller=new MihomoControllerClient(context);
+            MihomoControllerClient controller=MihomoControllerClient.forLocalRuntime(context);
             try{
                 controller.reloadLocalRuleProvider(ProxyAdblockRules.ALLOW_PROVIDER_NAME);
                 controller.reloadLocalRuleProvider(ProxyAdblockRules.PROVIDER_NAME);
@@ -404,7 +404,7 @@ final class RootProxyManager {
             prefs.edit().remove(RuntimeIdentity.RECORD_KEY).remove(RuntimeIdentity.OBSERVATION_KEY)
                     .putLong("proxyRootHealthProbeElapsed",0L).apply();
             installHotReloadFiles(p);
-            MihomoControllerClient controller=new MihomoControllerClient(context);
+            MihomoControllerClient controller=MihomoControllerClient.forLocalRuntime(context);
             boolean effective=false;
             try{
                 controller.reloadConfig(CONFIG);
@@ -917,7 +917,7 @@ final class RootProxyManager {
         try{
             int wechatUid=-1;
             try{wechatUid=context.getPackageManager().getApplicationInfo("com.tencent.mm",0).uid;}catch(Exception ignored){}
-            org.json.JSONArray connections=new MihomoControllerClient(context).connections().optJSONArray("connections");
+            org.json.JSONArray connections=MihomoControllerClient.forLocalRuntime(context).connections().optJSONArray("connections");
             StringBuilder matched=new StringBuilder("WeChat UID=").append(wechatUid).append('\n');
             int count=0,otherCount=0;
             StringBuilder other=new StringBuilder();
@@ -986,7 +986,7 @@ final class RootProxyManager {
                     +"\nwechatBatteryExempt="+power.isIgnoringBatteryOptimizations("com.tencent.mm");
             device+="\n以上是排查线索，不等于已定位微信延迟原因。分应用绕过、私人DNS、配置内置分流可使同一YAML实际走不同路径。";
             report.section("系统网络与消息排查线索",device,2500);
-            MihomoControllerClient controller=new MihomoControllerClient(context);
+            MihomoControllerClient controller=MihomoControllerClient.forLocalRuntime(context);
             String mode14=controller.configs().optString("mode","unknown");
             JSONObject providers14=controller.ruleProviders().optJSONObject("providers");
             JSONObject block14=providers14==null?null:providers14.optJSONObject(ProxyAdblockRules.PROVIDER_NAME);

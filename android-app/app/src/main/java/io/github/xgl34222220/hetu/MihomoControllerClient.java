@@ -9,7 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.Semaphore;
 
-/** Authenticated localhost-only Mihomo Clash API client for strategy, delay, providers, rules and connections UI. */
+/** Clash API client with a separate, local-only scope for Root runtime maintenance. */
 final class MihomoControllerClient {
     private static final int LIMIT=6*1024*1024;
     static final String IPV6_DELAY_URL="https://[2606:4700:4700::1111]/cdn-cgi/trace";
@@ -35,37 +35,46 @@ final class MihomoControllerClient {
         }
     }
     private final Context context;
-    MihomoControllerClient(Context c){context=c.getApplicationContext();}
+    private final boolean localRuntime;
+    MihomoControllerClient(Context c){this(c,false);}
+    private MihomoControllerClient(Context c,boolean localRuntime){context=c.getApplicationContext();this.localRuntime=localRuntime;}
+    static MihomoControllerClient forLocalRuntime(Context context){return new MihomoControllerClient(context,true);}
 
     private android.content.SharedPreferences prefs(){
         return context.getSharedPreferences("hetu",0);
     }
 
-    private boolean customApi(){
-        return prefs().getBoolean("proxyCustomApiEnabled",false);
+    private static final class Endpoint {
+        final String host,secret;final int port;
+        Endpoint(String host,int port,String secret){this.host=host;this.port=port;this.secret=secret;}
     }
 
-    private String host()throws IOException{
-        if(!customApi())return "127.0.0.1";
-        String value=prefs().getString("proxyCustomApiHost","127.0.0.1");
-        value=value==null?"":value.trim();
-        if(value.isEmpty()||value.length()>253||!value.matches("[A-Za-z0-9.-]+"))
+    private static String stringValue(Map<String,?> values,String key,String fallback)throws IOException{
+        Object value=values.get(key);
+        if(value==null)return fallback;
+        if(!(value instanceof String))throw new IOException("Clash API 配置类型无效");
+        return (String)value;
+    }
+
+    private Endpoint endpoint()throws IOException{
+        // SharedPreferences publishes each edit atomically. Read all endpoint fields from
+        // one snapshot so a settings change cannot pair one server with another secret.
+        Map<String,?> values=prefs().getAll();
+        Object enabled=values.get("proxyCustomApiEnabled");
+        if(!localRuntime&&enabled!=null&&!(enabled instanceof Boolean))throw new IOException("Clash API 配置类型无效");
+        boolean custom=!localRuntime&&Boolean.TRUE.equals(enabled);
+        String host=custom?stringValue(values,"proxyCustomApiHost","127.0.0.1").trim():"127.0.0.1";
+        if(host.isEmpty()||host.length()>253||!host.matches("[A-Za-z0-9.-]+"))
             throw new IOException("自定义 Clash API 地址无效");
-        return value;
-    }
-
-    private String secret()throws IOException{
-        String key=customApi()?"proxyCustomApiSecret":"proxyControllerSecret";
-        String value=prefs().getString(key,"");
-        value=value==null?"":value;
-        if(value.indexOf('\r')>=0||value.indexOf('\n')>=0)throw new IOException("Clash API Secret 包含非法换行");
-        if(!customApi()&&value.isEmpty())throw new IOException("策略控制接口尚未初始化");
-        return value;
-    }
-
-    private int port(){
-        int key=customApi()?prefs().getInt("proxyCustomApiPort",9090):prefs().getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT);
-        return key>=1024&&key<=65535?key:(customApi()?9090:MihomoStartupConfig.CONTROLLER_PORT);
+        String secret=stringValue(values,custom?"proxyCustomApiSecret":"proxyControllerSecret","");
+        if(secret.indexOf('\r')>=0||secret.indexOf('\n')>=0)throw new IOException("Clash API Secret 包含非法换行");
+        if(!custom&&secret.isEmpty())throw new IOException("策略控制接口尚未初始化");
+        int fallback=custom?9090:MihomoStartupConfig.CONTROLLER_PORT;
+        Object portValue=values.get(custom?"proxyCustomApiPort":"proxyControllerPort");
+        if(portValue!=null&&!(portValue instanceof Integer))throw new IOException("Clash API 配置类型无效");
+        int port=portValue==null?fallback:(Integer)portValue;
+        if(port<1024||port>65535)port=fallback;
+        return new Endpoint(host,port,secret);
     }
 
     private String customDelayUrl(){
@@ -224,9 +233,10 @@ final class MihomoControllerClient {
 
     private JSONObject request(String method,String path,JSONObject body,int socketTimeoutMs)throws Exception{
         byte[] payload=body==null?new byte[0]:body.toString().getBytes(StandardCharsets.UTF_8);
-        int port=port();
-        String host=host();
-        String secret=secret();
+        Endpoint endpoint=endpoint();
+        int port=endpoint.port;
+        String host=endpoint.host;
+        String secret=endpoint.secret;
         Socket socket=new Socket();
         try{
             socket.connect(new InetSocketAddress(InetAddress.getByName(host),port),2200);
