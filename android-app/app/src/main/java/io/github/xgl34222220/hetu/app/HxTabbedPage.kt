@@ -1,6 +1,7 @@
 package io.github.xgl34222220.hetu
 
 import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -139,7 +140,7 @@ internal fun HxTabbedPage(
     val host = remember { HxEmbedHost() }
     val shownSubtitle = if (showSubtitle) (host.subtitles[selected] ?: subtitle) else null
     val stackedActions = panelReferenceStyle && LocalDensity.current.fontScale > 1.3f
-    val topBarHeight = if (stackedActions) (48f * LocalDensity.current.fontScale + 48f).dp else if (panelReferenceStyle) 68.dp else if (minimalHeader) 48.dp else HxTopBarHeight
+    val topBarHeight = if (stackedActions) (40f * LocalDensity.current.fontScale + 48f).dp else if (panelReferenceStyle) 60.dp else if (minimalHeader) 48.dp else HxTopBarHeight
     val c = Hx.colors
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -211,6 +212,8 @@ internal fun HxTabbedPage(
     }
 
     val collapse = if (panelReferenceStyle) { if (listStates[selected]?.let { it.firstVisibleItemIndex > 0 || it.firstVisibleItemScrollOffset > 0 } == true) 1f else 0f } else if (headerHeightPx > 0f) (fold / headerHeightPx).coerceIn(0f, 1f) else 0f
+    val referenceTitleSize by animateFloatAsState(if (collapse > 0f) 22f else 26f,
+        tween(if (LocalHxMotionEnabled.current) HxMotion.Medium else 0), label = "panelTitleSize")
     val visibleHeader = with(density) { (headerHeightPx - fold).coerceAtLeast(0f).toDp() }
     val contentTop = statusTop + topBarHeight + tabsHeight + visibleHeader + 2.dp
     val pageCanvas = c.canvas
@@ -284,8 +287,8 @@ internal fun HxTabbedPage(
                         alpha = if (panelReferenceStyle) 1f else ((collapse - .45f) / .55f).coerceIn(0f, 1f)
                         translationY = (1f - alpha) * 6.dp.toPx()
                     },
-                style = if (panelReferenceStyle) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
+                style = if (panelReferenceStyle) MaterialTheme.typography.headlineMedium.copy(fontSize = referenceTitleSize.sp, lineHeight = (referenceTitleSize + 6f).sp) else MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
                 color = c.text,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

@@ -136,7 +136,7 @@ jobs:
         if: success()
         working-directory: android-app
         run: |
-          gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:testDebugUnitTest --tests '*HetuConceptRootTest' --tests '*HomeConceptUiTest' --tests '*ConfigEditorSafetyTest' --tests '*CpuSampleTrackerTest' --tests '*RuntimeCpuSamplingTest' --tests '*LauncherIconTest' --tests '*GoogleDiagnosticsIntegrationTest' --tests '*ConfigApplyQueueTest' --tests '*SettingsBackupRestoreTest' --tests '*ConfigWorkflowConceptTest' --tests '*NodeSelectionRootContractTest' --stacktrace
+          gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:testDebugUnitTest --tests '*HetuConceptRootTest' --tests '*HomeConceptUiTest' --tests '*ConfigEditorSafetyTest' --tests '*CpuSampleTrackerTest' --tests '*RuntimeCpuSamplingTest' --tests '*LauncherIconTest' --tests '*GoogleDiagnosticsIntegrationTest' --tests '*ConfigApplyQueueTest' --tests '*SettingsBackupRestoreTest' --tests '*ConfigWorkflowConceptTest' --tests '*NodeSelectionRootContractTest' --tests '*ProportionConceptRootTest' --stacktrace
 
       - name: Archive first actual launcher frames
         if: always() && steps.build.outcome == 'success'

@@ -287,7 +287,7 @@ internal fun ProxiesScreen(vm: HetuViewModel, bottomPadding: Dp) {
 
         item(key = "strategy-summary") {
             Row(Modifier.fillMaxWidth().padding(horizontal = Hx.gutter + 4.dp).padding(top = 4.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("策略分组", style = MaterialTheme.typography.titleLarge, color = c.text, modifier = Modifier.weight(1f))
+                Text("策略分组", style = MaterialTheme.typography.titleMedium, color = c.text, modifier = Modifier.weight(1f))
                 Text("共 ${visibleGroups.size} 个分组", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
             }
         }
@@ -432,32 +432,34 @@ private fun StrategyGroupCard(
     val online = group.nodes.count { (vm.delays[it.name] ?: it.lastDelay ?: 0L) > 0L }
 
     val c = Hx.colors
-    val nameLines = if (nameOverflow == "wrap" || LocalDensity.current.fontScale > 1.3f) 3 else 1
+    val nameLines = if (nameOverflow == "wrap" || LocalDensity.current.fontScale > 1.3f) 3 else 2
     val source = remember { MutableInteractionSource() }
     val shape = RoundedCornerShape(20.dp)
     val fill by animateColorAsState(if (expanded) c.accentSoft else c.surface.copy(alpha = .84f), HxMotion.enter(), label = "groupFill")
     Column(
-        modifier.heightIn(min = if (compact) 112.dp else 124.dp)
+        modifier.heightIn(min = if (compact) 112.dp else 120.dp)
             .testTag("strategy-group-${group.name}")
             .semantics { stateDescription = if (expanded) "已展开" else "已收起" }
             .hxPressScale(source).clip(shape).background(fill)
             .border(if (expanded) 1.dp else .8.dp, if (expanded) c.accent.copy(alpha = .6f) else c.line.copy(alpha = .7f), shape)
             .hxCombinedClickSource(source, onLongClick = { vm.testGroup(group) }, onClick = onClick)
-            .padding(13.dp), verticalArrangement = Arrangement.spacedBy(14.dp),
+            .padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(group.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = c.text, maxLines = nameLines, overflow = TextOverflow.Ellipsis)
-                Spacer(Modifier.height(3.dp))
-                Text("${group.type} · $online/${group.nodes.size}", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
-            }
+            Text(group.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = c.text, maxLines = nameLines, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             Spacer(Modifier.width(6.dp))
-            if (expanded) Icon(Icons.Rounded.ExpandLess, "收起 ${group.name}", tint = c.accent, modifier = Modifier.size(30.dp))
-            else HxGroupIcon(group, Modifier.size(34.dp))
+            if (expanded) Icon(Icons.Rounded.ExpandLess, "收起 ${group.name}", tint = c.accent, modifier = Modifier.size(28.dp))
+            else HxGroupIcon(group, Modifier.size(28.dp))
         }
+        Text(group.now.ifBlank { "未选择" }, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium,
+            color = c.text, maxLines = nameLines, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth().testTag("strategy-current-${group.name}"))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(group.now.ifBlank { "未选择" }, style = MaterialTheme.typography.labelLarge, color = c.text, maxLines = nameLines, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-            Spacer(Modifier.width(5.dp))
+            Column(Modifier.weight(1f)) {
+                Text(group.type, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Normal, color = c.textMuted)
+                Text("$online/${group.nodes.size}", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Normal, color = c.textFaint)
+            }
+            Spacer(Modifier.width(4.dp))
             StrategyCompactDelayPill(delay, testing) { vm.testGroup(group) }
         }
     }
@@ -624,13 +626,13 @@ private fun StrategyCompactDelayPill(delay: Long?, testing: Boolean, modifier: M
     val source = remember { MutableInteractionSource() }
     Box(
         modifier
+            .heightIn(min = 48.dp)
             .hxPressScale(source, .92f)
-            .clip(Hx.pillShape)
-            .background(bg)
             .clickable(interactionSource = source, indication = null, enabled = !testing, onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 2.dp),
+            .padding(horizontal = 2.dp),
         contentAlignment = Alignment.Center,
     ) {
+        Box(Modifier.clip(Hx.pillShape).background(bg).padding(horizontal = 8.dp, vertical = 3.dp), contentAlignment = Alignment.Center) {
         if (testing) HxSpinner(10.dp)
         else Text(
             if (delay == null || delay == 0L) "未知" else if (delay < 0L) "超时" else "$delay ms",
@@ -640,6 +642,7 @@ private fun StrategyCompactDelayPill(delay: Long?, testing: Boolean, modifier: M
             color = fg,
             maxLines = 1,
         )
+        }
     }
 }
 

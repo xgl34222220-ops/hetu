@@ -346,7 +346,7 @@ class ConfigWorkflowConceptTest {
         node("config-import-url").performScrollTo().performTextInput("https://example.invalid/large.yaml")
         node("config-import-submit").performScrollTo().assertIsDisplayed()
         val bounds = node("config-import-submit").getUnclippedBoundsInRoot()
-        assertTrue(bounds.width >= 48.dp && bounds.height >= 48.dp)
+        assertTrue((bounds.right - bounds.left) >= 48.dp && (bounds.bottom - bounds.top) >= 48.dp)
         screenshot("06-import-320dp-200pct")
         back()
         rule.onNodeWithText("取消", substring = false).assertIsDisplayed().performClick()
@@ -359,7 +359,7 @@ class ConfigWorkflowConceptTest {
         typeEditor("# keyboard input\n")
         for (description in listOf("撤销", "重做", "语法大纲", "校验")) {
             val bounds = rule.onNodeWithContentDescription(description).getUnclippedBoundsInRoot()
-            assertTrue("$description target", bounds.width >= 48.dp && bounds.height >= 48.dp)
+            assertTrue("$description target", (bounds.right - bounds.left) >= 48.dp && (bounds.bottom - bounds.top) >= 48.dp)
         }
         rule.runOnIdle { assertTrue(requireNotNull(findEditor()).height > 100) }
         rule.onNodeWithContentDescription("撤销").performClick()
@@ -374,7 +374,7 @@ class ConfigWorkflowConceptTest {
         node("config-subscription-url").performScrollTo().performTextReplacement("https://example.invalid/large-font")
         node("config-subscription-save").performScrollTo().assertIsDisplayed()
         val bounds = node("config-subscription-save").getUnclippedBoundsInRoot()
-        assertTrue(bounds.width >= 48.dp && bounds.height >= 48.dp)
+        assertTrue((bounds.right - bounds.left) >= 48.dp && (bounds.bottom - bounds.top) >= 48.dp)
         screenshot("10-subscription-320dp-200pct")
         back()
         rule.onNodeWithText("取消", substring = false).assertIsDisplayed().performClick()

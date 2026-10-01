@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -107,13 +109,13 @@ internal fun PanelOverviewScreen(vm: HetuViewModel, bottomPadding: Dp) {
                         Text("网络流量", style = MaterialTheme.typography.titleLarge, color = c.text, modifier = Modifier.weight(1f))
                         HxPill(if (state.running) "实时" else "未运行", if (state.running) HxTone.Accent else HxTone.Neutral)
                     }
-                    Spacer(Modifier.height(18.dp))
+                    Spacer(Modifier.height(12.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        HxMetric("下行速度", if (state.running) HxFormat.bytes(vm.downRate) + "/s" else "—", Modifier.weight(1f), valueColor = c.accent)
-                        HxMetric("上行速度", if (state.running) HxFormat.bytes(vm.upRate) + "/s" else "—", Modifier.weight(1f), valueColor = c.good)
+                        HxMetric("下行速度", if (state.running) HxFormat.bytes(vm.downRate) + "/s" else "—", Modifier.weight(1f), valueColor = c.accent, valueStyle = MaterialTheme.typography.headlineSmall, valueMaxLines = 2)
+                        HxMetric("上行速度", if (state.running) HxFormat.bytes(vm.upRate) + "/s" else "—", Modifier.weight(1f), valueColor = c.good, valueStyle = MaterialTheme.typography.headlineSmall, valueMaxLines = 2)
                     }
                     Spacer(Modifier.height(16.dp))
-                    HxTrafficChart(vm.rateHistory.toList(), vm.upHistory.toList(), c.accent, c.good, Modifier.fillMaxWidth().height(152.dp))
+                    HxTrafficChart(vm.rateHistory.toList(), vm.upHistory.toList(), c.accent, c.good, Modifier.fillMaxWidth().height(112.dp))
                     Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.Center) {
                         OverviewLegend("下行", c.accent, c.accentSoft)
                         Spacer(Modifier.width(20.dp))
@@ -124,23 +126,24 @@ internal fun PanelOverviewScreen(vm: HetuViewModel, bottomPadding: Dp) {
         }
         item(key = "overview-runtime") {
             HxSection {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    HxCard(Modifier.weight(1f), onClick = { vm.openPanel("conn") }) {
-                        HxIconBadge(Icons.Rounded.Wifi)
+                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    HxCard(Modifier.weight(1f).fillMaxHeight().testTag("overview-connections-card"), onClick = { vm.openPanel("conn") }) {
+                        HxIconBadge(Icons.Rounded.Wifi, size = 28.dp)
                         Spacer(Modifier.height(9.dp))
-                        HxMetric("活动连接", if (state.panelReady) connections.size.toString() else "—")
+                        HxMetric("活动连接", if (state.panelReady) connections.size.toString() else "—", valueStyle = MaterialTheme.typography.headlineSmall, valueMaxLines = 2)
                         Spacer(Modifier.height(10.dp))
-                        val tcp = connections.count { it.network.equals("tcp", true) }
-                        val udp = connections.count { it.network.equals("udp", true) }
+                        // Production display metadata includes the inbound type, e.g. "tcp · Tun".
+                        val tcp = connections.count { it.network.substringBefore('·').trim().equals("tcp", true) }
+                        val udp = connections.count { it.network.substringBefore('·').trim().equals("udp", true) }
                         Text("TCP  ${if (state.panelReady) tcp.toString() else "—"}", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
                         HxProgressBar(if (connections.isEmpty()) 0f else tcp.toFloat() / connections.size, modifier = Modifier.padding(vertical = 5.dp))
                         Text("UDP  ${if (state.panelReady) udp.toString() else "—"}", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
                         HxProgressBar(if (connections.isEmpty()) 0f else udp.toFloat() / connections.size, color = c.good, modifier = Modifier.padding(top = 5.dp))
                     }
-                    HxCard(Modifier.weight(1f)) {
-                        HxIconBadge(Icons.Rounded.Memory)
+                    HxCard(Modifier.weight(1f).fillMaxHeight().testTag("overview-memory-card")) {
+                        HxIconBadge(Icons.Rounded.Memory, size = 28.dp)
                         Spacer(Modifier.height(9.dp))
-                        HxMetric("内存占用", if (state.memoryBytes > 0) HxFormat.bytes(state.memoryBytes) else "—")
+                        HxMetric("内存占用", if (state.memoryBytes > 0) HxFormat.bytes(state.memoryBytes) else "—", valueStyle = MaterialTheme.typography.headlineSmall, valueMaxLines = 2)
                         Spacer(Modifier.height(14.dp))
                         Text("累计上传", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
                         Text(HxFormat.bytes(state.uploadTotal), style = MaterialTheme.typography.titleSmall, color = c.text)

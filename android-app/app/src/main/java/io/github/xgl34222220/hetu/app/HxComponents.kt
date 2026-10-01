@@ -180,7 +180,7 @@ internal fun HxPage(
     val c = Hx.colors
     val pageCanvas = canvasColor ?: c.canvas
     val prominent = largeTitle && onBack == null
-    val pageBarHeight = if (prominent) 72.dp else HxTopBarHeight
+    val pageBarHeight = if (prominent) maxOf(60f, 32f * LocalDensity.current.fontScale + 12f).dp else HxTopBarHeight
     val density = LocalDensity.current
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -188,6 +188,8 @@ internal fun HxPage(
     val collapsed by remember(listState) {
         derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > thresholdPx }
     }
+    val prominentTitleSize by animateFloatAsState(if (collapsed) 22f else 26f,
+        tween(if (LocalHxMotionEnabled.current) HxMotion.Medium else 0), label = "pageTitleSize")
     // 0 → large title fully visible, 1 → scrolled away. Read only inside graphicsLayer so
     // scrolling never recomposes the page.
     val headerProgress = remember(listState) {
@@ -318,8 +320,8 @@ internal fun HxPage(
                             scaleX = s
                             scaleY = s
                         },
-                    style = if (prominent) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    style = if (prominent) MaterialTheme.typography.headlineMedium.copy(fontSize = prominentTitleSize.sp, lineHeight = (prominentTitleSize + 6f).sp) else MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
                     color = c.text,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -934,17 +936,31 @@ internal fun HxSearchField(
 }
 
 /** A metric with a small caption. */
+internal fun hxMetricText(value: String): androidx.compose.ui.text.AnnotatedString {
+    val split = value.lastIndexOf(' ')
+    val unit = value.substringAfterLast(' ', "")
+    if (split < 0 || unit !in setOf("B", "KB", "MB", "GB", "TB", "B/s", "KB/s", "MB/s", "GB/s", "TB/s"))
+        return androidx.compose.ui.text.AnnotatedString(value)
+    return androidx.compose.ui.text.buildAnnotatedString {
+        append(value.substring(0, split + 1))
+        pushStyle(androidx.compose.ui.text.SpanStyle(fontSize = 12.sp, fontWeight = FontWeight.Normal))
+        append(unit)
+        pop()
+    }
+}
+
 @Composable
-internal fun HxMetric(label: String, value: String, modifier: Modifier = Modifier, unit: String? = null, valueColor: Color = Hx.colors.text) {
+internal fun HxMetric(label: String, value: String, modifier: Modifier = Modifier, unit: String? = null, valueColor: Color = Hx.colors.text,
+    valueStyle: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.titleMedium, valueMaxLines: Int = 1) {
     Column(modifier) {
         Text(label, style = MaterialTheme.typography.labelMedium, color = Hx.colors.textMuted, maxLines = 1)
         Spacer(Modifier.height(2.dp))
         Row(verticalAlignment = Alignment.Bottom) {
             Text(
-                value,
-                style = MaterialTheme.typography.titleMedium.merge(HxNumberStyle),
+                hxMetricText(value),
+                style = valueStyle.merge(HxNumberStyle),
                 color = valueColor,
-                maxLines = 1,
+                maxLines = valueMaxLines,
                 overflow = TextOverflow.Ellipsis,
             )
             if (!unit.isNullOrBlank()) {
@@ -1296,7 +1312,9 @@ internal fun HxBarAction(icon: ImageVector, description: String, onClick: () -> 
     val c = Hx.colors
     val haptics = rememberHetuHaptics()
     val tint by animateColorAsState(if (enabled) c.text else c.textFaint, tween(HxMotion.Medium), label = "barTint")
-    IconButton(onClick = { haptics.perform(HetuHaptic.Tap); onClick() }, enabled = enabled && !busy, modifier = Modifier.size(48.dp).padding(3.dp).background(c.surface.copy(alpha = .78f), CircleShape).border(.8.dp, if (c.dark) c.line else Color.White, CircleShape)) {
+    IconButton(onClick = { haptics.perform(HetuHaptic.Tap); onClick() }, enabled = enabled && !busy, modifier = Modifier.size(48.dp)) {
+        Box(Modifier.size(36.dp).background(c.surface.copy(alpha = .78f), CircleShape)
+            .border(.8.dp, if (c.dark) c.line else Color.White, CircleShape), contentAlignment = Alignment.Center) {
         // Icon swaps (search ↔ close search, idle ↔ busy) rotate/scale through instead of blinking.
         AnimatedContent(
             targetState = if (busy) null else icon,
@@ -1307,7 +1325,8 @@ internal fun HxBarAction(icon: ImageVector, description: String, onClick: () -> 
             contentAlignment = Alignment.Center,
             label = "barAction",
         ) { target ->
-            if (target == null) HxSpinner(18.dp) else Icon(target, description, tint = tint)
+            if (target == null) HxSpinner(16.dp) else Icon(target, description, tint = tint, modifier = Modifier.size(20.dp))
+        }
         }
     }
 }

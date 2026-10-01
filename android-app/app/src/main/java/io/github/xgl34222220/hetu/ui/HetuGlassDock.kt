@@ -325,13 +325,13 @@ private fun DockItems(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
-                    Icon(item.icon, null, Modifier.size(23.dp).graphicsLayer {
+                    Icon(item.icon, null, Modifier.size(22.dp).graphicsLayer {
                         scaleX = item.opticalScale * iconPop.value; scaleY = item.opticalScale * iconPop.value
                     }, tint = color)
                     Spacer(Modifier.height(1.dp))
                     Text(item.label, if (active) Modifier.testTag("dock-active-label") else Modifier,
-                        color = color, fontSize = 12.sp, lineHeight = 14.sp,
-                        fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1)
+                        color = color, fontSize = 11.5.sp, lineHeight = 14.sp,
+                        fontWeight = if (active) FontWeight.Medium else FontWeight.Normal, maxLines = 1)
                 }
             }
         }

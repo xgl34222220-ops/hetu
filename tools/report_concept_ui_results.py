@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 
 root = Path(__file__).resolve().parents[1]
 results = root / "android-app/app/build/test-results/testDebugUnitTest"
-required = ("HetuConceptRootTest", "HomeConceptUiTest", "ConfigEditorSafetyTest", "CpuSampleTrackerTest", "RuntimeCpuSamplingTest", "LauncherIconTest", "GoogleDiagnosticsIntegrationTest", "ConfigApplyQueueTest", "SettingsBackupRestoreTest", "ConfigWorkflowConceptTest", "NodeSelectionRootContractTest")
+required = ("HetuConceptRootTest", "HomeConceptUiTest", "ConfigEditorSafetyTest", "CpuSampleTrackerTest", "RuntimeCpuSamplingTest", "LauncherIconTest", "GoogleDiagnosticsIntegrationTest", "ConfigApplyQueueTest", "SettingsBackupRestoreTest", "ConfigWorkflowConceptTest", "NodeSelectionRootContractTest", "ProportionConceptRootTest")
 suites = []
 for name in required:
     path = results / f"TEST-io.github.xgl34222220.hetu.{name}.xml"

@@ -55,6 +55,8 @@ import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -315,19 +317,19 @@ private fun HomeFlowTile(vm: HetuViewModel, upload: Boolean, modifier: Modifier,
     val rate = if (upload) { if (local) vm.localUpRate else vm.upRate } else { if (local) vm.localDownRate else vm.downRate }
     val history = if (upload) vm.upHistory.toList() else vm.rateHistory.toList()
     val tint = if (upload) c.accent else c.good
-    HxCard(modifier = modifier, onClick = onOpen, padding = PaddingValues(14.dp)) {
+    HxCard(modifier = modifier.fillMaxHeight().testTag(if (upload) "home-upload-card" else "home-download-card"), onClick = onOpen, padding = PaddingValues(14.dp)) {
         Text(if (upload) "上传速度" else "下载速度", style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(6.dp))
         if (!local && vm.state.running && history.size > 1) {
-            HxTrafficChart(history, emptyList(), tint, tint, Modifier.fillMaxWidth().height(30.dp))
+            HxTrafficChart(history, emptyList(), tint, tint, Modifier.fillMaxWidth().height(24.dp))
         } else {
-            Box(Modifier.fillMaxWidth().height(30.dp), contentAlignment = Alignment.CenterStart) {
+            Box(Modifier.fillMaxWidth().heightIn(min = 16.dp), contentAlignment = Alignment.CenterStart) {
                 Text(if (local) "本地实时速率" else if (vm.state.running) "正在采样" else "等待连接", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
             }
         }
-        Spacer(Modifier.height(8.dp))
-        Text(if (vm.state.running || local) HxFormat.speed(rate) else "—",
-            style = MaterialTheme.typography.titleLarge.merge(HxNumberStyle), color = tint, maxLines = 2)
+        Spacer(Modifier.height(6.dp))
+        Text(hxMetricText(if (vm.state.running || local) HxFormat.speed(rate) else "—"),
+            style = MaterialTheme.typography.headlineSmall.copy(fontSize = 24.sp, lineHeight = 30.sp).merge(HxNumberStyle), color = tint, maxLines = 2)
     }
 }
 
@@ -336,20 +338,22 @@ private fun HomeResourceTile(vm: HetuViewModel, cpu: Boolean, modifier: Modifier
     val c = Hx.colors
     val running = vm.state.running
     val memory = vm.runtime.rssBytes.takeIf { it > 0 } ?: vm.state.memoryBytes
-    HxCard(modifier = modifier, onClick = onOpen, padding = PaddingValues(14.dp)) {
+    HxCard(modifier = modifier.fillMaxHeight().testTag(if (cpu) "home-cpu-card" else "home-memory-card"), onClick = onOpen, padding = PaddingValues(14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(if (cpu) Icons.Rounded.Speed else Icons.Rounded.Memory, null, tint = c.accent, modifier = Modifier.size(24.dp))
             Spacer(Modifier.width(9.dp))
             Column(Modifier.weight(1f)) {
                 Text(if (cpu) "CPU 占用" else "内存占用", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
-                Text(if (!running || cpu && !vm.cpuSampleAvailable) "—" else if (cpu) String.format(java.util.Locale.US, "%.1f%%", vm.cpuPercent)
-                    else if (memory > 0) HxFormat.bytes(memory) else "—", style = MaterialTheme.typography.titleMedium.merge(HxNumberStyle), color = c.text)
+                Text(hxMetricText(if (!running || cpu && !vm.cpuSampleAvailable) "—" else if (cpu) String.format(java.util.Locale.US, "%.1f%%", vm.cpuPercent)
+                    else if (memory > 0) HxFormat.bytes(memory) else "—"), style = MaterialTheme.typography.headlineSmall.merge(HxNumberStyle), color = c.text)
             }
         }
         Spacer(Modifier.height(8.dp))
-        if (cpu && running && vm.cpuSampleAvailable) HxProgressBar((vm.cpuPercent / 100f).coerceIn(0f, 1f), c.accent, height = 5.dp)
-        else if (cpu) Text(if (running) "等待有效采样" else "核心未运行", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
-        else Text("核心实际驻留", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
+        Box(Modifier.fillMaxWidth().heightIn(min = 18.dp), contentAlignment = Alignment.CenterStart) {
+            if (cpu && running && vm.cpuSampleAvailable) HxProgressBar((vm.cpuPercent / 100f).coerceIn(0f, 1f), c.accent, height = 5.dp)
+            else if (cpu) Text(if (running) "等待有效采样" else "核心未运行", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
+            else Text("核心实际驻留", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
+        }
     }
 }
 
@@ -483,8 +487,8 @@ private fun HomeLatencyCard(vm: HetuViewModel) {
                 }
             },
         ) {
-            Text("河图进程请求，未指定代理节点", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
-            Text("结果不代表其他应用的代理路径", style = MaterialTheme.typography.bodySmall, color = c.textFaint)
+            Text("河图进程请求，未指定代理节点", style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 16.sp), fontWeight = FontWeight.Normal, color = c.textMuted)
+            Text("结果不代表其他应用的代理路径", style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 16.sp), fontWeight = FontWeight.Normal, color = c.textFaint)
             Spacer(Modifier.height(8.dp))
             Row(Modifier.fillMaxWidth()) {
                 targets.forEachIndexed { index, target ->
@@ -587,16 +591,16 @@ private fun HomeWanCard(
                 val detailSource = remember { MutableInteractionSource() }
                 Box(
                     Modifier
-                        .clip(Hx.pillShape)
-                        .background(c.accentSoft)
                         .clickable(interactionSource = detailSource, indication = null) {
                             haptics.perform(HetuHaptic.Tap)
                             onDetails()
                         }
-                        .heightIn(min = 48.dp).padding(horizontal = 12.dp),
+                        .heightIn(min = 48.dp).widthIn(min = 48.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text("详情", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = c.accent)
+                    Box(Modifier.clip(Hx.pillShape).background(c.accentSoft).padding(horizontal = 12.dp, vertical = 6.dp)) {
+                        Text("详情", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium, color = c.accent)
+                    }
                 }
             }
         }
