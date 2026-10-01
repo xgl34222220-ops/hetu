@@ -4,7 +4,7 @@ package io.github.xgl34222220.hetu
 internal interface ConfigEditorRepository {
     suspend fun load(): ConfigEditSnapshot
     suspend fun validate(text: String)
-    suspend fun save(snapshot: ConfigEditSnapshot, text: String)
+    suspend fun save(snapshot: ConfigEditSnapshot, text: String): ProxyConfigLibrary.SourceVersion
 
     /** A failed write is only a conflict when the actual selected source has changed. */
     suspend fun conflictAfterFailure(opened: ConfigEditSnapshot): ConfigEditorConflict? {

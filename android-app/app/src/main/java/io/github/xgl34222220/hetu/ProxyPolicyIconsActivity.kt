@@ -45,7 +45,6 @@ import java.io.File
 
 internal object ProxyPolicyIconOverrides {
     internal const val PREF_KEY = "proxyPolicyIconOverridesJson"
-    private const val MAX_BYTES = 1572864
 
     internal data class Entry(val name: String, val url: String = "", val path: String = "")
 
@@ -88,9 +87,7 @@ internal object ProxyPolicyIconOverrides {
 
     fun importLocal(context: Context, prefs: SharedPreferences, name: String, uri: Uri): Entry {
         val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
-            val data = input.readBytes()
-            if (data.size > MAX_BYTES) throw IllegalArgumentException("图标不能超过 1.5 MiB")
-            data
+            PolicyIconInput.read(input)
         } ?: throw IllegalArgumentException("无法读取所选图标")
         if (bytes.isEmpty()) throw IllegalArgumentException("图标文件为空")
         val directory = File(context.filesDir, "policy-icons").apply { mkdirs() }

@@ -524,7 +524,8 @@ internal class ProxyComposeController(context: Context) {
         val latestProfile = ProxyRuntimeProfile.load(prefs)
         val latest = configs.selected(latestProfile.core) ?: error("尚未选择配置")
         snapshot.requireUnchanged(latestProfile.core.id, latest.name, configs.read(latest))
-        configs.writeIfUnchanged(latest, snapshot, text)
+        // Commit checks selected identity and full source again under the library writer lock.
+        configs.writeCurrentIfUnchanged(snapshot, text)
     }
 
     suspend fun validateConfigText(text: String) = withContext(Dispatchers.IO) {

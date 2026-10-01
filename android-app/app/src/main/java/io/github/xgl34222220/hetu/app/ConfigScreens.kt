@@ -784,12 +784,12 @@ internal fun ConfigEditorScreen(
         editor?.isEditable = false
         scope.launch {
             try {
-                repository.save(opened, current)
+                val savedSource = repository.save(opened, current)
                 snapshot = ConfigEditSnapshot(opened.coreId, opened.name, current)
                 dirty = false
                 problem = null
                 conflict = null
-                vm.applyConfigChange("配置已保存")
+                vm.applyConfigChange("配置已保存", savedSource)
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {

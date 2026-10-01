@@ -87,10 +87,7 @@ class ConfigApplyQueueTest {
 
     private fun saveBound(vm: HetuViewModel, version: String): ProxyConfigLibrary.SourceVersion {
         val source = yaml(version)
-        library.writeIfUnchanged(entry, ConfigEditSnapshot(entry.core.id, entry.name, library.read(entry)), source)
-        val digest = java.security.MessageDigest.getInstance("SHA-256").digest(source.toByteArray())
-            .joinToString("") { "%02x".format(it.toInt() and 0xff) }
-        val receipt = ProxyConfigLibrary.SourceVersion.restored(entry.core.id, entry.name, digest)
+        val receipt = library.writeCurrentIfUnchanged(ConfigEditSnapshot(entry.core.id, entry.name, library.read(entry)), source)
         vm.applyConfigChange("配置已保存", receipt)
         return receipt
     }

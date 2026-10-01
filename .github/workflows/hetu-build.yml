@@ -44,6 +44,8 @@ jobs:
           java -cp /tmp/hetu-snapshot-tests io.github.xgl34222220.hetu.ConfigEditSnapshotTest
           python3 tools/test_config_edit_library.py
           python3 tools/test_subscription_source_snapshot.py
+          python3 tools/test_editor_source_receipt.py
+          python3 tools/test_policy_icon_input.py
           python3 tools/test_subscription_structure.py
           python3 tools/test_google_diagnostics.py
           python3 tools/test_start_contract.py
@@ -139,7 +141,7 @@ jobs:
         if: success()
         working-directory: android-app
         run: |
-          gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:testDebugUnitTest --tests '*HetuConceptRootTest' --tests '*HomeConceptUiTest' --tests '*ConfigEditorSafetyTest' --tests '*CpuSampleTrackerTest' --tests '*RuntimeCpuSamplingTest' --tests '*LauncherIconTest' --tests '*GoogleDiagnosticsIntegrationTest' --tests '*ConfigApplyQueueTest' --tests '*SettingsBackupRestoreTest' --tests '*ConfigWorkflowConceptTest' --tests '*NodeSelectionRootContractTest' --tests '*ProportionConceptRootTest' --tests '*RuntimeIdentityControllerTest' --stacktrace
+          gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:testDebugUnitTest --tests '*HetuConceptRootTest' --tests '*HomeConceptUiTest' --tests '*ConfigEditorSafetyTest' --tests '*CpuSampleTrackerTest' --tests '*RuntimeCpuSamplingTest' --tests '*LauncherIconTest' --tests '*GoogleDiagnosticsIntegrationTest' --tests '*ConfigApplyQueueTest' --tests '*SettingsBackupRestoreTest' --tests '*ConfigWorkflowConceptTest' --tests '*NodeSelectionRootContractTest' --tests '*ProportionConceptRootTest' --tests '*RuntimeIdentityControllerTest' --tests '*PolicyIconImportTest' --stacktrace
 
       - name: Archive first actual launcher frames
         if: always() && steps.build.outcome == 'success'

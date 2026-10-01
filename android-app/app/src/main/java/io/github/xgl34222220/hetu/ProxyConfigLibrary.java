@@ -328,6 +328,26 @@ final class ProxyConfigLibrary {
         }
     }
 
+    /** Commit the currently selected editor source and return only its exact identity/revision. */
+    SourceVersion writeCurrentIfUnchanged(ConfigEditSnapshot snapshot, String text) throws IOException {
+        synchronized (WRITE_LOCK) {
+            if(snapshot==null)throw new IOException("缺少配置编辑快照，请重新打开配置。");
+            ProxyRuntimeProfile.Core core=null;
+            for(ProxyRuntimeProfile.Core candidate:ProxyRuntimeProfile.Core.values())
+                if(candidate.id.equals(snapshot.coreId))core=candidate;
+            requireActiveCore(core);
+            if(!snapshot.name.equals(safeName(snapshot.name))||!coreAccepts(core,snapshot.name)||!snapshot.name.equals(prefs.getString(key(core),"")))
+                throw new IOException("当前配置已切换，未保存任何文件。请返回后重新打开配置。");
+            // Resolve the captured source directly; never initialize a replacement after deletion.
+            Entry entry=new Entry(core,snapshot.name,new File(dir(core),snapshot.name));
+            snapshot.requireUnchanged(core.id,entry.name,read(entry));
+            if(text==null||text.trim().isEmpty())throw new IOException("配置不能为空");
+            SourceVersion receipt=new SourceVersion(core.id,entry.name,text);
+            writeIfUnchanged(entry,snapshot,text);
+            return receipt;
+        }
+    }
+
     void delete(Entry e)throws IOException{
         try(IdentityLease identityLease=tryIdentityChange()){
         synchronized (WRITE_LOCK) {

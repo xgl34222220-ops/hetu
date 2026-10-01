@@ -49,7 +49,7 @@ class ConfigEditorSafetyTest {
             return ConfigEditSnapshot(liveCore, liveName, liveSource)
         }
         override suspend fun validate(text: String) = Unit
-        override suspend fun save(snapshot: ConfigEditSnapshot, text: String) {
+        override suspend fun save(snapshot: ConfigEditSnapshot, text: String): ProxyConfigLibrary.SourceVersion {
             saveAttempts++
             lastSnapshot = snapshot
             snapshot.requireUnchanged(liveCore, liveName, liveSource)
@@ -58,6 +58,9 @@ class ConfigEditorSafetyTest {
             snapshot.requireUnchanged(liveCore, liveName, liveSource)
             liveSource = text
             saved += text
+            val digest = java.security.MessageDigest.getInstance("SHA-256").digest(text.toByteArray())
+                .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+            return ProxyConfigLibrary.SourceVersion.restored(snapshot.coreId, snapshot.name, digest)
         }
     }
     @Before fun clean() { app.getSharedPreferences("hetu", Context.MODE_PRIVATE).edit().clear().commit() }

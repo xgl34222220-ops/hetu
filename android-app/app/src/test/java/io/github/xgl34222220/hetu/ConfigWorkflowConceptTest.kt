@@ -63,6 +63,7 @@ class ConfigWorkflowConceptTest {
     private var readFailure = false
     private var writeFailure = false
     private var saveCount = 0
+    private var afterEditorCommit: (() -> Unit)? = null
     private val repository = object : ConfigEditorRepository {
         override suspend fun load(): ConfigEditSnapshot {
             if (readFailure) throw IOException("测试读取失败")
@@ -70,12 +71,14 @@ class ConfigWorkflowConceptTest {
             return ConfigEditSnapshot(core.id, selected.name, library.read(selected))
         }
         override suspend fun validate(text: String) = Unit
-        override suspend fun save(snapshot: ConfigEditSnapshot, text: String) {
+        override suspend fun save(snapshot: ConfigEditSnapshot, text: String): ProxyConfigLibrary.SourceVersion {
             saveCount++
             if (writeFailure) throw IOException("测试磁盘写入失败")
             val selected = requireNotNull(library.selected(core))
             snapshot.requireUnchanged(core.id, selected.name, library.read(selected))
-            library.writeIfUnchanged(selected, snapshot, text)
+            val receipt = library.writeCurrentIfUnchanged(snapshot, text)
+            afterEditorCommit?.invoke()
+            return receipt
         }
     }
 
@@ -327,6 +330,24 @@ class ConfigWorkflowConceptTest {
         cancelDialog()
         assertEquals("# local draft\n" + source, editorText())
         assertEquals("# external change\n" + source, library.read(entry))
+    }
+
+    @Test fun savedEditorReceiptStillNamesOriginalSourceIfSelectionChangesBeforeEnqueue() {
+        renderEditor(); typeEditor("# saved A\n")
+        lateinit var other: ProxyConfigLibrary.Entry
+        afterEditorCommit = { other = library.importConfig(core, "after-editor-save.yaml", source.byteInputStream()) }
+        rule.onNodeWithContentDescription("保存").performClick()
+        rule.waitForIdle()
+        val actual = library.read(entry)
+        assertEquals("# saved A\n" + source, actual)
+        assertEquals(source, library.read(other))
+        assertEquals(other.name, library.selected(core)?.name)
+        assertEquals(entry.core.id, vm.prefs.getString("proxyUiConfigApplySourceCore", null))
+        assertEquals(entry.name, vm.prefs.getString("proxyUiConfigApplySourceName", null))
+        val receipt = ProxyConfigLibrary.SourceVersion.restored(entry.core.id, entry.name,
+            vm.prefs.getString("proxyUiConfigApplySourceHash", null))
+        assertTrue(receipt.matches(entry.core.id, entry.name, actual))
+        assertThrows(IOException::class.java) { library.beginSourceApplication(receipt) }
     }
 
     @Test fun confirmedReloadReplacesDraftAndResetsTheCasBaseline() {
