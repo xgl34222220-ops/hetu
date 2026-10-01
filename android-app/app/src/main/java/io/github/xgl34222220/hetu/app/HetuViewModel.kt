@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.util.UUID
 
 internal enum class HxTab(val label: String) { Home("首页"), Panel("面板"), Tools("工具"), Settings("设置") }
 
@@ -40,6 +41,9 @@ internal val HxPanelSections = listOf(
 )
 
 internal enum class HxRunOp { Start, Stop, Restart, Reload }
+
+// This is an unacknowledged request, not a claim about the core's config version.
+private const val CONFIG_APPLY_PENDING_KEY = "proxyUiConfigApplyPending"
 
 /** Result of a long-running per-item task (rule-set update, provider update…). */
 internal data class HxTask(val running: Boolean = false, val ok: Boolean? = null, val message: String = "")
@@ -142,6 +146,9 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     }
 
     /* ---------------- runtime state ---------------- */
+    private var configApplyQueued = false
+    private var configApplyError: String? = null
+    private var runtimeMessage = ""
     var state by mutableStateOf(initialState())
         private set
     var runtime by mutableStateOf(initialRuntime())
@@ -267,8 +274,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     private fun initialState(): ProxyComposeState {
         val profile = ProxyRuntimeProfile.load(prefs)
         val cachedConfig = prefs.getString("proxySelectedConfig.${profile.core.id}", "").orEmpty().ifBlank { "尚未选择配置" }
+        val running = prefs.getBoolean("proxyUiLastRunning", prefs.getBoolean("proxyRootWanted", false))
         return ProxyComposeState(
-            running = prefs.getBoolean("proxyUiLastRunning", prefs.getBoolean("proxyRootWanted", false)),
+            running = running,
+            message = configApplyMessage(running),
             core = profile.core.label,
             mode = profile.mode.label,
             ipv6 = profile.ipv6.id,
@@ -364,6 +373,8 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             state = if (next.running && !next.panelReady) {
                 next.copy(groups = state.groups, connections = state.connections)
             } else next
+            runtimeMessage = next.message
+            refreshConfigApplyMessage()
             if (next.running) startupError = null
             if (next.panelReady) {
                 lastAt = now
@@ -435,13 +446,23 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     fun toggle() {
         if (operation != null) return
         val stopping = state.running
+        // A stop consumes no config request, even if it fails and the core stays alive.
+        configApplyQueued = !stopping && prefs.contains(CONFIG_APPLY_PENDING_KEY)
         operation = if (stopping) HxRunOp.Stop else HxRunOp.Start
         viewModelScope.launch {
+            var canApplyConfig = false
+            val configToken = prefs.getString(CONFIG_APPLY_PENDING_KEY, null)
             operationText = if (stopping) "正在停止…" else "正在启动…"
             try {
-                if (stopping) controller.stop { operationText = it } else controller.start { operationText = it }
+                val result = if (stopping) controller.stop { operationText = it } else controller.start { operationText = it }
                 state = controller.state()
-                if (!stopping) toast("代理已启动")
+                runtimeMessage = state.message
+                canApplyConfig = !stopping && state.running
+                if (canApplyConfig) {
+                    if (result.optBoolean("ok", false) && !result.optBoolean("cancelled", false) &&
+                        !result.optBoolean("alreadyRunning", false)) acknowledgeConfigApply(configToken)
+                    toast("代理已启动")
+                }
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
@@ -452,6 +473,8 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                 val recovered = if (configProblem || stopping) null else settleStart()
                 if (recovered != null) {
                     state = recovered
+                    runtimeMessage = recovered.message
+                    canApplyConfig = true
                 } else if (!stopping) {
                     startupError = if (reason.contains("仅所选应用代理")) {
                         "当前应用范围是「仅所选应用代理」，但没有选中任何可用应用。\n\n请到「设置 → 应用名单」至少勾选一个应用，或把应用范围改为其它模式后再启动。"
@@ -465,9 +488,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                     toast(reason)
                 }
             } finally {
-                operation = null
-                operationText = ""
-                refreshNow()
+                finishOperation(canApplyConfig)
             }
         }
     }
@@ -483,44 +504,115 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
     fun restart() {
         if (operation != null || !state.running) return
+        configApplyQueued = prefs.contains(CONFIG_APPLY_PENDING_KEY)
         operation = HxRunOp.Restart
         viewModelScope.launch {
+            var canApplyConfig = false
+            val configToken = prefs.getString(CONFIG_APPLY_PENDING_KEY, null)
             operationText = "正在重启…"
             ProxyRuntimeSettings.beginApply(prefs)
             try {
                 controller.restart { operationText = it }
+                // restart() checks that replacement actually completed before returning.
+                acknowledgeConfigApply(configToken)
                 prefs.edit().remove("proxyRootRuntimeRefreshPending").remove("proxyRootUpgradeError").apply()
-                toast("已重启，设置已生效")
+                canApplyConfig = true
+                toast(if (configApplyQueued) "已重启，继续应用最新配置" else "已重启，设置已生效")
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
                 ProxyRuntimeSettings.recordFailure(prefs, error)
                 toast(errorText(error, "重启失败"))
             } finally {
-                operation = null
-                operationText = ""
                 settingsRevision++
-                refreshNow()
+                finishOperation(canApplyConfig)
             }
         }
     }
 
+    /** The existing manual retry also coalesces with a running start/restart/reload. */
     fun reload() {
-        if (operation != null || !state.running) return
+        if (operation == HxRunOp.Stop || (operation == null && !state.running)) return
+        queueConfigApply()
+    }
+
+    private fun configApplyMessage(running: Boolean): String {
+        if (!prefs.contains(CONFIG_APPLY_PENDING_KEY)) return ""
+        if (!running) return "配置已保存，下次启动时应用"
+        return configApplyError?.let { "配置已保存，但应用失败：$it；请点「重载配置」重试" }
+            ?: "配置已保存，尚未确认应用；可点「重载配置」重试"
+    }
+
+    private fun refreshConfigApplyMessage() {
+        state = state.copy(message = listOf(runtimeMessage, configApplyMessage(state.running))
+            .filter { it.isNotBlank() }.joinToString("\n"))
+    }
+
+    private fun markConfigApplyPending() {
+        // A token prevents an older completion (including an old VM) from clearing
+        // a later save. Source persistence still belongs to ProxyConfigLibrary.
+        prefs.edit().putString(CONFIG_APPLY_PENDING_KEY, UUID.randomUUID().toString()).apply()
+        configApplyError = null
+    }
+
+    private fun acknowledgeConfigApply(token: String?): Boolean {
+        if (token == null || prefs.getString(CONFIG_APPLY_PENDING_KEY, null) != token) return false
+        prefs.edit().remove(CONFIG_APPLY_PENDING_KEY).apply()
+        configApplyQueued = false
+        configApplyError = null
+        return true
+    }
+
+    private fun queueConfigApply() {
+        markConfigApplyPending()
+        configApplyQueued = true
+        refreshConfigApplyMessage()
+        launchConfigApply()
+    }
+
+    private fun launchConfigApply() {
+        if (operation != null || !state.running || !configApplyQueued || !viewModelScope.isActive) return
         operation = HxRunOp.Reload
         viewModelScope.launch {
             operationText = "正在重载配置…"
             try {
-                toast(controller.reload())
-            } catch (cancel: CancellationException) {
-                throw cancel
-            } catch (error: Exception) {
-                toast(errorText(error, "重载失败"))
+                while (configApplyQueued && isActive) {
+                    val token = prefs.getString(CONFIG_APPLY_PENDING_KEY, null)
+                    configApplyQueued = false
+                    if (token == null) break
+                    configApplyError = null
+                    try {
+                        // Never cancel an already issued Root/API operation to replace it.
+                        // Root serializes and refuses reload when no core is alive.
+                        val result = controller.reload()
+                        if (acknowledgeConfigApply(token)) toast(result)
+                    } catch (cancel: CancellationException) {
+                        throw cancel
+                    } catch (error: Exception) {
+                        configApplyError = errorText(error, "重载失败")
+                        toast("配置已保存，但应用失败：$configApplyError；可点「重载配置」重试")
+                    }
+                    // A newer save gets one next attempt, including after failure.
+                    // An unchanged failed request stays pending for explicit retry.
+                    refreshConfigApplyMessage()
+                }
             } finally {
-                operation = null
-                operationText = ""
-                refreshNow()
+                finishOperation(allowConfigApply = true)
             }
+        }
+    }
+
+    private suspend fun finishOperation(allowConfigApply: Boolean) {
+        try {
+            // Keep ownership during read-back so a save here is not lost either.
+            refreshNow()
+        } finally {
+            operation = null
+            operationText = ""
+            if (!allowConfigApply) configApplyQueued = false
+            refreshConfigApplyMessage()
+            // Clearing a VM leaves its token pending; it cannot start another IO.
+            if (allowConfigApply && viewModelScope.isActive) launchConfigApply()
         }
     }
 
@@ -894,12 +986,15 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         }
     }
 
-    /** Hot-reload the running core after a config change, or just report it's saved. */
+    /** Called only after the real save succeeds. Safe to leave the config page immediately. */
     fun applyConfigChange(savedMessage: String) {
-        if (!state.running) {
+        if (operation == HxRunOp.Stop || (operation == null && !state.running)) {
+            markConfigApplyPending()
+            configApplyQueued = false
+            refreshConfigApplyMessage()
             toast("$savedMessage，下次启动生效")
             return
         }
-        reload()
+        queueConfigApply()
     }
 }

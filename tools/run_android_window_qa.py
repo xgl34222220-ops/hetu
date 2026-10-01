@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run an isolated Android window test. No root, security changes, or license acceptance."""
+"""Run an isolated Android window test. No app Root/proxy, guest security changes, or license acceptance."""
 from pathlib import Path
 import json
 import hashlib
@@ -96,13 +96,18 @@ config = dict(line.split("=", 1) for line in avd_config.read_text().splitlines()
 config.update({"hw.lcd.width": "720", "hw.lcd.height": "1560", "hw.lcd.density": "293",
                "skin.name": "720x1560", "skin.path": "720x1560"})
 avd_config.write_text("\n".join(f"{key}={value}" for key, value in config.items()) + "\n")
-# Only use permissions already present. Never chmod/chown /dev/kvm or change groups.
-acceleration = "on" if os.access("/dev/kvm", os.R_OK | os.W_OK) else "off"
+# Permissions are managed separately by the explicitly approved CI transaction.
+# Never silently return to the known-unreliable CPU-only environment.
+if not os.access("/dev/kvm", os.R_OK | os.W_OK):
+    raise RuntimeError("KVM read/write access is unavailable; CPU fallback is disabled")
+run([emulator, "-accel-check"], timeout=30, output=OUT / "acceleration-check.log")
+acceleration = "on"
 (OUT / "environment.json").write_text(json.dumps({"avd": "hetu_window_qa", "api": 35,
     "image": "default/x86_64", "imagePackage": image_package, "emulatorVersion": emulator_version,
     "vmAcceleration": acceleration, "graphics": "software",
     "physicalSize": [720, 1560], "densityDpi": 293, "installMode": "push-then-pm-install",
-    "systemSecurityChanged": False, "fontsChanged": False, "newLicenseAccepted": False,
+    "guestSecurityChanged": False, "hostKvmAclGrantedForThisRun": os.environ.get("HETU_KVM_ONCE") == "true",
+    "fontsChanged": False, "newLicenseAccepted": False,
     "limits": "SwiftShader/software graphics in an Android hardware-accelerated window, not phone GPU or FPS validation."}, indent=2))
 app_apk = Path(os.environ.get("HETU_WINDOW_APP_APK") or ROOT / "android-app/app/build/outputs/apk/debug/app-debug.apk")
 test_apk = ROOT / "android-app/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"

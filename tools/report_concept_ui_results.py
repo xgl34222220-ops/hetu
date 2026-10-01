@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 
 root = Path(__file__).resolve().parents[1]
 results = root / "android-app/app/build/test-results/testDebugUnitTest"
-required = ("HetuConceptRootTest", "HomeConceptUiTest", "ConfigEditorSafetyTest", "CpuSampleTrackerTest", "RuntimeCpuSamplingTest", "LauncherIconTest", "GoogleDiagnosticsIntegrationTest")
+required = ("HetuConceptRootTest", "HomeConceptUiTest", "ConfigEditorSafetyTest", "CpuSampleTrackerTest", "RuntimeCpuSamplingTest", "LauncherIconTest", "GoogleDiagnosticsIntegrationTest", "ConfigApplyQueueTest")
 suites = []
 for name in required:
     path = results / f"TEST-io.github.xgl34222220.hetu.{name}.xml"
@@ -24,7 +24,7 @@ for name in required:
 screenshots = [str(p.relative_to(root)) for folder in ("hetu-concept-root", "hetu-ui-consolidation")
                for p in sorted((root / "android-app/app/build/outputs" / folder).glob("*.png"))]
 report = {"status": "passed" if all(suite["status"] == "passed" for suite in suites) else "failed",
-          "scope": "Actual HetuRoot, HomeScreen, details, native editor, CPU sample continuity, launcher resources and diagnostic assembly; the complete regression suite remains authoritative and may independently fail.",
+          "scope": "Actual HetuRoot, HomeScreen, details, native editor, CPU sample continuity, launcher resources, diagnostic assembly and queued config application; the complete regression suite remains authoritative and may independently fail.",
           "suites": suites, "screenshots": screenshots,
           "limits": "Robolectric renderer with isolated IO. Screenshots require visual review; this does not validate device installation, real Root/VPN, GPU glass, or frame rate."}
 out = root / "out/concept-ui-result.json"

@@ -88,6 +88,8 @@ import io.github.rosemoe.sora.widget.schemes.SchemeGitHub
 import io.github.rosemoe.sora.widget.subscribeAlways
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
@@ -411,6 +413,8 @@ private fun normalizeConfigName(raw: String): String {
 
 /** Downloads a full Clash/Mihomo YAML subscription and stores it as a new config. */
 private suspend fun downloadConfig(context: Context, url: String, requestedName: String) = withContext(Dispatchers.IO) {
+    val downloadContext = currentCoroutineContext()
+    downloadContext.ensureActive()
     val connection = (URL(url).openConnection() as HttpURLConnection).apply {
         connectTimeout = 15_000
         readTimeout = 30_000
@@ -427,13 +431,15 @@ private suspend fun downloadConfig(context: Context, url: String, requestedName:
         val name = normalizeConfigName(
             requestedName.ifBlank { fromHeader.ifBlank { Uri.parse(url).host.orEmpty().ifBlank { "subscription" } } },
         )
-        val bytes = connection.inputStream.use { it.readBytes() }
-        val text = String(bytes, Charsets.UTF_8)
-        if (!text.contains("proxies") && !text.contains("proxy-providers")) {
+        val content = connection.inputStream.use {
+            ConfigDownloadReader.read(it, connection.contentLengthLong) { downloadContext.ensureActive() }
+        }
+        if (!content.text.contains("proxies") && !content.text.contains("proxy-providers")) {
             throw IOException("下载内容不是 Clash/Mihomo YAML 配置（可能是 Base64 节点列表，请改用「添加订阅」）")
         }
         val profile = ProxyRuntimeProfile.load(context.getSharedPreferences("hetu", Context.MODE_PRIVATE))
-        ProxyConfigLibrary(context).importConfig(profile.core, name, bytes.inputStream())
+        downloadContext.ensureActive()
+        ProxyConfigLibrary(context).importConfig(profile.core, name, content.bytes.inputStream())
     } finally {
         connection.disconnect()
     }
