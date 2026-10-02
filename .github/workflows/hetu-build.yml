@@ -980,6 +980,16 @@ jobs:
           echo "V20.53-V20.56 parity chain applied"
           git diff --stat
 
+      - name: Remove mockup-only annotations
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/remove_mockup_labels.py
+          if grep -R -n --include='*.kt' --include='*.java' '示例数据' android-app/app/src/main/java; then
+            echo "mockup annotation leaked into app source"
+            exit 1
+          fi
+          git diff --stat
+
       - name: Export effective V20.56 source
         run: |
           set -euo pipefail
