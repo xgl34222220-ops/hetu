@@ -5,10 +5,11 @@ Never starts/stops a proxy, requests permissions, imports user data, or clears a
 import json, os, re, subprocess, time, xml.etree.ElementTree as ET
 from pathlib import Path
 PKG='io.github.xgl34222220.hetu'
+ADB=str(Path(os.environ['ANDROID_HOME'])/'platform-tools'/'adb')
 OUT=Path(os.environ.get('HETU_SMOKE_OUT','out/android-smoke')); OUT.mkdir(parents=True,exist_ok=True)
 checks=[]
 def adb(*args, timeout=90, check=True):
- return subprocess.run(['adb',*args],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=timeout,check=check).stdout.decode(errors='replace')
+ return subprocess.run([ADB,*args],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=timeout,check=check).stdout.decode(errors='replace')
 def ui():
  adb('shell','uiautomator','dump','/sdcard/hetu-smoke.xml',timeout=60)
  raw=adb('shell','cat','/sdcard/hetu-smoke.xml')
@@ -16,7 +17,7 @@ def ui():
  return ET.fromstring(raw[start:]),raw[start:]
 def capture(name):
  root,raw=ui();(OUT/(name+'.xml')).write_text(raw)
- png=subprocess.run(['adb','exec-out','screencap','-p'],check=True,stdout=subprocess.PIPE,timeout=45).stdout
+ png=subprocess.run([ADB,'exec-out','screencap','-p'],check=True,stdout=subprocess.PIPE,timeout=45).stdout
  assert png.startswith(b'\x89PNG\r\n\x1a\n');(OUT/(name+'.png')).write_bytes(png)
  return root
 

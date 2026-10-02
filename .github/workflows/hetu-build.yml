@@ -1374,13 +1374,16 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p out/android-smoke
+          export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
+          test -x "$ANDROID_HOME/platform-tools/adb"
+          "$ANDROID_HOME/platform-tools/adb" version | tee out/android-smoke/adb-version.txt
           ACCEL=off
           if [ -r /dev/kvm ] && [ -w /dev/kvm ]; then ACCEL=on; fi
           printf '%s\n' "$ACCEL" > out/android-smoke/acceleration.txt
           "$ANDROID_HOME/emulator/emulator" -avd hetu-smoke -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -accel "$ACCEL" > out/android-smoke/emulator.log 2>&1 &
           EMULATOR_PID=$!
           trap 'kill "$EMULATOR_PID" 2>/dev/null || true' EXIT
-          adb start-server
+          "$ANDROID_HOME/platform-tools/adb" start-server
           python3 .github/scripts/smoke_hetu_apk.py
       - name: Upload Android smoke evidence
         if: always()
