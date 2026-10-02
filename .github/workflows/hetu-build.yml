@@ -871,26 +871,7 @@ jobs:
               1,
           )
           anchor = '\n            }\n        }\n    }\n}\n\n@Composable\nprivate fun HeroAction'
-          insert = '''\n            }
-            AnimatedVisibility(
-                visible = expanded && running && op == null,
-                enter = fadeIn(tween(HxMotion.Medium)) + expandVertically(tween(HxMotion.Medium, easing = HxMotion.Emphasized)),
-                exit = fadeOut(tween(HxMotion.Short)) + shrinkVertically(tween(HxMotion.Medium, easing = HxMotion.Emphasized)),
-            ) {
-                HxSegmented(
-                    options = listOf("rule" to "规则", "global" to "全局", "direct" to "直连"),
-                    selected = state.trafficMode.lowercase().ifBlank { "rule" },
-                    onSelect = vm::setTrafficMode,
-                    enabled = true,
-                    modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 10.dp),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun HeroAction'''
+          insert = '\n            }\n            AnimatedVisibility(\n                visible = expanded && running && op == null,\n                enter = fadeIn(tween(HxMotion.Medium)) + expandVertically(tween(HxMotion.Medium, easing = HxMotion.Emphasized)),\n                exit = fadeOut(tween(HxMotion.Short)) + shrinkVertically(tween(HxMotion.Medium, easing = HxMotion.Emphasized)),\n            ) {\n                HxSegmented(\n                    options = listOf("rule" to "规则", "global" to "全局", "direct" to "直连"),\n                    selected = state.trafficMode.lowercase().ifBlank { "rule" },\n                    onSelect = vm::setTrafficMode,\n                    enabled = true,\n                    modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 10.dp),\n                )\n            }\n        }\n    }\n}\n\n@Composable\nprivate fun HeroAction'
           assert anchor in s
           s = s.replace(anchor, insert, 1)
           home.write_text(s)
