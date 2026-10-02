@@ -1011,19 +1011,37 @@ jobs:
           grep -q 'dimBehind: Boolean = true' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
           grep -q 'FLAG_DIM_BEHIND' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java
 
+      - name: Apply V20.58 screenshot scroll fix
+        run: |
+          set -euo pipefail
+          echo '850b0e4e52d25769fdfa2bb6bcba58c3e8a2cc82671ef029c3b1bb9a6942326b  updates/v2058-test-scroll-fix.patch' | sha256sum -c -
+          git apply --check updates/v2058-test-scroll-fix.patch
+          git apply updates/v2058-test-scroll-fix.patch
+
+      - name: Apply V20.59 expanded root header parity
+        run: |
+          set -euo pipefail
+          echo '87114ad91ab98ecebdb66906e19f50c6333fc234f5cf559be6d52aaa6efc03dd  updates/v2059-large-title-parity.patch' | sha256sum -c -
+          git apply --check updates/v2059-large-title-parity.patch
+          git apply updates/v2059-large-title-parity.patch
+          grep -q 'versionCode = 2059' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.10.9-v20"' android-app/app/build.gradle.kts
+          grep -q 'largeTitleTopPadding = 26.dp' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
+          grep -q 'largeTitleTopPadding = 26.dp' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
+
       - name: Verify built-in WebUI behavior with controlled API fixtures
         run: node .github/scripts/test_webui_concept.cjs
 
-      - name: Export effective V20.58 source
+      - name: Export effective V20.59 source
         run: |
           set -euo pipefail
-          tar -czf /tmp/Hetu-V20.58-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
-          sha256sum /tmp/Hetu-V20.58-effective-source.tar.gz
+          tar -czf /tmp/Hetu-V20.59-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+          sha256sum /tmp/Hetu-V20.59-effective-source.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.58-effective-source
-          path: /tmp/Hetu-V20.58-effective-source.tar.gz
+          name: Hetu-V20.59-effective-source
+          path: /tmp/Hetu-V20.59-effective-source.tar.gz
           compression-level: 0
           if-no-files-found: error
 
@@ -1100,17 +1118,17 @@ jobs:
           gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:testDebugUnitTest \
             --tests '*RuntimeYaml15Test' --tests '*RuntimeStartup15Test' --tests '*AdblockSnifferTest' \
             --tests '*ConceptParity57Test' --tests '*PanelConceptModelTest' --tests '*SettingsConceptParityTest' \
-            --tests '*CoreManagerConcept57Test' --tests '*SettingsBackupParity57Test' --tests '*ToolsConceptParityTest' --tests '*NativeConceptScreenshotTest' --tests '*SettingsPickerParity58Test' --stacktrace
+            --tests '*CoreManagerConcept57Test' --tests '*SettingsBackupParity57Test' --tests '*ToolsConceptParityTest' --tests '*NativeConceptScreenshotTest' --tests '*SettingsPickerParity58Test' --tests '*LargeTitleParity59Test' --stacktrace
 
       - name: Upload concept UI verification evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.58-UI-verification
+          name: Hetu-V20.59-UI-verification
           path: |
             android-app/app/build/test-results/testDebugUnitTest/
             android-app/app/build/reports/tests/testDebugUnitTest/
-            android-app/app/build/outputs/concept58/
+            android-app/app/build/outputs/concept59/
             out/verification/
           if-no-files-found: warn
 
