@@ -1029,21 +1029,20 @@ jobs:
           grep -q 'largeTitleTopPadding = 26.dp' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
           grep -q 'largeTitleTopPadding = 26.dp' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
 
-      - name: Verify built-in WebUI behavior with controlled API fixtures
-        run: node .github/scripts/test_webui_concept.cjs
-
-      - name: Export effective V20.59 source
+      - name: Apply V20.60 startup protocol and boot-state repair
         run: |
           set -euo pipefail
-          tar -czf /tmp/Hetu-V20.59-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
-          sha256sum /tmp/Hetu-V20.59-effective-source.tar.gz
+          echo '41f4600e01d7d220b188da2d281117f538fb331be821150ee6ec13a70fd92e63  updates/v2060-boot-startup.patch' | sha256sum -c -
+          git apply --check updates/v2060-boot-startup.patch
+          git apply updates/v2060-boot-startup.patch
+          echo 'a3893b239af151fd2cee3e25582e0e8d95fbd309abdb7d4214ee5ba7e49e944f  updates/v2060-lazy-scale-test.patch' | sha256sum -c -
+          git apply --check updates/v2060-lazy-scale-test.patch
+          git apply updates/v2060-lazy-scale-test.patch
+          grep -q 'versionCode = 2060' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.11.0-v20"' android-app/app/build.gradle.kts
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Hetu-V20.59-effective-source
-          path: /tmp/Hetu-V20.59-effective-source.tar.gz
-          compression-level: 0
-          if-no-files-found: error
+      - name: Verify built-in WebUI behavior with controlled API fixtures
+        run: node .github/scripts/test_webui_concept.cjs
 
       - uses: actions/setup-java@v4
         with:
@@ -1078,7 +1077,7 @@ jobs:
           gradle-version: '9.5.0'
 
       # The Mihomo native core and runtime assets are not committed; take the exact,
-      # hash-verified payload from the published UI15 APK (unchanged since then).
+      # hash-verified payload from UI15; only the protocol-tested shell is maintained in source.
       - name: Restore runtime payload
         env:
           GH_TOKEN: ${{ github.token }}
@@ -1095,6 +1094,9 @@ jobs:
               for name, digest in expected.items():
                   data = z.read(name)
                   assert hashlib.sha256(data).hexdigest() == digest, name
+                  # The protocol-tested editable shell must not be overwritten by the old APK.
+                  if name == 'assets/hetu-root.sh':
+                      continue
                   if name.startswith('lib/'):
                       out = Path('android-app/app/src/main/jniLibs') / name.removeprefix('lib/')
                   elif name.startswith('assets/'):
@@ -1103,14 +1105,37 @@ jobs:
                       continue
                   out.parent.mkdir(parents=True, exist_ok=True)
                   out.write_bytes(data)
-          print('runtime payload restored', len(expected))
+          print('original payload verified', len(expected), '; restored unchanged entries', len(expected)-1, '; retained patched shell')
           PY
           # Keep the V20 ad-block/runtime Java changes: only binary/asset payload is restored.
           git diff --stat -- android-app/app/src/main/java || true
 
+      - name: Verify final packaged-source runtime contract
+        run: |
+          set -euo pipefail
+          mkdir -p out/verification
+          python3 tools/qa/test_boot_startup_protocol.py | tee out/verification/boot-protocol.txt
+          python3 .github/scripts/verify_packaged_runtime.py snapshot --script-sha256 96654eacde9009f0ad3f5ad31cd423147667548fd1a510b8bdef986a175ea7cb
+
+      - name: Export effective V20.60 source
+        run: |
+          set -euo pipefail
+          tar -czf /tmp/Hetu-V20.60-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+          sha256sum /tmp/Hetu-V20.60-effective-source.tar.gz
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Hetu-V20.60-effective-source
+          path: /tmp/Hetu-V20.60-effective-source.tar.gz
+          compression-level: 0
+          if-no-files-found: error
+
       - name: Build APK
         working-directory: android-app
         run: gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:assembleDebug --stacktrace
+
+      - name: Verify APK embeds the tested runtime
+        run: python3 .github/scripts/verify_packaged_runtime.py verify
 
       - name: Runtime unit tests
         working-directory: android-app
@@ -1118,13 +1143,13 @@ jobs:
           gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:testDebugUnitTest \
             --tests '*RuntimeYaml15Test' --tests '*RuntimeStartup15Test' --tests '*AdblockSnifferTest' \
             --tests '*ConceptParity57Test' --tests '*PanelConceptModelTest' --tests '*SettingsConceptParityTest' \
-            --tests '*CoreManagerConcept57Test' --tests '*SettingsBackupParity57Test' --tests '*ToolsConceptParityTest' --tests '*NativeConceptScreenshotTest' --tests '*SettingsPickerParity58Test' --tests '*LargeTitleParity59Test' --stacktrace
+            --tests '*CoreManagerConcept57Test' --tests '*SettingsBackupParity57Test' --tests '*ToolsConceptParityTest' --tests '*NativeConceptScreenshotTest' --tests '*SettingsPickerParity58Test' --tests '*LargeTitleParity59Test' --tests '*BootStartup60Test' --stacktrace
 
       - name: Upload concept UI verification evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.59-UI-verification
+          name: Hetu-V20.60-UI-verification
           path: |
             android-app/app/build/test-results/testDebugUnitTest/
             android-app/app/build/reports/tests/testDebugUnitTest/
@@ -1136,12 +1161,16 @@ jobs:
         run: |
           set -euo pipefail
           APK=android-app/app/build/outputs/apk/debug/app-debug.apk
-          "$ANDROID_HOME/build-tools/37.0.0/aapt" dump badging "$APK" | head -3
-          "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs "$APK" | grep -i 'SHA-256'
-          mkdir -p out
+          mkdir -p out/apk-transfer
+          "$ANDROID_HOME/build-tools/37.0.0/aapt" dump badging "$APK" > out/apk-transfer/apk-metadata.txt
+          head -3 out/apk-transfer/apk-metadata.txt
+          "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs "$APK" > out/apk-transfer/apk-signature.txt
+          grep -Fq '701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad' out/apk-transfer/apk-signature.txt
+          cat out/apk-transfer/apk-signature.txt
           VERSION=$(grep -oP 'versionName = "\K[^"]+' android-app/app/build.gradle.kts)
           cp "$APK" "out/Hetu-$VERSION.apk"
           sha256sum out/*.apk
+          python3 .github/scripts/split_apk_artifact.py "out/Hetu-$VERSION.apk"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -1149,3 +1178,61 @@ jobs:
           path: out/*.apk
           compression-level: 0
           if-no-files-found: error
+
+      - name: Upload APK transport manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hetu-V20.60-APK-manifest
+          path: |
+            out/apk-transfer/manifest.json
+            out/apk-transfer/apk-metadata.txt
+            out/apk-transfer/apk-signature.txt
+          if-no-files-found: error
+
+      - name: Upload APK transport part 00
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hetu-V20.60-APK-part00
+          path: out/apk-transfer/part00.bin
+          compression-level: 0
+          if-no-files-found: ignore
+
+      - name: Upload APK transport part 01
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hetu-V20.60-APK-part01
+          path: out/apk-transfer/part01.bin
+          compression-level: 0
+          if-no-files-found: ignore
+
+      - name: Upload APK transport part 02
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hetu-V20.60-APK-part02
+          path: out/apk-transfer/part02.bin
+          compression-level: 0
+          if-no-files-found: ignore
+
+      - name: Upload APK transport part 03
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hetu-V20.60-APK-part03
+          path: out/apk-transfer/part03.bin
+          compression-level: 0
+          if-no-files-found: ignore
+
+      - name: Upload APK transport part 04
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hetu-V20.60-APK-part04
+          path: out/apk-transfer/part04.bin
+          compression-level: 0
+          if-no-files-found: ignore
+
+      - name: Upload APK transport part 05
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hetu-V20.60-APK-part05
+          path: out/apk-transfer/part05.bin
+          compression-level: 0
+          if-no-files-found: ignore
