@@ -11,3 +11,7 @@ V20.65 installed-APK validation follow-up:
 - allow the software AOSP emulator up to 10 minutes for the 130+ MB signed APK install;
 - Android smoke remains a hard gate; no intermediate APK is a delivery candidate until it passes.
 
+
+V20.66 remote validation trigger:
+- rerun the latest 2066 effective build after the prior V20.65 smoke retry occupied the workflow concurrency slot;
+- keep the new SystemUI-only recovery and native WebView loopback fixture checks as hard validation steps.
