@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Read-only navigation smoke in a fresh non-root Android emulator.
+"""Navigation smoke in a fresh non-root Android emulator.
+Only the fixture app display language may be changed.
 Never starts/stops a proxy, requests permissions, imports user data, or clears app data.
 """
 import json, os, re, subprocess, time, xml.etree.ElementTree as ET
@@ -15,15 +16,43 @@ def adb(*args, timeout=90, check=True):
  except subprocess.TimeoutExpired as error:
   (OUT/'adb-timeout.txt').write_text(' '.join(args)+'\n'+(error.output or b'').decode(errors='replace'))
   raise
+ui_sequence=0
 def ui():
- adb('shell','uiautomator','dump','/data/local/tmp/hetu-smoke.xml',timeout=60)
- raw=adb('shell','cat','/data/local/tmp/hetu-smoke.xml')
- start=raw.find('<?xml'); assert start>=0,raw[:300]
- return ET.fromstring(raw[start:]),raw[start:]
-def capture(name):
- root,raw=ui();(OUT/(name+'.xml')).write_text(raw)
+ global ui_sequence
+ deadline=time.monotonic()+60
+ last='No snapshot attempted'
+ while time.monotonic()<deadline:
+  ui_sequence+=1
+  path=f'/data/local/tmp/hetu-smoke-{ui_sequence}.xml'
+  try:
+   dumped=adb('shell','uiautomator','dump',path,timeout=min(20,max(1,deadline-time.monotonic())),check=False)
+   if 'Permission denied' in dumped:raise PermissionError(dumped)
+   raw=adb('shell','cat',path,timeout=15,check=False)
+   start=raw.find('<?xml')
+   if start>=0:
+    try:return ET.fromstring(raw[start:]),raw[start:]
+    except ET.ParseError as error:last='Incomplete hierarchy: '+str(error)
+   else:
+    if 'Permission denied' in raw:raise PermissionError(raw)
+    last=dumped+'\n'+raw
+   with (OUT/'ui-snapshot-retries.txt').open('a') as log:log.write(path+'\n'+last+'\n')
+  except subprocess.TimeoutExpired as error:last='Snapshot command timeout: '+str(error)
+  finally:
+   adb('shell','rm','-f',path,timeout=10,check=False)
+  time.sleep(1)
+ raise AssertionError('No fresh accessibility hierarchy within60s: '+last)
+
+def save_png(name):
  png=subprocess.run([ADB,'exec-out','screencap','-p'],check=True,stdout=subprocess.PIPE,timeout=45).stdout
  assert png.startswith(b'\x89PNG\r\n\x1a\n');(OUT/(name+'.png')).write_bytes(png)
+
+def capture(name):
+ try:root,raw=ui()
+ except Exception:
+  save_png(name)
+  raise
+ (OUT/(name+'.xml')).write_text(raw)
+ save_png(name)
  return root
 
 def click(label,scroll=False,bottom=False):
@@ -105,7 +134,7 @@ def main():
  installed=adb('install','--no-streaming','-r',str(apk),timeout=600)
  (OUT/'install.txt').write_text(installed)
  assert 'Success' in installed,installed
- version=adb('shell','dumpsys','package',PKG);assert 'versionCode='+os.environ.get('HETU_EXPECTED_VERSION','2067') in version
+ version=adb('shell','dumpsys','package',PKG);assert 'versionCode='+os.environ.get('HETU_EXPECTED_VERSION','2068') in version
  (OUT/'version.txt').write_text('\n'.join(line for line in version.splitlines() if 'versionCode=' in line or 'versionName=' in line))
  components=adb('shell','cmd','package','query-activities','--brief','--components','--query-flags','0','--user','0','-a','android.intent.action.MAIN','-c','android.intent.category.LAUNCHER','-p',PKG)
  choices=[line.strip() for line in components.splitlines() if line.strip().startswith(PKG+'/')];assert choices,components
@@ -119,7 +148,7 @@ def main():
  root,_=ui()
  if any(n.get('text')=='Settings' for n in root.iter('node')):
   click('Settings',bottom=True);click('Language and appearance');click('Language')
-  click('简体中文');expect('语言与主题','00-language-selected')
+  click('简体中文');expect('主题设置','00-language-selected')
   adb('shell','input','keyevent','4');time.sleep(2);click('首页',bottom=True)
   expect('河图','01-home-language-restored')
  click('面板',bottom=True);expect('代理未运行','02-panel-stopped')
@@ -151,6 +180,8 @@ def main():
    (OUT/'native-webview-fixture-requests.json').write_text(json.dumps(requests,ensure_ascii=False,indent=2))
  log=adb('logcat','-d','-v','brief',timeout=30);(OUT/'logcat.txt').write_text(log)
  assert not re.search(r'FATAL EXCEPTION[\s\S]{0,1000}Process: '+re.escape(PKG),log),'Application crash in logcat'
+ assert not re.search(r'ANR in '+re.escape(PKG)+r'(?:\s|\(|:)',log),'Application ANR recorded during navigation'
+ (OUT/'last-anr.txt').write_text(adb('shell','dumpsys','activity','lastanr',timeout=60,check=False))
  assert adb('shell','pidof',PKG,check=False).strip(),'App process exited after navigation'
  (OUT/'results.json').write_text(json.dumps({'checks':checks,'passed':len(checks),'fixtureOnly':True,'rootActions':0,'limitations':'Fresh AOSP emulator. Five populated native-WebView states use an isolated loopback fixture with deliberate HTTP503 switch rejection. No K80, real core, Root boot or actual network validation.'},ensure_ascii=False,indent=2))
 try:main()
