@@ -294,7 +294,7 @@ private fun HomeOutboundNode(vm: HetuViewModel, group: ProxyGroupUi?) {
         HxCard(onClick = { vm.openPanel("proxies") }, padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 15.dp, vertical = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(38.dp), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Rounded.Router, null, tint = c.text, modifier = Modifier.size(24.dp))
+                    Icon(Icons.Rounded.Inventory2, null, tint = c.text, modifier = Modifier.size(24.dp))
                 }
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
