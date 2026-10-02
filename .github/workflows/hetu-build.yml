@@ -1060,8 +1060,26 @@ jobs:
           grep -q 'WindowInspector.getGlobalWindowViews' android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
           grep -q 'settings-license-lucide' android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
 
+      - name: Apply V20.62 measured concept geometry and coverage
+        run: |
+          set -euo pipefail
+          echo '0cdd72486bc288767e81c86177a4232cf87a11e7aa5a19eae8bf3bd040f5c1af  updates/v2062-concept-followthrough.patch' | sha256sum -c -
+          git apply --check updates/v2062-concept-followthrough.patch
+          git apply updates/v2062-concept-followthrough.patch
+          grep -q 'versionCode = 2062' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.11.2-v20"' android-app/app/build.gradle.kts
+          echo '31573825cac7536b442c67e7a8110fd5584715a347d9cc8e9ef50cc66b29d04c  android-app/app/src/main/res/drawable/ic_hetu_concept.png' | sha256sum -c -
+
       - name: Verify built-in WebUI behavior with controlled API fixtures
         run: node .github/scripts/test_webui_concept.cjs
+
+      - name: Render built-in WebUI with isolated browser fixtures
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          npm install --prefix "$RUNNER_TEMP/hetu-browser-qa" --ignore-scripts --no-audit --no-fund playwright@1.62.1
+          "$RUNNER_TEMP/hetu-browser-qa/node_modules/.bin/playwright" install --with-deps chromium
+          NODE_PATH="$RUNNER_TEMP/hetu-browser-qa/node_modules" node .github/scripts/test_webui_browser.cjs
 
       - uses: actions/setup-java@v4
         with:
@@ -1136,16 +1154,16 @@ jobs:
           python3 tools/qa/test_boot_startup_protocol.py | tee out/verification/boot-protocol.txt
           python3 .github/scripts/verify_packaged_runtime.py snapshot --script-sha256 96654eacde9009f0ad3f5ad31cd423147667548fd1a510b8bdef986a175ea7cb
 
-      - name: Export effective V20.61 source
+      - name: Export effective V20.62 source
         run: |
           set -euo pipefail
-          tar -czf /tmp/Hetu-V20.61-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
-          sha256sum /tmp/Hetu-V20.61-effective-source.tar.gz
+          tar -czf /tmp/Hetu-V20.62-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+          sha256sum /tmp/Hetu-V20.62-effective-source.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.61-effective-source
-          path: /tmp/Hetu-V20.61-effective-source.tar.gz
+          name: Hetu-V20.62-effective-source
+          path: /tmp/Hetu-V20.62-effective-source.tar.gz
           compression-level: 0
           if-no-files-found: error
 
@@ -1162,17 +1180,20 @@ jobs:
           gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:testDebugUnitTest \
             --tests '*RuntimeYaml15Test' --tests '*RuntimeStartup15Test' --tests '*AdblockSnifferTest' \
             --tests '*ConceptParity57Test' --tests '*PanelConceptModelTest' --tests '*SettingsConceptParityTest' \
-            --tests '*CoreManagerConcept57Test' --tests '*SettingsBackupParity57Test' --tests '*ToolsConceptParityTest' --tests '*NativeConceptScreenshotTest' --tests '*SettingsPickerParity58Test' --tests '*LargeTitleParity59Test' --tests '*BootStartup60Test' --stacktrace
+            --tests '*CoreManagerConcept57Test' --tests '*SettingsBackupParity57Test' --tests '*ToolsConceptParityTest' --tests '*NativeConceptScreenshotTest' --tests '*SettingsPickerParity58Test' --tests '*LargeTitleParity59Test' --tests '*BootStartup60Test' \
+            --tests '*ConceptStateCoverageTest' --tests '*ConceptRemainingCoverageTest' --tests '*WanDetails61Test' --stacktrace
 
       - name: Upload concept UI verification evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.61-UI-verification
+          name: Hetu-V20.62-UI-verification
           path: |
             android-app/app/build/test-results/testDebugUnitTest/
             android-app/app/build/reports/tests/testDebugUnitTest/
             android-app/app/build/outputs/concept59/
+            android-app/app/build/outputs/concept-state-coverage/
+            android-app/app/build/outputs/concept-remaining-coverage/
             out/verification/
           if-no-files-found: warn
 
@@ -1183,6 +1204,7 @@ jobs:
           mkdir -p out/apk-transfer
           "$ANDROID_HOME/build-tools/37.0.0/aapt" dump badging "$APK" > out/apk-transfer/apk-metadata.txt
           head -3 out/apk-transfer/apk-metadata.txt
+          grep -q "versionCode='2062' versionName='0.11.2-v20'" out/apk-transfer/apk-metadata.txt
           "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs "$APK" > out/apk-transfer/apk-signature.txt
           grep -Fq '701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad' out/apk-transfer/apk-signature.txt
           cat out/apk-transfer/apk-signature.txt
@@ -1201,7 +1223,7 @@ jobs:
       - name: Upload APK transport manifest
         uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.61-APK-manifest
+          name: Hetu-V20.62-APK-manifest
           path: |
             out/apk-transfer/manifest.json
             out/apk-transfer/apk-metadata.txt
@@ -1211,7 +1233,7 @@ jobs:
       - name: Upload APK transport part 00
         uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.61-APK-part00
+          name: Hetu-V20.62-APK-part00
           path: out/apk-transfer/part00.bin
           compression-level: 0
           if-no-files-found: ignore
@@ -1219,7 +1241,7 @@ jobs:
       - name: Upload APK transport part 01
         uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.61-APK-part01
+          name: Hetu-V20.62-APK-part01
           path: out/apk-transfer/part01.bin
           compression-level: 0
           if-no-files-found: ignore
@@ -1227,7 +1249,7 @@ jobs:
       - name: Upload APK transport part 02
         uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.61-APK-part02
+          name: Hetu-V20.62-APK-part02
           path: out/apk-transfer/part02.bin
           compression-level: 0
           if-no-files-found: ignore
@@ -1235,7 +1257,7 @@ jobs:
       - name: Upload APK transport part 03
         uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.61-APK-part03
+          name: Hetu-V20.62-APK-part03
           path: out/apk-transfer/part03.bin
           compression-level: 0
           if-no-files-found: ignore
@@ -1243,7 +1265,7 @@ jobs:
       - name: Upload APK transport part 04
         uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.61-APK-part04
+          name: Hetu-V20.62-APK-part04
           path: out/apk-transfer/part04.bin
           compression-level: 0
           if-no-files-found: ignore
@@ -1251,7 +1273,7 @@ jobs:
       - name: Upload APK transport part 05
         uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.61-APK-part05
+          name: Hetu-V20.62-APK-part05
           path: out/apk-transfer/part05.bin
           compression-level: 0
           if-no-files-found: ignore
