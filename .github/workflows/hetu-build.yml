@@ -853,51 +853,44 @@ jobs:
               1,
           )
 
-          seg = '''            HxSegmented(
-                      options = listOf("rule" to "规则", "global" to "全局", "direct" to "直连"),
-                      selected = state.trafficMode.lowercase().ifBlank { "rule" },
-                      onSelect = vm::setTrafficMode,
-                      enabled = running && op == null,
-                      modifier = Modifier.padding(horizontal = 14.dp),
-                  )
-          '''.replace('                  ', '            ')
-          assert seg in s
-          s = s.replace(seg, '', 1)
+          seg_pattern = re.compile(
+              r'\n            HxSegmented\(\n'
+              r'                options = listOf\("rule" to "规则", "global" to "全局", "direct" to "直连"\),\n'
+              r'                selected = state\.trafficMode\.lowercase\(\)\.ifBlank \{ "rule" \},\n'
+              r'                onSelect = vm::setTrafficMode,\n'
+              r'                enabled = running && op == null,\n'
+              r'                modifier = Modifier\.padding\(horizontal = 14\.dp\),\n'
+              r'            \)\n'
+          )
+          s, n = seg_pattern.subn('\n', s, count=1)
+          assert n == 1, 'traffic mode block'
           assert 'HeroAction("启动代理", c.accent, op == HxRunOp.Start, op == null, Modifier.weight(1f), vm::toggle)' in s
           s = s.replace(
               'HeroAction("启动代理", c.accent, op == HxRunOp.Start, op == null, Modifier.weight(1f), vm::toggle)',
               'HeroAction("启动", c.accent, op == HxRunOp.Start, op == null, Modifier.weight(1f), vm::toggle)',
               1,
           )
-          anchor = '''                }
-                      }
-                  }
-              }
-          }
+          anchor = '\n            }\n        }\n    }\n}\n\n@Composable\nprivate fun HeroAction'
+          insert = '''\n            }
+            AnimatedVisibility(
+                visible = expanded && running && op == null,
+                enter = fadeIn(tween(HxMotion.Medium)) + expandVertically(tween(HxMotion.Medium, easing = HxMotion.Emphasized)),
+                exit = fadeOut(tween(HxMotion.Short)) + shrinkVertically(tween(HxMotion.Medium, easing = HxMotion.Emphasized)),
+            ) {
+                HxSegmented(
+                    options = listOf("rule" to "规则", "global" to "全局", "direct" to "直连"),
+                    selected = state.trafficMode.lowercase().ifBlank { "rule" },
+                    onSelect = vm::setTrafficMode,
+                    enabled = true,
+                    modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 10.dp),
+                )
+            }
+        }
+    }
+}
 
-          @Composable
-          private fun HeroAction'''.replace('              ', '            ')
-          insert = '''                }
-                      }
-                      AnimatedVisibility(
-                          visible = expanded && running && op == null,
-                          enter = fadeIn(tween(HxMotion.Medium)) + expandVertically(tween(HxMotion.Medium, easing = HxMotion.Emphasized)),
-                          exit = fadeOut(tween(HxMotion.Short)) + shrinkVertically(tween(HxMotion.Medium, easing = HxMotion.Emphasized)),
-                      ) {
-                          HxSegmented(
-                              options = listOf("rule" to "规则", "global" to "全局", "direct" to "直连"),
-                              selected = state.trafficMode.lowercase().ifBlank { "rule" },
-                              onSelect = vm::setTrafficMode,
-                              enabled = true,
-                              modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 10.dp),
-                          )
-                      }
-                  }
-              }
-          }
-
-          @Composable
-          private fun HeroAction'''.replace('              ', '            ')
+@Composable
+private fun HeroAction'''
           assert anchor in s
           s = s.replace(anchor, insert, 1)
           home.write_text(s)
