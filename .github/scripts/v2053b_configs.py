@@ -139,3 +139,12 @@ s = s.replace(anchor, insert + anchor, 1)
 
 p.write_text(s)
 print('V20.53 config list parity applied')
+
+# V20.54 settings begin
+build = root / 'android-app/app/build.gradle.kts'
+version_text = build.read_text()
+assert 'versionCode = 2053' in version_text and 'versionName = "0.10.3-v20"' in version_text
+version_text = version_text.replace('versionCode = 2053', 'versionCode = 2054', 1)
+version_text = version_text.replace('versionName = "0.10.3-v20"', 'versionName = "0.10.4-v20"', 1)
+build.write_text(version_text)
+print('V20.54 settings begin')
