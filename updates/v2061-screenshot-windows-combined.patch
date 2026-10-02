@@ -1,0 +1,133 @@
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
+index ead86d7..3cbd60e 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
+@@ -798,9 +798,9 @@ internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
+                                         .clip(RoundedCornerShape(12.dp))
+                                         .then(
+                                             if (selected) Modifier.border(1.5.dp, c.accent, RoundedCornerShape(12.dp))
+-                                            else Modifier.border(1.dp, c.line, RoundedCornerShape(12.dp))
++                                            else Modifier
+                                         )
+-                                        .background(if (selected) c.accentSoft else Color.Transparent)
++                                        .background(if (selected) c.accentSoft else c.surfaceMuted.copy(alpha = .42f))
+                                         .clickable {
+                                             vm.setAppearanceMode(value)
+                                             vm.bumpSettings()
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
+index 43ea447..a52a756 100644
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
+@@ -3,9 +3,12 @@ package io.github.xgl34222220.hetu
+ import android.app.Application
+ import android.graphics.Bitmap
+ import android.graphics.Canvas
++import android.view.View
++import android.view.inspector.WindowInspector
+ import androidx.activity.ComponentActivity
+ import androidx.compose.runtime.Composable
+ import androidx.compose.runtime.CompositionLocalProvider
++import androidx.compose.material3.Text
+ import androidx.compose.foundation.layout.Box
+ import androidx.compose.foundation.layout.fillMaxSize
+ import androidx.compose.ui.Modifier
+@@ -18,6 +21,10 @@ import androidx.compose.ui.test.performScrollTo
+ import androidx.compose.ui.test.performScrollToNode
+ import androidx.compose.ui.test.hasScrollToIndexAction
+ import androidx.compose.ui.test.hasText
++import androidx.compose.ui.test.hasClickAction
++import androidx.compose.ui.test.hasSetTextAction
++import androidx.compose.ui.test.performTextReplacement
++import androidx.compose.ui.test.assertExists
+ import androidx.test.core.app.ApplicationProvider
+ import java.io.File
+ import org.junit.Assert.assertTrue
+@@ -65,10 +72,25 @@ class NativeConceptScreenshotTest {
+         rule.mainClock.advanceTimeBy(350)
+         rule.waitForIdle()
+         rule.runOnIdle {
+-            val view = rule.activity.window.decorView
+-            assertTrue("Window must be laid out", view.width > 0 && view.height > 0)
+-            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+-            view.draw(Canvas(bitmap))
++            val decor = rule.activity.window.decorView
++            assertTrue("Window must be laid out", decor.width > 0 && decor.height > 0)
++            val bitmap = Bitmap.createBitmap(decor.width, decor.height, Bitmap.Config.ARGB_8888)
++            val canvas = Canvas(bitmap)
++            val roots = WindowInspector.getGlobalWindowViews().filter { it.width > 0 && it.height > 0 && it.isShown }
++            val ordered = buildList {
++                if (roots.none { it === decor }) add(decor)
++                addAll(roots)
++            }
++            val drawn = HashSet<View>()
++            ordered.forEach { root ->
++                if (!drawn.add(root)) return@forEach
++                val location = IntArray(2)
++                root.getLocationOnScreen(location)
++                canvas.save()
++                canvas.translate(location[0].toFloat(), location[1].toFloat())
++                root.draw(canvas)
++                canvas.restore()
++            }
+             val file = File(System.getProperty("hetu.qa.output", "build/outputs/concept59"), "$name.png")
+             file.parentFile!!.mkdirs()
+             file.outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+@@ -117,5 +139,58 @@ class NativeConceptScreenshotTest {
+         rule.onAllNodesWithText("动作")[0].performScrollTo().performClick()
+     }
+ 
++    @Test fun notificationAction2Choice() = snapshotAfter("settings-notification-action2-choice", { NotificationSettingsScreen(vm) {} }) {
++        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("重启"))
++        rule.onNodeWithText("重启").performClick()
++        rule.onNodeWithText("快捷按钮 2").assertExists()
++    }
++    @Test fun notificationAction3Choice() = snapshotAfter("settings-notification-action3-choice", { NotificationSettingsScreen(vm) {} }) {
++        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("停止"))
++        rule.onNodeWithText("停止").performClick()
++        rule.onNodeWithText("快捷按钮 3").assertExists()
++    }
++    @Test fun mirrorAddressDialog() = snapshotAfter("settings-mirror-dialog", { SettingsScreen(vm, 0.dp, initialSubPage = "startupDownload") }) {
++        rule.onNode(hasText("加速地址") and hasClickAction()).performClick()
++        rule.onNodeWithText("加速下载").assertExists()
++    }
++    @Test fun mihomoLicenseSheet() = snapshotAfter("settings-license-mihomo", { AboutScreen(vm) }) {
++        rule.onNode(hasText("Mihomo") and hasClickAction()).performScrollTo().performClick()
++    }
++    @Test fun adguardLicenseSheet() = snapshotAfter("settings-license-adguard", { AboutScreen(vm) }) {
++        rule.onNodeWithText("AdGuard DNS Filter").performScrollTo().performClick()
++    }
++    @Test fun lucideLicenseSheet() = snapshotAfter("settings-license-lucide", { AboutScreen(vm) }) {
++        rule.onNodeWithText("Lucide Icons").performScrollTo().performClick()
++    }
++    @Test fun settingsBackup() = snapshot("settings-backup") { SettingsScreen(vm, 0.dp, initialSubPage = "backup") }
++    @Test fun settingsStartupDownload() = snapshot("settings-startup-download") { SettingsScreen(vm, 0.dp, initialSubPage = "startupDownload") }
++    @Test fun settingsDefaultPanel() = snapshot("settings-default-panel") { SettingsScreen(vm, 0.dp, initialSubPage = "defaultPanel") }
++    @Test fun themeMotion() = snapshotAfter("settings-theme-motion", { HxThemeLabScreen(vm) {} }) {
++        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("界面缩放"))
++        rule.onNodeWithText("界面缩放").assertExists()
++    }
++    @Test fun notificationButtons() = snapshotAfter("settings-notification-buttons", { NotificationSettingsScreen(vm) {} }) {
++        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("快捷按钮 3"))
++        rule.onNodeWithText("快捷按钮 3").assertExists()
++    }
++    @Test fun mirrorValidation() = snapshotAfter("settings-mirror-invalid", {
++        SettingsMirrorDialog(initial = "", onSave = {}, onDismiss = {})
++    }) {
++        rule.onNode(hasSetTextAction()).performTextReplacement("mirror.example")
++        rule.onNodeWithText("保存").performClick()
++        rule.onNodeWithText("请填写 http/https 地址").assertExists()
++    }
++    @Test fun restoreConfirmation() = snapshotAfter("settings-restore-confirm", {
++        SettingsDialog(title = "恢复备份？", onDismiss = {}, confirmLabel = "恢复", onConfirm = {}) {
++            Text(
++                "备份内的设置与配置将写入当前应用。同名同内容配置会复用；同名不同内容配置将保留为副本。正在运行的代理不会自动重启。",
++                color = Hx.colors.textMuted,
++            )
++        }
++    }) {
++        rule.onNodeWithText("恢复备份？").assertExists()
++        rule.onNodeWithText("取消").assertExists()
++        rule.onNodeWithText("恢复").assertExists()
++    }
+ 
+ }
