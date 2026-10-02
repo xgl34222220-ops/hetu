@@ -1,10 +1,19 @@
 --- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
-@@ -100,6 +100,7 @@
+@@ -10,6 +10,8 @@
+ import androidx.compose.foundation.layout.fillMaxSize
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.unit.dp
++import androidx.compose.ui.test.hasScrollAction
++import androidx.compose.ui.test.performScrollToIndex
+ import androidx.compose.ui.test.junit4.createAndroidComposeRule
+ import androidx.compose.ui.test.onAllNodesWithText
+ import androidx.compose.ui.test.onNodeWithText
+@@ -100,6 +102,7 @@
          rule.onNodeWithText("顶栏模糊样式").performScrollTo().performClick()
      }
      @Test fun themeScaleChoice() = snapshotAfter("settings-scale-choice", { HxThemeLabScreen(vm) {} }) {
-+        rule.onNodeWithText("顶栏模糊样式").performScrollTo()
++        rule.onAllNodes(hasScrollAction())[0].performScrollToIndex(4)
          rule.onNodeWithText("界面缩放").performScrollTo().performClick()
      }
      @Test fun notificationRefreshChoice() = snapshotAfter("settings-notification-refresh-choice", { NotificationSettingsScreen(vm) {} }) {
