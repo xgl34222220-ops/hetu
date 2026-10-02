@@ -172,3 +172,9 @@ private fun StrategyCompactDelayPill(delay: Long?, testing: Boolean, onClick: ()
 s = s[:start] + new_delay + s[end:]
 proxy.write_text(s)
 print('V20.51 strategy core parity applied')
+
+# Chain panel state parity.
+import runpy
+runpy.run_path('.github/scripts/v2052a_tabbed.py', run_name='__main__')
+runpy.run_path('.github/scripts/v2052b_connections.py', run_name='__main__')
+runpy.run_path('.github/scripts/v2052c_rules.py', run_name='__main__')
