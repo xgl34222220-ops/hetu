@@ -99,3 +99,14 @@
 +        assertTrue(settings.contains("largeTitleTopPadding = 26.dp"))
 +    }
 +}
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
+@@ -66,7 +66,7 @@
+             assertTrue("Window must be laid out", view.width > 0 && view.height > 0)
+             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+             view.draw(Canvas(bitmap))
+-            val file = File(System.getProperty("hetu.qa.output", "build/outputs/concept58"), "$name.png")
++            val file = File(System.getProperty("hetu.qa.output", "build/outputs/concept59"), "$name.png")
+             file.parentFile!!.mkdirs()
+             file.outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+             bitmap.recycle()
