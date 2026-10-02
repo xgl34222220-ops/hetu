@@ -10,6 +10,10 @@ build.write_text(s)
 
 settings = root / 'android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt'
 s = settings.read_text()
+if 'import androidx.compose.material.icons.rounded.Layers\n' not in s:
+    anchor = 'import androidx.compose.material.icons.rounded.LibraryBooks\n'
+    assert anchor in s
+    s = s.replace(anchor, anchor + 'import androidx.compose.material.icons.rounded.Layers\n', 1)
 page_start = s.index('        HxPage(\n            title = "设置",')
 when_start = s.index('\n    when (choice) {', page_start)
 prefix = s[:page_start]
@@ -34,7 +38,7 @@ new_page = '''        HxPage(
                     MiuixSettingsArrow(
                         title = "高级代理配置",
                         summary = "性能、DNS 与资源限制",
-                        icon = Icons.Rounded.AltRoute,
+                        icon = Icons.Rounded.Dns,
                         onClick = { open(ProxyAdvancedSettingsActivity::class.java) },
                     )
                 }
@@ -62,7 +66,7 @@ new_page = '''        HxPage(
                     MiuixSettingsArrow(
                         title = "备份与恢复",
                         summary = "导出与恢复应用设置",
-                        icon = Icons.Rounded.CloudSync,
+                        icon = Icons.Rounded.Layers,
                         onClick = { choice = "backup" },
                     )
                     MiuixSettingsArrow(
