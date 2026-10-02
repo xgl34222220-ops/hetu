@@ -1,0 +1,16 @@
+--- a/android-app/app/build.gradle.kts
++++ b/android-app/app/build.gradle.kts
+@@ -17,8 +17,8 @@
+-        versionCode = 2060
+-        versionName = "0.11.0-v20"
++        versionCode = 2061
++        versionName = "0.11.1-v20"
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTheme.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTheme.kt
+@@ -106,9 +106,9 @@
+-    val gutter = 12.dp
+-    val gap = 10.dp
+-    val gapSmall = 7.dp
++    val gutter = 14.dp
++    val gap = 12.dp
++    val gapSmall = 8.dp
