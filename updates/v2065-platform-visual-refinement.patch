@@ -1,0 +1,471 @@
+--- a/android-app/app/build.gradle.kts
++++ b/android-app/app/build.gradle.kts
+@@ -17,8 +17,8 @@
+         applicationId = "io.github.xgl34222220.hetu"
+         minSdk = 26
+         targetSdk = 35
+-        versionCode = 2064
+-        versionName = "0.11.4-v20"
++        versionCode = 2065
++        versionName = "0.11.5-v20"
+     }
+ 
+     // Explicit CI debug identity. No private key is committed or exported.
+--- a/android-app/app/src/main/AndroidManifest.xml
++++ b/android-app/app/src/main/AndroidManifest.xml
+@@ -5,9 +5,12 @@
+     <uses-permission android:name="android.permission.INTERNET" />
+     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
++    <!-- Android 12+ requires coarse and fine in the same user-initiated Wi-Fi identity request. -->
++    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+     <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" android:usesPermissionFlags="neverForLocation" />
+-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
++    <!-- Root per-app routing needs the complete installed-app inventory, including apps without launcher activities. This test-distributed manager is not a Play submission. -->
++    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
+     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLocalWebUiActivity.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLocalWebUiActivity.kt
+@@ -105,11 +105,11 @@
+ .status{position:absolute;right:0;top:28px;display:flex;align-items:center;gap:4px;border:1px solid #b4dfd0;border-radius:999px;padding:4px 7px;color:#269f7b;background:#edf9f4;font-size:10px;line-height:15px;font-weight:650}.status .mark{border-radius:50%;background:currentColor;width:15px;height:15px;position:relative}.status .mark:after{content:'✓';position:absolute;inset:0;color:white;text-align:center;font-size:11px;line-height:15px}.status.error{color:var(--red);border-color:var(--red);background:var(--surface)}.status.error .mark:after{content:'!'}
+ .tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin:0 1px 12px}.tabs button{border:1px solid #d1d7ee;border-radius:14px;padding:10px 8px;background:#e7eafb;color:var(--muted);font-size:15px;line-height:18px;font-weight:650}.tabs button.active{background:var(--surface);color:var(--text)}
+ .card{background:var(--surface);border-radius:20px;margin-bottom:12px;overflow:hidden}.metric{display:flex;align-items:center;min-height:80px;padding:17px 18px;gap:26px}.glyph{width:26px;height:26px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+-.title{font-size:18px;line-height:24px;font-weight:700;overflow-wrap:anywhere}.sub{font-size:15px;line-height:19px;color:var(--muted);overflow-wrap:anywhere}.metric .sub{font-size:15px}.group{padding:18px}.group-head{display:flex;align-items:center;gap:26px}.node{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:12px}.pill{display:block;max-width:42%;min-width:96px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;padding:7px 12px;border-radius:999px;background:var(--soft);color:var(--blue);font-size:14px;line-height:18px;font-weight:650}
+-.node-picker{border:1px solid var(--line);border-radius:12px;background:var(--inset);color:var(--text);padding:9px 12px;min-width:0;width:60%;font-size:15px;line-height:18px;display:flex;align-items:center;justify-content:space-between;gap:8px}.node-picker span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.node-picker .glyph{width:16px;height:16px;stroke-width:1.6}
+-.connections{padding:0 14px}.connection{display:flex;align-items:center;gap:26px;padding:15px 4px;border-top:1px solid var(--line)}.connection:first-child{border-top:0}.connection>div{min-width:0}.traffic{display:flex;flex-wrap:wrap;gap:12px;font-size:14px;line-height:20px;margin-top:1px;font-weight:600}.up{color:var(--blue)}.down{color:var(--green)}.traffic i{font-style:normal;font-size:21px;vertical-align:-1px;margin-right:5px}
++.title{font-size:18px;line-height:24px;font-weight:700;overflow-wrap:anywhere}.sub{font-size:14px;line-height:19px;color:var(--muted);overflow-wrap:anywhere}.metric .sub{font-size:14.5px}.group{padding:18px}.group-head{display:flex;align-items:center;gap:26px}.node{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:12px}.pill{display:block;max-width:42%;min-width:96px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;padding:7px 12px;border-radius:999px;background:var(--soft);color:var(--blue);font-size:13px;line-height:18px;font-weight:650}
++.node-picker{border:1px solid var(--line);border-radius:12px;background:var(--inset);color:var(--text);padding:9px 12px;min-width:0;width:60%;font-size:14px;line-height:18px;display:flex;align-items:center;justify-content:space-between;gap:8px}.node-picker span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.node-picker .glyph{width:16px;height:16px;stroke-width:1.6}
++.connections{padding:0 14px}.connection{display:flex;align-items:center;gap:26px;padding:15px 4px;border-top:1px solid var(--line)}.connection:first-child{border-top:0}.connection>div{min-width:0}.traffic{display:flex;flex-wrap:wrap;gap:12px;font-size:13px;line-height:20px;margin-top:1px;font-weight:600}.up{color:var(--blue)}.down{color:var(--green)}.traffic i{font-style:normal;font-size:21px;vertical-align:-1px;margin-right:5px}
+ .empty{padding:30px 18px;text-align:center;color:var(--muted);font-size:14px;line-height:22px}.error{color:var(--red)}.retry{display:block;margin:16px auto 0;background:var(--blue);color:white;border:0;border-radius:12px;padding:10px 24px}
+-dialog{border:0;border-radius:22px;background:var(--surface);color:var(--text);width:min(300px,calc(100vw - 40px));max-height:80vh;padding:0;box-shadow:0 14px 42px #0002}dialog::backdrop{background:#10182788}.dialog-title{font-size:20px;line-height:27px;font-weight:700;padding:18px 22px 8px}.node-options{max-height:48vh;overflow:auto;padding:0 17px}.node-option{border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--text);display:flex;align-items:center;gap:23px;text-align:left;width:100%;padding:11px 5px;font-size:16px;line-height:18px}.node-option:last-child{border-bottom:0}.radio{width:20px;height:20px;flex:none;border:1.5px solid var(--muted);border-radius:50%;position:relative}.node-option.selected .radio{border:2px solid var(--blue)}.node-option.selected .radio:after{content:'';position:absolute;inset:3px;border-radius:50%;background:var(--blue)}.dialog-footer{border-top:1px solid var(--line);display:flex;justify-content:flex-end;padding:5px 13px}.dialog-footer button{border:0;color:var(--blue);background:transparent;padding:8px 10px;font-size:16px;line-height:18px;font-weight:650}#notice{width:min(238px,calc(100vw - 40px));border-radius:13px}#notice .dialog-title{font-size:18px;padding:17px 20px 2px}#notice-message{padding:0 20px 8px;font-size:14px;line-height:20px;overflow-wrap:anywhere}
++dialog{border:0;border-radius:22px;background:var(--surface);color:var(--text);width:min(300px,calc(100vw - 40px));max-height:80vh;padding:0;box-shadow:0 14px 42px #0002}dialog::backdrop{background:#10182788}.dialog-title{font-size:20px;line-height:27px;font-weight:700;padding:18px 22px 8px}.node-options{max-height:48vh;overflow:auto;padding:0 17px}.node-option{border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--text);display:flex;align-items:center;gap:23px;text-align:left;width:100%;padding:11px 5px;font-size:15px;line-height:18px}.node-option:last-child{border-bottom:0}.radio{width:20px;height:20px;flex:none;border:1.5px solid var(--muted);border-radius:50%;position:relative}.node-option.selected .radio{border:2px solid var(--blue)}.node-option.selected .radio:after{content:'';position:absolute;inset:3px;border-radius:50%;background:var(--blue)}.dialog-footer{border-top:1px solid var(--line);display:flex;justify-content:flex-end;padding:5px 13px}.dialog-footer button{border:0;color:var(--blue);background:transparent;padding:8px 10px;font-size:16px;line-height:18px;font-weight:650}#notice{width:min(238px,calc(100vw - 40px));border-radius:13px}#notice .dialog-title{font-size:18px;padding:17px 20px 2px}#notice-message{padding:0 20px 8px;font-size:14px;line-height:20px;overflow-wrap:anywhere}
+ @media(prefers-color-scheme:dark){.tabs button{background:var(--inset);border-color:var(--line)}.status{background:var(--surface)}}
+ @media(max-width:350px){.title{font-size:16px}.group-head,.metric,.connection{gap:17px}.pill{min-width:74px}.node{gap:8px}.status{top:6px}}
+ </style>
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt
+@@ -96,7 +96,10 @@
+     fun requestWifiPermissions() {
+         val needs = buildList {
+             if (Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(Manifest.permission.NEARBY_WIFI_DEVICES) != PackageManager.PERMISSION_GRANTED) add(Manifest.permission.NEARBY_WIFI_DEVICES)
+-            if (context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) add(Manifest.permission.ACCESS_FINE_LOCATION)
++            if (context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
++                add(Manifest.permission.ACCESS_COARSE_LOCATION)
++                add(Manifest.permission.ACCESS_FINE_LOCATION)
++            }
+         }
+         if (needs.isNotEmpty()) permissionLauncher.launch(needs.toTypedArray()) else evaluate()
+     }
+@@ -354,7 +357,10 @@
+     fun requestWifiPermissions() {
+         val needs = buildList {
+             if (Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(Manifest.permission.NEARBY_WIFI_DEVICES) != PackageManager.PERMISSION_GRANTED) add(Manifest.permission.NEARBY_WIFI_DEVICES)
+-            if (context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) add(Manifest.permission.ACCESS_FINE_LOCATION)
++            if (context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
++                add(Manifest.permission.ACCESS_COARSE_LOCATION)
++                add(Manifest.permission.ACCESS_FINE_LOCATION)
++            }
+         }
+         if (needs.isNotEmpty()) permissionLauncher.launch(needs.toTypedArray()) else evaluate()
+     }
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchActivity.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchActivity.java
+@@ -16,7 +16,7 @@
+     private void build(){LinearLayout shell=u.col();u.window(shell);ScrollView scroll=new ScrollView(this);LinearLayout body=u.col();body.setPadding(u.dp(14),u.dp(18),u.dp(14),u.dp(34));scroll.addView(body);shell.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));LinearLayout top=u.row();top.setGravity(Gravity.CENTER_VERTICAL);top.addView(u.icon("back","返回",this::finish),new LinearLayout.LayoutParams(u.dp(46),u.dp(46)));TextView title=u.text("网络匹配",31,u.text,true);LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(0,-2,1);tp.leftMargin=u.dp(8);top.addView(title,tp);body.addView(top);u.gap(body,16);TextView tip=u.text("持续监听默认网络。可按 Wi‑Fi SSID/BSSID 或移动数据匹配，并自动启动/停止 Root 代理。",12,u.muted,false);tip.setPadding(u.dp(8),0,u.dp(8),u.dp(12));body.addView(tip);LinearLayout c=u.card(body);c.setPadding(u.dp(18),0,u.dp(18),0);enabledValue=row(c,"启用网络匹配",this::toggleEnabled);u.separator(c);statusValue=row(c,"当前环境",this::evaluate);u.separator(c);matchValue=row(c,"匹配成功动作",()->chooseAction("networkMatchAction",true));u.separator(c);unmatchValue=row(c,"失配动作",()->chooseAction("networkUnmatchAction",false));LinearLayout r=u.card(body);r.setPadding(u.dp(18),0,u.dp(18),0);ssidValue=row(r,"Wi‑Fi SSID",()->editSet("networkMatchSsids","Wi‑Fi SSID","每行一个 SSID；留空表示不限"));u.separator(r);bssidValue=row(r,"Wi‑Fi BSSID",()->editSet("networkMatchBssids","Wi‑Fi BSSID","每行一个 BSSID；留空表示不限"));u.separator(r);mobileValue=row(r,"移动数据匹配",()->{prefs.edit().putBoolean("networkMatchMobile",!prefs.getBoolean("networkMatchMobile",false)).apply();refresh();evaluate();});setContentView(shell);shell.requestApplyInsets();}
+     private TextView row(LinearLayout p,String label,Runnable a){LinearLayout r=u.row();r.setMinimumHeight(u.dp(70));r.setGravity(Gravity.CENTER_VERTICAL);r.setBackground(u.touch(android.graphics.Color.TRANSPARENT,14));r.addView(u.text(label,16.5f,u.text,true),new LinearLayout.LayoutParams(0,-2,1));TextView v=u.text("",14,u.muted,false);v.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);v.setMaxWidth(u.dp(210));v.setSingleLine(true);r.addView(v,new LinearLayout.LayoutParams(-2,-1));LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(u.dp(18),u.dp(18));cp.leftMargin=u.dp(7);r.addView(new IconView(this,"chevron",u.muted),cp);r.setOnClickListener(x->a.run());p.addView(r);return v;}
+     private void toggleEnabled(){boolean n=!prefs.getBoolean("networkMatchEnabled",false);prefs.edit().putBoolean("networkMatchEnabled",n).apply();if(n){requestWifiPermission();startForegroundService(new Intent(this,ProxyNetworkMatchService.class).setAction("START"));}else stopService(new Intent(this,ProxyNetworkMatchService.class));refresh();}
+-    private void requestWifiPermission(){if(Build.VERSION.SDK_INT>=33){ArrayList<String> q=new ArrayList<>();if(checkSelfPermission(Manifest.permission.NEARBY_WIFI_DEVICES)!=PackageManager.PERMISSION_GRANTED)q.add(Manifest.permission.NEARBY_WIFI_DEVICES);if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED)q.add(Manifest.permission.ACCESS_FINE_LOCATION);if(!q.isEmpty())requestPermissions(q.toArray(new String[0]),908);}else if(Build.VERSION.SDK_INT>=23&&checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION},908);}
++    private void requestWifiPermission(){if(Build.VERSION.SDK_INT>=33){ArrayList<String> q=new ArrayList<>();if(checkSelfPermission(Manifest.permission.NEARBY_WIFI_DEVICES)!=PackageManager.PERMISSION_GRANTED)q.add(Manifest.permission.NEARBY_WIFI_DEVICES);if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){q.add(Manifest.permission.ACCESS_COARSE_LOCATION);q.add(Manifest.permission.ACCESS_FINE_LOCATION);}if(!q.isEmpty())requestPermissions(q.toArray(new String[0]),908);}else if(Build.VERSION.SDK_INT>=23&&checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION,Manifest.permission.ACCESS_FINE_LOCATION},908);}
+     private void chooseAction(String key,boolean match){String[] labels={"不操作","启动 Root 代理","停止 Root 代理"},values={"none","start","stop"};String cur=prefs.getString(key,match?"start":"none");int checked=Arrays.asList(values).indexOf(cur);new AlertDialog.Builder(this).setTitle(match?"匹配成功动作":"失配动作").setSingleChoiceItems(labels,Math.max(0,checked),(d,w)->{prefs.edit().putString(key,values[w]).apply();d.dismiss();refresh();evaluate();}).setNegativeButton("取消",null).show();}
+     private Set<String> values(String key){Set<String>s=prefs.getStringSet(key,Collections.emptySet());return s==null?new TreeSet<>():new TreeSet<>(s);}
+     private void editSet(String key,String title,String hint){EditText in=new EditText(this);in.setText(android.text.TextUtils.join("\n",values(key)));in.setHint(hint);in.setMinLines(5);FrameLayout wrap=new FrameLayout(this);int m=u.dp(20);wrap.setPadding(m,u.dp(4),m,0);wrap.addView(in,new FrameLayout.LayoutParams(-1,-2));new AlertDialog.Builder(this).setTitle(title).setMessage(hint).setView(wrap).setPositiveButton("保存",(d,w)->{TreeSet<String>out=new TreeSet<>();for(String x:in.getText().toString().split("[\\n,;]+")){String v=x.trim();if(!v.isEmpty())out.add(v);}prefs.edit().putStringSet(key,out).apply();refresh();evaluate();}).setNegativeButton("取消",null).show();}
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
+@@ -3341,6 +3341,7 @@
+ 
+ @Composable
+ private fun RefOverviewSubscription19(items: List<DashboardProviderUi>) {
++    val displayLocale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
+     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
+     val t = LocalHetuTokens.current
+     val tracked = items.filter { it.hasSubscriptionInfo && it.total > 0L }
+@@ -3353,7 +3354,7 @@
+     val expire = tracked.map { it.expire }.filter { it > 0L }.minOrNull()
+     val expireText = expire?.let {
+         runCatching {
+-            java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
++            java.text.SimpleDateFormat("yyyy-MM-dd", displayLocale)
+                 .format(java.util.Date(if (it < 10_000_000_000L) it * 1000L else it))
+         }.getOrDefault("")
+     }.orEmpty()
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java
+@@ -195,7 +195,7 @@
+             else if(kind.equals("file")){android.graphics.Path path=new android.graphics.Path();path.moveTo(6,2);path.lineTo(14,2);path.lineTo(20,8);path.lineTo(20,22);path.lineTo(6,22);path.close();c.drawPath(path,p);c.drawLine(14,2,14,8,p);c.drawLine(14,8,20,8,p);c.drawLine(10,12,16,12,p);c.drawLine(10,16,16,16,p);}
+             else if(kind.equals("route")){c.drawCircle(6,18,3,p);c.drawCircle(18,6,3,p);android.graphics.Path path=new android.graphics.Path();path.moveTo(9,18);path.lineTo(15,18);path.cubicTo(21,18,21,12,15,12);path.lineTo(9,12);path.cubicTo(3,12,3,6,9,6);path.lineTo(15,6);c.drawPath(path,p);}
+             else if(kind.equals("globe")){c.drawCircle(12,12,10,p);c.drawOval(8,2,16,22,p);c.drawLine(2,12,22,12,p);}
+-            else if(kind.equals("refresh")){c.drawArc(3,3,21,21,-45,275,false,p);c.drawLine(21,3,21,9,p);c.drawLine(15,9,21,9,p);}
++            else if(kind.equals("refresh")){c.drawArc(3,3,21,21,195,135,false,p);c.drawArc(3,3,21,21,15,135,false,p);c.drawLine(21,3,21,9,p);c.drawLine(15,9,21,9,p);c.drawLine(3,21,3,15,p);c.drawLine(3,15,9,15,p);}
+             else if(kind.equals("unfold")){c.drawLine(7,8,12,3,p);c.drawLine(12,3,17,8,p);c.drawLine(7,16,12,21,p);c.drawLine(12,21,17,16,p);}
+             c.restore();
+         }
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/TrafficRankings.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/TrafficRankings.kt
+@@ -96,7 +96,7 @@
+                 if (provider.hasSubscriptionInfo && provider.total > 0) {
+                     HetuReadOnlyProgress(provider.ratio)
+                     Text("剩余 ${refBytes(provider.remaining)} / ${refBytes(provider.total)}", color = t.textSecondary, fontSize = 12.sp)
+-                    if(provider.expire > 0) Text("到期 " + java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date(provider.expire * 1000)), color = t.textSecondary, fontSize = 11.sp)
++                    if(provider.expire > 0) Text("到期 " + java.text.SimpleDateFormat("yyyy-MM-dd", androidx.compose.ui.platform.LocalConfiguration.current.locales[0]).format(java.util.Date(provider.expire * 1000)), color = t.textSecondary, fontSize = 11.sp)
+                 } else Text("订阅源未提供用量", color = t.textSecondary, fontSize = 12.sp)
+             }
+         }
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt
+@@ -26,6 +26,7 @@
+ import androidx.compose.material.icons.automirrored.rounded.Undo
+ import androidx.compose.material.icons.rounded.Check
+ import androidx.compose.ui.graphics.graphicsLayer
++import androidx.compose.ui.text.font.FontWeight
+ import androidx.compose.foundation.background
+ import androidx.compose.foundation.clickable
+ import androidx.compose.foundation.horizontalScroll
+@@ -342,7 +343,7 @@
+         HxConfirmDialog(
+             title = "删除配置？",
+             message = "「${config.name}」将被永久删除。" + if (config.selected) "删除后会切换回内置模板。" else "",
+-            confirmLabel = "删除", danger = true,
++            confirmLabel = "删除", danger = true, presentation = HxConfirmStyle.Text,
+             onConfirm = {
+                 confirmDelete = null
+                 perform("已删除", applyToRuntime = config.selected) { vm.controller.deleteConfig(config.name) }
+@@ -353,7 +354,7 @@
+     deleteSub?.let { sub ->
+         HxConfirmDialog(
+             title = "删除订阅？", message = "从当前配置中移除「${sub.name}」及其在策略组中的引用。",
+-            confirmLabel = "删除", danger = true,
++            confirmLabel = "删除", danger = true, presentation = HxConfirmStyle.SoftRow,
+             onConfirm = { deleteSub = null; perform("订阅已删除", true) { vm.controller.deleteSubscription(sub.name) } },
+             onDismiss = { deleteSub = null },
+         )
+@@ -415,7 +416,7 @@
+             }
+         }
+     }
+-    if (discard) HxConfirmDialog("放弃填写？", "已填写的内容尚未保存，返回后将丢失这些修改。", "放弃", danger = true,
++    if (discard) HxConfirmDialog("放弃填写？", "已填写的内容尚未保存，返回后将丢失这些修改。", "放弃", danger = true, presentation = HxConfirmStyle.DestructiveStack,
+         onConfirm = { discard = false; onBack() }, onDismiss = { discard = false })
+ }
+ 
+@@ -457,8 +458,21 @@
+     HxPage(title = "导入配置", largeTitle = false, onBack = ::leave) {
+         item("mode") {
+             HxSection {
+-                HxSegmented(listOf("file" to "从文件导入", "link" to "从链接导入"), mode,
+-                    onSelect = { mode = it; attempted = false; problem = null }, enabled = !busy)
++                HxCard(padding = androidx.compose.foundation.layout.PaddingValues(6.dp)) {
++                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
++                        listOf("file" to "从文件导入", "link" to "从链接导入").forEach { (id, label) ->
++                            Row(Modifier.weight(1f).height(44.dp).clip(RoundedCornerShape(18.dp))
++                                .background(if (id == mode) c.accentSoft else Color.Transparent)
++                                .clickable(enabled = !busy) { mode = id; attempted = false; problem = null },
++                                horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
++                                Icon(settingsLineIcon(if (id == "file") Icons.Rounded.Description else Icons.Rounded.Link), null,
++                                    tint = if (id == mode) c.accent else c.text, modifier = Modifier.size(22.dp))
++                                Spacer(Modifier.width(10.dp))
++                                Text(label, color = if (id == mode) c.accent else c.text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
++                            }
++                        }
++                    }
++                }
+             }
+         }
+         item("form") {
+@@ -495,7 +509,7 @@
+             }
+         }
+     }
+-    if (discard) HxConfirmDialog("放弃填写？", "已填写的内容尚未保存，返回后将丢失这些修改。", "放弃", danger = true,
++    if (discard) HxConfirmDialog("放弃填写？", "已填写的内容尚未保存，返回后将丢失这些修改。", "放弃", danger = true, presentation = HxConfirmStyle.DestructiveStack,
+         onConfirm = { discard = false; onBack() }, onDismiss = { discard = false })
+ }
+ 
+@@ -921,9 +935,9 @@
+         }
+     }
+     if (confirmReload) HxConfirmDialog("放弃草稿并重新读取？",
+-        "重新读取后，本页未保存的修改将被替换。该操作读取当前配置的最新内容，不会覆盖源文件。", "放弃并读取", danger = true,
++        "重新读取后，本页未保存的修改将被替换。该操作读取当前配置的最新内容，不会覆盖源文件。", "放弃并读取", danger = true, presentation = HxConfirmStyle.SoftStack,
+         onConfirm = { confirmReload = false; dirty = false; loadRevision++ }, onDismiss = { confirmReload = false })
+-    if (confirmLeave) HxConfirmDialog("放弃修改？", "编辑的修改没有保存。", "放弃", danger = true,
++    if (confirmLeave) HxConfirmDialog("放弃修改？", "编辑的修改没有保存。", "放弃", danger = true, presentation = HxConfirmStyle.SoftStack,
+         onConfirm = { confirmLeave = false; dirty = false; if (onBackOverride != null) onBackOverride() else nav?.pop() },
+         onDismiss = { confirmLeave = false })
+ }
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
+@@ -1244,6 +1244,7 @@
+     message: String? = null,
+     configFooter: Boolean = false,
+     messageBelowFields: Boolean = false,
++    errorField: (String) -> Int? = { null },
+     validate: (List<String>) -> String? = { null },
+     onConfirm: (List<String>) -> Unit,
+     onDismiss: () -> Unit,
+@@ -1291,18 +1292,20 @@
+                         textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.text, fontSize = 15.sp, lineHeight = 20.sp),
+                         cursorBrush = androidx.compose.ui.graphics.SolidColor(c.accent),
+                         modifier = Modifier.fillMaxWidth().heightIn(min = if (configFooter) 42.dp else 38.dp).clip(RoundedCornerShape(10.dp))
+-                            .background(c.surfaceMuted).border(.7.dp, if (error != null) c.bad else c.line, RoundedCornerShape(10.dp))
++                            .background(c.surfaceMuted).border(.7.dp, if (error != null && (errorField(error.orEmpty()) == null || errorField(error.orEmpty()) == index)) c.bad else c.line, RoundedCornerShape(10.dp))
+                             .padding(horizontal = 12.dp, vertical = if (configFooter) 10.dp else 9.dp),
+                         decorationBox = { input -> Box {
+                             if (values[index].value.isBlank() && field.placeholder.isNotBlank()) Text(field.placeholder, color = c.textFaint, fontSize = 15.sp)
+                             input()
+                         } },
+                     )
++                    if (error != null && errorField(error.orEmpty()) == index) Text(error.orEmpty(), color = c.bad,
++                        style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
+                 }
+                 if (!message.isNullOrBlank() && messageBelowFields) {
+                     Spacer(Modifier.height(6.dp)); Text(message, color = c.textMuted, fontSize = 12.sp, lineHeight = 16.sp)
+                 }
+-                AnimatedVisibility(error != null, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
++                AnimatedVisibility(error != null && errorField(error.orEmpty()) == null, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
+                     Text(error.orEmpty(), color = c.bad, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
+                 }
+                 if (!configFooter) {
+@@ -1326,12 +1329,15 @@
+     }
+ }
+ 
++internal enum class HxConfirmStyle { Filled, Text, SoftRow, SoftStack, DestructiveStack }
++
+ @Composable
+ internal fun HxConfirmDialog(
+     title: String,
+     message: String,
+     confirmLabel: String = "确定",
+     danger: Boolean = false,
++    presentation: HxConfirmStyle = HxConfirmStyle.Filled,
+     onConfirm: () -> Unit,
+     onDismiss: () -> Unit,
+ ) {
+@@ -1343,7 +1349,27 @@
+         Text(message, style = MaterialTheme.typography.bodyMedium, color = c.textMuted,
+             textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+         Spacer(Modifier.height(18.dp))
+-        HxDialogButtons(confirmLabel, if (danger) Color(0xFFFF3564) else c.accent, referenceCorners = true, onDismiss = onDismiss, onConfirm = onConfirm)
++        if (presentation == HxConfirmStyle.Filled) {
++            HxDialogButtons(confirmLabel, if (danger) Color(0xFFFF3B30) else c.accent, referenceCorners = true, onDismiss = onDismiss, onConfirm = onConfirm)
++        } else {
++            val stacked = presentation == HxConfirmStyle.SoftStack || presentation == HxConfirmStyle.DestructiveStack
++            @Composable fun action(label: String, destructive: Boolean, modifier: Modifier, click: () -> Unit) {
++                val strong = destructive && presentation == HxConfirmStyle.DestructiveStack
++                val tint = if (destructive && danger) Color(0xFFFF3B30) else c.accent
++                Box(modifier.height(44.dp).clip(RoundedCornerShape(12.dp))
++                    .background(when { presentation == HxConfirmStyle.Text -> Color.Transparent; strong -> tint; destructive && danger -> tint.copy(alpha = .09f); else -> c.accentSoft.copy(alpha = .65f) })
++                    .clickable(onClick = click), contentAlignment = Alignment.Center) {
++                    Text(label, color = if (strong) Color.White else tint, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
++                }
++            }
++            if (stacked) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
++                action("取消", false, Modifier.fillMaxWidth(), onDismiss)
++                action(confirmLabel, true, Modifier.fillMaxWidth(), onConfirm)
++            } else Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
++                action("取消", false, Modifier.weight(1f), onDismiss)
++                action(confirmLabel, true, Modifier.weight(1f), onConfirm)
++            }
++        }
+     }
+ }
+ 
+@@ -1386,7 +1412,7 @@
+         modifier
+             .hxPressScale(source, .97f)
+             .heightIn(min = 44.dp)
+-            .clip(Hx.pillShape)
++            .clip(RoundedCornerShape(12.dp))
+             .background(bg)
+             .clickable(interactionSource = source, indication = LocalIndication.current, enabled = enabled && !busy, onClick = { haptics.perform(HetuHaptic.Tap); onClick() })
+             .animateContentSize(tween(HxMotion.Short, easing = HxMotion.Emphasized))
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
+@@ -344,18 +344,18 @@
+                 indication = LocalIndication.current,
+                 onClick = onClick,
+             )
+-            .padding(horizontal = 13.dp, vertical = 6.dp),
++            .padding(horizontal = 15.dp, vertical = 6.dp),
+         verticalAlignment = Alignment.CenterVertically,
+     ) {
+         Box(Modifier.size(30.dp), contentAlignment = Alignment.Center) {
+             Icon(
+-                icon,
++                toolReferenceLineIcon(title, icon),
+                 contentDescription = null,
+                 tint = c.text.copy(alpha = if (c.dark) .92f else .88f),
+                 modifier = Modifier.size(26.dp),
+             )
+         }
+-        Spacer(Modifier.width(14.dp))
++        Spacer(Modifier.width(24.dp))
+         Column(Modifier.weight(1f)) {
+             Text(
+                 title,
+@@ -370,9 +370,9 @@
+             Text(
+                 subtitle,
+                 color = c.textMuted,
+-                fontSize = 13.5.sp,
+-                lineHeight = 17.sp,
+-                fontWeight = FontWeight.Normal,
++                fontSize = 15.sp,
++                lineHeight = 19.sp,
++                fontWeight = FontWeight.Medium,
+                 maxLines = 2,
+                 overflow = TextOverflow.Ellipsis,
+             )
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceIcons.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceIcons.kt
+@@ -17,6 +17,18 @@
+         data.forEach { addPath(PathParser().parsePathString(it).toNodes(), fill = null, stroke = SolidColor(Color.Black),
+             strokeLineWidth = 1.8f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) }
+     }.build()
++    val Script = line("Script", "M6 5 9 6 12 2 15 6 18 5v7a6 6 0 0 1-12 0V5Z", "M12 18v5", "m5 20 4 3", "m19 20-4 3")
++    val Broadcast = line("Broadcast", "M12 10a2 2 0 1 1 0 4a2 2 0 1 1 0-4Z", "M8 17a6 6 0 1 1 8 0", "M5 20a10 10 0 1 1 14 0", "M12 16v7")
++    val Fork = line("Fork", "M12 22v-9", "M12 15 6 9V3", "M12 15 18 9V3", "m3 6 3-3 3 3", "m15 6 3-3 3 3")
++    val FilledApps = ImageVector.Builder(name = "HetuTools.Apps", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
++        listOf("M4 2h5a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z", "M15 2h5a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z", "M4 13h5a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2Z", "M15 13h5a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2Z").forEach {
++            addPath(PathParser().parsePathString(it).toNodes(), fill = SolidColor(Color.Black))
++        }
++    }.build()
++    val Config = line("Config", "m12 2 9 5v10l-9 5-9-5V7l9-5Z", "M16 12a4 4 0 1 1-8 0a4 4 0 1 1 8 0")
++    val Download = line("Download", "M12 2v13", "m7 10 5 5 5-5", "M3 13v8h18v-8")
++    val Database = line("Database", "M21 5c0 2-4 3-9 3S3 7 3 5s4-3 9-3 9 1 9 3Z", "M3 5v14c0 2 4 3 9 3s9-1 9-3V5", "M3 12c0 2 4 3 9 3s9-1 9-3")
++    val Monitor = line("Monitor", "M3 3h18v14H3V3Z", "M12 17v5", "M7 22h10")
+     val Grid = line("Grid", "M5 3h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z", "M16 3h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z", "M5 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2Z", "M16 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-3a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2Z")
+     val Power = line("Power", "M12 2v10", "M5.6 5.6a9 9 0 1 0 12.8 0")
+     val Layers = line("Layers", "m3 7 9-5 9 5-9 5-9-5Z", "m3 12 9 5 9-5", "m3 17 9 5 9-5")
+@@ -50,3 +62,17 @@
+     "Check" -> SettingsReferenceIcons.CheckBox
+     else -> baiZeLineIcon(icon)
+ }
++
++/** Tools keep their reference-specific glyphs instead of unrelated filled Material symbols. */
++internal fun toolReferenceLineIcon(title: String, icon: ImageVector): ImageVector = when (title) {
++    "配置管理" -> SettingsReferenceIcons.Config
++    "Sub-Store" -> SettingsReferenceIcons.Link
++    "CNIP" -> SettingsReferenceIcons.Database
++    "核心管理" -> SettingsReferenceIcons.Download
++    "Web面板" -> SettingsReferenceIcons.Monitor
++    "应用管理" -> SettingsReferenceIcons.FilledApps
++    "脚本" -> SettingsReferenceIcons.Script
++    "共享网络" -> SettingsReferenceIcons.Broadcast
++    "绕过规则" -> SettingsReferenceIcons.Fork
++    else -> settingsLineIcon(icon)
++}
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
+@@ -786,6 +786,7 @@
+                 HxField("文件名（可选）", placeholder = "config.yaml"),
+             ),
+             confirmLabel = "下载",
++            errorField = { if (it == "请填写 HTTPS 下载地址") 0 else 1 },
+             validate = { v ->
+                 val address = v[0]
+                 val downloadUri = runCatching { java.net.URI(address) }.getOrNull()
+--- a/android-app/app/src/main/res/values/styles.xml
++++ b/android-app/app/src/main/res/values/styles.xml
+@@ -5,7 +5,6 @@
+         <item name="android:windowLightStatusBar">true</item>
+         <item name="android:statusBarColor">@android:color/transparent</item>
+         <item name="android:navigationBarColor">@android:color/transparent</item>
+-        <item name="android:windowLightNavigationBar">true</item>
+         <item name="android:windowActionModeOverlay">true</item>
+         <item name="android:windowBackground">#F4F5F7</item>
+         <item name="android:windowAnimationStyle">@style/HetuSharedAxisWindowAnimation</item>
+@@ -16,7 +15,6 @@
+         <item name="android:windowLightStatusBar">false</item>
+         <item name="android:statusBarColor">@android:color/transparent</item>
+         <item name="android:navigationBarColor">@android:color/transparent</item>
+-        <item name="android:windowLightNavigationBar">false</item>
+         <item name="android:windowActionModeOverlay">true</item>
+         <item name="android:windowBackground">#121714</item>
+         <item name="android:windowAnimationStyle">@style/HetuSharedAxisWindowAnimation</item>
+--- a/android-app/app/src/main/res/values-night/styles.xml
++++ b/android-app/app/src/main/res/values-night/styles.xml
+@@ -7,7 +7,6 @@
+         <item name="android:windowLightStatusBar">false</item>
+         <item name="android:statusBarColor">@android:color/transparent</item>
+         <item name="android:navigationBarColor">@android:color/transparent</item>
+-        <item name="android:windowLightNavigationBar">false</item>
+         <item name="android:windowActionModeOverlay">true</item>
+         <item name="android:windowBackground">#0D1012</item>
+         <item name="android:windowAnimationStyle">@style/HetuSharedAxisWindowAnimation</item>
+--- /dev/null
++++ b/android-app/app/src/main/res/values-night-v27/styles.xml
+@@ -0,0 +1,15 @@
++<resources>
++    <!-- Same theme name as values/: the window background matches the dark canvas so
++         a cold start in system dark mode never flashes a light frame. -->
++    <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
++        <item name="android:fontFamily">sans-serif</item>
++        <item name="android:colorAccent">#5CCFBC</item>
++        <item name="android:windowLightStatusBar">false</item>
++        <item name="android:statusBarColor">@android:color/transparent</item>
++        <item name="android:navigationBarColor">@android:color/transparent</item>
++        <item name="android:windowLightNavigationBar">false</item>
++        <item name="android:windowActionModeOverlay">true</item>
++        <item name="android:windowBackground">#0D1012</item>
++        <item name="android:windowAnimationStyle">@style/HetuSharedAxisWindowAnimation</item>
++    </style>
++</resources>
+--- /dev/null
++++ b/android-app/app/src/main/res/values-v27/styles.xml
+@@ -0,0 +1,41 @@
++<resources>
++    <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
++        <item name="android:fontFamily">sans-serif</item>
++        <item name="android:colorAccent">#12806F</item>
++        <item name="android:windowLightStatusBar">true</item>
++        <item name="android:statusBarColor">@android:color/transparent</item>
++        <item name="android:navigationBarColor">@android:color/transparent</item>
++        <item name="android:windowLightNavigationBar">true</item>
++        <item name="android:windowActionModeOverlay">true</item>
++        <item name="android:windowBackground">#F4F5F7</item>
++        <item name="android:windowAnimationStyle">@style/HetuSharedAxisWindowAnimation</item>
++    </style>
++    <style name="AppThemeDark" parent="android:style/Theme.Material.NoActionBar">
++        <item name="android:fontFamily">sans-serif</item>
++        <item name="android:colorAccent">#8DD3C3</item>
++        <item name="android:windowLightStatusBar">false</item>
++        <item name="android:statusBarColor">@android:color/transparent</item>
++        <item name="android:navigationBarColor">@android:color/transparent</item>
++        <item name="android:windowLightNavigationBar">false</item>
++        <item name="android:windowActionModeOverlay">true</item>
++        <item name="android:windowBackground">#121714</item>
++        <item name="android:windowAnimationStyle">@style/HetuSharedAxisWindowAnimation</item>
++    </style>
++    <style name="HetuSharedAxisWindowAnimation">
++        <item name="android:activityOpenEnterAnimation">@anim/hetu_route_open_enter</item>
++        <item name="android:activityOpenExitAnimation">@anim/hetu_route_open_exit</item>
++        <item name="android:activityCloseEnterAnimation">@anim/hetu_route_close_enter</item>
++        <item name="android:activityCloseExitAnimation">@anim/hetu_route_close_exit</item>
++    </style>
++<style name="HetuTranslucentPopupTheme" parent="@style/AppTheme">
++        <item name="android:windowIsTranslucent">true</item>
++        <item name="android:windowBackground">@android:color/transparent</item>
++        <item name="android:windowNoTitle">true</item>
++        <item name="android:backgroundDimEnabled">true</item>
++        <item name="android:backgroundDimAmount">0.30</item>
++        <item name="android:windowIsFloating">false</item>
++        <item name="android:statusBarColor">@android:color/transparent</item>
++        <item name="android:navigationBarColor">@android:color/transparent</item>
++        <item name="android:windowAnimationStyle">@style/HetuSharedAxisWindowAnimation</item>
++    </style>
++</resources>
+\ No newline at end of file
