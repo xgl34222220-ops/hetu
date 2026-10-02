@@ -1051,6 +1051,15 @@ jobs:
           grep -q 'versionName = "0.11.1-v20"' android-app/app/build.gradle.kts
           grep -q 'SettingsRow("内置核心", subtitle = "Mihomo"' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
 
+      - name: Apply V20.61 popup and sheet screenshot coverage
+        run: |
+          set -euo pipefail
+          echo '90c086fd6a110fed7080a506f85a21a2bee6266cbc77ce1463345e0139130a62  updates/v2061-screenshot-windows.patch' | sha256sum -c -
+          git apply --check updates/v2061-screenshot-windows.patch
+          git apply updates/v2061-screenshot-windows.patch
+          grep -q 'WindowInspector.getGlobalWindowViews' android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
+          grep -q 'settings-license-lucide' android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
+
       - name: Verify built-in WebUI behavior with controlled API fixtures
         run: node .github/scripts/test_webui_concept.cjs
 

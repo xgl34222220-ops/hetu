@@ -1,0 +1,68 @@
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
+index 0baeaa1..ee550ca 100644
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
+@@ -3,6 +3,8 @@ package io.github.xgl34222220.hetu
+ import android.app.Application
+ import android.graphics.Bitmap
+ import android.graphics.Canvas
++import android.view.View
++import android.view.inspector.WindowInspector
+ import androidx.activity.ComponentActivity
+ import androidx.compose.runtime.Composable
+ import androidx.compose.runtime.CompositionLocalProvider
+@@ -65,10 +67,25 @@ class NativeConceptScreenshotTest {
+         rule.mainClock.advanceTimeBy(350)
+         rule.waitForIdle()
+         rule.runOnIdle {
+-            val view = rule.activity.window.decorView
+-            assertTrue("Window must be laid out", view.width > 0 && view.height > 0)
+-            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+-            view.draw(Canvas(bitmap))
++            val decor = rule.activity.window.decorView
++            assertTrue("Window must be laid out", decor.width > 0 && decor.height > 0)
++            val bitmap = Bitmap.createBitmap(decor.width, decor.height, Bitmap.Config.ARGB_8888)
++            val canvas = Canvas(bitmap)
++            val roots = WindowInspector.getGlobalWindowViews().filter { it.width > 0 && it.height > 0 && it.isShown }
++            val ordered = buildList {
++                if (roots.none { it === decor }) add(decor)
++                addAll(roots)
++            }
++            val drawn = HashSet<View>()
++            ordered.forEach { root ->
++                if (!drawn.add(root)) return@forEach
++                val location = IntArray(2)
++                root.getLocationOnScreen(location)
++                canvas.save()
++                canvas.translate(location[0].toFloat(), location[1].toFloat())
++                root.draw(canvas)
++                canvas.restore()
++            }
+             val file = File(System.getProperty("hetu.qa.output", "build/outputs/concept59"), "$name.png")
+             file.parentFile!!.mkdirs()
+             file.outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+@@ -117,4 +134,24 @@ class NativeConceptScreenshotTest {
+         rule.onAllNodesWithText("动作")[0].performScrollTo().performClick()
+     }
+ 
++    @Test fun notificationAction2Choice() = snapshotAfter("settings-notification-action2-choice", { NotificationSettingsScreen(vm) {} }) {
++        rule.onAllNodesWithText("动作")[1].performScrollTo().performClick()
++    }
++    @Test fun notificationAction3Choice() = snapshotAfter("settings-notification-action3-choice", { NotificationSettingsScreen(vm) {} }) {
++        rule.onAllNodesWithText("动作")[2].performScrollTo().performClick()
++    }
++    @Test fun mirrorAddressDialog() = snapshotAfter("settings-mirror-dialog", { SettingsScreen(vm, 0.dp, initialSubPage = "startupDownload") }) {
++        rule.onNodeWithText("加速地址").performClick()
++        rule.onNodeWithText("加速下载").assertExists()
++    }
++    @Test fun mihomoLicenseSheet() = snapshotAfter("settings-license-mihomo", { AboutScreen(vm) }) {
++        rule.onNodeWithText("Mihomo", useUnmergedTree = true).performScrollTo().performClick()
++    }
++    @Test fun adguardLicenseSheet() = snapshotAfter("settings-license-adguard", { AboutScreen(vm) }) {
++        rule.onNodeWithText("AdGuard DNS Filter").performScrollTo().performClick()
++    }
++    @Test fun lucideLicenseSheet() = snapshotAfter("settings-license-lucide", { AboutScreen(vm) }) {
++        rule.onNodeWithText("Lucide Icons").performScrollTo().performClick()
++    }
++
+ }
