@@ -957,16 +957,39 @@ jobs:
           python3 .github/scripts/v2051a_overview.py
           python3 .github/scripts/v2051b_strategy_core.py
 
-      - name: Export effective V20.50 source
+      - name: Apply V20.52 panel detail parity
         run: |
           set -euo pipefail
-          tar -czf /tmp/Hetu-V20.51-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
-          sha256sum /tmp/Hetu-V20.51-effective-source.tar.gz
+          python3 .github/scripts/v2052a_tabbed.py
+          python3 .github/scripts/v2052b_connections.py
+          python3 .github/scripts/v2052c_rules.py
+          grep -q 'versionCode = 2052' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.10.2-v20"' android-app/app/build.gradle.kts
+          echo "V20.52 panel detail parity applied"
+          git diff --stat
+
+      - name: Apply V20.53 tools and V20.54-56 settings parity
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/v2053a_tools.py
+          python3 .github/scripts/v2053b_configs.py
+          grep -q 'versionCode = 2056' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.10.6-v20"' android-app/app/build.gradle.kts
+          grep -q 'title = "基础代理配置"' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java
+          grep -q 'title = "主题设置"' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
+          echo "V20.53-V20.56 parity chain applied"
+          git diff --stat
+
+      - name: Export effective V20.56 source
+        run: |
+          set -euo pipefail
+          tar -czf /tmp/Hetu-V20.56-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+          sha256sum /tmp/Hetu-V20.56-effective-source.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.51-effective-source
-          path: /tmp/Hetu-V20.51-effective-source.tar.gz
+          name: Hetu-V20.56-effective-source
+          path: /tmp/Hetu-V20.56-effective-source.tar.gz
           compression-level: 0
           if-no-files-found: error
 
