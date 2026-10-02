@@ -1,0 +1,28 @@
+diff --git a/android-app/app/build.gradle.kts b/android-app/app/build.gradle.kts
+index 7b7ba33..c8f1211 100644
+--- a/android-app/app/build.gradle.kts
++++ b/android-app/app/build.gradle.kts
+@@ -17,8 +17,8 @@ android {
+         applicationId = "io.github.xgl34222220.hetu"
+         minSdk = 26
+         targetSdk = 35
+-        versionCode = 2060
+-        versionName = "0.11.0-v20"
++        versionCode = 2061
++        versionName = "0.11.1-v20"
+     }
+ 
+     // Explicit CI debug identity. No private key is committed or exported.
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
+index b5b4263..166acfe 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
+@@ -515,7 +515,7 @@ internal fun AboutScreen(vm: HetuViewModel) {
+         item(key = "info") {
+             SettingsSection() {
+                 SettingsGroup(title = "信息") {
+-                    SettingsRow("内置核心", subtitle = revision.ifBlank { "Mihomo" }, icon = Icons.Rounded.Memory)
++                    SettingsRow("内置核心", subtitle = "Mihomo", icon = Icons.Rounded.Memory)
+                     SettingsDivider()
+                     SettingsRow("运行目录", subtitle = "/data/adb/hetu", icon = Icons.Rounded.Description, iconTint = c.textMuted)
+                 }

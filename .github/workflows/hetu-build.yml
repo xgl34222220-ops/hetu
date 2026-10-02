@@ -1041,6 +1041,16 @@ jobs:
           grep -q 'versionCode = 2060' android-app/app/build.gradle.kts
           grep -q 'versionName = "0.11.0-v20"' android-app/app/build.gradle.kts
 
+      - name: Apply V20.61 About parity correction
+        run: |
+          set -euo pipefail
+          echo 'b99a5734bb1fd82c4f3ac6082426a7a2d6f28454f21a099ac38022ceef925b32  updates/v2061-core-about.patch' | sha256sum -c -
+          git apply --check updates/v2061-core-about.patch
+          git apply updates/v2061-core-about.patch
+          grep -q 'versionCode = 2061' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.11.1-v20"' android-app/app/build.gradle.kts
+          grep -q 'SettingsRow("内置核心", subtitle = "Mihomo"' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
+
       - name: Verify built-in WebUI behavior with controlled API fixtures
         run: node .github/scripts/test_webui_concept.cjs
 
@@ -1117,16 +1127,16 @@ jobs:
           python3 tools/qa/test_boot_startup_protocol.py | tee out/verification/boot-protocol.txt
           python3 .github/scripts/verify_packaged_runtime.py snapshot --script-sha256 96654eacde9009f0ad3f5ad31cd423147667548fd1a510b8bdef986a175ea7cb
 
-      - name: Export effective V20.60 source
+      - name: Export effective V20.61 source
         run: |
           set -euo pipefail
-          tar -czf /tmp/Hetu-V20.60-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
-          sha256sum /tmp/Hetu-V20.60-effective-source.tar.gz
+          tar -czf /tmp/Hetu-V20.61-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+          sha256sum /tmp/Hetu-V20.61-effective-source.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.60-effective-source
-          path: /tmp/Hetu-V20.60-effective-source.tar.gz
+          name: Hetu-V20.61-effective-source
+          path: /tmp/Hetu-V20.61-effective-source.tar.gz
           compression-level: 0
           if-no-files-found: error
 
@@ -1149,7 +1159,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.60-UI-verification
+          name: Hetu-V20.61-UI-verification
           path: |
             android-app/app/build/test-results/testDebugUnitTest/
             android-app/app/build/reports/tests/testDebugUnitTest/
@@ -1182,7 +1192,7 @@ jobs:
       - name: Upload APK transport manifest
         uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.60-APK-manifest
+          name: Hetu-V20.61-APK-manifest
           path: |
             out/apk-transfer/manifest.json
             out/apk-transfer/apk-metadata.txt
@@ -1192,7 +1202,7 @@ jobs:
       - name: Upload APK transport part 00
         uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.60-APK-part00
+          name: Hetu-V20.61-APK-part00
           path: out/apk-transfer/part00.bin
           compression-level: 0
           if-no-files-found: ignore
@@ -1200,7 +1210,7 @@ jobs:
       - name: Upload APK transport part 01
         uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.60-APK-part01
+          name: Hetu-V20.61-APK-part01
           path: out/apk-transfer/part01.bin
           compression-level: 0
           if-no-files-found: ignore
@@ -1208,7 +1218,7 @@ jobs:
       - name: Upload APK transport part 02
         uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.60-APK-part02
+          name: Hetu-V20.61-APK-part02
           path: out/apk-transfer/part02.bin
           compression-level: 0
           if-no-files-found: ignore
@@ -1216,7 +1226,7 @@ jobs:
       - name: Upload APK transport part 03
         uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.60-APK-part03
+          name: Hetu-V20.61-APK-part03
           path: out/apk-transfer/part03.bin
           compression-level: 0
           if-no-files-found: ignore
@@ -1224,7 +1234,7 @@ jobs:
       - name: Upload APK transport part 04
         uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.60-APK-part04
+          name: Hetu-V20.61-APK-part04
           path: out/apk-transfer/part04.bin
           compression-level: 0
           if-no-files-found: ignore
@@ -1232,7 +1242,7 @@ jobs:
       - name: Upload APK transport part 05
         uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.60-APK-part05
+          name: Hetu-V20.61-APK-part05
           path: out/apk-transfer/part05.bin
           compression-level: 0
           if-no-files-found: ignore
