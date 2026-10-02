@@ -6,3 +6,5 @@ import androidx.compose.ui.graphics.vector.ImageVector
 
 val Icons.Rounded.Description: ImageVector
     get() = Icons.Rounded.InsertDriveFile
+
+// Concept parity generation: 2054
