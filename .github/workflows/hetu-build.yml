@@ -1032,7 +1032,7 @@ jobs:
                 }
             }
         }
-'''
+          '''
           s = prefix + new_page + suffix
 
           # Make the default panel picker match the seven PDF choices and default to 概览.
@@ -1085,7 +1085,7 @@ jobs:
             },
             onDismiss = { choice = null },
         )
-'''
+          '''
           s = s.replace(insert_before, startup_case + insert_before, 1)
           settings.write_text(s)
           PY
