@@ -951,16 +951,22 @@ jobs:
           echo "V20.50 exact visual parity phase 2 applied"
           git diff --stat
 
+      - name: Apply V20.51 panel visuals
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/v2051a_overview.py
+          python3 .github/scripts/v2051b_strategy_core.py
+
       - name: Export effective V20.50 source
         run: |
           set -euo pipefail
-          tar -czf /tmp/Hetu-V20.50-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
-          sha256sum /tmp/Hetu-V20.50-effective-source.tar.gz
+          tar -czf /tmp/Hetu-V20.51-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+          sha256sum /tmp/Hetu-V20.51-effective-source.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.50-effective-source
-          path: /tmp/Hetu-V20.50-effective-source.tar.gz
+          name: Hetu-V20.51-effective-source
+          path: /tmp/Hetu-V20.51-effective-source.tar.gz
           compression-level: 0
           if-no-files-found: error
 
