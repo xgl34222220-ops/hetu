@@ -1,5 +1,22 @@
 const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict');
 (async()=>{
+ // Stabilize the generated settings screenshot smoke test after the V20.58 patch.
+ // HxThemeLabScreen uses a LazyColumn; "界面缩放" is not composed until the list moves.
+ // This changes test navigation only and never touches production UI/data.
+ const nativeShot='android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt';
+ if(fs.existsSync(nativeShot)){
+  let test=fs.readFileSync(nativeShot,'utf8');
+  const oldImport='import androidx.compose.ui.test.performScrollTo\\n';
+  if(!test.includes('import androidx.compose.ui.test.performScrollToIndex')){
+   assert(test.includes(oldImport),'Native screenshot test scroll import anchor missing');
+   test=test.replace(oldImport,oldImport+'import androidx.compose.ui.test.hasScrollAction\\nimport androidx.compose.ui.test.onAllNodes\\nimport androidx.compose.ui.test.performScrollToIndex\\n');
+  }
+  const oldScale='        rule.onNodeWithText("顶栏模糊样式").performScrollTo()\\n        rule.onNodeWithText("界面缩放").performScrollTo().performClick()';
+  const newScale='        rule.onAllNodes(hasScrollAction())[0].performScrollToIndex(4)\\n        rule.onNodeWithText("界面缩放").performScrollTo().performClick()';
+  assert(test.includes(oldScale)||test.includes(newScale),'Native screenshot themeScaleChoice anchor missing');
+  test=test.replace(oldScale,newScale);
+  fs.writeFileSync(nativeShot,test);
+ }
  const s=fs.readFileSync('android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLocalWebUiActivity.kt','utf8');
  const html=s.split('val WEB_UI = """')[1].split('""".trimIndent()')[0];const js=html.split('<script>')[1].split('</script>')[0].replace('__SECRET_JSON__','"test-only-secret"');
  const els={};class El{constructor(){this.innerHTML='';this.textContent='';this.open=false;this.classList={toggle(){}};}querySelectorAll(){return []}showModal(){this.open=true}close(){this.open=false}}
