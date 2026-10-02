@@ -16,6 +16,7 @@ class AutomationConceptParity57Test {
         val home = source("app/HomeScreen.kt")
         val root = source("app/HetuActivity.kt")
         val latency = source("ProxyLatencyTargetsActivity.kt")
+        val details = source("app/HomeDetailsScreen.kt")
 
         listOf(
             "网速数据来源",
@@ -25,9 +26,9 @@ class AutomationConceptParity57Test {
             "\"LAN\"",
             "\"WAN\"",
             "资源占用",
-            "等待采样",
         ).forEach { assertTrue("missing home concept control $it", home.contains(it)) }
 
+        assertTrue("resource waiting state required", details.contains("等待采样"))
         assertTrue("startup error sheet required", root.contains("启动失败"))
         assertTrue("direct target screen required", latency.contains("本机直测目标"))
         assertTrue("direct target input required", latency.contains("目标"))
@@ -57,7 +58,7 @@ class AutomationConceptParity57Test {
     @Test fun stoppedPanelAndRuntimeStatesAreExplicit() {
         val panel = source("app/PanelScreen.kt")
         val proxy = source("app/ProxiesScreen.kt")
-        val nav = source("app/PanelNavigation13.kt")
+        val nav = source("PanelNavigation13.kt")
         val vm = source("app/HetuViewModel.kt")
 
         val combined = panel + proxy + nav
