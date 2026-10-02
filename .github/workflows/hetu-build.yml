@@ -939,16 +939,28 @@ jobs:
           grep -q 'title = "开机启动与下载"' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
           git diff --stat
 
-      - name: Export effective V20.49 source
+      - name: Apply V20.50 exact visual parity phase 2
         run: |
           set -euo pipefail
-          tar -czf /tmp/Hetu-V20.49-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
-          sha256sum /tmp/Hetu-V20.49-effective-source.tar.gz
+          python3 .github/scripts/v2050_visuals.py
+          grep -q 'versionCode = 2050' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.10.0-v20"' android-app/app/build.gradle.kts
+          grep -q 'referenceLabel = "示例数据"' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeScreen.kt
+          grep -q 'Color(0xFFECEEFB)' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTheme.kt
+          grep -q 'Text("当前节点"' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeScreen.kt
+          echo "V20.50 exact visual parity phase 2 applied"
+          git diff --stat
+
+      - name: Export effective V20.50 source
+        run: |
+          set -euo pipefail
+          tar -czf /tmp/Hetu-V20.50-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+          sha256sum /tmp/Hetu-V20.50-effective-source.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.49-effective-source
-          path: /tmp/Hetu-V20.49-effective-source.tar.gz
+          name: Hetu-V20.50-effective-source
+          path: /tmp/Hetu-V20.50-effective-source.tar.gz
           compression-level: 0
           if-no-files-found: error
 
