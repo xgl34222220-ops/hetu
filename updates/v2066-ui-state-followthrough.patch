@@ -1,0 +1,3342 @@
+--- a/android-app/app/build.gradle.kts
++++ b/android-app/app/build.gradle.kts
+@@ -17,8 +17,8 @@
+         applicationId = "io.github.xgl34222220.hetu"
+         minSdk = 26
+         targetSdk = 35
+-        versionCode = 2065
+-        versionName = "0.11.5-v20"
++        versionCode = 2066
++        versionName = "0.11.6-v20"
+     }
+ 
+     // Explicit CI debug identity. No private key is committed or exported.
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/EditorWorkbench.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/EditorWorkbench.kt
+@@ -1,5 +1,6 @@
+ package io.github.xgl34222220.hetu
+ 
++import androidx.compose.foundation.text.BasicTextField
+ import androidx.compose.foundation.background
+ import androidx.compose.foundation.clickable
+ import androidx.compose.foundation.horizontalScroll
+@@ -194,21 +195,35 @@
+         }
+     }
+     DisposableEffect(editor) { onDispose { editor?.searcher?.stopSearch() } }
+-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).testTag("yaml-search")) {
+-        OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth().focusRequester(focus).testTag("yaml-search-query"),
+-            singleLine = true, placeholder = { Text("搜索配置文本", fontSize = 13.sp) },
+-            textStyle = LocalTextStyle.current.copy(fontSize = 13.sp), shape = RoundedCornerShape(12.dp),
+-            trailingIcon = { IconButton(onClick = onClose) { Icon(Icons.Rounded.Close, "关闭搜索") } })
+-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+-            Text(if (query.isEmpty()) "输入关键字" else if (pending) "正在搜索…" else "$matches 个匹配",
+-                Modifier.weight(1f), color = t.textSecondary, fontSize = 11.sp)
+-            val canNavigate = !pending && query.isNotEmpty() && matches > 0
+-            IconButton(onClick = { if (editor?.searcher?.hasQuery() == true) editor.searcher.gotoPrevious() }, enabled = canNavigate) {
+-                Icon(Icons.Rounded.KeyboardArrowUp, "上一个匹配", Modifier.size(18.dp))
+-            }
+-            IconButton(onClick = { if (editor?.searcher?.hasQuery() == true) editor.searcher.gotoNext() }, enabled = canNavigate) {
+-                Icon(Icons.Rounded.KeyboardArrowDown, "下一个匹配", Modifier.size(18.dp))
+-            }
+-        }
+-    }
+-}
++    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp).clip(RoundedCornerShape(18.dp))
++        .background(t.cardBackground).padding(horizontal = 8.dp, vertical = 7.dp).testTag("yaml-search"),
++        verticalAlignment = Alignment.CenterVertically) {
++        Row(Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).background(t.pageBackground)
++            .heightIn(min = 36.dp).padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
++            Icon(Icons.Rounded.Search, null, Modifier.size(19.dp), tint = t.textPrimary)
++            Spacer(Modifier.width(8.dp))
++            BasicTextField(query, { query = it }, Modifier.weight(1f).focusRequester(focus).testTag("yaml-search-query"),
++                singleLine = true, textStyle = LocalTextStyle.current.copy(fontSize = 14.sp, color = t.textPrimary),
++                decorationBox = { field -> Box { if (query.isEmpty()) Text("搜索配置文本", color = t.textMuted, fontSize = 13.sp); field() } })
++            if (query.isNotEmpty()) IconButton(onClick = { query = "" }, modifier = Modifier.size(34.dp)) {
++                Icon(Icons.Rounded.Cancel, "清空搜索", Modifier.size(16.dp), tint = t.textMuted)
++            }
++        }
++        Text(if (query.isEmpty()) "0 个匹配" else if (pending) "搜索中…" else "$matches 个匹配",
++            Modifier.padding(horizontal = 10.dp), color = t.textSecondary, fontSize = 11.sp)
++        VerticalDivider(Modifier.height(24.dp), color = t.textMuted.copy(alpha = .18f))
++        val canNavigate = !pending && query.isNotEmpty() && matches > 0
++        IconButton(onClick = { if (editor?.searcher?.hasQuery() == true) editor.searcher.gotoPrevious() },
++            enabled = canNavigate, modifier = Modifier.size(32.dp)) {
++            Icon(Icons.Rounded.KeyboardArrowUp, "上一个匹配", Modifier.size(19.dp))
++        }
++        IconButton(onClick = { if (editor?.searcher?.hasQuery() == true) editor.searcher.gotoNext() },
++            enabled = canNavigate, modifier = Modifier.size(32.dp)) {
++            Icon(Icons.Rounded.KeyboardArrowDown, "下一个匹配", Modifier.size(19.dp))
++        }
++        VerticalDivider(Modifier.height(24.dp), color = t.textMuted.copy(alpha = .18f))
++        IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
++            Icon(Icons.Rounded.Close, "关闭搜索", Modifier.size(19.dp))
++        }
++    }
++}
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/PanelStrategyModel11.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/PanelStrategyModel11.kt
+@@ -15,9 +15,9 @@
+     val sort: String = "config",
+     val descending: Boolean = false,
+     val columns: Int = 2,
+-    val compact: Boolean = false,
++    val compact: Boolean = true,
+     val groupColumns: Int = 2,
+-    val groupCompact: Boolean = false,
++    val groupCompact: Boolean = true,
+     val nameOverflow: String = "clip",
+ ) {
+     companion object {
+@@ -29,9 +29,9 @@
+             p.getString("proxySelectorNodeSort", "config").orEmpty(),
+             p.getBoolean("proxySelectorSortDescending", false),
+             p.getInt("proxySelectorNodeColumns", 2).coerceIn(1, 2),
+-            p.getString("proxySelectorDensity", "standard") == "compact",
++            p.getString("proxySelectorDensity", "compact") == "compact",
+             p.getInt("proxySelectorGroupColumns", 2).coerceIn(1, 2),
+-            p.getString("proxySelectorGroupDensity", "standard") == "compact",
++            p.getString("proxySelectorGroupDensity", "compact") == "compact",
+             p.getString("proxySelectorNameOverflow", "clip").orEmpty().ifBlank { "clip" },
+         )
+     }
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt
+@@ -23,6 +23,12 @@
+ import androidx.activity.compose.setContent
+ import androidx.activity.enableEdgeToEdge
+ import androidx.compose.foundation.background
++import androidx.compose.foundation.border
++import androidx.compose.foundation.clickable
++import androidx.compose.foundation.selection.selectable
++import androidx.compose.foundation.selection.selectableGroup
++import androidx.compose.foundation.selection.toggleable
++import androidx.compose.foundation.text.BasicTextField
+ import androidx.compose.foundation.layout.*
+ import androidx.compose.foundation.rememberScrollState
+ import androidx.compose.foundation.shape.CircleShape
+@@ -34,11 +40,24 @@
+ import androidx.compose.material.icons.rounded.DeleteOutline
+ import androidx.compose.material.icons.rounded.MoreHoriz
+ import androidx.compose.material.icons.rounded.Refresh
++import androidx.compose.material.icons.rounded.Check
++import androidx.compose.material.icons.rounded.Close
++import androidx.compose.material.icons.rounded.Sort
++import androidx.compose.material.icons.rounded.Sync
+ import androidx.compose.material3.*
+ import androidx.compose.runtime.*
+ import androidx.compose.runtime.saveable.rememberSaveable
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
++import androidx.compose.ui.focus.FocusRequester
++import androidx.compose.ui.focus.focusRequester
++import androidx.compose.ui.geometry.Rect
++import androidx.compose.ui.graphics.SolidColor
++import androidx.compose.ui.layout.boundsInWindow
++import androidx.compose.ui.layout.onGloballyPositioned
++import androidx.compose.ui.semantics.Role
++import androidx.compose.ui.semantics.contentDescription
++import androidx.compose.ui.semantics.semantics
+ import androidx.compose.ui.text.font.FontFamily
+ import androidx.compose.ui.text.font.FontWeight
+ import androidx.compose.ui.text.style.TextOverflow
+@@ -371,6 +390,7 @@
+     var loading by remember { mutableStateOf(true) }
+     var error by remember { mutableStateOf("") }
+     var pickFile by remember { mutableStateOf(false) }
++    var pickerAnchor by remember { mutableStateOf<Rect?>(null) }
+     var clearConfirm by remember { mutableStateOf(false) }
+     var searching by rememberSaveable { mutableStateOf(false) }
+     var autoRefresh by rememberSaveable { mutableStateOf(prefs.getBoolean("logAutoRefresh", false)) }
+@@ -424,7 +444,7 @@
+                 searching = !searching
+                 if (!searching) query = ""
+             })
+-            IconButton(onClick = { pickFile = true }, modifier = Modifier.hxAnchorSource()) {
++            IconButton(onClick = { pickFile = true }, modifier = Modifier.onGloballyPositioned { pickerAnchor = it.boundsInWindow() }) {
+                 Icon(Icons.Rounded.FolderOpen, "选择日志", tint = c.text)
+             }
+             HxBarAction(Icons.Rounded.DeleteOutline, "清空当前日志", onClick = { clearConfirm = true }, enabled = selected != null && !loading)
+@@ -432,19 +452,17 @@
+     ) {
+         item(key = "controls") {
+             Column(Modifier.padding(horizontal = Hx.gutter).padding(bottom = 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+-                if (searching) HxSearchField(query, { query = it }, "搜索日志", autoFocus = true)
+-                HxSegmented(
+-                    options = listOf("all" to "全部", "error" to "错误", "warn" to "警告", "info" to "信息", "debug" to "调试"),
++                if (searching) HxLogSearchField(query, { query = it })
++                HxLogLevelFilter(
+                     selected = level,
+                     onSelect = { level = it },
+                 )
+-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+-                    HxToggleChip(if (autoRefresh) "自动刷新中" else "自动刷新", autoRefresh) {
+-                        autoRefresh = it
+-                        prefs.edit().putBoolean("logAutoRefresh", it).apply()
+-                    }
+-                    HxToggleChip(if (newestFirst) "最新在前" else "最早在前", newestFirst) { newestFirst = it }
+-                }
++                HxLogControls(
++                    autoRefresh = autoRefresh,
++                    newestFirst = newestFirst,
++                    onAutoRefresh = { autoRefresh = it; prefs.edit().putBoolean("logAutoRefresh", it).apply() },
++                    onOrderChange = { newestFirst = !newestFirst },
++                )
+             }
+         }
+         if (error.isNotBlank()) {
+@@ -461,10 +479,10 @@
+     }
+ 
+     if (pickFile) {
+-        HxChoiceSheet(
+-            title = "选择日志",
+-            choices = files.map { HxChoice(it.path, it.name, it.path.removePrefix(LOG_ROOT + "/").substringBeforeLast('/', "").ifBlank { null }) },
+-            selected = selectedPath,
++        HxLogFilePicker(
++            files = files,
++            selectedPath = selectedPath,
++            anchor = pickerAnchor,
+             onPick = { selectedPath = it; pickFile = false },
+             onDismiss = { pickFile = false },
+         )
+@@ -496,6 +514,172 @@
+ }
+ 
+ @Composable
++private fun HxLogSearchField(value: String, onChange: (String) -> Unit) {
++    val c = Hx.colors
++    val focus = remember { FocusRequester() }
++    LaunchedEffect(Unit) {
++        delay(60)
++        runCatching { focus.requestFocus() }
++    }
++    Row(
++        Modifier.fillMaxWidth().heightIn(min = 40.dp).clip(Hx.pillShape).background(c.surface)
++            .padding(start = 14.dp),
++        verticalAlignment = Alignment.CenterVertically,
++    ) {
++        Icon(Icons.Rounded.Search, null, tint = c.textMuted, modifier = Modifier.size(22.dp))
++        Spacer(Modifier.width(10.dp))
++        BasicTextField(
++            value = value,
++            onValueChange = onChange,
++            modifier = Modifier.weight(1f).focusRequester(focus).padding(vertical = 9.dp)
++                .semantics { contentDescription = "搜索日志" },
++            singleLine = true,
++            textStyle = LocalTextStyle.current.copy(color = c.text, fontSize = 16.sp, lineHeight = 22.sp),
++            cursorBrush = SolidColor(c.accent),
++            decorationBox = { inner ->
++                Box {
++                    if (value.isEmpty()) Text("搜索日志", color = c.textFaint, fontSize = 16.sp, lineHeight = 22.sp)
++                    inner()
++                }
++            },
++        )
++        if (value.isNotEmpty()) {
++            IconButton(onClick = { onChange("") }, modifier = Modifier.size(40.dp)) {
++                Box(Modifier.size(20.dp).clip(CircleShape).background(c.textFaint.copy(alpha = .3f)), contentAlignment = Alignment.Center) {
++                    Icon(Icons.Rounded.Close, "清除", tint = c.surface, modifier = Modifier.size(14.dp))
++                }
++            }
++        } else Spacer(Modifier.width(14.dp))
++    }
++}
++
++@Composable
++private fun HxLogLevelFilter(selected: String, onSelect: (String) -> Unit) {
++    val c = Hx.colors
++    val haptics = rememberHetuHaptics()
++    val options = listOf("all" to "全部", "error" to "错误", "warn" to "警告", "info" to "信息", "debug" to "调试")
++    Row(
++        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(c.surface)
++            .padding(8.dp).selectableGroup(),
++        verticalAlignment = Alignment.CenterVertically,
++    ) {
++        options.forEachIndexed { index, (key, label) ->
++            val active = selected == key
++            Box(
++                Modifier.weight(1f).heightIn(min = 40.dp).clip(RoundedCornerShape(13.dp))
++                    .background(if (active) c.accentSoft else androidx.compose.ui.graphics.Color.Transparent)
++                    .selectable(selected = active, role = Role.Tab) {
++                        if (!active) { haptics.perform(HetuHaptic.Tick); onSelect(key) }
++                    }.padding(vertical = 8.dp),
++                contentAlignment = Alignment.Center,
++            ) {
++                Text(label, color = if (active) c.accent else c.textMuted, fontSize = 15.sp,
++                    fontWeight = if (active) FontWeight.Bold else FontWeight.SemiBold, maxLines = 1)
++            }
++            if (index != options.lastIndex) {
++                Box(Modifier.padding(horizontal = 4.dp).width(1.dp).height(20.dp).background(c.line))
++            }
++        }
++    }
++}
++
++@Composable
++private fun HxLogControls(
++    autoRefresh: Boolean,
++    newestFirst: Boolean,
++    onAutoRefresh: (Boolean) -> Unit,
++    onOrderChange: () -> Unit,
++) {
++    val c = Hx.colors
++    Row(
++        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(c.surface).padding(8.dp),
++        horizontalArrangement = Arrangement.spacedBy(8.dp),
++    ) {
++        Row(
++            Modifier.weight(1f).heightIn(min = 48.dp).clip(RoundedCornerShape(12.dp))
++                .background(if (autoRefresh) c.accentSoft else c.surfaceMuted)
++                .toggleable(value = autoRefresh, role = Role.Switch, onValueChange = onAutoRefresh)
++                .padding(horizontal = 8.dp, vertical = 10.dp),
++            verticalAlignment = Alignment.CenterVertically,
++            horizontalArrangement = Arrangement.Center,
++        ) {
++            val tint = if (autoRefresh) c.accent else c.textMuted
++            Icon(Icons.Rounded.Sync, null, tint = tint, modifier = Modifier.size(22.dp))
++            Spacer(Modifier.width(8.dp))
++            Text(if (autoRefresh) "自动刷新中" else "自动刷新", color = tint, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
++        }
++        Row(
++            Modifier.weight(1f).heightIn(min = 48.dp).clip(RoundedCornerShape(12.dp)).background(c.surfaceMuted)
++                .clickable(role = Role.Button, onClick = onOrderChange).padding(horizontal = 8.dp, vertical = 10.dp),
++            verticalAlignment = Alignment.CenterVertically,
++            horizontalArrangement = Arrangement.Center,
++        ) {
++            Icon(Icons.Rounded.Sort, null, tint = c.textMuted, modifier = Modifier.size(22.dp))
++            Spacer(Modifier.width(8.dp))
++            Text(if (newestFirst) "最新在前" else "最早在前", color = c.textMuted, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
++        }
++    }
++}
++
++@Composable
++private fun HxLogFilePicker(
++    files: List<HetuLogFile>,
++    selectedPath: String,
++    anchor: Rect?,
++    onPick: (String) -> Unit,
++    onDismiss: () -> Unit,
++) {
++    val c = Hx.colors
++    @Composable
++    fun Choices(pick: (String) -> Unit) {
++        Text("选择日志", color = c.text, fontSize = 16.sp, fontWeight = FontWeight.Bold,
++            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 9.dp))
++        HorizontalDivider(Modifier.padding(horizontal = 10.dp), thickness = .5.dp, color = c.line)
++        if (files.isEmpty()) {
++            Text("暂无日志", color = c.textMuted, modifier = Modifier.padding(16.dp))
++        }
++        files.forEachIndexed { index, file ->
++            val selected = file.path == selectedPath
++            Row(
++                Modifier.fillMaxWidth()
++                    .selectable(selected = selected, role = Role.RadioButton, onClick = { pick(file.path) })
++                    .semantics { contentDescription = file.path }
++                    .padding(horizontal = 16.dp, vertical = 12.dp),
++                verticalAlignment = Alignment.CenterVertically,
++            ) {
++                Box(
++                    Modifier.size(20.dp).clip(CircleShape)
++                        .background(if (selected) c.accent else androidx.compose.ui.graphics.Color.Transparent)
++                        .then(if (selected) Modifier else Modifier.border(1.25.dp, c.textFaint, CircleShape)),
++                    contentAlignment = Alignment.Center,
++                ) {
++                    if (selected) Icon(Icons.Rounded.Check, null, tint = c.onAccent, modifier = Modifier.size(14.dp))
++                }
++                Spacer(Modifier.width(14.dp))
++                Column(Modifier.weight(1f)) {
++                    Text(file.name, color = c.text, fontSize = 16.sp, lineHeight = 21.sp, fontWeight = FontWeight.Medium)
++                    // Preserve disambiguation when different folders contain the same filename.
++                    if (files.count { it.name == file.name } > 1) {
++                        Text(file.path.removePrefix(LOG_ROOT + "/"), color = c.textMuted, fontSize = 11.sp)
++                    }
++                }
++            }
++            if (index != files.lastIndex) HorizontalDivider(Modifier.padding(horizontal = 10.dp), thickness = .5.dp, color = c.line)
++        }
++    }
++    if (anchor != null) {
++        HxAnchoredMenu(anchor, onDismiss, minWidth = 152.dp, anchorEndInset = (-36).dp) { close ->
++            Choices { path -> close { onPick(path) } }
++        }
++    } else {
++        HxSheet(onDismiss = onDismiss) {
++            val close = LocalHxSheetClose.current
++            Choices { path -> close { onPick(path) } }
++        }
++    }
++}
++
++@Composable
+ private fun LazyItemScope.HxLogLine(line: String, first: Boolean, last: Boolean) {
+     val c = Hx.colors
+     val context = androidx.compose.ui.platform.LocalContext.current
+@@ -514,18 +698,18 @@
+             .clip(RoundedCornerShape(18.dp)).background(c.surface)
+             .hxCombinedClick(onLongClick = { hxCopy(context, "日志", line) }, onClick = { expanded = !expanded })
+             .animateContentSize(androidx.compose.animation.core.tween(HxMotion.Medium, easing = HxMotion.Emphasized))
+-            .padding(horizontal = 14.dp, vertical = 10.dp),
++            .padding(horizontal = 16.dp, vertical = 14.dp),
+     ) {
+         Row(verticalAlignment = Alignment.CenterVertically) {
+             if (time.isNotBlank()) {
+-                Text(time, fontSize = 11.sp, lineHeight = 14.sp, color = c.text, fontWeight = FontWeight.Medium)
++                Text(time, fontSize = 13.sp, lineHeight = 17.sp, color = c.text, fontWeight = FontWeight.Medium)
+                 Spacer(Modifier.width(10.dp))
+             }
+-            Text(level.uppercase(), fontSize = 10.sp, lineHeight = 13.sp, color = tint,
++            Text(level.uppercase(), fontSize = 11.sp, lineHeight = 14.sp, color = tint,
+                 modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(tint.copy(alpha = .1f)).padding(horizontal = 6.dp, vertical = 2.dp))
+         }
+-        Spacer(Modifier.height(5.dp))
+-        Text(if (expanded) line else message, fontSize = 12.sp, lineHeight = 17.sp, color = c.text,
++        Spacer(Modifier.height(7.dp))
++        Text(if (expanded) line else message, fontSize = 15.sp, lineHeight = 21.sp, color = c.text,
+             maxLines = if (expanded) Int.MAX_VALUE else 5, overflow = TextOverflow.Ellipsis)
+     }
+ }
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt
+@@ -428,24 +428,24 @@
+                             context.stopService(Intent(context, ProxyNetworkMatchService::class.java))
+                             refresh()
+                         }
+-                    }, subtitle = if (enabled) "监听服务正在运行" else "关闭后不会自动启停代理", icon = Icons.Rounded.Wifi, iconTint = c.textMuted)
++                    }, subtitle = if (enabled) "监听服务正在运行" else "关闭后不会自动启停代理", icon = Icons.Rounded.Sensors, iconTint = c.textMuted)
+                     SettingsDivider()
+                     SettingsSwitchRow("移动数据", mobile, {
+                         prefs.edit().putBoolean("networkMatchMobile", it).apply()
+                         refresh()
+                         evaluate()
+-                    }, subtitle = "使用蜂窝网络时视为匹配", icon = Icons.Rounded.SignalCellularAlt, iconTint = c.textMuted)
++                    }, subtitle = "使用蜂窝网络时视为匹配", icon = Icons.Rounded.CellTower, iconTint = c.textMuted)
+                 }
+             }
+         }
+         item(key = "actions") {
+             SettingsSection {
+                 SettingsGroup(title = "自动动作") {
+-                    SettingsNavRow("匹配成功", icon = Icons.Rounded.CheckCircle, iconTint = c.textMuted, value = actionLabel("networkMatchAction", "start"), dropdown = true) {
++                    SettingsNavRow("匹配成功", compact = true, icon = Icons.Rounded.PlayCircleOutline, iconTint = c.textMuted, value = actionLabel("networkMatchAction", "start"), dropdown = true) {
+                         actionKey = "networkMatchAction"
+                     }
+                     SettingsDivider()
+-                    SettingsNavRow("条件失配", icon = Icons.Rounded.Cancel, iconTint = c.textMuted, value = actionLabel("networkUnmatchAction", "none"), dropdown = true) {
++                    SettingsNavRow("条件失配", compact = true, icon = Icons.Rounded.StopCircle, iconTint = c.textMuted, value = actionLabel("networkUnmatchAction", "none"), dropdown = true) {
+                         actionKey = "networkUnmatchAction"
+                     }
+                 }
+@@ -460,7 +460,7 @@
+         item(key = "note") {
+             HxBanner(
+                 "部分 Android 版本读取 SSID / BSSID 需要附近设备或定位权限；权限不足时不会猜测 Wi‑Fi 名称。",
+-                tone = HxTone.Accent,
++                tone = HxTone.Neutral,
+                 modifier = Modifier.padding(horizontal = Hx.gutter),
+             )
+         }
+@@ -470,6 +470,7 @@
+         HxChoiceSheet(
+             title = if (key == "networkMatchAction") "匹配成功动作" else "失配动作",
+             referenceRadios = true,
++            trailingReferenceRadios = key == "networkUnmatchAction",
+             choices = listOf(HxChoice("none", "不操作"), HxChoice("start", "启动 Root 代理"), HxChoice("stop", "停止 Root 代理")),
+             selected = prefs.getString(key, if (key == "networkMatchAction") "start" else "none"),
+             onPick = { value ->
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyReferenceExtras.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyReferenceExtras.kt
+@@ -195,10 +195,10 @@
+     Row(modifier.fillMaxWidth().clickable(onClick = onClick).heightIn(min = 78.dp).padding(horizontal = 18.dp, vertical = 18.dp),
+         verticalAlignment = Alignment.CenterVertically) {
+         Icon(icon, null, tint = c.text, modifier = Modifier.size(26.dp))
+-        Spacer(Modifier.width(24.dp))
++        Spacer(Modifier.width(25.dp))
+         Column(Modifier.weight(1f)) {
+             Text(title, color = c.text, fontSize = 18.sp, lineHeight = 23.sp, fontWeight = FontWeight.Bold)
+-            Text(subtitle, color = c.textMuted, fontSize = 12.5.sp, lineHeight = 16.sp)
++            Text(subtitle, color = c.textMuted, fontSize = 12.5.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium)
+         }
+         if (!value.isNullOrBlank()) {
+             Spacer(Modifier.width(8.dp))
+@@ -253,7 +253,7 @@
+                     Text("自定义面板", color = c.text, fontSize = 21.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                     Row(Modifier.clip(RoundedCornerShape(50)).background(c.accentSoft).clickable {
+                         editingPanel = null; adding = true; error = ""; panelName = ""; panelUrl = ""
+-                    }.padding(horizontal = 14.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
++                    }.padding(horizontal = 15.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+                         Icon(Icons.Rounded.Add, null, tint = c.accent, modifier = Modifier.size(23.dp))
+                         Spacer(Modifier.width(5.dp)); Text("添加", color = c.accent, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                     }
+@@ -268,10 +268,10 @@
+                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                             Icon(WebToolIcons.Link, null, tint = c.text, modifier = Modifier.size(26.dp))
+-                            Spacer(Modifier.width(24.dp))
++                            Spacer(Modifier.width(25.dp))
+                             Column(Modifier.weight(1f)) {
+                                 Text(panel.name, color = c.text, fontSize = 18.sp, lineHeight = 23.sp, fontWeight = FontWeight.Bold)
+-                                Text(panel.url, color = c.textMuted, fontSize = 12.5.sp, lineHeight = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
++                                Text(panel.url, color = c.textMuted, fontSize = 12.5.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                             }
+                             if (selected == panel.id) Text("默认", color = c.accent, fontSize = 10.sp,
+                                 modifier = Modifier.background(c.accentSoft, RoundedCornerShape(50)).padding(horizontal = 8.dp, vertical = 4.dp))
+@@ -329,11 +329,11 @@
+         HxSheet(onDismiss = { deletingPanel = null }) {
+             val close = LocalHxSheetClose.current
+             Row(Modifier.fillMaxWidth().padding(start = 18.dp, end = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+-                Text("删除面板 ${panel.name}？", color = c.text, fontSize = 17.sp, lineHeight = 23.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+-                IconButton(onClick = { close { deletingPanel = null } }) { Icon(Icons.Rounded.Close, "关闭", tint = c.textMuted) }
++                Text("删除面板 ${panel.name}？", color = c.text, fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
++                IconButton(onClick = { close { deletingPanel = null } }, modifier = Modifier.size(40.dp)) { Icon(Icons.Rounded.Close, "关闭", tint = c.textMuted) }
+             }
+             Text("仅移除面板入口，远端服务不受影响。", color = c.textMuted, fontSize = 12.sp, lineHeight = 18.sp,
+-                modifier = Modifier.padding(horizontal = 18.dp).padding(bottom = 14.dp))
++                modifier = Modifier.padding(horizontal = 18.dp).padding(bottom = 12.dp))
+             WebToolAction("删除", {
+                 close {
+                     HetuWebPanels.save(context, panels.filterNot { it.id == panel.id })
+@@ -362,22 +362,22 @@
+             }
+         }, Modifier.fillMaxWidth())
+     }
+-    if (modePicker) WebToolSheet("本地面板模式", { modePicker = false }) {
++    if (modePicker) WebToolSheet("本地面板模式", { modePicker = false }, separatedChoices = true) {
+         val close = LocalHxSheetClose.current
+         listOf(Triple("auto", "自动：优先本地 Zashboard", "已安装 Zashboard 时打开本地面板，否则使用河图内置面板"),
+             Triple("builtin", "河图内置面板", "始终使用河图内置面板"),
+             Triple("zashboard", "本地 Zashboard", "未安装时回退河图内置面板")).forEach { (id, title, subtitle) ->
+             val chosen = localMode == id
+-            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(if (chosen) c.accentSoft.copy(alpha = .45f) else c.surface)
++            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(if (chosen) c.accentSoft.copy(alpha = .45f) else if (c.dark) c.surfaceMuted else Color.White.copy(alpha = .68f))
+                 .then(if (chosen) Modifier.border(.8.dp, c.accentSoft, RoundedCornerShape(18.dp)) else Modifier)
+                 .clickable { close { localMode = id; prefs.edit().putString("proxyWebPanelLocalMode", id).apply(); modePicker = false } }
+                 .padding(horizontal = 18.dp, vertical = 17.dp), verticalAlignment = Alignment.CenterVertically) {
+                 Icon(when (id) { "auto" -> WebToolIcons.Tune; "builtin" -> WebToolIcons.Window; else -> WebToolIcons.Terminal }, null,
+                     tint = if (chosen) c.accent else c.text, modifier = Modifier.size(27.dp))
+-                Spacer(Modifier.width(24.dp))
++                Spacer(Modifier.width(25.dp))
+                 Column(Modifier.weight(1f)) {
+                     Text(title, color = c.text, fontSize = 17.sp, lineHeight = 23.sp, fontWeight = FontWeight.SemiBold)
+-                    Text(subtitle, color = c.textMuted, fontSize = 12.5.sp, lineHeight = 17.sp)
++                    Text(subtitle, color = c.textMuted, fontSize = 12.5.sp, lineHeight = 17.sp, fontWeight = FontWeight.Medium)
+                 }
+                 Spacer(Modifier.width(10.dp))
+                 Icon(if (chosen) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked, if (chosen) "已选择" else "未选择",
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptsActivity.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptsActivity.kt
+@@ -12,6 +12,7 @@
+ import androidx.activity.enableEdgeToEdge
+ import androidx.compose.foundation.background
+ import androidx.compose.foundation.clickable
++import androidx.compose.foundation.text.BasicTextField
+ import androidx.compose.foundation.layout.*
+ import androidx.compose.foundation.lazy.LazyColumn
+ import androidx.compose.foundation.lazy.items
+@@ -21,25 +22,32 @@
+ import androidx.compose.material.icons.Icons
+ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+ import androidx.compose.material.icons.rounded.Add
+-import androidx.compose.material.icons.rounded.PlayCircleOutline
+-import androidx.compose.material.icons.rounded.StopCircle
+-import androidx.compose.material.icons.rounded.Code
+ import androidx.compose.material.icons.rounded.DeleteOutline
+ import androidx.compose.material.icons.rounded.ChevronRight
+ import androidx.compose.material.icons.rounded.ExpandMore
+-import androidx.compose.material.icons.rounded.Info
++import androidx.compose.material.icons.outlined.Info
+ import androidx.compose.material.icons.rounded.MoreHoriz
+ import androidx.compose.material.icons.rounded.PlayArrow
+-import androidx.compose.material.icons.rounded.Save
+-import androidx.compose.material.icons.rounded.Terminal
+ import androidx.compose.material3.*
+ import androidx.compose.runtime.*
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.clip
++import androidx.compose.ui.geometry.Rect
+ import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.graphics.SolidColor
++import androidx.compose.ui.graphics.PathFillType
++import androidx.compose.ui.graphics.StrokeCap
++import androidx.compose.ui.graphics.StrokeJoin
+ import androidx.compose.ui.graphics.luminance
+-import androidx.compose.ui.text.font.FontFamily
++import androidx.compose.ui.graphics.vector.ImageVector
++import androidx.compose.ui.graphics.vector.PathParser
++import androidx.compose.ui.layout.boundsInWindow
++import androidx.compose.ui.layout.onGloballyPositioned
++import androidx.compose.ui.semantics.contentDescription
++import androidx.compose.ui.semantics.semantics
+ import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.text.style.TextOverflow
+ import androidx.compose.ui.unit.dp
+ import androidx.compose.ui.unit.sp
+ import io.github.xgl34222220.hetu.ui.*
+@@ -94,6 +102,7 @@
+     var managedRevision by remember { mutableIntStateOf(0) }
+     var hookRevision by remember { mutableIntStateOf(0) }
+     var menuOpen by remember { mutableStateOf(false) }
++    var menuAnchor by remember { mutableStateOf<Rect?>(null) }
+     var deleteTarget by remember { mutableStateOf<ManagedScript?>(null) }
+     val fixedStatus by produceState(initialValue = mapOf<String, Boolean>(), hookRevision) {
+         value = try { entries.associate { it.path to ProxyScriptHooks.read(context, it.path).isNotBlank() } }
+@@ -158,7 +167,7 @@
+     }
+ 
+     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
+-    val pageBg = if (dark) t.pageBackground else Color(0xFFF2F0F9)
++    val pageBg = if (dark) t.pageBackground else Color(0xFFECEEFB)
+     LazyColumn(
+         modifier = Modifier.fillMaxSize().background(pageBg),
+         contentPadding = PaddingValues(
+@@ -175,24 +184,13 @@
+                     IconButton(onClick = onBack, modifier = Modifier.size(42.dp)) {
+                         Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回", tint = t.textPrimary, modifier = Modifier.size(28.dp))
+                     }
+-                    Text("脚本", color = t.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.SemiBold,
++                    Text("脚本", color = t.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold,
+                         textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.weight(1f))
+-                    Box {
+-                        IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(42.dp)) {
+-                            Icon(Icons.Rounded.MoreHoriz, "更多", tint = t.textPrimary, modifier = Modifier.size(28.dp))
+-                        }
+-                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+-                            DropdownMenuItem(
+-                                text = { Text("导入自定义脚本") },
+-                                leadingIcon = { Icon(Icons.Rounded.Add, null) },
+-                                onClick = { menuOpen = false; importer.launch(arrayOf("text/*", "application/octet-stream")) },
+-                            )
+-                            DropdownMenuItem(
+-                                text = { Text("脚本环境") },
+-                                leadingIcon = { Icon(Icons.Rounded.Info, null) },
+-                                onClick = { menuOpen = false; environment = true },
+-                            )
+-                        }
++                    IconButton(
++                        onClick = { menuOpen = true },
++                        modifier = Modifier.size(42.dp).onGloballyPositioned { menuAnchor = it.boundsInWindow() },
++                    ) {
++                        Icon(Icons.Rounded.MoreHoriz, "更多", tint = t.textPrimary, modifier = Modifier.size(28.dp))
+                     }
+                 }
+ 
+@@ -208,14 +206,14 @@
+                 Column(Modifier.fillMaxWidth()) {
+                     entries.forEachIndexed { index, entry ->
+                         Row(
+-                            Modifier.fillMaxWidth().heightIn(min = 64.dp).clickable { open(entry) }.padding(horizontal = 16.dp),
++                            Modifier.fillMaxWidth().heightIn(min = 70.dp).clickable { open(entry) }.padding(horizontal = 16.dp),
+                             verticalAlignment = Alignment.CenterVertically,
+                         ) {
+-                            Icon(if (entry.path == ProxyScriptHooks.PRE_START) Icons.Rounded.PlayCircleOutline else Icons.Rounded.StopCircle,
+-                                null, tint = t.textPrimary, modifier = Modifier.size(22.dp))
+-                            Spacer(Modifier.width(12.dp))
+-                            Text(entry.title, color = t.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+-                            Text(if (fixedStatus[entry.path] == true) "已设置" else "不设置", color = t.textSecondary, fontSize = 13.sp)
++                            Icon(if (entry.path == ProxyScriptHooks.PRE_START) ScriptReferenceIcons.Start else ScriptReferenceIcons.Stop,
++                                null, tint = t.textPrimary, modifier = Modifier.size(26.dp))
++                            Spacer(Modifier.width(16.dp))
++                            Text(entry.title, color = t.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
++                            Text(if (fixedStatus[entry.path] == true) "已设置" else "不设置", color = t.textSecondary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                             Spacer(Modifier.width(8.dp))
+                             Icon(Icons.Rounded.ExpandMore, null, tint = t.textSecondary, modifier = Modifier.size(22.dp))
+                         }
+@@ -223,12 +221,12 @@
+                     }
+                     HorizontalDivider(Modifier.padding(start = 16.dp), thickness = .5.dp, color = t.outline.copy(alpha = .55f))
+                     Row(
+-                        Modifier.fillMaxWidth().heightIn(min = 64.dp).clickable { environment = true }.padding(horizontal = 16.dp),
++                        Modifier.fillMaxWidth().heightIn(min = 70.dp).clickable { environment = true }.padding(horizontal = 16.dp),
+                         verticalAlignment = Alignment.CenterVertically,
+                     ) {
+-                        Icon(Icons.Rounded.Code, null, tint = t.textPrimary, modifier = Modifier.size(22.dp))
+-                        Spacer(Modifier.width(12.dp))
+-                        Text("脚本环境", color = t.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
++                        Icon(ScriptReferenceIcons.Environment, null, tint = t.textPrimary, modifier = Modifier.size(26.dp))
++                        Spacer(Modifier.width(16.dp))
++                        Text("脚本环境", color = t.textPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                         Icon(Icons.Rounded.ChevronRight, null, tint = t.textSecondary, modifier = Modifier.size(22.dp))
+                     }
+                 }
+@@ -242,15 +240,28 @@
+         } else {
+             item("custom-title") {
+                 Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+-                    Text("自定义脚本", color = t.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
++                    Text("自定义脚本", color = t.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                     TextButton(onClick = { importer.launch(arrayOf("text/*", "application/octet-stream")) }, enabled = !busy) {
+-                        Icon(Icons.Rounded.Add, null, Modifier.size(17.dp)); Spacer(Modifier.width(4.dp)); Text("导入")
++                        Icon(Icons.Rounded.Add, null, Modifier.size(24.dp), tint = t.textPrimary)
++                        Spacer(Modifier.width(6.dp))
++                        Text("导入", color = t.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                     }
+                 }
+             }
+             items(managedScripts, key = { it.name }) { script ->
+                 Surface(shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+-                    WorkspaceSettingRow(script.name, scriptSize(script.size), Icons.Rounded.Code) {
++                    Row(Modifier.fillMaxWidth().heightIn(min = 84.dp).padding(horizontal = 16.dp, vertical = 14.dp),
++                        verticalAlignment = Alignment.CenterVertically) {
++                        Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
++                            Icon(ScriptReferenceIcons.File, null, tint = t.textPrimary, modifier = Modifier.size(30.dp))
++                        }
++                        Spacer(Modifier.width(10.dp))
++                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
++                            Text(script.name, color = t.textPrimary, fontSize = 18.sp, lineHeight = 23.sp,
++                                fontWeight = FontWeight.SemiBold, overflow = TextOverflow.Ellipsis)
++                            Text(scriptSize(script.size), color = t.textSecondary, fontSize = 14.sp, lineHeight = 19.sp,
++                                fontWeight = FontWeight.Medium)
++                        }
+                         Row(verticalAlignment = Alignment.CenterVertically) {
+                             IconButton(onClick = {
+                                 if (!busy) scope.launch {
+@@ -260,8 +271,8 @@
+                                     catch (failure: Exception) { message = failure.message ?: "脚本执行失败" }
+                                     finally { busy = false }
+                                 }
+-                            }, enabled = !busy, modifier = Modifier.size(38.dp)) { Icon(Icons.Rounded.PlayArrow, "执行", tint = MaterialTheme.colorScheme.primary) }
+-                            IconButton(onClick = { if (!busy) deleteTarget = script }, enabled = !busy, modifier = Modifier.size(38.dp)) { Icon(Icons.Rounded.DeleteOutline, "删除", tint = t.textSecondary) }
++                            }, enabled = !busy, modifier = Modifier.size(38.dp)) { Icon(Icons.Rounded.PlayArrow, "执行", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp)) }
++                            IconButton(onClick = { if (!busy) deleteTarget = script }, enabled = !busy, modifier = Modifier.size(38.dp)) { Icon(Icons.Rounded.DeleteOutline, "删除", tint = t.textPrimary, modifier = Modifier.size(24.dp)) }
+                         }
+                     }
+                 }
+@@ -269,17 +280,37 @@
+         }
+         if (message.isNotBlank()) {
+             item("feedback") { HetuTaskFeedback(message, error = message.contains("失败") || message.contains("错误"), busy = busy) }
++        }
++    }
++
++    if (menuOpen) {
++        menuAnchor?.let { anchor ->
++            // This legacy host uses HetuTheme, so keep the anchored menu in its active palette too.
++            val menuColors = Hx.colors.copy(surface = t.cardBackground, text = t.textPrimary,
++                textMuted = t.textSecondary, line = t.outline, dark = dark)
++            CompositionLocalProvider(LocalHx provides menuColors) {
++                HxAnchoredMenu(anchor, onDismiss = { menuOpen = false }, minWidth = 160.dp, anchorEndInset = 0.dp) { close ->
++                    HxMenuItem("导入自定义脚本", icon = Icons.Rounded.Add, onClick = {
++                        close { menuOpen = false; importer.launch(arrayOf("text/*", "application/octet-stream")) }
++                    })
++                    HorizontalDivider(Modifier.padding(horizontal = 14.dp), thickness = .5.dp, color = t.outline.copy(alpha = .55f))
++                    HxMenuItem("脚本环境", icon = Icons.Outlined.Info, onClick = {
++                        close { menuOpen = false; environment = true }
++                    })
++                }
++            }
+         }
+     }
+ 
+     editor?.let { entry ->
+         ModalBottomSheet(
+             onDismissRequest = { if (!busy) editor = null },
+-            containerColor = Color.Transparent,
++            containerColor = t.cardBackground,
+             shape = RoundedCornerShape(topStart = HetuGlassRadius.Sheet, topEnd = HetuGlassRadius.Sheet),
++            dragHandle = { ScriptSheetHandle() },
+         ) {
+             Column(
+-                Modifier.fillMaxWidth().liquidSheetMaterial().navigationBarsPadding().imePadding()
++                Modifier.fillMaxWidth().navigationBarsPadding().imePadding().verticalScroll(rememberScrollState())
+                     .padding(start = 16.dp, end = 16.dp, bottom = 18.dp),
+                 verticalArrangement = Arrangement.spacedBy(12.dp),
+             ) {
+@@ -292,21 +323,13 @@
+                 Text(
+                     entry.subtitle,
+                     color = t.textSecondary,
+-                    fontSize = 12.sp,
+-                    lineHeight = 17.sp,
++                    fontSize = 14.sp,
++                    lineHeight = 20.sp,
+                 )
+-                LiquidGlassTextField(
++                ScriptCodeField(
+                     value = text,
+                     onValueChange = { if (it.length <= 64 * 1024) text = it },
+-                    modifier = Modifier.fillMaxWidth().heightIn(min = 260.dp, max = 480.dp),
+-                    label = "脚本内容",
+-                    placeholder = "#!/system/bin/sh\n# 在这里输入脚本",
+-                    singleLine = false,
+-                    textStyle = LocalTextStyle.current.copy(
+-                        fontFamily = io.github.xgl34222220.hetu.ui.HetuSystemFontFamily,
+-                        fontSize = 12.sp,
+-                        lineHeight = 18.sp,
+-                    ),
++                    enabled = !busy,
+                 )
+                 Row(
+                     Modifier.fillMaxWidth(),
+@@ -329,10 +352,9 @@
+                         },
+                         enabled = !busy,
+                         modifier = Modifier.weight(1f).heightIn(min = 48.dp),
++                        shape = RoundedCornerShape(12.dp),
+                     ) {
+-                        Icon(Icons.Rounded.DeleteOutline, null, Modifier.size(17.dp))
+-                        Spacer(Modifier.width(6.dp))
+-                        Text("清空")
++                        Text("清空", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                     }
+                     Button(
+                         onClick = {
+@@ -352,10 +374,9 @@
+                         },
+                         enabled = !busy,
+                         modifier = Modifier.weight(1f).heightIn(min = 48.dp),
++                        shape = RoundedCornerShape(12.dp),
+                     ) {
+-                        Icon(Icons.Rounded.Save, null, Modifier.size(17.dp))
+-                        Spacer(Modifier.width(6.dp))
+-                        Text(if (busy) "处理中" else "保存")
++                        Text(if (busy) "处理中" else "保存", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                     }
+                 }
+             }
+@@ -365,27 +386,31 @@
+     deleteTarget?.let { target ->
+         ModalBottomSheet(
+             onDismissRequest = { if (!busy) deleteTarget = null },
+-            containerColor = Color.Transparent,
++            containerColor = t.cardBackground,
+             shape = RoundedCornerShape(topStart = HetuGlassRadius.Sheet, topEnd = HetuGlassRadius.Sheet),
++            dragHandle = { ScriptSheetHandle() },
+         ) {
+             Column(
+-                Modifier.fillMaxWidth().liquidSheetMaterial().navigationBarsPadding()
+-                    .padding(start = 18.dp, end = 18.dp, bottom = 20.dp),
+-                verticalArrangement = Arrangement.spacedBy(12.dp),
++                Modifier.fillMaxWidth().navigationBarsPadding()
++                    .padding(start = 22.dp, end = 22.dp, bottom = 24.dp),
++                verticalArrangement = Arrangement.spacedBy(20.dp),
+             ) {
+-                Text("删除脚本", color = t.textPrimary, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
++                Text("删除脚本", color = t.textPrimary, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold,
++                    textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                 Text(
+-                    "确定删除 “" + target.name + "” 吗？此操作只删除自定义脚本，不会影响固定启动/停止 Hook。",
++                    "确定删除 “" + target.name + "” 吗？\n此操作只删除自定义脚本，不会影响固定启动/停止 Hook。",
+                     color = t.textSecondary,
+-                    fontSize = 12.5.sp,
+-                    lineHeight = 18.sp,
++                    fontSize = 15.sp,
++                    lineHeight = 21.sp,
+                 )
+                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+-                    TextButton(
++                    Button(
+                         onClick = { deleteTarget = null },
+                         enabled = !busy,
+-                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+-                    ) { Text("取消") }
++                        modifier = Modifier.weight(1f).heightIn(min = 54.dp),
++                        shape = RoundedCornerShape(12.dp),
++                        colors = ButtonDefaults.buttonColors(containerColor = t.controlBackground, contentColor = t.textPrimary),
++                    ) { Text("取消", fontSize = 16.sp, fontWeight = FontWeight.SemiBold) }
+                     Button(
+                         onClick = {
+                             scope.launch {
+@@ -405,8 +430,10 @@
+                             }
+                         },
+                         enabled = !busy,
+-                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+-                    ) { Text(if (busy) "处理中" else "删除") }
++                        modifier = Modifier.weight(1f).heightIn(min = 54.dp),
++                        shape = RoundedCornerShape(12.dp),
++                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEE4055), contentColor = Color.White),
++                    ) { Text(if (busy) "处理中" else "删除", fontSize = 16.sp, fontWeight = FontWeight.SemiBold) }
+                 }
+             }
+         }
+@@ -417,33 +444,108 @@
+             onDismissRequest = { environment = false },
+             containerColor = t.cardBackground,
+             shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
++            dragHandle = { ScriptSheetHandle() },
+         ) {
+             Column(
+-                Modifier.fillMaxWidth().fillMaxHeight(.62f).navigationBarsPadding()
+-                    .padding(16.dp),
++                Modifier.fillMaxWidth().navigationBarsPadding().verticalScroll(rememberScrollState())
++                    .padding(start = 20.dp, end = 20.dp, bottom = 24.dp),
+                 verticalArrangement = Arrangement.spacedBy(12.dp),
+             ) {
+                 Text(
+                     "脚本环境",
+                     color = t.textPrimary,
+-                    fontSize = 21.sp,
++                    fontSize = 25.sp,
+                     fontWeight = FontWeight.ExtraBold,
+                 )
+-                Box(
+-                    Modifier.fillMaxWidth().weight(1f)
++                Column(
++                    Modifier.fillMaxWidth()
+                         .background(t.controlBackground, RoundedCornerShape(16.dp))
+-                        .padding(14.dp)
+-                        .verticalScroll(rememberScrollState()),
++                        .padding(16.dp),
++                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                 ) {
++                    val environmentLines = remember { ProxyScriptHooks.environmentText().lines() }
++                    environmentLines.takeWhile { it.isNotBlank() }.forEach { line ->
++                        val parts = line.trim().split(Regex("\\s+"), limit = 2)
++                        Column {
++                            Text(parts.first(), color = t.textPrimary, fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold)
++                            Text(parts.getOrElse(1) { "" }, color = t.textSecondary, fontSize = 14.sp, lineHeight = 19.sp)
++                        }
++                    }
+                     Text(
+-                        ProxyScriptHooks.environmentText(),
+-                        color = t.textPrimary,
++                        environmentLines.dropWhile { it.isNotBlank() }.dropWhile { it.isBlank() }.joinToString("\n"),
++                        color = t.textSecondary,
+                         fontFamily = io.github.xgl34222220.hetu.ui.HetuSystemFontFamily,
+-                        fontSize = 12.sp,
+-                        lineHeight = 18.sp,
++                        fontSize = 14.sp,
++                        lineHeight = 20.sp,
+                     )
+                 }
+             }
+         }
+     }
+ }
++
++/** Screen-local glyphs following the supplied script controls, without changing shared icons. */
++private object ScriptReferenceIcons {
++    private fun line(name: String, vararg paths: String): ImageVector = ImageVector.Builder(
++        name = "HetuScripts.$name", defaultWidth = 24.dp, defaultHeight = 24.dp,
++        viewportWidth = 24f, viewportHeight = 24f,
++    ).apply {
++        paths.forEach { addPath(PathParser().parsePathString(it).toNodes(), fill = null, stroke = SolidColor(Color.Black),
++            strokeLineWidth = 1.8f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) }
++    }.build()
++
++    private fun control(name: String, mark: String): ImageVector = ImageVector.Builder(
++        name = "HetuScripts.$name", defaultWidth = 24.dp, defaultHeight = 24.dp,
++        viewportWidth = 24f, viewportHeight = 24f,
++    ).apply {
++        addPath(PathParser().parsePathString("M22 12a10 10 0 1 1-20 0a10 10 0 1 1 20 0Z").toNodes(),
++            fill = null, stroke = SolidColor(Color.Black), strokeLineWidth = 1.8f)
++        addPath(PathParser().parsePathString(mark).toNodes(), fill = SolidColor(Color.Black))
++    }.build()
++
++    val Start = control("Start", "m10 7 7 5-7 5V7Z")
++    val Stop = control("Stop", "M8 8h8v8H8V8Z")
++    val Environment = line("Environment", "m12 1 10 5.5v11L12 23 2 17.5v-11L12 1Z", "m7 8 4 4-4 4", "M13 16h4")
++    val File = ImageVector.Builder(name = "HetuScripts.File", defaultWidth = 24.dp, defaultHeight = 28.dp,
++        viewportWidth = 24f, viewportHeight = 28f).apply {
++        // Knockouts stay transparent when Icon applies the active light/dark text tint.
++        addPath(PathParser().parsePathString("M4 1h11l6 6v18a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2Z " +
++            "M14.2 1.8h1.4v5.5H21v1.4h-6.8V1.8Z M6 13l4 4-4 4-1-1 3-3-3-3 1-1Z M11 20h6v1.5h-6V20Z").toNodes(),
++            fill = SolidColor(Color.Black), pathFillType = PathFillType.EvenOdd)
++    }.build()
++}
++
++@Composable
++private fun ScriptSheetHandle() {
++    val t = LocalHetuTokens.current
++    Box(Modifier.padding(top = 9.dp, bottom = 24.dp).size(width = 44.dp, height = 5.dp)
++        .clip(RoundedCornerShape(3.dp)).background(t.textSecondary.copy(alpha = .38f)))
++}
++
++/** A bounded, top-aligned editor; long hook content scrolls inside its own input well. */
++@Composable
++private fun ScriptCodeField(value: String, onValueChange: (String) -> Unit, enabled: Boolean) {
++    val t = LocalHetuTokens.current
++    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
++    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
++        Text("脚本内容", color = t.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
++        BasicTextField(
++            value = value,
++            onValueChange = onValueChange,
++            enabled = enabled,
++            modifier = Modifier.fillMaxWidth().height(280.dp).clip(RoundedCornerShape(14.dp))
++                .background(if (dark) t.controlBackground else Color(0xFFEEEDF8))
++                .semantics { contentDescription = "脚本内容" }
++                .padding(14.dp),
++            textStyle = LocalTextStyle.current.copy(color = t.textPrimary, fontFamily = HetuSystemFontFamily, fontSize = 14.sp, lineHeight = 20.sp),
++            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
++            decorationBox = { inner ->
++                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopStart) {
++                    if (value.isEmpty()) Text("#!/system/bin/sh\n# 在这里输入脚本", color = t.textSecondary,
++                        fontFamily = HetuSystemFontFamily, fontSize = 14.sp, lineHeight = 20.sp)
++                    inner()
++                }
++            },
++        )
++    }
++}
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubStoreActivity.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubStoreActivity.kt
+@@ -106,7 +106,7 @@
+                     maxLines = 1, overflow = TextOverflow.Ellipsis)
+                 if (!subtitle.isNullOrBlank()) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                     if (subtitleIcon != null) { Icon(subtitleIcon, null, tint = c.textMuted, modifier = Modifier.size(12.dp)); Spacer(Modifier.width(5.dp)) }
+-                    Text(subtitle, color = c.textMuted, fontSize = 12.5.sp, lineHeight = 18.sp,
++                    Text(subtitle, color = c.textMuted, fontSize = 12.5.sp, lineHeight = 18.sp, fontWeight = FontWeight.Medium,
+                         textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                 }
+             }
+@@ -141,13 +141,16 @@
+ @Composable
+ internal fun WebToolField(value: String, onChange: (String) -> Unit, label: String, clear: Boolean = false, enabled: Boolean = true) {
+     val c = Hx.colors
+-    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+-        Text(label, color = c.textMuted, fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold)
+-        Row(Modifier.fillMaxWidth().heightIn(min = 46.dp).clip(RoundedCornerShape(11.dp))
+-            .background(c.surfaceMuted.copy(alpha = .68f)).border(.7.dp, c.line.copy(alpha = .6f), RoundedCornerShape(11.dp))
++    val fieldShape = RoundedCornerShape(if (clear) 17.dp else 11.dp)
++    Column(verticalArrangement = Arrangement.spacedBy(if (clear) 6.dp else 7.dp)) {
++        Text(label, color = if (clear) c.text else c.textMuted,
++            fontSize = if (clear) 16.sp else 13.sp, lineHeight = if (clear) 22.sp else 18.sp, fontWeight = FontWeight.SemiBold)
++        Row(Modifier.fillMaxWidth().heightIn(min = if (clear) 44.dp else 48.dp).clip(fieldShape)
++            .background(c.surfaceMuted.copy(alpha = if (clear) .5f else .4f)).border(.7.dp, c.line.copy(alpha = .6f), fieldShape)
+             .padding(start = 13.dp, end = if (clear) 2.dp else 13.dp), verticalAlignment = Alignment.CenterVertically) {
+-            BasicTextField(value, onChange, enabled = enabled, singleLine = true, textStyle = TextStyle(color = c.text, fontSize = 16.sp, lineHeight = 22.sp),
+-                cursorBrush = SolidColor(c.accent), modifier = Modifier.weight(1f).padding(vertical = 11.dp))
++            BasicTextField(value, onChange, enabled = enabled, singleLine = true,
++                textStyle = TextStyle(color = c.text, fontSize = if (clear) 16.sp else 15.5.sp, lineHeight = 22.sp, fontWeight = FontWeight.Medium),
++                cursorBrush = SolidColor(c.accent), modifier = Modifier.weight(1f).padding(vertical = if (clear) 9.dp else 11.dp))
+             if (clear && value.isNotEmpty()) IconButton(onClick = { onChange("") }, enabled = enabled, modifier = Modifier.size(42.dp)) {
+                 Icon(Icons.Rounded.Cancel, "清空后端地址", tint = c.textFaint.copy(alpha = .7f), modifier = Modifier.size(19.dp))
+             }
+@@ -156,14 +159,15 @@
+ }
+ 
+ @Composable
+-internal fun WebToolSheet(title: String, onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+-    HxSheet(onDismiss) {
++internal fun WebToolSheet(title: String, onDismiss: () -> Unit, separatedChoices: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
++    val c = Hx.colors
++    HxSheet(onDismiss, containerColor = if (separatedChoices && !c.dark) Color(0xFFF5F4FD) else c.surface) {
+         val close = LocalHxSheetClose.current
+         Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 6.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+             Text(title, color = Hx.colors.text, fontWeight = FontWeight.Bold, fontSize = 22.sp, lineHeight = 28.sp, modifier = Modifier.weight(1f))
+-            IconButton(onClick = { close(onDismiss) }) { Icon(Icons.Rounded.Close, "关闭", tint = Hx.colors.textMuted) }
+-        }
+-        Column(Modifier.fillMaxWidth().imePadding().padding(horizontal = 18.dp), verticalArrangement = Arrangement.spacedBy(16.dp), content = content)
++            IconButton(onClick = { close(onDismiss) }, modifier = Modifier.size(40.dp)) { Icon(Icons.Rounded.Close, "关闭", tint = Hx.colors.textMuted) }
++        }
++        Column(Modifier.fillMaxWidth().imePadding().padding(horizontal = 17.dp), verticalArrangement = Arrangement.spacedBy(if (separatedChoices) 10.dp else 16.dp), content = content)
+     }
+ }
+ 
+@@ -193,7 +197,7 @@
+                     Text("本地后端", color = c.text, fontSize = 20.sp, lineHeight = 26.sp, fontWeight = FontWeight.Bold)
+                     Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                         WebToolField(backend, { backend = it.take(240); available = null; status = "地址已修改，请重新检测。" }, "后端地址", clear = true, enabled = !checking)
+-                        Text(status, color = when (available) { true -> c.good; false -> c.bad; null -> c.textMuted }, fontSize = 12.5.sp, lineHeight = 18.sp)
++                        Text(status, color = when (available) { true -> c.good; false -> c.bad; null -> c.textMuted }, fontSize = 12.5.sp, lineHeight = 18.sp, fontWeight = FontWeight.Medium)
+                     }
+                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                         WebToolAction(if (checking) "检测中" else "检测", {
+@@ -217,13 +221,13 @@
+                 }
+             }
+             WebToolCard {
+-                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
++                Column(Modifier.padding(horizontal = 18.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                         Icon(WebToolIcons.Document, null, tint = c.text, modifier = Modifier.size(25.dp))
+                         Text("说明", color = c.text, fontSize = 20.sp, lineHeight = 26.sp, fontWeight = FontWeight.Bold)
+                     }
+                     Text("河图连接的是你设备上已经运行的 Sub-Store 后端，不会把订阅内容上传给河图服务器。\n\n面板使用 Sub-Store 官方前端，并把 API 指向你填写的本机地址。\n\n若显示未安装，请先确保本地后端已启动。",
+-                        color = c.textMuted, fontSize = 14.sp, lineHeight = 23.sp, fontWeight = FontWeight.Medium)
++                        color = c.textMuted, fontSize = 14.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold)
+                 }
+             }
+         }
+@@ -310,7 +314,7 @@
+                     if (state.loading || state.error != null) {
+                         Column(Modifier.fillMaxSize().background(Hx.colors.surface).padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                             if (state.loading) LinearProgressIndicator(progress = { state.progress / 100f }, modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(4.dp)),
+-                                color = Color(0xFF287AFF), trackColor = Hx.colors.line.copy(alpha = .6f))
++                                color = Color(0xFF287AFF), trackColor = Hx.colors.line.copy(alpha = .6f), gapSize = 0.dp, drawStopIndicator = {})
+                             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                     if (state.loading) CircularProgressIndicator(Modifier.size(34.dp), color = Color(0xFF287AFF), trackColor = Hx.colors.accentSoft, strokeWidth = 4.dp)
+@@ -321,7 +325,7 @@
+                                 }
+                             }
+                             if (subStoreBackend != null) HorizontalDivider(color = Hx.colors.line.copy(alpha = .35f))
+-                            Text(if (subStoreBackend == null) "远端内容由网站提供" else "官方前端内容由网页提供", color = Hx.colors.textMuted, fontSize = 11.sp,
++                            Text(if (subStoreBackend == null) "远端内容由网站提供" else "官方前端内容由网页提供", color = Hx.colors.textMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium,
+                                 modifier = Modifier.padding(top = 14.dp, bottom = if (subStoreBackend == null) 16.dp else 5.dp))
+                             if (subStoreBackend != null) Text("后端 ${android.net.Uri.parse(subStoreBackend).let { "${it.host.orEmpty()}${if (it.port >= 0) ":${it.port}" else ""}" }}",
+                                 color = Hx.colors.textFaint, fontSize = 10.sp, modifier = Modifier.padding(bottom = 12.dp))
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt
+@@ -20,6 +20,8 @@
+ import androidx.compose.animation.core.tween
+ import androidx.compose.foundation.background
+ import androidx.compose.foundation.clickable
++import androidx.compose.foundation.layout.Arrangement
++import androidx.compose.foundation.layout.heightIn
+ import androidx.compose.foundation.layout.Box
+ import androidx.compose.foundation.layout.Column
+ import androidx.compose.foundation.layout.Row
+@@ -34,6 +36,8 @@
+ import androidx.compose.material.icons.Icons
+ import androidx.compose.material.icons.rounded.Add
+ import androidx.compose.material.icons.rounded.Block
++import androidx.compose.material.icons.rounded.Check
++import androidx.compose.material.icons.rounded.Description
+ import androidx.compose.material.icons.rounded.CheckCircle
+ import androidx.compose.material.icons.rounded.Close
+ import androidx.compose.material.icons.rounded.Dns
+@@ -45,6 +49,7 @@
+ import androidx.compose.material3.Icon
+ import androidx.compose.material3.IconButton
+ import androidx.compose.material3.MaterialTheme
++import androidx.compose.material3.HorizontalDivider
+ import androidx.compose.material3.Text
+ import androidx.compose.runtime.Composable
+ import androidx.compose.runtime.LaunchedEffect
+@@ -58,7 +63,10 @@
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.draw.clip
+ import androidx.compose.ui.platform.LocalContext
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.text.font.FontWeight
+ import androidx.compose.ui.text.style.TextOverflow
++import androidx.compose.ui.unit.sp
+ import androidx.compose.ui.unit.dp
+ import io.github.xgl34222220.hetu.ui.RulesSnapshot
+ import kotlinx.coroutines.CancellationException
+@@ -167,14 +175,17 @@
+ 
+     HxPage(
+         title = "广告过滤",
+-        largeTitle = false,
+-        subtitle = "在 Mihomo 内按域名拦截广告与追踪",
++        largeTitle = false, compactTitleFontSizeSp = 20f,
+         onBack = { nav.pop() },
+         actions = {
+             HxBarAction(Icons.Rounded.HelpOutline, "说明", onClick = { showHelp = true })
+             HxBarAction(Icons.Rounded.Refresh, "刷新", onClick = { revision++ })
+         },
+     ) {
++        item(key = "adblock-subtitle") {
++            Text("在 Mihomo 内按域名拦截广告与追踪", Modifier.fillMaxWidth().padding(bottom = 12.dp),
++                color = c.textMuted, fontSize = 13.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
++        }
+         item(key = "master") {
+             HxSection {
+                 HxCard {
+@@ -184,10 +195,10 @@
+                         val breathing = rememberInfiniteTransition(label = "shieldBreath")
+                         val breath by breathing.animateFloat(0f, 1f, infiniteRepeatable(tween(2200), RepeatMode.Reverse), label = "shieldBreathValue")
+                         val haloStrength by animateFloatAsState(if (effective) 1f else 0f, tween(HxMotion.Long), label = "shieldHalo")
+-                        Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) {
++                        Box(Modifier.size(76.dp), contentAlignment = Alignment.Center) {
+                             Box(
+                                 Modifier
+-                                    .size(52.dp)
++                                    .size(76.dp)
+                                     .graphicsLayer {
+                                         val s = 1f + .12f * breath * haloStrength
+                                         scaleX = s
+@@ -197,8 +208,11 @@
+                                     .clip(CircleShape)
+                                     .background(tint.copy(alpha = .18f)),
+                             )
+-                            Box(Modifier.size(48.dp).clip(CircleShape).background(tint.copy(alpha = .14f)), contentAlignment = Alignment.Center) {
+-                                Icon(Icons.Rounded.Shield, null, tint = tint, modifier = Modifier.size(26.dp))
++                            Box(Modifier.size(76.dp).clip(CircleShape).background(tint.copy(alpha = .14f)), contentAlignment = Alignment.Center) {
++                                Icon(Icons.Rounded.Shield, null, tint = tint, modifier = Modifier.size(44.dp))
++                                if (effective) Icon(Icons.Rounded.Check, null, tint = Color.White, modifier = Modifier.size(23.dp))
++                                else if (running && enabled && (actualMode in listOf("global", "direct") || lastError.isNotBlank()))
++                                    Text("!", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                             }
+                         }
+                         Spacer(Modifier.width(14.dp))
+@@ -215,14 +229,15 @@
+                                 transitionSpec = { fadeIn(tween(HxMotion.Medium)).togetherWith(fadeOut(tween(HxMotion.Short))) },
+                                 label = "adblockTitle",
+                             ) { title ->
+-                                Text(title, style = MaterialTheme.typography.titleLarge, color = tint)
++                                Text(title, fontSize = 24.sp, lineHeight = 30.sp, fontWeight = FontWeight.Bold, color = tint)
+                             }
+                             Text(
+-                                if (actualMode == "global" || actualMode == "direct") "广告规则只在「规则」模式下生效" else "广告域名直接 REJECT，其余流量照常分流",
+-                                style = MaterialTheme.typography.bodySmall,
++                                if (actualMode == "global" || actualMode == "direct") "广告规则只在「规则」模式下生效" else "广告域名直接 REJECT，\n其余流量照常分流",
++                                fontSize = 14.sp, lineHeight = 18.sp,
+                                 color = c.textMuted,
+                             )
+                         }
++                        Spacer(Modifier.width(10.dp))
+                         if (busy == "toggle") HxSpinner(20.dp)
+                         else HxSwitch(enabled, { on ->
+                             enabled = on
+@@ -231,35 +246,40 @@
+                             }
+                         })
+                     }
+-                    Spacer(Modifier.height(16.dp))
+-                    Row {
+-                        HxMetric("有效规则", HxFormat.count((snapshot?.count ?: 0).toLong()), Modifier.weight(1f))
+-                        HxMetric("本次拦截", if (running) HxFormat.count(stats.count) else "—", Modifier.weight(1f), valueColor = if (stats.count > 0) c.good else c.text)
+-                        HxMetric("白名单", (snapshot?.allow?.size ?: 0).toString(), Modifier.weight(.8f))
+-                    }
++                    Spacer(Modifier.height(12.dp))
+                     if (lastError.isNotBlank()) {
+-                        HxBanner(lastError, tone = HxTone.Warn, modifier = Modifier.padding(top = 14.dp), actionLabel = if (running) "重载" else null, onAction = {
++                        HxBanner(lastError, tone = HxTone.Warn, modifier = Modifier.padding(bottom = 12.dp), actionLabel = if (running) "重载" else null, onAction = {
+                             perform("reload") { withContext(Dispatchers.IO) { ProxyAdblockRuntimeBridge.hotReload(context) } }
+                         })
+                     } else if (running && enabled && (actualMode == "global" || actualMode == "direct")) {
+-                        HxBanner("当前模式不会经过规则，广告过滤不会生效", tone = HxTone.Warn, modifier = Modifier.padding(top = 14.dp), actionLabel = "切到规则", onAction = {
++                        HxBanner("当前模式不会经过规则，广告过滤不会生效", tone = HxTone.Warn, modifier = Modifier.padding(bottom = 12.dp), actionLabel = "切到规则", onAction = {
+                             vm.setTrafficMode("rule")
+                         })
+                     }
++                    HorizontalDivider(thickness = .5.dp, color = c.line)
++                    Spacer(Modifier.height(12.dp))
++                    Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
++                        AdblockMetric("有效规则", snapshot?.let { adblockCount(it.count.toLong()) } ?: "—", Modifier.weight(1f))
++                        Box(Modifier.width(.5.dp).height(36.dp).background(c.line))
++                        AdblockMetric("本次拦截", if (running) adblockCount(stats.count) else "—", Modifier.weight(1f))
++                        Box(Modifier.width(.5.dp).height(36.dp).background(c.line))
++                        AdblockMetric("白名单", snapshot?.allow?.size?.toString() ?: "—", Modifier.weight(1f))
++                    }
+                 }
+             }
+         }
+ 
+         item(key = "verify") {
+             HxSection() {
+-                HxGroup(title = "运行链验证") {
++                HxGroup {
++                    AdblockHeading("运行链验证")
+                     VerifyRow("本地规则库", (snapshot?.count ?: 0) > 0, if ((snapshot?.count ?: 0) > 0) "${snapshot?.count} 条有效规则" else "当前没有启用的拦截规则")
+                     HxDivider(44.dp)
+                     VerifyRow("启动配置注入", injected, when (injected) { true -> "hetu-adblock 已写入运行副本"; false -> "当前运行副本没有广告规则"; null -> "代理启动后检测" })
+                     HxDivider(44.dp)
+                     VerifyRow("Mihomo 规则链", loadedInCore, when (loadedInCore) { true -> "核心已加载 REJECT 规则"; false -> "核心未看到广告规则"; null -> "代理启动后检测" })
+                     HxDivider(44.dp)
+-                    VerifyRow("实际拦截", if (running) stats.count > 0 else null, if (running) "${stats.count} 次" else "代理启动后统计")
++                    VerifyRow("实际拦截", if (running) stats.count > 0 else null, if (running) "${stats.count} 次" else "代理启动后统计", neutralFalse = true)
+                 }
+             }
+         }
+@@ -267,11 +287,21 @@
+         if (running && stats.recentDomains.isNotEmpty()) {
+             item(key = "recent") {
+                 HxSection() {
+-                    HxGroup(title = "最近拦截") {
++                    HxGroup {
++                        AdblockHeading("最近拦截")
+                         stats.recentDomains.forEachIndexed { index, domain ->
+                             if (index > 0) HxDivider(16.dp)
+-                            HxRow(domain, subtitle = "点按可加入白名单", onClick = { whitelistCandidate = domain }) {
+-                                Icon(Icons.Rounded.Block, null, tint = c.bad, modifier = Modifier.size(18.dp))
++                            Row(Modifier.fillMaxWidth().heightIn(min = 60.dp).clickable { whitelistCandidate = domain }
++                                .padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
++                                Box(Modifier.size(28.dp).clip(CircleShape).background(c.badSoft), contentAlignment = Alignment.Center) {
++                                    Icon(Icons.Rounded.Block, null, tint = c.bad, modifier = Modifier.size(20.dp))
++                                }
++                                Spacer(Modifier.width(16.dp))
++                                Column(Modifier.weight(1f)) {
++                                    Text(domain, fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
++                                    Text("点按可加入白名单", fontSize = 14.sp, lineHeight = 18.sp, color = c.textMuted)
++                                }
++                                HxChevron()
+                             }
+                         }
+                     }
+@@ -286,7 +316,10 @@
+                 snapshot.profile.startsWith("加强") -> "enhanced"
+                 else -> "custom"
+             }
+-            HxSection("拦截强度") {
++            HxSection {
++                HxCard {
++                    Text("拦截强度", fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.Bold, color = c.text)
++                    Spacer(Modifier.height(8.dp))
+                 HxSegmented(
+                     options = listOf("lite" to "轻量", "balanced" to "均衡", "enhanced" to "加强"),
+                     selected = current,
+@@ -306,37 +339,39 @@
+                     modifier = Modifier.padding(start = 4.dp, top = 8.dp),
+                 )
+             }
++            }
+         }
+ 
+         item(key = "sources") {
+-            HxSection(
+-                "规则源",
+-                trailing = {
+-                    HxButton("立即更新", onClick = {
+-                        perform("update") { vm.filters.updateRules() }
+-                    }, icon = Icons.Rounded.Sync, busy = busy == "update", enabled = busy == null || busy == "update")
+-                },
+-            ) {
++            HxSection {
+                 HxGroup {
++                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
++                        Text("规则源", fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.Bold, color = c.text, modifier = Modifier.weight(1f))
++                        Row(Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp)).background(c.accent)
++                            .clickable(enabled = busy == null) { perform("update") { vm.filters.updateRules() } }
++                            .padding(horizontal = 12.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
++                            if (busy == "update") { HxSpinner(13.dp, c.onAccent); Spacer(Modifier.width(5.dp)) }
++                            Text("立即更新", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = c.onAccent)
++                        }
++                    }
+                     val sources = snapshot?.sources.orEmpty()
+-                    if (sources.isEmpty()) {
+-                        Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { HxSpinner() }
+-                    }
++                    if (sources.isEmpty()) Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { HxSpinner() }
+                     sources.forEachIndexed { index, source ->
+-                        if (index > 0) HxDivider()
+-                        HxSwitchRow(
+-                            source.name,
+-                            source.enabled,
+-                            { on -> perform("source") { vm.filters.setRuleSource(source.id, on).ifBlank { "${source.name} 已${if (on) "开启" else "关闭"}" } } },
+-                            subtitle = buildString {
+-                                append("${HxFormat.count(source.count.toLong())} 条 · ")
+-                                append(if (source.lastSuccess > 0) "更新于 ${HxFormat.ago(source.lastSuccess)}" else "使用内置快照")
+-                                if (source.lastError.isNotBlank()) append("\n上次更新失败：${source.lastError}")
+-                            },
+-                            icon = Icons.Rounded.FilterAlt,
+-                            iconTint = if (source.lastError.isNotBlank()) c.warn else c.accent,
+-                            enabled = busy == null,
+-                        )
++                        if (index > 0) HxDivider(16.dp)
++                        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
++                            Icon(settingsLineIcon(if (source.name.contains("AdGuard", ignoreCase = true)) Icons.Rounded.Shield else Icons.Rounded.Description), null,
++                                tint = if (source.lastError.isNotBlank()) c.warn else c.text, modifier = Modifier.size(24.dp))
++                            Spacer(Modifier.width(18.dp))
++                            Column(Modifier.weight(1f)) {
++                                Text(source.name, fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold, color = c.text)
++                                Text(buildString {
++                                    append("${adblockCount(source.count.toLong())} 条 · ")
++                                    append(if (source.lastSuccess > 0) "更新于 ${HxFormat.ago(source.lastSuccess)}" else "使用内置快照")
++                                    if (source.lastError.isNotBlank()) append("\n上次更新失败：${source.lastError}")
++                                }, fontSize = 14.sp, lineHeight = 18.sp, color = c.textMuted)
++                            }
++                            HxSwitch(source.enabled, { on -> perform("source") { vm.filters.setRuleSource(source.id, on).ifBlank { "${source.name} 已${if (on) "开启" else "关闭"}" } } }, enabled = busy == null)
++                        }
+                     }
+                 }
+             }
+@@ -393,7 +428,7 @@
+     if (showHelp) {
+         HxSheet(onDismiss = { showHelp = false }, title = "广告过滤说明") {
+             Text(
+-                "应用流量会先经过应用直连与明确白名单，再匹配广告规则 REJECT，之后才进入普通配置分流与兜底。代理运行时，独立 DNS 过滤会自动暂停，避免两套过滤链同时接管。",
++                "应用流量会先经过应用直连与明确白名单，再匹配广告规则 REJECT，之后才进入普通配置分流与兜底。\n\n代理运行时，独立 DNS 过滤会自动暂停，避免两套过滤链同时接管。",
+                 style = MaterialTheme.typography.bodyMedium,
+                 color = Hx.colors.textMuted,
+                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+@@ -404,6 +439,7 @@
+     addDomain?.let { allow ->
+         HxFormDialog(
+             title = if (allow) "添加白名单" else "添加黑名单",
++            compactPills = true, widthFraction = .67f,
+             message = "输入域名，匹配它及其所有子域名，例如 example.com",
+             fields = listOf(HxField("域名", placeholder = "example.com")),
+             confirmLabel = "添加",
+@@ -419,7 +455,7 @@
+     whitelistCandidate?.let { domain ->
+         HxConfirmDialog(
+             title = "加入白名单？",
+-            message = "$domain 及其子域名将不再被拦截。",
++            message = "$domain\n及其子域名将不再被拦截。",
+             confirmLabel = "加入",
+             onConfirm = {
+                 whitelistCandidate = null
+@@ -437,7 +473,7 @@
+     HxSection {
+         HxGroup {
+             Row(Modifier.fillMaxWidth().padding(start = 14.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+-                Text(title, style = MaterialTheme.typography.titleSmall, color = c.text,
++                Text(title, fontSize = 18.sp, lineHeight = 24.sp, color = c.text,
+                     fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                 IconButton(onClick = onAdd) { Icon(Icons.Rounded.Add, "添加", tint = c.text, modifier = Modifier.size(20.dp)) }
+             }
+@@ -465,11 +501,11 @@
+     }
+ }
+ @Composable
+-private fun VerifyRow(label: String, ok: Boolean?, detail: String) {
++private fun VerifyRow(label: String, ok: Boolean?, detail: String, neutralFalse: Boolean = false) {
+     val c = Hx.colors
+-    val tint by animateColorAsState(when (ok) { true -> c.good; false -> c.warn; null -> c.textFaint }, tween(HxMotion.Medium), label = "verifyTint")
+-    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
+-        Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) {
++    val tint by animateColorAsState(when (ok) { true -> c.good; false -> if (neutralFalse) c.textFaint else c.warn; null -> c.textFaint }, tween(HxMotion.Medium), label = "verifyTint")
++    Row(Modifier.fillMaxWidth().heightIn(min = 60.dp).padding(horizontal = 17.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
++        Box(Modifier.size(26.dp), contentAlignment = Alignment.Center) {
+             AnimatedContent(
+                 targetState = ok,
+                 transitionSpec = {
+@@ -478,16 +514,34 @@
+                 label = "verifyIcon",
+             ) { state ->
+                 when (state) {
+-                    true -> Icon(Icons.Rounded.CheckCircle, null, tint = tint, modifier = Modifier.size(19.dp))
+-                    false -> Icon(Icons.Rounded.ErrorOutline, null, tint = tint, modifier = Modifier.size(19.dp))
++                    true -> Icon(Icons.Rounded.CheckCircle, null, tint = tint, modifier = Modifier.size(24.dp))
++                    false -> Icon(if (neutralFalse) Icons.Rounded.CheckCircle else Icons.Rounded.ErrorOutline, null, tint = tint, modifier = Modifier.size(24.dp))
+                     null -> HxDot(tint, 9.dp)
+                 }
+             }
+         }
+-        Spacer(Modifier.width(12.dp))
++        Spacer(Modifier.width(16.dp))
+         Column(Modifier.weight(1f)) {
+-            Text(label, style = MaterialTheme.typography.bodyMedium, color = c.text)
+-            Text(detail, style = MaterialTheme.typography.bodySmall, color = c.textMuted)
++            Text(label, fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold, color = c.text)
++            Text(detail, fontSize = 14.sp, lineHeight = 18.sp, color = c.textMuted)
+         }
+     }
+ }
++
++private fun adblockCount(value: Long): String = String.format(java.util.Locale.US, "%,d", value)
++
++@Composable
++private fun AdblockHeading(title: String) {
++    Text(title, fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.Bold, color = Hx.colors.text,
++        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp))
++}
++
++@Composable
++private fun AdblockMetric(label: String, value: String, modifier: Modifier) {
++    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
++        Text(label, fontSize = 14.sp, lineHeight = 18.sp, color = Hx.colors.textMuted, fontWeight = FontWeight.Medium)
++        Spacer(Modifier.height(3.dp))
++        Text(value, style = HxNumberStyle.copy(fontSize = 22.sp, lineHeight = 26.sp, fontWeight = FontWeight.Bold),
++            color = if (value == "—") Hx.colors.textFaint else Hx.colors.accent, maxLines = 1, overflow = TextOverflow.Ellipsis)
++    }
++}
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
+@@ -1,6 +1,7 @@
+ package io.github.xgl34222220.hetu
+ 
+ import io.github.xgl34222220.hetu.ui.HetuHaptic
++import io.github.xgl34222220.hetu.ui.ht
+ import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
+ import android.content.Intent
+ import android.os.Bundle
+@@ -379,14 +380,14 @@
+             add(HxTab.Settings)
+         }
+     }
+-    val items = remember(dockTabs) {
+-        dockTabs.map { tab ->
+-            when (tab) {
+-                HxTab.Home -> DockItem(tab.label, Icons.Rounded.Home, 1.12f)
+-                HxTab.Panel -> DockItem(tab.label, ConceptDockIcons.Chain, 1f)
+-                HxTab.Tools -> DockItem(tab.label, ConceptDockIcons.Grid, 1f)
+-                HxTab.Settings -> DockItem(tab.label, ConceptDockIcons.Settings, 1f)
+-            }
++    // Resolve only the fixed navigation labels; route keys and user content stay unchanged.
++    val items = dockTabs.map { tab ->
++        val label = ht(tab.label)
++        when (tab) {
++            HxTab.Home -> DockItem(label, Icons.Rounded.Home, 1.12f)
++            HxTab.Panel -> DockItem(label, ConceptDockIcons.Chain, 1f)
++            HxTab.Tools -> DockItem(label, ConceptDockIcons.Grid, 1f)
++            HxTab.Settings -> DockItem(label, ConceptDockIcons.Settings, 1f)
+         }
+     }
+     val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeScreen.kt
+@@ -1,4 +1,6 @@
+ package io.github.xgl34222220.hetu
++
++import io.github.xgl34222220.hetu.ui.ht
+ 
+ import android.content.Intent
+ import io.github.xgl34222220.hetu.ui.HetuHaptic
+@@ -152,7 +154,7 @@
+ 
+     if (showSpeedSource) {
+         HxChoiceSheet(
+-            title = "网速数据来源",
++            title = ht("网速数据来源"),
+             choices = listOf(
+                 HxChoice("api", "API 模式", "读取 Mihomo 控制器流量，适合查看代理核心吞吐"),
+                 HxChoice("local", "本地模式", "读取设备本地总流量，适合查看当前网络实际吞吐"),
+@@ -265,11 +267,11 @@
+         glyphScale.animateTo(1f, spring(dampingRatio = .56f, stiffness = 320f))
+     }
+     val status = when (op) {
+-        HxRunOp.Start -> "正在启动"
+-        HxRunOp.Stop -> "正在停止"
+-        HxRunOp.Restart -> "正在重启"
+-        HxRunOp.Reload -> "正在重载"
+-        null -> if (running) "运行中" else "未运行"
++        HxRunOp.Start -> ht("正在启动")
++        HxRunOp.Stop -> ht("正在停止")
++        HxRunOp.Restart -> ht("正在重启")
++        HxRunOp.Reload -> ht("正在重载")
++        null -> if (running) ht("运行中") else ht("未运行")
+     }
+ 
+     HxSection {
+@@ -313,7 +315,7 @@
+                         when {
+                             op != null -> vm.operationText.ifBlank { "请稍候…" }
+                             running -> "已运行 " + HxFormat.duration(vm.runtime.elapsedSeconds)
+-                            else -> "尚未启动代理"
++                            else -> ht("尚未启动代理")
+                         },
+                         style = MaterialTheme.typography.titleMedium.copy(fontSize = 17.sp).merge(HxNumberStyle),
+                         fontWeight = FontWeight.SemiBold,
+@@ -336,13 +338,13 @@
+                 verticalAlignment = Alignment.CenterVertically,
+             ) {
+                 if (running) {
+-                    HeroAction("重载", c.accent, op == HxRunOp.Reload, op == null, Modifier.weight(1f), vm::reload)
++                    HeroAction(ht("重载"), c.accent, op == HxRunOp.Reload, op == null, Modifier.weight(1f), vm::reload)
+                     Box(Modifier.width(0.5.dp).height(22.dp).background(c.line))
+-                    HeroAction("停止", c.bad, op == HxRunOp.Stop, op == null, Modifier.weight(1f), vm::toggle)
++                    HeroAction(ht("停止"), c.bad, op == HxRunOp.Stop, op == null, Modifier.weight(1f), vm::toggle)
+                     Box(Modifier.width(0.5.dp).height(22.dp).background(c.line))
+-                    HeroAction("重启", c.warn, op == HxRunOp.Restart, op == null, Modifier.weight(1f), vm::restart)
++                    HeroAction(ht("重启"), c.warn, op == HxRunOp.Restart, op == null, Modifier.weight(1f), vm::restart)
+                 } else {
+-                    HeroAction("启动", c.accent, op == HxRunOp.Start, op == null, Modifier.weight(1f), vm::toggle)
++                    HeroAction(ht("启动"), c.accent, op == HxRunOp.Start, op == null, Modifier.weight(1f), vm::toggle)
+                 }
+             }
+ 
+@@ -359,7 +361,7 @@
+                 exit = fadeOut(tween(HxMotion.Short)) + shrinkVertically(tween(HxMotion.Medium, easing = HxMotion.Emphasized)),
+             ) {
+                 HxSegmented(
+-                    options = listOf("rule" to "规则", "global" to "全局", "direct" to "直连"),
++                    options = listOf("rule" to ht("规则"), "global" to ht("全局"), "direct" to ht("直连")),
+                     selected = state.trafficMode.lowercase().ifBlank { "rule" },
+                     onSelect = vm::setTrafficMode,
+                     enabled = op == null,
+@@ -484,7 +486,7 @@
+     val targets = ProxyLatencyTargets.load(vm.prefs)
+     HxSection {
+         Bento(
+-            "延迟",
++            ht("延迟"),
+             modifier = Modifier.semantics {
+                 contentDescription = "本机直测。测量直连请求，未指定代理节点；结果不代表其他应用的代理路径"
+             },
+@@ -614,7 +616,7 @@
+                         .padding(horizontal = 10.dp, vertical = 4.dp),
+                     contentAlignment = Alignment.Center,
+                 ) {
+-                    Text("详情", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = c.accent)
++                    Text(ht("详情"), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = c.accent)
+                 }
+             }
+         }
+@@ -652,7 +654,7 @@
+             label = "wanLanMeta",
+         ) { lanMode ->
+             Row(verticalAlignment = Alignment.CenterVertically) {
+-                Text(if (lanMode) "接口" else "地区", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, color = c.textMuted)
++                Text(if (lanMode) ht("接口") else ht("地区"), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, color = c.textMuted)
+                 Spacer(Modifier.width(10.dp))
+                 if (lanMode) {
+                     Text(
+@@ -694,12 +696,12 @@
+     val up = if (local) vm.localUpRate else vm.upRate
+     val down = if (local) vm.localDownRate else vm.downRate
+     Bento(
+-        "网速",
++        ht("网速"),
+         modifier = modifier.fillMaxHeight(),
+         onClick = onOpen,
+     ) {
+-        BentoLine("上行", if (running || local) HxFormat.speed(up) else "—")
+-        BentoLine("下行", if (running || local) HxFormat.speed(down) else "—")
++        BentoLine(ht("上行"), if (running || local) HxFormat.speed(up) else "—")
++        BentoLine(ht("下行"), if (running || local) HxFormat.speed(down) else "—")
+     }
+ }
+ 
+@@ -711,7 +713,7 @@
+     val total = tracked.sumOf { it.total }
+     val ratio = if (total > 0L) (used.toDouble() / total.toDouble()).toFloat().coerceIn(0f, 1f) else 0f
+     Bento(
+-        "订阅",
++        ht("订阅"),
+         modifier = modifier.fillMaxHeight(),
+         trailing = {
+             if (total > 0L) Text("剩余 ${((1f - ratio) * 100).toInt()}%", style = MaterialTheme.typography.labelMedium, color = c.textMuted)
+@@ -721,19 +723,19 @@
+         onLongClick = if (vm.state.running && vm.providers.isNotEmpty()) vm::updateAllProviders else null,
+     ) {
+         if (total > 0L) {
+-            BentoLine("已用", HxFormat.bytes(used))
+-            BentoLine("总量", HxFormat.bytes(total))
++            BentoLine(ht("已用"), HxFormat.bytes(used))
++            BentoLine(ht("总量"), HxFormat.bytes(total))
+             Spacer(Modifier.weight(1f))
+             Spacer(Modifier.height(6.dp))
+             HxProgressBar(ratio, if (ratio > .9f) c.bad else c.accent, height = 5.dp)
+         } else {
+             Text(
+-                if (vm.providers.isEmpty()) "无在线订阅" else "${vm.providers.size} 个订阅 · 无流量信息",
++                if (vm.providers.isEmpty()) ht("无在线订阅") else "${vm.providers.size} 个订阅 · 无流量信息",
+                 style = MaterialTheme.typography.bodySmall,
+                 color = c.textMuted,
+             )
+             Spacer(Modifier.height(4.dp))
+-            Text("长按更新全部", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
++            Text(ht("长按更新全部"), style = MaterialTheme.typography.labelSmall, color = c.textFaint)
+         }
+     }
+ }
+@@ -743,8 +745,8 @@
+     val c = Hx.colors
+     val running = vm.state.running
+     val memory = if (vm.runtime.rssBytes > 0) vm.runtime.rssBytes else vm.state.memoryBytes
+-    Bento("资源占用", modifier = modifier.fillMaxHeight(), onClick = onOpen) {
+-        BentoLine("内存", if (running && memory > 0) HxFormat.bytes(memory) else "—")
++    Bento(ht("资源占用"), modifier = modifier.fillMaxHeight(), onClick = onOpen) {
++        BentoLine(ht("内存"), if (running && memory > 0) HxFormat.bytes(memory) else "—")
+         BentoLine("CPU", vm.resourceSamples.lastOrNull()?.cpuPercent?.let { String.format(java.util.Locale.US, "%.1f%%", it) } ?: "—")
+         HxProgressBar(if (running) (vm.cpuPercent / 100f).coerceIn(0f, 1f) else 0f, c.accent, Modifier.padding(top = 3.dp), height = 3.dp)
+     }
+@@ -762,11 +764,11 @@
+                 Row(verticalAlignment = Alignment.CenterVertically) {
+                     HxDot(c.textMuted, 7.dp)
+                     Spacer(Modifier.width(4.dp))
+-                    Text("上行", style = MaterialTheme.typography.labelSmall, color = c.textMuted)
++                    Text(ht("上行"), style = MaterialTheme.typography.labelSmall, color = c.textMuted)
+                     Spacer(Modifier.width(10.dp))
+                     HxDot(c.accent, 7.dp)
+                     Spacer(Modifier.width(4.dp))
+-                    Text("下行", style = MaterialTheme.typography.labelSmall, color = c.textMuted)
++                    Text(ht("下行"), style = MaterialTheme.typography.labelSmall, color = c.textMuted)
+                 }
+             },
+         ) {
+@@ -870,7 +872,7 @@
+     HxSection {
+         HxCard(padding = androidx.compose.foundation.layout.PaddingValues(16.dp)) {
+             Row(verticalAlignment = Alignment.CenterVertically) {
+-                Text("实时网络", style = MaterialTheme.typography.titleSmall, color = c.text, fontWeight = FontWeight.SemiBold)
++                Text(ht("实时网络"), style = MaterialTheme.typography.titleSmall, color = c.text, fontWeight = FontWeight.SemiBold)
+                 Spacer(Modifier.weight(1f))
+                 HxPill(if (running) "代理运行中" else "未连接", if (running) HxTone.Good else HxTone.Neutral)
+             }
+@@ -1026,7 +1028,7 @@
+                 }
+                 Spacer(Modifier.width(10.dp))
+                 Column(Modifier.weight(1f)) {
+-                    Text("当前节点", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = c.text, maxLines = 1)
++                    Text(ht("当前节点"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = c.text, maxLines = 1)
+                     Text(
+                         selected.ifBlank { if (vm.state.running) "等待节点信息" else "节点信息尚未确认" },
+                         style = MaterialTheme.typography.bodySmall,
+@@ -1089,19 +1091,19 @@
+     val targets = ProxyLatencyTargets.load(prefs)
+     val best = targets.mapNotNull { vm.siteDelays[it.name]?.takeIf { d -> d > 0L } }.minOrNull()
+ 
+-    HxSection("常用") {
++    HxSection(ht("常用")) {
+         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                 HomeTile(
+                     icon = Icons.Rounded.Description,
+-                    title = "配置与订阅",
++                    title = ht("配置与订阅"),
+                     value = vm.state.config,
+                     modifier = Modifier.weight(1f),
+                     onClick = { nav.push(HxRoute.Configs) },
+                 )
+                 HomeTile(
+                     icon = Icons.Rounded.Shield,
+-                    title = "广告过滤",
++                    title = ht("广告过滤"),
+                     value = when {
+                         !adblockOn -> "已关闭"
+                         adblockEffective -> "保护中"
+@@ -1116,7 +1118,7 @@
+             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                 HomeTile(
+                     icon = Icons.Rounded.Speed,
+-                    title = "站点延迟",
++                    title = ht("站点延迟"),
+                     value = when {
+                         vm.siteTesting -> "测速中…"
+                         !running -> "启动后可测"
+@@ -1131,7 +1133,7 @@
+                 )
+                 HomeTile(
+                     icon = Icons.Rounded.Sync,
+-                    title = "更新订阅",
++                    title = ht("更新订阅"),
+                     value = when {
+                         vm.providersUpdatingAll -> "更新中…"
+                         !running -> "启动后可更新"
+@@ -1235,7 +1237,7 @@
+         "ASN" to rt.wanAsn.ifBlank { "—" },
+         (if (isV6) "IPv4" else "IPv6") to "暂不可用",
+     )
+-    HxSheet(onDismiss = onDismiss, title = "公网 IP 详情") {
++    HxSheet(onDismiss = onDismiss, title = ht("公网 IP 详情")) {
+         Column(Modifier.padding(horizontal = 16.dp)) {
+             HxGroup {
+                 rows.forEachIndexed { index, (label, value) ->
+@@ -1272,7 +1274,7 @@
+         "配置" to state.config,
+         "活动连接" to state.connections.size.toString(),
+     )
+-    HxSheet(onDismiss = onDismiss, title = "核心运行详情") {
++    HxSheet(onDismiss = onDismiss, title = ht("核心运行详情")) {
+         Column(Modifier.padding(horizontal = 16.dp)) {
+             HxGroup {
+                 rows.forEachIndexed { i, (label, value) ->
+@@ -1297,10 +1299,10 @@
+     val running = state.running
+     val healthy = running && state.message.isBlank()
+     val statusTitle = when (op) {
+-        HxRunOp.Start -> "正在启动"
+-        HxRunOp.Stop -> "正在停止"
+-        HxRunOp.Restart -> "正在重启"
+-        HxRunOp.Reload -> "正在重载"
++        HxRunOp.Start -> ht("正在启动")
++        HxRunOp.Stop -> ht("正在停止")
++        HxRunOp.Restart -> ht("正在重启")
++        HxRunOp.Reload -> ht("正在重载")
+         null -> if (running) "代理运行中" else "代理未运行"
+     }
+     val statusDetail = when {
+@@ -1360,14 +1362,14 @@
+                 Column {
+                     Spacer(Modifier.height(16.dp))
+                     HxSegmented(
+-                        options = listOf("rule" to "规则", "global" to "全局", "direct" to "直连"),
++                        options = listOf("rule" to ht("规则"), "global" to ht("全局"), "direct" to ht("直连")),
+                         selected = state.trafficMode.lowercase().ifBlank { "rule" },
+                         onSelect = vm::setTrafficMode,
+                     )
+                     Spacer(Modifier.height(12.dp))
+                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+-                        HxButton("重载配置", onClick = vm::reload, icon = Icons.Rounded.Refresh, filled = false, modifier = Modifier.weight(1f))
+-                        HxButton("重启代理", onClick = vm::restart, icon = Icons.Rounded.RestartAlt, filled = false, modifier = Modifier.weight(1f))
++                        HxButton(ht("重载配置"), onClick = vm::reload, icon = Icons.Rounded.Refresh, filled = false, modifier = Modifier.weight(1f))
++                        HxButton(ht("重启代理"), onClick = vm::restart, icon = Icons.Rounded.RestartAlt, filled = false, modifier = Modifier.weight(1f))
+                     }
+                 }
+             }
+@@ -1428,7 +1430,7 @@
+ private fun TrafficCard(vm: HetuViewModel) {
+     val c = Hx.colors
+     val running = vm.state.running
+-    HxSection("流量") {
++    HxSection(ht("流量")) {
+         HxCard {
+             Row {
+                 SpeedFigure("下载", vm.downRate, Icons.Rounded.ArrowDownward, c.accent, Modifier.weight(1f), running)
+@@ -1438,16 +1440,16 @@
+             HxTrafficChart(vm.rateHistory.toList(), vm.upHistory.toList(), c.accent, c.warn, Modifier.fillMaxWidth().height(52.dp))
+             Spacer(Modifier.height(14.dp))
+             Row {
+-                HxMetric("总下载", HxFormat.bytes(vm.state.downloadTotal), Modifier.weight(1f))
+-                HxMetric("总上传", HxFormat.bytes(vm.state.uploadTotal), Modifier.weight(1f))
+-                HxMetric("连接", if (running) vm.state.connections.size.toString() else "—", Modifier.weight(.8f))
++                HxMetric(ht("总下载"), HxFormat.bytes(vm.state.downloadTotal), Modifier.weight(1f))
++                HxMetric(ht("总上传"), HxFormat.bytes(vm.state.uploadTotal), Modifier.weight(1f))
++                HxMetric(ht("连接"), if (running) vm.state.connections.size.toString() else "—", Modifier.weight(.8f))
+             }
+             Spacer(Modifier.height(12.dp))
+             Row {
+                 val memory = if (vm.runtime.rssBytes > 0) vm.runtime.rssBytes else vm.state.memoryBytes
+-                HxMetric("内存", if (running && memory > 0) HxFormat.bytes(memory) else "—", Modifier.weight(1f))
++                HxMetric(ht("内存"), if (running && memory > 0) HxFormat.bytes(memory) else "—", Modifier.weight(1f))
+                 HxMetric("CPU", if (running) String.format(java.util.Locale.US, "%.1f%%", vm.cpuPercent) else "—", Modifier.weight(1f))
+-                HxMetric("运行", if (running) HxFormat.duration(vm.runtime.elapsedSeconds) else "—", Modifier.weight(.8f))
++                HxMetric(ht("运行"), if (running) HxFormat.duration(vm.runtime.elapsedSeconds) else "—", Modifier.weight(.8f))
+             }
+         }
+     }
+@@ -1528,7 +1530,7 @@
+     val c = Hx.colors
+     val rt = vm.runtime
+     val running = vm.state.running
+-    HxSection("网络") {
++    HxSection(ht("网络")) {
+         HxGroup {
+             val flag = HxFormat.flag(rt.wanCountryCode)
+             val wan = if (running && rt.wanAddress.isNotBlank() && rt.wanAddress != "—") rt.wanAddress else "—"
+@@ -1545,12 +1547,12 @@
+                 Text(wan, style = MaterialTheme.typography.bodyMedium.merge(HxNumberStyle), color = c.text, maxLines = 1)
+             }
+             HxDivider()
+-            HxRow("本机地址", subtitle = rt.lanInterface.takeIf { it.isNotBlank() && it != "—" } ?: "当前网络", icon = Icons.Rounded.Router, iconTint = c.good) {
++            HxRow(ht("本机地址"), subtitle = rt.lanInterface.takeIf { it.isNotBlank() && it != "—" } ?: "当前网络", icon = Icons.Rounded.Router, iconTint = c.good) {
+                 Text(rt.lanAddress.ifBlank { "—" }, style = MaterialTheme.typography.bodyMedium.merge(HxNumberStyle), color = c.text, maxLines = 1)
+             }
+             HxDivider()
+             HxRow(
+-                "站点延迟",
++                ht("站点延迟"),
+                 subtitle = if (running) "点按重新测试" else "启动代理后可测试",
+                 icon = Icons.Rounded.Speed,
+                 iconTint = c.warn,
+@@ -1585,7 +1587,7 @@
+     val used = tracked.sumOf { it.used }
+     val total = tracked.sumOf { it.total }
+     val expire = tracked.mapNotNull { p -> p.expire.takeIf { it > 0L } }.minOrNull() ?: 0L
+-    HxSection("配置与订阅") {
++    HxSection(ht("配置与订阅")) {
+         HxCard(onClick = onOpen) {
+             Row(verticalAlignment = Alignment.CenterVertically) {
+                 HxIconBadge(Icons.Rounded.Description)
+@@ -1638,7 +1640,7 @@
+         effective -> "保护中" to HxTone.Good
+         else -> "规则已加载 · 非规则模式" to HxTone.Warn
+     }
+-    HxSection("广告过滤") {
++    HxSection(ht("广告过滤")) {
+         HxCard(onClick = onOpen) {
+             Row(verticalAlignment = Alignment.CenterVertically) {
+                 HxIconBadge(Icons.Rounded.Shield, tint = if (effective) c.good else c.textMuted)
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
+@@ -1,6 +1,7 @@
+ package io.github.xgl34222220.hetu
+ 
+ import io.github.xgl34222220.hetu.ui.HetuHaptic
++import io.github.xgl34222220.hetu.ui.ht
+ import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
+ import android.content.ClipData
+ import android.content.ClipboardManager
+@@ -360,7 +361,7 @@
+                 )
+                 if (onBack != null) {
+                     IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
+-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回", tint = c.text)
++                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = ht("返回"), tint = c.text)
+                     }
+                 }
+                 if (!largeTitle || collapsed || onBack != null) {
+@@ -407,7 +408,7 @@
+             },
+         contentAlignment = Alignment.Center,
+     ) {
+-        Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = "回到顶部", tint = c.text, modifier = Modifier.size(22.dp))
++        Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = ht("回到顶部"), tint = c.text, modifier = Modifier.size(22.dp))
+     }
+ }
+ 
+@@ -960,7 +961,7 @@
+                 enter = fadeIn(tween(HxMotion.Short)) + scaleIn(HxMotion.pop(), initialScale = .6f),
+                 exit = fadeOut(tween(HxMotion.Short)) + scaleOut(tween(HxMotion.Short), targetScale = .6f),
+             ) {
+-                IconButton(onClick = { onChange("") }) { Icon(Icons.Rounded.Close, "清除", tint = c.textMuted) }
++                IconButton(onClick = { onChange("") }) { Icon(Icons.Rounded.Close, ht("清除"), tint = c.textMuted) }
+             }
+         },
+         shape = Hx.pillShape,
+@@ -1053,7 +1054,7 @@
+                     Row(Modifier.fillMaxWidth().padding(start = 22.dp, end = if (showClose) 8.dp else 22.dp).padding(bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                         Text(title, style = MaterialTheme.typography.titleLarge, color = c.text, modifier = Modifier.weight(1f))
+                         if (showClose) IconButton(onClick = { close(onDismiss) }) {
+-                            Icon(Icons.Rounded.Close, "关闭详情", tint = c.textMuted)
++                            Icon(Icons.Rounded.Close, ht("关闭详情"), tint = c.textMuted)
+                         }
+                     }
+                 }
+@@ -1077,8 +1078,8 @@
+     HxSheet(onDismiss = onDismiss) {
+         Row(Modifier.fillMaxWidth().padding(start = 22.dp, end = 10.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+             Text(title, style = if (wrapLines) MaterialTheme.typography.titleLarge.copy(fontSize = 24.sp, fontWeight = FontWeight.Bold) else MaterialTheme.typography.titleLarge, color = c.text, modifier = Modifier.weight(1f))
+-            if (onRefresh != null) TextButton(onClick = onRefresh) { Text("刷新") }
+-            IconButton(onClick = { hxCopy(context, title, text) }) { Icon(Icons.Rounded.ContentCopy, "复制", tint = c.textMuted) }
++            if (onRefresh != null) TextButton(onClick = onRefresh) { Text(ht("刷新")) }
++            IconButton(onClick = { hxCopy(context, title, text) }) { Icon(Icons.Rounded.ContentCopy, ht("复制"), tint = c.textMuted) }
+         }
+         Box(
+             Modifier
+@@ -1116,6 +1117,7 @@
+     footer: String? = null,
+     dimBehind: Boolean = true,
+     referenceRadios: Boolean = false,
++    trailingReferenceRadios: Boolean = false,
+     presentation: HxChoicePresentation = HxChoicePresentation.Standard,
+ ) {
+     val c = Hx.colors
+@@ -1129,27 +1131,30 @@
+             HxChoicePresentation.Language -> 130.dp
+             HxChoicePresentation.Scale -> 154.dp
+             HxChoicePresentation.Notification -> 148.dp
+-            else -> if (referenceRadios) 232.dp else if (dimBehind) 152.dp else 128.dp
++            else -> if (trailingReferenceRadios) 200.dp else if (referenceRadios) 232.dp else if (dimBehind) 152.dp else 128.dp
+         }
+         HxAnchoredMenu(anchor, onDismiss, dimBehind = !referenceSettings && (dimBehind || referenceRadios), minWidth = menuWidth) { close ->
+             if (referenceRadios) {
+                 Text(title, modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+-                    textAlign = TextAlign.Center, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = c.text)
+-                Column(Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+-                    choices.forEach { choice ->
++                    textAlign = if (trailingReferenceRadios) TextAlign.Start else TextAlign.Center, fontSize = if (trailingReferenceRadios) 15.sp else 18.sp, fontWeight = FontWeight.Bold, color = c.text)
++                Column(Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(if (trailingReferenceRadios) 0.dp else 6.dp)) {
++                    choices.forEachIndexed { index, choice ->
+                         val active = choice.id == selected
+                         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+-                            .background(if (active) c.accentSoft else if (c.dark) c.surfaceMuted else Color.White)
++                            .background(if (trailingReferenceRadios) Color.Transparent else if (active) c.accentSoft else if (c.dark) c.surfaceMuted else Color.White)
+                             .selectable(selected = active, enabled = choice.enabled, role = Role.RadioButton) { haptics.perform(HetuHaptic.Tick); close { onPick(choice.id) } }
+-                            .padding(horizontal = 12.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+-                            Box(Modifier.size(20.dp).clip(CircleShape)
++                            .padding(horizontal = if (trailingReferenceRadios) 2.dp else 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
++                            @Composable fun radio() { Box(Modifier.size(20.dp).clip(CircleShape)
+                                 .background(if (active) c.accent else Color.Transparent)
+                                 .then(if (active) Modifier else Modifier.border(1.5.dp, c.textFaint, CircleShape)), contentAlignment = Alignment.Center) {
+                                 if (active) Icon(Icons.Rounded.Check, null, tint = c.onAccent, modifier = Modifier.size(14.dp))
+                             }
+-                            Spacer(Modifier.width(14.dp))
+-                            Text(choice.label, color = if (active) c.accent else c.text, fontSize = 14.sp, fontWeight = FontWeight.Medium)
++                            }
++                            if (!trailingReferenceRadios) { radio(); Spacer(Modifier.width(14.dp)) }
++                            Text(choice.label, Modifier.weight(1f), color = if (active && !trailingReferenceRadios) c.accent else c.text, fontSize = 14.sp, fontWeight = FontWeight.Medium)
++                            if (trailingReferenceRadios) { Spacer(Modifier.width(10.dp)); radio() }
+                         }
++                        if (trailingReferenceRadios && index < choices.lastIndex) HorizontalDivider(thickness = .5.dp, color = c.line)
+                     }
+                 }
+             } else choices.forEachIndexed { index, choice ->
+@@ -1245,6 +1250,12 @@
+     configFooter: Boolean = false,
+     messageBelowFields: Boolean = false,
+     errorField: (String) -> Int? = { null },
++    widthFraction: Float? = null,
++    titleFontSize: androidx.compose.ui.unit.TextUnit = 20.sp,
++    hideMessageOnError: Boolean = false,
++    highlightError: Boolean = true,
++    plainFields: Boolean = false,
++    compactPills: Boolean = false,
+     validate: (List<String>) -> String? = { null },
+     onConfirm: (List<String>) -> Unit,
+     onDismiss: () -> Unit,
+@@ -1268,32 +1279,32 @@
+         if (problem != null) { error = problem; shakeTick++ }
+         else { haptics.perform(HetuHaptic.Confirm); onConfirm(result) }
+     }
+-    HxReferenceDialog(onDismiss, widthFraction = if (configFooter) .74f else .76f, contentPadding = 0.dp) {
++    HxReferenceDialog(onDismiss, widthFraction = widthFraction ?: if (configFooter) .74f else .76f, contentPadding = 0.dp) {
+         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+-            Column(Modifier.padding(horizontal = if (configFooter) 20.dp else 22.dp, vertical = if (configFooter) 20.dp else 18.dp)
++            Column(Modifier.padding(horizontal = if (compactPills) 16.dp else if (configFooter) 20.dp else 22.dp, vertical = if (compactPills) 16.dp else if (configFooter) 20.dp else 18.dp)
+                 .graphicsLayer { translationX = shake.value * density }) {
+-                Text(title, fontSize = 20.sp, lineHeight = 26.sp, fontWeight = FontWeight.Bold, color = c.text,
++                Text(title, fontSize = titleFontSize, lineHeight = 26.sp, fontWeight = FontWeight.Bold, color = c.text,
+                     textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+-                Spacer(Modifier.height(if (configFooter) 18.dp else 14.dp))
+-                if (!message.isNullOrBlank() && !messageBelowFields) {
++                Spacer(Modifier.height(if (compactPills) 10.dp else if (configFooter) 18.dp else 14.dp))
++                if (!message.isNullOrBlank() && !messageBelowFields && !(hideMessageOnError && error != null)) {
+                     Text(message, style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
+                     Spacer(Modifier.height(12.dp))
+                 }
+                 fields.forEachIndexed { index, field ->
+                     if (index > 0) Spacer(Modifier.height(12.dp))
+-                    Text(field.label, color = c.textMuted, fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.Medium)
+-                    Spacer(Modifier.height(6.dp))
++                    Text(field.label, color = c.textMuted, fontSize = if (plainFields) 15.sp else 13.sp, lineHeight = if (plainFields) 20.sp else 18.sp, fontWeight = FontWeight.Medium)
++                    Spacer(Modifier.height(if (compactPills) 3.dp else 6.dp))
+                     androidx.compose.foundation.text.BasicTextField(
+                         value = values[index].value,
+                         onValueChange = { values[index].value = it; error = null },
+                         singleLine = field.singleLine,
+                         maxLines = if (field.singleLine) 1 else 6,
+                         keyboardOptions = if (field.number) KeyboardOptions(keyboardType = KeyboardType.Number) else KeyboardOptions.Default,
+-                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.text, fontSize = 15.sp, lineHeight = 20.sp),
++                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.text, fontSize = if (plainFields) 16.sp else 15.sp, lineHeight = 20.sp),
+                         cursorBrush = androidx.compose.ui.graphics.SolidColor(c.accent),
+-                        modifier = Modifier.fillMaxWidth().heightIn(min = if (configFooter) 42.dp else 38.dp).clip(RoundedCornerShape(10.dp))
+-                            .background(c.surfaceMuted).border(.7.dp, if (error != null && (errorField(error.orEmpty()) == null || errorField(error.orEmpty()) == index)) c.bad else c.line, RoundedCornerShape(10.dp))
+-                            .padding(horizontal = 12.dp, vertical = if (configFooter) 10.dp else 9.dp),
++                        modifier = Modifier.fillMaxWidth().heightIn(min = if (compactPills) 36.dp else if (configFooter) 42.dp else if (plainFields) 40.dp else 38.dp).clip(RoundedCornerShape(if (compactPills) 24.dp else 10.dp))
++                            .background(if (plainFields) c.surface else c.surfaceMuted).border(.7.dp, if (highlightError && error != null && (errorField(error.orEmpty()) == null || errorField(error.orEmpty()) == index)) c.bad else if (compactPills) Color.Transparent else c.line, RoundedCornerShape(if (compactPills) 24.dp else 10.dp))
++                            .padding(horizontal = 12.dp, vertical = if (compactPills) 7.dp else if (configFooter) 10.dp else 9.dp),
+                         decorationBox = { input -> Box {
+                             if (values[index].value.isBlank() && field.placeholder.isNotBlank()) Text(field.placeholder, color = c.textFaint, fontSize = 15.sp)
+                             input()
+@@ -1303,21 +1314,21 @@
+                         style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
+                 }
+                 if (!message.isNullOrBlank() && messageBelowFields) {
+-                    Spacer(Modifier.height(6.dp)); Text(message, color = c.textMuted, fontSize = 12.sp, lineHeight = 16.sp)
++                    Spacer(Modifier.height(if (compactPills) 3.dp else 6.dp)); Text(message, color = c.textMuted, fontSize = 12.sp, lineHeight = 16.sp)
+                 }
+                 AnimatedVisibility(error != null && errorField(error.orEmpty()) == null, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
+                     Text(error.orEmpty(), color = c.bad, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
+                 }
+                 if (!configFooter) {
+                     Spacer(Modifier.height(14.dp))
+-                    HxDialogButtons(confirmLabel, c.accent, referenceCorners = true, onDismiss = onDismiss, onConfirm = submit)
++                    HxDialogButtons(confirmLabel, c.accent, referenceCorners = !compactPills, buttonHeight = if (compactPills) 36.dp else 46.dp, onDismiss = onDismiss, onConfirm = submit)
+                 }
+             }
+             if (configFooter) {
+                 HorizontalDivider(thickness = .5.dp, color = c.line)
+                 Row(Modifier.fillMaxWidth().height(58.dp)) {
+                     Box(Modifier.weight(1f).fillMaxHeight().clickable(onClick = onDismiss), contentAlignment = Alignment.Center) {
+-                        Text("取消", color = c.textMuted, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
++                        Text(ht("取消"), color = c.textMuted, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                     }
+                     Box(Modifier.width(.5.dp).fillMaxHeight().background(c.line))
+                     Box(Modifier.weight(1f).fillMaxHeight().clickable(onClick = submit), contentAlignment = Alignment.Center) {
+@@ -1363,10 +1374,10 @@
+                 }
+             }
+             if (stacked) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+-                action("取消", false, Modifier.fillMaxWidth(), onDismiss)
++                action(ht("取消"), false, Modifier.fillMaxWidth(), onDismiss)
+                 action(confirmLabel, true, Modifier.fillMaxWidth(), onConfirm)
+             } else Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+-                action("取消", false, Modifier.weight(1f), onDismiss)
++                action(ht("取消"), false, Modifier.weight(1f), onDismiss)
+                 action(confirmLabel, true, Modifier.weight(1f), onConfirm)
+             }
+         }
+@@ -1511,7 +1522,7 @@
+ 
+ /** Dialog footer: two equal pills — a quiet cancel and a solid confirm. */
+ @Composable
+-private fun HxDialogButtons(confirmLabel: String, confirmColor: Color, referenceCorners: Boolean = false, onDismiss: () -> Unit, onConfirm: () -> Unit) {
++private fun HxDialogButtons(confirmLabel: String, confirmColor: Color, referenceCorners: Boolean = false, buttonHeight: Dp = 46.dp, onDismiss: () -> Unit, onConfirm: () -> Unit) {
+     val c = Hx.colors
+     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+         val cancelSource = remember { MutableInteractionSource() }
+@@ -1519,20 +1530,20 @@
+             Modifier
+                 .weight(1f)
+                 .hxPressScale(cancelSource, .96f)
+-                .height(46.dp)
++                .height(buttonHeight)
+                 .clip(if (referenceCorners) RoundedCornerShape(14.dp) else Hx.pillShape)
+                 .background(c.surfaceMuted)
+                 .clickable(interactionSource = cancelSource, indication = LocalIndication.current, onClick = onDismiss),
+             contentAlignment = Alignment.Center,
+         ) {
+-            Text("取消", style = MaterialTheme.typography.labelLarge, color = c.text)
++            Text(ht("取消"), style = MaterialTheme.typography.labelLarge, color = c.text)
+         }
+         val okSource = remember { MutableInteractionSource() }
+         Box(
+             Modifier
+                 .weight(1f)
+                 .hxPressScale(okSource, .96f)
+-                .height(46.dp)
++                .height(buttonHeight)
+                 .clip(if (referenceCorners) RoundedCornerShape(14.dp) else Hx.pillShape)
+                 .background(confirmColor)
+                 .clickable(interactionSource = okSource, indication = LocalIndication.current, onClick = onConfirm),
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMenus.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMenus.kt
+@@ -47,6 +47,11 @@
+ import androidx.compose.ui.draw.clip
+ import androidx.compose.ui.draw.shadow
+ import androidx.compose.ui.geometry.Rect
++import androidx.compose.ui.draw.drawBehind
++import androidx.compose.ui.graphics.Path
++import androidx.compose.ui.graphics.PathFillType
++import androidx.compose.ui.geometry.RoundRect
++import androidx.compose.ui.geometry.CornerRadius
+ import androidx.compose.ui.graphics.Color
+ import androidx.compose.ui.graphics.TransformOrigin
+ import androidx.compose.ui.graphics.graphicsLayer
+@@ -130,6 +135,8 @@
+     anchor: Rect,
+     onDismiss: () -> Unit,
+     dimBehind: Boolean = true,
++    dimAmount: Float? = null,
++    emphasizeAnchor: Boolean = false,
+     minWidth: Dp = 152.dp,
+     anchorEndInset: Dp = 14.dp,
+     content: @Composable ColumnScope.(close: (() -> Unit) -> Unit) -> Unit,
+@@ -160,7 +167,16 @@
+                 Modifier
+                     .fillMaxSize()
+                     .graphicsLayer { alpha = scrim }
+-                    .background(if (dimBehind) Color.Black.copy(alpha = if (c.dark) .42f else .26f) else Color.Transparent)
++                    .drawBehind {
++                        if (dimBehind) {
++                            val mask = Path().apply {
++                                fillType = PathFillType.EvenOdd
++                                addRect(Rect(0f, 0f, size.width, size.height))
++                                if (emphasizeAnchor) addRoundRect(RoundRect(anchor, CornerRadius(12.dp.toPx())))
++                            }
++                            drawPath(mask, Color.Black.copy(alpha = (dimAmount ?: if (c.dark) .42f else .26f).coerceIn(0f, 1f)))
++                        }
++                    }
+                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { close(onDismiss) },
+             )
+             Box(
+@@ -286,10 +302,10 @@
+  * known, otherwise a bottom sheet with the same actions.
+  */
+ @Composable
+-internal fun HxActionMenu(title: String, actions: List<HxMenuAction>, onDismiss: () -> Unit, referenceFileMenu: Boolean = false, anchorEndInset: Dp = 14.dp) {
++internal fun HxActionMenu(title: String, actions: List<HxMenuAction>, onDismiss: () -> Unit, referenceFileMenu: Boolean = false, anchorEndInset: Dp = 14.dp, dimBehind: Boolean? = null, dimAmount: Float? = null, emphasizeAnchor: Boolean = false) {
+     val anchor = remember { HxAnchor.take() }
+     if (anchor != null) {
+-        HxAnchoredMenu(anchor, onDismiss, dimBehind = !referenceFileMenu, anchorEndInset = anchorEndInset) { close ->
++        HxAnchoredMenu(anchor, onDismiss, dimBehind = dimBehind ?: !referenceFileMenu, dimAmount = dimAmount, emphasizeAnchor = emphasizeAnchor, anchorEndInset = anchorEndInset) { close ->
+             if (referenceFileMenu) {
+                 Text(title, color = Hx.colors.textMuted, style = MaterialTheme.typography.labelMedium,
+                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp))
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTheme.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTheme.kt
+@@ -2,6 +2,8 @@
+ 
+ import android.app.Activity
+ import android.os.Build
++import io.github.xgl34222220.hetu.ui.LocalHetuLanguage
++import io.github.xgl34222220.hetu.ui.rememberHetuLanguage
+ import androidx.compose.animation.core.CubicBezierEasing
+ import androidx.compose.animation.core.FiniteAnimationSpec
+ import androidx.compose.animation.core.Spring
+@@ -258,7 +260,8 @@
+         }
+     }
+ 
+-    CompositionLocalProvider(LocalHx provides colors) {
++    val language = rememberHetuLanguage()
++    CompositionLocalProvider(LocalHx provides colors, LocalHetuLanguage provides language) {
+         MaterialTheme(
+             colorScheme = schemeFrom(colors),
+             typography = hxTypography(),
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
+@@ -1,4 +1,6 @@
+ package io.github.xgl34222220.hetu
++
++import io.github.xgl34222220.hetu.ui.ht
+ 
+ import android.graphics.Bitmap
+ import android.net.Uri
+@@ -22,6 +24,15 @@
+ import androidx.compose.foundation.layout.padding
+ import androidx.compose.foundation.layout.size
+ import androidx.compose.foundation.layout.width
++import androidx.compose.foundation.layout.heightIn
++import androidx.compose.foundation.layout.WindowInsets
++import androidx.compose.foundation.layout.navigationBars
++import androidx.compose.foundation.layout.asPaddingValues
++import androidx.compose.foundation.layout.navigationBarsPadding
++import androidx.compose.ui.platform.testTag
++import androidx.compose.ui.text.buildAnnotatedString
++import androidx.compose.ui.text.SpanStyle
++import androidx.compose.ui.text.withStyle
+ import androidx.compose.foundation.lazy.items
+ import androidx.compose.foundation.shape.RoundedCornerShape
+ import androidx.compose.material.icons.Icons
+@@ -136,9 +147,26 @@
+     }
+ 
+     HxPage(
+-        title = "应用管理",
++        title = ht("应用管理"),
+         onBack = { nav.pop() },
+         largeTitle = false,
++        bottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 64.dp,
++        overlay = {
++            Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding()
++                .padding(horizontal = Hx.gutter, vertical = 8.dp)) {
++                Text(buildAnnotatedString {
++                    if (scope == "core") append("核心模式不按 Android UID 区分；名单会保留但暂不生效")
++                    else {
++                        withStyle(SpanStyle(color = c.text, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, fontSize = 12.sp)) { append("已选 ") }
++                        withStyle(SpanStyle(color = c.accent, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontSize = 12.sp)) { append(selected.size.toString()) }
++                        withStyle(SpanStyle(color = c.text, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, fontSize = 12.sp)) { append(" 个") }
++                        append(if (scope == "blacklist") " · 名单内应用直连，其余应用由配置规则决定" else " · 仅名单内应用进入代理")
++                    }
++                }, fontSize = 10.5.sp, lineHeight = 15.sp, color = c.textMuted,
++                    modifier = Modifier.fillMaxWidth().testTag("app-routing-summary").clip(RoundedCornerShape(12.dp))
++                        .background(c.surface).heightIn(min = 40.dp).padding(horizontal = 12.dp, vertical = 10.dp))
++            }
++        },
+         actions = {
+             AppListBarAction(if (searching) Icons.Rounded.SearchOff else Icons.Rounded.Search, "搜索", onClick = {
+                 searching = !searching
+@@ -190,18 +218,7 @@
+                 commit(if (checked) selected + key else selected - key)
+             }
+         }
+-        item(key = "scope-note") {
+-            Text(
+-                when (scope) {
+-                    "blacklist" -> "已选 ${selected.size} 个 · 名单内应用直连，其余应用由配置规则决定"
+-                    "whitelist" -> "已选 ${selected.size} 个 · 仅名单内应用进入代理"
+-                    else -> "核心模式不按 Android UID 区分；名单会保留但暂不生效"
+-                },
+-                style = MaterialTheme.typography.bodySmall,
+-                color = c.textMuted,
+-                modifier = Modifier.padding(horizontal = Hx.gutter + 4.dp, vertical = 8.dp),
+-            )
+-        }
++
+     }
+ }
+ 
+@@ -316,7 +333,7 @@
+     }
+ 
+     HxPage(
+-        title = "核心管理",
++        title = ht("核心管理"),
+         largeTitle = false,
+         subtitle = if (vm.coreVersion.isNotBlank()) "运行中：${vm.coreVersion}" else "内置 Mihomo，可在线更新",
+         onBack = { onBackOverride?.invoke() ?: nav?.pop() },
+@@ -471,7 +488,7 @@
+     }
+ 
+     val aboutList = androidx.compose.foundation.lazy.rememberLazyListState()
+-    HxPage(title = "关于", onBack = { nav.pop() }, listState = aboutList, largeTitle = false) {
++    HxPage(title = ht("关于"), onBack = { nav.pop() }, listState = aboutList, largeTitle = false) {
+         item(key = "brand") {
+             val wash = androidx.compose.ui.graphics.Brush.verticalGradient(
+                 listOf(c.accentSoft, androidx.compose.ui.graphics.lerp(c.accentSoft, Color(0xFFF7D9E8), if (c.dark) .15f else .55f), c.canvas),
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
+@@ -66,6 +66,7 @@
+ import androidx.compose.ui.unit.dp
+ import androidx.compose.ui.unit.sp
+ import io.github.xgl34222220.hetu.ui.HetuHaptic
++import io.github.xgl34222220.hetu.ui.ht
+ import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
+ 
+ /* ------------------------------------------------------------------ */
+@@ -75,8 +76,8 @@
+ @Composable
+ internal fun PanelScreen(vm: HetuViewModel, bottomPadding: Dp) {
+     HxTabbedPage(
+-        title = "面板",
+-        tabs = HxPanelSections.map { (key, label) -> HxPageTab(key, label) },
++        title = ht("面板"),
++        tabs = HxPanelSections.map { (key, label) -> HxPageTab(key, ht(label)) },
+         selected = vm.panelSection,
+         onSelect = vm::openPanel,
+         showSubtitle = false,
+@@ -110,7 +111,7 @@
+     fun open(type: Class<out android.app.Activity>) { context.startActivity(Intent(context, type)) }
+ 
+     HxPage(
+-        title = "工具",
++        title = ht("工具"),
+         scrollToTopSignal = vm.reselect,
+         bottomPadding = bottomPadding,
+         largeTitleStartPadding = 26.dp,
+@@ -121,7 +122,7 @@
+         actions = {
+             HxBarAction(
+                 if (searching) Icons.Rounded.Close else Icons.Rounded.Search,
+-                if (searching) "关闭搜索" else "搜索",
++                if (searching) ht("关闭搜索") else ht("搜索"),
+                 onClick = {
+                     if (searching) toolQuery = ""
+                     searching = !searching
+@@ -132,7 +133,7 @@
+         if (searching) {
+             item(key = "tool-search") {
+                 Box(Modifier.padding(horizontal = 12.dp).padding(bottom = 10.dp)) {
+-                    HxSearchField(toolQuery, { toolQuery = it }, "搜索工具", autoFocus = true)
++                    HxSearchField(toolQuery, { toolQuery = it }, ht("搜索工具"), autoFocus = true)
+                 }
+             }
+             item(key = "tool-search-results") {
+@@ -152,8 +153,8 @@
+                     Triple("广告过滤", "规则与屏蔽", "广告 DNS 白名单 黑名单"),
+                     Triple("诊断工具", "网络与环境", "网络 诊断 维护 恢复"),
+                     Triple("Web面板", "外部面板", "WebUI Zashboard"),
+-                ).filter { q.isBlank() || it.first.contains(q, true) || it.second.contains(q, true) || it.third.contains(q, true) }
+-                if (tools.isEmpty()) HxEmpty(Icons.Rounded.Search, "没有匹配的工具", "试试工具名称或功能关键词")
++                ).filter { q.isBlank() || it.first.contains(q, true) || it.second.contains(q, true) || it.third.contains(q, true) || ht(it.first).contains(q, true) || ht(it.second).contains(q, true) }
++                if (tools.isEmpty()) HxEmpty(Icons.Rounded.Search, ht("没有匹配的工具"), ht("试试工具名称或功能关键词"))
+                 else tools.groupBy { if (it.first == "诊断工具") "diagnostics" else "tools" }.values.forEach { group ->
+                     ToolReferenceCard {
+                         group.forEach { (title, subtitle, _) ->
+@@ -358,7 +359,7 @@
+         Spacer(Modifier.width(24.dp))
+         Column(Modifier.weight(1f)) {
+             Text(
+-                title,
++                ht(title),
+                 color = c.text,
+                 fontSize = 18.sp,
+                 lineHeight = 22.sp,
+@@ -368,7 +369,7 @@
+             )
+             Spacer(Modifier.height(1.dp))
+             Text(
+-                subtitle,
++                ht(subtitle),
+                 color = c.textMuted,
+                 fontSize = 15.sp,
+                 lineHeight = 19.sp,
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ProxiesScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ProxiesScreen.kt
+@@ -449,7 +449,7 @@
+                 Text(group.name, fontSize = 16.sp, lineHeight = 19.sp, fontWeight = FontWeight.SemiBold,
+                     color = c.text, maxLines = if (nameOverflow == "wrap" && !compact) 2 else 1, overflow = TextOverflow.Ellipsis)
+                 Text("${group.type.ifBlank { "Selector" }}  $online/${group.nodes.size}",
+-                    fontSize = 12.sp, lineHeight = 15.sp, color = c.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
++                    fontSize = 13.sp, lineHeight = 16.sp, color = c.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+             }
+             Spacer(Modifier.width(5.dp))
+             ConfiguredGroupIcon(group, Modifier.size(34.dp))
+@@ -461,7 +461,7 @@
+                 Spacer(Modifier.width(4.dp))
+             }
+             Text(group.now.removePrefix(flag.orEmpty()).trim().ifBlank { "未选择" },
+-                fontSize = 11.5.sp, lineHeight = 14.sp, color = c.text, maxLines = 1,
++                fontSize = 13.5.sp, lineHeight = 17.sp, color = c.text, maxLines = 1,
+                 overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+             Spacer(Modifier.width(5.dp))
+             StrategyCompactDelayPill(delay, testing) { vm.testGroup(group) }
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceComponents.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceComponents.kt
+@@ -27,6 +27,7 @@
+ import androidx.compose.ui.unit.dp
+ import androidx.compose.ui.unit.sp
+ import io.github.xgl34222220.hetu.ui.baiZeLineIcon
++import io.github.xgl34222220.hetu.ui.ht
+ 
+ /** Settings-only dimensions, measured from the supplied 04 concept sheets.
+  * These do not change the denser controls used by the proxy dashboard. */
+@@ -187,7 +188,7 @@
+             content()
+             Spacer(Modifier.height(18.dp))
+             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+-                SettingsDialogButton("取消", false, onDismiss, Modifier.weight(1f))
++                SettingsDialogButton(ht("取消"), false, onDismiss, Modifier.weight(1f))
+                 SettingsDialogButton(confirmLabel, true, onConfirm, Modifier.weight(1f))
+             }
+     }
+@@ -209,15 +210,15 @@
+ internal fun SettingsMirrorDialog(initial: String, onSave: (String) -> Unit, onDismiss: () -> Unit) {
+     var value by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(initial) }
+     var error by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+-    SettingsDialog("加速下载", onDismiss, "保存", onConfirm = {
++    SettingsDialog(ht("加速下载"), onDismiss, ht("保存"), onConfirm = {
+         val next = value.trim()
+         if (next.isNotBlank() && !next.startsWith("https://") && !next.startsWith("http://")) error = true
+         else onSave(next)
+     }) {
+-        Text("镜像前缀", color = Hx.colors.textMuted, fontSize = 13.sp)
++        Text(ht("镜像前缀"), color = Hx.colors.textMuted, fontSize = 13.sp)
+         Spacer(Modifier.height(6.dp))
+         SettingsInput(value, { value = it; error = false }, error = error)
+-        if (error) Text("请填写 http/https 地址", color = Hx.colors.bad, fontSize = 12.sp,
++        if (error) Text(ht("请填写 http/https 地址"), color = Hx.colors.bad, fontSize = 12.sp,
+             modifier = Modifier.padding(start = 4.dp, top = 5.dp))
+     }
+ }
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
+@@ -1,4 +1,6 @@
+ package io.github.xgl34222220.hetu
++
++import io.github.xgl34222220.hetu.ui.ht
+ 
+ import android.Manifest
+ import android.content.Intent
+@@ -185,7 +187,7 @@
+ 
+     if (subPage == "backup") {
+         HxPage(
+-            title = "备份与恢复",
++            title = ht("备份与恢复"),
+             subtitle = "管理配置与偏好数据",
+             largeTitle = false,
+             onBack = { closeSubPage() },
+@@ -234,7 +236,7 @@
+         val mirrorOn = prefs.getBoolean("downloadMirrorEnabled", false)
+         val mirrorPrefix = prefs.getString("downloadMirrorPrefix", "").orEmpty()
+         HxPage(
+-            title = "开机启动与下载",
++            title = ht("开机启动与下载"),
+             largeTitle = false,
+             onBack = { closeSubPage() },
+         ) {
+@@ -256,7 +258,7 @@
+                 SettingsSection {
+                     SettingsGroup {
+                         SettingsSwitchRow(
+-                            "加速下载",
++                            ht("加速下载"),
+                             mirrorOn,
+                             { prefs.edit().putBoolean("downloadMirrorEnabled", it).apply(); bump() },
+                             subtitle = "通过已配置的镜像下载资源",
+@@ -283,7 +285,7 @@
+         }
+     } else if (subPage == "defaultPanel") {
+         HxPage(
+-            title = "默认面板",
++            title = ht("默认面板"),
+             largeTitle = false,
+             onBack = { closeSubPage() },
+         ) {
+@@ -291,19 +293,19 @@
+                 SettingsSection {
+                     SettingsGroup {
+                         SettingsNavRow(
+-                            "默认面板页面",
++                            ht("默认面板页面"),
+                             icon = Icons.Rounded.GridView,
+                             iconTint = c.text,
+                             value = when (panelDefault) {
+-                                "overview" -> "概览"; "proxies" -> "策略"; "providers" -> "订阅"; "conn" -> "连接"
+-                                "rules" -> "规则"; "sets" -> "规则集"; "logs" -> "日志"; else -> "概览"
++                                "overview" -> ht("概览"); "proxies" -> ht("策略"); "providers" -> ht("订阅"); "conn" -> ht("连接")
++                                "rules" -> ht("规则"); "sets" -> ht("规则集"); "logs" -> ht("日志"); else -> ht("概览")
+                             },
+                             dropdown = true,
+                             onClick = { choice = "defaultPanel" },
+                         )
+                         SettingsDivider()
+                         SettingsSwitchRow(
+-                            "启动时打开面板",
++                            ht("启动时打开面板"),
+                             startOnPanel,
+                             { prefs.edit().putBoolean("startOnPanel", it).apply(); bump() },
+                             icon = Icons.Rounded.Dashboard,
+@@ -311,7 +313,7 @@
+                         )
+                         SettingsDivider()
+                         SettingsSwitchRow(
+-                            "显示底栏面板入口",
++                            ht("显示底栏面板入口"),
+                             showPanelDock,
+                             { prefs.edit().putBoolean("showPanelDock", it).apply(); bump() },
+                             icon = Icons.Rounded.GridView,
+@@ -326,7 +328,7 @@
+     if (subPage == null) {
+     top.yukonga.miuix.kmp.theme.MiuixTheme(colors = miuixColors) {
+         HxPage(
+-            title = "设置",
++            title = ht("设置"),
+             scrollToTopSignal = vm.reselect,
+             bottomPadding = bottomPadding,
+             largeTitleStartPadding = 26.dp,
+@@ -338,14 +340,14 @@
+             item(key = "proxy-config") {
+                 MiuixSettingsCard {
+                     MiuixSettingsArrow(
+-                        title = "基础代理配置",
+-                        summary = "核心、模式与当前配置",
++                        title = ht("基础代理配置"),
++                        summary = ht("核心、模式与当前配置"),
+                         icon = Icons.Rounded.Tune,
+                         onClick = { open(RootTproxyActivity::class.java) },
+                     )
+                     MiuixSettingsArrow(
+-                        title = "高级代理配置",
+-                        summary = "性能、DNS 与资源限制",
++                        title = ht("高级代理配置"),
++                        summary = ht("性能、DNS 与资源限制"),
+                         icon = Icons.Rounded.Dns,
+                         onClick = { open(ProxyAdvancedSettingsActivity::class.java) },
+                     )
+@@ -355,14 +357,14 @@
+             item(key = "appearance-panel") {
+                 MiuixSettingsCard {
+                     MiuixSettingsArrow(
+-                        title = "语言与主题",
+-                        summary = "显示语言、主题与显示",
++                        title = ht("语言与主题"),
++                        summary = ht("显示语言、主题与显示"),
+                         icon = Icons.Rounded.Palette,
+                         onClick = { nav.push(HxRoute.Theme) },
+                     )
+                     MiuixSettingsArrow(
+-                        title = "默认面板",
+-                        summary = "选择面板与显示偏好",
++                        title = ht("默认面板"),
++                        summary = ht("选择面板与显示偏好"),
+                         icon = Icons.Rounded.GridView,
+                         onClick = { nav.push(HxRoute.DefaultPanelSettings) },
+                     )
+@@ -372,20 +374,20 @@
+             item(key = "backup-startup-notify") {
+                 MiuixSettingsCard {
+                     MiuixSettingsArrow(
+-                        title = "备份与恢复",
+-                        summary = "导出与恢复应用设置",
++                        title = ht("备份与恢复"),
++                        summary = ht("导出与恢复应用设置"),
+                         icon = Icons.Rounded.Layers,
+                         onClick = { nav.push(HxRoute.BackupSettings) },
+                     )
+                     MiuixSettingsArrow(
+-                        title = "开机启动与下载",
+-                        summary = "启动设置与资源下载",
++                        title = ht("开机启动与下载"),
++                        summary = ht("启动设置与资源下载"),
+                         icon = Icons.Rounded.RestartAlt,
+                         onClick = { nav.push(HxRoute.StartupDownloadSettings) },
+                     )
+                     MiuixSettingsArrow(
+-                        title = "通知设置",
+-                        summary = "管理运行状态提醒",
++                        title = ht("通知设置"),
++                        summary = ht("管理运行状态提醒"),
+                         icon = Icons.Rounded.Notifications,
+                         onClick = { nav.push(HxRoute.Notifications) },
+                     )
+@@ -395,8 +397,8 @@
+             item(key = "about") {
+                 MiuixSettingsCard {
+                     MiuixSettingsArrow(
+-                        title = "关于",
+-                        summary = "版本与开源信息",
++                        title = ht("关于"),
++                        summary = ht("版本与开源信息"),
+                         icon = Icons.Rounded.Info,
+                         onClick = { nav.push(HxRoute.About) },
+                     )
+@@ -409,9 +411,9 @@
+     when (choice) {
+         "language" -> HxChoiceSheet(
+             presentation = HxChoicePresentation.Language,
+-            title = "语言",
++            title = ht("语言"),
+             choices = listOf(
+-                HxChoice("system", "跟随系统"),
++                HxChoice("system", ht("跟随系统")),
+                 HxChoice("zh-CN", "简体中文"),
+                 HxChoice("zh-TW", "繁體中文"),
+                 HxChoice("en", "English"),
+@@ -432,15 +434,15 @@
+ 
+         "defaultPanel" -> HxChoiceSheet(
+             presentation = HxChoicePresentation.Settings,
+-            title = "默认面板页面",
++            title = ht("默认面板页面"),
+             choices = listOf(
+-                HxChoice("overview", "概览"),
+-                HxChoice("proxies", "策略"),
+-                HxChoice("providers", "订阅"),
+-                HxChoice("conn", "连接"),
+-                HxChoice("rules", "规则"),
+-                HxChoice("sets", "规则集"),
+-                HxChoice("logs", "日志"),
++                HxChoice("overview", ht("概览")),
++                HxChoice("proxies", ht("策略")),
++                HxChoice("providers", ht("订阅")),
++                HxChoice("conn", ht("连接")),
++                HxChoice("rules", ht("规则")),
++                HxChoice("sets", ht("规则集")),
++                HxChoice("logs", ht("日志")),
+             ),
+             selected = panelDefault,
+             onPick = { vm.setDefaultPanelSection(it); revision++; choice = null },
+@@ -525,7 +527,7 @@
+     val c = Hx.colors
+ 
+     HxPage(
+-        title = "基础代理配置",
++        title = ht("基础代理配置"),
+         onBack = { nav.pop() },
+         largeTitle = false,
+         canvasColor = if (c.dark) c.canvas else Color(0xFFF2F0F9),
+@@ -709,7 +711,7 @@
+         Row(verticalAlignment = Alignment.CenterVertically) {
+             Icon(io.github.xgl34222220.hetu.ui.baiZeLineIcon(Icons.Rounded.Palette), null, tint = c.text, modifier = Modifier.size(26.dp))
+             Spacer(Modifier.width(24.dp))
+-            Text("强调色", fontSize = 18.sp, lineHeight = 23.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = c.text)
++            Text(ht("强调色"), fontSize = 18.sp, lineHeight = 23.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = c.text)
+         }
+         Column(Modifier.padding(start = 50.dp, end = 14.dp, top = 6.dp, bottom = 6.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+             swatches.chunked(4).forEach { row ->
+@@ -760,7 +762,7 @@
+     }
+ 
+     HxPage(
+-        title = "主题设置",
++        title = ht("主题设置"),
+         subtitle = null,
+         onBack = onBack,
+         largeTitle = false,
+@@ -769,8 +771,8 @@
+             SettingsSection {
+                 SettingsGroup {
+                     SettingsNavRow(
+-                        "语言",
+-                        subtitle = "切换应用语言",
++                        ht("语言"),
++                        subtitle = ht("切换应用语言"),
+                         icon = Icons.Rounded.Public,
+                         iconTint = c.text,
+                         value = when (appLanguage) {
+@@ -778,7 +780,7 @@
+                             "zh-TW" -> "繁體中文"
+                             "en" -> "English"
+                             "ru" -> "Русский"
+-                            else -> "跟随系统"
++                            else -> ht("跟随系统")
+                         },
+                         onClick = { choice = "language" },
+                     )
+@@ -789,13 +791,13 @@
+             SettingsSection {
+                 SettingsGroup {
+                     Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
+-                        Text("主题模式", fontSize = 18.sp, lineHeight = 24.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = c.text)
++                        Text(ht("主题模式"), fontSize = 18.sp, lineHeight = 24.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = c.text)
+                         Spacer(Modifier.height(8.dp))
+                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                             listOf(
+-                                Triple("system", "跟随系统", Icons.Rounded.AutoAwesome),
+-                                Triple("light", "浅色模式", Icons.Rounded.LightMode),
+-                                Triple("dark", "深色模式", Icons.Rounded.DarkMode),
++                                Triple("system", ht("跟随系统"), Icons.Rounded.AutoAwesome),
++                                Triple("light", ht("浅色模式"), Icons.Rounded.LightMode),
++                                Triple("dark", ht("深色模式"), Icons.Rounded.DarkMode),
+                             ).forEach { (value, label, icon) ->
+                                 val selected = vm.appearance == value
+                                 Column(
+@@ -823,7 +825,7 @@
+                                     }
+                                     Spacer(Modifier.height(5.dp))
+                                     Text(label, fontSize = 13.sp, lineHeight = 19.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = c.text, maxLines = 1)
+-                                    Text(when (value) { "system" -> "与系统设置保持一致"; "light" -> "始终使用浅色主题"; else -> "始终使用深色主题" },
++                                    Text(when (value) { "system" -> ht("与系统设置保持一致"); "light" -> ht("始终使用浅色主题"); else -> ht("始终使用深色主题") },
+                                         fontSize = 10.sp, lineHeight = 14.sp, color = c.textMuted, maxLines = 1)
+                                 }
+                             }
+@@ -836,10 +838,10 @@
+             SettingsSection {
+                 SettingsGroup {
+                     if (Build.VERSION.SDK_INT >= 31) {
+-                        SettingsSwitchRow("Monet 动态取色", vm.dynamicColor, { vm.setDynamic(it); vm.bumpSettings(); revision++ }, subtitle = "使用系统壁纸提供的配色", icon = Icons.Rounded.Palette)
++                        SettingsSwitchRow(ht("Monet 动态取色"), vm.dynamicColor, { vm.setDynamic(it); vm.bumpSettings(); revision++ }, subtitle = ht("使用系统壁纸提供的配色"), icon = Icons.Rounded.Palette)
+                     }
+                     SettingsDivider()
+-                    SettingsSwitchRow("深色纯黑背景", vm.pureBlack, { vm.updatePureBlack(it); vm.bumpSettings(); revision++ }, subtitle = "OLED 模式使用纯黑画布", icon = Icons.Rounded.Contrast, iconTint = c.textMuted)
++                    SettingsSwitchRow(ht("深色纯黑背景"), vm.pureBlack, { vm.updatePureBlack(it); vm.bumpSettings(); revision++ }, subtitle = ht("OLED 模式使用纯黑画布"), icon = Icons.Rounded.Contrast, iconTint = c.textMuted)
+                     if (!vm.dynamicColor) {
+                         SettingsDivider()
+                         HxAccentSwatches(vm)
+@@ -850,28 +852,28 @@
+         item(key = "glass") {
+             SettingsSection {
+                 SettingsGroup {
+-                    SettingsSwitchRow("模糊效果", blur, { setBool("enableBlur", it, reload = true) }, subtitle = "控制顶栏、底栏与浮层的实时模糊", icon = Icons.Rounded.BlurOn, iconTint = c.textMuted)
++                    SettingsSwitchRow(ht("模糊效果"), blur, { setBool("enableBlur", it, reload = true) }, subtitle = ht("控制顶栏、底栏与浮层的实时模糊"), icon = Icons.Rounded.BlurOn, iconTint = c.textMuted)
+                     SettingsDivider()
+-                    SettingsNavRow("顶栏模糊样式", subtitle = "选择顶栏磨砂的过渡方式", icon = Icons.Rounded.Tune, iconTint = c.textMuted, value = if (topBlur == "gaussian") "高斯模糊" else "渐进式模糊", dropdown = true) { choice = "topBlur" }
++                    SettingsNavRow(ht("顶栏模糊样式"), subtitle = ht("选择顶栏磨砂的过渡方式"), icon = Icons.Rounded.Tune, iconTint = c.textMuted, value = if (topBlur == "gaussian") ht("高斯模糊") else ht("渐进式模糊"), dropdown = true) { choice = "topBlur" }
+                     SettingsDivider()
+-                    SettingsSwitchRow("悬浮底栏", floating, { setBool("floatingBottomBar", it) }, subtitle = "关闭后底栏吸附屏幕底部", icon = Icons.Rounded.Dashboard, iconTint = c.textMuted)
++                    SettingsSwitchRow(ht("悬浮底栏"), floating, { setBool("floatingBottomBar", it) }, subtitle = ht("关闭后底栏吸附屏幕底部"), icon = Icons.Rounded.Dashboard, iconTint = c.textMuted)
+                     SettingsDivider()
+-                    SettingsSwitchRow("底栏液态玻璃", liquid, { setBool("liquidGlass", it) }, subtitle = "为底栏加入通透的折射与高光", icon = Icons.Rounded.BlurOn, iconTint = c.accent, enabled = blur)
++                    SettingsSwitchRow(ht("底栏液态玻璃"), liquid, { setBool("liquidGlass", it) }, subtitle = ht("为底栏加入通透的折射与高光"), icon = Icons.Rounded.BlurOn, iconTint = c.accent, enabled = blur)
+                 }
+             }
+         }
+         item(key = "motion") {
+             SettingsSection {
+                 SettingsGroup {
+-                    SettingsSwitchRow("预测性返回动画", backAnim, { setBool("predictiveBackAnimation", it) }, subtitle = "返回手势让页面跟手缩放、位移并露出上一层", icon = Icons.Rounded.Route, iconTint = c.textMuted)
++                    SettingsSwitchRow(ht("预测性返回动画"), backAnim, { setBool("predictiveBackAnimation", it) }, subtitle = ht("返回手势让页面跟手缩放、位移并露出上一层"), icon = Icons.Rounded.Route, iconTint = c.textMuted)
+                     AnimatedVisibility(backAnim) {
+                         Column {
+                             SettingsDivider()
+-                            SettingsSwitchRow("动画方向跟随滑动边缘", followEdge, { setBool("predictiveBackFollowEdge", it) }, subtitle = "从右边缘返回时方向同步反转", icon = Icons.Rounded.SwapHoriz, iconTint = c.textMuted)
++                            SettingsSwitchRow(ht("动画方向跟随滑动边缘"), followEdge, { setBool("predictiveBackFollowEdge", it) }, subtitle = ht("从右边缘返回时方向同步反转"), icon = Icons.Rounded.SwapHoriz, iconTint = c.textMuted)
+                         }
+                     }
+                     SettingsDivider()
+-                    SettingsNavRow("界面缩放", subtitle = "统一调整界面和文字大小", icon = Icons.Rounded.GridView, iconTint = c.textMuted, value = "${(uiScale * 100).toInt()}%", dropdown = true) { choice = "scale" }
++                    SettingsNavRow(ht("界面缩放"), subtitle = ht("统一调整界面和文字大小"), icon = Icons.Rounded.GridView, iconTint = c.textMuted, value = "${(uiScale * 100).toInt()}%", dropdown = true) { choice = "scale" }
+                 }
+             }
+         }
+@@ -880,9 +882,9 @@
+     when (choice) {
+         "language" -> HxChoiceSheet(
+             presentation = HxChoicePresentation.Language,
+-            title = "语言",
++            title = ht("语言"),
+             choices = listOf(
+-                HxChoice("system", "跟随系统"),
++                HxChoice("system", ht("跟随系统")),
+                 HxChoice("zh-CN", "简体中文"),
+                 HxChoice("zh-TW", "繁體中文"),
+                 HxChoice("en", "English"),
+@@ -899,18 +901,18 @@
+         )
+         "appearance" -> HxChoiceSheet(
+             presentation = HxChoicePresentation.Settings,
+-            title = "主题模式",
+-            choices = listOf(HxChoice("system", "跟随系统"), HxChoice("light", "浅色"), HxChoice("dark", "深色")),
++            title = ht("主题模式"),
++            choices = listOf(HxChoice("system", ht("跟随系统")), HxChoice("light", ht("浅色")), HxChoice("dark", ht("深色"))),
+             selected = vm.appearance,
+             onPick = { vm.setAppearanceMode(it); vm.bumpSettings(); revision++; choice = null },
+             onDismiss = { choice = null },
+         )
+         "topBlur" -> HxChoiceSheet(
+             presentation = HxChoicePresentation.Settings,
+-            title = "顶栏模糊样式",
++            title = ht("顶栏模糊样式"),
+             choices = listOf(
+-                HxChoice("progressive", "渐进式模糊", "顶部更浓，向内容区域逐渐消散"),
+-                HxChoice("gaussian", "高斯模糊", "整条顶栏使用均匀磨砂"),
++                HxChoice("progressive", ht("渐进式模糊"), "顶部更浓，向内容区域逐渐消散"),
++                HxChoice("gaussian", ht("高斯模糊"), "整条顶栏使用均匀磨砂"),
+             ),
+             selected = topBlur,
+             onPick = { setString("topBarBlurStyle", it); choice = null },
+@@ -918,7 +920,7 @@
+         )
+         "scale" -> HxChoiceSheet(
+             presentation = HxChoicePresentation.Scale,
+-            title = "界面缩放",
++            title = ht("界面缩放"),
+             choices = listOf(.8f, .9f, 1f, 1.1f, 1.2f).map { HxChoice(it.toString(), "${(it * 100).toInt()}%") },
+             selected = uiScale.toString(),
+             onPick = { value -> prefs.edit().putFloat("uiScale", value.toFloat()).apply(); vm.bumpSettings(); revision++; choice = null },
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
+@@ -31,6 +31,7 @@
+ import androidx.compose.foundation.text.KeyboardOptions
+ import androidx.compose.foundation.shape.RoundedCornerShape
+ import androidx.compose.material.icons.Icons
++import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+ import androidx.compose.material.icons.rounded.Add
+ import androidx.compose.material.icons.rounded.Info
+ import androidx.compose.ui.draw.clip
+@@ -79,6 +80,7 @@
+ import androidx.compose.runtime.snapshots.SnapshotStateList
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
++import androidx.compose.ui.graphics.Color
+ import androidx.compose.ui.platform.LocalContext
+ import androidx.compose.ui.text.font.FontWeight
+ import androidx.compose.ui.text.input.KeyboardType
+@@ -638,28 +640,7 @@
+                 searching = !searching
+                 if (!searching && path == root) query = ""
+             })
+-            Box {
+-                HxBarAction(Icons.Rounded.MoreHoriz, "更多", onClick = { moreMenu = true })
+-                androidx.compose.material3.DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
+-                    androidx.compose.material3.DropdownMenuItem(text = { Text("导入") }, onClick = {
+-                        moreMenu = false
+-                        importer.launch(arrayOf("*/*"))
+-                    })
+-                    androidx.compose.material3.DropdownMenuItem(text = { Text("下载") }, onClick = {
+-                        moreMenu = false
+-                        downloadDialog = true
+-                    })
+-                    androidx.compose.material3.HorizontalDivider()
+-                    androidx.compose.material3.DropdownMenuItem(text = { Text("新建文件") }, onClick = {
+-                        moreMenu = false
+-                        createFolder = false
+-                    })
+-                    androidx.compose.material3.DropdownMenuItem(text = { Text("新建文件夹") }, onClick = {
+-                        moreMenu = false
+-                        createFolder = true
+-                    })
+-                }
+-            }
++            HxBarAction(Icons.Rounded.MoreHoriz, "更多", onClick = { moreMenu = true })
+         },
+     ) {
+         item(key = "breadcrumbs") {
+@@ -711,37 +692,37 @@
+                     modifier = Modifier.padding(start = Hx.gutter + 4.dp, bottom = 8.dp),
+                 )
+             }
+-            // The reference separates folders and files into two cards, including a parent row.
+             val folders = visibleEntries.filter { it.directory }
+             val files = visibleEntries.filterNot { it.directory }
+-            if (path != root || folders.isNotEmpty()) item(key = "folders") {
++            if (path != root) item(key = "subdirectory") {
+                 HxSection {
+                     HxGroup {
+-                        if (path != root) HxRow("..", icon = Icons.Rounded.Folder, referenceRow = true, referenceTextSizeSp = 18f, minimumHeight = 68.dp, onClick = {
+-                            val parent = File(path).parentFile?.path.orEmpty()
+-                            onOpen(parent.takeIf { it == root || it.startsWith("$root/") } ?: root)
+-                        }) { HxChevron() }
+-                        folders.forEach { entry ->
+-                            HxRow(entry.name, icon = Icons.Rounded.Folder, referenceRow = true, referenceTextSizeSp = 18f, minimumHeight = 68.dp,
+-                                onClick = { haptics.perform(HetuHaptic.Tap); onOpen(entry.path) },
+-                                onLongClick = { menuFor = entry }) { HxChevron() }
+-                        }
+-                    }
+-                }
+-            }
+-            if (files.isNotEmpty()) item(key = "files") {
+-                HxSection {
+-                    HxGroup {
+-                        files.forEach { entry ->
+-                            HxRow(entry.name, referenceRow = true, referenceTextSizeSp = 18f, minimumHeight = 74.dp,
+-                                subtitle = listOf(HxFormat.bytes(entry.size), if (entry.modified > 0) HxFormat.ago(entry.modified * 1000L) else "")
+-                                    .filter { it.isNotBlank() }.joinToString(" · "),
+-                                icon = Icons.Rounded.Description,
+-                                onClick = { haptics.perform(HetuHaptic.Tap); openFile(entry) },
++                        HxRow("..", icon = Icons.AutoMirrored.Rounded.ArrowBack, referenceRow = true,
++                            referenceTextSizeSp = 18f, minimumHeight = 68.dp, onClick = {
++                                val parent = File(path).parentFile?.path.orEmpty()
++                                onOpen(parent.takeIf { it == root || it.startsWith("$root/") } ?: root)
++                            })
++                        (folders + files).forEach { entry ->
++                            FileReferenceEntryRow(entry, (menuFor ?: renameFor ?: deleteFor)?.path == entry.path,
++                                onClick = { haptics.perform(HetuHaptic.Tap); if (entry.directory) onOpen(entry.path) else openFile(entry) },
+                                 onLongClick = { menuFor = entry })
+                         }
+                     }
+                 }
++            } else {
++                listOf("folders" to folders, "files" to files).filter { it.second.isNotEmpty() }.forEach { (key, grouped) ->
++                    item(key = key) {
++                        HxSection {
++                            HxGroup {
++                                grouped.forEach { entry ->
++                                    FileReferenceEntryRow(entry, (menuFor ?: renameFor ?: deleteFor)?.path == entry.path,
++                                        onClick = { haptics.perform(HetuHaptic.Tap); if (entry.directory) onOpen(entry.path) else openFile(entry) },
++                                        onLongClick = { menuFor = entry })
++                                }
++                            }
++                        }
++                    }
++                }
+             }
+             if (visibleEntries.isEmpty() && query.isNotBlank()) item(key = "no-matches") {
+                 HxEmpty(Icons.Rounded.SearchOff, "没有匹配的文件", "试试其他文件名称")
+@@ -749,11 +730,21 @@
+ 
+         }
+     }
++
++    if (moreMenu) HxActionMenu(
++        title = "文件管理", onDismiss = { moreMenu = false },
++        actions = listOf(
++            HxMenuAction("导入", Icons.Rounded.FileUpload) { moreMenu = false; importer.launch(arrayOf("*/*")) },
++            HxMenuAction("下载", Icons.Rounded.SystemUpdateAlt) { moreMenu = false; downloadDialog = true },
++            HxMenuAction("新建文件", Icons.Rounded.NoteAdd) { moreMenu = false; createFolder = false },
++            HxMenuAction("新建文件夹", Icons.Rounded.CreateNewFolder) { moreMenu = false; createFolder = true },
++        ),
++    )
+ 
+     menuFor?.let { entry ->
+         HxActionMenu(
+             title = entry.name,
+-            referenceFileMenu = true,
++            referenceFileMenu = true, dimBehind = true, dimAmount = if (entry.directory) .38f else .45f, emphasizeAnchor = true,
+             actions = buildList {
+                 if (entry.directory) add(HxMenuAction("打开", Icons.Rounded.FolderOpen) { menuFor = null; onOpen(entry.path) })
+                 else add(HxMenuAction("编辑", Icons.Rounded.Edit) { menuFor = null; openFile(entry) })
+@@ -767,6 +758,7 @@
+     createFolder?.let { folder ->
+         HxFormDialog(
+             title = if (folder) "新建文件夹" else "新建文件",
++            widthFraction = .84f,
+             fields = listOf(HxField("名称", placeholder = if (folder) "例如 backup" else "例如 config.yaml")),
+             confirmLabel = "创建",
+             validate = { v -> runCatching { RuntimeFilesRepository.child(path, v[0]) }.exceptionOrNull()?.message },
+@@ -780,6 +772,7 @@
+     if (downloadDialog) {
+         HxFormDialog(
+             title = "下载到当前目录",
++            widthFraction = .87f, titleFontSize = 22.sp, hideMessageOnError = true, highlightError = false, plainFields = true,
+             message = "支持 HTTPS。文件名可留空，河图会从下载地址自动推断。",
+             fields = listOf(
+                 HxField("下载地址", placeholder = "https://example.com/file.yaml"),
+@@ -836,6 +829,19 @@
+             onDismiss = { deleteFor = null },
+         )
+     }
++}
++
++@Composable
++private fun FileReferenceEntryRow(entry: RuntimeFileEntry, selected: Boolean, onClick: () -> Unit, onLongClick: () -> Unit) {
++    val c = Hx.colors
++    HxRow(entry.name, referenceRow = true, referenceTextSizeSp = 18f,
++        modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(if (selected) c.accentSoft else Color.Transparent),
++        minimumHeight = if (entry.directory) 68.dp else 74.dp,
++        subtitle = if (entry.directory) null else listOf(HxFormat.bytes(entry.size), if (entry.modified > 0) HxFormat.ago(entry.modified * 1000L) else "")
++            .filter { it.isNotBlank() }.joinToString(" · "),
++        icon = if (entry.directory) Icons.Rounded.Folder else Icons.Rounded.Description,
++        onClick = onClick, onLongClick = onLongClick,
++        trailing = if (entry.directory) ({ HxChevron() }) else null)
+ }
+ 
+ /* ------------------------------------------------------------------ */
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
+@@ -1,9 +1,30 @@
+ package io.github.xgl34222220.hetu.ui
+ 
+ import androidx.compose.runtime.*
++import android.content.SharedPreferences
+ import androidx.compose.ui.platform.LocalConfiguration
++import androidx.compose.ui.platform.LocalContext
++import java.util.Locale
+ 
+ val LocalHetuLanguage = staticCompositionLocalOf { "system" }
++
++/** Observe the persisted setting, including changes made by a different settings screen. */
++@Composable
++fun rememberHetuLanguage(): String {
++    val context = LocalContext.current
++    val prefs = remember(context) { context.getSharedPreferences("hetu", 0) }
++    fun currentSetting() = prefs.getString("appLanguage", "system").orEmpty().ifBlank { "system" }
++    var language by remember(prefs) { mutableStateOf(currentSetting()) }
++    DisposableEffect(prefs) {
++        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
++            if (key == "appLanguage" || key == null) language = currentSetting()
++        }
++        prefs.registerOnSharedPreferenceChangeListener(listener)
++        language = currentSetting()
++        onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
++    }
++    return language
++}
+ 
+ /** Stable UI vocabulary. Technical diagnostics and user content retain their original text. */
+ private val vocabulary = """
+@@ -93,6 +114,119 @@
+ 顶栏模糊样式|Header blur style|頂列模糊樣式|Размытие заголовка
+ 高斯模糊|Gaussian blur|高斯模糊|Гауссово размытие
+ 渐进式模糊|Progressive blur|漸進式模糊|Постепенное размытие
++规则集|Rule sets|規則集|Наборы правил
++高级代理配置|Advanced proxy settings|進階代理設定|Дополнительные настройки прокси
++语言与主题|Language and appearance|語言與主題|Язык и оформление
++主题设置|Appearance settings|主題設定|Настройки оформления
++默认面板|Default panel|預設面板|Панель по умолчанию
++默认面板页面|Default panel page|預設面板頁面|Начальная страница панели
++开机启动与下载|Startup and downloads|開機啟動與下載|Автозапуск и загрузки
++核心、模式与当前配置|Core, mode and current configuration|核心、模式與目前設定|Ядро, режим и текущая конфигурация
++性能、DNS 与资源限制|Performance, DNS and resource limits|效能、DNS 與資源限制|Производительность, DNS и лимиты ресурсов
++显示语言、主题与显示|Language, theme and display|顯示語言、主題與顯示|Язык, тема и экран
++选择面板与显示偏好|Panel and display preferences|選擇面板與顯示偏好|Панель и параметры отображения
++导出与恢复应用设置|Export and restore app settings|匯出與還原應用程式設定|Экспорт и восстановление настроек
++启动设置与资源下载|Startup settings and resource downloads|啟動設定與資源下載|Автозапуск и загрузка ресурсов
++管理运行状态提醒|Manage runtime notifications|管理執行狀態提醒|Уведомления о состоянии
++版本与开源信息|Version and open source information|版本與開源資訊|Версия и открытый исходный код
++切换应用语言|Choose the app language|切換應用程式語言|Выбрать язык приложения
++主题模式|Theme mode|主題模式|Режим темы
++浅色模式|Light mode|淺色模式|Светлая тема
++深色模式|Dark mode|深色模式|Тёмная тема
++浅色|Light|淺色|Светлая
++深色|Dark|深色|Тёмная
++与系统设置保持一致|Use system settings|與系統設定保持一致|Как в системе
++始终使用浅色主题|Always use a light theme|一律使用淺色主題|Всегда светлая тема
++始终使用深色主题|Always use a dark theme|一律使用深色主題|Всегда тёмная тема
++Monet 动态取色|Dynamic colors|Monet 動態取色|Динамические цвета
++使用系统壁纸提供的配色|Use colors from the system wallpaper|使用系統桌布提供的配色|Цвета из системных обоев
++深色纯黑背景|Pure black dark background|深色純黑背景|Чёрный фон в тёмной теме
++OLED 模式使用纯黑画布|Use a pure black canvas in OLED mode|OLED 模式使用純黑畫布|Чёрный фон для OLED
++强调色|Accent color|強調色|Акцентный цвет
++模糊效果|Blur effects|模糊效果|Размытие
++控制顶栏、底栏与浮层的实时模糊|Blur headers, navigation and overlays|控制頂列、底列與浮層的即時模糊|Размытие панелей и всплывающих окон
++选择顶栏磨砂的过渡方式|Choose the header blur transition|選擇頂列磨砂的過渡方式|Выбрать переход размытия заголовка
++关闭后底栏吸附屏幕底部|Dock navigation at the bottom when disabled|關閉後底列吸附螢幕底部|Закрепить навигацию внизу при отключении
++为底栏加入通透的折射与高光|Add translucent refraction and highlights|為底列加入通透的折射與高光|Преломление и блики для навигации
++预测性返回动画|Predictive back animation|預測式返回動畫|Анимация возврата
++返回手势让页面跟手缩放、位移并露出上一层|Preview the previous page during the back gesture|返回手勢讓頁面跟手縮放、位移並露出上一層|Предпросмотр предыдущей страницы при возврате
++动画方向跟随滑动边缘|Follow the gesture edge|動畫方向跟隨滑動邊緣|Следовать краю жеста
++从右边缘返回时方向同步反转|Reverse the animation for right-edge gestures|從右邊緣返回時方向同步反轉|Обратить анимацию для жеста справа
++统一调整界面和文字大小|Adjust interface and text size together|統一調整介面和文字大小|Масштаб интерфейса и текста
++顶部更浓，向内容区域逐渐消散|Stronger at the top, fading into the content|頂部更濃，向內容區域逐漸消散|Сильнее вверху, слабее у содержимого
++整条顶栏使用均匀磨砂|Apply uniform blur across the header|整條頂列使用均勻磨砂|Равномерное размытие заголовка
++启动时打开面板|Open the panel on startup|啟動時開啟面板|Открывать панель при запуске
++显示底栏面板入口|Show the panel in navigation|顯示底列面板入口|Показывать панель в навигации
++加速下载|Download acceleration|加速下載|Ускорение загрузок
++镜像前缀|Mirror prefix|鏡像前綴|Префикс зеркала
++请填写 http/https 地址|Enter an http/https URL|請填寫 http/https 位址|Введите адрес http/https
++回到顶部|Back to top|回到頂部|Наверх
++清除|Clear|清除|Очистить
++关闭详情|Close details|關閉詳情|Закрыть подробности
++正在启动|Starting|正在啟動|Запуск
++正在停止|Stopping|正在停止|Остановка
++正在重启|Restarting|正在重新啟動|Перезапуск
++正在重载|Reloading|正在重新載入|Перезагрузка
++运行中|Running|執行中|Работает
++未运行|Stopped|未執行|Остановлено
++尚未启动代理|Proxy has not started|尚未啟動代理|Прокси не запущен
++常用|Favorites|常用|Основное
++配置与订阅|Configurations and subscriptions|設定與訂閱|Конфигурации и подписки
++广告过滤|Ad blocking|廣告過濾|Блокировка рекламы
++站点延迟|Site latency|網站延遲|Задержка сайтов
++更新订阅|Update subscriptions|更新訂閱|Обновить подписки
++详情|Details|詳情|Подробности
++上行|Upload|上行|Отправка
++下行|Download|下行|Загрузка
++实时网络|Live network|即時網路|Сеть в реальном времени
++当前节点|Current proxy|目前節點|Текущий прокси
++核心管理|Core management|核心管理|Управление ядром
++应用管理|App management|應用程式管理|Управление приложениями
++公网 IP 详情|Public IP details|公網 IP 詳情|Внешний IP-адрес
++核心运行详情|Core runtime details|核心執行詳情|Состояние ядра
++重载配置|Reload configuration|重新載入設定|Перезагрузить конфигурацию
++重启代理|Restart proxy|重新啟動代理|Перезапустить прокси
++流量|Traffic|流量|Трафик
++总下载|Total download|總下載|Всего загружено
++总上传|Total upload|總上傳|Всего отправлено
++内存|Memory|記憶體|Память
++运行|Uptime|執行|Время работы
++网络|Network|網路|Сеть
++本机地址|Local address|本機位址|Локальный адрес
++网速数据来源|Traffic data source|網速資料來源|Источник данных о трафике
++配置管理|Configuration management|設定管理|Управление конфигурациями
++日志文件|Log files|日誌檔案|Файлы журналов
++诊断工具|Diagnostics|診斷工具|Диагностика
++Web面板|Web panels|Web 面板|Веб-панели
++查看与处理应用文件|View and manage app files|檢視與處理應用程式檔案|Просмотр и управление файлами
++运行与管理服务脚本|Run and manage service scripts|執行與管理服務指令碼|Запуск и управление скриптами
++查看与导出运行日志|View and export runtime logs|檢視與匯出執行日誌|Просмотр и экспорт журналов
++代理与直连|Proxy and direct routing|代理與直連|Прокси и прямое подключение
++热点与代理|Hotspot and proxy|熱點與代理|Точка доступа и прокси
++自动切换|Automatic switching|自動切換|Автоматическое переключение
++网段与接口|Subnets and interfaces|網段與介面|Подсети и интерфейсы
++导入与编辑配置文件|Import and edit configurations|匯入與編輯設定檔案|Импорт и редактирование конфигураций
++订阅处理|Subscription processing|訂閱處理|Обработка подписок
++规则集管理|Manage rule sets|規則集管理|Управление наборами правил
++下载与更新|Download and update|下載與更新|Загрузка и обновление
++规则与屏蔽|Rules and blocking|規則與封鎖|Правила и блокировки
++网络与环境|Network and environment|網路與環境|Сеть и окружение
++外部面板|External panels|外部面板|Внешние панели
++关闭搜索|Close search|關閉搜尋|Закрыть поиск
++搜索工具|Search tools|搜尋工具|Поиск инструментов
++没有匹配的工具|No matching tools|沒有符合的工具|Инструменты не найдены
++试试工具名称或功能关键词|Try a tool name or feature keyword|試試工具名稱或功能關鍵字|Введите название или ключевое слово
++延迟|Latency|延遲|Задержка
++网速|Speed|網速|Скорость
++资源占用|Resources|資源使用|Ресурсы
++已用|Used|已用|Использовано
++总量|Total|總量|Всего
++长按更新全部|Hold to update all|長按更新全部|Удерживайте, чтобы обновить всё
++无在线订阅|No online subscriptions|無線上訂閱|Нет активных подписок
++接口|Interface|介面|Интерфейс
++地区|Region|地區|Регион
++全局|Global|全域|Глобальный
++直连|Direct|直連|Напрямую
+ """.trimIndent().lineSequence().map { it.split('|') }.associate { it[0] to it.drop(1) }
+ 
+ fun translateHetuText(source: String, language: String): String {
+@@ -102,6 +236,9 @@
+ 
+ @Composable fun ht(source: String): String {
+     val setting = LocalHetuLanguage.current
+-    val language = if (setting == "system") LocalConfiguration.current.locales[0].toLanguageTag() else setting
++    val language = if (setting.isBlank() || setting == "system") {
++        val locales = LocalConfiguration.current.locales
++        if (locales.isEmpty) "zh-CN" else locales[0].toLanguageTag()
++    } else setting
+     return translateHetuText(source, language)
+ }
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt
+@@ -415,7 +415,13 @@
+         expect("config.yaml"); capture("03B-012-runtime-editor")
+         touch("更多"); expect("跳转到行"); capture("03B-026-runtime-editor-menu")
+         click("跳转到行"); capture("03B-027-runtime-editor-jump"); click("继续编辑")
+-        touch("更多"); click("搜索"); capture("03B-029-runtime-editor-search")
++        touch("更多"); click("搜索"); replace(0, "mode")
++        expectEventually("2 个匹配")
++        rule.runOnUiThread { assertEquals(2, editor().searcher.matchedPositionCount) }
++        capture("03B-029-runtime-editor-search")
++        click("下一个匹配"); click("上一个匹配")
++        click("清空搜索"); expectEventually("0 个匹配")
++        rule.runOnUiThread { assertFalse(editor().searcher.hasQuery()) }
+         back(); changeEditor(yaml + "\n# runtime draft\n"); click("返回"); capture("03B-028-runtime-editor-discard"); click("继续编辑")
+     }
+     @Test fun fileManagerMenusFormsValidationAndCancellations() {
+@@ -482,11 +488,21 @@
+         vm.filters.javaClass.getDeclaredField("appCache").apply { isAccessible = true }.set(vm.filters, apps)
+         vm.prefs.edit().putString("proxyAppScope", "blacklist").putStringSet("proxyAppPackages", setOf("com.example.chat")).commit()
+         show { AppListScreen(vm) }; expectEventually("微信"); capture("03A-028-app-blacklist")
++        var summaryBottom = 0f
++        rule.runOnUiThread {
++            val summary = nativeNodes().single { it.config.getOrNull(SemanticsProperties.TestTag) == "app-routing-summary" }
++            summaryBottom = summary.boundsInWindow.bottom
++            assertTrue("Selection summary stays at the viewport bottom, not after short results", summaryBottom > rule.activity.window.decorView.height - 24f)
++        }
+         touch("排序"); capture("03A-029-app-sort"); click("按 UID")
+         touch("更多"); capture("03A-030-app-more"); click("隐藏系统应用")
+         click("白名单"); capture("03A-031-app-whitelist"); assertEquals("whitelist", vm.prefs.getString("proxyAppScope", ""))
+         click("核心"); capture("03A-032-app-core-mode")
+         click("黑名单"); click("搜索"); replace(0,"微信"); capture("03A-033-app-search")
++        rule.runOnUiThread {
++            val summary = nativeNodes().single { it.config.getOrNull(SemanticsProperties.TestTag) == "app-routing-summary" }
++            assertEquals("Search cannot pull the summary up into the scrolling list", summaryBottom, summary.boundsInWindow.bottom, 1f)
++        }
+     }
+     @Test fun panelLogReadSearchAndExpand() {
+         fixture("state", vm.state.copy(running=true, panelReady=true)); vm.openPanel("logs"); show { HetuRoot(vm) }
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/MainLanguageBindingTest.kt
+@@ -0,0 +1,195 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import android.content.res.Configuration
++import android.os.LocaleList
++import android.os.Looper
++import android.view.View
++import android.view.ViewGroup
++import android.view.inspector.WindowInspector
++import androidx.activity.ComponentActivity
++import androidx.activity.compose.setContent
++import androidx.compose.foundation.layout.Column
++import androidx.compose.material3.Text
++import androidx.compose.runtime.*
++import androidx.compose.ui.platform.LocalConfiguration
++import androidx.compose.ui.semantics.*
++import androidx.compose.ui.test.junit4.createAndroidComposeRule
++import androidx.compose.ui.text.AnnotatedString
++import androidx.test.core.app.ApplicationProvider
++import io.github.xgl34222220.hetu.ui.ht
++import io.github.xgl34222220.hetu.ui.translateHetuText
++import org.junit.After
++import org.junit.Before
++import org.junit.Rule
++import org.junit.Test
++import org.junit.Assert.*
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.Shadows
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.GraphicsMode
++import java.time.Duration
++
++/** Production theme, settings chooser, navigation and raw-content boundaries. No core is started. */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], qualifiers = "zh-rCN-w393dp-h852dp-mdpi", application = Application::class)
++@GraphicsMode(GraphicsMode.Mode.NATIVE)
++class MainLanguageBindingTest {
++    @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
++    private val app get() = ApplicationProvider.getApplicationContext<Application>()
++    private val prefs get() = app.getSharedPreferences("hetu", 0)
++    private var vm: HetuViewModel? = null
++
++    @Before fun prepare() {
++        prefs.edit().clear().putString("appLanguage", "zh-CN")
++            .putBoolean("enableBlur", false).putBoolean("enableAnimations", false)
++            .putBoolean("liquidGlass", false).putBoolean("predictiveBackAnimation", false).commit()
++        rule.mainClock.autoAdvance = false
++    }
++
++    @After fun finish() {
++        rule.runOnUiThread { rule.activity.setContent {} }
++        frame()
++        vm?.onBackground()
++    }
++
++    private fun frame() {
++        repeat(4) {
++            rule.mainClock.advanceTimeBy(200)
++            rule.runOnUiThread { Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100)) }
++        }
++    }
++
++    private fun show(content: @Composable () -> Unit) {
++        rule.runOnUiThread { rule.activity.setContent { HetuAppTheme("light", false, content = content) } }
++        frame()
++    }
++
++    private fun nodes(): List<SemanticsNode> {
++        val result = mutableListOf<SemanticsNode>()
++        fun visitNode(node: SemanticsNode) { result += node; node.children.forEach(::visitNode) }
++        fun visitView(view: View) {
++            view.javaClass.methods.firstOrNull { it.name == "getSemanticsOwner" }?.let {
++                visitNode((it.invoke(view) as SemanticsOwner).rootSemanticsNode)
++            }
++            if (view is ViewGroup) (0 until view.childCount).forEach { visitView(view.getChildAt(it)) }
++        }
++        WindowInspector.getGlobalWindowViews().asReversed().forEach(::visitView)
++        return result
++    }
++
++    private fun labels(node: SemanticsNode) =
++        node.config.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text } +
++            node.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty() +
++            listOfNotNull(node.config.getOrNull(SemanticsProperties.EditableText)?.text)
++
++    private fun assertVisible(label: String) = rule.runOnUiThread {
++        assertTrue("Missing '$label'; visible labels: ${nodes().flatMap(::labels)}", nodes().any { label in labels(it) })
++    }
++
++    private fun click(label: String) {
++        rule.runOnUiThread {
++            val node = nodes().firstOrNull { label in labels(it) && it.config.getOrNull(SemanticsActions.OnClick) != null }
++            assertNotNull("No clickable '$label'; visible labels: ${nodes().flatMap(::labels)}", node)
++            assertTrue(node!!.config[SemanticsActions.OnClick].action!!.invoke())
++        }
++        frame()
++    }
++
++    @Test fun chooserUpdatesMainNavigationAndSurvivesActivityRecreation() {
++        val first = HetuViewModel(app).also { vm = it; it.tab = HxTab.Settings }
++        show { HetuRoot(first) }
++        click("语言与主题")
++        click("语言")
++        click("English")
++        assertEquals("en", prefs.getString("appLanguage", null))
++        assertVisible("Language")
++        assertVisible("Appearance settings")
++        click("Back")
++        assertVisible("Language and appearance")
++        assertVisible("Home")
++        click("Tools")
++        assertVisible("Files")
++        assertVisible("View and manage app files")
++
++        // A preference edit outside the current screen must invalidate the theme by itself.
++        rule.runOnUiThread { prefs.edit().putString("appLanguage", "ru").apply() }
++        frame()
++        assertVisible("Инструменты")
++        assertVisible("Файлы")
++        rule.runOnUiThread { prefs.edit().putString("appLanguage", "zh-TW").apply() }
++        frame()
++        assertVisible("檔案管理")
++
++        rule.activityRule.scenario.recreate()
++        first.onBackground()
++        val restarted = HetuViewModel(app).also { vm = it; it.tab = HxTab.Settings }
++        show { HetuRoot(restarted) }
++        assertEquals("zh-TW", prefs.getString("appLanguage", null))
++        assertVisible("設定")
++        assertVisible("語言與主題")
++    }
++
++    @Test fun systemLocaleChangesAndBlankPreferenceFallBackToConfiguration() {
++        val configuration = mutableStateOf(Configuration(app.resources.configuration).apply {
++            setLocales(LocaleList.forLanguageTags("en-US"))
++        })
++        rule.runOnUiThread { prefs.edit().putString("appLanguage", "system").apply() }
++        show { CompositionLocalProvider(LocalConfiguration provides configuration.value) { Text(ht("首页")) } }
++        assertVisible("Home")
++        rule.runOnUiThread {
++            configuration.value = Configuration(configuration.value).apply { setLocales(LocaleList.forLanguageTags("ru-RU")) }
++        }
++        frame()
++        assertVisible("Главная")
++        rule.runOnUiThread { prefs.edit().putString("appLanguage", "zh-CN").apply() }
++        frame()
++        assertVisible("首页")
++        rule.runOnUiThread { prefs.edit().putString("appLanguage", "").apply() }
++        frame()
++        assertVisible("Главная")
++        rule.runOnUiThread { prefs.edit().remove("appLanguage").apply() }
++        frame()
++        assertVisible("Главная")
++    }
++
++    @Test fun userNamesInputsAndDiagnosticsStayVerbatimEvenWhenTheyMatchVocabulary() {
++        rule.runOnUiThread { prefs.edit().putString("appLanguage", "en").apply() }
++        var userName = "首页"
++        show { Column {
++            // Config/group/node/file names can legitimately collide with any vocabulary entry.
++            SettingsRow("工具", subtitle = "首页")
++            HxRow("保存", subtitle = "语言")
++            SettingsInput(userName, { userName = it })
++        } }
++        listOf("工具", "首页", "保存", "语言").forEach(::assertVisible)
++        rule.runOnUiThread {
++            assertFalse(nodes().flatMap(::labels).any { it in listOf("Tools", "Home", "Save", "Language") })
++            val field = nodes().first { it.config.getOrNull(SemanticsActions.SetText) != null }
++            assertTrue(field.config[SemanticsActions.SetText].action!!.invoke(AnnotatedString("设置")))
++        }
++        assertEquals("设置", userName)
++        show { HxPage(title = "首页") { item { Text("工具") } } }
++        assertVisible("首页")
++        assertVisible("工具")
++        // This viewer also renders logs, diagnostics and generated YAML. Never translate its body.
++        show { HxTextSheet(title = "工具", text = "首页", onDismiss = {}) }
++        assertVisible("工具")
++        assertVisible("首页")
++        val yaml = "proxy-groups:\n  - name: 工具\n    proxies: [首页, 设置]\n"
++        show { HxTextSheet(title = "诊断", text = yaml, onDismiss = {}) }
++        assertVisible(yaml)
++    }
++
++    @Test fun vocabularySupportsAllFourLanguagesWithoutTranslatingUnknownText() {
++        assertEquals("首页", translateHetuText("首页", "zh-CN"))
++        assertEquals("首頁", translateHetuText("首页", "zh-TW"))
++        assertEquals("首頁", translateHetuText("首页", "zh-Hant-HK"))
++        assertEquals("Home", translateHetuText("首页", "en-US"))
++        assertEquals("Главная", translateHetuText("首页", "ru-RU"))
++        assertEquals("首页", translateHetuText("首页", "fr-FR"))
++        val diagnostic = "Mihomo: 配置 tools.yaml\nproxy-groups: [首页]"
++        listOf("zh-CN", "zh-TW", "en", "ru").forEach { assertEquals(diagnostic, translateHetuText(diagnostic, it)) }
++    }
++}
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelLayoutDefaultsTest.kt
+@@ -0,0 +1,38 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import androidx.test.core.app.ApplicationProvider
++import org.junit.Assert.*
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], application = Application::class)
++class PanelLayoutDefaultsTest {
++    private fun preferences() = ApplicationProvider.getApplicationContext<Application>()
++        .getSharedPreferences("layout-defaults-test", 0).also { it.edit().clear().commit() }
++
++    @Test fun missingPreferencesUseReferenceCompactTwoColumnLayout() {
++        val options = PanelOptions11.read(preferences())
++        assertTrue(options.compact)
++        assertTrue(options.groupCompact)
++        assertEquals(2, options.columns)
++        assertEquals(2, options.groupColumns)
++    }
++
++    @Test fun explicitStandardLayoutSurvivesReadingAndOtherPresentationEdits() {
++        val prefs = preferences()
++        prefs.edit().putString("proxySelectorDensity", "standard")
++            .putString("proxySelectorGroupDensity", "standard").commit()
++        val selected = PanelOptions11.read(prefs)
++        assertFalse(selected.compact)
++        assertFalse(selected.groupCompact)
++        selected.copy(sort = "delay").save(prefs)
++        val restored = PanelOptions11.read(prefs)
++        assertFalse(restored.compact)
++        assertFalse(restored.groupCompact)
++        assertEquals("delay", restored.sort)
++    }
++}
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt
+@@ -35,7 +35,8 @@
+     }
+     @Test fun uiVersionBumpDoesNotRequestRuntimeRedeployment() {
+         val p = prefs()
+-        assertEquals(145, ProxyRuntimeSettings.RUNTIME_REVISION)
++        // V20.60 explicitly introduced startup-protocol revision 147; UI-only deltas keep it.
++        assertEquals(147, ProxyRuntimeSettings.RUNTIME_REVISION)
+         assertFalse(ProxyRuntimeSettings.runtimeUpgradePending(true, 492, true))
+         assertFalse(ProxyRuntimeSettings.runtimeUpgradePending(true, p))
+     }
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/SettingsConceptParityTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/SettingsConceptParityTest.kt
+@@ -25,7 +25,7 @@
+ import java.time.Duration
+ 
+ @RunWith(RobolectricTestRunner::class)
+-@Config(sdk = [35], qualifiers = "w393dp-h852dp-mdpi", application = Application::class)
++@Config(sdk = [35], qualifiers = "zh-rCN-w393dp-h852dp-mdpi", application = Application::class)
+ @GraphicsMode(GraphicsMode.Mode.NATIVE)
+ class SettingsConceptParityTest {
+     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()

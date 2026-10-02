@@ -7,6 +7,7 @@ from pathlib import Path
 PKG='io.github.xgl34222220.hetu'
 ADB=str(Path(os.environ['ANDROID_HOME'])/'platform-tools'/'adb')
 OUT=Path(os.environ.get('HETU_SMOKE_OUT','out/android-smoke')); OUT.mkdir(parents=True,exist_ok=True)
+from mock_webview_controller import controller_fixture
 checks=[]
 def adb(*args, timeout=90, check=True):
  try:
@@ -42,6 +43,41 @@ def expect(label,name):
  root=capture(name);assert any(label in n.get('text','') or label in n.get('content-desc','') for n in root.iter('node')),(label,name)
  checks.append({'name':name,'result':'passed'})
 
+def expect_eventually(label,name):
+ deadline=time.monotonic()+120
+ while time.monotonic()<deadline:
+  root,_=ui()
+  if any(label in n.get('text','') or label in n.get('content-desc','') for n in root.iter('node')):
+   expect(label,name);return
+  time.sleep(2)
+ raise AssertionError('Timed out waiting for native WebView label: '+label)
+
+def wait_for_home():
+ # Software-emulated AOSP may present its own first-boot System UI ANR.
+ # Preserve evidence, wait for that exact system process at most twice, and
+ # never dismiss an application ANR or turn off Android's ANR detector.
+ deadline=time.monotonic()+300
+ recoveries=0
+ while time.monotonic()<deadline:
+  root,_=ui()
+  nodes=list(root.iter('node'))
+  titles=[n.get('text','') for n in nodes if n.get('resource-id')=='android:id/alertTitle']
+  if "System UI isn't responding" in titles:
+   assert recoveries<2,'System UI repeatedly failed to recover'
+   capture(f'system-ui-anr-{recoveries+1}')
+   waiters=[n for n in nodes if n.get('package')=='android' and n.get('resource-id')=='android:id/aerr_wait' and n.get('text')=='Wait']
+   assert len(waiters)==1,[(n.get('text'),n.get('resource-id')) for n in nodes]
+   x1,y1,x2,y2=map(int,re.findall(r'\d+',waiters[0].get('bounds','')))
+   adb('shell','input','tap',str((x1+x2)//2),str((y1+y2)//2));recoveries+=1
+   time.sleep(20);continue
+  assert not any("isn't responding" in title for title in titles),('Unexpected application ANR',titles)
+  if any(n.get('package')==PKG and n.get('text')=='河图' for n in nodes):
+   (OUT/'first-frame-ready.json').write_text(json.dumps({'system_ui_wait_recoveries':recoveries,'app_visible':True}))
+   return
+  assert adb('shell','pidof',PKG,check=False).strip(),'App process exited before first frame'
+  time.sleep(5)
+ raise AssertionError('Hetu did not become visible after system startup settled')
+
 def main():
  end=time.monotonic()+900
  while time.monotonic()<end:
@@ -69,13 +105,23 @@ def main():
  installed=adb('install','--no-streaming','-r',str(apk),timeout=600)
  (OUT/'install.txt').write_text(installed)
  assert 'Success' in installed,installed
- version=adb('shell','dumpsys','package',PKG);assert 'versionCode=2065' in version
+ version=adb('shell','dumpsys','package',PKG);assert 'versionCode='+os.environ.get('HETU_EXPECTED_VERSION','2066') in version
  (OUT/'version.txt').write_text('\n'.join(line for line in version.splitlines() if 'versionCode=' in line or 'versionName=' in line))
  components=adb('shell','cmd','package','query-activities','--brief','--components','--query-flags','0','--user','0','-a','android.intent.action.MAIN','-c','android.intent.category.LAUNCHER','-p',PKG)
  choices=[line.strip() for line in components.splitlines() if line.strip().startswith(PKG+'/')];assert choices,components
- adb('logcat','-c');adb('shell','am','start','-W','-n',choices[0],timeout=180);time.sleep(8)
+ adb('logcat','-c')
+ (OUT/'launch.txt').write_text(adb('shell','am','start','-W','-n',choices[0],timeout=240))
+ wait_for_home()
  assert adb('shell','pidof',PKG,check=False).strip(),'App process exited at launch'
  expect('河图','01-home')
+ # New language binding follows the actual system locale. Exercise the visible
+ # preference picker before collecting the Chinese-reference navigation set.
+ root,_=ui()
+ if any(n.get('text')=='Settings' for n in root.iter('node')):
+  click('Settings',bottom=True);click('Language and appearance');click('Language')
+  click('简体中文');expect('语言与主题','00-language-selected')
+  adb('shell','input','keyevent','4');time.sleep(2);click('首页',bottom=True)
+  expect('河图','01-home-language-restored')
  click('面板',bottom=True);expect('代理未运行','02-panel-stopped')
  click('工具',bottom=True);expect('文件管理','03-tools')
  click('设置',bottom=True);expect('基础代理配置','04-settings')
@@ -85,10 +131,28 @@ def main():
  click('河图本地面板');time.sleep(8);expect('河图 WebUI','07-native-webview')
  expect('未连接','08-native-webview-disconnected')
  adb('shell','input','keyevent','4');time.sleep(2);expect('河图本地面板','09-webview-back')
+ # Fresh emulator only: no proxy process, subscription, network rules or Root.
+ # Server listens solely on host127.0.0.1; always remove the test-only reverse.
+ with controller_fixture() as (fixture_port, requests):
+  device_port=29090
+  adb('reverse',f'tcp:{device_port}',f'tcp:{fixture_port}')
+  try:
+   click('河图本地面板')
+   expect_eventually('Mihomo v1.19.0','reference-03B-040-native-overview')
+   click('策略组');expect_eventually('节点选择','reference-03B-041-native-groups')
+   click('连接');expect_eventually('api.example.com','reference-03B-042-native-connections')
+   click('策略组');click('节点选择：选择节点')
+   expect_eventually('香港 02','reference-03B-043-native-node-dialog')
+   click('香港 02');expect_eventually('切换失败：HTTP 503','reference-03B-044-native-switch-failure')
+   assert any(r.get('method')=='PUT' and r.get('valid_fixture_request') for r in requests),requests
+   click('确定')
+  finally:
+   adb('reverse','--remove',f'tcp:{device_port}')
+   (OUT/'native-webview-fixture-requests.json').write_text(json.dumps(requests,ensure_ascii=False,indent=2))
  log=adb('logcat','-d','-v','brief',timeout=30);(OUT/'logcat.txt').write_text(log)
  assert not re.search(r'FATAL EXCEPTION[\s\S]{0,1000}Process: '+re.escape(PKG),log),'Application crash in logcat'
  assert adb('shell','pidof',PKG,check=False).strip(),'App process exited after navigation'
- (OUT/'results.json').write_text(json.dumps({'checks':checks,'passed':len(checks),'fixtureOnly':True,'rootActions':0,'limitations':'Fresh AOSP emulator, offline backend. No K80, Root boot, real network or populated native-WebView state acceptance.'},ensure_ascii=False,indent=2))
+ (OUT/'results.json').write_text(json.dumps({'checks':checks,'passed':len(checks),'fixtureOnly':True,'rootActions':0,'limitations':'Fresh AOSP emulator. Five populated native-WebView states use an isolated loopback fixture with deliberate HTTP503 switch rejection. No K80, real core, Root boot or actual network validation.'},ensure_ascii=False,indent=2))
 try:main()
 except Exception:
  try:capture('failure')
