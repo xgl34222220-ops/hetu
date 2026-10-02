@@ -5,6 +5,7 @@ Never starts/stops a proxy, requests permissions, imports user data, or clears a
 """
 import json, os, re, subprocess, time, xml.etree.ElementTree as ET
 from pathlib import Path
+from contextlib import contextmanager
 PKG='io.github.xgl34222220.hetu'
 ADB=str(Path(os.environ['ANDROID_HOME'])/'platform-tools'/'adb')
 OUT=Path(os.environ.get('HETU_SMOKE_OUT','out/android-smoke')); OUT.mkdir(parents=True,exist_ok=True)
@@ -107,6 +108,48 @@ def wait_for_home():
   time.sleep(5)
  raise AssertionError('Hetu did not become visible after system startup settled')
 
+@contextmanager
+def webview_cdp():
+ pid=adb('shell','pidof',PKG).strip()
+ assert pid.isdigit(),('Expected one app process',pid)
+ port=adb('forward','tcp:0','localabstract:webview_devtools_remote_'+pid).strip()
+ assert port.isdigit(),port
+ try:yield int(port)
+ finally:
+  adb('forward','--remove','tcp:'+port)
+  remaining=adb('forward','--list')
+  assert not any(len(parts)>1 and parts[1]=='tcp:'+port for parts in (line.split() for line in remaining.splitlines())),remaining
+  proof=OUT/'webview-forward-cleanup.json'
+  entries=json.loads(proof.read_text()) if proof.exists() else []
+  entries.append({'app_pid':int(pid),'local_port':int(port),'removed':True})
+  proof.write_text(json.dumps(entries,indent=2))
+
+def web_command(port,action='read',label=None):
+ command=['node',str(Path(__file__).with_name('check_hetu_webview.cjs')),str(port),action]
+ if label is not None:command.append(label)
+ result=subprocess.run(command,check=False,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=45)
+ if result.returncode:
+  detail=result.stderr.decode(errors='replace')+'\n'+result.stdout.decode(errors='replace')
+  (OUT/'webview-driver-error.txt').write_text(detail)
+  raise AssertionError('Native WebView driver failed: '+detail)
+ return json.loads(result.stdout.decode())['value']
+
+def web_expect(port,label,name,required=None):
+ deadline=time.monotonic()+120
+ value={}
+ while time.monotonic()<deadline:
+  value=web_command(port)
+  if label in value.get('text','') and all(value.get(k)==v for k,v in (required or {}).items()):
+   (OUT/(name+'.dom.json')).write_text(json.dumps(value,ensure_ascii=False,indent=2))
+   save_png(name)
+   checks.append({'name':name,'result':'passed','evidence':'actual Android WebView DOM + native adb screenshot'})
+   return
+  time.sleep(1)
+ raise AssertionError(('Actual WebView did not reach expected state',label,required,value))
+
+def web_click(port,label):
+ assert web_command(port,'click',label).get('clicked')==label
+
 def main():
  end=time.monotonic()+900
  while time.monotonic()<end:
@@ -134,7 +177,7 @@ def main():
  installed=adb('install','--no-streaming','-r',str(apk),timeout=600)
  (OUT/'install.txt').write_text(installed)
  assert 'Success' in installed,installed
- version=adb('shell','dumpsys','package',PKG);assert 'versionCode='+os.environ.get('HETU_EXPECTED_VERSION','2068') in version
+ version=adb('shell','dumpsys','package',PKG);assert 'versionCode='+os.environ.get('HETU_EXPECTED_VERSION','2069') in version
  (OUT/'version.txt').write_text('\n'.join(line for line in version.splitlines() if 'versionCode=' in line or 'versionName=' in line))
  components=adb('shell','cmd','package','query-activities','--brief','--components','--query-flags','0','--user','0','-a','android.intent.action.MAIN','-c','android.intent.category.LAUNCHER','-p',PKG)
  choices=[line.strip() for line in components.splitlines() if line.strip().startswith(PKG+'/')];assert choices,components
@@ -157,8 +200,10 @@ def main():
  click('关于',scroll=True);expect('内置核心','05-about')
  adb('shell','input','keyevent','4');time.sleep(2)
  click('工具',bottom=True);click('Web面板',scroll=True);expect('河图本地面板','06-web-panels')
- click('河图本地面板');time.sleep(8);expect('河图 WebUI','07-native-webview')
- expect('未连接','08-native-webview-disconnected')
+ click('河图本地面板');time.sleep(3)
+ with webview_cdp() as web_port:
+  web_expect(web_port,'河图 WebUI','07-native-webview')
+  web_expect(web_port,'未连接','08-native-webview-disconnected',{'status':'未连接','metricCount':0})
  adb('shell','input','keyevent','4');time.sleep(2);expect('河图本地面板','09-webview-back')
  # Fresh emulator only: no proxy process, subscription, network rules or Root.
  # Server listens solely on host127.0.0.1; always remove the test-only reverse.
@@ -167,14 +212,15 @@ def main():
   adb('reverse',f'tcp:{device_port}',f'tcp:{fixture_port}')
   try:
    click('河图本地面板')
-   expect_eventually('Mihomo v1.19.0','reference-03B-040-native-overview')
-   click('策略组');expect_eventually('节点选择','reference-03B-041-native-groups')
-   click('连接');expect_eventually('api.example.com','reference-03B-042-native-connections')
-   click('策略组');click('节点选择：选择节点')
-   expect_eventually('香港 02','reference-03B-043-native-node-dialog')
-   click('香港 02');expect_eventually('切换失败：HTTP 503','reference-03B-044-native-switch-failure')
-   assert any(r.get('method')=='PUT' and r.get('valid_fixture_request') for r in requests),requests
-   click('确定')
+   with webview_cdp() as web_port:
+    web_expect(web_port,'Mihomo v1.19.0','reference-03B-040-native-overview',{'metricCount':4})
+    web_click(web_port,'策略组');web_expect(web_port,'节点选择','reference-03B-041-native-groups',{'groupCount':12})
+    web_click(web_port,'连接');web_expect(web_port,'api.example.com','reference-03B-042-native-connections',{'connectionCount':18})
+    web_click(web_port,'策略组');web_click(web_port,'节点选择：选择节点')
+    web_expect(web_port,'香港 02','reference-03B-043-native-node-dialog',{'nodeDialogOpen':True})
+    web_click(web_port,'香港 02');web_expect(web_port,'切换失败：HTTP 503','reference-03B-044-native-switch-failure',{'noticeOpen':True,'firstSelected':'香港 01'})
+    assert any(r.get('method')=='PUT' and r.get('valid_fixture_request') for r in requests),requests
+    web_click(web_port,'确定')
   finally:
    adb('reverse','--remove',f'tcp:{device_port}')
    (OUT/'native-webview-fixture-requests.json').write_text(json.dumps(requests,ensure_ascii=False,indent=2))
