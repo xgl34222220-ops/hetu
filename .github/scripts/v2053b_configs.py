@@ -13,3 +13,4 @@ build.write_text(s)
 
 runpy.run_path(".github/scripts/v2054_settings_pages.py", run_name="__main__")
 runpy.run_path(".github/scripts/v2055_theme.py", run_name="__main__")
+runpy.run_path(".github/scripts/v2056_proxy_settings.py", run_name="__main__")
