@@ -6676,7 +6676,7 @@
 @@ -364,13 +373,13 @@
                          title = "备份与恢复",
                          summary = "导出与恢复应用设置",
-                         icon = Icons.Rounded.CloudSync,
+                         icon = Icons.Rounded.Layers,
 -                        onClick = { subPage = "backup" },
 +                        onClick = { nav.push(HxRoute.BackupSettings) },
                      )

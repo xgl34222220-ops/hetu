@@ -9,10 +9,14 @@ ADB=str(Path(os.environ['ANDROID_HOME'])/'platform-tools'/'adb')
 OUT=Path(os.environ.get('HETU_SMOKE_OUT','out/android-smoke')); OUT.mkdir(parents=True,exist_ok=True)
 checks=[]
 def adb(*args, timeout=90, check=True):
- return subprocess.run([ADB,*args],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=timeout,check=check).stdout.decode(errors='replace')
+ try:
+  return subprocess.run([ADB,*args],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=timeout,check=check).stdout.decode(errors='replace')
+ except subprocess.TimeoutExpired as error:
+  (OUT/'adb-timeout.txt').write_text(' '.join(args)+'\n'+(error.output or b'').decode(errors='replace'))
+  raise
 def ui():
- adb('shell','uiautomator','dump','/sdcard/hetu-smoke.xml',timeout=60)
- raw=adb('shell','cat','/sdcard/hetu-smoke.xml')
+ adb('shell','uiautomator','dump','/data/local/tmp/hetu-smoke.xml',timeout=60)
+ raw=adb('shell','cat','/data/local/tmp/hetu-smoke.xml')
  start=raw.find('<?xml'); assert start>=0,raw[:300]
  return ET.fromstring(raw[start:]),raw[start:]
 def capture(name):
@@ -46,13 +50,30 @@ def main():
   except subprocess.TimeoutExpired:pass
   time.sleep(5)
  else: raise AssertionError('Emulator boot did not complete in 15 minutes')
+ # Boot-completed precedes some first-boot package/role work under software emulation.
+ ready_until=time.monotonic()+180
+ stable=0
+ while time.monotonic()<ready_until:
+  try:
+   packages=adb('shell','cmd','package','list','packages','android',timeout=30,check=False)
+   animation=adb('shell','getprop','init.svc.bootanim',timeout=15,check=False).strip()
+   stable=stable+1 if 'package:android' in packages and animation in ('stopped','') else 0
+   if stable>=3:
+    (OUT/'boot-ready.json').write_text(json.dumps({'boot_completed':True,'boot_animation':animation,'package_manager_stable_samples':stable}))
+    break
+  except subprocess.TimeoutExpired:stable=0
+  time.sleep(5)
+ else:raise AssertionError('Package manager/boot animation did not settle')
  adb('shell','input','keyevent','82');time.sleep(3)
- apk=next(Path('candidate').glob('*.apk'));adb('install','-r',str(apk),timeout=600)
+ apk=next(Path('candidate').glob('*.apk'))
+ installed=adb('install','--no-streaming','-r',str(apk),timeout=600)
+ (OUT/'install.txt').write_text(installed)
+ assert 'Success' in installed,installed
  version=adb('shell','dumpsys','package',PKG);assert 'versionCode=2065' in version
  (OUT/'version.txt').write_text('\n'.join(line for line in version.splitlines() if 'versionCode=' in line or 'versionName=' in line))
  components=adb('shell','cmd','package','query-activities','--brief','--components','--query-flags','0','--user','0','-a','android.intent.action.MAIN','-c','android.intent.category.LAUNCHER','-p',PKG)
  choices=[line.strip() for line in components.splitlines() if line.strip().startswith(PKG+'/')];assert choices,components
- adb('logcat','-c');adb('shell','am','start','-W','-n',choices[0],timeout=60);time.sleep(8)
+ adb('logcat','-c');adb('shell','am','start','-W','-n',choices[0],timeout=180);time.sleep(8)
  assert adb('shell','pidof',PKG,check=False).strip(),'App process exited at launch'
  expect('河图','01-home')
  click('面板',bottom=True);expect('代理未运行','02-panel-stopped')

@@ -993,7 +993,7 @@ jobs:
       - name: Apply V20.57 concept states and safety regression pass
         run: |
           set -euo pipefail
-          echo 'd076978ba8ffdb651fd2fe926a5fd1158606aa54be4eb6a7e50b18880eef0f1e  updates/v2057-concept-parity.patch' | sha256sum -c -
+          echo '7edba368ce3a167db96742bff42b5e9f844c2e44086ab0eb0fdfb7d74abca39d  updates/v2057-concept-parity.patch' | sha256sum -c -
           git apply --check updates/v2057-concept-parity.patch
           git apply updates/v2057-concept-parity.patch
           grep -q 'versionCode = 2057' android-app/app/build.gradle.kts
@@ -1340,7 +1340,7 @@ jobs:
   android-ui-smoke:
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -1361,7 +1361,8 @@ jobs:
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           AVDMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
           "$SDKMANAGER" 'platform-tools' 'emulator' 'system-images;android-35;default;x86_64' 2>&1 | tee out/android-smoke/sdk-prepare.log
-          echo no | "$AVDMANAGER" create avd --force --name hetu-smoke --path "$ANDROID_AVD_HOME/hetu-smoke.avd" --package 'system-images;android-35;default;x86_64' 2>&1 | tee out/android-smoke/avd-prepare.log
+          "$AVDMANAGER" list device --compact | grep -qx 'pixel_2'
+          echo no | "$AVDMANAGER" create avd --force --device pixel_2 --name hetu-smoke --path "$ANDROID_AVD_HOME/hetu-smoke.avd" --package 'system-images;android-35;default;x86_64' 2>&1 | tee out/android-smoke/avd-prepare.log
           test -f "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini"
           sed -i '/^hw.lcd.width=/d;/^hw.lcd.height=/d;/^hw.lcd.density=/d;/^hw.ramSize=/d' "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini"
           cat >> "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini" <<'EOF'
