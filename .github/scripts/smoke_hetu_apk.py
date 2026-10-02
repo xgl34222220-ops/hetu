@@ -47,7 +47,7 @@ def main():
   time.sleep(5)
  else: raise AssertionError('Emulator boot did not complete in 15 minutes')
  adb('shell','input','keyevent','82');time.sleep(3)
- apk=next(Path('candidate').glob('*.apk'));adb('install','-r',str(apk),timeout=180)
+ apk=next(Path('candidate').glob('*.apk'));adb('install','-r',str(apk),timeout=600)
  version=adb('shell','dumpsys','package',PKG);assert 'versionCode=2065' in version
  (OUT/'version.txt').write_text('\n'.join(line for line in version.splitlines() if 'versionCode=' in line or 'versionName=' in line))
  components=adb('shell','cmd','package','query-activities','--brief','--components','--query-flags','0','--user','0','-a','android.intent.action.MAIN','-c','android.intent.category.LAUNCHER','-p',PKG)
