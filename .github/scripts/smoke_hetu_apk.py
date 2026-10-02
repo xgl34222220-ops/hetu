@@ -105,7 +105,7 @@ def main():
  installed=adb('install','--no-streaming','-r',str(apk),timeout=600)
  (OUT/'install.txt').write_text(installed)
  assert 'Success' in installed,installed
- version=adb('shell','dumpsys','package',PKG);assert 'versionCode='+os.environ.get('HETU_EXPECTED_VERSION','2066') in version
+ version=adb('shell','dumpsys','package',PKG);assert 'versionCode='+os.environ.get('HETU_EXPECTED_VERSION','2067') in version
  (OUT/'version.txt').write_text('\n'.join(line for line in version.splitlines() if 'versionCode=' in line or 'versionName=' in line))
  components=adb('shell','cmd','package','query-activities','--brief','--components','--query-flags','0','--user','0','-a','android.intent.action.MAIN','-c','android.intent.category.LAUNCHER','-p',PKG)
  choices=[line.strip() for line in components.splitlines() if line.strip().startswith(PKG+'/')];assert choices,components
@@ -157,5 +157,12 @@ try:main()
 except Exception:
  try:capture('failure')
  except Exception:pass
- (OUT/'failure-logcat.txt').write_text(adb('logcat','-d','-v','brief',timeout=30,check=False))
+ (OUT/'failure-logcat.txt').write_text(adb('logcat','-d','-v','threadtime',timeout=60,check=False))
+ try:
+  (OUT/'last-anr.txt').write_text(adb('shell','dumpsys','activity','lastanr',timeout=60,check=False))
+  # Fresh disposable emulator contains only test fixtures. Keep the original
+  # app/system ANR trace; never dismiss an app ANR or disable its detector.
+  (OUT/'bugreport-command.txt').write_text(adb('bugreport',str(OUT/'bugreport.zip'),timeout=240,check=False))
+ except Exception as diagnostic_error:
+  (OUT/'bugreport-error.txt').write_text(repr(diagnostic_error))
  raise

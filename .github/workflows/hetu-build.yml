@@ -1129,6 +1129,16 @@ jobs:
           grep -q 'versionName = "0.11.6-v20"' android-app/app/build.gradle.kts
           python3 .github/scripts/test_mock_webview_controller.py
 
+      - name: Apply V20.67 panel action integrity
+        run: |
+          set -euo pipefail
+          echo 'a3a063001b351e98b3218c85bbd64ff9f8bfc12825c708a2f116ccdebf36b09e  updates/v2067-panel-action-integrity.patch' | sha256sum -c -
+          git apply --check updates/v2067-panel-action-integrity.patch
+          git apply updates/v2067-panel-action-integrity.patch
+          grep -q 'versionCode = 2067' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.11.7-v20"' android-app/app/build.gradle.kts
+          python3 .github/scripts/test_hetu_emulator_runner.py
+
       - name: Verify built-in WebUI behavior with controlled API fixtures
         run: node .github/scripts/test_webui_concept.cjs
 
@@ -1213,16 +1223,16 @@ jobs:
           python3 tools/qa/test_boot_startup_protocol.py | tee out/verification/boot-protocol.txt
           python3 .github/scripts/verify_packaged_runtime.py snapshot --script-sha256 96654eacde9009f0ad3f5ad31cd423147667548fd1a510b8bdef986a175ea7cb
 
-      - name: Export effective V20.66 source
+      - name: Export effective V20.67 source
         run: |
           set -euo pipefail
-          tar -czf /tmp/Hetu-V20.66-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
-          sha256sum /tmp/Hetu-V20.66-effective-source.tar.gz
+          tar -czf /tmp/Hetu-V20.67-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+          sha256sum /tmp/Hetu-V20.67-effective-source.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.66-effective-source
-          path: /tmp/Hetu-V20.66-effective-source.tar.gz
+          name: Hetu-V20.67-effective-source
+          path: /tmp/Hetu-V20.67-effective-source.tar.gz
           compression-level: 0
           if-no-files-found: error
 
@@ -1240,20 +1250,20 @@ jobs:
             --tests '*RuntimeYaml15Test' --tests '*RuntimeStartup15Test' --tests '*AdblockSnifferTest' \
             --tests '*ConceptParity57Test' --tests '*PanelConceptModelTest' --tests '*SettingsConceptParityTest' \
             --tests '*CoreManagerConcept57Test' --tests '*SettingsBackupParity57Test' --tests '*ToolsConceptParityTest' --tests '*NativeConceptScreenshotTest' --tests '*SettingsPickerParity58Test' --tests '*LargeTitleParity59Test' --tests '*BootStartup60Test' \
-            --tests '*ConceptStateCoverageTest' --tests '*ConceptRemainingCoverageTest' --tests '*WanDetails61Test' --tests '*MainLanguageBindingTest' --tests '*PanelLayoutDefaultsTest' --tests '*Runtime146ContractTest' --stacktrace
+            --tests '*ConceptStateCoverageTest' --tests '*ConceptRemainingCoverageTest' --tests '*WanDetails61Test' --tests '*MainLanguageBindingTest' --tests '*PanelLayoutDefaultsTest' --tests '*Runtime146ContractTest' --tests '*PanelModel11Test' --tests '*PanelActionSafetyTest' --stacktrace
 
       - name: Android lint compatibility gate
         working-directory: android-app
         run: gradle --no-daemon --max-workers=1 -Dorg.gradle.jvmargs='-Xmx1500m -Dfile.encoding=UTF-8' :app:lintDebug --stacktrace
 
       - name: Consolidate native and browser state evidence
-        run: python3 tools/qa/consolidate_concept_coverage.py --repo . --expected-tests 172 --browser-evidence out/verification/webui-browser --browser-commit "$GITHUB_SHA"
+        run: python3 tools/qa/consolidate_concept_coverage.py --repo . --expected-tests 213 --browser-evidence out/verification/webui-browser --browser-commit "$GITHUB_SHA"
 
       - name: Upload concept UI verification evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.66-UI-verification
+          name: Hetu-V20.67-UI-verification
           path: |
             android-app/app/build/test-results/testDebugUnitTest/
             android-app/app/build/reports/tests/testDebugUnitTest/
@@ -1273,7 +1283,7 @@ jobs:
           mkdir -p out/apk-transfer
           "$ANDROID_HOME/build-tools/37.0.0/aapt" dump badging "$APK" > out/apk-transfer/apk-metadata.txt
           head -3 out/apk-transfer/apk-metadata.txt
-          grep -q "versionCode='2066' versionName='0.11.6-v20'" out/apk-transfer/apk-metadata.txt
+          grep -q "versionCode='2067' versionName='0.11.7-v20'" out/apk-transfer/apk-metadata.txt
           "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs "$APK" > out/apk-transfer/apk-signature.txt
           grep -Fq '701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad' out/apk-transfer/apk-signature.txt
           cat out/apk-transfer/apk-signature.txt
@@ -1292,7 +1302,7 @@ jobs:
       - name: Upload APK transport manifest
         uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.66-APK-manifest
+          name: Hetu-V20.67-APK-manifest
           path: |
             out/apk-transfer/manifest.json
             out/apk-transfer/apk-metadata.txt
@@ -1302,7 +1312,7 @@ jobs:
       - name: Upload APK transport part 00
         uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.66-APK-part00
+          name: Hetu-V20.67-APK-part00
           path: out/apk-transfer/part00.bin
           compression-level: 0
           if-no-files-found: ignore
@@ -1310,7 +1320,7 @@ jobs:
       - name: Upload APK transport part 01
         uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.66-APK-part01
+          name: Hetu-V20.67-APK-part01
           path: out/apk-transfer/part01.bin
           compression-level: 0
           if-no-files-found: ignore
@@ -1318,7 +1328,7 @@ jobs:
       - name: Upload APK transport part 02
         uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.66-APK-part02
+          name: Hetu-V20.67-APK-part02
           path: out/apk-transfer/part02.bin
           compression-level: 0
           if-no-files-found: ignore
@@ -1326,7 +1336,7 @@ jobs:
       - name: Upload APK transport part 03
         uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.66-APK-part03
+          name: Hetu-V20.67-APK-part03
           path: out/apk-transfer/part03.bin
           compression-level: 0
           if-no-files-found: ignore
@@ -1334,7 +1344,7 @@ jobs:
       - name: Upload APK transport part 04
         uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.66-APK-part04
+          name: Hetu-V20.67-APK-part04
           path: out/apk-transfer/part04.bin
           compression-level: 0
           if-no-files-found: ignore
@@ -1342,7 +1352,7 @@ jobs:
       - name: Upload APK transport part 05
         uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.66-APK-part05
+          name: Hetu-V20.67-APK-part05
           path: out/apk-transfer/part05.bin
           compression-level: 0
           if-no-files-found: ignore
@@ -1388,18 +1398,13 @@ jobs:
           export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
           test -x "$ANDROID_HOME/platform-tools/adb"
           "$ANDROID_HOME/platform-tools/adb" version | tee out/android-smoke/adb-version.txt
-          ACCEL=off
-          if [ -r /dev/kvm ] && [ -w /dev/kvm ]; then ACCEL=on; fi
-          printf '%s\n' "$ACCEL" > out/android-smoke/acceleration.txt
-          "$ANDROID_HOME/emulator/emulator" -avd hetu-smoke -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -accel "$ACCEL" > out/android-smoke/emulator.log 2>&1 &
-          EMULATOR_PID=$!
-          trap 'kill "$EMULATOR_PID" 2>/dev/null || true' EXIT
-          "$ANDROID_HOME/platform-tools/adb" start-server
-          python3 .github/scripts/smoke_hetu_apk.py
+          # Uses only this runner's existing KVM or sudo access. No device permission,
+          # group, ACL or SELinux changes; owned supervisor verifies process cleanup.
+          python3 .github/scripts/run_hetu_emulator.py
       - name: Upload Android smoke evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.66-Android-smoke
+          name: Hetu-V20.67-Android-smoke
           path: out/android-smoke/
           if-no-files-found: warn
