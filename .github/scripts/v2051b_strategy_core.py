@@ -178,3 +178,8 @@ import runpy
 runpy.run_path('.github/scripts/v2052a_tabbed.py', run_name='__main__')
 runpy.run_path('.github/scripts/v2052b_connections.py', run_name='__main__')
 runpy.run_path('.github/scripts/v2052c_rules.py', run_name='__main__')
+
+# Continue the PDF parity chain with tools/configs.
+import runpy
+runpy.run_path('.github/scripts/v2053a_tools.py', run_name='__main__')
+runpy.run_path('.github/scripts/v2053b_configs.py', run_name='__main__')
