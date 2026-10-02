@@ -3,7 +3,7 @@
 Only the fixture app display language may be changed.
 Never starts/stops a proxy, requests permissions, imports user data, or clears app data.
 """
-import json, os, re, subprocess, time, xml.etree.ElementTree as ET
+import hashlib, json, os, re, subprocess, time, xml.etree.ElementTree as ET
 from pathlib import Path
 from contextlib import contextmanager
 PKG='io.github.xgl34222220.hetu'
@@ -140,12 +140,25 @@ def web_expect(port,label,name,required=None):
  while time.monotonic()<deadline:
   value=web_command(port)
   if label in value.get('text','') and all(value.get(k)==v for k,v in (required or {}).items()):
+   # DOM readiness precedes Android's compositor. The CDP read awaits two
+   # animation frames; then recheck after a short surface-settle interval.
+   time.sleep(.4)
+   value=web_command(port)
+   if label not in value.get('text','') or not all(value.get(k)==v for k,v in (required or {}).items()):continue
    (OUT/(name+'.dom.json')).write_text(json.dumps(value,ensure_ascii=False,indent=2))
    save_png(name)
    checks.append({'name':name,'result':'passed','evidence':'actual Android WebView DOM + native adb screenshot'})
    return
   time.sleep(1)
  raise AssertionError(('Actual WebView did not reach expected state',label,required,value))
+
+def verify_distinct_webview_frames(output):
+ expected={f'reference-03B-{number:03d}-native-{state}.png' for number,state in [(40,'overview'),(41,'groups'),(42,'connections'),(43,'node-dialog'),(44,'switch-failure')]}
+ frames=sorted(output.glob('reference-03B-04*-native-*.png'))
+ assert {p.name for p in frames}==expected,('Missing native frame', [p.name for p in frames])
+ frame_hashes={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in frames}
+ (output/'native-webview-frame-hashes.json').write_text(json.dumps(frame_hashes,indent=2))
+ assert len(set(frame_hashes.values()))==5,('Stale duplicate native frames',frame_hashes)
 
 def web_click(port,label):
  assert web_command(port,'click',label).get('clicked')==label
@@ -177,7 +190,7 @@ def main():
  installed=adb('install','--no-streaming','-r',str(apk),timeout=600)
  (OUT/'install.txt').write_text(installed)
  assert 'Success' in installed,installed
- version=adb('shell','dumpsys','package',PKG);assert 'versionCode='+os.environ.get('HETU_EXPECTED_VERSION','2069') in version
+ version=adb('shell','dumpsys','package',PKG);assert 'versionCode='+os.environ.get('HETU_EXPECTED_VERSION','2070') in version
  (OUT/'version.txt').write_text('\n'.join(line for line in version.splitlines() if 'versionCode=' in line or 'versionName=' in line))
  components=adb('shell','cmd','package','query-activities','--brief','--components','--query-flags','0','--user','0','-a','android.intent.action.MAIN','-c','android.intent.category.LAUNCHER','-p',PKG)
  choices=[line.strip() for line in components.splitlines() if line.strip().startswith(PKG+'/')];assert choices,components
@@ -220,6 +233,7 @@ def main():
     web_expect(web_port,'香港 02','reference-03B-043-native-node-dialog',{'nodeDialogOpen':True})
     web_click(web_port,'香港 02');web_expect(web_port,'切换失败：HTTP 503','reference-03B-044-native-switch-failure',{'noticeOpen':True,'firstSelected':'香港 01'})
     assert any(r.get('method')=='PUT' and r.get('valid_fixture_request') for r in requests),requests
+    verify_distinct_webview_frames(OUT)
     web_click(web_port,'确定')
   finally:
    adb('reverse','--remove',f'tcp:{device_port}')

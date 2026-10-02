@@ -13,7 +13,7 @@ async function test(action,label,status=200){
  return{output,errors,commands,connections,process};
 }
 (async()=>{
- let r=await test('read');assert.equal(r.process.exitCode,0);assert.equal(r.output[0].value.metricCount,4);assert.equal(r.output[0].source,'actual Android WebView CDP');assert.deepEqual(r.connections,['ws://127.0.0.1:32768/devtools/page/fixture-target']);assert.equal(r.commands[0].method,'Runtime.evaluate');assert(r.commands[0].params.expression.includes('document.baseURI'));
+ let r=await test('read');assert.equal(r.process.exitCode,0);assert.equal(r.output[0].value.metricCount,4);assert.equal(r.output[0].source,'actual Android WebView CDP');assert.deepEqual(r.connections,['ws://127.0.0.1:32768/devtools/page/fixture-target']);assert.equal(r.commands[0].method,'Runtime.evaluate');assert(r.commands[0].params.expression.includes('document.baseURI'));assert(r.commands[0].params.expression.includes('requestAnimationFrame(()=>requestAnimationFrame(resolve))'));assert.equal(r.commands[0].params.awaitPromise,true);
  r=await test('click','香港 "02"');assert.equal(r.output[0].value.clicked,'香港 "02"');assert(r.commands[0].params.expression.includes(JSON.stringify('香港 "02"')));assert(r.commands[0].params.expression.includes('nodes[0].click()'));
  r=await test('read',null,403);assert.equal(r.process.exitCode,1);assert.equal(r.connections.length,0);assert(r.errors.some(x=>x.includes('access denied')));
  console.log('3 WebView driver protocol checks passed (host mocks only; native execution still required)');
