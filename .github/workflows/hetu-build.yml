@@ -765,16 +765,205 @@ jobs:
           echo "V20.47 settings functional parity applied"
           git diff --stat
 
-      - name: Export effective V20.47 source
+      - name: Apply V20.48 concept PDF parity
         run: |
           set -euo pipefail
-          tar -czf /tmp/Hetu-V20.47-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
-          sha256sum /tmp/Hetu-V20.47-effective-source.tar.gz
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path('.')
+
+          build = root / 'android-app/app/build.gradle.kts'
+          s = build.read_text()
+          assert 'versionCode = 2047' in s and 'versionName = "0.9.7-v20"' in s
+          s = s.replace('versionCode = 2047', 'versionCode = 2048', 1)
+          s = s.replace('versionName = "0.9.7-v20"', 'versionName = "0.9.8-v20"', 1)
+          build.write_text(s)
+
+          home = root / 'android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeScreen.kt'
+          s = home.read_text()
+          if 'import androidx.compose.runtime.saveable.rememberSaveable\n' not in s:
+              s = s.replace(
+                  'import androidx.compose.runtime.rememberCoroutineScope\n',
+                  'import androidx.compose.runtime.rememberCoroutineScope\nimport androidx.compose.runtime.saveable.rememberSaveable\n',
+                  1,
+              )
+          assert '    var showSpeedSource by remember { mutableStateOf(false) }\n' in s
+          s = s.replace(
+              '    var showSpeedSource by remember { mutableStateOf(false) }\n',
+              '    var showSpeedSource by remember { mutableStateOf(false) }\n    var runControlsExpanded by rememberSaveable { mutableStateOf(false) }\n',
+              1,
+          )
+          old_header = '''        largeTitleStartPadding = 26.dp,
+                  largeTitleFontSizeSp = 36f,
+                  largeTitleBottomPadding = 18.dp,
+          '''
+          # Preserve the exact indentation from the Kotlin source.
+          old_header = old_header.replace('                  ', '        ')
+          assert old_header in s
+          s = s.replace(old_header, '        largeTitle = false,\n', 1)
+
+          old_hero = 'Box(Modifier.hxEnter(stagger, 0)) { HomeHero(vm, onDetails = { showCoreDetails = true }) }'
+          assert old_hero in s
+          s = s.replace(
+              old_hero,
+              '''Box(Modifier.hxEnter(stagger, 0)) {
+                          HomeHero(
+                              vm = vm,
+                              expanded = runControlsExpanded,
+                              onToggleExpanded = { if (vm.state.running && vm.operation == null) runControlsExpanded = !runControlsExpanded },
+                          )
+                      }'''.replace('                      ', '            '),
+              1,
+          )
+
+          pattern = re.compile(r'''        item\(key = "launchers"\) \{.*?        \}
+                  item\(key = "latency"\) \{
+                      Box\(Modifier\.hxEnter\(stagger, 2\)\) \{ HomeLatencyCard\(vm\) \}
+                  \}
+          '''.replace('                  ', '        '), re.S)
+          replacement = '''        item(key = "current-node") {
+                      val primaryGroup = vm.state.groups.firstOrNull { it.name.contains("节点选择") } ?: vm.state.groups.firstOrNull()
+                      Box(Modifier.hxEnter(stagger, 1)) { HomeOutboundNode(vm, primaryGroup) }
+                  }
+                  item(key = "latency") {
+                      Box(Modifier.hxEnter(stagger, 2)) { HomeLatencyCard(vm) }
+                  }
+          '''.replace('                  ', '        ')
+          s, n = pattern.subn(replacement, s, count=1)
+          assert n == 1, 'launcher block'
+
+          assert 'private fun HomeHero(vm: HetuViewModel, onDetails: () -> Unit)' in s
+          s = s.replace(
+              'private fun HomeHero(vm: HetuViewModel, onDetails: () -> Unit)',
+              'private fun HomeHero(vm: HetuViewModel, expanded: Boolean, onToggleExpanded: () -> Unit)',
+              1,
+          )
+          assert '.clickable(enabled = running && op == null, onClick = onDetails),' in s
+          s = s.replace(
+              '.clickable(enabled = running && op == null, onClick = onDetails),',
+              '.clickable(enabled = running && op == null, onClick = onToggleExpanded),',
+              1,
+          )
+          assert 'running -> HxFormat.duration(vm.runtime.elapsedSeconds)\n                            else -> "点按下方启动代理"' in s
+          s = s.replace(
+              'running -> HxFormat.duration(vm.runtime.elapsedSeconds)\n                            else -> "点按下方启动代理"',
+              'running -> "已运行 " + HxFormat.duration(vm.runtime.elapsedSeconds)\n                            else -> "尚未启动代理"',
+              1,
+          )
+
+          seg = '''            HxSegmented(
+                      options = listOf("rule" to "规则", "global" to "全局", "direct" to "直连"),
+                      selected = state.trafficMode.lowercase().ifBlank { "rule" },
+                      onSelect = vm::setTrafficMode,
+                      enabled = running && op == null,
+                      modifier = Modifier.padding(horizontal = 14.dp),
+                  )
+          '''.replace('                  ', '            ')
+          assert seg in s
+          s = s.replace(seg, '', 1)
+          assert 'HeroAction("启动代理", c.accent, op == HxRunOp.Start, op == null, Modifier.weight(1f), vm::toggle)' in s
+          s = s.replace(
+              'HeroAction("启动代理", c.accent, op == HxRunOp.Start, op == null, Modifier.weight(1f), vm::toggle)',
+              'HeroAction("启动", c.accent, op == HxRunOp.Start, op == null, Modifier.weight(1f), vm::toggle)',
+              1,
+          )
+          anchor = '''                }
+                      }
+                  }
+              }
+          }
+
+          @Composable
+          private fun HeroAction'''.replace('              ', '            ')
+          insert = '''                }
+                      }
+                      AnimatedVisibility(
+                          visible = expanded && running && op == null,
+                          enter = fadeIn(tween(HxMotion.Medium)) + expandVertically(tween(HxMotion.Medium, easing = HxMotion.Emphasized)),
+                          exit = fadeOut(tween(HxMotion.Short)) + shrinkVertically(tween(HxMotion.Medium, easing = HxMotion.Emphasized)),
+                      ) {
+                          HxSegmented(
+                              options = listOf("rule" to "规则", "global" to "全局", "direct" to "直连"),
+                              selected = state.trafficMode.lowercase().ifBlank { "rule" },
+                              onSelect = vm::setTrafficMode,
+                              enabled = true,
+                              modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 10.dp),
+                          )
+                      }
+                  }
+              }
+          }
+
+          @Composable
+          private fun HeroAction'''.replace('              ', '            ')
+          assert anchor in s
+          s = s.replace(anchor, insert, 1)
+          home.write_text(s)
+
+          tools = root / 'android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt'
+          s = tools.read_text()
+          replacements = {
+              '"脚本",\n                    "管理服务脚本"': '"脚本",\n                    "运行与管理服务脚本"',
+              '"日志查看",\n                    "查看运行日志与调试输出"': '"日志文件",\n                    "查看与导出运行日志"',
+              '"应用管理",\n                    "查看并管理应用相关规则"': '"应用管理",\n                    "管理应用代理与直连规则"',
+              '"订阅管理",\n                    "配置订阅源并覆写配置"': '"配置管理",\n                    "导入与编辑配置文件"',
+              '"Sub-Store",\n                    "订阅处理、覆写与配置导入"': '"Sub-Store",\n                    "订阅处理"',
+              '"CNIP 设置",\n                    "配置 CNIP 数据源并更新地理数据"': '"CNIP",\n                    "规则集管理"',
+          }
+          for old, new in replacements.items():
+              assert old in s, old
+              s = s.replace(old, new, 1)
+          start = s.index('        item(key = "updates") {')
+          end = s.index('    }\n}\n\n/**', start)
+          s = s[:start] + '''        item(key = "updates") {
+                      ToolReferenceCard(Modifier.hxEnter(stagger, 5)) {
+                          ToolReferenceRow(
+                              "核心管理",
+                              "下载与更新",
+                              Icons.Rounded.Memory,
+                          ) { nav.push(HxRoute.Cores) }
+                          ToolReferenceRow(
+                              "广告过滤",
+                              "规则与屏蔽",
+                              Icons.Rounded.Shield,
+                          ) { nav.push(HxRoute.Adblock) }
+                          ToolReferenceRow(
+                              "诊断工具",
+                              "网络与环境",
+                              Icons.Rounded.HealthAndSafety,
+                          ) { nav.push(HxRoute.Diagnostics) }
+                          ToolReferenceRow(
+                              "Web面板",
+                              "外部面板",
+                              Icons.Rounded.Web,
+                          ) { open(ProxyWebPanelsActivity::class.java) }
+                      }
+                  }
+          '''.replace('                  ', '        ') + s[end:]
+          tools.write_text(s)
+          PY
+
+          grep -q 'versionCode = 2048' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.9.8-v20"' android-app/app/build.gradle.kts
+          grep -q 'largeTitle = false' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeScreen.kt
+          grep -q 'item(key = "current-node")' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeScreen.kt
+          grep -q '"日志文件"' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
+          grep -q '"Web面板"' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
+          echo "V20.48 concept PDF parity applied"
+          git diff --stat
+
+      - name: Export effective V20.48 source
+        run: |
+          set -euo pipefail
+          tar -czf /tmp/Hetu-V20.48-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+          sha256sum /tmp/Hetu-V20.48-effective-source.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.47-effective-source
-          path: /tmp/Hetu-V20.47-effective-source.tar.gz
+          name: Hetu-V20.48-effective-source
+          path: /tmp/Hetu-V20.48-effective-source.tar.gz
           compression-level: 0
           if-no-files-found: error
 
