@@ -1178,6 +1178,12 @@ jobs:
           grep -q 'versionCode = 2071' android-app/app/build.gradle.kts
           grep -q 'versionName = "0.12.1-v20"' android-app/app/build.gradle.kts
 
+      - name: Restore exact existing launcher icon and verify image bytes
+        run: |
+          set -euo pipefail
+          base64 -d updates/v2071-official-icon.b64 > android-app/app/src/main/res/drawable/ic_hetu_official.webp
+          python3 .github/scripts/verify_hetu_icons.py source android-app
+
       - name: Verify built-in WebUI behavior with controlled API fixtures
         run: node .github/scripts/test_webui_concept.cjs
 
@@ -1281,6 +1287,9 @@ jobs:
 
       - name: Verify APK embeds the tested runtime
         run: python3 .github/scripts/verify_packaged_runtime.py verify
+
+      - name: Verify packaged launcher and concept icon bytes
+        run: python3 .github/scripts/verify_hetu_icons.py apk android-app/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Runtime unit tests
         working-directory: android-app
