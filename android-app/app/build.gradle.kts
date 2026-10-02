@@ -1,3 +1,4 @@
+// concept parity pipeline sync
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
