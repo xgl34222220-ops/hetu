@@ -11,6 +11,8 @@ import xml.etree.ElementTree as ET
 parser = argparse.ArgumentParser()
 parser.add_argument('--repo', type=Path, default=Path(__file__).resolve().parents[2])
 parser.add_argument('--expected-tests', type=int, default=160)
+parser.add_argument('--browser-evidence', type=Path)
+parser.add_argument('--browser-commit', default='')
 a = parser.parse_args()
 repo = a.repo.resolve()
 qa = repo / 'docs/qa'
@@ -71,6 +73,16 @@ for old in base['pages']:
         assert ref in {f'03B/{i:03d}' for i in range(40, 45)}, ref
         row['status'] = 'native_webview_content_pending'
         row['limitations'] = 'Robolectric cannot render Chromium. CI browser fixtures are supplementary evidence, not Android WebView/device acceptance.'
+        if a.browser_evidence:
+            names = {40: 'overview', 41: 'groups', 42: 'connections', 43: 'node-dialog', 44: 'switch-failure'}
+            number = int(ref.split('/')[-1])
+            p = a.browser_evidence / f'reference-03B-{number:03d}-{names[number]}.png'
+            report = json.loads((a.browser_evidence / 'results.json').read_text())
+            assert p.exists() and report['passed'] == 12 and report['fixtureOnly'] is True
+            row['status'] = 'controlled_browser_supplement'
+            row['evidence'] = [{'image': str(p), 'image_sha256': hashlib.sha256(p.read_bytes()).hexdigest(),
+                                'fixture_only': True, 'renderer': 'Chromium', 'commit': a.browser_commit}]
+            row['limitations'] = 'Rendered Chromium content and interactions passed using isolated fixtures. Android WebView, OS chrome and pixel-exact visual acceptance remain unverified.'
     rows.append(row)
 assert len(rows) == len({x['reference'] for x in rows}) == 173
 sources = {}
