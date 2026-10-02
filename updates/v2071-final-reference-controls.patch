@@ -1,0 +1,470 @@
+--- a/android-app/app/build.gradle.kts
++++ b/android-app/app/build.gradle.kts
+@@ -17,8 +17,8 @@
+         applicationId = "io.github.xgl34222220.hetu"
+         minSdk = 26
+         targetSdk = 35
+-        versionCode = 2070
+-        versionName = "0.12.0-v20"
++        versionCode = 2071
++        versionName = "0.12.1-v20"
+     }
+ 
+     // Explicit CI debug identity. No private key is committed or exported.
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLatencyTargetsActivity.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLatencyTargetsActivity.kt
+@@ -82,7 +82,7 @@
+                         targets = ProxyLatencyTargets.defaults
+                         message = "已恢复默认测速目标"
+                         error = false
+-                    }, modifier = Modifier.weight(1f), icon = Icons.Rounded.RestartAlt, filled = false)
++                    }, modifier = Modifier.weight(1f), icon = Icons.Rounded.RestartAlt, filled = false, outlined = true)
+                     HxButton("保存", onClick = {
+                         val failure = targets.firstNotNullOfOrNull(ProxyLatencyTargets::validate)
+                         when {
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConnectionsScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConnectionsScreen.kt
+@@ -293,7 +293,7 @@
+                             vm.closeConnection(id)
+                             detailId = null
+                         }
+-                    }, icon = Icons.Rounded.LinkOff, tone = HxTone.Bad, filled = false, modifier = Modifier.fillMaxWidth())
++                    }, icon = Icons.Rounded.LinkOff, tone = HxTone.Bad, filled = false, outlined = true, modifier = Modifier.fillMaxWidth())
+                 }
+             }
+         }
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
+@@ -338,7 +338,7 @@
+         }
+ 
+         vm.startupError?.let { text ->
+-            HxTextSheet(title = "启动失败", text = text, onDismiss = { vm.startupError = null })
++            HxTextSheet(title = "启动失败", text = text, onDismiss = { vm.startupError = null }, showCopyLabel = true)
+         }
+     }
+ }
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeScreen.kt
+@@ -344,7 +344,8 @@
+                     Box(Modifier.width(0.5.dp).height(22.dp).background(c.line))
+                     HeroAction(ht("重启"), c.warn, op == HxRunOp.Restart, op == null, Modifier.weight(1f), vm::restart)
+                 } else {
+-                    HeroAction(ht("启动"), c.accent, op == HxRunOp.Start, op == null, Modifier.weight(1f), vm::toggle)
++                    HeroAction(ht("启动"), c.accent, op == HxRunOp.Start, op == null, Modifier.weight(1f), vm::toggle,
++                        busyLeading = true, busyTextColor = c.textFaint, busySpinnerColor = c.warn)
+                 }
+             }
+ 
+@@ -374,7 +375,8 @@
+ }
+ 
+ @Composable
+-private fun HeroAction(label: String, color: Color, busy: Boolean, enabled: Boolean, modifier: Modifier, onClick: () -> Unit) {
++private fun HeroAction(label: String, color: Color, busy: Boolean, enabled: Boolean, modifier: Modifier, onClick: () -> Unit,
++    busyLeading: Boolean = false, busyTextColor: Color = color, busySpinnerColor: Color = color) {
+     val haptics = rememberHetuHaptics()
+     val source = remember { MutableInteractionSource() }
+     val alpha by animateFloatAsState(if (enabled || busy) 1f else .4f, tween(HxMotion.Medium), label = "heroActionAlpha")
+@@ -389,8 +391,11 @@
+             .graphicsLayer { this.alpha = alpha },
+         contentAlignment = Alignment.Center,
+     ) {
+-        if (busy) HxSpinner(16.dp, color)
+-        else Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = color)
++        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
++            if (busy && busyLeading) HxSpinner(16.dp, busySpinnerColor)
++            Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = if (busy) busyTextColor else color)
++            if (busy && !busyLeading) HxSpinner(16.dp, busySpinnerColor)
++        }
+     }
+ }
+ 
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
+@@ -90,6 +90,7 @@
+ import androidx.compose.material.icons.rounded.Check
+ import androidx.compose.material.icons.rounded.ChevronRight
+ import androidx.compose.material.icons.rounded.Close
++import androidx.compose.material.icons.rounded.Cancel
+ import androidx.compose.material.icons.rounded.ContentCopy
+ import androidx.compose.material.icons.rounded.ErrorOutline
+ import androidx.compose.material.icons.rounded.Info
+@@ -948,29 +949,29 @@
+             runCatching { focus.requestFocus() }
+         }
+     }
+-    OutlinedTextField(
++    androidx.compose.foundation.text.BasicTextField(
+         value = value,
+         onValueChange = onChange,
+-        modifier = modifier.fillMaxWidth().focusRequester(focus),
++        modifier = modifier.fillMaxWidth().heightIn(min = 44.dp).focusRequester(focus)
++            .clip(Hx.pillShape).background(c.surface),
+         singleLine = true,
+-        placeholder = { Text(placeholder, color = c.textFaint) },
+-        leadingIcon = { Icon(Icons.Rounded.Search, null, tint = c.textMuted) },
+-        trailingIcon = {
+-            AnimatedVisibility(
+-                value.isNotEmpty(),
+-                enter = fadeIn(tween(HxMotion.Short)) + scaleIn(HxMotion.pop(), initialScale = .6f),
+-                exit = fadeOut(tween(HxMotion.Short)) + scaleOut(tween(HxMotion.Short), targetScale = .6f),
+-            ) {
+-                IconButton(onClick = { onChange("") }) { Icon(Icons.Rounded.Close, ht("清除"), tint = c.textMuted) }
++        textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.text, fontSize = 18.sp, lineHeight = 24.sp),
++        cursorBrush = androidx.compose.ui.graphics.SolidColor(c.accent),
++        decorationBox = { input ->
++            Row(Modifier.padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
++                Icon(Icons.Rounded.Search, null, tint = c.textMuted, modifier = Modifier.size(22.dp))
++                Spacer(Modifier.width(8.dp))
++                Box(Modifier.weight(1f).padding(vertical = 10.dp)) {
++                    if (value.isEmpty()) Text(placeholder, color = c.textFaint, fontSize = 18.sp, lineHeight = 24.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
++                    input()
++                }
++                if (value.isNotEmpty()) {
++                    IconButton(onClick = { onChange("") }, modifier = Modifier.size(44.dp)) {
++                        Icon(Icons.Rounded.Cancel, ht("清除"), tint = c.textFaint, modifier = Modifier.size(22.dp))
++                    }
++                } else Spacer(Modifier.width(12.dp))
+             }
+         },
+-        shape = Hx.pillShape,
+-        colors = OutlinedTextFieldDefaults.colors(
+-            focusedContainerColor = c.surface,
+-            unfocusedContainerColor = c.surface,
+-            focusedBorderColor = c.accent,
+-            unfocusedBorderColor = Color.Transparent,
+-        ),
+     )
+ }
+ 
+@@ -1072,14 +1073,17 @@
+ 
+ /** Monospace text viewer (logs, diagnostics, generated config). */
+ @Composable
+-internal fun HxTextSheet(title: String, text: String, onDismiss: () -> Unit, onRefresh: (() -> Unit)? = null, wrapLines: Boolean = false) {
++internal fun HxTextSheet(title: String, text: String, onDismiss: () -> Unit, onRefresh: (() -> Unit)? = null, wrapLines: Boolean = false, showCopyLabel: Boolean = false) {
+     val context = LocalContext.current
+     val c = Hx.colors
+     HxSheet(onDismiss = onDismiss) {
+         Row(Modifier.fillMaxWidth().padding(start = 22.dp, end = 10.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+             Text(title, style = if (wrapLines) MaterialTheme.typography.titleLarge.copy(fontSize = 24.sp, fontWeight = FontWeight.Bold) else MaterialTheme.typography.titleLarge, color = c.text, modifier = Modifier.weight(1f))
+             if (onRefresh != null) TextButton(onClick = onRefresh) { Text(ht("刷新")) }
+-            IconButton(onClick = { hxCopy(context, title, text) }) { Icon(Icons.Rounded.ContentCopy, ht("复制"), tint = c.textMuted) }
++            if (showCopyLabel) TextButton(onClick = { hxCopy(context, title, text) }) {
++                Icon(Icons.Rounded.ContentCopy, null, tint = c.accent, modifier = Modifier.size(15.dp))
++                Spacer(Modifier.width(5.dp)); Text(ht("复制"), color = c.accent, fontSize = 12.sp)
++            } else IconButton(onClick = { hxCopy(context, title, text) }) { Icon(Icons.Rounded.ContentCopy, ht("复制"), tint = c.textMuted) }
+         }
+         Box(
+             Modifier
+@@ -1252,6 +1256,8 @@
+     errorField: (String) -> Int? = { null },
+     widthFraction: Float? = null,
+     titleFontSize: androidx.compose.ui.unit.TextUnit = 20.sp,
++    titleLineHeight: androidx.compose.ui.unit.TextUnit = 26.sp,
++    titleTextAlign: TextAlign = TextAlign.Center,
+     hideMessageOnError: Boolean = false,
+     highlightError: Boolean = true,
+     plainFields: Boolean = false,
+@@ -1283,8 +1289,8 @@
+         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+             Column(Modifier.padding(horizontal = if (compactPills) 16.dp else if (configFooter) 20.dp else 22.dp, vertical = if (compactPills) 16.dp else if (configFooter) 20.dp else 18.dp)
+                 .graphicsLayer { translationX = shake.value * density }) {
+-                Text(title, fontSize = titleFontSize, lineHeight = 26.sp, fontWeight = FontWeight.Bold, color = c.text,
+-                    textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
++                Text(title, fontSize = titleFontSize, lineHeight = titleLineHeight, fontWeight = FontWeight.Bold, color = c.text,
++                    textAlign = titleTextAlign, modifier = Modifier.fillMaxWidth())
+                 Spacer(Modifier.height(if (compactPills) 10.dp else if (configFooter) 18.dp else 14.dp))
+                 if (!message.isNullOrBlank() && !messageBelowFields && !(hideMessageOnError && error != null)) {
+                     Text(message, style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
+@@ -1411,12 +1417,13 @@
+     busy: Boolean = false,
+     tone: HxTone = HxTone.Accent,
+     filled: Boolean = true,
++    outlined: Boolean = false,
+ ) {
+     val c = Hx.colors
+     val haptics = rememberHetuHaptics()
+     val source = remember { MutableInteractionSource() }
+-    val rawBg = if (filled) tone.fg() else tone.bg()
+-    val rawFg = if (filled) (if (tone == HxTone.Accent) c.onAccent else Color.White) else tone.fg()
++    val rawBg = if (outlined) c.surface else if (filled) tone.fg() else tone.bg()
++    val rawFg = if (outlined) tone.fg() else if (filled) (if (tone == HxTone.Accent) c.onAccent else Color.White) else tone.fg()
+     val bg by animateColorAsState(if (enabled) rawBg else c.surfaceMuted, tween(HxMotion.Medium), label = "btnBg")
+     val fg by animateColorAsState(if (enabled) rawFg else c.textFaint, tween(HxMotion.Medium), label = "btnFg")
+     Row(
+@@ -1425,6 +1432,7 @@
+             .heightIn(min = 44.dp)
+             .clip(RoundedCornerShape(12.dp))
+             .background(bg)
++            .then(if (outlined) Modifier.border(1.dp, fg, RoundedCornerShape(12.dp)) else Modifier)
+             .clickable(interactionSource = source, indication = LocalIndication.current, enabled = enabled && !busy, onClick = { haptics.perform(HetuHaptic.Tap); onClick() })
+             .animateContentSize(tween(HxMotion.Short, easing = HxMotion.Emphasized))
+             .padding(horizontal = 18.dp, vertical = 10.dp),
+@@ -1444,11 +1452,12 @@
+ 
+ /** Small circular icon action used in top bars. */
+ @Composable
+-internal fun HxBarAction(icon: ImageVector, description: String, onClick: () -> Unit, busy: Boolean = false, enabled: Boolean = true) {
++internal fun HxBarAction(icon: ImageVector, description: String, onClick: () -> Unit, busy: Boolean = false, enabled: Boolean = true, anchorMenu: Boolean = false) {
+     val c = Hx.colors
+     val haptics = rememberHetuHaptics()
+     val tint by animateColorAsState(if (enabled) c.text else c.textFaint, tween(HxMotion.Medium), label = "barTint")
+-    IconButton(onClick = { haptics.perform(HetuHaptic.Tap); onClick() }, enabled = enabled && !busy, modifier = Modifier.size(44.dp)) {
++    IconButton(onClick = { haptics.perform(HetuHaptic.Tap); onClick() }, enabled = enabled && !busy,
++        modifier = Modifier.size(44.dp).then(if (anchorMenu) Modifier.hxAnchorSource() else Modifier)) {
+         // Icon swaps (search ↔ close search, idle ↔ busy) rotate/scale through instead of blinking.
+         AnimatedContent(
+             targetState = if (busy) null else icon,
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMenus.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMenus.kt
+@@ -143,6 +143,7 @@
+     anchorEndInset: Dp = 14.dp,
+     contextEntryOffset: Dp? = null,
+     leftAnchorPointer: Boolean = false,
++    verticalPadding: Dp = 6.dp,
+     content: @Composable ColumnScope.(close: (() -> Unit) -> Unit) -> Unit,
+ ) {
+     val c = Hx.colors
+@@ -236,7 +237,7 @@
+                             .background(c.surface)
+                             .then(if (c.dark) Modifier.border(0.5.dp, c.line, RoundedCornerShape(12.dp)) else Modifier)
+                             .verticalScroll(rememberScrollState())
+-                            .padding(vertical = 6.dp),
++                            .padding(vertical = verticalPadding),
+                     ) {
+                         content(close)
+                     }
+@@ -262,6 +263,7 @@
+     minimumHeight: Dp = 0.dp,
+     labelFontSizeSp: Float? = null,
+     choicePresentation: HxChoicePresentation = HxChoicePresentation.Standard,
++    compactVerticalPadding: Dp = 6.dp,
+ ) {
+     val c = Hx.colors
+     val haptics = rememberHetuHaptics()
+@@ -275,7 +277,7 @@
+             .background(if (choicePresentation == HxChoicePresentation.Notification && selected) c.surfaceMuted else Color.Transparent)
+             .heightIn(min = minimumHeight)
+             .padding(horizontal = 14.dp, vertical = when {
+-                compact -> 6.dp
++                compact -> compactVerticalPadding
+                 choicePresentation == HxChoicePresentation.Scale -> 8.dp
+                 choicePresentation == HxChoicePresentation.Language -> 9.dp
+                 choicePresentation != HxChoicePresentation.Standard -> 11.dp
+@@ -336,7 +338,8 @@
+             minWidth = if (entryMenu == HxFileEntryMenu.Folder) 148.dp else 152.dp,
+             anchorEndInset = when (entryMenu) { HxFileEntryMenu.File -> 34.dp; HxFileEntryMenu.Folder -> 54.dp; else -> anchorEndInset },
+             contextEntryOffset = when (entryMenu) { HxFileEntryMenu.File -> 14.dp; HxFileEntryMenu.Folder -> 8.dp; else -> null },
+-            leftAnchorPointer = entryMenu == HxFileEntryMenu.Folder) { close ->
++            leftAnchorPointer = entryMenu == HxFileEntryMenu.Folder,
++            verticalPadding = if (referenceFileMenu && entryMenu == null) 4.dp else 6.dp) { close ->
+             if (entryMenu != null) {
+                 Row(Modifier.fillMaxWidth().heightIn(min = 34.dp).padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                     if (headerIcon != null) { Icon(headerIcon, null, tint = Hx.colors.text, modifier = Modifier.size(22.dp)); Spacer(Modifier.width(12.dp)) }
+@@ -345,14 +348,16 @@
+                 }
+                 HorizontalDivider(Modifier.padding(horizontal = 12.dp), thickness = .5.dp, color = Hx.colors.line)
+             } else if (referenceFileMenu) {
+-                Text(title, color = Hx.colors.textMuted, style = MaterialTheme.typography.labelMedium,
+-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp))
++                Text(title, color = Hx.colors.textMuted, fontSize = 13.sp, lineHeight = 18.sp,
++                    maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
++                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp))
+                 HorizontalDivider(Modifier.padding(horizontal = 12.dp), color = Hx.colors.line)
+             }
+             actions.forEachIndexed { index, action ->
+                 HxMenuItem(action.label, onClick = { close(action.onClick) }, danger = action.danger, icon = action.icon, compact = referenceFileMenu,
+-                    minimumHeight = when (entryMenu) { HxFileEntryMenu.File -> 43.dp; HxFileEntryMenu.Folder -> 36.dp; else -> 0.dp },
+-                    labelFontSizeSp = if (entryMenu != null) 15f else null)
++                    minimumHeight = when (entryMenu) { HxFileEntryMenu.File -> 43.dp; HxFileEntryMenu.Folder -> 36.dp; else -> if (referenceFileMenu) 32.dp else 0.dp },
++                    labelFontSizeSp = if (entryMenu != null || referenceFileMenu) 15f else null,
++                    compactVerticalPadding = if (referenceFileMenu && entryMenu == null) 5.dp else 6.dp)
+                 if (entryMenu != null && index < actions.lastIndex) HorizontalDivider(Modifier.padding(horizontal = 12.dp), thickness = .5.dp, color = Hx.colors.line)
+             }
+         }
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
+@@ -204,6 +204,7 @@
+                     options = listOf("blacklist" to "黑名单", "whitelist" to "白名单", "core" to "核心"),
+                     selected = scope,
+                     onSelect = ::setScope,
++                    selectedTextColor = c.accent,
+                 )
+             }
+         }
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelStrategyLayout51.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelStrategyLayout51.kt
+@@ -157,6 +157,7 @@
+             selected = selected,
+             onSelect = onSelect,
+             modifier = Modifier.weight(1f),
++            selectionColor = c.accent, selectedTextColor = c.onAccent,
+         )
+     }
+ }
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
+@@ -651,7 +651,7 @@
+                 searching = !searching
+                 if (!searching && path == root) query = ""
+             })
+-            HxBarAction(Icons.Rounded.MoreHoriz, "更多", onClick = { moreMenu = true })
++            HxBarAction(Icons.Rounded.MoreHoriz, "更多", onClick = { moreMenu = true }, anchorMenu = true)
+         },
+     ) {
+         item(key = "breadcrumbs") {
+@@ -744,6 +744,7 @@
+ 
+     if (moreMenu) HxActionMenu(
+         title = "文件管理", onDismiss = { moreMenu = false },
++        dimBehind = false,
+         actions = listOf(
+             HxMenuAction("导入", Icons.Rounded.FileUpload) { moreMenu = false; importer.launch(arrayOf("*/*")) },
+             HxMenuAction("下载", Icons.Rounded.SystemUpdateAlt) { moreMenu = false; downloadDialog = true },
+@@ -772,6 +773,9 @@
+         HxFormDialog(
+             title = if (folder) "新建文件夹" else "新建文件",
+             widthFraction = .84f,
++            titleFontSize = if (folder) 20.sp else 26.sp,
++            titleLineHeight = if (folder) 26.sp else 32.sp,
++            titleTextAlign = if (folder) androidx.compose.ui.text.style.TextAlign.Center else androidx.compose.ui.text.style.TextAlign.Start,
+             fields = listOf(HxField("名称", placeholder = if (folder) "例如 backup" else "例如 config.yaml")),
+             confirmLabel = "创建",
+             validate = { v -> runCatching { RuntimeFilesRepository.child(path, v[0]) }.exceptionOrNull()?.message },
+@@ -973,7 +977,7 @@
+         }
+     }
+ 
+-    sheet?.let { (title, text) -> HxTextSheet(title, text, onDismiss = { sheet = null }) }
++    sheet?.let { (title, text) -> HxTextSheet(title, text, onDismiss = { sheet = null }, showCopyLabel = true) }
+     if (confirmRecover) {
+         HxConfirmDialog(
+             title = "恢复网络？",
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt
+@@ -350,7 +350,13 @@
+     @Test fun configMenusAndCancelledDestructiveDialogs() {
+         val library = configFiles()
+         show { ConfigsScreen(vm) }; expectEventually("日常使用.yaml")
+-        longClick("日常使用.yaml"); expect("重命名"); capture("03A-006-current-config-menu"); dismissSheet()
++        longClick("日常使用.yaml"); expect("重命名")
++        rule.runOnUiThread {
++            val action = nativeNodes().first { "导出配置" in labels(it) }
++            val row = generateSequence(action) { it.parent }.first { it.config.getOrNull(SemanticsActions.OnClick)?.action != null }
++            assertTrue("Config actions preserve the measured32dp density; actual=${row.boundsInWindow.height}", row.boundsInWindow.height in 31.5f..33f)
++        }
++        capture("03A-006-current-config-menu"); dismissSheet()
+         longClick("备用配置.yaml"); capture("03A-007-other-config-menu"); dismissSheet()
+         longClick(ProxyConfigLibrary.BUNDLED_NAME); capture("03A-008-bundled-config-menu"); dismissSheet()
+         longClick("日常使用.yaml"); click("重命名"); capture("03A-009-rename-config"); click("取消")
+@@ -370,6 +376,20 @@
+         capture("extra-configs-narrow-long-name-menu")
+         click("重命名"); expect("重命名配置"); click("取消")
+         assertEquals(name, library.selected(ProxyRuntimeProfile.Core.MIHOMO)!!.name)
++        var query by mutableStateOf("香港超长节点名称 Long node ".repeat(8))
++        show {
++            CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(1f, 1.4f)) {
++                HxSearchField(query, { query = it }, "搜索", autoFocus = true)
++            }
++        }
++        rule.runOnUiThread {
++            val field = nativeNodes().first { it.config.getOrNull(SemanticsActions.SetText)?.action != null }
++            assertTrue("Narrow large-font search stays within viewport", field.boundsInWindow.right <= 321f)
++            assertTrue("Large font input grows instead of clipping", field.boundsInWindow.height >= 44f)
++        }
++        capture("extra-search-narrow-large-font")
++        click("清除"); assertEquals("", query)
++        replace(0, "重新输入"); assertEquals("重新输入", query)
+     }
+     @Test fun existingSubscriptionInvalidDraftAndCancel() {
+         configFiles(); show { ConfigsScreen(vm) }; expectEventually("日常使用.yaml"); scroll(360f)
+@@ -432,7 +452,20 @@
+             assertTrue("Child-page actions stay in the toolbar above the large title", search.boundsInWindow.center.y < heading.boundsInWindow.top)
+         }
+         capture("03B-013-files-list")
+-        touch("更多"); capture("03B-015-files-more"); click("新建文件"); capture("03B-018-files-new-file"); click("取消")
++        touch("更多")
++        rule.runOnUiThread {
++            val lastAction = nativeNodes().first { "新建文件夹" in labels(it) && it.boundsInWindow.height > 0f }
++            assertTrue("Topbar more opens its anchored reference menu, not a bottom sheet", lastAction.boundsInWindow.top < 300f)
++        }
++        capture("03B-015-files-more"); click("新建文件")
++        rule.runOnUiThread {
++            val title = nativeNodes().first { "新建文件" in labels(it) && it.config.getOrNull(SemanticsActions.GetTextLayoutResult)?.action != null }
++            val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
++            assertTrue(title.config[SemanticsActions.GetTextLayoutResult].action!!.invoke(layouts))
++            assertEquals(26f, layouts.single().layoutInput.style.fontSize.value, .01f)
++            assertEquals(0f, layouts.single().getLineLeft(0), 1f)
++        }
++        capture("03B-018-files-new-file"); click("取消")
+         touch("更多"); click("新建文件夹"); capture("03B-019-files-new-folder"); click("取消")
+         touch("更多"); click("下载"); replace(0,"https://example.com/config.yaml"); capture("03B-020-files-download")
+         replace(0,"file:///tmp/config.yaml"); click("下载"); expect("请填写 HTTPS 下载地址"); capture("03B-021-files-download-invalid"); click("取消")
+@@ -476,7 +509,9 @@
+         val app = ApplicationProvider.getApplicationContext<Application>()
+         RootProxyManager(app).startupFile().apply { parentFile!!.mkdirs(); writeText(yaml) }
+         show { SettingsStartupConfigScreen {} }; expectEventually(yaml); capture("04-014-startup-config")
+-        configFiles(); show { DiagnosticsScreen(vm) {} }; click("启动配置"); expectEventually("复制"); capture("03A-041-diagnostic-startup"); dismissSheet()
++        configFiles(); show { DiagnosticsScreen(vm) {} }; click("启动配置"); expectEventually("复制")
++        rule.runOnUiThread { assertTrue("Diagnostic copy affordance includes visible text", nativeNodes().any { n -> n.config.getOrNull(SemanticsProperties.Text)?.any { it.text == "复制" } == true }) }
++        capture("03A-041-diagnostic-startup"); dismissSheet()
+         click("恢复网络"); capture("03A-042-diagnostic-recovery"); click("取消")
+         click("消息与网络诊断"); expectEventually("受控诊断快照：无实际 Root 或网络操作"); capture("03A-043-diagnostic-network"); dismissSheet()
+     }
+@@ -527,6 +562,8 @@
+             val summary = nativeNodes().single { it.config.getOrNull(SemanticsProperties.TestTag) == "app-routing-summary" }
+             assertEquals("Search cannot pull the summary up into the scrolling list", summaryBottom, summary.boundsInWindow.bottom, 1f)
+         }
++        click("清除"); expect("浏览器")
++        assertEquals(setOf("com.example.chat"), vm.prefs.getStringSet("proxyAppPackages", emptySet()))
+     }
+     @Test fun panelLogReadSearchAndExpand() {
+         fixture("state", vm.state.copy(running=true, panelReady=true)); vm.openPanel("logs"); show { HetuRoot(vm) }
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptStateCoverageTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptStateCoverageTest.kt
+@@ -311,14 +311,22 @@
+         click("本地模式")
+         assertEquals("local", vm.prefs.getString("homeSpeedSource", ""))
+         rule.runOnUiThread { fixture("operation", HxRunOp.Restart); fixture("operationText", "请稍候…") }; frame()
+-        expect("正在重启"); capture("01-008-restarting")
++        expect("正在重启"); expectDisabledActionLabel("重启"); capture("01-008-restarting")
+     }
+     @Test fun homeStartAndFailure() {
+         fixture("operation", HxRunOp.Start); fixture("operationText", "请稍候…")
+         show { HetuRoot(vm) }
+-        expect("正在启动"); capture("01-006-starting")
++        expect("正在启动"); expectDisabledActionLabel("启动"); capture("01-006-starting")
+         rule.runOnUiThread { fixture("operation", null); vm.startupError = "测试夹具：配置加载失败\n第 18 行：缩进无效" }; frame()
+-        expect("启动失败"); capture("01-007-failed")
++        expect("启动失败")
++        rule.runOnUiThread { assertTrue("Copy label is visible text, not only an icon description", nativeNodes().any { n -> n.config.getOrNull(SemanticsProperties.Text)?.any { it.text == "复制" } == true }) }
++        capture("01-007-failed")
++    }
++    private fun expectDisabledActionLabel(label: String) = rule.runOnUiThread {
++        val text = nativeNodes().firstOrNull { label in labels(it) }
++        assertNotNull("Busy operation retains its action label: $label", text)
++        assertTrue("Busy action remains disabled without hiding its label", generateSequence(text) { it.parent }
++            .any { it.config.contains(SemanticsProperties.Disabled) })
+     }
+     @Test fun strategyExpansionSearchAndNodeInfo() {
+         runningFixture(); vm.openPanel("proxies")
+@@ -363,7 +371,16 @@
+         click("显示隐藏策略")
+         assertTrue(vm.prefs.getBoolean("proxySelectorShowHidden", false))
+         assertFalse("Atlas requires filter to close after choosing", exists("显示隐藏策略"))
+-        click("排序与布局"); expect("测速与 API"); capture("02-011-layout")
++        click("排序与布局"); expect("测速与 API")
++        rule.runOnUiThread {
++            val selected = nativeNodes().first { "按配置" in labels(it) && it.config.getOrNull(SemanticsActions.GetTextLayoutResult)?.action != null }
++            val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
++            assertTrue(selected.config[SemanticsActions.GetTextLayoutResult].action!!.invoke(layouts))
++            assertEquals(androidx.compose.ui.graphics.Color.White, layouts.single().layoutInput.style.color)
++        }
++        click("1 列", 0); assertEquals(1, vm.prefs.getInt("proxySelectorGroupColumns", 2))
++        click("2 列", 0); assertEquals(2, vm.prefs.getInt("proxySelectorGroupColumns", 1))
++        capture("02-011-layout")
+         click("测速与 API"); expect("测速地址")
+         toggle(2); capture("02-027-api-default")
+         toggle(0); toggle(1); toggle(2); replace(0, "https://example.com/generate_204")
