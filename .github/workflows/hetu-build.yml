@@ -1354,11 +1354,17 @@ jobs:
       - name: Prepare official AOSP emulator
         run: |
           set -euo pipefail
+          mkdir -p out/android-smoke
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/hetu-avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           AVDMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
-          "$SDKMANAGER" 'platform-tools' 'emulator' 'system-images;android-35;default;x86_64'
-          echo no | "$AVDMANAGER" create avd --force --name hetu-smoke --package 'system-images;android-35;default;x86_64'
-          cat >> "$HOME/.android/avd/hetu-smoke.avd/config.ini" <<'EOF'
+          "$SDKMANAGER" 'platform-tools' 'emulator' 'system-images;android-35;default;x86_64' 2>&1 | tee out/android-smoke/sdk-prepare.log
+          echo no | "$AVDMANAGER" create avd --force --name hetu-smoke --path "$ANDROID_AVD_HOME/hetu-smoke.avd" --package 'system-images;android-35;default;x86_64' 2>&1 | tee out/android-smoke/avd-prepare.log
+          test -f "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini"
+          sed -i '/^hw.lcd.width=/d;/^hw.lcd.height=/d;/^hw.lcd.density=/d;/^hw.ramSize=/d' "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini"
+          cat >> "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini" <<'EOF'
           hw.lcd.width=393
           hw.lcd.height=852
           hw.lcd.density=160

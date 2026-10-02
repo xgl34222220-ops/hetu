@@ -27,6 +27,8 @@ def click(label,scroll=False,bottom=False):
   if found:
    x1,y1,x2,y2=map(int,re.findall(r'\d+',found[0].get('bounds','')))
    assert x2>x1 and y2>y1,(label,found[0].attrib)
+   if scroll and (y1 < 65 or y2 > 742):
+    adb('shell','input','swipe','196','710','196','260','400');time.sleep(1);continue
    adb('shell','input','tap',str((x1+x2)//2),str((y1+y2)//2));time.sleep(2);return
   if scroll: adb('shell','input','swipe','196','710','196','260','400');time.sleep(1)
  raise AssertionError('UI label unavailable: '+label)
