@@ -15,7 +15,8 @@ class AutomationSettingsConceptParityTest {
 
     @Test fun basicProxyPickersCoverConceptOptions() {
         val s = source("RootTproxyActivity.java")
-        listOf("Mihomo", "Mihomo Smart").forEach { assertTrue("missing core option $it", s.contains(it)) }
+        val profile = source("ProxyRuntimeProfile.java")
+        listOf("Mihomo", "Mihomo Smart").forEach { assertTrue("missing core option $it", profile.contains(it)) }
         listOf("TUN", "TPROXY", "eBPF", "Redirect", "Enhance").forEach {
             assertTrue("missing run mode $it", s.contains(it, ignoreCase = true))
         }
