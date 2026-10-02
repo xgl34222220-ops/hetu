@@ -1069,6 +1069,11 @@ jobs:
           grep -q 'build/outputs/concept61' android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
           grep -q 'class SettingsStateCoverage61Test' android-app/app/src/test/java/io/github/xgl34222220/hetu/SettingsStateCoverage61Test.kt
 
+      - name: Fix V20.61 screenshot test import
+        run: |
+          set -euo pipefail
+          sed -i '/import androidx.compose.ui.test.assertExists/d' android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
+
       - name: Verify built-in WebUI behavior with controlled API fixtures
         run: node .github/scripts/test_webui_concept.cjs
 
