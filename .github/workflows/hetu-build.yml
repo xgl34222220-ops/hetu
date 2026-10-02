@@ -1060,6 +1060,15 @@ jobs:
           grep -q 'WindowInspector.getGlobalWindowViews' android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
           grep -q 'settings-license-lucide' android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
 
+      - name: Apply V20.61 settings proof correction
+        run: |
+          set -euo pipefail
+          echo '9abeb45b8fc7904dd7cf7177a3afe854be6e0bd8e3b08554972ce73f5e7849ed  updates/v2061-settings-proof-fix.patch' | sha256sum -c -
+          git apply --check updates/v2061-settings-proof-fix.patch
+          git apply updates/v2061-settings-proof-fix.patch
+          grep -q 'build/outputs/concept61' android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
+          grep -q 'class SettingsStateCoverage61Test' android-app/app/src/test/java/io/github/xgl34222220/hetu/SettingsStateCoverage61Test.kt
+
       - name: Verify built-in WebUI behavior with controlled API fixtures
         run: node .github/scripts/test_webui_concept.cjs
 
@@ -1162,7 +1171,7 @@ jobs:
           gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:testDebugUnitTest \
             --tests '*RuntimeYaml15Test' --tests '*RuntimeStartup15Test' --tests '*AdblockSnifferTest' \
             --tests '*ConceptParity57Test' --tests '*PanelConceptModelTest' --tests '*SettingsConceptParityTest' \
-            --tests '*CoreManagerConcept57Test' --tests '*SettingsBackupParity57Test' --tests '*ToolsConceptParityTest' --tests '*NativeConceptScreenshotTest' --tests '*SettingsPickerParity58Test' --tests '*LargeTitleParity59Test' --tests '*BootStartup60Test' --stacktrace
+            --tests '*CoreManagerConcept57Test' --tests '*SettingsBackupParity57Test' --tests '*ToolsConceptParityTest' --tests '*NativeConceptScreenshotTest' --tests '*SettingsStateCoverage61Test' --tests '*SettingsPickerParity58Test' --tests '*LargeTitleParity59Test' --tests '*BootStartup60Test' --stacktrace
 
       - name: Upload concept UI verification evidence
         if: always()
@@ -1172,7 +1181,7 @@ jobs:
           path: |
             android-app/app/build/test-results/testDebugUnitTest/
             android-app/app/build/reports/tests/testDebugUnitTest/
-            android-app/app/build/outputs/concept59/
+            android-app/app/build/outputs/concept61/
             out/verification/
           if-no-files-found: warn
 
