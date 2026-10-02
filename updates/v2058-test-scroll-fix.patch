@@ -1,0 +1,10 @@
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
+@@ -100,6 +100,7 @@
+         rule.onNodeWithText("顶栏模糊样式").performScrollTo().performClick()
+     }
+     @Test fun themeScaleChoice() = snapshotAfter("settings-scale-choice", { HxThemeLabScreen(vm) {} }) {
++        rule.onNodeWithText("顶栏模糊样式").performScrollTo()
+         rule.onNodeWithText("界面缩放").performScrollTo().performClick()
+     }
+     @Test fun notificationRefreshChoice() = snapshotAfter("settings-notification-refresh-choice", { NotificationSettingsScreen(vm) {} }) {
