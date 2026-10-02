@@ -975,7 +975,7 @@ jobs:
           python3 .github/scripts/v2053b_configs.py
           grep -q 'versionCode = 2056' android-app/app/build.gradle.kts
           grep -q 'versionName = "0.10.6-v20"' android-app/app/build.gradle.kts
-          grep -q 'title = "基础代理配置"' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java
+          grep -Fq 'u.text("基础代理配置"' android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java || { echo "V20.56 basic settings native title missing"; exit 1; }
           grep -q 'title = "主题设置"' android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
           echo "V20.53-V20.56 parity chain applied"
           git diff --stat
@@ -990,16 +990,29 @@ jobs:
           fi
           git diff --stat
 
-      - name: Export effective V20.56 source
+      - name: Apply V20.57 concept states and safety regression pass
         run: |
           set -euo pipefail
-          tar -czf /tmp/Hetu-V20.56-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
-          sha256sum /tmp/Hetu-V20.56-effective-source.tar.gz
+          echo 'd076978ba8ffdb651fd2fe926a5fd1158606aa54be4eb6a7e50b18880eef0f1e  updates/v2057-concept-parity.patch' | sha256sum -c -
+          git apply --check updates/v2057-concept-parity.patch
+          git apply updates/v2057-concept-parity.patch
+          grep -q 'versionCode = 2057' android-app/app/build.gradle.kts
+          grep -q 'versionName = "0.10.7-v20"' android-app/app/build.gradle.kts
+          ! grep -R -n --include='*.kt' --include='*.java' '示例数据' android-app/app/src/main/java
+
+      - name: Verify built-in WebUI behavior with controlled API fixtures
+        run: node .github/scripts/test_webui_concept.cjs
+
+      - name: Export effective V20.57 source
+        run: |
+          set -euo pipefail
+          tar -czf /tmp/Hetu-V20.57-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+          sha256sum /tmp/Hetu-V20.57-effective-source.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Hetu-V20.56-effective-source
-          path: /tmp/Hetu-V20.56-effective-source.tar.gz
+          name: Hetu-V20.57-effective-source
+          path: /tmp/Hetu-V20.57-effective-source.tar.gz
           compression-level: 0
           if-no-files-found: error
 
@@ -1074,7 +1087,21 @@ jobs:
         working-directory: android-app
         run: |
           gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:testDebugUnitTest \
-            --tests '*RuntimeYaml15Test' --tests '*RuntimeStartup15Test' --tests '*AdblockSnifferTest' --stacktrace
+            --tests '*RuntimeYaml15Test' --tests '*RuntimeStartup15Test' --tests '*AdblockSnifferTest' \
+            --tests '*ConceptParity57Test' --tests '*PanelConceptModelTest' --tests '*SettingsConceptParityTest' \
+            --tests '*CoreManagerConcept57Test' --tests '*SettingsBackupParity57Test' --tests '*ToolsConceptParityTest' --tests '*NativeConceptScreenshotTest' --stacktrace
+
+      - name: Upload concept UI verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hetu-V20.57-UI-verification
+          path: |
+            android-app/app/build/test-results/testDebugUnitTest/
+            android-app/app/build/reports/tests/testDebugUnitTest/
+            android-app/app/build/outputs/concept57/
+            out/verification/
+          if-no-files-found: warn
 
       - name: Verify APK
         run: |
