@@ -1,3 +1,11 @@
+## 当前交付：V20.73 脚本与开机自启修复
+
+以已验证 V20.71 有效源码、V20.72 补丁及 `updates/v2073-scripts-boot/runtime.patch` 为底座，使用 `.github/workflows/hetu-build.yml`；不重放历史 UI 覆盖。应用提交 `1321b2d6fddf8abae82c9bf98483ba58c33748d4`，versionCode 2073，versionName 0.12.3-v20，Root runtime 149。用户本轮要求修复运行问题，Root 开机脚本与运行层修复见 `docs/V20.73_SCRIPTS_BOOT.md`，不沿用下文历史“后端未改”作为本版描述。
+
+保留全部界面/功能，21 个原始 native/core 载荷不变。沿用固定签名 SHA-256 `701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad`；缓存/证书缺失失败关闭。开机自启须实际安装 Root service.d 脚本并校验成功部署配置才保存为开启。脚本文件列表保留真实文件名；导入后台限量读取，错误结果明确显示诊断。Google 防火墙回归保留。
+
+259 个 Android 单测和 lint 通过；Android 15/16 各 27 个实际安装交互检查通过，最终 CI 37118971993 attempt 2 成功；Root 重启只验证受控夹具，没有用户手机/Magisk/KernelSU/APatch 真机验收。用户所述脚本点击闪退未在旧包 AOSP 上复现，不声称设备根因已经确认。APK 与安装测试身份、后续交付证据见本版文档。
+
 ## 当前交付：V20 整体重构（以此为准）
 
 用户要求“按你的审美完全重构，包括功能”。V20 用单一 `HetuActivity` + `app/` 下的新 Compose 界面取代全部旧 UI；用户明确要求**不删除任何功能**：旧 UI 文件、功能页、测试、脚本、工作流全部保留，旧页面只换配色并由新设置页进入；下文 UI10–UI15 的首页/面板布局约束对新主界面不再适用。后端（Root、Mihomo、规则、DNS VPN、服务）未改，除：`MihomoStartupConfig` 在广告过滤开启且源配置无 sniffer 时注入嗅探。构建用 `.github/workflows/hetu-build.yml`。详情 `CHANGELOG-V20.md`。
