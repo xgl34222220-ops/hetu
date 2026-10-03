@@ -62,7 +62,7 @@ jobs:
     - name: Apply and test scripts and native boot fixes
       run: 'set -euo pipefail
 
-        echo ''8563747730e399cfbdf2e2ceada0ae67ed58b39e5d3c377a6b56d609fb29bab1  updates/v2073-scripts-boot/runtime.patch''
+        echo ''64b39aa3cc905f6e22c7172ad9ccf291741cc9590d3411df08850e33a1634a05  updates/v2073-scripts-boot/runtime.patch''
         | sha256sum -c -
 
         git apply --check updates/v2073-scripts-boot/runtime.patch
@@ -79,7 +79,7 @@ jobs:
 
         python3 tools/qa/test_google_firewall.py 2>&1 | tee out/verification/google-firewall-tests.txt
 
-        python3 .github/scripts/verify_packaged_runtime.py snapshot --script-sha256 0e349bf1f41c7f6fc9fff1a0c00842fb10229e11ffec53e8bf686cd9d356636a
+        python3 .github/scripts/verify_packaged_runtime.py snapshot --script-sha256 32291ca1ef266c1561122fe4ebd2329d3ffacb889c6992f92234afcceaa25fed
         --autostart-sha256 3a1215f4e9093ae2298803020d697da0c14c35ee5cf28f84f2a81608093783f9
 
         '

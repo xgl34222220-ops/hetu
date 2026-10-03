@@ -101,12 +101,15 @@ index 0000000..4d17a16
 +done
 +state cancelled
 diff --git a/android-app/app/src/main/assets/hetu-root.sh b/android-app/app/src/main/assets/hetu-root.sh
-index 75f2e48..63d2592 100755
+index 75f2e48..c81f2fd 100755
 --- a/android-app/app/src/main/assets/hetu-root.sh
 +++ b/android-app/app/src/main/assets/hetu-root.sh
-@@ -960,6 +960,14 @@ start(){
+@@ -958,8 +958,17 @@ google_firewall_maintain(){ (
+ start(){
+   START_BIN="$1"; START_CFG="$2"; START_MODE="$3"; START_TP="$4"; START_RP="$5"; START_V6="$6"; START_TCP="$7"; START_UDP="$8"; START_DNS="$9"; START_QUIC="${10}"; START_DP="${11}"; START_CP="${12}"; START_SCOPE="${13}"; START_UIDS="${14}"; START_SHARE="${15}"; START_KILL="${16}"; START_CIDRS="${17}"; START_IFACES="${18}"; START_DIRECT_UIDS="${19}"; START_PREVALIDATED="${20:-0}"; START_FAST_CAPS="${21:-0}"; START_DIRECT_GIDS="${22:-}"; START_SHARED_MACS="${23:-}"
    START_VENDOR_CLEAN="${30:-0}"
-   mkdir -p "$RUN" || fail "无法创建运行目录"; : > "$START_TIMING"
+-  mkdir -p "$RUN" || fail "无法创建运行目录"; : > "$START_TIMING"
++  mkdir -p "$RUN" || fail "无法创建运行目录"
    acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
 +  if [ -n "${HETU_BOOT_RESTORE_ID:-}" ]; then
 +    BOOT_NOW=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || true)
@@ -116,10 +119,11 @@ index 75f2e48..63d2592 100755
 +    BOOT_PID=$(cat "$PIDFILE" 2>/dev/null || true)
 +    if pidcore "$BOOT_PID" && kill -0 "$BOOT_PID" 2>/dev/null; then ok "Root 代理已在运行"; return 0; fi
 +  fi
++  : > "$START_TIMING"
    rm -f "$START_ERROR"; start_stage "preflight"
    if [ "$START_FAST_CAPS" != 1 ]; then
      preflight "$START_MODE" "$START_TP" "$START_RP" "$START_V6" "$START_TCP" "$START_UDP" "$START_DNS" "$START_QUIC" "$START_DP" "$START_CP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_KILL" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" >/dev/null
-@@ -1395,7 +1403,7 @@ case "${1:-status}" in
+@@ -1395,7 +1404,7 @@ case "${1:-status}" in
        *) fail "启动参数数量错误：收到 $#，预期 23/24/31（含操作名）";;
      esac
      root; shift; start "$@";;
@@ -383,10 +387,10 @@ index d0d1f54..8c0286b 100644
              } catch (cancel: CancellationException) {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootAutostart.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootAutostart.java
 new file mode 100644
-index 0000000..6e7c4e9
+index 0000000..93a3d3d
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootAutostart.java
-@@ -0,0 +1,88 @@
+@@ -0,0 +1,87 @@
 +package io.github.xgl34222220.hetu;
 +
 +import android.content.Context;
@@ -447,8 +451,7 @@ index 0000000..6e7c4e9
 +    static void remove(Context context)throws IOException{
 +        RootBridge.requireWorkerThread();
 +        check(RootBridge.rootShell(context,"set -e; test \"$(id -u)\" = 0; rm -f "
-+                +RootBridge.quote(BASE+"/enabled")+" "+RootBridge.quote(ENTRY)
-+                +"; test ! -e "+RootBridge.quote(ENTRY),10000L),"关闭开机自启失败");
++                +RootBridge.quote(ENTRY)+"; test ! -e "+RootBridge.quote(ENTRY)+"; rm -f "+RootBridge.quote(BASE+"/enabled"),10000L),"关闭开机自启失败");
 +    }
 +
 +    static boolean restoreInProgress(Context context){
@@ -476,10 +479,34 @@ index 0000000..6e7c4e9
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-index 482853a..2be3bd8 100644
+index 482853a..1672970 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-@@ -627,12 +627,13 @@ final class RootProxyManager {
+@@ -410,7 +410,8 @@ final class RootProxyManager {
+                     .putBoolean("proxyAdblockCounterArmed",profile.adblockChain)
+                     .remove("proxyAdblockLastError")
+                     .apply();
+-            return "运行配置已热重载";
++            String bootWarning=refreshAutostart(p,autostartArgs(p));
++            return "运行配置已热重载"+(bootWarning.isEmpty()?"":"；"+bootWarning);
+         }finally{
+             CONTROL_LOCK.unlock();
+         }
+@@ -520,8 +521,12 @@ final class RootProxyManager {
+                 prefs.edit().putBoolean("proxyRootWanted",true).putBoolean("proxyRootRuntimeRunning",true).apply();
+                 ensureContinuityService(true);
+                 trace.outcome="alreadyRunning";
+-                return new JSONObject().put("ok",true).put("running",true).put("alreadyRunning",true)
++                JSONObject unchanged=new JSONObject().put("ok",true).put("running",true).put("alreadyRunning",true)
+                         .put("message","Root 代理已在运行，已忽略重复启动请求");
++                if(prefs.getBoolean("proxyRootAutoStart",false)&&!prefs.getBoolean("proxyRootAutoStartInstalled",false)){
++                    try{setAutoStart(true);}catch(Exception error){unchanged.put("warning","开机脚本未安装："+error.getMessage());}
++                }
++                return unchanged;
+             }
+             if(replaceRunning) {
+                 // Preserve the user's intent before any new preparation. The shell start transaction
+@@ -627,12 +632,13 @@ final class RootProxyManager {
          String ioWeight=prefs.getBoolean("proxyIoWeightEnabled",false)?prefs.getString("proxyIoWeight","4"):"";
          String vendorClean=bit(prefs.getBoolean("proxyVendorFirewallCleanup",false));
          JSONObject result;
@@ -495,24 +522,16 @@ index 482853a..2be3bd8 100644
              if(!result.optBoolean("ok"))throw new IOException(result.optString("message","Root 代理启动失败"));
          }catch(Exception startFailure){if(adblockCoordinatorEntered)ProxyAdblockCoordinator.exit(context);throw startFailure;}
  
-@@ -718,6 +719,16 @@ final class RootProxyManager {
+@@ -718,6 +724,8 @@ final class RootProxyManager {
                  .remove("proxyRootBootError")
                  .apply();
          }
-+        if(prefs.getBoolean("proxyRootAutoStart",false)){
-+            try{
-+                installAutostart(p,bootArgs);
-+                prefs.edit().putBoolean("proxyRootAutoStartInstalled",true).remove("proxyRootAutoStartError").apply();
-+            }catch(Exception bootError){
-+                String detail=bootError.getMessage()==null?bootError.getClass().getSimpleName():bootError.getMessage();
-+                prefs.edit().putBoolean("proxyRootAutoStartInstalled",false).putString("proxyRootAutoStartError",detail).apply();
-+                result.put("warning",(result.optString("warning","").isEmpty()?"":result.optString("warning")+"；")+"代理已启动，但开机脚本未更新："+detail);
-+            }
-+        }
++        String bootWarning=refreshAutostart(p,bootArgs);
++        if(!bootWarning.isEmpty())result.put("warning",(result.optString("warning","").isEmpty()?"":result.optString("warning")+"；")+bootWarning);
          ensureContinuityService(true);
          trace.outcome="ready";
          return result;
-@@ -732,6 +743,68 @@ final class RootProxyManager {
+@@ -732,6 +740,81 @@ final class RootProxyManager {
          }
      }
  
@@ -537,6 +556,19 @@ index 482853a..2be3bd8 100644
 +        if(!stage.isDirectory()&&!stage.mkdirs())throw new IOException("无法准备开机脚本");
 +        File script=new File(stage,"hetu-root.sh");copyScriptAsset(script);
 +        RootAutostart.install(context,new File(CONFIG),args,script);
++    }
++
++    private String refreshAutostart(Prepared p,String[] args){
++        if(!prefs.getBoolean("proxyRootAutoStart",false))return "";
++        try{
++            installAutostart(p,args);
++            prefs.edit().putBoolean("proxyRootAutoStartInstalled",true).remove("proxyRootAutoStartError").apply();
++            return "";
++        }catch(Exception error){
++            String detail=error.getMessage()==null?error.getClass().getSimpleName():error.getMessage();
++            prefs.edit().putBoolean("proxyRootAutoStartInstalled",false).putString("proxyRootAutoStartError",detail).apply();
++            return "开机脚本未更新："+detail;
++        }
 +    }
 +
 +    boolean adoptBootRuntime()throws Exception{
@@ -581,7 +613,7 @@ index 482853a..2be3bd8 100644
      JSONObject stop()throws Exception{return stop(null);}
      JSONObject stop(Progress progress)throws Exception{
          CONTROL_LOCK.lock();
-@@ -823,6 +896,12 @@ final class RootProxyManager {
+@@ -823,6 +906,12 @@ final class RootProxyManager {
          StringBuilder events=new StringBuilder("time=").append(new Date())
                  .append("\napp=").append(BuildConfig.VERSION_NAME)
                  .append("\nexpectedCore=").append(expectedCoreToken(ProxyRuntimeProfile.load(prefs).core));
@@ -784,7 +816,7 @@ index 0000000..e7a15e4
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootAutostartTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootAutostartTest.kt
 new file mode 100644
-index 0000000..1b631dd
+index 0000000..c1cd8e1
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootAutostartTest.kt
 @@ -0,0 +1,77 @@
@@ -819,7 +851,7 @@ index 0000000..1b631dd
 +class RootAutostartTest {
 +    private fun args() = Array(30) { "arg$it" }.also { it[19] = "1"; it[20] = "1" }
 +    @Test fun planPreservesThirtyArgumentsAndNeverExecutesTheirText() {
-+        val folder = createTempDir(prefix = "hetu-boot-plan-")
++        val folder = java.nio.file.Files.createTempDirectory("hetu-boot-plan-").toFile()
 +        try {
 +            val sink = File(folder, "args.bin")
 +            val control = File(folder, "control.sh").apply { writeText("printf '%s\\000' \"\$@\" > \"\$HETU_TEST_ARGS\"\n") }
