@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Navigation smoke in a fresh non-root Android emulator.
-Only the fixture app display language may be changed.
-Never starts/stops a proxy, requests permissions, imports user data, or clears app data.
+Changes fixture display language and exercises denied Root setup in non-root AOSP.
+Never starts/stops a proxy, imports user data, or clears app data.
 """
 import hashlib, json, os, re, subprocess, time, xml.etree.ElementTree as ET
 from pathlib import Path
@@ -287,6 +287,7 @@ def main():
  (OUT/'results.json').write_text(json.dumps({'checks':checks,'passed':len(checks),'fixtureOnly':True,'rootMutationActions':0,'rootSetupDenialAttempts':1,'apiLevel':int(adb('shell','getprop','ro.build.version.sdk').strip()),'limitations':'Fresh AOSP emulator. Five populated native-WebView states use an isolated loopback fixture with deliberate HTTP503 switch rejection. No K80, real core, Root boot or actual network validation.'},ensure_ascii=False,indent=2))
 try:main()
 except Exception:
+ (OUT/'failure-preferences.xml').write_text(adb('shell','run-as',PKG,'cat','shared_prefs/hetu.xml',check=False))
  (OUT/'last-app-crash.txt').write_text(adb('shell','run-as',PKG,'cat','files/last-app-crash.txt',check=False))
  try:capture('failure')
  except Exception:pass

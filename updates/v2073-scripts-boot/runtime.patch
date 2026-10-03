@@ -831,19 +831,22 @@ index e38bd72..d2b40c8 100644
          if (operation != null) return
          val stopping = state.running
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
-index 8e4c39a..f77801f 100644
+index 8e4c39a..fed0118 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
-@@ -236,7 +236,7 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
+@@ -236,7 +236,10 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
              }
          }
      } else if (subPage == "startupDownload") {
 -        val autoStart = prefs.getBoolean("proxyRootAutoStart", false)
 +        val autoStart = prefs.getBoolean("proxyRootAutoStart", false) && prefs.getBoolean("proxyRootAutoStartInstalled", false)
++        // Capture changing preferences before the memoized LazyList builder.
++        // A failed setup leaves autoStart false, so it cannot invalidate that builder.
++        val autoStartError = prefs.getString("proxyRootAutoStartError", "").orEmpty()
          val mirrorOn = prefs.getBoolean("downloadMirrorEnabled", false)
          val mirrorPrefix = prefs.getString("downloadMirrorPrefix", "").orEmpty()
          HxPage(
-@@ -250,14 +250,22 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
+@@ -250,14 +253,21 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
                          SettingsSwitchRow(
                              "开机自启",
                              autoStart,
@@ -858,7 +861,6 @@ index 8e4c39a..f77801f 100644
                      }
                  }
              }
-+            val autoStartError = prefs.getString("proxyRootAutoStartError", "").orEmpty()
 +            if (autoStartError.isNotBlank()) {
 +                item(key = "autostart-error") {
 +                    HxBanner(DiagnosticReport.redact(autoStartError, prefs.getString("proxyControllerSecret", "")).take(220),
@@ -886,7 +888,7 @@ index 979f2b2..bde5c0d 100644
          seed(false,true);
          new BootReceiver().onReceive(app,new Intent(Intent.ACTION_BOOT_COMPLETED));
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt
-index 359defb..e0eb849 100644
+index 359defb..f3f4b13 100644
 --- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt
 @@ -498,6 +498,20 @@ class ConceptRemainingCoverageTest {
@@ -910,7 +912,34 @@ index 359defb..e0eb849 100644
      @Test fun logFilesSelectionSearchAndCancelledClear() {
          show { HxLogFilesScreen(vm) {} }; expectEventually("INFO"); capture("03B-002-log-files")
          touch("选择日志"); capture("03B-003-log-file-picker"); click("core.log")
-@@ -683,9 +697,12 @@ class RemainingRootBridgeShadow {
+@@ -616,6 +630,26 @@ class ConceptRemainingCoverageTest {
+         try { frame(); expect("正在加载 Sub-Store…"); capture("03B-039-substore-web-container") }
+         finally { subStore.pause().stop().destroy(); frame() }
+     }
++    @Config(sdk = [28])
++    @Test fun failedBootSetupUpdatesBannerWithoutLeavingSettingsPage() {
++        show { SettingsScreen(vm, androidx.compose.ui.unit.Dp(0f), "startupDownload") {} }
++        expect("开机自启")
++        val error = "无法取得 Root 权限，请在 Root 管理器中授权河图"
++        rule.runOnUiThread {
++            assertFalse(exists(error))
++            vm.prefs.edit().putString("proxyRootAutoStartError", error).commit()
++            vm.bumpSettings()
++        }
++        frame()
++        expect(error)
++        assertFalse(vm.prefs.getBoolean("proxyRootAutoStart", false))
++        rule.runOnUiThread {
++            vm.prefs.edit().remove("proxyRootAutoStartError").commit()
++            vm.bumpSettings()
++        }
++        frame()
++        rule.runOnUiThread { assertFalse("Cleared error remained in the list", exists(error)) }
++    }
+     @Test fun restoreFileResultRequiresConfirmationAndCancelPreservesSettings() {
+         show { SettingsScreen(vm, androidx.compose.ui.unit.Dp(0f), "backup") {} }
+         click("选择文件")
+@@ -683,9 +717,12 @@ class RemainingRootBridgeShadow {
      companion object {
          val unexpected = java.util.Collections.synchronizedList(mutableListOf<String>())
          val commands = java.util.Collections.synchronizedList(mutableListOf<String>())
@@ -924,7 +953,7 @@ index 359defb..e0eb849 100644
              val response = when {
                  command.startsWith("set -e; p=\$(readlink -f '") && command.contains("; for f in") && command.contains("stat -c %Y") ->
                      if (command.contains("readlink -f '/data/adb/hetu/backup'")) "F\tbackup.yaml\t4200\t1790899200\nF\told.yaml\t2800\t1790899200\n"
-@@ -693,7 +710,7 @@ class RemainingRootBridgeShadow {
+@@ -693,7 +730,7 @@ class RemainingRootBridgeShadow {
                  command == "mkdir -p '/data/adb/hetu/scripts' /data/adb/hetu/run && chmod 700 '/data/adb/hetu/scripts'" -> ""
                  command == "if [ -f '/data/adb/hetu/scripts/pre-start.sh' ]; then head -c 131072 '/data/adb/hetu/scripts/pre-start.sh'; fi" -> "#!/system/bin/sh\n# 测试夹具，未执行\necho ready\n"
                  command == "if [ -f '/data/adb/hetu/scripts/post-stop.sh' ]; then head -c 131072 '/data/adb/hetu/scripts/post-stop.sh'; fi" -> "#!/system/bin/sh\n# 测试夹具，未执行\necho stopped\n"

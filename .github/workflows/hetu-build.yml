@@ -1,3 +1,4 @@
+# Pinned V20.71 effective source, verified V20.72 patch, reviewed V20.73 fixes.
 name: Hetu V20.73 scripts and boot fixes
 permissions:
   contents: read
@@ -61,7 +62,7 @@ jobs:
     - name: Apply and test scripts and native boot fixes
       run: 'set -euo pipefail
 
-        echo ''fec7d0d863ad6a700c6bab9f6595df0cf79ae85f0854bc2f2d8fcde576b694e9  updates/v2073-scripts-boot/runtime.patch''
+        echo ''b536efaa3e3057755511bc631a03519871a29cca157a0569daaf5085dba5e823  updates/v2073-scripts-boot/runtime.patch''
         | sha256sum -c -
 
         git apply --check updates/v2073-scripts-boot/runtime.patch
@@ -161,7 +162,7 @@ jobs:
         --stacktrace
       working-directory: android-app
     - name: Consolidate native and browser state evidence
-      run: python3 tools/qa/consolidate_concept_coverage.py --repo . --expected-tests 258 --browser-evidence out/verification/webui-browser
+      run: python3 tools/qa/consolidate_concept_coverage.py --repo . --expected-tests 259 --browser-evidence out/verification/webui-browser
         --browser-commit "$GITHUB_SHA"
     - if: always()
       name: Upload concept UI verification evidence
@@ -276,7 +277,6 @@ jobs:
         if-no-files-found: ignore
         name: Hetu-V20.73-APK-part05
         path: out/apk-transfer/part05.bin
-    if: ${{ !contains(github.event.head_commit.message, '[verify-apk-only]') }}
   android-ui-smoke:
     needs: build
     runs-on: ubuntu-latest
@@ -294,23 +294,6 @@ jobs:
       with:
         name: Hetu-APK
         path: candidate
-        github-token: ${{ github.token }}
-        run-id: ${{ needs.build.result == 'success' && github.run_id || '37117107486' }}
-    - name: Verify immutable candidate for installed-only checks
-      if: ${{ needs.build.result == 'skipped' }}
-      run: 'python3 - <<''PY''
-
-        from pathlib import Path
-
-        import hashlib
-
-        p=next(Path(''candidate'').glob(''*.apk''))
-
-        assert hashlib.sha256(p.read_bytes()).hexdigest()==''98d7e10aeeb3fbd75b8f460b51eacc4b1c686ea7a8d770b6063be56b1dfed773''
-
-        PY
-
-        '
     - name: Prepare official AOSP emulator
       run: 'set -euo pipefail
 
@@ -385,7 +368,6 @@ jobs:
         - 35
         - 36
     name: Installed APK on Android API ${{ matrix.api }}
-    if: ${{ !cancelled() && (needs.build.result == 'success' || needs.build.result == 'skipped') }}
 'on':
   push:
     branches:
