@@ -1,10 +1,12 @@
-## 当前修订：V20.74 开机运行健康基线修复
+## 当前交付：V20.74 开机运行健康基线修复
 
 沿用已交付 V20.73 底座与固定签名，追加 `updates/v2074-boot-health/runtime.patch`，构建用 `.github/workflows/hetu-build.yml`。versionCode 2074，versionName 0.12.4-v20，Root runtime 150。全部界面与功能、21 个原始 native/core 载荷、service.d 自启实现保持。
 
 确认并复现启动顺序错误：`health_record` 复制 session 后才追加 `GOOGLE_FIREWALL_CLEAN`，导致完整性快照始终不匹配、状态返回 `upgrade-required/session-manifest-missing`，并跳过仅处理 degraded 的自动修复。先完成 session 再保存快照；写入失败停止启动。不能用核心 PID 或远程测速结果替代健康检查，不能清空系统防火墙。Google 超时本身不等于已确认 OEM 防火墙拦截。
 
-本地实际 shell 11 项健康/修复、17 项开机、17 项 Google 清理夹具通过；构建、APK 身份及 Android 安装回归结果待 CI 完成再记入 `docs/V20.74_BOOT_HEALTH.md`。无用户手机 Root 重启验收。
+应用提交 `ae544982c501c61af2d8687169194bb604b9eb31`，Actions `37122739246` 全部 success。本地/CI 实际 shell 11 项健康/修复、17 项开机、17 项 Google 清理夹具通过；259 项 Android 单测、lint、23 项 runtime 打包 hash、固定签名验证通过。API35/36 各 27 项实际安装交互通过，无闪退/ANR。APK SHA-256 `ea8569b8d3c1aea7ddd969eb9e1f8a6d721dd653ebf554147ae3bbaa6c5d303f`。首轮错误测试预期的失败与完整重建结果保留在 `docs/V20.74_BOOT_HEALTH.md`。
+
+覆盖安装后须显式重启一次代理更新 Root 脚本和基线；版本号不自动强制重启已有核心。AOSP 安装与 shell 夹具不等于用户手机 Root 重启验收，Google 超时的真机根因仍未确认。
 
 ## 当前交付：V20.73 脚本与开机自启修复
 
