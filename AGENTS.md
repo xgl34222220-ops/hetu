@@ -1,3 +1,11 @@
+## 当前续接：V20.76 安全运行记录修复与过滤导出
+
+继续 `test/v20.75-theme-compat` 的已交付 V20.75（分支原 HEAD 069a7ed），不创建重复分支，不合并主分支，不发布或部署。追加 `updates/v2076-session-filter/runtime.patch`，versionCode 2076 / 0.12.6-v20，Root runtime 151；21 个原 native/core 与 service.d 载荷、固定签名保持。最新用户禁止操作手机或修改其网络、安全设置，测试仅限已有授权的隔离 shell/JVM/AOSP 环境。
+
+旧 r149 session 仅多出末尾 GOOGLE_FIREWALL_CLEAN 行时，现有不可变 baseline checksum、PID、规则、路由、监听与守护身份全部核对后，允许用户在工具中显式修复运行记录。保留原始 baseline；不重建缺失/损坏 baseline，不将现网快照登记为健康，不强制重启核心，不自动把已应用 runtime 149 改为 151。新版独立检查器用于旧部署的诊断，读检查不得使 ProxyControlEpoch 的观察票据失效。任何观察不完整均失败关闭，Google 可达独立报告。
+
+过滤导出迁至 noBackup 稳定目录；按不可变 generation 成对发布、hash 校验、保留旧交接文件。实际旧/new 导出器的缓存清理故障注入、真实 Android 导出、第二 provider 写入失败、共享主题重建与 Monet 切换回归均纳入本轮 CI。预期选中 Android 单测 277 项；实际结果须核对最终 Actions，不引用旧 262/旧 Android 15/16 作为本轮通过。详见 docs/V20.76_SESSION_FILTER.md。禁止访问用户设备、扩大 KVM/Root/SELinux 等权限；本轮不得永久删除用户数据。
+
 ## 当前交付：V20.75 自定义配色兼容修复
 
 从已交付 V20.74 源码继续，追加 `updates/v2075-theme-compat/runtime.patch`，不重放历史 UI 迁移。versionCode 2075，versionName 0.12.5-v20；Root runtime 保持 150，原核心/native 载荷、Root 脚本与 service.d 自启保持已验证 V20.74 字节与固定签名。

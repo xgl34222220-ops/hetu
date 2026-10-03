@@ -1,5 +1,5 @@
-# Verified V20.74 source chain plus a pinned MaterialKolor ABI correction.
-name: Hetu V20.75 custom palette compatibility
+# Continue the original V20.75 test branch; no deployment or release.
+name: Hetu V20.76 safe Root session and filtering
 permissions:
   contents: read
   actions: read
@@ -42,8 +42,7 @@ jobs:
     - name: Restore verified V20.72 fixes
       run: 'set -euo pipefail
 
-        echo ''51349b72b0025c3e27d09723a72592aa1ff8977bbdfd641533872c3fb6932da4  updates/v2072-google-firewall-crash/runtime.patch''
-        | sha256sum -c -
+        echo ''51349b72b0025c3e27d09723a72592aa1ff8977bbdfd641533872c3fb6932da4  updates/v2072-google-firewall-crash/runtime.patch'' | sha256sum -c -
 
         git apply --check updates/v2072-google-firewall-crash/runtime.patch
 
@@ -61,8 +60,7 @@ jobs:
     - name: Apply and test scripts and native boot fixes
       run: 'set -euo pipefail
 
-        echo ''b536efaa3e3057755511bc631a03519871a29cca157a0569daaf5085dba5e823  updates/v2073-scripts-boot/runtime.patch''
-        | sha256sum -c -
+        echo ''b536efaa3e3057755511bc631a03519871a29cca157a0569daaf5085dba5e823  updates/v2073-scripts-boot/runtime.patch'' | sha256sum -c -
 
         git apply --check updates/v2073-scripts-boot/runtime.patch
 
@@ -78,15 +76,14 @@ jobs:
 
         python3 tools/qa/test_google_firewall.py 2>&1 | tee out/verification/google-firewall-tests.txt
 
-        python3 .github/scripts/verify_packaged_runtime.py snapshot --script-sha256 32291ca1ef266c1561122fe4ebd2329d3ffacb889c6992f92234afcceaa25fed
-        --autostart-sha256 3a1215f4e9093ae2298803020d697da0c14c35ee5cf28f84f2a81608093783f9
+        python3 .github/scripts/verify_packaged_runtime.py snapshot --script-sha256 32291ca1ef266c1561122fe4ebd2329d3ffacb889c6992f92234afcceaa25fed --autostart-sha256
+        3a1215f4e9093ae2298803020d697da0c14c35ee5cf28f84f2a81608093783f9
 
         '
     - name: Apply and regress boot session health fix
       run: 'set -euo pipefail
 
-        printf ''%s\n'' ''6d880e466bbb1d9128307d888e169d926e9f03c5e1369ed8dd0ff91422a54fdf  updates/v2074-boot-health/runtime.patch''
-        | sha256sum -c -
+        printf ''%s\n'' ''6d880e466bbb1d9128307d888e169d926e9f03c5e1369ed8dd0ff91422a54fdf  updates/v2074-boot-health/runtime.patch'' | sha256sum -c -
 
         git apply --check updates/v2074-boot-health/runtime.patch
 
@@ -96,17 +93,14 @@ jobs:
 
         sh -n android-app/app/src/main/assets/hetu-root.sh
 
-        python3 tools/qa/test_root_health.py 2>&1 | tee out/verification/root-health-tests.txt
-
-        python3 .github/scripts/verify_packaged_runtime.py snapshot --script-sha256 9ba3f0f2add7094c9759b0c525ba9d327f1a7f6e6d65ad3c01decf435fd4b7fb
-        --autostart-sha256 3a1215f4e9093ae2298803020d697da0c14c35ee5cf28f84f2a81608093783f9
+        python3 .github/scripts/verify_packaged_runtime.py snapshot --script-sha256 9ba3f0f2add7094c9759b0c525ba9d327f1a7f6e6d65ad3c01decf435fd4b7fb --autostart-sha256
+        3a1215f4e9093ae2298803020d697da0c14c35ee5cf28f84f2a81608093783f9
 
         '
     - name: Apply custom palette ABI fix
       run: 'set -euo pipefail
 
-        printf ''%s\n'' ''3a058657fcd2461b7c3ea2d08c1480d83630e6d6245128d26fc5d320293e8cb0  updates/v2075-theme-compat/runtime.patch''
-        | sha256sum -c -
+        printf ''%s\n'' ''3a058657fcd2461b7c3ea2d08c1480d83630e6d6245128d26fc5d320293e8cb0  updates/v2075-theme-compat/runtime.patch'' | sha256sum -c -
 
         git apply --check updates/v2075-theme-compat/runtime.patch
 
@@ -114,8 +108,36 @@ jobs:
 
         grep -q ''versionCode = 2075'' android-app/app/build.gradle.kts
 
-        python3 .github/scripts/verify_packaged_runtime.py snapshot --script-sha256 9ba3f0f2add7094c9759b0c525ba9d327f1a7f6e6d65ad3c01decf435fd4b7fb
-        --autostart-sha256 3a1215f4e9093ae2298803020d697da0c14c35ee5cf28f84f2a81608093783f9
+        python3 .github/scripts/verify_packaged_runtime.py snapshot --script-sha256 9ba3f0f2add7094c9759b0c525ba9d327f1a7f6e6d65ad3c01decf435fd4b7fb --autostart-sha256
+        3a1215f4e9093ae2298803020d697da0c14c35ee5cf28f84f2a81608093783f9
+
+        '
+    - name: Apply and verify safe session and stable filtering fixes
+      run: 'set -euo pipefail
+
+        mkdir -p out/before-filter-export
+
+        cp android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockRules.java out/before-filter-export/ProxyAdblockRules.java
+
+        printf ''%s\n'' ''c890d5932f4ae7fe057a9c38daac90cbfe58f311819872a7d576e9ec7133835e  updates/v2076-session-filter/runtime.patch'' | sha256sum -c
+        -
+
+        git apply --check updates/v2076-session-filter/runtime.patch
+
+        git apply updates/v2076-session-filter/runtime.patch
+
+        grep -q ''versionCode = 2076'' android-app/app/build.gradle.kts
+
+        sh -n android-app/app/src/main/assets/hetu-root.sh
+
+        python3 tools/qa/test_root_health.py 2>&1 | tee out/verification/root-health-tests.txt
+
+        python3 tools/qa/test_google_firewall.py 2>&1 | tee out/verification/google-firewall-tests.txt
+
+        python3 tools/qa/test_root_autostart.py 2>&1 | tee out/verification/root-autostart-tests.txt
+
+        python3 .github/scripts/verify_packaged_runtime.py snapshot --script-sha256 5eb7f1d1478eac053b34b830ae122d3eae0eebcad5f0777f8e7ac57c37c3f5e6 --autostart-sha256
+        3a1215f4e9093ae2298803020d697da0c14c35ee5cf28f84f2a81608093783f9
 
         '
     - name: Verify built-in WebUI behavior with controlled API fixtures
@@ -135,6 +157,8 @@ jobs:
       with:
         distribution: temurin
         java-version: '21'
+    - name: Reproduce cache eviction on old production exporter and verify new exporter
+      run: python3 tools/qa/test_filter_export.py --before out/before-filter-export/ProxyAdblockRules.java
     - name: Restore signing identity
       uses: actions/cache/restore@v4
       with:
@@ -142,8 +166,8 @@ jobs:
         key: hetu-ui10-debug-signing-v1
         fail-on-cache-miss: true
     - name: Verify signing identity
-      run: "set -euo pipefail\ntest -s \"$HETU_TEST_KEYSTORE\"\nkeytool -exportcert -keystore \"$HETU_TEST_KEYSTORE\" -alias\
-        \ androiddebugkey -storepass android \\\n  | openssl dgst -sha256 -r | cut -d ' ' -f1 | grep -qx '701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad'\n"
+      run: "set -euo pipefail\ntest -s \"$HETU_TEST_KEYSTORE\"\nkeytool -exportcert -keystore \"$HETU_TEST_KEYSTORE\" -alias androiddebugkey -storepass\
+        \ android \\\n  | openssl dgst -sha256 -r | cut -d ' ' -f1 | grep -qx '701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad'\n"
     - name: Prepare Android SDK
       run: 'set -euo pipefail
 
@@ -157,26 +181,26 @@ jobs:
     - uses: gradle/actions/setup-gradle@v4
       with:
         gradle-version: 9.5.0
-    - name: Export effective V20.75 source
+    - name: Export effective V20.76 source
       run: 'set -euo pipefail
 
-        tar -czf /tmp/Hetu-V20.75-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+        tar -czf /tmp/Hetu-V20.76-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
 
-        sha256sum /tmp/Hetu-V20.75-effective-source.tar.gz
+        sha256sum /tmp/Hetu-V20.76-effective-source.tar.gz
 
         '
     - uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: error
-        name: Hetu-V20.75-effective-source
-        path: /tmp/Hetu-V20.75-effective-source.tar.gz
+        name: Hetu-V20.76-effective-source
+        path: /tmp/Hetu-V20.76-effective-source.tar.gz
     - name: Record resolved MaterialKolor ABI dependencies
       working-directory: android-app
       run: 'set -euo pipefail
 
-        gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=''-Xmx2g -Dfile.encoding=UTF-8'' :app:dependencyInsight --configuration
-        debugRuntimeClasspath --dependency com.materialkolor > ../out/verification/materialkolor-dependency-insight.txt
+        gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=''-Xmx2g -Dfile.encoding=UTF-8'' :app:dependencyInsight --configuration debugRuntimeClasspath
+        --dependency com.materialkolor > ../out/verification/materialkolor-dependency-insight.txt
 
         cat ../out/verification/materialkolor-dependency-insight.txt
 
@@ -187,33 +211,31 @@ jobs:
     - name: Verify APK embeds the tested runtime
       run: python3 .github/scripts/verify_packaged_runtime.py verify
     - name: Verify packaged MaterialKolor constructors
-      run: python3 .github/scripts/verify_materialkolor_abi.py android-app/app/build/outputs/apk/debug/app-debug.apk --output
-        out/verification/materialkolor-abi.json
+      run: python3 .github/scripts/verify_materialkolor_abi.py android-app/app/build/outputs/apk/debug/app-debug.apk --output out/verification/materialkolor-abi.json
     - name: Verify packaged launcher and concept icon bytes
       run: python3 .github/scripts/verify_hetu_icons.py apk android-app/app/build/outputs/apk/debug/app-debug.apk
     - name: Runtime unit tests
-      run: "gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:testDebugUnitTest\
-        \ \\\n  --tests '*RuntimeYaml15Test' --tests '*RuntimeStartup15Test' --tests '*AdblockSnifferTest' \\\n  --tests '*ConceptParity57Test'\
-        \ --tests '*PanelConceptModelTest' --tests '*SettingsConceptParityTest' \\\n  --tests '*CoreManagerConcept57Test'\
-        \ --tests '*SettingsBackupParity57Test' --tests '*ToolsConceptParityTest' --tests '*NativeConceptScreenshotTest' --tests\
-        \ '*SettingsPickerParity58Test' --tests '*LargeTitleParity59Test' --tests '*BootStartup60Test' \\\n  --tests '*ConceptStateCoverageTest'\
-        \ --tests '*ConceptRemainingCoverageTest' --tests '*WanDetails61Test' --tests '*MainLanguageBindingTest' --tests '*PanelLayoutDefaultsTest'\
-        \ --tests '*Runtime146ContractTest' --tests '*PanelModel11Test' --tests '*PanelActionSafetyTest' --tests '*ProxyLatencyRegressionTest'\
-        \ --tests '*DocumentPickerSafetyTest' --tests '*AppCrashReportTest' --tests '*ProxyScriptSafetyTest' --tests '*RootAutostartTest'\
-        \ --tests '*CustomPaletteCompatibilityTest' --stacktrace\n"
+      run: "gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:testDebugUnitTest \\\n  --tests '*RuntimeYaml15Test'\
+        \ --tests '*RuntimeStartup15Test' --tests '*AdblockSnifferTest' \\\n  --tests '*ConceptParity57Test' --tests '*PanelConceptModelTest' --tests '*SettingsConceptParityTest'\
+        \ \\\n  --tests '*CoreManagerConcept57Test' --tests '*SettingsBackupParity57Test' --tests '*ToolsConceptParityTest' --tests '*NativeConceptScreenshotTest'\
+        \ --tests '*SettingsPickerParity58Test' --tests '*LargeTitleParity59Test' --tests '*BootStartup60Test' \\\n  --tests '*ConceptStateCoverageTest'\
+        \ --tests '*ConceptRemainingCoverageTest' --tests '*WanDetails61Test' --tests '*MainLanguageBindingTest' --tests '*PanelLayoutDefaultsTest' --tests\
+        \ '*Runtime146ContractTest' --tests '*PanelModel11Test' --tests '*PanelActionSafetyTest' --tests '*ProxyLatencyRegressionTest' --tests '*DocumentPickerSafetyTest'\
+        \ --tests '*AppCrashReportTest' --tests '*ProxyScriptSafetyTest' --tests '*RootAutostartTest' --tests '*CustomPaletteCompatibilityTest' --tests\
+        \ '*ProxyAdblockExportTest' --tests '*RootHealthUpgradeTest' --stacktrace\n"
       working-directory: android-app
     - name: Android lint compatibility gate
       run: gradle --no-daemon --max-workers=1 -Dorg.gradle.jvmargs='-Xmx1500m -Dfile.encoding=UTF-8' :app:lintDebug --stacktrace
       working-directory: android-app
     - name: Consolidate native and browser state evidence
-      run: python3 tools/qa/consolidate_concept_coverage.py --repo . --expected-tests 262 --browser-evidence out/verification/webui-browser
-        --browser-commit "$GITHUB_SHA"
+      run: python3 tools/qa/consolidate_concept_coverage.py --repo . --expected-tests 277 --browser-evidence out/verification/webui-browser --browser-commit
+        "$GITHUB_SHA"
     - if: always()
       name: Upload concept UI verification evidence
       uses: actions/upload-artifact@v4
       with:
         if-no-files-found: warn
-        name: Hetu-V20.75-UI-verification
+        name: Hetu-V20.76-UI-verification
         path: 'android-app/app/build/test-results/testDebugUnitTest/
 
           android-app/app/build/reports/tests/testDebugUnitTest/
@@ -271,7 +293,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         if-no-files-found: error
-        name: Hetu-V20.75-APK-manifest
+        name: Hetu-V20.76-APK-manifest
         path: 'out/apk-transfer/manifest.json
 
           out/apk-transfer/apk-metadata.txt
@@ -284,42 +306,42 @@ jobs:
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.75-APK-part00
+        name: Hetu-V20.76-APK-part00
         path: out/apk-transfer/part00.bin
     - name: Upload APK transport part 01
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.75-APK-part01
+        name: Hetu-V20.76-APK-part01
         path: out/apk-transfer/part01.bin
     - name: Upload APK transport part 02
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.75-APK-part02
+        name: Hetu-V20.76-APK-part02
         path: out/apk-transfer/part02.bin
     - name: Upload APK transport part 03
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.75-APK-part03
+        name: Hetu-V20.76-APK-part03
         path: out/apk-transfer/part03.bin
     - name: Upload APK transport part 04
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.75-APK-part04
+        name: Hetu-V20.76-APK-part04
         path: out/apk-transfer/part04.bin
     - name: Upload APK transport part 05
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.75-APK-part05
+        name: Hetu-V20.76-APK-part05
         path: out/apk-transfer/part05.bin
   android-ui-smoke:
     needs: build
@@ -353,13 +375,12 @@ jobs:
 
         AVDMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
 
-        "$SDKMANAGER" ''platform-tools'' ''emulator'' ''system-images;android-${{ matrix.api }};default;x86_64'' 2>&1 | tee
-        out/android-smoke/sdk-prepare.log
+        "$SDKMANAGER" ''platform-tools'' ''emulator'' ''system-images;android-${{ matrix.api }};default;x86_64'' 2>&1 | tee out/android-smoke/sdk-prepare.log
 
         "$AVDMANAGER" list device --compact | grep -qx ''pixel_2''
 
-        echo no | "$AVDMANAGER" create avd --force --device pixel_2 --name hetu-smoke --path "$ANDROID_AVD_HOME/hetu-smoke.avd"
-        --package ''system-images;android-${{ matrix.api }};default;x86_64'' 2>&1 | tee out/android-smoke/avd-prepare.log
+        echo no | "$AVDMANAGER" create avd --force --device pixel_2 --name hetu-smoke --path "$ANDROID_AVD_HOME/hetu-smoke.avd" --package ''system-images;android-${{
+        matrix.api }};default;x86_64'' 2>&1 | tee out/android-smoke/avd-prepare.log
 
         test -f "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini"
 
@@ -380,7 +401,7 @@ jobs:
         '
     - name: Run installed APK navigation and native WebView smoke
       env:
-        HETU_EXPECTED_VERSION: '2075'
+        HETU_EXPECTED_VERSION: '2076'
       run: 'set -euo pipefail
 
         mkdir -p out/android-smoke
@@ -402,7 +423,7 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: Hetu-V20.75-Android-${{ matrix.api }}-smoke
+        name: Hetu-V20.76-Android-${{ matrix.api }}-smoke
         path: out/android-smoke/
         if-no-files-found: warn
     strategy:
@@ -433,8 +454,7 @@ jobs:
 
         gh run download 37122739246 --repo "$GITHUB_REPOSITORY" --name Hetu-APK --dir candidate
 
-        printf ''%s\n'' ''ea8569b8d3c1aea7ddd969eb9e1f8a6d721dd653ebf554147ae3bbaa6c5d303f  candidate/Hetu-0.12.4-v20.apk'' | sha256sum
-        -c -
+        printf ''%s\n'' ''ea8569b8d3c1aea7ddd969eb9e1f8a6d721dd653ebf554147ae3bbaa6c5d303f  candidate/Hetu-0.12.4-v20.apk'' | sha256sum -c -
 
         python3 .github/scripts/verify_materialkolor_abi.py candidate/Hetu-0.12.4-v20.apk --expect-incompatible --output out/android-smoke/v2074-materialkolor-abi.json
 
@@ -454,13 +474,12 @@ jobs:
 
         AVDMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
 
-        "$SDKMANAGER" ''platform-tools'' ''emulator'' ''system-images;android-${{ matrix.api }};default;x86_64'' 2>&1 | tee
-        out/android-smoke/sdk-prepare.log
+        "$SDKMANAGER" ''platform-tools'' ''emulator'' ''system-images;android-${{ matrix.api }};default;x86_64'' 2>&1 | tee out/android-smoke/sdk-prepare.log
 
         "$AVDMANAGER" list device --compact | grep -qx ''pixel_2''
 
-        echo no | "$AVDMANAGER" create avd --force --device pixel_2 --name hetu-smoke --path "$ANDROID_AVD_HOME/hetu-smoke.avd"
-        --package ''system-images;android-${{ matrix.api }};default;x86_64'' 2>&1 | tee out/android-smoke/avd-prepare.log
+        echo no | "$AVDMANAGER" create avd --force --device pixel_2 --name hetu-smoke --path "$ANDROID_AVD_HOME/hetu-smoke.avd" --package ''system-images;android-${{
+        matrix.api }};default;x86_64'' 2>&1 | tee out/android-smoke/avd-prepare.log
 
         test -f "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini"
 
@@ -527,4 +546,6 @@ jobs:
     - tools/qa/test_root_health.py
     - updates/v2075-theme-compat/**
     - .github/scripts/verify_materialkolor_abi.py
+    - updates/v2076-session-filter/**
+    - tools/qa/test_filter_export.py
   workflow_dispatch: null

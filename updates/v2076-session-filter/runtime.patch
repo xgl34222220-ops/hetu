@@ -1,0 +1,703 @@
+diff --git a/android-app/app/build.gradle.kts b/android-app/app/build.gradle.kts
+index 9ca7eb2..a4edadf 100644
+--- a/android-app/app/build.gradle.kts
++++ b/android-app/app/build.gradle.kts
+@@ -17,8 +17,8 @@ android {
+         applicationId = "io.github.xgl34222220.hetu"
+         minSdk = 26
+         targetSdk = 35
+-        versionCode = 2075
+-        versionName = "0.12.5-v20"
++        versionCode = 2076
++        versionName = "0.12.6-v20"
+     }
+ 
+     // Explicit CI debug identity. No private key is committed or exported.
+diff --git a/android-app/app/src/main/assets/hetu-root.sh b/android-app/app/src/main/assets/hetu-root.sh
+index 67c3395..3195b3a 100755
+--- a/android-app/app/src/main/assets/hetu-root.sh
++++ b/android-app/app/src/main/assets/hetu-root.sh
+@@ -1228,14 +1228,46 @@ health_record(){ (
+   (cd "$H_TMP" && { cksum [46]-* session pid; [ ! -f net ] || cksum net; }) > "$H_TMP/checksums" || { rm -rf "$H_TMP"; exit 1; }
+   rm -rf "$H_DIR"; mv "$H_TMP" "$H_DIR"
+ ); }
+-health_session_current(){
+-  [ -r "$RUN/network-manifest/session" ] && [ -r "$RUN/network-manifest/pid" ] || return 1
+-  cmp -s "$RUN/network-manifest/session" "$SESSION" && cmp -s "$RUN/network-manifest/pid" "$PIDFILE" || return 1
+-  H_SUM=$(cd "$RUN/network-manifest" && { cksum [46]-* session pid; [ ! -f net ] || cksum net; }) || return 1
+-  [ "$H_SUM" = "$(cat "$RUN/network-manifest/checksums" 2>/dev/null)" ]
++health_manifest_valid(){
++  H_DIR="${H_BASELINE_DIR:-$RUN/network-manifest}"
++  [ -r "$H_DIR/session" ] && [ -r "$H_DIR/pid" ] || return 1
++  H_SUM=$(cd "$H_DIR" && { cksum [46]-* session pid; [ ! -f net ] || cksum net; }) || return 1
++  [ "$H_SUM" = "$(cat "$H_DIR/checksums" 2>/dev/null)" ]
+ }
+-health_fault(){ H_STATE=degraded; H_REASON="${H_REASON:+$H_REASON,}$1"; }
++health_session_current(){
++  health_manifest_valid || return 1
++  cmp -s "$H_DIR/session" "$SESSION" && cmp -s "$H_DIR/pid" "$PIDFILE"
++}
++health_legacy_tail(){
++  # Only the known r149 ordering defect is eligible. Never synthesize a missing
++  # baseline or replace its saved network rules with a snapshot of today's rules.
++  health_manifest_valid && cmp -s "$H_DIR/pid" "$PIDFILE" || return 1
++  ! grep -q '^GOOGLE_FIREWALL_CLEAN=' "$H_DIR/session" || return 1
++  H_TAIL=$(tail -n 1 "$SESSION" 2>/dev/null)
++  case "$H_TAIL" in GOOGLE_FIREWALL_CLEAN=0|GOOGLE_FIREWALL_CLEAN=1) ;; *) return 1;; esac
++  { cat "$H_DIR/session"; printf '%s\n' "$H_TAIL"; } | cmp -s - "$SESSION"
++}
++health_fault(){ [ "$H_STATE" = upgrade-required ] || H_STATE=degraded; H_REASON="${H_REASON:+$H_REASON,}$1"; }
+ health_unknown(){ H_UNKNOWN=1; H_REASON="${H_REASON:+$H_REASON,}$1"; }
++health_core_and_watchdog(){
++  H_PID=$(cat "$PIDFILE" 2>/dev/null || true)
++  pidcore "$H_PID"; H_ID=$?
++  case "$H_ID" in 0) kill -0 "$H_PID" 2>/dev/null || health_fault core-exited;;
++    2) health_unknown core-identity-read;; *) health_fault core-identity;; esac
++  H_WD=$(cat "$WATCHDOG_PID" 2>/dev/null || true)
++  case "$H_WD" in ''|*[!0-9]*) health_fault watchdog-missing; return;; esac
++  kill -0 "$H_WD" 2>/dev/null || { health_fault watchdog-exited; return; }
++  H_WCMD=$(tr '\000' '\n' 2>/dev/null < "/proc/$H_WD/cmdline") || { health_unknown watchdog-identity-read; return; }
++  [ -n "$H_WCMD" ] || { health_unknown watchdog-identity-read; return; }
++  printf '%s\n' "$H_WCMD" | awk -v s="$BASE/hetu-root.sh" -v p="$H_PID" '
++    $0==s {if(getline>0 && $0=="watchdog" && getline>0 && $0==p) found=1}
++    END{exit !found}' || health_fault watchdog-identity
++}
++health_core_birth(){
++  # /proc stat comm can contain spaces/parentheses. Start ticks are field 22,
++  # or field 20 after the last closing parenthesis, not a PID alone.
++  sed 's/^.*) //' "/proc/$1/stat" 2>/dev/null | awk 'NF>=20 && $20~/^[0-9]+$/ {print $20}'
++}
+ health_routes(){
+   H_F="$1"; H_RULES=$(ip -"$H_F" rule show 2>/dev/null) || { health_unknown "ipv$H_F-rule-read"; return; }
+   H_RULE_OK=$(printf '%s\n' "$H_RULES" | awk -v p="$PREF:" -v m="$MARK/$MASK" -v t="$TABLE" '$1==p && $2=="from" && $3=="all" && $4=="fwmark" && $5==m && ($6=="lookup" || $6=="table") && $7==t {print "yes"}')
+@@ -1249,11 +1281,16 @@ health_routes(){
+   [ "$H_ROUTE_OK" = yes ] || health_fault "ipv$H_F-local-route"
+ }
+ health_collect(){
+-  H_STATE=healthy; H_REASON=''; H_UNKNOWN=0
+-  if [ ! -r "$SESSION" ] && [ ! -r "$PIDFILE" ]; then H_STATE=stopped; H_REASON=not-running; return; fi
+-  if ! health_session_current; then H_STATE=upgrade-required; H_REASON=session-manifest-missing; return; fi
++  H_STATE=healthy; H_REASON=''; H_UNKNOWN=0; H_REPAIR_AVAILABLE=false; H_MANIFEST_STATE=current
++  if [ ! -r "$SESSION" ] && [ ! -r "$PIDFILE" ]; then H_STATE=stopped; H_REASON=not-running; H_MANIFEST_STATE=stopped; return; fi
+   if [ -d "$LOCK_DIR" ] && [ "$LOCK_HELD" != 1 ]; then H_STATE=unknown; H_REASON=transaction-in-progress; return; fi
+-  for H_E in "$RUN/network-manifest"/[46]-*; do
++  if ! health_session_current; then
++    H_STATE=upgrade-required; H_REASON=session-manifest-missing; H_MANIFEST_STATE=missing-or-invalid
++    if health_legacy_tail; then H_MANIFEST_STATE=legacy-tail-mismatch
++    else health_core_and_watchdog; [ "$H_UNKNOWN" = 0 ] || H_STATE=unknown; return; fi
++  fi
++  health_core_and_watchdog
++  for H_E in "$H_DIR"/[46]-*; do
+     [ -s "$H_E" ] || continue
+     H_KEY=${H_E##*/}; H_F=${H_KEY%%-*}; H_T=${H_KEY#*-}
+     H_RAW=$("xt${H_F}q" -t "$H_T" -S 2>/dev/null) || { health_unknown "$H_KEY-read"; continue; }
+@@ -1269,12 +1306,12 @@ health_collect(){
+       esac
+     done < "$H_E"
+   done
+-  if [ -s "$RUN/network-manifest/net" ]; then
+-    if ! cmp -s "$NET_STATE" "$RUN/network-manifest/net" || ! loadnet; then
++  if [ -s "$H_DIR/net" ]; then
++    if ! cmp -s "$NET_STATE" "$H_DIR/net" || ! loadnet; then
+       health_fault routing-journal
+     else
+-      [ ! -s "$RUN/network-manifest/4-mangle" ] || health_routes 4
+-      [ ! -s "$RUN/network-manifest/6-mangle" ] || health_routes 6
++      [ ! -s "$H_DIR/4-mangle" ] || health_routes 4
++      [ ! -s "$H_DIR/6-mangle" ] || health_routes 6
+     fi
+   fi
+   H_MODE=$(sed -n 's/^MODE=//p' "$SESSION")
+@@ -1290,7 +1327,35 @@ health_collect(){
+   fi
+   # Never mutate after an incomplete observation, even if another check failed.
+   [ "$H_UNKNOWN" = 0 ] || H_STATE=unknown
++  if [ "$H_MANIFEST_STATE" = legacy-tail-mismatch ] && [ "$H_STATE" = upgrade-required ] && [ "$H_REASON" = session-manifest-missing ]; then H_REPAIR_AVAILABLE=true; fi
+ }
++health_repair_session(){ (
++  root; acquire_lock || { printf '{"ok":false,"message":"运行事务正在执行，请稍后重试"}\n'; exit 0; }
++  H_TMP="$RUN/network-manifest.tail-new.$$"; H_BACKUP="$RUN/network-manifest.pre-tail.$$"
++  H_MOVED=0
++  trap '[ "$H_MOVED" != 1 ] || [ -d "$RUN/network-manifest" ] || mv "$H_BACKUP" "$RUN/network-manifest"; rm -rf "$H_TMP"; release_lock' EXIT
++  health_collect
++  if [ "$H_REPAIR_AVAILABLE" != true ]; then
++    printf '{"ok":false,"message":"运行记录不符合安全修复条件，请查看网络诊断；未改动核心和网络规则"}\n'; exit 0
++  fi
++  H_EXPECTED_PID=$(cat "$PIDFILE"); H_BIRTH=$(health_core_birth "$H_EXPECTED_PID")
++  [ -n "$H_BIRTH" ] || { printf '{"ok":false,"message":"无法确认核心身份，未修复运行记录"}\n'; exit 0; }
++  cp -R "$RUN/network-manifest" "$H_TMP" && cp "$SESSION" "$H_TMP/session" || exit 1
++  (cd "$H_TMP" && { cksum [46]-* session pid; [ ! -f net ] || cksum net; }) > "$H_TMP/checksums" || exit 1
++  H_BASELINE_DIR="$H_TMP"; health_collect
++  [ "$H_STATE" = healthy ] && [ "$H_EXPECTED_PID" = "$(cat "$PIDFILE")" ] && [ "$H_BIRTH" = "$(health_core_birth "$H_EXPECTED_PID")" ] || {
++    printf '{"ok":false,"message":"校验期间运行状态发生变化，未修复运行记录"}\n'; exit 0;
++  }
++  # Keep the original evidence. A failed publish rolls back; even interrupted
++  # publication must fail closed, never treat an absent manifest as healthy.
++  unset H_BASELINE_DIR
++  health_legacy_tail && cmp -s "$H_TMP/session" "$SESSION" || exit 1
++  H_MOVED=1; mv "$RUN/network-manifest" "$H_BACKUP" || exit 1
++  mv "$H_TMP" "$RUN/network-manifest" || exit 1; H_MOVED=0
++  printf '%s pid=%s kind=legacy-google-tail rules=preserved\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$H_EXPECTED_PID" >> "$RUN/session-repair.log"
++  unset H_BASELINE_DIR; health_collect
++  printf '{"ok":true,"networkIntegrity":"%s","networkFault":"%s","message":"已修复旧版运行记录；核心和网络规则保持原状"}\n' "$H_STATE" "$H_REASON"
++); }
+ health_restore_table(){
+   H_E="$1"; H_KEY=${H_E##*/}; H_F=${H_KEY%%-*}; H_T=${H_KEY#*-}
+   H_RAW=$("xt${H_F}q" -t "$H_T" -S 2>/dev/null) || return 1
+@@ -1353,7 +1418,7 @@ health_repair(){ (
+   pidcore "$H_PID" && kill -0 "$H_PID" 2>/dev/null || exit 0
+   # Missing metadata or listeners cannot safely be reconstructed from preferences.
+   # Keep the core and its existing connections; report instead of restart-looping.
+-  case "$H_REASON" in *routing-journal*|*listener-*|*native-device*) exit 0;; esac
++  case "$H_REASON" in *routing-journal*|*listener-*|*native-device*|*core-*|*watchdog-*) exit 0;; esac
+   printf '%s\n' "$H_NOW" > "$RUN/network-repair-at"
+   printf '%s pid=%s before=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$H_PID" "$H_REASON" >> "$RUN/network-repair.log"
+   if [ -s "$RUN/network-manifest/net" ]; then
+@@ -1383,10 +1448,11 @@ health_json(){ (
+   root; health_collect
+   H_DNS6=$(sed -n 's/^DNS6_POLICY=//p' "$SESSION" 2>/dev/null || true)
+   case "$H_DNS6" in redirect|blocked-no-nat|blocked-no-redirect|off|core) ;; *) H_DNS6=unknown;; esac
+-  printf '{"ok":true,"networkIntegrity":"%s","networkFault":"%s","ipv6DnsPolicy":"%s","dataPlaneHealthy":%s}\n' "$H_STATE" "$H_REASON" "$H_DNS6" "$([ "$H_STATE" = healthy ] && echo true || echo false)"
++  printf '{"ok":true,"networkIntegrity":"%s","networkFault":"%s","sessionManifestState":"%s","baselineRepairAvailable":%s,"ipv6DnsPolicy":"%s","dataPlaneHealthy":%s}\n' "$H_STATE" "$H_REASON" "$H_MANIFEST_STATE" "$H_REPAIR_AVAILABLE" "$H_DNS6" "$([ "$H_STATE" = healthy ] && echo true || echo false)"
+ ); }
+ 
+ case "${1:-status}" in
++  repair-session) [ "$#" = 1 ] || fail "参数错误"; health_repair_session;;
+   preflight) { [ "$#" = 19 ] || [ "$#" = 20 ]; } || fail "参数错误"; preflight "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}" "${18}" "${19}" "${20:-}";;
+   # Retain the established DNS/process protocol; only UID-scoped Google cleanup is added.
+   start)
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockRules.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockRules.java
+index 856bc49..17eab36 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockRules.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockRules.java
+@@ -27,19 +27,32 @@ final class ProxyAdblockRules {
+     }
+ 
+     static synchronized Snapshot export(Context context) throws Exception {
+-        File dir=new File(context.getCacheDir(),"hetu-dns-filter");
+-        if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("无法创建河图 DNS 过滤规则目录");
+-        File target=new File(dir,"hetu-adblock.txt");
+-        File allowTarget=new File(dir,"hetu-adblock-allow.txt");
+-        File meta=new File(dir,"hetu-adblock.meta");
+-
+         RuleStore rules=new RuleStore(context.getApplicationContext());
+         rules.reload();
+         RuleStore.ExportRules effective=RuleStore.currentExportRules();
+-        String generation=effective.revision;
++        return exportSnapshot(context.getNoBackupFilesDir(),effective.revision,effective.domains,effective.allowDomains);
++    }
++
++    /** Immutable pairs survive cache eviction and cannot change during Root handoff. */
++    static synchronized Snapshot exportSnapshot(File stableRoot,String generation,Set<String> block,Set<String> exceptions) throws IOException {
++        return exportSnapshot(stableRoot,generation,block,exceptions,ProxyAdblockRules::writeProvider);
++    }
++    interface ProviderWriter { void write(List<String> domains,File target)throws IOException; }
++    static synchronized Snapshot exportSnapshot(File stableRoot,String generation,Set<String> block,Set<String> exceptions,ProviderWriter writer) throws IOException {
++        File dir=new File(stableRoot,"hetu-dns-filter");
++        if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("无法创建河图 DNS 过滤规则目录");
+         String persisted=generation.isEmpty()?"":EXPORT_VERSION+generation;
++        File index=new File(dir,"current.meta");
++        Properties cached=new Properties();
++        if(index.isFile())try(FileInputStream in=new FileInputStream(index)){cached.load(in);}
++        catch(IOException ignored){cached.clear();}
++        String directory=cached.getProperty("directory","");
++        // Index data is local but still must not escape our export directory.
++        File previous=new File(dir,directory.matches("snapshot-[0-9a-f-]{36}")?directory:"invalid");
++        File target=new File(previous,"hetu-adblock.txt");
++        File allowTarget=new File(previous,"hetu-adblock-allow.txt");
++        File meta=new File(previous,"hetu-adblock.meta");
+         if(!persisted.isEmpty()&&target.isFile()&&allowTarget.isFile()&&meta.isFile()){
+-            Properties cached=new Properties();
+             try(FileInputStream in=new FileInputStream(meta)){cached.load(in);}
+             catch(Exception ignored){cached.clear();}
+             if(persisted.equals(cached.getProperty("revision",""))&&RuntimeCompatibility14.cachedPairValid(cached,target,allowTarget)){
+@@ -52,33 +65,48 @@ final class ProxyAdblockRules {
+         }
+ 
+         String revision=EXPORT_VERSION+generation;
+-        ArrayList<String> domains=new ArrayList<>(effective.domains);
+-        ArrayList<String> allow=new ArrayList<>(effective.allowDomains);
++        ArrayList<String> domains=new ArrayList<>(block);
++        ArrayList<String> allow=new ArrayList<>(exceptions);
+         Collections.sort(domains);
+         Collections.sort(allow);
+-        if(domains.size()>1500000)throw new IOException("广告规则超过 150 万条安全上限");
+-        // A failed second write must not leave an old cache index pointing at a
+-        // partially replaced pair (including when the user rolls back a revision).
+-        Files.deleteIfExists(meta.toPath());
+-        writeProvider(domains,target);
+-        writeProvider(allow,allowTarget);
+-
++        if(domains.size()>1500000||allow.size()>1500000)throw new IOException("广告规则超过 150 万条安全上限");
++        String name="snapshot-"+UUID.randomUUID();
++        File stage=new File(dir,name+".new");
++        if(!stage.mkdir())throw new IOException("无法创建广告过滤导出事务");
++        target=new File(stage,"hetu-adblock.txt"); allowTarget=new File(stage,"hetu-adblock-allow.txt");
++        try {
++        writer.write(domains,target); writer.write(allow,allowTarget);
+         Properties saved=new Properties();
++        saved.setProperty("directory",name);
+         saved.setProperty("revision",revision);
+         saved.setProperty("blockSha256",RuntimeCompatibility14.sha256(target));
+         saved.setProperty("allowSha256",RuntimeCompatibility14.sha256(allowTarget));
+         saved.setProperty("count",String.valueOf(domains.size()));
+         saved.setProperty("allowCount",String.valueOf(allow.size()));
+-        File metaTmp=new File(dir,"hetu-adblock.meta.new");
+-        try(FileOutputStream out=new FileOutputStream(metaTmp,false)){
++        try(FileOutputStream out=new FileOutputStream(new File(stage,"hetu-adblock.meta"),false)){
+             saved.store(out,null);out.getFD().sync();
+         }
+-        try{Files.move(metaTmp.toPath(),meta.toPath(),StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);}
+-        catch(Exception atomic){if(!metaTmp.renameTo(meta)){metaTmp.delete();throw new IOException("无法保存广告规则缓存索引",atomic);}}
+-        return new Snapshot(target,allowTarget,domains.size(),allow.size(),revision);
++        File published=new File(dir,name);
++        move(stage,published);
++        File metaTmp=new File(dir,"current.meta.new");
++        try(FileOutputStream out=new FileOutputStream(metaTmp,false)){saved.store(out,null);out.getFD().sync();}
++        move(metaTmp,index);
++        return new Snapshot(new File(published,target.getName()),new File(published,allowTarget.getName()),domains.size(),allow.size(),revision);
++        } finally {
++            // Only our unpublished transaction is disposable. Previously returned
++            // generations remain immutable, including during a failed refresh.
++            File[] abandoned=stage.listFiles();
++            if(abandoned!=null)for(File file:abandoned)file.delete();
++            stage.delete();
++        }
++    }
++
++    private static void move(File source,File target)throws IOException{
++        try{Files.move(source.toPath(),target.toPath(),StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);}
++        catch(AtomicMoveNotSupportedException unsupported){Files.move(source.toPath(),target.toPath(),StandardCopyOption.REPLACE_EXISTING);}
+     }
+ 
+-    private static void writeProvider(List<String> domains,File target)throws IOException{
++    static void writeProvider(List<String> domains,File target)throws IOException{
+         File temp=new File(target.getParentFile(),target.getName()+".new");
+         try(FileOutputStream raw=new FileOutputStream(temp,false);
+             OutputStreamWriter writer=new OutputStreamWriter(raw,StandardCharsets.UTF_8);
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
+index 73fc48d..90bdf1e 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
+@@ -255,6 +255,8 @@ internal class ProxyComposeController(context: Context) {
+                 ).filter { it.isNotBlank() }.distinct().joinToString("；")
+                 startupGrace && (status.optBoolean("healthProbeFailed", false) || !status.optBoolean("dataPlaneHealthy", false)) -> ""
+                 status.optBoolean("healthProbeFailed", false) -> userSafeRuntimeMessage(status.optString("message", ""))
++                status.optBoolean("baselineRepairAvailable", false) ->
++                    "旧版运行记录需要校正，可在工具中修复运行记录；当前规则已核对"
+                 !status.optBoolean("dataPlaneHealthy", false) ->
+                     "核心仍在运行，但透明代理/DNS 数据面健康检查未完整通过"
+                 else -> ""
+@@ -344,6 +346,7 @@ internal class ProxyComposeController(context: Context) {
+     suspend fun closeAll() = withContext(Dispatchers.IO) { api.closeAll() }
+     suspend fun closeConnection(id: String) = withContext(Dispatchers.IO) { api.closeConnection(id) }
+     suspend fun diagnostics(): String = withContext(Dispatchers.IO) { root.diagnostics() }
++    suspend fun repairSessionRecord(): String = withContext(Dispatchers.IO) { root.repairSessionRecord().optString("message") }
+     suspend fun startupConfig(): String = withContext(Dispatchers.IO) { root.prepare(ProxyRuntimeProfile.load(prefs)).startup }
+ 
+     suspend fun rules(): List<ProxyRuleUi> = withContext(Dispatchers.IO) {
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java
+index bdcf90d..8420c3f 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java
+@@ -9,7 +9,7 @@ import java.util.*;
+ final class ProxyRuntimeSettings {
+     static final String DIRTY_KEY = "proxyRootSettingsDirty";
+     // Bump only when deployed Root scripts/core behavior changes, never for UI-only APKs.
+-    static final int RUNTIME_REVISION = 150;
++    static final int RUNTIME_REVISION = 151;
+     static final String APPLIED_RUNTIME_REVISION_KEY = "proxyRootAppliedRuntimeRevision";
+     private static final Set<String> RESTART_KEYS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
+             "proxyBaseCore","proxyBaseMode","proxyBaseIpv6","proxyAppScope","proxyDnsHijack",
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
+index f877b2a..26f1713 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt
+@@ -4147,6 +4147,14 @@ internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
+                     }
+                 }
+                 RefDivider()
++                RefToolRow(Icons.Rounded.NetworkCheck, Color(0xFF059669), "修复运行记录", "核对规则与 DNS，修复旧版会话记录") {
++                    scope.launch {
++                        try { onLog(ProxyComposeController(context).repairSessionRecord()) }
++                        catch (cancel: CancellationException) { throw cancel }
++                        catch (error: Exception) { onLog(error.message ?: "运行记录未修复，请查看网络诊断") }
++                    }
++                }
++                RefDivider()
+                 RefToolRow(Icons.Rounded.Apps, Color(0xFFF97316), "应用名单", "选择需要代理的应用", trailingText = "管理", trailingColor = Color(0xFF2A62E8)) {
+                     context.startActivity(Intent(context, ProxyAppSelectionActivity::class.java))
+                 }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
+index 47fe938..569dd7c 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
+@@ -22,11 +22,13 @@ final class RootProxyManager {
+     private static final String CONFIG=ROOT+"/run/state/startup-config";
+     private static final String CORE_TOKEN=ROOT+"/run/state/core.token";
+     private static final String SCRIPT=ROOT+"/hetu-root.sh";
++    private static final String HEALTH_CHECKER=ROOT+"/run/state/hetu-health-checker.sh";
+     private static final String OLD_HETU_SCRIPT=ROOT+"/proxy-root.sh";
+     private static final String LEGACY_ROOT="/data/adb/bichen/proxy";
+     private static final String LEGACY_MODULE="/data/adb/modules/bichen";
+     private static final String LEGACY_MODULE_UPDATE="/data/adb/modules_update/bichen";
+     private static final ProxyControlEpoch CONTROL_LOCK=new ProxyControlEpoch();
++    private static final ReentrantLock HEALTH_CHECKER_LOCK=new ReentrantLock(true);
+     static long observationTicket(){return CONTROL_LOCK.observe();}
+     static boolean publishObservation(long ticket,Runnable publish){return CONTROL_LOCK.publish(ticket,publish);}
+     private final Context context;
+@@ -877,12 +879,51 @@ final class RootProxyManager {
+     }
+ 
+     JSONObject networkHealth()throws Exception{
+-        // Old deployed scripts intentionally require one explicit restart after upgrade.
+-        return runJsonWithTimeout(8000L,"network-health");
++        return runHealthChecker("network-health");
++    }
++
++    JSONObject repairSessionRecord()throws Exception{
++        CONTROL_LOCK.lock();
++        try{
++            JSONObject result=runHealthChecker("repair-session");
++            JSONObject checked=networkHealth();
++            prefs.edit().putString("proxyNetworkIntegrity",checked.optString("networkIntegrity","unknown"))
++                    .putString("proxyNetworkFault",checked.optString("networkFault",""))
++                    .putLong("proxyNetworkCheckedAt",System.currentTimeMillis()).apply();
++            return result;
++        }finally{CONTROL_LOCK.unlock();}
++    }
++
++    private JSONObject runHealthChecker(String action)throws Exception{
++        RootBridge.requireWorkerThread();
++        HEALTH_CHECKER_LOCK.lock();
++        try{
++            // Update only the inspector, never the running controller/core or boot
++            // entry. Merely opening a diagnostic does not migrate a session.
++            File stage=new File(context.getNoBackupFilesDir(),"hetu-health-stage");
++            if(!stage.isDirectory()&&!stage.mkdirs())throw new IOException("无法创建健康检查目录");
++            File checker=new File(stage,"hetu-health-checker.sh");
++            copyScriptAsset(checker);
++            String digest=RuntimeCompatibility14.sha256(checker);
++            String temporary=HEALTH_CHECKER+".new";
++            String command="set -e; test -s "+RootBridge.quote(ROOT+"/run/session.state")
++                    +"; if [ \"$(sha256sum "+RootBridge.quote(HEALTH_CHECKER)+" 2>/dev/null | cut -d ' ' -f 1)\" != "+RootBridge.quote(digest)+" ]; then"
++                    +" cp "+RootBridge.quote(checker.getAbsolutePath())+" "+RootBridge.quote(temporary)
++                    +"; chmod 700 "+RootBridge.quote(temporary)+"; chown 0:0 "+RootBridge.quote(temporary)
++                    +"; test \"$(sha256sum "+RootBridge.quote(temporary)+" | cut -d ' ' -f 1)\" = "+RootBridge.quote(digest)
++                    +"; mv -f "+RootBridge.quote(temporary)+" "+RootBridge.quote(HEALTH_CHECKER)+"; fi; exec "+RootBridge.quote(HEALTH_CHECKER)+" "+RootBridge.quote(action);
++            RootBridge.Result reply=RootBridge.rootShell(context,command,"repair-session".equals(action)?20000L:10000L);
++            return RootCommandReply.read(reply.code,reply.output);
++        }finally{HEALTH_CHECKER_LOCK.unlock();}
+     }
+ 
+     JSONObject status()throws Exception{
+         JSONObject state=runJsonAllowMissing("status",new JSONObject().put("ok",true).put("running",false).put("state","idle").put("message","尚未启动"));
++        if(state.optBoolean("running",false)){
++            JSONObject health=networkHealth();
++            for(String key:new String[]{"networkIntegrity","networkFault","sessionManifestState","baselineRepairAvailable","dataPlaneHealthy"})
++                state.put(key,health.get(key));
++        }
+         int livePort=liveControllerPort(state);
+         if(livePort>0&&prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT)!=livePort){
+             prefs.edit().putInt("proxyControllerPort",livePort).apply();
+@@ -969,6 +1010,8 @@ final class RootProxyManager {
+             report.section("网络完整性（不等同于外部网站可达）",networkHealth().toString(),2500);
+             RootBridge.Result repairs=RootBridge.rootShell(context,"tail -n 30 "+RootBridge.quote(ROOT+"/run/network-repair.log")+" 2>/dev/null; true",3000L);
+             report.section("网络原位修复记录",repairs.output,5000);
++            RootBridge.Result sessionRepairs=RootBridge.rootShell(context,"tail -n 20 "+RootBridge.quote(ROOT+"/run/session-repair.log")+" 2>/dev/null; true",3000L);
++            report.section("运行记录兼容修复",sessionRepairs.output,3000);
+             RootBridge.Result google=RootBridge.rootShell(context,"cat "+RootBridge.quote(ROOT+"/run/google-firewall-status")
+                     +" 2>/dev/null; tail -n 30 "+RootBridge.quote(ROOT+"/run/google-firewall.log")+" 2>/dev/null; true",3000L);
+             report.section("Google 服务防火墙修复",google.output,5000);
+@@ -1244,12 +1287,17 @@ final class RootProxyManager {
+                     .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblockAllow))).append(" ]; then")
+                     .append(" cp ").append(RootBridge.quote(adblock.getAbsolutePath())).append(' ').append(RootBridge.quote(tmp))
+                     .append("; chmod 600 ").append(RootBridge.quote(tmp)).append("; chown 0:0 ").append(RootBridge.quote(tmp))
+-                    .append("; mv -f ").append(RootBridge.quote(tmp)).append(' ').append(RootBridge.quote(dst));
++                    ;
+             if(adblockAllow!=null){
+                 cmd.append("; cp ").append(RootBridge.quote(adblockAllow.getAbsolutePath())).append(' ').append(RootBridge.quote(allowTmp))
+                         .append("; chmod 600 ").append(RootBridge.quote(allowTmp)).append("; chown 0:0 ").append(RootBridge.quote(allowTmp))
+-                        .append("; mv -f ").append(RootBridge.quote(allowTmp)).append(' ').append(RootBridge.quote(allowDst));
++                        .append("; test \"$(sha256sum ").append(RootBridge.quote(allowTmp)).append(" | cut -d ' ' -f 1)\" = ")
++                        .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblockAllow)));
+             }
++            cmd.append("; test \"$(sha256sum ").append(RootBridge.quote(tmp)).append(" | cut -d ' ' -f 1)\" = ")
++                    .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblock)))
++                    .append("; mv -f ").append(RootBridge.quote(allowTmp)).append(' ').append(RootBridge.quote(allowDst))
++                    .append("; mv -f ").append(RootBridge.quote(tmp)).append(' ').append(RootBridge.quote(dst));
+             cmd.append("; printf %s ").append(RootBridge.quote(p.adblock.revision)).append(" > ").append(RootBridge.quote(revisionFile))
+                     .append("; chmod 600 ").append(RootBridge.quote(revisionFile)).append("; chown 0:0 ").append(RootBridge.quote(revisionFile))
+                     .append("; fi");
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/CustomPaletteCompatibilityTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/CustomPaletteCompatibilityTest.kt
+index ead341c..cc9d24c 100644
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/CustomPaletteCompatibilityTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/CustomPaletteCompatibilityTest.kt
+@@ -117,4 +117,28 @@ class CustomPaletteCompatibilityTest {
+         assertReadable(false)
+         assertNotEquals(systemScheme.primary, observed!!.primary)
+     }
++
++    @Test fun customizedSeedsSurviveDisposalAndFreshThemeComposition() {
++        val schemes = mutableListOf<Color>()
++        for (seed in listOf("#22C55E", "#A855F7", "#F97316")) {
++            select(seed, "Fidelity", "dark")
++            show(); assertReadable(true)
++            val original = observed!!.sample()
++            schemes += observed!!.primary
++            rule.runOnUiThread { rule.activity.setContent {} }; frames()
++            show(); assertReadable(true)
++            assertEquals("Stored preferences must reconstruct the same scheme", original, observed!!.sample())
++        }
++        assertEquals(3, schemes.toSet().size)
++    }
++
++    @Test fun monetCanBeRestoredAfterCustomizedDarkPaletteRecomposition() {
++        prefs.edit().putBoolean("enableMonet", true).commit(); show()
++        val original = observed!!.sample()
++        rule.runOnUiThread { prefs.edit().putBoolean("enableMonet", false).commit() }
++        select("#22C55E", "FruitSalad", "dark"); assertReadable(true)
++        assertNotEquals(original, observed!!.sample())
++        rule.runOnUiThread { prefs.edit().putString("appearance", "light").putBoolean("enableMonet", true).commit() }
++        frames(); assertEquals(original, observed!!.sample())
++    }
+ }
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyAdblockExportTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyAdblockExportTest.kt
+new file mode 100644
+index 0000000..d7a3015
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyAdblockExportTest.kt
+@@ -0,0 +1,113 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import android.content.Context
++import android.content.ContextWrapper
++import androidx.test.core.app.ApplicationProvider
++import org.junit.After
++import org.junit.Before
++import org.junit.Test
++import org.junit.Assert.*
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++import java.io.File
++import java.io.IOException
++import java.nio.file.Files
++import java.util.Properties
++
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], application = Application::class)
++class ProxyAdblockExportTest {
++    private lateinit var stable: File
++    @Before fun prepare() { stable = Files.createTempDirectory("hetu-filter-export-").toFile() }
++    @After fun finish() { stable.deleteRecursively() }
++    private fun export(revision: String = "g.fixture", block: Set<String> = setOf("blocked.test"), allow: Set<String> = setOf("allow.test")) =
++        ProxyAdblockRules.exportSnapshot(stable, revision, block, allow)
++    private fun index() = File(stable, "hetu-dns-filter/current.meta")
++
++    @Test fun actualExportSurvivesCacheEvictionDuringRuleLoad() {
++        val app = ApplicationProvider.getApplicationContext<Application>()
++        var evicted = false
++        val context = object : ContextWrapper(app) {
++            override fun getApplicationContext(): Context {
++                // In the old method this executes after mkdir and before .new is
++                // opened, reproducing the reported ENOENT with real production I/O.
++                File(super.getCacheDir(), "hetu-dns-filter").deleteRecursively()
++                evicted = true
++                return app
++            }
++            override fun getNoBackupFilesDir(): File = stable
++        }
++        val snapshot = ProxyAdblockRules.export(context)
++        assertTrue(evicted)
++        assertTrue(snapshot.count > 0)
++        assertTrue(snapshot.file.canonicalPath.startsWith(stable.canonicalPath + File.separator))
++        assertTrue(snapshot.file.isFile && snapshot.allowFile.isFile)
++        assertFalse(File(app.cacheDir, "hetu-dns-filter").exists())
++    }
++
++    @Test fun bothProvidersArePublishedSortedFromOneGeneration() {
++        val snapshot = export(block = setOf("z.test", "a.test"), allow = setOf("z-allow.test", "a-allow.test"))
++        assertEquals("+.a.test\n+.z.test\n", snapshot.file.readText())
++        assertEquals("+.a-allow.test\n+.z-allow.test\n", snapshot.allowFile.readText())
++        assertEquals(snapshot.file.parentFile, snapshot.allowFile.parentFile)
++        val meta = Properties().apply { File(snapshot.file.parentFile, "hetu-adblock.meta").inputStream().use { load(it) } }
++        assertEquals(snapshot.revision, meta.getProperty("revision"))
++        assertTrue(RuntimeCompatibility14.cachedPairValid(meta, snapshot.file, snapshot.allowFile))
++    }
++
++    @Test fun newerExportNeverOverwritesFilesAlreadyBeingHandedToRoot() {
++        val old = export("g.old")
++        val bytes = old.file.readBytes(); val exceptions = old.allowFile.readBytes()
++        val new = export("g.new", setOf("new-block.test"), setOf("new-allow.test"))
++        assertNotEquals(old.file.parentFile, new.file.parentFile)
++        assertArrayEquals(bytes, old.file.readBytes()); assertArrayEquals(exceptions, old.allowFile.readBytes())
++        assertEquals("+.new-block.test\n", new.file.readText())
++    }
++
++    @Test fun failedSecondProviderKeepsThePreviousIndexAndPair() {
++        val old = export(); val indexBytes = index().readBytes(); val oldBytes = old.file.readBytes()
++        try {
++            ProxyAdblockRules.exportSnapshot(stable, "g.failed", setOf("new.test"), setOf("allow-new.test")) { domains, target ->
++                if (target.name.contains("allow")) throw IOException("injected disk full")
++                ProxyAdblockRules.writeProvider(domains, target)
++            }
++            fail("second provider must fail")
++        } catch (error: IOException) { assertEquals("injected disk full", error.message) }
++        assertArrayEquals(indexBytes, index().readBytes()); assertArrayEquals(oldBytes, old.file.readBytes())
++        assertEquals(old.file, export().file)
++        assertFalse(File(stable, "hetu-dns-filter").listFiles()!!.any { it.name.endsWith(".new") })
++    }
++
++    @Test fun unchangedRevisionReusesOnlyAHashVerifiedPair() {
++        val first = export(); assertEquals(first.file, export().file)
++        first.file.writeText("+.changed.test\n")
++        val repaired = export()
++        assertNotEquals(first.file, repaired.file)
++        assertEquals("+.blocked.test\n", repaired.file.readText())
++    }
++
++    @Test fun missingAllowFileForcesACompleteFreshPair() {
++        val first = export(); assertTrue(first.allowFile.delete())
++        val new = export(); assertNotEquals(first.file, new.file)
++        assertEquals("+.allow.test\n", new.allowFile.readText())
++    }
++
++    @Test fun corruptOrTraversingIndexCannotAuthorizeAnOutsideFile() {
++        export(); index().writeText("directory=../../elsewhere\nrevision=filter-v4-sha256:g.fixture\n")
++        val new = export()
++        assertTrue(new.file.canonicalPath.startsWith(stable.canonicalPath + File.separator))
++        assertEquals("+.blocked.test\n", new.file.readText())
++    }
++
++    @Test fun unavailableStableDirectoryFailsWithoutTouchingOldSnapshot() {
++        val old = export(); val bytes = old.file.readBytes()
++        val unavailable = File(stable, "not-a-directory").apply { writeText("sentinel") }
++        try {
++            ProxyAdblockRules.exportSnapshot(unavailable, "g.failed", setOf("x.test"), emptySet())
++            fail("invalid root must fail")
++        } catch (_: IOException) { }
++        assertEquals("sentinel", unavailable.readText()); assertArrayEquals(bytes, old.file.readBytes())
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootHealthUpgradeTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootHealthUpgradeTest.kt
+new file mode 100644
+index 0000000..491a308
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootHealthUpgradeTest.kt
+@@ -0,0 +1,101 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import android.content.Context
++import androidx.test.core.app.ApplicationProvider
++import org.json.JSONObject
++import org.junit.Assert.*
++import org.junit.Before
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.Implements
++import org.robolectric.annotation.Implementation
++import java.io.IOException
++import java.util.concurrent.Executors
++import java.util.concurrent.ExecutionException
++
++@Implements(value = RootBridge::class, isInAndroidSdk = false)
++class HealthUpgradeBridgeShadow {
++    companion object {
++        val commands = mutableListOf<String>()
++        var integrity = "degraded"
++        var fault = "listener-11053-udp"
++        var deny = false
++        var allowRepair = false
++        @JvmStatic @Implementation fun rootShell(context: Context, command: String, timeout: Long): RootBridge.Result {
++            commands += command
++            require(!command.contains("service.d") && !command.contains("iptables") && !command.contains("kill "))
++            if (command.contains("hetu-health-checker.sh")) {
++                require(!command.contains("/bin/core") && !command.contains("startup-config"))
++                if (deny) return RootBridge.Result(126, "inspector unavailable")
++                if (command.endsWith("'repair-session'")) return RootBridge.Result(0,
++                    JSONObject().put("ok", allowRepair).put("message", if (allowRepair) "已核对运行记录" else "拒绝不匹配的运行记录").toString())
++                require(command.endsWith("'network-health'"))
++                return RootBridge.Result(0, JSONObject().put("ok", true).put("networkIntegrity", integrity)
++                    .put("networkFault", fault).put("sessionManifestState", "current")
++                    .put("baselineRepairAvailable", false).put("dataPlaneHealthy", integrity == "healthy").toString())
++            }
++            require(command.contains("'status'"))
++            // Old deployed status and an egress success must not override the
++            // current inspector's more complete rule/listener/daemon assessment.
++            return RootBridge.Result(0, """{"ok":true,"running":true,"dataPlaneHealthy":true,"controllerPort":29094,"pid":3087}""")
++        }
++    }
++}
++
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], application = Application::class, shadows = [HealthUpgradeBridgeShadow::class])
++class RootHealthUpgradeTest {
++    private val app get() = ApplicationProvider.getApplicationContext<Application>()
++    private val prefs get() = app.getSharedPreferences("hetu", 0)
++    @Before fun prepare() {
++        HealthUpgradeBridgeShadow.commands.clear(); HealthUpgradeBridgeShadow.deny = false
++        HealthUpgradeBridgeShadow.allowRepair = false; HealthUpgradeBridgeShadow.integrity = "degraded"
++        HealthUpgradeBridgeShadow.fault = "listener-11053-udp"
++        prefs.edit().clear().putInt("proxyRootAppliedRuntimeRevision", 149).putBoolean("proxyRootAutoStart", true)
++            .putString("proxyPolicyEgressState", "reachable").putString("proxyNetworkIntegrity", "upgrade-required").commit()
++    }
++    private fun <T> worker(action: (RootProxyManager) -> T): T {
++        val executor = Executors.newSingleThreadExecutor()
++        try { return executor.submit<T> { action(RootProxyManager(app)) }.get() }
++        finally { executor.shutdownNow() }
++    }
++
++    @Test fun readOnlyInspectorDoesNotInvalidateObservationPublication() {
++        val ticket = RootProxyManager.observationTicket()
++        assertEquals("degraded", worker { it.networkHealth() }.getString("networkIntegrity"))
++        var published = false
++        assertTrue(RootProxyManager.publishObservation(ticket) { published = true })
++        assertTrue(published)
++        assertEquals(149, prefs.getInt("proxyRootAppliedRuntimeRevision", 0))
++    }
++    @Test fun reachableEgressAndOldRunningStatusCannotMaskABrokenDnsListener() {
++        val state = worker { it.status() }
++        assertTrue(state.getBoolean("running")); assertFalse(state.getBoolean("dataPlaneHealthy"))
++        assertEquals("listener-11053-udp", state.getString("networkFault"))
++        assertEquals("reachable", prefs.getString("proxyPolicyEgressState", ""))
++    }
++    @Test fun failedInspectorDoesNotFallBackToAnOldHealthyResult() {
++        HealthUpgradeBridgeShadow.deny = true
++        try { worker { it.status() }; fail("failed observation must not claim health") }
++        catch (error: ExecutionException) { assertTrue(error.cause is IOException) }
++        assertEquals("upgrade-required", prefs.getString("proxyNetworkIntegrity", ""))
++    }
++    @Test fun refusedRepairPreservesDeploymentAndAutostartState() {
++        try { worker { it.repairSessionRecord() }; fail("refused repair must remain refused") }
++        catch (error: ExecutionException) { assertTrue(error.cause is IOException) }
++        assertEquals(149, prefs.getInt("proxyRootAppliedRuntimeRevision", 0)); assertTrue(prefs.getBoolean("proxyRootAutoStart", false))
++        assertEquals("upgrade-required", prefs.getString("proxyNetworkIntegrity", ""))
++        assertEquals(1, HealthUpgradeBridgeShadow.commands.size)
++    }
++    @Test fun metadataRepairDoesNotClaimRuntimeUpgradeOrHideSubsequentFaults() {
++        HealthUpgradeBridgeShadow.allowRepair = true
++        worker { it.repairSessionRecord() }
++        assertEquals(149, prefs.getInt("proxyRootAppliedRuntimeRevision", 0)); assertTrue(prefs.getBoolean("proxyRootAutoStart", false))
++        assertEquals("degraded", prefs.getString("proxyNetworkIntegrity", ""))
++        assertEquals("listener-11053-udp", prefs.getString("proxyNetworkFault", ""))
++        assertEquals(2, HealthUpgradeBridgeShadow.commands.size)
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt
+index eba2ea8..2477f85 100644
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt
+@@ -36,7 +36,7 @@ class Runtime146ContractTest {
+     @Test fun uiVersionBumpDoesNotRequestRuntimeRedeployment() {
+         val p = prefs()
+         // V20.74 deploys the corrected snapshot on the next explicit Start/Restart.
+-        assertEquals(150, ProxyRuntimeSettings.RUNTIME_REVISION)
++        assertEquals(151, ProxyRuntimeSettings.RUNTIME_REVISION)
+         assertFalse(ProxyRuntimeSettings.runtimeUpgradePending(true, 149, true))
+         assertFalse(ProxyRuntimeSettings.runtimeUpgradePending(true, 150, true))
+         assertFalse(ProxyRuntimeSettings.runtimeUpgradePending(true, 492, true))

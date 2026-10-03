@@ -183,11 +183,11 @@ def verify_distinct_webview_frames(output):
 def web_click(port,label):
  assert web_command(port,'click',label).get('clicked')==label
 
-def palette_preferences(original,accent,palette,appearance):
+def palette_preferences(original,accent,palette,appearance,monet=False):
  # Only a fresh disposable emulator fixture is edited. Preserve unrelated keys.
  root=ET.fromstring(original) if original.lstrip().startswith('<?xml') else ET.Element('map')
  changes={'accentHex':('string',accent),'colorPalette':('string',palette),
-          'appearance':('string',appearance),'enableMonet':('boolean','false')}
+          'appearance':('string',appearance),'enableMonet':('boolean',str(monet).lower())}
  for key,(kind,value) in changes.items():
   for node in list(root):
    if node.get('name')==key:root.remove(node)
@@ -204,12 +204,13 @@ def write_fixture_preferences(data):
 def palette_scripts_cases(component,apk,expect_crash=False):
  original=adb('shell','run-as',PKG,'cat','shared_prefs/hetu.xml',check=False)
  palettes=['TonalSpot','Neutral','Vibrant','Expressive','Rainbow','FruitSalad','Monochrome','Fidelity']
- cases=[('#EF4444',palette,appearance) for appearance in ['light','dark'] for palette in palettes]
- cases += [('#2A62E8','Vibrant',appearance) for appearance in ['light','dark']]
+ cases=[('#EF4444',palette,appearance,False) for appearance in ['light','dark'] for palette in palettes]
+ cases += [('#2A62E8','Vibrant',appearance,False) for appearance in ['light','dark']]
+ cases += [('#22C55E','Fidelity','dark',False),('#A855F7','FruitSalad','light',False),('#22C55E','Expressive','dark',True)]
  if expect_crash:cases=cases[:1]
  try:
-  for index,(accent,palette,appearance) in enumerate(cases):
-   write_fixture_preferences(palette_preferences(original,accent,palette,appearance))
+  for index,(accent,palette,appearance,monet) in enumerate(cases):
+   write_fixture_preferences(palette_preferences(original,accent,palette,appearance,monet))
    adb('shell','am','start','-W','-n',component,timeout=240)
    wait_for_home()
    click('工具',bottom=True);click('脚本',scroll=True)

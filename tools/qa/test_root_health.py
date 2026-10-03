@@ -69,7 +69,12 @@ class RootHealth(unittest.TestCase):
         self.base = Path(self.temp.name)
         self.run = self.base/'run'; self.run.mkdir()
         self.fixture = self.base/'fixture'; self.fixture.mkdir()
-        self.functions = self.base/'functions.sh'; self.functions.write_text(PREFIX+'\n')
+        self.functions = self.base/'functions.sh'
+        self.proc = self.base/'proc'; self.proc.mkdir()
+        self.install_prefix(PREFIX)
+        self.watchdogs = []
+        self.wd_script = self.run/'base/hetu-root.sh'; self.wd_script.parent.mkdir()
+        self.wd_script.write_text('#!/bin/sh\nsleep 300\n')
         self.mock = self.base/'mock.py'; self.mock.write_text(MOCK)
         self.commands = self.base/'commands'; self.commands.mkdir()
         restore = self.commands/'iptables-restore'
@@ -81,6 +86,7 @@ class RootHealth(unittest.TestCase):
                            'rule':RULE, 'route':ROUTE, 'sockets':SOCKETS}.items():
             (self.fixture/file).write_text(text)
         self.env = dict(os.environ, HEALTH_FIXTURE=str(self.fixture),
+                        HEALTH_PROC_FIXTURE=str(self.proc),
                         PATH=str(self.commands)+':'+os.environ['PATH'])
         self.setup = ('RUN='+shlex.quote(str(self.run))+'\nBASE="$RUN/base"\n'
                       'PIDFILE="$RUN/pid"; MODEFILE="$RUN/mode"; SESSION="$RUN/session"; '
@@ -92,7 +98,7 @@ class RootHealth(unittest.TestCase):
                       'xt4q(){ xt4 "$@"; }; xt6(){ return 1; }; xt6q(){ return 1; }\n'
                       'ip(){ '+shlex.quote(sys.executable)+' '+shlex.quote(str(self.mock))+' ip "$@"; }\n'
                       'ss(){ cat "$HEALTH_FIXTURE/sockets"; }\n'
-                      'pidcore(){ [ "$1" = "$(cat "$PIDFILE")" ]; }\n'
+                      'pidcore(){ [ ! -f "$HEALTH_FIXTURE/core-identity-failed" ] && [ "$1" = "$(cat "$PIDFILE")" ]; }\n'
                       'monotonic_seconds(){ MONO_SECONDS=100; }\n'
                       'select_dns6_policy(){ START_DNS6=off; }\n'
                       'markused(){ return 1; }\n'
@@ -105,27 +111,48 @@ class RootHealth(unittest.TestCase):
             self.setup += name+'(){ :; }\n'
 
     def tearDown(self):
+        for process in self.watchdogs:
+            try: os.killpg(process.pid, signal.SIGTERM)
+            except ProcessLookupError: pass
+            process.wait(timeout=3)
         pidfile = self.run/'pid'
         if pidfile.exists():
             try: os.kill(int(pidfile.read_text()), signal.SIGTERM)
             except (ProcessLookupError, ValueError): pass
         self.temp.cleanup()
 
-    def shell(self, body, prefix=None):
-        if prefix is not None: self.functions.write_text(prefix+'\n')
+    def shell(self, body, prefix=None, expected_code=0):
+        if prefix is not None: self.install_prefix(prefix)
         harness = self.base/'harness.sh'
         harness.write_text('. '+shlex.quote(str(self.functions))+'\n'+self.setup+body+'\n')
         result = subprocess.run(['sh',str(harness)], env=self.env, text=True,
                                 capture_output=True, timeout=10)
         self.assertEqual('',result.stderr,result.stderr)
-        self.assertEqual(0,result.returncode,result.stdout)
+        self.assertEqual(expected_code,result.returncode,result.stdout)
         return result.stdout
+
+    def install_prefix(self, prefix):
+        # Some executors virtualize PIDs and hide procfs. Replace only procfs read
+        # paths with isolated metadata; execute the shipped identity parser itself.
+        prefix=prefix.replace('"/proc/$H_WD/cmdline"','"$HEALTH_PROC_FIXTURE/$H_WD/cmdline"')
+        prefix=prefix.replace('"/proc/$1/stat"','"$HEALTH_PROC_FIXTURE/$1/stat"')
+        self.functions.write_text(prefix+'\n')
 
     def start(self, vendor='0', prefix=None):
         args = [str(self.core),str(self.config),'tproxy','7893','7892','bypass',
                 '1','1','redirect','0','1053','29090','core','','0','0','','','',
                 '0','0','','','1','1','0','','','',vendor]
-        return self.shell('start '+' '.join(map(shlex.quote,args)),prefix)
+        result=self.shell('start '+' '.join(map(shlex.quote,args)),prefix)
+        process=subprocess.Popen(['sh',str(self.wd_script),'watchdog',(self.run/'pid').read_text().strip()],
+                                 stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True)
+        self.watchdogs.append(process); (self.run/'watchdog').write_text(str(process.pid)+'\n')
+        corepid=(self.run/'pid').read_text().strip()
+        cdir=self.proc/corepid; cdir.mkdir()
+        (cdir/'cmdline').write_bytes(b'core\0')
+        (cdir/'stat').write_text(corepid+' (fixture core (owned)) '+' '.join(['S']+['0']*18+['1234'])+'\n')
+        wdir=self.proc/str(process.pid); wdir.mkdir()
+        (wdir/'cmdline').write_bytes(('sh\0'+str(self.wd_script)+'\0watchdog\0'+corepid+'\0').encode())
+        return result
 
     def health(self):
         return self.shell('health_collect; printf "%s:%s\\n" "$H_STATE" "$H_REASON"').strip()
@@ -136,6 +163,101 @@ class RootHealth(unittest.TestCase):
     def calls(self):
         path = self.fixture/'calls'
         return [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
+
+    def legacy(self):
+        line=next(line for line in PREFIX.splitlines(True) if "printf 'GOOGLE_FIREWALL_CLEAN=%s" in line)
+        old=PREFIX.replace(line,'').replace('  start_stage "start-watchdog"\n','  start_stage "start-watchdog"\n'+line,1)
+        self.start(prefix=old)
+        self.install_prefix(PREFIX)
+
+    def observation(self):
+        return json.loads(self.shell('health_json'))
+
+    def assert_read_only(self):
+        self.assertFalse(any(call[0]=='iptables-restore' or 'replace' in call or 'add' in call for call in self.calls()))
+
+    def test_known_upgrade_repairs_only_metadata_preserving_core_and_saved_rules(self):
+        self.legacy()
+        before={p.name:p.read_bytes() for p in (self.run/'network-manifest').iterdir()}
+        pid=(self.run/'pid').read_bytes()
+        self.assertTrue(self.observation()['baselineRepairAvailable'])
+        self.assertFalse(self.observation()['dataPlaneHealthy'])
+        result=json.loads(self.shell('health_repair_session'))
+        self.assertTrue(result['ok']); self.assertEqual('healthy',result['networkIntegrity'])
+        self.assertEqual('healthy:',self.health()); self.assertEqual(pid,(self.run/'pid').read_bytes())
+        for name in ['4-mangle','4-nat','4-filter','net','pid']:
+            self.assertEqual(before[name],(self.run/'network-manifest'/name).read_bytes())
+        backup=next(self.run.glob('network-manifest.pre-tail.*'))
+        self.assertEqual(before['session'],(backup/'session').read_bytes())
+        self.assertIn('kind=legacy-google-tail rules=preserved',(self.run/'session-repair.log').read_text())
+        self.assert_read_only(); self.assertEqual(FOREIGN,(self.fixture/'4-filter').read_text())
+        # An idempotent second click cannot manufacture another repair.
+        self.assertFalse(json.loads(self.shell('health_repair_session'))['ok'])
+
+    def test_upgrade_with_missing_route_is_reported_and_refuses_rebaselining(self):
+        self.legacy(); (self.fixture/'route').write_text('')
+        observed=self.observation()
+        self.assertIn('ipv4-local-route',observed['networkFault'])
+        self.assertFalse(observed['baselineRepairAvailable']); self.assertFalse(observed['dataPlaneHealthy'])
+        self.assertFalse(json.loads(self.shell('health_repair_session'))['ok'])
+        self.assertEqual('',(self.fixture/'route').read_text()); self.assert_read_only()
+
+    def test_upgrade_with_missing_dns_listener_cannot_become_healthy(self):
+        self.legacy(); (self.fixture/'sockets').write_text(SOCKETS.replace('udp UNCONN 0 0 0.0.0.0:1053 0.0.0.0:*\n',''))
+        observed=self.observation(); self.assertIn('listener-1053-udp',observed['networkFault'])
+        self.assertFalse(json.loads(self.shell('health_repair_session'))['ok']); self.assert_read_only()
+
+    def test_upgrade_with_unknown_read_refuses_metadata_and_network_changes(self):
+        self.legacy(); (self.fixture/'read-failure').touch()
+        self.assertEqual('unknown',self.observation()['networkIntegrity'])
+        self.assertFalse(json.loads(self.shell('health_repair_session'))['ok']); self.assert_read_only()
+
+    def test_missing_manifest_is_not_reconstructed_from_reachable_sockets(self):
+        self.start()
+        (self.run/'network-manifest/session').unlink()
+        self.assertFalse(self.observation()['baselineRepairAvailable'])
+        self.assertFalse(json.loads(self.shell('health_repair_session'))['ok']); self.assert_read_only()
+
+    def test_corrupt_legacy_snapshot_is_never_accepted(self):
+        self.legacy(); (self.run/'network-manifest/4-mangle').write_text('')
+        self.assertFalse(self.observation()['baselineRepairAvailable'])
+        self.assertFalse(json.loads(self.shell('health_repair_session'))['ok']); self.assert_read_only()
+
+    def test_other_session_difference_is_not_a_known_tail_migration(self):
+        self.legacy(); file=self.run/'session'; file.write_text(file.read_text().replace('TCP=1\n','TCP=0\n'))
+        self.assertFalse(self.observation()['baselineRepairAvailable'])
+        self.assertFalse(json.loads(self.shell('health_repair_session'))['ok']); self.assert_read_only()
+
+    def test_core_identity_failure_is_degraded_despite_reachable_listener_fixture(self):
+        self.start(); (self.fixture/'core-identity-failed').touch()
+        self.assertIn('core-identity',self.observation()['networkFault'])
+        self.assertFalse(self.observation()['dataPlaneHealthy']); self.repair(); self.assert_read_only()
+
+    def test_watchdog_missing_is_degraded_and_does_not_trigger_network_repair(self):
+        self.start(); (self.run/'watchdog').unlink()
+        self.assertEqual('degraded:watchdog-missing',self.health())
+        self.assertFalse(self.observation()['dataPlaneHealthy']); self.repair(); self.assert_read_only()
+
+    def test_watchdog_pid_for_an_unrelated_live_process_is_not_accepted(self):
+        self.start(); (self.run/'watchdog').write_text((self.run/'pid').read_text())
+        self.assertEqual('degraded:watchdog-identity',self.health()); self.repair(); self.assert_read_only()
+
+    def test_core_birth_change_during_validation_refuses_publication(self):
+        self.legacy(); previous=(self.run/'network-manifest/session').read_bytes()
+        override='health_core_birth(){ n=$(cat "$RUN/birth-count" 2>/dev/null || echo 0); n=$((n+1)); echo "$n" > "$RUN/birth-count"; echo "$n"; }\n'
+        self.assertFalse(json.loads(self.shell(override+'health_repair_session'))['ok'])
+        self.assertEqual(previous,(self.run/'network-manifest/session').read_bytes()); self.assert_read_only()
+
+    def test_failed_metadata_publish_restores_original_manifest(self):
+        self.legacy(); previous=(self.run/'network-manifest/session').read_bytes()
+        override='mv(){ case "$1" in *network-manifest.tail-new.*) return 1;; *) command mv "$@";; esac; }\n'
+        self.shell(override+'health_repair_session',expected_code=1)
+        self.assertEqual(previous,(self.run/'network-manifest/session').read_bytes())
+        self.assertTrue(self.observation()['baselineRepairAvailable']); self.assert_read_only()
+
+    def test_transaction_in_progress_is_unknown_and_read_only(self):
+        self.start(); (self.run/'lock').mkdir()
+        self.assertEqual('unknown:transaction-in-progress',self.health()); self.assert_read_only()
 
     def test_real_start_google_disabled_has_complete_healthy_baseline(self):
         self.assertTrue(json.loads(self.start())['ok'])
