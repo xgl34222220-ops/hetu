@@ -183,6 +183,63 @@ def verify_distinct_webview_frames(output):
 def web_click(port,label):
  assert web_command(port,'click',label).get('clicked')==label
 
+def palette_preferences(original,accent,palette,appearance):
+ # Only a fresh disposable emulator fixture is edited. Preserve unrelated keys.
+ root=ET.fromstring(original) if original.lstrip().startswith('<?xml') else ET.Element('map')
+ changes={'accentHex':('string',accent),'colorPalette':('string',palette),
+          'appearance':('string',appearance),'enableMonet':('boolean','false')}
+ for key,(kind,value) in changes.items():
+  for node in list(root):
+   if node.get('name')==key:root.remove(node)
+  node=ET.SubElement(root,kind,{'name':key})
+  if kind=='string':node.text=value
+  else:node.set('value',value)
+ return ET.tostring(root,encoding='utf-8',xml_declaration=True)
+
+def write_fixture_preferences(data):
+ adb('shell','am','force-stop',PKG)
+ subprocess.run([ADB,'shell','run-as',PKG,'sh','-c',"'cat > shared_prefs/hetu.xml'"],
+                input=data,stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=True,timeout=30)
+
+def palette_scripts_cases(component,apk,expect_crash=False):
+ original=adb('shell','run-as',PKG,'cat','shared_prefs/hetu.xml',check=False)
+ palettes=['TonalSpot','Neutral','Vibrant','Expressive','Rainbow','FruitSalad','Monochrome','Fidelity']
+ cases=[('#EF4444',palette,appearance) for appearance in ['light','dark'] for palette in palettes]
+ cases += [('#2A62E8','Vibrant',appearance) for appearance in ['light','dark']]
+ if expect_crash:cases=cases[:1]
+ try:
+  for index,(accent,palette,appearance) in enumerate(cases):
+   write_fixture_preferences(palette_preferences(original,accent,palette,appearance))
+   adb('shell','am','start','-W','-n',component,timeout=240)
+   wait_for_home()
+   click('工具',bottom=True);click('脚本',scroll=True)
+   if expect_crash:
+    log=adb('logcat','-d','-v','brief',timeout=30)
+    (OUT/'expected-v2074-palette-crash-logcat.txt').write_text(log)
+    report=adb('shell','run-as',PKG,'cat','files/last-app-crash.txt',check=False)
+    (OUT/'expected-v2074-palette-crash-record.txt').write_text(report)
+    save_png('expected-v2074-palette-crash')
+    assert re.search(r'FATAL EXCEPTION[\s\S]{0,1000}Process: '+re.escape(PKG),log),log[-4000:]
+    assert 'NoSuchMethodError' in log and 'com.materialkolor.scheme.SchemeTonalSpot' in log,log[-4000:]
+    assert 'screen=ProxyScriptsActivity' in report and 'app=0.12.4-v20 (2074)' in report,report
+    (OUT/'results.json').write_text(json.dumps({'result':'expected_failure_reproduced','apkSha256':hashlib.sha256(apk.read_bytes()).hexdigest(),
+       'versionCode':2074,'accent':accent,'palette':palette,'appearance':appearance,
+       'screen':'ProxyScriptsActivity','exception':'NoSuchMethodError','apiLevel':int(adb('shell','getprop','ro.build.version.sdk').strip()),
+       'fixtureOnly':True,'limitations':'Controlled AOSP reproduction of historical APK. No phone Root or network validation.'},indent=2))
+    return
+   expect('服务启动前',f'custom-palette-{index:02d}-{palette}-{appearance}')
+   assert adb('shell','pidof',PKG,check=False).strip(),'Custom palette exited app process'
+   assert 'ProxyScriptsActivity' in adb('shell','dumpsys','activity','activities'), 'Expected actual scripts activity'
+ finally:
+  if original.lstrip().startswith('<?xml'):
+   write_fixture_preferences(original.encode())
+  else:
+   adb('shell','am','force-stop',PKG)
+   adb('shell','run-as',PKG,'rm','-f','shared_prefs/hetu.xml')
+ if not expect_crash:
+  adb('shell','am','start','-W','-n',component,timeout=240)
+  wait_for_home()
+
 def main():
  end=time.monotonic()+900
  while time.monotonic()<end:
@@ -227,6 +284,9 @@ def main():
   click('简体中文');expect('主题设置','00-language-selected')
   adb('shell','input','keyevent','4');time.sleep(2);click('首页',bottom=True)
   expect('河图','01-home-language-restored')
+ if os.environ.get('HETU_EXPECT_PALETTE_CRASH')=='1':
+  palette_scripts_cases(choices[0],apk,expect_crash=True)
+  return
  click('面板',bottom=True);expect('代理未运行','02-panel-stopped')
  click('工具',bottom=True);expect('文件管理','03-tools')
  click('脚本',scroll=True);expect('服务启动前','scripts-entry');expect('服务停止后','scripts-stop')
@@ -279,6 +339,7 @@ def main():
   finally:
    adb('reverse','--remove',f'tcp:{device_port}')
    (OUT/'native-webview-fixture-requests.json').write_text(json.dumps(requests,ensure_ascii=False,indent=2))
+ palette_scripts_cases(choices[0],apk)
  log=adb('logcat','-d','-v','brief',timeout=30);(OUT/'logcat.txt').write_text(log)
  assert not re.search(r'FATAL EXCEPTION[\s\S]{0,1000}Process: '+re.escape(PKG),log),'Application crash in logcat'
  assert not re.search(r'ANR in '+re.escape(PKG)+r'(?:\s|\(|:)',log),'Application ANR recorded during navigation'

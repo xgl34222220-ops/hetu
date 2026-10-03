@@ -1,3 +1,11 @@
+## 当前工作：V20.75 自定义配色兼容修复
+
+从已交付 V20.74 源码继续，追加 `updates/v2075-theme-compat/runtime.patch`，不重放历史 UI 迁移。versionCode 2075，versionName 0.12.5-v20；Root runtime 保持 150，原核心/native 载荷、Root 脚本与 service.d 自启保持已验证 V20.74 字节与固定签名。
+
+用户最新真机诊断：当前 App 2074，但已部署 Root 149；`upgrade-required/session-manifest-missing` 仍来自旧运行基线，须显式重启代理部署 150，不能隐藏警告、无条件重新快照现网或自动强制重启。Google 服务已有双向流量，清理 checked=6/removed=0/failed=0，不声称已确认 Google 防火墙断网。
+
+历史 2072 的 `ProxyScriptsActivity` 闪退记录为 `NoSuchMethodError` / MaterialKolor DynamicScheme。已检查 2074 实际 APK DEX：MaterialKolor 2.0.0 引用的 Scheme 构造方法在实际 MCU 5.0.1 中不存在。MiuiX 0.9.4 引入 MCU 5.0.1，主题依赖也统一严格锁到 5.0.1，保留全部 8 种配色、系统 Monet、强调色与原配色算法。默认蓝色/TonalSpot 分支不会进入有缺陷代码，之前默认配色 smoke 因此漏报。按 `.github/workflows/hetu-build.yml` 构建，补真实共享主题回归、APK 构造方法存在性校验、API35/36 自定义配色实际脚本页交互和 2074/Android16 旧包预期闪退复现。结果须以最终 Actions 与 artifact 为准；AOSP 仍不等于用户手机 Root 重启验收。
+
 ## 当前交付：V20.74 开机运行健康基线修复
 
 沿用已交付 V20.73 底座与固定签名，追加 `updates/v2074-boot-health/runtime.patch`，构建用 `.github/workflows/hetu-build.yml`。versionCode 2074，versionName 0.12.4-v20，Root runtime 150。全部界面与功能、21 个原始 native/core 载荷、service.d 自启实现保持。
