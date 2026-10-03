@@ -142,7 +142,7 @@ jobs:
     - name: Apply network epoch recovery and preserve Root/core payloads
       run: 'set -euo pipefail
 
-        printf ''%s\n'' ''617945532b4b01536c34b2d9a7a71eba37d1a85e301deda13c91998db6acd8f2  updates/v2077-network-recovery/runtime.patch'' | sha256sum -c
+        printf ''%s\n'' ''a912fb4e7b2a3d4bcd611b9022348426f96d6dde1765638baa6d93c5315333f9  updates/v2077-network-recovery/runtime.patch'' | sha256sum -c
         -
 
         git apply --check updates/v2077-network-recovery/runtime.patch

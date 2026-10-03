@@ -333,10 +333,9 @@ index 533aa35..5ca3c82 100644
  }
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootNetworkRecoveryTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootNetworkRecoveryTest.kt
 new file mode 100644
-index 0000000..f66f18c
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootNetworkRecoveryTest.kt
-@@ -0,0 +1,161 @@
+@@ -0,0 +1,168 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
@@ -356,6 +355,9 @@ index 0000000..f66f18c
 +import org.robolectric.android.controller.ServiceController
 +import org.robolectric.annotation.Config
 +import org.robolectric.util.ReflectionHelpers
++import org.robolectric.shadow.api.Shadow
++import org.robolectric.shadows.ShadowNetwork
++import org.robolectric.shadows.ShadowNetworkCapabilities
 +import java.net.InetAddress
 +import java.util.concurrent.ExecutorService
 +
@@ -370,8 +372,8 @@ index 0000000..f66f18c
 +    private var destroyed = false
 +    private val app get() = ApplicationProvider.getApplicationContext<Application>()
 +    private val prefs get() = app.getSharedPreferences("hetu", Context.MODE_PRIVATE)
-+    private val a = Network(101)
-+    private val b = Network(102)
++    private val a = ShadowNetwork.newInstance(101)
++    private val b = ShadowNetwork.newInstance(102)
 +
 +    @Before fun prepare() {
 +        prefs.edit().clear().commit()
@@ -385,17 +387,21 @@ index 0000000..f66f18c
 +    }
 +    @After fun finish() { if (!destroyed) controller.destroy() }
 +
-+    private fun capabilities(validated: Boolean = false, captive: Boolean = false, physical: Boolean = true) =
-+        NetworkCapabilities().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).apply {
-+            if (physical) addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
-+            else removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
-+            if (validated) addCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-+            if (captive) addCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL)
-+            addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
-+        }
++    private fun capabilities(validated: Boolean = false, captive: Boolean = false, physical: Boolean = true): NetworkCapabilities {
++        val value = NetworkCapabilities()
++        val shadow = Shadow.extract<ShadowNetworkCapabilities>(value)
++        shadow.addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
++        if (physical) shadow.addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
++        else shadow.removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
++        if (validated) shadow.addCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
++        if (captive) shadow.addCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL)
++        shadow.addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
++        return value
++    }
 +    private fun links(dns: String = "192.0.2.53", name: String? = "wlan0") = LinkProperties().apply {
 +        interfaceName = name
-+        addDnsServer(InetAddress.getByName(dns))
++        ReflectionHelpers.callInstanceMethod<Boolean>(this, "addDnsServer",
++            ReflectionHelpers.ClassParameter.from(InetAddress::class.java, InetAddress.getByName(dns)))
 +    }
 +    private fun ready(n: Network = a) {
 +        callback.onAvailable(n)
