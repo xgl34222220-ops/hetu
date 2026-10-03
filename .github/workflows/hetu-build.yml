@@ -266,7 +266,7 @@ jobs:
 
         head -3 out/apk-transfer/apk-metadata.txt
 
-        grep -q "versionCode=''2075'' versionName=''0.12.5-v20''" out/apk-transfer/apk-metadata.txt
+        grep -q "versionCode=''2076'' versionName=''0.12.6-v20''" out/apk-transfer/apk-metadata.txt
 
         "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs "$APK" > out/apk-transfer/apk-signature.txt
 
