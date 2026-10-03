@@ -209,7 +209,26 @@ def main():
   expect('河图','01-home-language-restored')
  click('面板',bottom=True);expect('代理未运行','02-panel-stopped')
  click('工具',bottom=True);expect('文件管理','03-tools')
+ click('脚本',scroll=True);expect('服务启动前','scripts-entry');expect('服务停止后','scripts-stop')
+ click('脚本环境');expect('HETU_HOOK','scripts-environment')
+ adb('shell','input','keyevent','4');time.sleep(2)
+ click('更多');expect('导入自定义脚本','scripts-overflow')
+ click('导入自定义脚本');root=capture('scripts-document-picker')
+ assert any(n.get('package','').endswith('.documentsui') for n in root.iter('node')),'OS document picker did not open'
+ checks.append({'name':'scripts-document-picker','result':'passed'})
+ adb('shell','input','keyevent','4');time.sleep(2)
+ expect('服务启动前','scripts-import-cancelled')
+ adb('shell','input','keyevent','4');time.sleep(2)
+
  click('设置',bottom=True);expect('基础代理配置','04-settings')
+ click('开机启动与下载',scroll=True);expect('开机自启','boot-settings')
+ click('开机自启');expect_eventually('无法取得 Root 权限','boot-root-denial-visible')
+ raw=adb('shell','run-as',PKG,'cat','shared_prefs/hetu.xml')
+ prefs=ET.fromstring(raw)
+ assert not any(n.get('name')=='proxyRootAutoStart' and n.get('value')=='true' for n in prefs),'Failed setup was falsely saved as enabled'
+ checks.append({'name':'boot-denial-keeps-toggle-off','result':'passed'})
+ adb('shell','input','keyevent','4');time.sleep(2)
+
  click('关于',scroll=True);expect('内置核心','05-about')
  adb('shell','input','keyevent','4');time.sleep(2)
  click('工具',bottom=True);click('Web面板',scroll=True);expect('河图本地面板','06-web-panels')
@@ -243,9 +262,10 @@ def main():
  assert not re.search(r'ANR in '+re.escape(PKG)+r'(?:\s|\(|:)',log),'Application ANR recorded during navigation'
  (OUT/'last-anr.txt').write_text(adb('shell','dumpsys','activity','lastanr',timeout=60,check=False))
  assert adb('shell','pidof',PKG,check=False).strip(),'App process exited after navigation'
- (OUT/'results.json').write_text(json.dumps({'checks':checks,'passed':len(checks),'fixtureOnly':True,'rootActions':0,'limitations':'Fresh AOSP emulator. Five populated native-WebView states use an isolated loopback fixture with deliberate HTTP503 switch rejection. No K80, real core, Root boot or actual network validation.'},ensure_ascii=False,indent=2))
+ (OUT/'results.json').write_text(json.dumps({'checks':checks,'passed':len(checks),'fixtureOnly':True,'rootMutationActions':0,'rootSetupDenialAttempts':1,'apiLevel':int(adb('shell','getprop','ro.build.version.sdk').strip()),'limitations':'Fresh AOSP emulator. Five populated native-WebView states use an isolated loopback fixture with deliberate HTTP503 switch rejection. No K80, real core, Root boot or actual network validation.'},ensure_ascii=False,indent=2))
 try:main()
 except Exception:
+ (OUT/'last-app-crash.txt').write_text(adb('shell','run-as',PKG,'cat','files/last-app-crash.txt',check=False))
  try:capture('failure')
  except Exception:pass
  (OUT/'failure-logcat.txt').write_text(adb('logcat','-d','-v','threadtime',timeout=60,check=False))

@@ -23,6 +23,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('mode', choices=['snapshot', 'verify'])
     parser.add_argument('--script-sha256')
+    parser.add_argument('--autostart-sha256')
     parser.add_argument('--apk', default='android-app/app/build/outputs/apk/debug/app-debug.apk')
     parser.add_argument('--manifest', default='out/verification/packaged-runtime.json')
     args = parser.parse_args()
@@ -34,15 +35,22 @@ def main():
         assert args.script_sha256 and len(args.script_sha256) == 64, 'Pinned tested script hash required'
         expected = dict(original)
         expected[script] = args.script_sha256
+        added = []
+        if args.autostart_sha256:
+            assert len(args.autostart_sha256) == 64
+            expected['assets/hetu-autostart.sh'] = args.autostart_sha256
+            added = ['assets/hetu-autostart.sh']
         for name, digest in expected.items():
             assert sha(source_path(name).read_bytes()) == digest, f'Source runtime hash mismatch: {name}'
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(json.dumps({'expected': expected, 'originalPayloadCount': len(original),
-                                     'editedPayloads': [script], 'apkVerified': False}, indent=2) + '\n')
-        print(f'Snapshot verified: {len(expected)-1} unchanged runtime payloads + pinned tested shell')
+                                     'editedPayloads': [script], 'addedPayloads': added, 'apkVerified': False}, indent=2) + '\n')
+        print(f'Snapshot verified: {len(original)-1} unchanged runtime payloads + tested shell + {len(added)} added boot script')
     else:
         record = json.loads(output.read_text())
-        assert set(record['expected']) == set(original), 'Runtime manifest is incomplete'
+        added = record.get('addedPayloads', [])
+        assert added in [[], ['assets/hetu-autostart.sh']], 'Unexpected additional payload'
+        assert set(record['expected']) == set(original) | set(added), 'Runtime manifest is incomplete'
         assert record['editedPayloads'] == [script], 'Unexpected runtime payload change'
         for name, digest in original.items():
             if name != script:
@@ -53,7 +61,7 @@ def main():
         record['apkVerified'] = True
         record['apkSha256'] = sha(Path(args.apk).read_bytes())
         output.write_text(json.dumps(record, indent=2) + '\n')
-        print(f'APK runtime verified: all {len(original)} entries match tested source/pinned originals')
+        print(f'APK runtime verified: all {len(record['expected'])} entries match tested source/pinned originals')
 
 
 if __name__ == '__main__':

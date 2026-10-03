@@ -1,10 +1,10 @@
-# V20.72: pinned successful effective source + reviewed runtime patch.
-name: Hetu V20.72 runtime fixes
+# Pinned V20.71 effective source, verified V20.72 patch, reviewed V20.73 fixes.
+name: Hetu V20.73 scripts and boot fixes
 permissions:
   contents: read
   actions: read
 concurrency:
-  group: hetu-v2072-${{ github.ref }}
+  group: hetu-v2073-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   build:
@@ -40,7 +40,7 @@ jobs:
         python3 .github/scripts/verify_packaged_runtime.py snapshot --script-sha256 96654eacde9009f0ad3f5ad31cd423147667548fd1a510b8bdef986a175ea7cb
 
         '
-    - name: Apply Google firewall and click-crash fixes
+    - name: Restore verified V20.72 fixes
       run: 'set -euo pipefail
 
         echo ''51349b72b0025c3e27d09723a72592aa1ff8977bbdfd641533872c3fb6932da4  updates/v2072-google-firewall-crash/runtime.patch''
@@ -57,6 +57,30 @@ jobs:
         python3 tools/qa/test_google_firewall.py 2>&1 | tee out/verification/google-firewall-tests.txt
 
         python3 .github/scripts/verify_packaged_runtime.py snapshot --script-sha256 aa5fdb7d05e04f1b36a15af13d6525de5e2c3c0190e96d3361c2abf54ea2a008
+
+        '
+    - name: Apply and test scripts and native boot fixes
+      run: 'set -euo pipefail
+
+        echo ''8563747730e399cfbdf2e2ceada0ae67ed58b39e5d3c377a6b56d609fb29bab1  updates/v2073-scripts-boot/runtime.patch''
+        | sha256sum -c -
+
+        git apply --check updates/v2073-scripts-boot/runtime.patch
+
+        git apply updates/v2073-scripts-boot/runtime.patch
+
+        grep -q ''versionCode = 2073'' android-app/app/build.gradle.kts
+
+        sh -n android-app/app/src/main/assets/hetu-root.sh
+
+        sh -n android-app/app/src/main/assets/hetu-autostart.sh
+
+        python3 tools/qa/test_root_autostart.py 2>&1 | tee out/verification/root-autostart-tests.txt
+
+        python3 tools/qa/test_google_firewall.py 2>&1 | tee out/verification/google-firewall-tests.txt
+
+        python3 .github/scripts/verify_packaged_runtime.py snapshot --script-sha256 0e349bf1f41c7f6fc9fff1a0c00842fb10229e11ffec53e8bf686cd9d356636a
+        --autostart-sha256 3a1215f4e9093ae2298803020d697da0c14c35ee5cf28f84f2a81608093783f9
 
         '
     - name: Verify built-in WebUI behavior with controlled API fixtures
@@ -102,17 +126,17 @@ jobs:
     - name: Export effective V20.72 source
       run: 'set -euo pipefail
 
-        tar -czf /tmp/Hetu-V20.72-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+        tar -czf /tmp/Hetu-V20.73-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
 
-        sha256sum /tmp/Hetu-V20.72-effective-source.tar.gz
+        sha256sum /tmp/Hetu-V20.73-effective-source.tar.gz
 
         '
     - uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: error
-        name: Hetu-V20.72-effective-source
-        path: /tmp/Hetu-V20.72-effective-source.tar.gz
+        name: Hetu-V20.73-effective-source
+        path: /tmp/Hetu-V20.73-effective-source.tar.gz
     - name: Build APK
       run: gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:assembleDebug
         --stacktrace
@@ -130,21 +154,22 @@ jobs:
         \ --tests '*BootStartup60Test' \\\n  --tests '*ConceptStateCoverageTest' --tests '*ConceptRemainingCoverageTest'\
         \ --tests '*WanDetails61Test' --tests '*MainLanguageBindingTest' --tests '*PanelLayoutDefaultsTest' --tests\
         \ '*Runtime146ContractTest' --tests '*PanelModel11Test' --tests '*PanelActionSafetyTest' --tests '*ProxyLatencyRegressionTest'\
-        \ --tests '*DocumentPickerSafetyTest' --tests '*AppCrashReportTest' --stacktrace\n"
+        \ --tests '*DocumentPickerSafetyTest' --tests '*AppCrashReportTest' --tests '*ProxyScriptSafetyTest' --tests\
+        \ '*RootAutostartTest' --stacktrace\n"
       working-directory: android-app
     - name: Android lint compatibility gate
       run: gradle --no-daemon --max-workers=1 -Dorg.gradle.jvmargs='-Xmx1500m -Dfile.encoding=UTF-8' :app:lintDebug
         --stacktrace
       working-directory: android-app
     - name: Consolidate native and browser state evidence
-      run: python3 tools/qa/consolidate_concept_coverage.py --repo . --expected-tests 239 --browser-evidence out/verification/webui-browser
+      run: python3 tools/qa/consolidate_concept_coverage.py --repo . --expected-tests 256 --browser-evidence out/verification/webui-browser
         --browser-commit "$GITHUB_SHA"
     - if: always()
       name: Upload concept UI verification evidence
       uses: actions/upload-artifact@v4
       with:
         if-no-files-found: warn
-        name: Hetu-V20.72-UI-verification
+        name: Hetu-V20.73-UI-verification
         path: 'android-app/app/build/test-results/testDebugUnitTest/
 
           android-app/app/build/reports/tests/testDebugUnitTest/
@@ -175,7 +200,7 @@ jobs:
 
         head -3 out/apk-transfer/apk-metadata.txt
 
-        grep -q "versionCode=''2072'' versionName=''0.12.2-v20''" out/apk-transfer/apk-metadata.txt
+        grep -q "versionCode=''2073'' versionName=''0.12.3-v20''" out/apk-transfer/apk-metadata.txt
 
         "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs "$APK" > out/apk-transfer/apk-signature.txt
 
@@ -202,7 +227,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         if-no-files-found: error
-        name: Hetu-V20.72-APK-manifest
+        name: Hetu-V20.73-APK-manifest
         path: 'out/apk-transfer/manifest.json
 
           out/apk-transfer/apk-metadata.txt
@@ -215,42 +240,42 @@ jobs:
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.72-APK-part00
+        name: Hetu-V20.73-APK-part00
         path: out/apk-transfer/part00.bin
     - name: Upload APK transport part 01
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.72-APK-part01
+        name: Hetu-V20.73-APK-part01
         path: out/apk-transfer/part01.bin
     - name: Upload APK transport part 02
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.72-APK-part02
+        name: Hetu-V20.73-APK-part02
         path: out/apk-transfer/part02.bin
     - name: Upload APK transport part 03
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.72-APK-part03
+        name: Hetu-V20.73-APK-part03
         path: out/apk-transfer/part03.bin
     - name: Upload APK transport part 04
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.72-APK-part04
+        name: Hetu-V20.73-APK-part04
         path: out/apk-transfer/part04.bin
     - name: Upload APK transport part 05
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.72-APK-part05
+        name: Hetu-V20.73-APK-part05
         path: out/apk-transfer/part05.bin
   android-ui-smoke:
     needs: build
@@ -284,12 +309,13 @@ jobs:
 
         AVDMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
 
-        "$SDKMANAGER" ''platform-tools'' ''emulator'' ''system-images;android-35;default;x86_64'' 2>&1 | tee out/android-smoke/sdk-prepare.log
+        "$SDKMANAGER" ''platform-tools'' ''emulator'' ''system-images;android-${{ matrix.api }};default;x86_64''
+        2>&1 | tee out/android-smoke/sdk-prepare.log
 
         "$AVDMANAGER" list device --compact | grep -qx ''pixel_2''
 
         echo no | "$AVDMANAGER" create avd --force --device pixel_2 --name hetu-smoke --path "$ANDROID_AVD_HOME/hetu-smoke.avd"
-        --package ''system-images;android-35;default;x86_64'' 2>&1 | tee out/android-smoke/avd-prepare.log
+        --package ''system-images;android-${{ matrix.api }};default;x86_64'' 2>&1 | tee out/android-smoke/avd-prepare.log
 
         test -f "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini"
 
@@ -310,7 +336,7 @@ jobs:
         '
     - name: Run installed APK navigation and native WebView smoke
       env:
-        HETU_EXPECTED_VERSION: '2072'
+        HETU_EXPECTED_VERSION: '2073'
       run: 'set -euo pipefail
 
         mkdir -p out/android-smoke
@@ -332,16 +358,24 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: Hetu-V20.72-Android-smoke
+        name: Hetu-V20.73-Android-${{ matrix.api }}-smoke
         path: out/android-smoke/
         if-no-files-found: warn
+    strategy:
+      fail-fast: false
+      matrix:
+        api:
+        - 35
+        - 36
+    name: Installed APK on Android API ${{ matrix.api }}
 'on':
   push:
     branches:
-    - test/v20.72-google-firewall-crash
+    - test/v20.73-scripts-boot
     paths:
-    - updates/v2072-google-firewall-crash/**
-    - tools/qa/test_google_firewall.py
+    - updates/v2073-scripts-boot/**
+    - tools/qa/test_root_autostart.py
     - .github/workflows/hetu-build.yml
-    - docs/V20.72_GOOGLE_FIREWALL_CRASH.md
+    - .github/scripts/smoke_hetu_apk.py
+    - .github/scripts/verify_packaged_runtime.py
   workflow_dispatch: null
