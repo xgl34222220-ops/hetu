@@ -1,0 +1,10 @@
+{
+  "patch_sha256": "617945532b4b01536c34b2d9a7a71eba37d1a85e301deda13c91998db6acd8f2",
+  "base_effective_source": "verified V20.76 a48ece29289a34b1812c67fa0f82e0252362efc3",
+  "versionCode": 2077,
+  "versionName": "0.12.7-v20",
+  "rootRuntimeRevision": 151,
+  "rootAssetSha256": "6b59cc14c687f067ab942d0b4855fcdde6183a874275e1acda6105cbfff0a16b",
+  "autostartSha256": "3a1215f4e9093ae2298803020d697da0c14c35ee5cf28f84f2a81608093783f9",
+  "native_changes": false
+}

@@ -1,0 +1,500 @@
+diff --git a/android-app/app/build.gradle.kts b/android-app/app/build.gradle.kts
+index a4edadf..ea477ae 100644
+--- a/android-app/app/build.gradle.kts
++++ b/android-app/app/build.gradle.kts
+@@ -17,8 +17,8 @@ android {
+         applicationId = "io.github.xgl34222220.hetu"
+         minSdk = 26
+         targetSdk = 35
+-        versionCode = 2076
+-        versionName = "0.12.6-v20"
++        versionCode = 2077
++        versionName = "0.12.7-v20"
+     }
+ 
+     // Explicit CI debug identity. No private key is committed or exported.
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/NetworkEpoch.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/NetworkEpoch.java
+index f1354b3..e4eab6b 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/NetworkEpoch.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/NetworkEpoch.java
+@@ -15,6 +15,7 @@ public final class NetworkEpoch<N> {
+     }
+     private N candidate;
+     private boolean eligible, blocked;
++    private String capabilities;
+     private String links;
+     private Snapshot<N> current = new Snapshot<>(null, 0, "waiting");
+ 
+@@ -22,12 +23,16 @@ public final class NetworkEpoch<N> {
+     public synchronized boolean isCurrent(Snapshot<N> value) { return value == current; }
+     public synchronized void available(N network) {
+         if (network == null || Objects.equals(candidate, network)) return;
+-        candidate = network; eligible = false; blocked = false; links = null;
++        candidate = network; eligible = false; blocked = false; links = null; capabilities = null;
+         publish();
+     }
+     public synchronized void capabilities(N network, boolean usable) {
+-        if (!Objects.equals(candidate, network) || candidate == null || eligible == usable) return;
+-        eligible = usable; publish();
++        capabilities(network, usable, null);
++    }
++    public synchronized void capabilities(N network, boolean usable, String signature) {
++        if (!Objects.equals(candidate, network) || candidate == null ||
++                (eligible == usable && Objects.equals(capabilities, signature))) return;
++        eligible = usable; capabilities = signature; publish();
+     }
+     public synchronized void links(N network, String value) {
+         if (!Objects.equals(candidate, network) || candidate == null || Objects.equals(links, value)) return;
+@@ -42,7 +47,7 @@ public final class NetworkEpoch<N> {
+         if (candidate != null && Objects.equals(candidate, network)) reset();
+     }
+     public synchronized void reset() {
+-        candidate = null; eligible = false; blocked = false; links = null;
++        candidate = null; eligible = false; blocked = false; links = null; capabilities = null;
+         current = new Snapshot<>(null, current.epoch + 1, "offline");
+     }
+     private void publish() {
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
+index 242950b..2023d6c 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
+@@ -18,7 +18,9 @@ public final class ProxyNetworkMatchService extends Service {
+     private ConnectivityManager.NetworkCallback cb;
+     private final ExecutorService worker=Executors.newSingleThreadExecutor();
+     private final ScheduledExecutorService metrics=Executors.newScheduledThreadPool(2);
+-    private final ProxyNetworkHandover<Network> networkHandover=new ProxyNetworkHandover<>();
++    private final NetworkEpoch<Network> networkEvents=new NetworkEpoch<>();
++    private final ProxyNetworkState networkState=new ProxyNetworkState();
++    private ScheduledFuture<?> networkRefreshTask;
+     private final ProxyTaskCoalescer evaluations=new ProxyTaskCoalescer(worker,this::evaluateNow);
+     private volatile boolean destroyed;
+     private long automaticStopGeneration;
+@@ -89,17 +91,17 @@ public final class ProxyNetworkMatchService extends Service {
+             prefs.edit().putString("proxyRootBootError","Root 开机脚本正在等待或恢复…").apply();
+             return 5000L;
+         }
+-        Network network=cm==null?null:cm.getActiveNetwork();
+-        NetworkCapabilities caps=network==null||cm==null?null:cm.getNetworkCapabilities(network);
+-        boolean internet=caps!=null&&caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+-        if(!internet){
++        final NetworkEpoch.Snapshot<Network> route=networkEvents.snapshot();
++        if(route.network==null){
+             prefs.edit().putString("proxyRootBootError","等待开机网络就绪…").apply();
+             return Math.min(30000L,1000L+Math.min(++bootRestoreAttempts,29)*1000L);
+         }
+         try{
+-            JSONObject result=new RootProxyManager(getApplicationContext()).startIfWanted(ProxyRuntimeProfile.load(prefs));
++            JSONObject result=new RootProxyManager(getApplicationContext()).startIfWanted(ProxyRuntimeProfile.load(prefs),
++                    ()->!destroyed&&networkEvents.isCurrent(route));
+             if(result.optBoolean("cancelled",false))
+-                return "control-busy".equals(result.optString("reason"))?1000L:0L;
++                return "control-busy".equals(result.optString("reason"))?1000L:
++                        "network-changed".equals(result.optString("reason"))?1000L:0L;
+             if(result.optBoolean("ok",false)||result.optBoolean("running",false)){
+                 bootRestoreAttempts=0;
+                 prefs.edit()
+@@ -124,6 +126,7 @@ public final class ProxyNetworkMatchService extends Service {
+         destroyed=true;
+         evaluations.close();
+         bootRestores.close();
++        synchronized(networkEvents){if(networkRefreshTask!=null)networkRefreshTask.cancel(false);networkEvents.reset();}
+         if(cb!=null)try{cm.unregisterNetworkCallback(cb);}catch(Exception ignored){}
+         worker.shutdownNow();
+         metrics.shutdownNow();
+@@ -134,43 +137,83 @@ public final class ProxyNetworkMatchService extends Service {
+     private void register(){
+         cb=new ConnectivityManager.NetworkCallback(){
+             @Override public void onAvailable(Network n){
+-                handleDefaultNetwork(n);
+-                if(prefs.getBoolean("proxyRootAutoStart",false)&&prefs.getBoolean("proxyRootWanted",false))
+-                    scheduleBootRestore(250L);
+-                evaluate();
++                networkChanged("available",()->{networkEvents.available(n);networkState.available(n);});
++            }
++            @Override public void onLost(Network n){
++                networkChanged("lost",()->{networkEvents.lost(n);networkState.lost(n);});
+             }
+-            @Override public void onLost(Network n){networkHandover.lost(n);evaluate();}
+             @Override public void onCapabilitiesChanged(Network n,NetworkCapabilities c){
+-                if(c.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)&&prefs.getBoolean("proxyRootAutoStart",false)&&prefs.getBoolean("proxyRootWanted",false))
+-                    scheduleBootRestore(250L);
+-                evaluate();
++                boolean physical=c.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN);
++                boolean internet=c.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
++                boolean validated=c.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
++                boolean captive=c.hasCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL);
++                String signature=physical+"|"+internet+"|"+validated+"|"+captive+"|"
++                        +c.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)+"|"
++                        +c.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR);
++                networkChanged("capabilities",()->{
++                    networkState.capabilities(n,physical,internet,validated,captive);
++                    // Validation can itself need the proxy. Do not make it a
++                    // prerequisite; blocked/captive networks cannot auto-recover.
++                    networkEvents.capabilities(n,physical&&internet&&!captive,signature);
++                });
++            }
++            @Override public void onLinkPropertiesChanged(Network n,LinkProperties links){
++                networkChanged("links",()->networkEvents.links(n,
++                        links.getInterfaceName()==null?null:links.toString()));
++            }
++            @Override public void onBlockedStatusChanged(Network n,boolean blocked){
++                networkChanged("blocked",()->{networkEvents.blocked(n,blocked);networkState.blocked(n,blocked);});
+             }
+         };
+         try{cm.registerDefaultNetworkCallback(cb);}
+         catch(Exception e){prefs.edit().putString("networkMatchLastEnvironment","监听失败："+e.getClass().getSimpleName()).apply();}
+     }
+ 
+-    private void handleDefaultNetwork(Network n){
+-        final long generation=networkHandover.available(n);
+-        if(generation==0L||!prefs.getBoolean("proxyRootWanted",false))return;
+-        scheduleWorker(()->{
+-            if(destroyed||!networkHandover.isCurrent(n,generation)||!prefs.getBoolean("proxyRootWanted",false))return;
+-            Network active=cm.getActiveNetwork();
+-            if(active==null||!active.equals(n))return;
+-            long ticket=RootProxyManager.observationTicket();
+-            // A new BEST network does not prove that the old one disconnected.
+-            // Do not DELETE every connection merely because its start precedes a callback.
+-            RootProxyManager.publishObservation(ticket,()->prefs.edit()
+-                    .putLong("proxyLastNetworkObservationAt",System.currentTimeMillis())
+-                    .putString("proxyLastNetworkObservationReason","default-changed-connections-preserved")
+-                    .putBoolean("proxyRootEgressPending",true).apply());
++    private void networkChanged(String reason,Runnable update){
++        synchronized(networkEvents){
++            if(destroyed)return;
++            NetworkEpoch.Snapshot<Network> before=networkEvents.snapshot();
++            update.run();
++            final NetworkEpoch.Snapshot<Network> route=networkEvents.snapshot();
++            if(route==before)return;
+             lastPolicyProbeAt=-90000L;
+-            // Android/netd may rebuild policy-routing or firewall state during a
+-            // Wi-Fi/cellular handover. Waiting for the 12s watchdog window leaves
+-            // a visible "connected but no Internet" gap. Repair only Hetu-owned
+-            // state in place; never restart Mihomo or flush its live connections.
+-            repairLiveNetworkIntegrity();
+-        },2500L);
++            prefs.edit().putLong("proxyNetworkEpoch",route.epoch)
++                    .putString("proxyPhysicalNetworkState",networkState.state().name().toLowerCase(Locale.ROOT))
++                    .putString("proxyLastNetworkCallback",reason)
++                    .putLong("proxyLastNetworkCallbackAt",System.currentTimeMillis())
++                    .putString("proxyPolicyEgressState","unverified")
++                    .putLong("proxyPolicyEgressCheckedAt",0L)
++                    .putBoolean("proxyRootEgressPending",prefs.getBoolean("proxyRootWanted",false)).apply();
++            if(networkRefreshTask!=null){networkRefreshTask.cancel(false);networkRefreshTask=null;}
++            if(route.network!=null&&prefs.getBoolean("proxyRootWanted",false)){
++                if(prefs.getBoolean("proxyRootAutoStart",false))scheduleBootRestore(250L);
++                try{networkRefreshTask=metrics.schedule(()->{
++                    try{worker.execute(()->recoverNetwork(route,reason));}
++                    catch(RejectedExecutionException stopped){}
++                },2500L,TimeUnit.MILLISECONDS);}catch(RejectedExecutionException stopped){}
++            }
++        }
++        evaluate();
++    }
++
++    private void recoverNetwork(NetworkEpoch.Snapshot<Network> route,String reason){
++        if(destroyed||route.network==null||!networkEvents.isCurrent(route)||!prefs.getBoolean("proxyRootWanted",false))return;
++        long ticket=RootProxyManager.observationTicket();
++        if(!publishNetworkObservation(route,ticket,()->prefs.edit()
++                .putLong("proxyLastNetworkObservationAt",System.currentTimeMillis())
++                .putString("proxyLastNetworkObservationReason",reason+"-changed-connections-preserved").apply()))return;
++        // Refresh only Hetu-owned state in place. A new default does not prove
++        // old connections failed, so preserve the core and all live connections.
++        repairLiveNetworkIntegrity();
++        if(networkEvents.isCurrent(route))probeEgressIfPending();
++    }
++
++    boolean publishNetworkObservation(NetworkEpoch.Snapshot<Network> route,long ticket,Runnable action){
++        synchronized(networkEvents){
++            if(destroyed||!prefs.getBoolean("proxyRootWanted",false))return false;
++            if(!networkEvents.isCurrent(route))return false;
++            return RootProxyManager.publishObservation(ticket,action);
++        }
+     }
+ 
+     private void repairLiveNetworkIntegrity(){
+@@ -321,8 +364,8 @@ public final class ProxyNetworkMatchService extends Service {
+                 probeEgressIfPending();
+                 return;
+             }
+-            Network network=cm==null?null:cm.getActiveNetwork();
+-            if(network==null){
++            final NetworkEpoch.Snapshot<Network> route=networkEvents.snapshot();
++            if(route.network==null){
+                 prefs.edit().putString("proxyAutoRecoveryError","等待网络恢复后重新启动代理").apply();
+                 return;
+             }
+@@ -331,7 +374,8 @@ public final class ProxyNetworkMatchService extends Service {
+             if(now-last<30000L)return;
+             prefs.edit().putLong("proxyAutoRecoveryAttempt",now).apply();
+             RootProxyManager root=new RootProxyManager(getApplicationContext());
+-            JSONObject result=root.startIfWanted(ProxyRuntimeProfile.load(prefs));
++            JSONObject result=root.startIfWanted(ProxyRuntimeProfile.load(prefs),
++                    ()->!destroyed&&networkEvents.isCurrent(route));
+             if(result.optBoolean("cancelled",false))return;
+             if(result.optBoolean("running",false)||result.optBoolean("ok",false)){
+                 prefs.edit()
+@@ -350,6 +394,7 @@ public final class ProxyNetworkMatchService extends Service {
+ 
+     private void checkLiveNetworkIntegrity(){
+         if(destroyed||!prefs.getBoolean("proxyRootWanted",false))return;
++        final NetworkEpoch.Snapshot<Network> route=networkEvents.snapshot();
+         final long ticket=RootProxyManager.observationTicket();
+         if(ticket<0L)return;
+         try{
+@@ -362,9 +407,9 @@ public final class ProxyNetworkMatchService extends Service {
+             if("healthy".equals(integrity))editor.remove("proxyAutoRecoveryError");
+             else if("degraded".equals(integrity))editor.putString("proxyAutoRecoveryError","核心存活，网络接管不完整："+health.optString("networkFault"));
+             // Unknown/old-script observations are never treated as proof of failure.
+-            RootProxyManager.publishObservation(ticket,editor::apply);
++            publishNetworkObservation(route,ticket,editor::apply);
+         }catch(Exception ignored){
+-            RootProxyManager.publishObservation(ticket,()->prefs.edit().putString("proxyNetworkIntegrity","unknown").apply());
++            publishNetworkObservation(route,ticket,()->prefs.edit().putString("proxyNetworkIntegrity","unknown").apply());
+         }
+     }
+ 
+@@ -372,11 +417,14 @@ public final class ProxyNetworkMatchService extends Service {
+         if(destroyed||!prefs.getBoolean("proxyRootWanted",false))return;
+         final long ticket=RootProxyManager.observationTicket();
+         if(ticket<0L)return;
+-        Network network=cm==null?null:cm.getActiveNetwork();
+-        if(network==null)return;
+-        long now=android.os.SystemClock.elapsedRealtime();
+-        if(now-lastPolicyProbeAt<90000L)return;
+-        lastPolicyProbeAt=now;
++        final NetworkEpoch.Snapshot<Network> route;
++        synchronized(networkEvents){
++            route=networkEvents.snapshot();
++            if(route.network==null)return;
++            long now=android.os.SystemClock.elapsedRealtime();
++            if(now-lastPolicyProbeAt<90000L)return;
++            lastPolicyProbeAt=now;
++        }
+         int port=MihomoStartupConfig.egressProbePort(prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT));
+         String error=""; boolean success=false;
+         // Explicit loopback proxy; no DIRECT fallback, node switch, connection flush
+@@ -396,7 +444,7 @@ public final class ProxyNetworkMatchService extends Service {
+             finally{if(connection!=null)connection.disconnect();}
+         }
+         // Discard results from a completed stop or a network handover.
+-        if(destroyed||!prefs.getBoolean("proxyRootWanted",false)||!network.equals(cm.getActiveNetwork()))return;
++        if(destroyed||!prefs.getBoolean("proxyRootWanted",false)||!networkEvents.isCurrent(route))return;
+         if(error.length()>260)error=error.substring(0,260);
+         SharedPreferences.Editor edit=prefs.edit()
+                 .putString("proxyPolicyEgressState",success?"reachable":"unverified")
+@@ -408,7 +456,7 @@ public final class ProxyNetworkMatchService extends Service {
+             edit.putBoolean("proxyRootEgressPending",true).putString("proxyRootEgressProbeLastError",error)
+                     .putString("proxyRootEgressWarning","按规则出口暂未验证通过；未重启核心、未改节点："+error);
+         }
+-        RootProxyManager.publishObservation(ticket,edit::apply);
++        publishNetworkObservation(route,ticket,edit::apply);
+     }
+ 
+     private void updateAdblockMetrics(){
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
+index dfae79b..887faf4 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
+@@ -492,10 +492,15 @@ final class RootProxyManager {
+         }finally{CONTROL_LOCK.unlock();}
+     }
+     JSONObject startIfWanted(ProxyRuntimeProfile profile)throws Exception{
++        return startIfWanted(profile,()->true);
++    }
++    JSONObject startIfWanted(ProxyRuntimeProfile profile,java.util.function.BooleanSupplier currentNetwork)throws Exception{
+         if(!CONTROL_LOCK.tryLock())return new JSONObject().put("ok",true).put("cancelled",true).put("reason","control-busy");
+         try{
+             if(!prefs.getBoolean("proxyRootWanted",false))
+                 return new JSONObject().put("ok",true).put("running",false).put("cancelled",true);
++            if(!currentNetwork.getAsBoolean())
++                return new JSONObject().put("ok",true).put("running",false).put("cancelled",true).put("reason","network-changed");
+             return startInternal(profile,null,false);
+         }finally{CONTROL_LOCK.unlock();}
+     }
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootHealthUpgradeTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootHealthUpgradeTest.kt
+index 533aa35..5ca3c82 100644
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootHealthUpgradeTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootHealthUpgradeTest.kt
+@@ -109,4 +109,14 @@ class RootHealthUpgradeTest {
+         assertEquals(149, prefs.getInt("proxyRootAppliedRuntimeRevision", 0))
+         assertEquals("upgrade-required", prefs.getString("proxyNetworkIntegrity", ""))
+     }
++    @Test fun supersededRecoveryCannotRunRootCommandsOrChangeDeployment() {
++        prefs.edit().putBoolean("proxyRootWanted", true).commit()
++        val result = worker { it.startIfWanted(ProxyRuntimeProfile.load(prefs)) { false } }
++        assertTrue(result.getBoolean("cancelled"))
++        assertEquals("network-changed", result.getString("reason"))
++        assertTrue(HealthUpgradeBridgeShadow.commands.isEmpty())
++        assertTrue(prefs.getBoolean("proxyRootWanted", false))
++        assertEquals(149, prefs.getInt("proxyRootAppliedRuntimeRevision", 0))
++        assertTrue(prefs.getBoolean("proxyRootAutoStart", false))
++    }
+ }
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootNetworkRecoveryTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootNetworkRecoveryTest.kt
+new file mode 100644
+index 0000000..f66f18c
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootNetworkRecoveryTest.kt
+@@ -0,0 +1,161 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import android.content.Context
++import android.net.ConnectivityManager
++import android.net.LinkProperties
++import android.net.Network
++import android.net.NetworkCapabilities
++import androidx.test.core.app.ApplicationProvider
++import org.junit.After
++import org.junit.Assert.*
++import org.junit.Before
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.Robolectric
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.android.controller.ServiceController
++import org.robolectric.annotation.Config
++import org.robolectric.util.ReflectionHelpers
++import java.net.InetAddress
++import java.util.concurrent.ExecutorService
++
++/** Real service callbacks and publication fence, with all Root/HTTP workers stopped. */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], application = Application::class)
++class RootNetworkRecoveryTest {
++    private lateinit var controller: ServiceController<ProxyNetworkMatchService>
++    private lateinit var service: ProxyNetworkMatchService
++    private lateinit var callback: ConnectivityManager.NetworkCallback
++    private lateinit var epochs: NetworkEpoch<Network>
++    private var destroyed = false
++    private val app get() = ApplicationProvider.getApplicationContext<Application>()
++    private val prefs get() = app.getSharedPreferences("hetu", Context.MODE_PRIVATE)
++    private val a = Network(101)
++    private val b = Network(102)
++
++    @Before fun prepare() {
++        prefs.edit().clear().commit()
++        controller = Robolectric.buildService(ProxyNetworkMatchService::class.java).create()
++        service = controller.get()
++        ReflectionHelpers.getField<ExecutorService>(service, "metrics").shutdownNow()
++        ReflectionHelpers.getField<ExecutorService>(service, "worker").shutdownNow()
++        callback = ReflectionHelpers.getField(service, "cb")
++        epochs = ReflectionHelpers.getField(service, "networkEvents")
++        prefs.edit().putBoolean("proxyRootWanted", true).commit()
++    }
++    @After fun finish() { if (!destroyed) controller.destroy() }
++
++    private fun capabilities(validated: Boolean = false, captive: Boolean = false, physical: Boolean = true) =
++        NetworkCapabilities().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).apply {
++            if (physical) addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
++            else removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
++            if (validated) addCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
++            if (captive) addCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL)
++            addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
++        }
++    private fun links(dns: String = "192.0.2.53", name: String? = "wlan0") = LinkProperties().apply {
++        interfaceName = name
++        addDnsServer(InetAddress.getByName(dns))
++    }
++    private fun ready(n: Network = a) {
++        callback.onAvailable(n)
++        callback.onCapabilitiesChanged(n, capabilities())
++        callback.onLinkPropertiesChanged(n, links())
++    }
++    private fun publish(route: NetworkEpoch.Snapshot<Network>, ticket: Long = RootProxyManager.observationTicket()): Boolean =
++        service.publishNetworkObservation(route, ticket) {
++            prefs.edit().putString("proxyPolicyEgressState", "reachable").apply()
++        }
++
++    @Test fun waitsForCallbackLinksButDoesNotRequireOsValidation() {
++        callback.onAvailable(a)
++        callback.onCapabilitiesChanged(a, capabilities())
++        assertNull(epochs.snapshot().network)
++        callback.onLinkPropertiesChanged(a, links())
++        assertEquals(a, epochs.snapshot().network)
++        assertEquals("unverified", prefs.getString("proxyPhysicalNetworkState", ""))
++        assertTrue(publish(epochs.snapshot()))
++    }
++    @Test fun blockedAndUnblockedInvalidateInFlightResults() {
++        ready(); val old = epochs.snapshot()
++        callback.onBlockedStatusChanged(a, true)
++        assertEquals("blocked", epochs.snapshot().status)
++        assertNull(epochs.snapshot().network); assertFalse(publish(old))
++        callback.onBlockedStatusChanged(a, false)
++        assertEquals(a, epochs.snapshot().network); assertFalse(publish(old))
++    }
++    @Test fun captivePortalWaitsThenUnvalidatedNetworkCanRecover() {
++        ready(); val old = epochs.snapshot()
++        callback.onCapabilitiesChanged(a, capabilities(captive = true))
++        assertNull(epochs.snapshot().network)
++        assertEquals("captive", prefs.getString("proxyPhysicalNetworkState", ""))
++        callback.onCapabilitiesChanged(a, capabilities())
++        assertEquals(a, epochs.snapshot().network); assertFalse(publish(old))
++    }
++    @Test fun sameNetworkIdAfterAtoBtoARejectsOldPublication() {
++        ready(a); val old = epochs.snapshot()
++        ready(b); ready(a)
++        assertEquals(old.network, epochs.snapshot().network)
++        assertFalse(publish(old))
++        assertEquals("unverified", prefs.getString("proxyPolicyEgressState", ""))
++    }
++    @Test fun lateOldLossCapabilitiesLinksAndBlockedCannotClearCurrentNetwork() {
++        ready(a); ready(b); val current = epochs.snapshot()
++        callback.onLost(a)
++        callback.onCapabilitiesChanged(a, capabilities(captive = true))
++        callback.onLinkPropertiesChanged(a, links("192.0.2.99"))
++        callback.onBlockedStatusChanged(a, true)
++        assertSame(current, epochs.snapshot()); assertTrue(publish(current))
++    }
++    @Test fun sameNetworkDnsChangeInvalidatesReachabilityAndPendingResult() {
++        ready(); val old = epochs.snapshot(); assertTrue(publish(old))
++        callback.onLinkPropertiesChanged(a, links("192.0.2.54"))
++        assertFalse(publish(old))
++        assertEquals("unverified", prefs.getString("proxyPolicyEgressState", ""))
++        assertEquals(0L, prefs.getLong("proxyPolicyEgressCheckedAt", -1))
++        assertTrue(prefs.getBoolean("proxyRootEgressPending", false))
++    }
++    @Test fun duplicateCallbacksDoNotInvalidateCurrentResult() {
++        ready(); val current = epochs.snapshot()
++        repeat(1000) {
++            callback.onAvailable(a)
++            callback.onCapabilitiesChanged(a, capabilities())
++            callback.onLinkPropertiesChanged(a, links())
++        }
++        assertSame(current, epochs.snapshot()); assertTrue(publish(current))
++    }
++    @Test fun missingInterfaceAndLossWaitWithoutInventingReachability() {
++        callback.onAvailable(a); callback.onCapabilitiesChanged(a, capabilities())
++        callback.onLinkPropertiesChanged(a, links(name = null))
++        assertNull(epochs.snapshot().network)
++        ready(); val old = epochs.snapshot(); callback.onLost(a)
++        assertEquals("offline", epochs.snapshot().status); assertFalse(publish(old))
++    }
++    @Test fun manualStopIntentRejectsCurrentObservation() {
++        ready(); prefs.edit().putBoolean("proxyRootWanted", false).commit()
++        assertFalse(publish(epochs.snapshot()))
++    }
++    @Test fun interveningControlTransactionRejectsCurrentNetworkObservation() {
++        ready(); val ticket = RootProxyManager.observationTicket()
++        val control = ReflectionHelpers.getStaticField<ProxyControlEpoch>(RootProxyManager::class.java, "CONTROL_LOCK")
++        control.lock(); control.unlock()
++        assertFalse(publish(epochs.snapshot(), ticket))
++    }
++    @Test fun destroyedServiceCannotPublishOrAcceptFurtherCallbacks() {
++        ready(); val old = epochs.snapshot(); controller.destroy(); destroyed = true
++        val ended = epochs.snapshot(); callback.onAvailable(b)
++        assertSame(ended, epochs.snapshot()); assertFalse(publish(old))
++    }
++    @Test fun vpnCapabilitiesCannotTriggerRootRecovery() {
++        ready(); callback.onCapabilitiesChanged(a, capabilities(physical = false))
++        assertNull(epochs.snapshot().network)
++    }
++    @Test fun validationChangeOnSameNetworkInvalidatesPreviousObservation() {
++        ready(); val old = epochs.snapshot()
++        callback.onCapabilitiesChanged(a, capabilities(validated = true))
++        assertEquals(a, epochs.snapshot().network)
++        assertEquals("ready", prefs.getString("proxyPhysicalNetworkState", ""))
++        assertFalse(publish(old)); assertTrue(publish(epochs.snapshot()))
++    }
++}
