@@ -166,7 +166,7 @@ def web_expect(port,label,name,required=None):
    value=web_command(port)
    if label not in value.get('text','') or not all(value.get(k)==v for k,v in (required or {}).items()):continue
    (OUT/(name+'.dom.json')).write_text(json.dumps(value,ensure_ascii=False,indent=2))
-   save_png(name)
+   capture(name) # Wait for the native accessibility/UI idle snapshot before screencap.
    checks.append({'name':name,'result':'passed','evidence':'actual Android WebView DOM + native adb screenshot'})
    return
   time.sleep(1)
@@ -181,7 +181,24 @@ def verify_distinct_webview_frames(output):
  assert len(set(frame_hashes.values()))==5,('Stale duplicate native frames',frame_hashes)
 
 def web_click(port,label):
- assert web_command(port,'click',label).get('clicked')==label
+ # CDP is read-only here: resolve layout, then send the same native input path
+ # used by other installed-APK checks. JS click() can precede surface painting.
+ target=web_command(port,'locate',label)
+ assert target.get('located')==label,target
+ root,_=ui()
+ views=[n for n in root.iter('node') if n.get('class')=='android.webkit.WebView' and n.get('package')==PKG]
+ assert len(views)==1,('Expected one actual WebView',len(views))
+ x1,y1,x2,y2=map(int,re.findall(r'\d+',views[0].get('bounds','')))
+ width,height=target['viewportWidth'],target['viewportHeight']
+ assert width>0 and height>0 and x2>x1 and y2>y1,target
+ assert 0<target['x']<width and 0<target['y']<height,('Offscreen button',target)
+ x=round(x1+target['x']*(x2-x1)/width);y=round(y1+target['y']*(y2-y1)/height)
+ assert x1<x<x2 and y1<y<y2,('Tap outside WebView',x,y)
+ proof=OUT/'native-webview-input.json'
+ entries=json.loads(proof.read_text()) if proof.exists() else []
+ entries.append({'label':label,'webview_bounds':[x1,y1,x2,y2],'viewport':[width,height],'tap':[x,y],'input':'native adb tap'})
+ proof.write_text(json.dumps(entries,ensure_ascii=False,indent=2))
+ adb('shell','input','tap',str(x),str(y));time.sleep(2)
 
 def palette_preferences(original,accent,palette,appearance,monet=False):
  # Only a fresh disposable emulator fixture is edited. Preserve unrelated keys.
@@ -315,6 +332,9 @@ def main():
  click('关于',scroll=True);expect('内置核心','05-about')
  adb('shell','input','keyevent','4');time.sleep(2)
  click('工具',bottom=True);click('诊断工具',scroll=True)
+ expect('网络事件记录','network-events-entry')
+ click('网络事件记录',scroll=True);expect_eventually('尚无网络事件记录','network-events-without-root')
+ adb('shell','input','keyevent','4');time.sleep(2)
  expect('修复运行记录','safe-session-repair-entry')
  click('修复运行记录',scroll=True);expect_eventually('无法取得 Root 权限','safe-session-repair-root-denial')
  adb('shell','input','keyevent','4');time.sleep(2)

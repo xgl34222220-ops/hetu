@@ -1,3 +1,11 @@
+## 当前续接：V20.78 网络诊断（本轮 CI 待完成）
+
+仍使用 `test/v20.75-theme-compat`，从 V20.76 成功有效源码接续，不重放 UI 迁移，不开重复分支/实现。V20.77 应用 6a94d872 首轮测试夹具隐藏 API 编译失败；34ba4778 修正后实际 292 单测、lint、载荷/签名/ABI 通过，Actions 37160754265 的 API35/36 均在原生 WebView 截图重复门禁失败，不能称完整通过。所有证据保留在 docs/V20.77_NETWORK_RECOVERY.md。
+
+V20.78 在相同补丁链追加 `updates/v2078-network-traces/runtime.patch`；2078 / 0.12.8-v20，Root 151、原 native/core/service.d、固定证书不变。先修安装测试同步（CDP 只读定位 + 实际 AOSP 原生点击 + 原生 UI 快照后截图），保留五截图唯一性和原门禁。新增网络事件 noBackup 追加分段、错误 UUID/网络代次/原因类型、每固定出口目标结果及 stale-result、独立无 Root 报告入口；旧分段不自动删除。写盘/队列失败报告缺口，不能改变健康或 wanted。完整 CI 预计311选中单测、60 shell、全部原载荷/ABI/lint/签名与API35/36各52安装检查，结果须待当轮核实，旧76/75结果不计为本轮通过。
+
+参考源码、文档和许可证已核对，见 docs/V20.78_NETWORK_TRACES.md；只借鉴设计，沿用原 UI，不引入 hook 或新安全敏感权限。Google 可达独立于 session baseline、规则、DNS 与守护完整性。用户手机间歇断网仍未确认；禁止操作用户设备/网络/安全设置、扩大 Root/KVM/SELinux 权限、合并主分支、正式发布部署或永久删除用户数据。继续现有失败优先，缺相应真机的项继续明确列为未验证。
+
 ## 当前测试交付：V20.76 安全运行记录修复与过滤导出
 
 继续 `test/v20.75-theme-compat` 的已交付 V20.75（分支原 HEAD 069a7ed），不创建重复分支，不合并主分支，不发布或部署。追加 `updates/v2076-session-filter/runtime.patch`，versionCode 2076 / 0.12.6-v20，Root runtime 151；21 个原 native/core 与 service.d 载荷、固定签名保持。最新用户禁止操作手机或修改其网络、安全设置，测试仅限已有授权的隔离 shell/JVM/AOSP 环境。
