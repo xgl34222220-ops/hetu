@@ -62,7 +62,7 @@ jobs:
     - name: Apply and test scripts and native boot fixes
       run: 'set -euo pipefail
 
-        echo ''64b39aa3cc905f6e22c7172ad9ccf291741cc9590d3411df08850e33a1634a05  updates/v2073-scripts-boot/runtime.patch''
+        echo ''7cd643458c7bfa0b32c776a02f45c1e9de907bc11803203974768de96351b0ad  updates/v2073-scripts-boot/runtime.patch''
         | sha256sum -c -
 
         git apply --check updates/v2073-scripts-boot/runtime.patch
@@ -162,7 +162,7 @@ jobs:
         --stacktrace
       working-directory: android-app
     - name: Consolidate native and browser state evidence
-      run: python3 tools/qa/consolidate_concept_coverage.py --repo . --expected-tests 256 --browser-evidence out/verification/webui-browser
+      run: python3 tools/qa/consolidate_concept_coverage.py --repo . --expected-tests 258 --browser-evidence out/verification/webui-browser
         --browser-commit "$GITHUB_SHA"
     - if: always()
       name: Upload concept UI verification evidence

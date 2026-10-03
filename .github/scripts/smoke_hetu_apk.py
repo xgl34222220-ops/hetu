@@ -210,6 +210,7 @@ def main():
  click('面板',bottom=True);expect('代理未运行','02-panel-stopped')
  click('工具',bottom=True);expect('文件管理','03-tools')
  click('脚本',scroll=True);expect('服务启动前','scripts-entry');expect('服务停止后','scripts-stop')
+ expect('详情','scripts-root-error-details');click('详情');expect('复制诊断','scripts-root-error-expanded')
  click('脚本环境');expect('HETU_HOOK','scripts-environment')
  adb('shell','input','keyevent','4');time.sleep(2)
  click('更多');expect('导入自定义脚本','scripts-overflow')
