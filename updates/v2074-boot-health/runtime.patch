@@ -45,7 +45,7 @@ index 0389b1d..bdcf90d 100644
      private static final Set<String> RESTART_KEYS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
              "proxyBaseCore","proxyBaseMode","proxyBaseIpv6","proxyAppScope","proxyDnsHijack",
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt
-index daac6c8..22d88d6 100644
+index daac6c8..eba2ea8 100644
 --- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt
 @@ -35,8 +35,10 @@ class Runtime146ContractTest {
@@ -54,9 +54,9 @@ index daac6c8..22d88d6 100644
          val p = prefs()
 -        // V20.73 adds serialized native boot restore and per-boot stop cancellation.
 -        assertEquals(149, ProxyRuntimeSettings.RUNTIME_REVISION)
-+        // V20.74 must redeploy the corrected immutable session snapshot ordering.
++        // V20.74 deploys the corrected snapshot on the next explicit Start/Restart.
 +        assertEquals(150, ProxyRuntimeSettings.RUNTIME_REVISION)
-+        assertTrue(ProxyRuntimeSettings.runtimeUpgradePending(true, 149, true))
++        assertFalse(ProxyRuntimeSettings.runtimeUpgradePending(true, 149, true))
 +        assertFalse(ProxyRuntimeSettings.runtimeUpgradePending(true, 150, true))
          assertFalse(ProxyRuntimeSettings.runtimeUpgradePending(true, 492, true))
          assertFalse(ProxyRuntimeSettings.runtimeUpgradePending(true, p))

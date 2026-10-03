@@ -86,7 +86,7 @@ jobs:
     - name: Apply and regress boot session health fix
       run: 'set -euo pipefail
 
-        printf ''%s\n'' ''eaebd756f7997cc1aa2d9d6dec0ae4ec804ee915bf0803d812982c260bb5738b  updates/v2074-boot-health/runtime.patch''
+        printf ''%s\n'' ''6d880e466bbb1d9128307d888e169d926e9f03c5e1369ed8dd0ff91422a54fdf  updates/v2074-boot-health/runtime.patch''
         | sha256sum -c -
 
         git apply --check updates/v2074-boot-health/runtime.patch
