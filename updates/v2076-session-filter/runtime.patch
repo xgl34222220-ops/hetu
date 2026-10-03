@@ -14,7 +14,7 @@ index 9ca7eb2..a4edadf 100644
  
      // Explicit CI debug identity. No private key is committed or exported.
 diff --git a/android-app/app/src/main/assets/hetu-root.sh b/android-app/app/src/main/assets/hetu-root.sh
-index 67c3395..3195b3a 100755
+index 67c3395..e447597 100755
 --- a/android-app/app/src/main/assets/hetu-root.sh
 +++ b/android-app/app/src/main/assets/hetu-root.sh
 @@ -1228,14 +1228,46 @@ health_record(){ (
@@ -108,7 +108,7 @@ index 67c3395..3195b3a 100755
      fi
    fi
    H_MODE=$(sed -n 's/^MODE=//p' "$SESSION")
-@@ -1290,7 +1327,35 @@ health_collect(){
+@@ -1290,7 +1327,40 @@ health_collect(){
    fi
    # Never mutate after an incomplete observation, even if another check failed.
    [ "$H_UNKNOWN" = 0 ] || H_STATE=unknown
@@ -116,7 +116,12 @@ index 67c3395..3195b3a 100755
  }
 +health_repair_session(){ (
 +  root; acquire_lock || { printf '{"ok":false,"message":"运行事务正在执行，请稍后重试"}\n'; exit 0; }
-+  H_TMP="$RUN/network-manifest.tail-new.$$"; H_BACKUP="$RUN/network-manifest.pre-tail.$$"
++  H_N=0
++  while :; do
++    H_TMP="$RUN/network-manifest.tail-new.$$.$H_N"; H_BACKUP="$RUN/network-manifest.pre-tail.$$.$H_N"
++    [ -e "$H_TMP" ] || [ -e "$H_BACKUP" ] || break
++    H_N=$((H_N+1)); [ "$H_N" -lt 100 ] || exit 1
++  done
 +  H_MOVED=0
 +  trap '[ "$H_MOVED" != 1 ] || [ -d "$RUN/network-manifest" ] || mv "$H_BACKUP" "$RUN/network-manifest"; rm -rf "$H_TMP"; release_lock' EXIT
 +  health_collect
@@ -144,7 +149,7 @@ index 67c3395..3195b3a 100755
  health_restore_table(){
    H_E="$1"; H_KEY=${H_E##*/}; H_F=${H_KEY%%-*}; H_T=${H_KEY#*-}
    H_RAW=$("xt${H_F}q" -t "$H_T" -S 2>/dev/null) || return 1
-@@ -1353,7 +1418,7 @@ health_repair(){ (
+@@ -1353,7 +1423,7 @@ health_repair(){ (
    pidcore "$H_PID" && kill -0 "$H_PID" 2>/dev/null || exit 0
    # Missing metadata or listeners cannot safely be reconstructed from preferences.
    # Keep the core and its existing connections; report instead of restart-looping.
@@ -153,7 +158,7 @@ index 67c3395..3195b3a 100755
    printf '%s\n' "$H_NOW" > "$RUN/network-repair-at"
    printf '%s pid=%s before=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$H_PID" "$H_REASON" >> "$RUN/network-repair.log"
    if [ -s "$RUN/network-manifest/net" ]; then
-@@ -1383,10 +1448,11 @@ health_json(){ (
+@@ -1383,10 +1453,11 @@ health_json(){ (
    root; health_collect
    H_DNS6=$(sed -n 's/^DNS6_POLICY=//p' "$SESSION" 2>/dev/null || true)
    case "$H_DNS6" in redirect|blocked-no-nat|blocked-no-redirect|off|core) ;; *) H_DNS6=unknown;; esac
@@ -276,7 +281,7 @@ index 856bc49..17eab36 100644
          try(FileOutputStream raw=new FileOutputStream(temp,false);
              OutputStreamWriter writer=new OutputStreamWriter(raw,StandardCharsets.UTF_8);
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
-index 73fc48d..90bdf1e 100644
+index 73fc48d..c5d8184 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
 @@ -255,6 +255,8 @@ internal class ProxyComposeController(context: Context) {
@@ -284,7 +289,7 @@ index 73fc48d..90bdf1e 100644
                  startupGrace && (status.optBoolean("healthProbeFailed", false) || !status.optBoolean("dataPlaneHealthy", false)) -> ""
                  status.optBoolean("healthProbeFailed", false) -> userSafeRuntimeMessage(status.optString("message", ""))
 +                status.optBoolean("baselineRepairAvailable", false) ->
-+                    "旧版运行记录需要校正，可在工具中修复运行记录；当前规则已核对"
++                    "旧版运行记录需要校正，可在工具→诊断工具中修复运行记录；当前规则已核对"
                  !status.optBoolean("dataPlaneHealthy", false) ->
                      "核心仍在运行，但透明代理/DNS 数据面健康检查未完整通过"
                  else -> ""
@@ -329,7 +334,7 @@ index f877b2a..26f1713 100644
                      context.startActivity(Intent(context, ProxyAppSelectionActivity::class.java))
                  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-index 47fe938..569dd7c 100644
+index 47fe938..80f4c2b 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 @@ -22,11 +22,13 @@ final class RootProxyManager {
@@ -346,7 +351,7 @@ index 47fe938..569dd7c 100644
      static long observationTicket(){return CONTROL_LOCK.observe();}
      static boolean publishObservation(long ticket,Runnable publish){return CONTROL_LOCK.publish(ticket,publish);}
      private final Context context;
-@@ -877,12 +879,51 @@ final class RootProxyManager {
+@@ -877,12 +879,53 @@ final class RootProxyManager {
      }
  
      JSONObject networkHealth()throws Exception{
@@ -363,6 +368,8 @@ index 47fe938..569dd7c 100644
 +            prefs.edit().putString("proxyNetworkIntegrity",checked.optString("networkIntegrity","unknown"))
 +                    .putString("proxyNetworkFault",checked.optString("networkFault",""))
 +                    .putLong("proxyNetworkCheckedAt",System.currentTimeMillis()).apply();
++            if(!checked.optBoolean("dataPlaneHealthy",false))result.put("message",result.optString("message")
++                    +"；网络核验仍未通过："+checked.optString("networkFault","unknown"));
 +            return result;
 +        }finally{CONTROL_LOCK.unlock();}
 +    }
@@ -400,7 +407,7 @@ index 47fe938..569dd7c 100644
          int livePort=liveControllerPort(state);
          if(livePort>0&&prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT)!=livePort){
              prefs.edit().putInt("proxyControllerPort",livePort).apply();
-@@ -969,6 +1010,8 @@ final class RootProxyManager {
+@@ -969,6 +1012,8 @@ final class RootProxyManager {
              report.section("网络完整性（不等同于外部网站可达）",networkHealth().toString(),2500);
              RootBridge.Result repairs=RootBridge.rootShell(context,"tail -n 30 "+RootBridge.quote(ROOT+"/run/network-repair.log")+" 2>/dev/null; true",3000L);
              report.section("网络原位修复记录",repairs.output,5000);
@@ -409,12 +416,13 @@ index 47fe938..569dd7c 100644
              RootBridge.Result google=RootBridge.rootShell(context,"cat "+RootBridge.quote(ROOT+"/run/google-firewall-status")
                      +" 2>/dev/null; tail -n 30 "+RootBridge.quote(ROOT+"/run/google-firewall.log")+" 2>/dev/null; true",3000L);
              report.section("Google 服务防火墙修复",google.output,5000);
-@@ -1244,12 +1287,17 @@ final class RootProxyManager {
+@@ -1243,13 +1288,17 @@ final class RootProxyManager {
+                     .append(" ] || [ \"$(sha256sum ").append(RootBridge.quote(allowDst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
                      .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblockAllow))).append(" ]; then")
                      .append(" cp ").append(RootBridge.quote(adblock.getAbsolutePath())).append(' ').append(RootBridge.quote(tmp))
-                     .append("; chmod 600 ").append(RootBridge.quote(tmp)).append("; chown 0:0 ").append(RootBridge.quote(tmp))
+-                    .append("; chmod 600 ").append(RootBridge.quote(tmp)).append("; chown 0:0 ").append(RootBridge.quote(tmp))
 -                    .append("; mv -f ").append(RootBridge.quote(tmp)).append(' ').append(RootBridge.quote(dst));
-+                    ;
++                    .append("; chmod 600 ").append(RootBridge.quote(tmp)).append("; chown 0:0 ").append(RootBridge.quote(tmp));
              if(adblockAllow!=null){
                  cmd.append("; cp ").append(RootBridge.quote(adblockAllow.getAbsolutePath())).append(' ').append(RootBridge.quote(allowTmp))
                          .append("; chmod 600 ").append(RootBridge.quote(allowTmp)).append("; chown 0:0 ").append(RootBridge.quote(allowTmp))
@@ -429,6 +437,25 @@ index 47fe938..569dd7c 100644
              cmd.append("; printf %s ").append(RootBridge.quote(p.adblock.revision)).append(" > ").append(RootBridge.quote(revisionFile))
                      .append("; chmod 600 ").append(RootBridge.quote(revisionFile)).append("; chown 0:0 ").append(RootBridge.quote(revisionFile))
                      .append("; fi");
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
+index 6161312..d238299 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
+@@ -959,6 +959,14 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+                         iconTint = c.textMuted,
+                         onClick = { task("diag") { sheet = "消息与网络诊断" to vm.controller.diagnostics() } },
+                     ) { if (busy == "diag") HxSpinner(16.dp) else HxChevron() }
++                    SettingsDivider()
++                    SettingsRow(
++                        "修复运行记录",
++                        subtitle = "核对原会话基线、规则、DNS 与守护进程；保留现有连接",
++                        icon = Icons.Rounded.HealthAndSafety,
++                        iconTint = c.textMuted,
++                        onClick = { task("session-record") { sheet = "修复运行记录" to vm.controller.repairSessionRecord() } },
++                    ) { if (busy == "session-record") HxSpinner(16.dp) else HxChevron() }
+                 }
+             }
+         }
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/CustomPaletteCompatibilityTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/CustomPaletteCompatibilityTest.kt
 index ead341c..cc9d24c 100644
 --- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/CustomPaletteCompatibilityTest.kt
@@ -583,7 +610,7 @@ index 0000000..d7a3015
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootHealthUpgradeTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootHealthUpgradeTest.kt
 new file mode 100644
-index 0000000..491a308
+index 0000000..bc50d8b
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootHealthUpgradeTest.kt
 @@ -0,0 +1,101 @@
@@ -681,7 +708,7 @@ index 0000000..491a308
 +    }
 +    @Test fun metadataRepairDoesNotClaimRuntimeUpgradeOrHideSubsequentFaults() {
 +        HealthUpgradeBridgeShadow.allowRepair = true
-+        worker { it.repairSessionRecord() }
++        assertTrue(worker { it.repairSessionRecord() }.getString("message").contains("listener-11053-udp"))
 +        assertEquals(149, prefs.getInt("proxyRootAppliedRuntimeRevision", 0)); assertTrue(prefs.getBoolean("proxyRootAutoStart", false))
 +        assertEquals("degraded", prefs.getString("proxyNetworkIntegrity", ""))
 +        assertEquals("listener-11053-udp", prefs.getString("proxyNetworkFault", ""))

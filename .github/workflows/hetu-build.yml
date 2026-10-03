@@ -119,7 +119,7 @@ jobs:
 
         cp android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockRules.java out/before-filter-export/ProxyAdblockRules.java
 
-        printf ''%s\n'' ''c890d5932f4ae7fe057a9c38daac90cbfe58f311819872a7d576e9ec7133835e  updates/v2076-session-filter/runtime.patch'' | sha256sum -c
+        printf ''%s\n'' ''25aceb7beced5b12e3b6711fc54a0d6d5dda901c534a0bfbec1c9a7fab684c1e  updates/v2076-session-filter/runtime.patch'' | sha256sum -c
         -
 
         git apply --check updates/v2076-session-filter/runtime.patch
@@ -136,7 +136,7 @@ jobs:
 
         python3 tools/qa/test_root_autostart.py 2>&1 | tee out/verification/root-autostart-tests.txt
 
-        python3 .github/scripts/verify_packaged_runtime.py snapshot --script-sha256 5eb7f1d1478eac053b34b830ae122d3eae0eebcad5f0777f8e7ac57c37c3f5e6 --autostart-sha256
+        python3 .github/scripts/verify_packaged_runtime.py snapshot --script-sha256 6b59cc14c687f067ab942d0b4855fcdde6183a874275e1acda6105cbfff0a16b --autostart-sha256
         3a1215f4e9093ae2298803020d697da0c14c35ee5cf28f84f2a81608093783f9
 
         '

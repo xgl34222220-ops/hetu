@@ -93,6 +93,7 @@ class RootHealth(unittest.TestCase):
                       'NET_STATE="$RUN/net"; LOG="$RUN/core.log"; LOCK_DIR="$RUN/lock"; '
                       'START_STATE="$RUN/stage"; START_ERROR="$RUN/error"; START_TIMING="$RUN/timing"; '
                       'CRASH_STATE="$RUN/crash"; WATCHDOG_PID="$RUN/watchdog"\n'
+                      'root(){ :; } # Fixture authorization only; no host elevation.\n'
                       'has(){ [ "$1" != ip6tables ]; }\n'
                       'xt4(){ '+shlex.quote(sys.executable)+' '+shlex.quote(str(self.mock))+' xt4 "$@"; }\n'
                       'xt4q(){ xt4 "$@"; }; xt6(){ return 1; }; xt6q(){ return 1; }\n'
@@ -258,6 +259,20 @@ class RootHealth(unittest.TestCase):
     def test_transaction_in_progress_is_unknown_and_read_only(self):
         self.start(); (self.run/'lock').mkdir()
         self.assertEqual('unknown:transaction-in-progress',self.health()); self.assert_read_only()
+
+    def test_production_entry_refuses_an_unauthorized_root_identity(self):
+        self.legacy()
+        guard=next(line for line in PREFIX.splitlines() if line.startswith('root(){'))
+        result=json.loads(self.shell(guard+'\nid(){ echo 10001; }\nhealth_repair_session',expected_code=1))
+        self.assertFalse(result['ok']); self.assertIn('Root',result['message']); self.assert_read_only()
+
+    def test_reused_shell_pid_cannot_overwrite_an_older_repair_backup(self):
+        self.legacy()
+        body='mkdir "$RUN/network-manifest.pre-tail.$$.0"; echo sentinel > "$RUN/network-manifest.pre-tail.$$.0/session"; health_repair_session'
+        self.assertTrue(json.loads(self.shell(body))['ok'])
+        backups=list(self.run.glob('network-manifest.pre-tail.*'))
+        self.assertEqual(2,len(backups))
+        self.assertEqual(1,sum((p/'session').read_text()=='sentinel\n' for p in backups)); self.assert_read_only()
 
     def test_real_start_google_disabled_has_complete_healthy_baseline(self):
         self.assertTrue(json.loads(self.start())['ok'])
