@@ -73,6 +73,26 @@ def expect(label,name):
  root=capture(name);assert any(label in n.get('text','') or label in n.get('content-desc','') for n in root.iter('node')),(label,name)
  checks.append({'name':name,'result':'passed'})
 
+def switch_node(root,label):
+ parents={child:parent for parent in root.iter() for child in parent}
+ titles=[n for n in root.iter('node') if n.get('text')==label]
+ assert len(titles)==1,('Expected one switch label',label,len(titles))
+ row=titles[0]
+ while row in parents:
+  row=parents[row]
+  switches=[n for n in row.iter('node') if n.get('checkable')=='true' and n.get('clickable')=='true']
+  if switches:
+   assert len(switches)==1,('Ambiguous switch row',label)
+   return switches[0]
+ raise AssertionError('No accessible switch for '+label)
+
+def click_switch(label):
+ root,_=ui();node=switch_node(root,label)
+ assert node.get('enabled')=='true' and node.get('checked')=='false',node.attrib
+ x1,y1,x2,y2=map(int,re.findall(r'\d+',node.get('bounds','')))
+ assert x2>x1 and y2>y1,node.attrib
+ adb('shell','input','tap',str((x1+x2)//2),str((y1+y2)//2));time.sleep(2)
+
 def expect_eventually(label,name):
  deadline=time.monotonic()+120
  while time.monotonic()<deadline:
@@ -80,7 +100,7 @@ def expect_eventually(label,name):
   if any(label in n.get('text','') or label in n.get('content-desc','') for n in root.iter('node')):
    expect(label,name);return
   time.sleep(2)
- raise AssertionError('Timed out waiting for native WebView label: '+label)
+ raise AssertionError('Timed out waiting for accessibility label: '+label)
 
 def wait_for_home():
  # Software-emulated AOSP may present its own first-boot System UI ANR.
@@ -223,7 +243,8 @@ def main():
 
  click('设置',bottom=True);expect('基础代理配置','04-settings')
  click('开机启动与下载',scroll=True);expect('开机自启','boot-settings')
- click('开机自启');expect_eventually('无法取得 Root 权限','boot-root-denial-visible')
+ click_switch('开机自启');expect_eventually('无法取得 Root 权限','boot-root-denial-visible')
+ root,_=ui();assert switch_node(root,'开机自启').get('checked')=='false','Root denial left switch enabled'
  raw=adb('shell','run-as',PKG,'cat','shared_prefs/hetu.xml')
  prefs=ET.fromstring(raw)
  assert not any(n.get('name')=='proxyRootAutoStart' and n.get('value')=='true' for n in prefs),'Failed setup was falsely saved as enabled'
