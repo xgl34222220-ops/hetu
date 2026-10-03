@@ -1,3 +1,11 @@
+## 当前修订：V20.74 开机运行健康基线修复
+
+沿用已交付 V20.73 底座与固定签名，追加 `updates/v2074-boot-health/runtime.patch`，构建用 `.github/workflows/hetu-build.yml`。versionCode 2074，versionName 0.12.4-v20，Root runtime 150。全部界面与功能、21 个原始 native/core 载荷、service.d 自启实现保持。
+
+确认并复现启动顺序错误：`health_record` 复制 session 后才追加 `GOOGLE_FIREWALL_CLEAN`，导致完整性快照始终不匹配、状态返回 `upgrade-required/session-manifest-missing`，并跳过仅处理 degraded 的自动修复。先完成 session 再保存快照；写入失败停止启动。不能用核心 PID 或远程测速结果替代健康检查，不能清空系统防火墙。Google 超时本身不等于已确认 OEM 防火墙拦截。
+
+本地实际 shell 11 项健康/修复、17 项开机、17 项 Google 清理夹具通过；构建、APK 身份及 Android 安装回归结果待 CI 完成再记入 `docs/V20.74_BOOT_HEALTH.md`。无用户手机 Root 重启验收。
+
 ## 当前交付：V20.73 脚本与开机自启修复
 
 以已验证 V20.71 有效源码、V20.72 补丁及 `updates/v2073-scripts-boot/runtime.patch` 为底座，使用 `.github/workflows/hetu-build.yml`；不重放历史 UI 覆盖。应用提交 `1321b2d6fddf8abae82c9bf98483ba58c33748d4`，versionCode 2073，versionName 0.12.3-v20，Root runtime 149。用户本轮要求修复运行问题，Root 开机脚本与运行层修复见 `docs/V20.73_SCRIPTS_BOOT.md`，不沿用下文历史“后端未改”作为本版描述。

@@ -1,10 +1,10 @@
-# Pinned V20.71 effective source, verified V20.72 patch, reviewed V20.73 fixes.
-name: Hetu V20.73 scripts and boot fixes
+# Verified V20.71 source + pinned V20.72/V20.73 patches + minimal V20.74 fix.
+name: Hetu V20.74 boot health fix
 permissions:
   contents: read
   actions: read
 concurrency:
-  group: hetu-v2073-${{ github.ref }}
+  group: hetu-v2074-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   build:
@@ -83,6 +83,26 @@ jobs:
         --autostart-sha256 3a1215f4e9093ae2298803020d697da0c14c35ee5cf28f84f2a81608093783f9
 
         '
+    - name: Apply and regress boot session health fix
+      run: 'set -euo pipefail
+
+        printf ''%s\n'' ''eaebd756f7997cc1aa2d9d6dec0ae4ec804ee915bf0803d812982c260bb5738b  updates/v2074-boot-health/runtime.patch''
+        | sha256sum -c -
+
+        git apply --check updates/v2074-boot-health/runtime.patch
+
+        git apply updates/v2074-boot-health/runtime.patch
+
+        grep -q ''versionCode = 2074'' android-app/app/build.gradle.kts
+
+        sh -n android-app/app/src/main/assets/hetu-root.sh
+
+        python3 tools/qa/test_root_health.py 2>&1 | tee out/verification/root-health-tests.txt
+
+        python3 .github/scripts/verify_packaged_runtime.py snapshot --script-sha256 9ba3f0f2add7094c9759b0c525ba9d327f1a7f6e6d65ad3c01decf435fd4b7fb
+        --autostart-sha256 3a1215f4e9093ae2298803020d697da0c14c35ee5cf28f84f2a81608093783f9
+
+        '
     - name: Verify built-in WebUI behavior with controlled API fixtures
       run: node .github/scripts/test_webui_concept.cjs
     - name: Render built-in WebUI with isolated browser fixtures
@@ -123,20 +143,20 @@ jobs:
     - uses: gradle/actions/setup-gradle@v4
       with:
         gradle-version: 9.5.0
-    - name: Export effective V20.72 source
+    - name: Export effective V20.74 source
       run: 'set -euo pipefail
 
-        tar -czf /tmp/Hetu-V20.73-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+        tar -czf /tmp/Hetu-V20.74-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
 
-        sha256sum /tmp/Hetu-V20.73-effective-source.tar.gz
+        sha256sum /tmp/Hetu-V20.74-effective-source.tar.gz
 
         '
     - uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: error
-        name: Hetu-V20.73-effective-source
-        path: /tmp/Hetu-V20.73-effective-source.tar.gz
+        name: Hetu-V20.74-effective-source
+        path: /tmp/Hetu-V20.74-effective-source.tar.gz
     - name: Build APK
       run: gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:assembleDebug
         --stacktrace
@@ -169,7 +189,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         if-no-files-found: warn
-        name: Hetu-V20.73-UI-verification
+        name: Hetu-V20.74-UI-verification
         path: 'android-app/app/build/test-results/testDebugUnitTest/
 
           android-app/app/build/reports/tests/testDebugUnitTest/
@@ -200,7 +220,7 @@ jobs:
 
         head -3 out/apk-transfer/apk-metadata.txt
 
-        grep -q "versionCode=''2073'' versionName=''0.12.3-v20''" out/apk-transfer/apk-metadata.txt
+        grep -q "versionCode=''2074'' versionName=''0.12.4-v20''" out/apk-transfer/apk-metadata.txt
 
         "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs "$APK" > out/apk-transfer/apk-signature.txt
 
@@ -227,7 +247,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         if-no-files-found: error
-        name: Hetu-V20.73-APK-manifest
+        name: Hetu-V20.74-APK-manifest
         path: 'out/apk-transfer/manifest.json
 
           out/apk-transfer/apk-metadata.txt
@@ -240,42 +260,42 @@ jobs:
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.73-APK-part00
+        name: Hetu-V20.74-APK-part00
         path: out/apk-transfer/part00.bin
     - name: Upload APK transport part 01
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.73-APK-part01
+        name: Hetu-V20.74-APK-part01
         path: out/apk-transfer/part01.bin
     - name: Upload APK transport part 02
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.73-APK-part02
+        name: Hetu-V20.74-APK-part02
         path: out/apk-transfer/part02.bin
     - name: Upload APK transport part 03
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.73-APK-part03
+        name: Hetu-V20.74-APK-part03
         path: out/apk-transfer/part03.bin
     - name: Upload APK transport part 04
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.73-APK-part04
+        name: Hetu-V20.74-APK-part04
         path: out/apk-transfer/part04.bin
     - name: Upload APK transport part 05
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.73-APK-part05
+        name: Hetu-V20.74-APK-part05
         path: out/apk-transfer/part05.bin
   android-ui-smoke:
     needs: build
@@ -336,7 +356,7 @@ jobs:
         '
     - name: Run installed APK navigation and native WebView smoke
       env:
-        HETU_EXPECTED_VERSION: '2073'
+        HETU_EXPECTED_VERSION: '2074'
       run: 'set -euo pipefail
 
         mkdir -p out/android-smoke
@@ -358,7 +378,7 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: Hetu-V20.73-Android-${{ matrix.api }}-smoke
+        name: Hetu-V20.74-Android-${{ matrix.api }}-smoke
         path: out/android-smoke/
         if-no-files-found: warn
     strategy:
@@ -371,11 +391,13 @@ jobs:
 'on':
   push:
     branches:
-    - test/v20.73-scripts-boot
+    - test/v20.74-boot-health
     paths:
     - updates/v2073-scripts-boot/**
     - tools/qa/test_root_autostart.py
     - .github/workflows/hetu-build.yml
     - .github/scripts/smoke_hetu_apk.py
     - .github/scripts/verify_packaged_runtime.py
+    - updates/v2074-boot-health/**
+    - tools/qa/test_root_health.py
   workflow_dispatch: null

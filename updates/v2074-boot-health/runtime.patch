@@ -1,0 +1,63 @@
+diff --git a/android-app/app/build.gradle.kts b/android-app/app/build.gradle.kts
+index 10f3d03..60871b8 100644
+--- a/android-app/app/build.gradle.kts
++++ b/android-app/app/build.gradle.kts
+@@ -17,8 +17,8 @@ android {
+         applicationId = "io.github.xgl34222220.hetu"
+         minSdk = 26
+         targetSdk = 35
+-        versionCode = 2073
+-        versionName = "0.12.3-v20"
++        versionCode = 2074
++        versionName = "0.12.4-v20"
+     }
+ 
+     // Explicit CI debug identity. No private key is committed or exported.
+diff --git a/android-app/app/src/main/assets/hetu-root.sh b/android-app/app/src/main/assets/hetu-root.sh
+index c81f2fd..67c3395 100755
+--- a/android-app/app/src/main/assets/hetu-root.sh
++++ b/android-app/app/src/main/assets/hetu-root.sh
+@@ -1037,10 +1037,12 @@ start(){
+   if [ "$START_V6" = disable ] && v6supported && [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ] && [ "$START_DNS" != off ]; then
+     install_disabled_dns6 || { cleanup; stopcore; rm -f "$SESSION"; fail "IPv6 DNS 防泄漏安装失败，未放行直连 DNS"; }
+   fi
++  # Finish the immutable session before its integrity snapshot. Updating it after
++  # health_record would invalidate every status check and disable owned-rule repair.
++  printf 'GOOGLE_FIREWALL_CLEAN=%s\n' "$START_VENDOR_CLEAN" >> "$SESSION" || { cleanup; stopcore; rm -f "$SESSION"; fail "无法记录 Google 防火墙设置，已停止本次启动"; }
+   # Record exactly what this session installed, not mutable app preferences.
+   health_record || { cleanup; stopcore; rm -f "$SESSION"; fail "无法记录网络完整性基线，已停止本次启动"; }
+   start_stage "start-watchdog"
+-  printf 'GOOGLE_FIREWALL_CLEAN=%s\n' "$START_VENDOR_CLEAN" >> "$SESSION"
+   rm -f "$RUN/google-firewall-at"
+   if [ "$START_VENDOR_CLEAN" = 1 ]; then google_firewall_cleanup; fi
+   start_watchdog "$START_PID" "$START_KILL" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS"
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java
+index 0389b1d..bdcf90d 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java
+@@ -9,7 +9,7 @@ import java.util.*;
+ final class ProxyRuntimeSettings {
+     static final String DIRTY_KEY = "proxyRootSettingsDirty";
+     // Bump only when deployed Root scripts/core behavior changes, never for UI-only APKs.
+-    static final int RUNTIME_REVISION = 149;
++    static final int RUNTIME_REVISION = 150;
+     static final String APPLIED_RUNTIME_REVISION_KEY = "proxyRootAppliedRuntimeRevision";
+     private static final Set<String> RESTART_KEYS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
+             "proxyBaseCore","proxyBaseMode","proxyBaseIpv6","proxyAppScope","proxyDnsHijack",
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt
+index daac6c8..22d88d6 100644
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt
+@@ -35,8 +35,10 @@ class Runtime146ContractTest {
+     }
+     @Test fun uiVersionBumpDoesNotRequestRuntimeRedeployment() {
+         val p = prefs()
+-        // V20.73 adds serialized native boot restore and per-boot stop cancellation.
+-        assertEquals(149, ProxyRuntimeSettings.RUNTIME_REVISION)
++        // V20.74 must redeploy the corrected immutable session snapshot ordering.
++        assertEquals(150, ProxyRuntimeSettings.RUNTIME_REVISION)
++        assertTrue(ProxyRuntimeSettings.runtimeUpgradePending(true, 149, true))
++        assertFalse(ProxyRuntimeSettings.runtimeUpgradePending(true, 150, true))
+         assertFalse(ProxyRuntimeSettings.runtimeUpgradePending(true, 492, true))
+         assertFalse(ProxyRuntimeSettings.runtimeUpgradePending(true, p))
+     }
