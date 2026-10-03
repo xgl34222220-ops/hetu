@@ -655,7 +655,7 @@ index 0000000..93a3d3d
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-index 482853a..1672970 100644
+index 482853a..47fe938 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 @@ -410,7 +410,8 @@ final class RootProxyManager {
@@ -707,7 +707,7 @@ index 482853a..1672970 100644
          ensureContinuityService(true);
          trace.outcome="ready";
          return result;
-@@ -732,6 +740,81 @@ final class RootProxyManager {
+@@ -732,6 +740,84 @@ final class RootProxyManager {
          }
      }
  
@@ -775,6 +775,9 @@ index 482853a..1672970 100644
 +                if(!available.ok())throw new IOException("请先成功启动一次代理，再开启开机自启");
 +                if(!p.settingsSignature.equals(prefs.getString("proxyRootAppliedSettings","")))
 +                    throw new IOException("代理设置已变化，请先启动或重启应用设置，再开启开机自启");
++                // A failed restart may have replaced CONFIG without publishing a
++                // successful settings snapshot. Validate the actual deployed bytes.
++                validateRuntimeConfig();
 +                installAutostart(p,autostartArgs(p));
 +            }else RootAutostart.remove(context);
 +            if(!prefs.edit().putBoolean("proxyRootAutoStart",enabled).putBoolean("proxyRootAutoStartInstalled",enabled)
@@ -789,7 +792,7 @@ index 482853a..1672970 100644
      JSONObject stop()throws Exception{return stop(null);}
      JSONObject stop(Progress progress)throws Exception{
          CONTROL_LOCK.lock();
-@@ -823,6 +906,12 @@ final class RootProxyManager {
+@@ -823,6 +909,12 @@ final class RootProxyManager {
          StringBuilder events=new StringBuilder("time=").append(new Date())
                  .append("\napp=").append(BuildConfig.VERSION_NAME)
                  .append("\nexpectedCore=").append(expectedCoreToken(ProxyRuntimeProfile.load(prefs).core));

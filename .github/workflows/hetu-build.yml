@@ -62,7 +62,7 @@ jobs:
     - name: Apply and test scripts and native boot fixes
       run: 'set -euo pipefail
 
-        echo ''7cd643458c7bfa0b32c776a02f45c1e9de907bc11803203974768de96351b0ad  updates/v2073-scripts-boot/runtime.patch''
+        echo ''fec7d0d863ad6a700c6bab9f6595df0cf79ae85f0854bc2f2d8fcde576b694e9  updates/v2073-scripts-boot/runtime.patch''
         | sha256sum -c -
 
         git apply --check updates/v2073-scripts-boot/runtime.patch
