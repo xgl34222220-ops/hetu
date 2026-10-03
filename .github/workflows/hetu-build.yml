@@ -119,7 +119,7 @@ jobs:
 
         cp android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockRules.java out/before-filter-export/ProxyAdblockRules.java
 
-        printf ''%s\n'' ''25aceb7beced5b12e3b6711fc54a0d6d5dda901c534a0bfbec1c9a7fab684c1e  updates/v2076-session-filter/runtime.patch'' | sha256sum -c
+        printf ''%s\n'' ''9ee6b1088c54bb8e5879c923cc6e2624181df07dca6c8ebc97c45cef6ded6a62  updates/v2076-session-filter/runtime.patch'' | sha256sum -c
         -
 
         git apply --check updates/v2076-session-filter/runtime.patch
@@ -228,7 +228,7 @@ jobs:
       run: gradle --no-daemon --max-workers=1 -Dorg.gradle.jvmargs='-Xmx1500m -Dfile.encoding=UTF-8' :app:lintDebug --stacktrace
       working-directory: android-app
     - name: Consolidate native and browser state evidence
-      run: python3 tools/qa/consolidate_concept_coverage.py --repo . --expected-tests 277 --browser-evidence out/verification/webui-browser --browser-commit
+      run: python3 tools/qa/consolidate_concept_coverage.py --repo . --expected-tests 278 --browser-evidence out/verification/webui-browser --browser-commit
         "$GITHUB_SHA"
     - if: always()
       name: Upload concept UI verification evidence

@@ -318,6 +318,7 @@ def main():
  expect('修复运行记录','safe-session-repair-entry')
  click('修复运行记录',scroll=True);expect_eventually('无法取得 Root 权限','safe-session-repair-root-denial')
  adb('shell','input','keyevent','4');time.sleep(2)
+ adb('shell','input','keyevent','4');time.sleep(2)
  click('工具',bottom=True);click('Web面板',scroll=True);expect('河图本地面板','06-web-panels')
  click('河图本地面板');time.sleep(3)
  with webview_cdp() as web_port:

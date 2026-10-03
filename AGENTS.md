@@ -4,7 +4,7 @@
 
 旧 r149 session 仅多出末尾 GOOGLE_FIREWALL_CLEAN 行时，现有不可变 baseline checksum、PID、规则、路由、监听与守护身份全部核对后，允许用户在工具中显式修复运行记录。保留原始 baseline；不重建缺失/损坏 baseline，不将现网快照登记为健康，不强制重启核心，不自动把已应用 runtime 149 改为 151。新版独立检查器用于旧部署的诊断，读检查不得使 ProxyControlEpoch 的观察票据失效。任何观察不完整均失败关闭，Google 可达独立报告。
 
-过滤导出迁至 noBackup 稳定目录；按不可变 generation 成对发布、hash 校验、保留旧交接文件。实际旧/new 导出器的缓存清理故障注入、真实 Android 导出、第二 provider 写入失败、共享主题重建与 Monet 切换回归均纳入本轮 CI。预期选中 Android 单测 277 项；实际结果须核对最终 Actions，不引用旧 262/旧 Android 15/16 作为本轮通过。详见 docs/V20.76_SESSION_FILTER.md。禁止访问用户设备、扩大 KVM/Root/SELinux 等权限；本轮不得永久删除用户数据。
+过滤导出迁至 noBackup 稳定目录；按不可变 generation 成对发布、hash 校验、保留旧交接文件。实际旧/new 导出器的缓存清理故障注入、真实 Android 导出、第二 provider 写入失败、共享主题重建与 Monet 切换回归均纳入本轮 CI。预期选中 Android 单测 278 项；实际结果须核对最终 Actions，不引用旧 262/旧 Android 15/16 作为本轮通过。详见 docs/V20.76_SESSION_FILTER.md。禁止访问用户设备、扩大 KVM/Root/SELinux 等权限；本轮不得永久删除用户数据。
 
 ## 当前交付：V20.75 自定义配色兼容修复
 

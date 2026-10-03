@@ -334,7 +334,7 @@ index f877b2a..26f1713 100644
                      context.startActivity(Intent(context, ProxyAppSelectionActivity::class.java))
                  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-index 47fe938..80f4c2b 100644
+index 47fe938..dfae79b 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 @@ -22,11 +22,13 @@ final class RootProxyManager {
@@ -351,7 +351,7 @@ index 47fe938..80f4c2b 100644
      static long observationTicket(){return CONTROL_LOCK.observe();}
      static boolean publishObservation(long ticket,Runnable publish){return CONTROL_LOCK.publish(ticket,publish);}
      private final Context context;
-@@ -877,12 +879,53 @@ final class RootProxyManager {
+@@ -877,12 +879,55 @@ final class RootProxyManager {
      }
  
      JSONObject networkHealth()throws Exception{
@@ -361,8 +361,10 @@ index 47fe938..80f4c2b 100644
 +    }
 +
 +    JSONObject repairSessionRecord()throws Exception{
++        RootBridge.requireWorkerThread();
 +        CONTROL_LOCK.lock();
 +        try{
++            if(!RootBridge.hasRoot(context))throw new IOException("无法取得 Root 权限；运行记录未改动");
 +            JSONObject result=runHealthChecker("repair-session");
 +            JSONObject checked=networkHealth();
 +            prefs.edit().putString("proxyNetworkIntegrity",checked.optString("networkIntegrity","unknown"))
@@ -407,7 +409,7 @@ index 47fe938..80f4c2b 100644
          int livePort=liveControllerPort(state);
          if(livePort>0&&prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT)!=livePort){
              prefs.edit().putInt("proxyControllerPort",livePort).apply();
-@@ -969,6 +1012,8 @@ final class RootProxyManager {
+@@ -969,6 +1014,8 @@ final class RootProxyManager {
              report.section("网络完整性（不等同于外部网站可达）",networkHealth().toString(),2500);
              RootBridge.Result repairs=RootBridge.rootShell(context,"tail -n 30 "+RootBridge.quote(ROOT+"/run/network-repair.log")+" 2>/dev/null; true",3000L);
              report.section("网络原位修复记录",repairs.output,5000);
@@ -416,7 +418,7 @@ index 47fe938..80f4c2b 100644
              RootBridge.Result google=RootBridge.rootShell(context,"cat "+RootBridge.quote(ROOT+"/run/google-firewall-status")
                      +" 2>/dev/null; tail -n 30 "+RootBridge.quote(ROOT+"/run/google-firewall.log")+" 2>/dev/null; true",3000L);
              report.section("Google 服务防火墙修复",google.output,5000);
-@@ -1243,13 +1288,17 @@ final class RootProxyManager {
+@@ -1243,13 +1290,17 @@ final class RootProxyManager {
                      .append(" ] || [ \"$(sha256sum ").append(RootBridge.quote(allowDst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
                      .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblockAllow))).append(" ]; then")
                      .append(" cp ").append(RootBridge.quote(adblock.getAbsolutePath())).append(' ').append(RootBridge.quote(tmp))
@@ -438,10 +440,10 @@ index 47fe938..80f4c2b 100644
                      .append("; chmod 600 ").append(RootBridge.quote(revisionFile)).append("; chown 0:0 ").append(RootBridge.quote(revisionFile))
                      .append("; fi");
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
-index 6161312..d238299 100644
+index 6161312..0351a62 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
-@@ -959,6 +959,14 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -959,6 +959,21 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                          iconTint = c.textMuted,
                          onClick = { task("diag") { sheet = "消息与网络诊断" to vm.controller.diagnostics() } },
                      ) { if (busy == "diag") HxSpinner(16.dp) else HxChevron() }
@@ -451,7 +453,14 @@ index 6161312..d238299 100644
 +                        subtitle = "核对原会话基线、规则、DNS 与守护进程；保留现有连接",
 +                        icon = Icons.Rounded.HealthAndSafety,
 +                        iconTint = c.textMuted,
-+                        onClick = { task("session-record") { sheet = "修复运行记录" to vm.controller.repairSessionRecord() } },
++                        onClick = {
++                            task("session-record") {
++                                val result = try { vm.controller.repairSessionRecord() }
++                                    catch (cancel: CancellationException) { throw cancel }
++                                    catch (error: Exception) { error.message ?: "运行记录未修复，请查看网络诊断" }
++                                sheet = "修复运行记录" to result
++                            }
++                        },
 +                    ) { if (busy == "session-record") HxSpinner(16.dp) else HxChevron() }
                  }
              }
@@ -610,10 +619,10 @@ index 0000000..d7a3015
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootHealthUpgradeTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootHealthUpgradeTest.kt
 new file mode 100644
-index 0000000..bc50d8b
+index 0000000..533aa35
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootHealthUpgradeTest.kt
-@@ -0,0 +1,101 @@
+@@ -0,0 +1,112 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
@@ -640,6 +649,8 @@ index 0000000..bc50d8b
 +        var fault = "listener-11053-udp"
 +        var deny = false
 +        var allowRepair = false
++        var granted = true
++        @JvmStatic @Implementation fun hasRoot(context: Context): Boolean = granted
 +        @JvmStatic @Implementation fun rootShell(context: Context, command: String, timeout: Long): RootBridge.Result {
 +            commands += command
 +            require(!command.contains("service.d") && !command.contains("iptables") && !command.contains("kill "))
@@ -669,6 +680,7 @@ index 0000000..bc50d8b
 +    @Before fun prepare() {
 +        HealthUpgradeBridgeShadow.commands.clear(); HealthUpgradeBridgeShadow.deny = false
 +        HealthUpgradeBridgeShadow.allowRepair = false; HealthUpgradeBridgeShadow.integrity = "degraded"
++        HealthUpgradeBridgeShadow.granted = true
 +        HealthUpgradeBridgeShadow.fault = "listener-11053-udp"
 +        prefs.edit().clear().putInt("proxyRootAppliedRuntimeRevision", 149).putBoolean("proxyRootAutoStart", true)
 +            .putString("proxyPolicyEgressState", "reachable").putString("proxyNetworkIntegrity", "upgrade-required").commit()
@@ -713,6 +725,14 @@ index 0000000..bc50d8b
 +        assertEquals("degraded", prefs.getString("proxyNetworkIntegrity", ""))
 +        assertEquals("listener-11053-udp", prefs.getString("proxyNetworkFault", ""))
 +        assertEquals(2, HealthUpgradeBridgeShadow.commands.size)
++    }
++    @Test fun unauthorizedRepairCannotDeployAnInspectorOrChangeSessionPreferences() {
++        HealthUpgradeBridgeShadow.granted = false
++        try { worker { it.repairSessionRecord() }; fail("ungranted Root must be refused") }
++        catch (error: ExecutionException) { assertTrue(error.cause!!.message!!.contains("无法取得 Root 权限")) }
++        assertTrue(HealthUpgradeBridgeShadow.commands.isEmpty())
++        assertEquals(149, prefs.getInt("proxyRootAppliedRuntimeRevision", 0))
++        assertEquals("upgrade-required", prefs.getString("proxyNetworkIntegrity", ""))
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt
