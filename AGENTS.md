@@ -1,6 +1,8 @@
-## 当前续接：V20.81 合法栈位置（CI待核实）
+## 当前续接：V20.81 合法栈位置（全量CI已核实通过）
 
-V20.80完整四job/344单测/API35-36各56已核实后接续原分支；首轮编译失败和全部前轮证据保留。原创生产类夹具复现Kotlin短横线及init/clinit三类栈位置均被替换；改后捕获/读回保留，5类URI/凭据/新行/超长非法符号仍拒绝。新增4单测（预计348）及安装合成行的位置保留断言，全部原门禁重跑。复用预编译有界校验；Root151/23载荷/签名/Manifest/原UI/权限不变，无hook、不操作用户手机或安全网络设置、不永久删除用户数据、不合并主分支或正式发布部署。真机KernelSU/OEM、Google微信长期断连、长期IPv6/TUN/eBPF未验证，间歇断网未确认。见docs/V20.81_TRACE_SYMBOLS.md与docs/ci/V20.81_REPRO.json。
+沿原test/v20.75-theme-compat，应用37e963d4 / Actions37171744564 attempt1四job全部success；实际348单测0fail/error/skipped，JournalReliability21执行，6host+60shell、过滤ENOENT、lint0error、687ABI/23载荷/固定签名通过；API35/36各56（各21配色），Root mutation0。符号夹具旧捕获/复制三处redacted，新保留Kotlin短横线及init/clinit，5类恶意符号仍拒绝；安装报告位置/UUID/脱敏/满额旧段保留通过。实际下载APK133353242 bytes，SHA2561319ef860d4aedcfcb4e57f029df0a45e285d67ad7dcd3415a7d8c0cb1dbe425，23载荷逐项回读匹配。详见docs/ci/V20.81_RESULT.json、docs/V20.81_TRACE_SYMBOLS.md。
+
+保留ed326756/37163668343及V20.79、V20.80首轮失败和最终证据；不把旧262/旧Android15-16当本轮结果。Root151、核心/service.d、原UI方向、固定签名、Manifest/权限保持，无hook、不操作用户设备/安全网络设置、不永久删除用户数据、不合并主分支或正式发布部署。真机KernelSU/OEM、长期Google微信、长期IPv6/TUN/eBPF仍未验证；服务/状态重建仅隔离夹具通过，真实强杀/掉电后日志完整性及异步计数持久化未测。间歇断网未确认解决。
 
 ## 当前续接：V20.80 日志限额与脱敏（全量CI已核实通过）
 
