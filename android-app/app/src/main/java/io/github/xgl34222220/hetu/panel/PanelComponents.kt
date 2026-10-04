@@ -7,6 +7,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -294,7 +295,7 @@ internal fun PanelSwitchRow(title: String, checked: Boolean, onChange: (Boolean)
     val haptics = LocalHomeHaptics.current
     Row(
         modifier.fillMaxWidth().heightIn(min = if (subtitle == null) minHeight else HomeDims.rowMinHeight)
-            .clickable(role = Role.Switch) { haptics(HomeHaptic.Tick); onChange(!checked) }
+            .toggleable(value = checked, role = Role.Switch) { next -> haptics(HomeHaptic.Tick); onChange(next) }
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),

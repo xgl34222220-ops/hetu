@@ -3,7 +3,7 @@
   "baseRun": 37171744564,
   "uiCommit": "9f046d75d8ad5b9fe63582e3157c4f7dfb93442c",
   "archiveSha256": "6190b4fd4fcd011cae77e81cdd33b5270e557194c56bf88d0a824d74d811b730",
-  "patchSha256": "50695aae129e98f9b6a10a6c948666bf7909d4731f9546581616c4eaaf5706b2",
+  "patchSha256": "3f08f86d8413c9a905de1eae0c5347e8f7c5dd4032ee4a8e6181d439abda7002",
   "baselineFiles": {
     "android-app/V2059_TRIGGER.txt": "fab8afca5160fd2fadef637fd1b936afe8ac6f45ef8973965354d20017365691",
     "android-app/build.gradle.kts": "88813f0b340fb9f75b242aacc7b7dac5fe49a7ca4e20fcbb5fb0422a51bf0ebc",
@@ -331,7 +331,7 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt": "cdd245eef3a5fd8da688293e6c4ad649fc1af1bd2c87320e8b74d8ebfe472ca4",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeTokens.kt": "3a35d5f31e5edcc8f568b97a75c116438ad548ef836a5494ebaf4d187b1e36aa",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt": "7c653953408af4f06add53d470297424b4577fe2dbe221c078cdaa48d767e1ca",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt": "a57d777be1b0a0cdceceb186a12c09b13546baf927fa6795dd10b13111698f4e",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt": "24e5755ab910d5834510e9c14ed7d13bdc479a33d33295a8138dc1b0a592a0a2",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt": "7ee443716b6e97a7554517c13dd8d27cafb128948070acf5c40b6bf4b3b7dff5",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelIcons.kt": "f9ca2f3f309553a57caf6c89cfebdceb4293b47529eae977913e74986bf3168a",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt": "b7ea73018527c0bb67a74abaf1a1abd8b9a3a503e2533e4ab8f727c9ac2bb695",

@@ -3869,7 +3869,7 @@
 +}
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt
-@@ -0,0 +1,586 @@
+@@ -0,0 +1,587 @@
 +package io.github.xgl34222220.hetu.panel
 +
 +import androidx.compose.animation.core.animateDpAsState
@@ -3879,6 +3879,7 @@
 +import androidx.compose.foundation.background
 +import androidx.compose.foundation.border
 +import androidx.compose.foundation.clickable
++import androidx.compose.foundation.selection.toggleable
 +import androidx.compose.foundation.horizontalScroll
 +import androidx.compose.foundation.layout.Arrangement
 +import androidx.compose.foundation.layout.Box
@@ -4166,7 +4167,7 @@
 +    val haptics = LocalHomeHaptics.current
 +    Row(
 +        modifier.fillMaxWidth().heightIn(min = if (subtitle == null) minHeight else HomeDims.rowMinHeight)
-+            .clickable(role = Role.Switch) { haptics(HomeHaptic.Tick); onChange(!checked) }
++            .toggleable(value = checked, role = Role.Switch) { next -> haptics(HomeHaptic.Tick); onChange(next) }
 +            .padding(horizontal = 16.dp, vertical = 8.dp),
 +        verticalAlignment = Alignment.CenterVertically,
 +        horizontalArrangement = Arrangement.spacedBy(12.dp),
