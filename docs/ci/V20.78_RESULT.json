@@ -1,0 +1,414 @@
+{
+  "schema": 1,
+  "branch": "test/v20.75-theme-compat",
+  "baseApplicationCommit": "a48ece29289a34b1812c67fa0f82e0252362efc3",
+  "batch1ApplicationCommit": "34ba4778e36e79ae916c5729e6b848c4218f868f",
+  "applicationCommit": "47609a6925eb411def74ea6781eaa77b88a6b7da",
+  "testedCommit": "95b6e171f0f078a0477d200cdb4c391629b62234",
+  "runId": 37163668343,
+  "runUrl": "https://github.com/xgl34222220-ops/hetu/actions/runs/37163668343",
+  "overall": "success",
+  "buildJob": 111322115686,
+  "oldCrashJob": 111322115768,
+  "allFourJobs": "success",
+  "unitTests": {
+    "tests": 311,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suiteCount": 35,
+    "suites": {
+      "io.github.xgl34222220.hetu.AutomationSettingsConceptParityTest": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.SettingsPickerParity58Test": {
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.RootAutostartTest": {
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.NativeConceptScreenshotTest": {
+        "tests": 30,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.ConceptStateCoverageTest": {
+        "tests": 25,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.LargeTitleParity59Test": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.ProxyLatencyRegressionTest": {
+        "tests": 16,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.Runtime146ContractTest": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.ConceptRemainingCoverageTest": {
+        "tests": 26,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.ConceptParity57Test": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.CustomPaletteCompatibilityTest": {
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.SettingsBackupParity57Test": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.MainLanguageBindingTest": {
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.ProxyNetworkJournalTest": {
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.PanelConceptModelTest": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.RuntimeStartup15Test": {
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.PanelLayoutDefaultsTest": {
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.RuntimeYaml15Test": {
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.CoreManagerConcept57Test": {
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.AutomationToolsConceptParityTest": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.DocumentPickerSafetyTest": {
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.ProxyScriptSafetyTest": {
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.PanelModel11Test": {
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.RootNetworkRecoveryTest": {
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.RootHealthUpgradeTest": {
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.NetworkDiagnosticsTest": {
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.SettingsConceptParityTest": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.ProxyAdblockExportTest": {
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.AppCrashReportTest": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.AutomationConceptParity57Test": {
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.ToolsConceptParityTest": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.PanelActionSafetyTest": {
+        "tests": 30,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.WanDetails61Test": {
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.AdblockSnifferTest": {
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.github.xgl34222220.hetu.BootStartup60Test": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    }
+  },
+  "hostRegressionTests": {
+    "tests": 6,
+    "result": "success",
+    "artifactRelativePath": "out/verification/native-webview-bounds-tests.txt"
+  },
+  "shellTests": {
+    "rootHealth": 26,
+    "googleFirewall": 17,
+    "rootAutostart": 17,
+    "total": 60,
+    "result": "success"
+  },
+  "filterExportBeforeAfter": {
+    "fixtureOnly": true,
+    "deviceOrNetworkAccess": false,
+    "beforeSourceSha256": "a7518bf438b82eab26c37611c6fad90b818cd8d2c84e119f083091bb2719ac04",
+    "afterSourceSha256": "55b8d560086cf41493a28d074e63ee08f72e7c360c208d63fb36cbb59d46506f",
+    "before": "old-cache-eviction-ENOENT-reproduced",
+    "after": "new-cache-eviction-stable-pair-and-handoff-passed"
+  },
+  "lint": {
+    "result": "success",
+    "errors": 0,
+    "warnings": 278,
+    "disabledChecks": false
+  },
+  "materialkolorConstructorReferences": 687,
+  "missingConstructors": 0,
+  "runtimePayloadsVerified": 23,
+  "rootRevision": 151,
+  "runtimeAssetSha256": "6b59cc14c687f067ab942d0b4855fcdde6183a874275e1acda6105cbfff0a16b",
+  "bootAssetSha256": "3a1215f4e9093ae2298803020d697da0c14c35ee5cf28f84f2a81608093783f9",
+  "apkSha256": "33c48db99d98c19b8e91bb44c5441e8c32250e083dc459d97c2403f19c697966",
+  "apkBytes": 133347510,
+  "versionCode": 2078,
+  "versionName": "0.12.8-v20",
+  "certificateSha256": "701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad",
+  "localApkAndAllRuntimePayloadHashesReverified": true,
+  "android": {
+    "35": {
+      "jobId": 111324108306,
+      "artifactId": 11288478376,
+      "result": "success",
+      "checks": 52,
+      "passed": 52,
+      "paletteScriptPageCombinations": 21,
+      "rootMutationActions": 0,
+      "nativeDistinctFrameBodies": [
+        {
+          "name": "reference-03B-040-native-overview.png",
+          "bodySha256": "3ff589757bfc1366fc965f067ade938bac1579a8170c082e41e6fc437417fd34"
+        },
+        {
+          "name": "reference-03B-041-native-groups.png",
+          "bodySha256": "6cbca06cf1701c42c40b4ea5f506c2c234657b05f1f531830372322b59f1150c"
+        },
+        {
+          "name": "reference-03B-042-native-connections.png",
+          "bodySha256": "d766e075b98eaeb7c1dda22f7675bd94d442d22fbbefea5382eb4a021e43bb52"
+        },
+        {
+          "name": "reference-03B-043-native-node-dialog.png",
+          "bodySha256": "8b052762279604496ea0cb4d7e77e54a1f325e37edd5ea67a727b18c1cd33c50"
+        },
+        {
+          "name": "reference-03B-044-native-switch-failure.png",
+          "bodySha256": "2c6ae8b8ae1ca9cc44a7b22ec420f9afb26ee5cf7e019fb48cbde6b13edd8329"
+        }
+      ],
+      "input": "read-only CDP position; native adb tap on unique top-level WebView",
+      "runnerLifecycle": "PASS",
+      "kvmOwnershipAndModeUnchanged": true,
+      "emulatorReaped": true,
+      "noApplicationCrashOrAnrObserved": true,
+      "fixtureOnly": true
+    },
+    "36": {
+      "jobId": 111324108311,
+      "artifactId": 11288598168,
+      "result": "success",
+      "checks": 52,
+      "passed": 52,
+      "paletteScriptPageCombinations": 21,
+      "rootMutationActions": 0,
+      "nativeDistinctFrameBodies": [
+        {
+          "name": "reference-03B-040-native-overview.png",
+          "bodySha256": "3ff589757bfc1366fc965f067ade938bac1579a8170c082e41e6fc437417fd34"
+        },
+        {
+          "name": "reference-03B-041-native-groups.png",
+          "bodySha256": "cd030395109ce0fc32c2c46a2a3982841745982a559daee227e6280986657576"
+        },
+        {
+          "name": "reference-03B-042-native-connections.png",
+          "bodySha256": "d766e075b98eaeb7c1dda22f7675bd94d442d22fbbefea5382eb4a021e43bb52"
+        },
+        {
+          "name": "reference-03B-043-native-node-dialog.png",
+          "bodySha256": "0f741610fd6fc63eedacb0cad6007ef0159d95fed1cf382e82b04ccbcdf81765"
+        },
+        {
+          "name": "reference-03B-044-native-switch-failure.png",
+          "bodySha256": "068335aa53183c1d46c36bad8b0b46e597ca675a235ef1ea9aa1abd968e3af07"
+        }
+      ],
+      "input": "read-only CDP position; native adb tap on unique top-level WebView",
+      "runnerLifecycle": "PASS",
+      "kvmOwnershipAndModeUnchanged": true,
+      "emulatorReaped": true,
+      "noApplicationCrashOrAnrObserved": true,
+      "fixtureOnly": true
+    }
+  },
+  "historicalPaletteCrash": {
+    "result": "expected_failure_reproduced",
+    "apkSha256": "ea8569b8d3c1aea7ddd969eb9e1f8a6d721dd653ebf554147ae3bbaa6c5d303f",
+    "versionCode": 2074,
+    "accent": "#EF4444",
+    "palette": "TonalSpot",
+    "appearance": "light",
+    "screen": "ProxyScriptsActivity",
+    "exception": "NoSuchMethodError",
+    "apiLevel": 36,
+    "fixtureOnly": true,
+    "limitations": "Controlled AOSP reproduction of historical APK. No phone Root or network validation."
+  },
+  "retainedFailedRuns": [
+    {
+      "id": 37160159973,
+      "reason": "test-fixture-hidden-SDK-API-compilation"
+    },
+    {
+      "id": 37160754265,
+      "reason": "native-WebView-frame-duplication"
+    },
+    {
+      "id": 37162276140,
+      "reason": "nested-document-counted-as-independent-container"
+    }
+  ],
+  "artifacts": {
+    "verification": 11288379820,
+    "apkManifest": 11288384811,
+    "apk": 11289091024,
+    "effectiveSource": 11288264171,
+    "oldPaletteCrash": 11288915573
+  },
+  "retainedHarnessAnomaly": {
+    "api": 36,
+    "process": "com.android.commands.uiautomator.Launcher",
+    "uid": 2000,
+    "pid": 3960,
+    "exception": "RuntimeException: Bad file descriptor",
+    "thread": "UiAutomation",
+    "applicationPid": 2375,
+    "independentlyReproduced": false,
+    "smokeExit": 0,
+    "evidenceRetained": true
+  },
+  "scope": {
+    "userDeviceAccessed": false,
+    "phoneOutageResolved": false,
+    "manifestChangedSinceV20_76": false,
+    "coreAndSigningChanged": false,
+    "hookAdded": false,
+    "securityPermissionsExpanded": false,
+    "merged": false,
+    "published": false,
+    "deployed": false
+  },
+  "unverified": [
+    "OEM/KernelSU real-device network switching and boot restoration",
+    "long-running Google/WeChat disconnects and message delays",
+    "real-device IPv6/TUN/eBPF data plane",
+    "blocked callback only describes calling Hetu UID, not GMS or whole device",
+    "already-entered Root shell transaction is not cancelled by network epoch",
+    "long-term disk growth from retained journal segments",
+    "independent reproduction of API36 UiAutomation harness anomaly"
+  ],
+  "referencesAndReasons": "../V20.77_NETWORK_RECOVERY.md; ../V20.78_NETWORK_TRACES.md"
+}
