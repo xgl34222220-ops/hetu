@@ -189,7 +189,7 @@ jobs:
 
         cp android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkJournal.java "$RUNNER_TEMP/hetu-v2079-network-journal.java"
 
-        echo ''feed944d628c5ea795e0828bb9d8895c0d494b3f7ec102b41595425a27525297  updates/v2080-journal-bounds/runtime.patch'' | sha256sum -c -
+        echo ''cb7ae7efab80b0825952c421330fd56016f7d3a47fffef23570481c65116323e  updates/v2080-journal-bounds/runtime.patch'' | sha256sum -c -
 
         git apply --check updates/v2080-journal-bounds/runtime.patch
 

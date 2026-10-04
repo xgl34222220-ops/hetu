@@ -410,17 +410,16 @@ index 6bf5b13..e20dfd6 100644
                          onClick = { task("network-events") { sheet = "网络事件记录" to vm.controller.networkEvents() } },
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/JournalReliabilityTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/JournalReliabilityTest.kt
 new file mode 100644
-index 0000000..ba9d533
+index 0000000..fa22a74
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/JournalReliabilityTest.kt
-@@ -0,0 +1,167 @@
+@@ -0,0 +1,166 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
 +import android.content.ClipboardManager
 +import android.content.Context
 +import androidx.test.core.app.ApplicationProvider
-+import io.github.xgl34222220.hetu.app.hxCopy
 +import org.json.JSONObject
 +import org.junit.Assert.*
 +import org.junit.Rule
