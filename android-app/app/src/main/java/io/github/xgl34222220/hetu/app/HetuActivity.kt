@@ -122,6 +122,7 @@ import kotlinx.coroutines.flow.collectLatest
  */
 class HetuActivity : ComponentActivity() {
     private lateinit var vm: HetuViewModel
+    private var requestedRoute by mutableStateOf<HxRoute?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -134,7 +135,9 @@ class HetuActivity : ComponentActivity() {
                 val baseDensity = LocalDensity.current
                 val uiScale = vm.prefs.getFloat("uiScale", 1f).coerceIn(.8f, 1.2f)
                 val scaledDensity = remember(baseDensity, uiScale, revision) { Density(baseDensity.density * uiScale, baseDensity.fontScale) }
-                CompositionLocalProvider(LocalDensity provides scaledDensity) { HetuRoot(vm) }
+                CompositionLocalProvider(LocalDensity provides scaledDensity) {
+                    HetuRoot(vm, requestedRoute) { requestedRoute = null }
+                }
             }
         }
     }
@@ -156,12 +159,20 @@ class HetuActivity : ComponentActivity() {
     }
 
     private fun applyStartPage(intent: Intent?) {
-        when (intent?.getStringExtra(EXTRA_START_PAGE)?.lowercase()) {
+        val target = intent?.getStringExtra(EXTRA_START_PAGE)?.lowercase() ?: return
+        if (target !in setOf("settings", "tools", "panel", "panelsheet", "strategy", "proxies", "strategysheet", "connections", "providers", "subscriptions", "configs", "rules", "home")) return
+        requestedRoute = HxRoute.Main
+        when (target) {
             "settings" -> vm.tab = HxTab.Settings
             "tools" -> vm.tab = HxTab.Tools
             "panel", "panelsheet" -> vm.tab = HxTab.Panel
             "strategy", "proxies", "strategysheet" -> vm.openPanel("proxies")
             "connections" -> vm.openPanel("conn")
+            "providers", "subscriptions" -> vm.openPanel("providers")
+            "configs" -> {
+                vm.tab = HxTab.Tools
+                requestedRoute = HxRoute.Configs
+            }
             "rules" -> vm.openPanel("rules")
             "home" -> vm.tab = HxTab.Home
         }
@@ -221,16 +232,28 @@ internal class HxNav {
         stack.removeAt(stack.lastIndex)
         return true
     }
+
+    fun openRequested(route: HxRoute) {
+        // Notification entry points replace the old child page instead of stacking over it.
+        while (stack.size > 1) stack.removeAt(stack.lastIndex)
+        if (route != HxRoute.Main) push(route)
+    }
 }
 
 internal val LocalNav = staticCompositionLocalOf<HxNav> { error("HxNav not provided") }
 
 @Composable
-internal fun HetuRoot(vm: HetuViewModel) {
+internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRouteConsumed: () -> Unit = {}) {
     val nav = remember { HxNav() }
     val routeHolder = rememberSaveableStateHolder()
     val scope = rememberCoroutineScope()
     val c = Hx.colors
+    LaunchedEffect(startRoute) {
+        if (startRoute != null) {
+            nav.openRequested(startRoute)
+            onStartRouteConsumed()
+        }
+    }
     androidx.compose.runtime.SideEffect { AppCrashReport.screen("${vm.tab.name}/${nav.current.key}") }
 
     // Predictive back: the page follows the finger (shrinks toward the swipe edge with
@@ -397,6 +420,7 @@ private fun MainTabs(vm: HetuViewModel) {
     // Other root pages keep their existing scroll behavior; child routes own no dock.
     var dockVisible by remember { mutableStateOf(true) }
     var homeDetail by remember { mutableStateOf(false) }
+    var toolsDetail by remember { mutableStateOf(false) }
     val page = vm.tab.name
     LaunchedEffect(page) { dockVisible = true }
     val dockScroll = remember(page) {
@@ -434,7 +458,7 @@ private fun MainTabs(vm: HetuViewModel) {
                     when (tab) {
                         "Home" -> NewUiHome(vm, bottom) { homeDetail = it }
                         "Panel" -> io.github.xgl34222220.hetu.panel.NewUiPanel(vm, bottom)
-                        "Tools" -> ToolsScreen(vm, bottom)
+                        "Tools" -> ToolsScreen(vm, bottom, onSubPageVisibleChanged = { toolsDetail = it })
                         else -> SettingsScreen(vm, bottom)
                     }
                 }
@@ -446,7 +470,8 @@ private fun MainTabs(vm: HetuViewModel) {
             spring(dampingRatio = .88f, stiffness = 420f),
             label = "dockShift",
         )
-        if (!(vm.tab == HxTab.Home && homeDetail)) HetuGlassDock(
+        val detailVisible = (vm.tab == HxTab.Home && homeDetail) || (vm.tab == HxTab.Tools && toolsDetail)
+        if (!detailVisible) HetuGlassDock(
             items = items,
             selected = selectedIndex,
             onSelect = { index ->

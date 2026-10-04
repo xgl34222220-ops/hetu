@@ -92,7 +92,7 @@ internal fun HomeCard(
         .clip(HomeDims.cardShape)
         .background(background)
         .border(1.dp, c.line, HomeDims.cardShape)
-    val interactive = if (onClick == null) base else base.clickable(onClickLabel = clickLabel, role = Role.Button) {
+    val interactive = if (onClick == null) base else base.homeTap(onClickLabel = clickLabel, role = Role.Button) {
         haptics(HomeHaptic.Tap)
         onClick()
     }
@@ -152,7 +152,7 @@ internal fun HomeBadge(
     val shaped = modifier.height(20.dp).clip(HomeDims.badgeShape).let {
         if (outlined) it.border(1.dp, c.line2, HomeDims.badgeShape) else it.background(tone.soft())
     }
-    val interactive = if (onClick == null) shaped else shaped.clickable(role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
+    val interactive = if (onClick == null) shaped else shaped.homeTap(role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
     Row(interactive.padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
         if (icon != null) Icon(icon, null, Modifier.size(12.dp), tint = tone.foreground())
         Text(text, color = tone.foreground(), style = HomeType.badge, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -192,8 +192,11 @@ internal fun HomeDelayText(delayMs: Long?, modifier: Modifier = Modifier, style:
 
 @Composable
 internal fun HomeSpinner(modifier: Modifier = Modifier, size: Dp = 16.dp, color: Color = LocalHomeColors.current.accent, strokeWidth: Dp = 2.dp) {
-    val transition = rememberInfiniteTransition(label = "home-spinner")
-    val angle by transition.animateFloat(0f, 360f, infiniteRepeatable(tween(800, easing = LinearEasing), RepeatMode.Restart), label = "home-spinner-angle")
+    val angle = if (LocalHomeMotionEnabled.current) {
+        val transition = rememberInfiniteTransition(label = "home-spinner")
+        val animated by transition.animateFloat(0f, 360f, infiniteRepeatable(tween(800, easing = LinearEasing), RepeatMode.Restart), label = "home-spinner-angle")
+        animated
+    } else 0f
     Canvas(modifier.size(size).graphicsLayer { rotationZ = angle }) {
         val stroke = Stroke(strokeWidth.toPx(), cap = StrokeCap.Round)
         val inset = strokeWidth.toPx() / 2f
@@ -254,7 +257,7 @@ internal fun HomeButton(
             .clip(shape)
             .background(fill)
             .let { if (kind == HomeButtonKind.Secondary) it.border(1.dp, c.line2, shape) else it }
-            .clickable(enabled = enabled && !loading, role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
+            .homeTap(enabled = enabled && !loading, role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
@@ -282,7 +285,7 @@ internal fun HomeIconButton(
         modifier
             .size(40.dp, HomeDims.touch)
             .clip(HomeDims.controlShape)
-            .clickable(enabled = enabled && !loading, onClickLabel = label, role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
+            .homeTap(enabled = enabled && !loading, onClickLabel = label, role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
             .semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
     ) {
@@ -317,8 +320,9 @@ internal fun <T> HomeSegmented(
     ) {
         options.forEach { (value, label) ->
             val active = value == selected
-            val fill by animateColorAsState(if (active) c.surface else Color.Transparent, tween(HomeMotion.SwitchMs), label = "home-seg-fill")
-            val text by animateColorAsState(if (active) c.t1 else c.t2, tween(HomeMotion.SwitchMs), label = "home-seg-text")
+            val duration = if (LocalHomeMotionEnabled.current) HomeMotion.SwitchMs else 0
+            val fill by animateColorAsState(if (active) c.surface else Color.Transparent, tween(duration), label = "home-seg-fill")
+            val text by animateColorAsState(if (active) c.t1 else c.t2, tween(duration), label = "home-seg-text")
             Box(
                 Modifier
                     .weight(1f)
@@ -326,7 +330,7 @@ internal fun <T> HomeSegmented(
                     .clip(HomeDims.segmentShape)
                     .background(fill)
                     .let { if (active) it.border(1.dp, c.line, HomeDims.segmentShape) else it }
-                    .clickable(enabled = enabled && !active, role = Role.RadioButton) { haptics(HomeHaptic.Tick); onSelect(value) },
+                    .homeTap(enabled = enabled && !active, role = Role.RadioButton) { haptics(HomeHaptic.Tick); onSelect(value) },
                 contentAlignment = Alignment.Center,
             ) { Text(label, color = text, style = HomeType.buttonSmall, maxLines = 1) }
         }

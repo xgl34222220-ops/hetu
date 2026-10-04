@@ -50,6 +50,7 @@ internal fun HomeRoute(
     onDetailVisibleChange: (Boolean) -> Unit = {},
 ) {
     val haptics = LocalHomeHaptics.current
+    val animate = motion && LocalHomeMotionEnabled.current
     var destination by rememberSaveable { mutableStateOf(HomeDestination.Main) }
     var ipSide by rememberSaveable { mutableStateOf(HomeNetSide.Wan) }
     var speedSheet by rememberSaveable { mutableStateOf(false) }
@@ -65,7 +66,7 @@ internal fun HomeRoute(
         transitionSpec = {
             val page = HomeMotion.PageMs
             when {
-                !motion -> EnterTransition.None togetherWith ExitTransition.None
+                !animate -> EnterTransition.None togetherWith ExitTransition.None
                 targetState != HomeDestination.Main ->
                     (slideInHorizontally(tween(page, easing = HomeMotion.Emphasized)) { it / 10 } + fadeIn(tween(page))) togetherWith
                         fadeOut(tween(HomeMotion.SwitchMs))
@@ -85,7 +86,7 @@ internal fun HomeRoute(
                 onOpenResource = { destination = HomeDestination.Resource },
                 onOpenSpeedSource = { speedSheet = true },
                 contentPadding = contentPadding,
-                motion = motion,
+                motion = animate,
             )
             HomeDestination.IpDetail -> HomeIpDetailScreen(
                 state = state,

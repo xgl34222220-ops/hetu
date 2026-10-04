@@ -33,7 +33,6 @@ import io.github.xgl34222220.hetu.ProxyGroupUi
 import io.github.xgl34222220.hetu.ProxyLatencyTarget
 import io.github.xgl34222220.hetu.ProxyLatencyTargets
 import io.github.xgl34222220.hetu.ui.HetuHaptic
-import io.github.xgl34222220.hetu.ui.LocalHetuMotionEnabled
 import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
 import kotlinx.coroutines.delay
 
@@ -92,7 +91,7 @@ internal fun HetuHomeV2(
     val context = LocalContext.current
     val prefs = remember(context) { context.getSharedPreferences("hetu", Context.MODE_PRIVATE) }
     val hetuHaptics = rememberHetuHaptics()
-    val motion = LocalHetuMotionEnabled.current
+    val motion = homeMotionEnabled()
 
     var netSide by remember { mutableStateOf(if (prefs.getString(PrefNetSide, "wan") == "lan") HomeNetSide.Lan else HomeNetSide.Wan) }
     var speedSource by remember { mutableStateOf(HomeSpeedSource.fromId(prefs.getString(PrefSpeedSource, "api"))) }

@@ -1123,6 +1123,7 @@ internal fun HxChoiceSheet(
     referenceRadios: Boolean = false,
     trailingReferenceRadios: Boolean = false,
     presentation: HxChoicePresentation = HxChoicePresentation.Standard,
+    menuWidthOverride: Dp? = null,
 ) {
     val c = Hx.colors
     val haptics = rememberHetuHaptics()
@@ -1137,7 +1138,7 @@ internal fun HxChoiceSheet(
             HxChoicePresentation.Notification -> 148.dp
             else -> if (trailingReferenceRadios) 200.dp else if (referenceRadios) 232.dp else if (dimBehind) 152.dp else 128.dp
         }
-        HxAnchoredMenu(anchor, onDismiss, dimBehind = !referenceSettings && (dimBehind || referenceRadios), minWidth = menuWidth) { close ->
+        HxAnchoredMenu(anchor, onDismiss, dimBehind = !referenceSettings && (dimBehind || referenceRadios), minWidth = menuWidthOverride ?: menuWidth) { close ->
             if (referenceRadios) {
                 Text(title, modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
                     textAlign = if (trailingReferenceRadios) TextAlign.Start else TextAlign.Center, fontSize = if (trailingReferenceRadios) 15.sp else 18.sp, fontWeight = FontWeight.Bold, color = c.text)

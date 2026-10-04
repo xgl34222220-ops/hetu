@@ -189,6 +189,8 @@ internal data class PanelData(
     val ruleTotal: Int = rules.size,
     val ruleSets: List<PanelRuleSet> = emptyList(),
     val logs: List<PanelLogEntry> = emptyList(),
+    /** Owns the pull indicator; false only after the real read finishes or is cancelled. */
+    val refreshing: Boolean = false,
 ) {
     val running: Boolean get() = status == PanelStatus.Running
 
@@ -329,6 +331,7 @@ internal class PanelActions(
     /** 排序与布局 › 策略图标. */
     val onOpenPolicyIcons: () -> Unit = {},
     val onCopy: (label: String, text: String) -> Unit = { _, _ -> },
+    val onRefresh: () -> Unit = {},
 )
 
 /* ------------------------------------------------------------------ */
@@ -355,6 +358,17 @@ internal data class PanelAppGroup(val app: String, val packageName: String, val 
 internal object PanelLogic {
     const val UnattributedApp = "未归属应用"
     val rankCounts = listOf(5, 10, 15, 20, 30)
+
+    /** Keep user column choices; use one column where font scaling would squeeze the cards. */
+    fun layoutForViewport(layout: PanelGroupLayout, widthDp: Int, fontScale: Float): PanelGroupLayout {
+        val scale = fontScale.takeIf { it.isFinite() && it > 0f } ?: 1f
+        val groupWidth = (widthDp - 32f - 8f) / 2f
+        val nodeWidth = (widthDp - 32f - 16f - 8f) / 2f
+        return layout.copy(
+            groupColumns = if (groupWidth < 148f * scale) 1 else layout.groupColumns,
+            nodeColumns = if (nodeWidth < 148f * scale) 1 else layout.nodeColumns,
+        )
+    }
 
     fun visibleGroups(data: PanelData, view: PanelViewState): List<PanelGroup> {
         val terms = view.needle.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }

@@ -6,6 +6,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,6 +17,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
@@ -48,7 +53,7 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
     fun putBool(key: String, value: Boolean) { prefs.edit().putBoolean(key, value).apply(); changed(key) }
     fun putString(key: String, value: String) { prefs.edit().putString(key, value).apply(); changed(key) }
 
-    HxPage(title = "高级代理配置", largeTitle = false, onBack = onBack) {
+    HxPage(title = "高级代理配置", largeTitle = false, compactTitleFontSizeSp = 20f, onBack = onBack) {
         item {
             OtherCard(card) {
                 OtherLabel("代理能力")
@@ -122,8 +127,9 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(6.dp))
+            Column(Modifier.selectableGroup()) {
             listOf(OtherChoice("TPROXY", "tproxy"), OtherChoice("REDIRECT", "redirect"), OtherChoice("关闭", "off")).forEach { item ->
-                Row(Modifier.fillMaxWidth().height(45.dp).clickable {
+                Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).selectable(selected = profile.dnsHijack.id == item.value, role = Role.RadioButton) {
                     putString("proxyDnsHijack", item.value)
                     prefs.edit().putBoolean("proxyMihomoDnsForward", item.value != "off").apply()
                     revision++
@@ -134,9 +140,10 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
                         modifier = Modifier.size(24.dp))
                 }
             }
+            }
             Spacer(Modifier.height(6.dp))
             Text("取消", color = Hx.colors.accent, fontSize = 18.sp, fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.align(Alignment.End).clickable { choice = null }.padding(vertical = 4.dp))
+                modifier = Modifier.align(Alignment.End).heightIn(min = 48.dp).clickable { choice = null }.padding(vertical = 12.dp))
         }
     }
 }
@@ -149,7 +156,7 @@ private fun OtherCard(color: Color, content: @Composable ColumnScope.() -> Unit)
 @Composable
 private fun OtherLabel(text: String) {
     Text(text, color = Hx.colors.text, fontSize = 21.sp, lineHeight = 28.sp,
-        fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 4.dp))
+        fontWeight = FontWeight.Bold, modifier = Modifier.semantics { heading() }.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 6.dp))
 }
 
 @Composable

@@ -10,12 +10,17 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.Icon
@@ -80,6 +85,7 @@ import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.RestartAlt
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.Route
 import androidx.compose.material.icons.rounded.Shield
@@ -98,6 +104,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.onSizeChanged
@@ -194,6 +203,7 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
             title = ht("备份与恢复"),
             subtitle = "管理配置与偏好数据",
             largeTitle = false,
+            compactTitleFontSizeSp = 20f,
             onBack = { closeSubPage() },
         ) {
             item(key = "create") {
@@ -245,6 +255,7 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
         HxPage(
             title = ht("开机启动与下载"),
             largeTitle = false,
+            compactTitleFontSizeSp = 20f,
             onBack = { closeSubPage() },
         ) {
             item(key = "autostart") {
@@ -301,6 +312,7 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
         HxPage(
             title = ht("默认面板"),
             largeTitle = false,
+            compactTitleFontSizeSp = 20f,
             onBack = { closeSubPage() },
         ) {
             item(key = "panel") {
@@ -361,7 +373,7 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
                             title = ht("基础代理配置"),
                             summary = ht("核心、模式与当前配置"),
                             icon = Icons.Rounded.Tune,
-                            onClick = { open(RootTproxyActivity::class.java) },
+                            onClick = { nav.push(HxRoute.Network) },
                         )
                         MiuixSettingsArrow(
                             title = ht("高级代理配置"),
@@ -527,7 +539,7 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
     var choice by remember { mutableStateOf<String?>(null) }
     var configs by remember { mutableStateOf<List<ProxyConfigUi>>(emptyList()) }
     val profile = ProxyRuntimeProfile.load(prefs)
-    LaunchedEffect(revision) { configs = runCatching { vm.controller.configLibrary() }.getOrDefault(emptyList()) }
+    LaunchedEffect(revision, profile.core) { configs = runCatching { vm.controller.configLibrary() }.getOrDefault(emptyList()) }
     val importConfig = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         if (uri != null) scope.launch {
             runCatching { vm.controller.importConfig(uri, uri.lastPathSegment?.substringAfterLast('/') ?: "config.yaml") }
@@ -549,17 +561,22 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
         title = ht("基础代理配置"),
         onBack = { nav.pop() },
         largeTitle = false,
+        compactTitleFontSizeSp = 20f,
         canvasColor = if (c.dark) c.canvas else Color(0xFFF2F0F9),
     ) {
         item(key = "core") {
             SettingsSection {
                 SettingsGroup {
-                    SettingsNavRow("核心选择", value = profile.core.label, dropdown = true) { choice = "core" }
+                    SettingsNavRow("代理核心", subtitle = "选择代理核心程序", icon = Icons.Rounded.Memory,
+                        value = profile.core.label, dropdown = true) { choice = "core" }
                     SettingsDivider()
-                    SettingsNavRow("运行模式", value = profile.mode.label, dropdown = true) { choice = "mode" }
+                    SettingsNavRow("运行模式", subtitle = "选择代理运行模式", icon = Icons.Rounded.AltRoute,
+                        value = profile.mode.label, dropdown = true) { choice = "mode" }
                     SettingsDivider()
                     SettingsNavRow(
                         "IPv6",
+                        subtitle = "启用或禁用 IPv6 支持",
+                        icon = Icons.Rounded.Public,
                         value = when (profile.ipv6) {
                             ProxyRuntimeProfile.Ipv6.BYPASS -> "不进核心"
                             ProxyRuntimeProfile.Ipv6.STRICT -> "严格防泄漏"
@@ -574,6 +591,7 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
                         profile.autoOverwrite,
                         { putBool("proxyBaseAutoOverwrite", it) },
                         subtitle = "启动时将必要的河图参数覆写到运行配置",
+                        icon = Icons.Rounded.Refresh,
                     )
                 }
             }
@@ -581,37 +599,17 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
         item(key = "startup") {
             SettingsSection {
                 SettingsGroup {
-                    SettingsNavRow("查看启动配置") { context.startActivity(Intent(context, ProxyStartupConfigActivity::class.java)) }
+                    SettingsNavRow("查看启动配置", subtitle = "查看当前生成的运行配置文件", icon = Icons.Rounded.Description) {
+                        context.startActivity(Intent(context, ProxyStartupConfigActivity::class.java))
+                    }
                 }
             }
         }
         item(key = "config") {
             SettingsSection {
                 SettingsGroup {
-                    Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text("配置选择", style = MaterialTheme.typography.titleSmall, color = c.text, modifier = Modifier.weight(1f))
-                        Icon(
-                            Icons.Rounded.AddCircleOutline, "导入配置", tint = c.text,
-                            modifier = Modifier.size(26.dp).clip(CircleShape).clickable { launchDocumentPicker(vm::toast) { importConfig.launch(arrayOf("*/*")) } }.padding(2.dp),
-                        )
-                    }
-                    configs.forEachIndexed { index, config ->
-                        if (index > 0) SettingsDivider()
-                        SettingsRow(
-                            config.name,
-                            onClick = {
-                                if (!config.selected) scope.launch {
-                                    runCatching { vm.controller.selectConfig(config.name) }
-                                        .onSuccess { vm.applyConfigChange("已切换到 ${config.name}"); revision++ }
-                                        .onFailure { vm.toast(it.message ?: "切换配置失败") }
-                                }
-                            },
-                        ) { if (config.selected) Icon(Icons.Rounded.Check, null, tint = c.accent, modifier = Modifier.size(22.dp)) }
-                    }
-                    if (configs.isEmpty()) SettingsRow("暂无配置", subtitle = "点右上角 + 导入 YAML 配置")
+                    SettingsNavRow("当前配置", subtitle = configs.firstOrNull { it.selected }?.name ?: "尚未选择配置",
+                        icon = Icons.Rounded.Description, onClick = { choice = "config" })
                 }
             }
         }
@@ -630,9 +628,36 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
     }
 
     when (choice) {
+        "config" -> HxSheet(title = "当前配置", onDismiss = { choice = null }) {
+            androidx.compose.foundation.lazy.LazyColumn(Modifier.fillMaxWidth().heightIn(max = 480.dp)) {
+                items(configs.size, key = { configs[it].name }) { index ->
+                    val config = configs[index]
+                    SettingsRow(config.name, onClick = {
+                        choice = null
+                        if (!config.selected) scope.launch {
+                            try {
+                                vm.controller.selectConfig(config.name)
+                                vm.applyConfigChange("已切换到 ${config.name}")
+                                revision++
+                            } catch (cancel: CancellationException) { throw cancel }
+                            catch (error: Exception) { vm.toast(error.message ?: "切换配置失败") }
+                        }
+                    }) {
+                        if (config.selected) Icon(Icons.Rounded.Check, "当前配置", tint = c.accent, modifier = Modifier.size(22.dp))
+                    }
+                }
+                item(key = "import-config") {
+                    SettingsNavRow("导入配置", subtitle = "从文件导入 YAML 配置", icon = Icons.Rounded.UploadFile) {
+                        choice = null
+                        launchDocumentPicker(vm::toast) { importConfig.launch(arrayOf("*/*")) }
+                    }
+                }
+            }
+        }
         "core" -> HxChoiceSheet(
             presentation = HxChoicePresentation.Settings,
-            title = "核心选择",
+            menuWidthOverride = 174.dp,
+            title = "代理核心",
             choices = listOf(ProxyRuntimeProfile.Core.MIHOMO, ProxyRuntimeProfile.Core.MIHOMO_SMART).map { core ->
                 val installed = core == ProxyRuntimeProfile.Core.MIHOMO || ProxyCoreStore(context).installed(core)
                 HxChoice(core.id, core.label, if (installed) null else "尚未安装，请先在核心管理下载", enabled = installed)
@@ -643,6 +668,7 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
         )
         "mode" -> HxChoiceSheet(
             presentation = HxChoicePresentation.Settings,
+            menuWidthOverride = 184.dp,
             title = "运行模式",
             choices = ProxyRuntimeProfile.Mode.values()
                 .filter { ProxyRuntimeProfile.capability(profile.core, it).available }
@@ -653,6 +679,7 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
         )
         "ipv6" -> HxChoiceSheet(
             presentation = HxChoicePresentation.Settings,
+            menuWidthOverride = 184.dp,
             title = "IPv6",
             choices = listOf(
                 HxChoice("enable", "启用", "IPv6 流量同样进入代理"),
@@ -719,6 +746,11 @@ private fun SettingsIdentityCard(vm: HetuViewModel, onClick: () -> Unit) {
 /** The concept's eight accents keep their persisted IDs and use a two-by-four grid. */
 @Composable
 private fun HxAccentSwatches(vm: HetuViewModel) {
+    SettingsAccentSwatches(vm.accentChoice, vm::setAccent)
+}
+
+@Composable
+internal fun SettingsAccentSwatches(selectedHex: String, onSelect: (String) -> Unit) {
     val c = Hx.colors
     val swatches = listOf(
         "#2A62E8" to Color(0xFF0A62E8), "#42CAA3" to Color(0xFF42CAA3),
@@ -732,17 +764,55 @@ private fun HxAccentSwatches(vm: HetuViewModel) {
             Spacer(Modifier.width(24.dp))
             Text(ht("强调色"), fontSize = 18.sp, lineHeight = 23.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = c.text)
         }
-        Column(Modifier.padding(start = 50.dp, end = 14.dp, top = 6.dp, bottom = 6.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.selectableGroup().padding(start = 50.dp, end = 6.dp, top = 6.dp, bottom = 6.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             swatches.chunked(4).forEach { row ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     row.forEach { (hex, color) ->
-                        val selected = vm.accentChoice.equals(hex, true)
-                        Box(Modifier.size(46.dp).clip(CircleShape).background(color)
-                            .clickable { vm.setAccent(hex) }, contentAlignment = Alignment.Center) {
-                            if (selected) Icon(Icons.Rounded.Check, null, tint = Color.White, modifier = Modifier.size(21.dp))
+                        val selected = selectedHex.equals(hex, true)
+                        val source = remember { MutableInteractionSource() }
+                        Box(Modifier.size(48.dp).hxPressScale(source, .92f)
+                            .semantics { contentDescription = "${ht("强调色")} $hex" }
+                            .selectable(selected = selected, role = Role.RadioButton, interactionSource = source, indication = null) { onSelect(hex) },
+                            contentAlignment = Alignment.Center) {
+                            Box(Modifier.size(46.dp).clip(CircleShape).background(color), contentAlignment = Alignment.Center) {
+                                if (selected) Icon(Icons.Rounded.Check, null, tint = Color.White, modifier = Modifier.size(21.dp))
+                            }
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun SettingsThemeModeChoices(selected: String, onSelect: (String) -> Unit) {
+    val c = Hx.colors
+    Row(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf(
+            Triple("system", ht("跟随系统"), Icons.Rounded.AutoAwesome),
+            Triple("light", ht("浅色模式"), Icons.Rounded.LightMode),
+            Triple("dark", ht("深色模式"), Icons.Rounded.DarkMode),
+        ).forEach { (value, label, icon) ->
+            val active = selected == value
+            val source = remember { MutableInteractionSource() }
+            val background by animateColorAsState(if (active) c.accentSoft else c.surfaceMuted.copy(alpha = .42f), label = "settingsThemeChoice")
+            Column(Modifier.weight(1f).heightIn(min = 108.dp).hxPressScale(source, .96f)
+                .clip(RoundedCornerShape(12.dp))
+                .then(if (active) Modifier.border(1.dp, c.accent, RoundedCornerShape(12.dp)) else Modifier)
+                .background(background)
+                .selectable(selected = active, role = Role.RadioButton, interactionSource = source, indication = null) { onSelect(value) }
+                .padding(horizontal = 4.dp, vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopEnd) {
+                    if (active) Icon(Icons.Rounded.Check, null, tint = c.accent, modifier = Modifier.size(16.dp))
+                    Icon(settingsLineIcon(icon), null, tint = c.text, modifier = Modifier.align(Alignment.Center).size(30.dp))
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(label, fontSize = 14.sp, lineHeight = 19.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                    color = c.text, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                Text(when (value) { "system" -> ht("与系统设置保持一致"); "light" -> ht("始终使用浅色主题"); else -> ht("始终使用深色主题") },
+                    fontSize = 10.sp, lineHeight = 14.sp, color = c.textMuted, maxLines = 2,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center)
             }
         }
     }
@@ -785,6 +855,7 @@ internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
         subtitle = null,
         onBack = onBack,
         largeTitle = false,
+        compactTitleFontSizeSp = 20f,
     ) {
         item(key = "language") {
             SettingsSection {
@@ -809,45 +880,13 @@ internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
         item(key = "theme") {
             SettingsSection {
                 SettingsGroup {
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
-                        Text(ht("主题模式"), fontSize = 18.sp, lineHeight = 24.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = c.text)
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp)) {
+                        Text(ht("主题模式"), fontSize = 20.sp, lineHeight = 26.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = c.text)
                         Spacer(Modifier.height(8.dp))
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf(
-                                Triple("system", ht("跟随系统"), Icons.Rounded.AutoAwesome),
-                                Triple("light", ht("浅色模式"), Icons.Rounded.LightMode),
-                                Triple("dark", ht("深色模式"), Icons.Rounded.DarkMode),
-                            ).forEach { (value, label, icon) ->
-                                val selected = vm.appearance == value
-                                Column(
-                                    Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .then(
-                                            if (selected) Modifier.border(1.5.dp, c.accent, RoundedCornerShape(12.dp))
-                                            else Modifier
-                                        )
-                                        .background(if (selected) c.accentSoft else c.surfaceMuted.copy(alpha = .42f))
-                                        .clickable {
-                                            vm.setAppearanceMode(value)
-                                            vm.bumpSettings()
-                                            revision++
-                                        }
-                                        .padding(horizontal = 4.dp, vertical = 12.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                ) {
-                                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopEnd) {
-                                        if (selected) {
-                                            Icon(Icons.Rounded.Check, null, tint = c.accent, modifier = Modifier.size(16.dp))
-                                        }
-                                        Icon(icon, null, tint = c.text, modifier = Modifier.align(Alignment.Center).size(30.dp))
-                                    }
-                                    Spacer(Modifier.height(5.dp))
-                                    Text(label, fontSize = 13.sp, lineHeight = 19.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = c.text, maxLines = 1)
-                                    Text(when (value) { "system" -> ht("与系统设置保持一致"); "light" -> ht("始终使用浅色主题"); else -> ht("始终使用深色主题") },
-                                        fontSize = 10.sp, lineHeight = 14.sp, color = c.textMuted, maxLines = 1)
-                                }
-                            }
+                        SettingsThemeModeChoices(vm.appearance) { value ->
+                            vm.setAppearanceMode(value)
+                            vm.bumpSettings()
+                            revision++
                         }
                     }
                 }
@@ -873,7 +912,7 @@ internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
                 SettingsGroup {
                     SettingsSwitchRow(ht("模糊效果"), blur, { setBool("enableBlur", it, reload = true) }, subtitle = ht("控制顶栏、底栏与浮层的实时模糊"), icon = Icons.Rounded.BlurOn, iconTint = c.textMuted)
                     SettingsDivider()
-                    SettingsNavRow(ht("顶栏模糊样式"), subtitle = ht("选择顶栏磨砂的过渡方式"), icon = Icons.Rounded.Tune, iconTint = c.textMuted, value = if (topBlur == "gaussian") ht("高斯模糊") else ht("渐进式模糊"), dropdown = true) { choice = "topBlur" }
+                    SettingsNavRow(ht("顶栏模糊样式"), subtitle = ht("选择顶栏磨砂的过渡方式"), icon = Icons.Rounded.Inventory2, iconTint = c.textMuted, value = if (topBlur == "gaussian") ht("高斯模糊") else ht("渐进式模糊"), dropdown = true) { choice = "topBlur" }
                     SettingsDivider()
                     SettingsSwitchRow(ht("悬浮底栏"), floating, { setBool("floatingBottomBar", it) }, subtitle = ht("关闭后底栏吸附屏幕底部"), icon = Icons.Rounded.Dashboard, iconTint = c.textMuted)
                     SettingsDivider()

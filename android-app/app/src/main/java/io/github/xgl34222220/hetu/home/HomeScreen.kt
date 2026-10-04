@@ -3,7 +3,6 @@ package io.github.xgl34222220.hetu.home
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +21,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
@@ -68,7 +68,13 @@ internal fun HomeScreen(
     val collapsed by remember(scroll, collapseAt) { derivedStateOf { scroll.value > collapseAt } }
     val live = state.status.isLive
 
-    Box(modifier.fillMaxSize().background(c.bg)) {
+    HomeRefreshBox(
+        refreshing = state.ipRefreshing,
+        onRefresh = actions.onRefreshIp,
+        label = "刷新首页状态",
+        modifier = modifier.fillMaxSize().background(c.bg),
+        indicatorPadding = PaddingValues(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + HomeDims.barHeight),
+    ) {
         Column(
             Modifier
                 .fillMaxSize()
@@ -110,7 +116,7 @@ internal fun HomeScreen(
         }
 
         // Compact centred title that fades in once the large title has scrolled 40 dp.
-        val barAlpha by animateFloatAsState(if (collapsed) 1f else 0f, tween(HomeMotion.SwitchMs), label = "home-bar")
+        val barAlpha by animateFloatAsState(if (collapsed) 1f else 0f, tween(if (motion && LocalHomeMotionEnabled.current) HomeMotion.SwitchMs else 0), label = "home-bar")
         if (barAlpha > 0f) {
             Column(Modifier.fillMaxWidth().alpha(barAlpha).background(c.bg.copy(alpha = .94f))) {
                 Box(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars).height(HomeDims.barHeight), contentAlignment = Alignment.Center) {
@@ -193,7 +199,7 @@ private fun RowScope.HeroAction(
     val haptics = LocalHomeHaptics.current
     val tint = if (enabled) color else c.t3
     Row(
-        Modifier.weight(1f).fillMaxHeight().clickable(enabled = enabled, role = Role.Button) { haptics(HomeHaptic.Confirm); onClick() },
+        Modifier.weight(1f).fillMaxHeight().homeTap(enabled = enabled, role = Role.Button) { haptics(HomeHaptic.Confirm); onClick() },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
     ) {

@@ -641,8 +641,8 @@ private fun FileFolderPage(vm: HetuViewModel, path: String, onOpen: (String) -> 
     HxPage(
         title = "文件管理",
         largeTitle = true,
-        largeTitleFontSizeSp = 34f,
-        largeTitleStartPadding = 20.dp,
+        largeTitleFontSizeSp = 36f,
+        largeTitleStartPadding = 26.dp,
         largeTitleTopPadding = 6.dp,
         onBack = onBack,
         refreshing = loading && entries.isNotEmpty(),
@@ -1032,7 +1032,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
     val c = Hx.colors
     val haptics = rememberHetuHaptics()
     val initialEnabled = remember { prefs.getBoolean(ProxyStatusNotificationService.PREF_ENABLED, false) }
-    var enabled by remember { mutableStateOf(initialEnabled) }
+    var enabled by rememberSaveable { mutableStateOf(initialEnabled) }
     val initialTitle = remember { prefs.getString(ProxyStatusNotificationService.PREF_TITLE_TEMPLATE, ProxyStatusNotificationService.DEFAULT_TITLE_TEMPLATE).orEmpty() }
     val initialTemplate = remember { prefs.getString(ProxyStatusNotificationService.PREF_TEMPLATE, ProxyStatusNotificationService.DEFAULT_TEMPLATE).orEmpty() }
     val initialRefresh = remember { prefs.getInt(ProxyStatusNotificationService.PREF_REFRESH_SECONDS, 3).coerceIn(2, 60) }
@@ -1042,19 +1042,22 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
     val defaults = listOf("reload", "restart", "stop")
     val initialActions = remember { actionKeys.mapIndexed { i, k -> prefs.getString(k, defaults[i]).orEmpty() } }
     val initialLabels = remember { labelKeys.map { prefs.getString(it, "").orEmpty() } }
-    var titleTemplate by remember { mutableStateOf(initialTitle) }
-    var template by remember { mutableStateOf(initialTemplate) }
-    var refresh by remember { mutableIntStateOf(initialRefresh) }
-    var target by remember { mutableStateOf(initialTarget) }
-    val actions = remember { mutableStateListOf<String>().apply { addAll(initialActions) } }
-    val labels = remember { mutableStateListOf<String>().apply { addAll(initialLabels) } }
+    var titleTemplate by rememberSaveable { mutableStateOf(initialTitle) }
+    var template by rememberSaveable { mutableStateOf(initialTemplate) }
+    var refresh by rememberSaveable { mutableIntStateOf(initialRefresh) }
+    var target by rememberSaveable { mutableStateOf(initialTarget) }
+    val listSaver = remember { androidx.compose.runtime.saveable.listSaver<SnapshotStateList<String>, String>(
+        save = { it.toList() }, restore = { values -> mutableStateListOf<String>().apply { addAll(values) } }) }
+    val actions = rememberSaveable(saver = listSaver) { mutableStateListOf<String>().apply { addAll(initialActions) } }
+    val labels = rememberSaveable(saver = listSaver) { mutableStateListOf<String>().apply { addAll(initialLabels) } }
     var picker by remember { mutableStateOf<Pair<String, Int>?>(null) }
     val dirty = enabled != initialEnabled || titleTemplate != initialTitle || template != initialTemplate || refresh != initialRefresh || target != initialTarget ||
         actions.toList() != initialActions || labels.toList() != initialLabels
 
     val targetOptions = listOf(
-        "Home" to "首页", "Panel" to "面板", "Strategy" to "策略", "PanelSheet" to "面板浮窗",
-        "StrategySheet" to "策略浮窗", "Tools" to "工具", "Settings" to "设置",
+        "Home" to "首页", "Panel" to "面板", "Strategy" to "策略", "Configs" to "配置页",
+        "Providers" to "订阅页", "Tools" to "工具", "Settings" to "设置",
+        "PanelSheet" to "面板浮窗", "StrategySheet" to "策略浮窗",
     )
     val actionOptions = listOf("reload" to "重载", "restart" to "重启", "stop" to "停止", "hide" to "隐藏通知", "none" to "无")
     val refreshOptions = listOf(2, 3, 5, 10, 30, 60)
@@ -1086,6 +1089,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
     HxPage(
         title = "通知详细设置",
         largeTitle = false,
+        compactTitleFontSizeSp = 20f,
         subtitle = null,
         onBack = onBack,
         actions = { HxBarAction(Icons.Rounded.Check, "保存", onClick = ::save, enabled = dirty) },
@@ -1115,7 +1119,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
         item(key = "title-template") {
             SettingsSection {
                 SettingsGroup(title = "通知标题") {
-                    Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                         SettingsInput(value = titleTemplate, onValueChange = { titleTemplate = it.take(96) }, label = "标题模板")
                     }
                 }
@@ -1124,12 +1128,12 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
         item(key = "template") {
             SettingsSection {
                 SettingsGroup(title = "通知内容") {
-                    Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                         SettingsInput(value = template, onValueChange = { template = it.take(320) }, label = "模板", singleLine = false)
                         Spacer(Modifier.height(8.dp))
                         Text(
                             "可用变量：{status} {uptime} {upload} {download} {upload_total} {download_total} {cpu} {memory} {connections} {config} {core} {mode}",
-                            style = MaterialTheme.typography.labelSmall,
+                            fontSize = 12.sp, lineHeight = 17.sp,
                             color = c.textMuted,
                         )
                     }
@@ -1143,7 +1147,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                         SettingsNavRow("动作", icon = Icons.Rounded.Check, iconTint = c.textMuted, value = actionOptions.firstOrNull { it.first == actions[index] }?.second ?: actions[index], dropdown = true) {
                             picker = "action" to index
                         }
-                        Column(Modifier.padding(horizontal = 12.dp).padding(bottom = 10.dp)) {
+                        Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 12.dp)) {
                             SettingsInput(value = labels[index], onValueChange = { labels[index] = it.take(12) },
                                 label = "按钮文字（可空，最多 12 字）", placeholder = actionOptions.firstOrNull { it.first == actions[index] }?.second.orEmpty())
                         }

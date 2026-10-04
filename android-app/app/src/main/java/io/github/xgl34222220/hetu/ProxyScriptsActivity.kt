@@ -102,6 +102,7 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
     var messageError by remember { mutableStateOf(false) }
     var environment by remember { mutableStateOf(false) }
     var managedRevision by remember { mutableIntStateOf(0) }
+    var refreshing by remember { mutableStateOf(false) }
     var hookRevision by remember { mutableIntStateOf(0) }
     var menuOpen by remember { mutableStateOf(false) }
     var menuAnchor by remember { mutableStateOf<Rect?>(null) }
@@ -119,7 +120,7 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
         } catch (failure: Exception) {
             message = failure.message ?: "脚本列表读取失败"; messageError = true
             emptyList()
-        }
+        } finally { refreshing = false }
     }
     val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null || busy) return@rememberLauncherForActivityResult
@@ -161,6 +162,9 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
 
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val pageBg = if (dark) t.pageBackground else Color(0xFFECEEFB)
+    io.github.xgl34222220.hetu.tools.ToolsPullRefresh(refreshing, {
+        if (!busy && !refreshing) { refreshing = true; managedRevision++; hookRevision++ }
+    }, Modifier.fillMaxSize()) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(pageBg),
         contentPadding = PaddingValues(
@@ -192,7 +196,7 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
 
         item("hooks") {
             Surface(
-                shape = RoundedCornerShape(20.dp),
+                shape = HomeContinuousShape(24.dp),
                 color = t.cardBackground,
                 shadowElevation = 0.dp,
             ) {
@@ -242,7 +246,7 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
                 }
             }
             items(managedScripts, key = { it.name }) { script ->
-                Surface(shape = RoundedCornerShape(18.dp), color = t.cardBackground, shadowElevation = 0.dp) {
+                Surface(shape = HomeContinuousShape(24.dp), color = t.cardBackground, shadowElevation = 0.dp) {
                     Row(Modifier.fillMaxWidth().heightIn(min = 84.dp).padding(horizontal = 16.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
@@ -293,6 +297,8 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
                 }
             }
         }
+    }
+
     }
 
     editor?.let { entry ->

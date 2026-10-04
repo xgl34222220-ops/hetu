@@ -14,6 +14,7 @@ import androidx.compose.ui.semantics.*
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.unit.dp
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -109,5 +110,62 @@ class SettingsConceptParityTest {
         rule.onNodeWithText("0-7").assertIsNotEnabled()
         rule.onNode(hasSetTextAction()).assertDoesNotExist()
         assertEquals("0-7", value)
+    }
+
+    @Test fun settingsSwitchExposesOneLabeledControlAndRealCheckedState() {
+        var checked by mutableStateOf(false)
+        var calls = 0
+        rule.setContent { HetuAppTheme("light", false) {
+            SettingsSwitchRow("显示状态通知", checked, { checked = it; calls++ }, subtitle = "运行状态与网速")
+        } }
+        val switches = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Switch)
+        rule.onAllNodes(switches).assertCountEquals(1)
+        rule.onNode(switches).assertIsOff().assert(hasText("显示状态通知"))
+        rule.onNode(switches).performClick()
+        rule.onNode(switches).assertIsOn()
+        assertEquals(1, calls)
+    }
+
+    @Test fun disabledSettingsSwitchRetainsStateAndCannotInvokeCallback() {
+        var calls = 0
+        rule.setContent { HetuAppTheme("light", false) {
+            SettingsSwitchRow("底栏液态玻璃", true, { calls++ }, enabled = false)
+        } }
+        val switches = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Switch)
+        rule.onNode(switches).assertIsNotEnabled().assertIsOn().performClick()
+        assertEquals(0, calls)
+    }
+
+    @Test fun themeTilesExposeExclusiveSelectionAndChangeActualValue() {
+        var selected by mutableStateOf("system")
+        var calls = 0
+        rule.setContent { HetuAppTheme("light", false) {
+            SettingsThemeModeChoices(selected) { selected = it; calls++ }
+        } }
+        rule.onNodeWithText("跟随系统").assertIsSelected()
+        rule.onNodeWithText("深色模式").assertIsNotSelected().performClick()
+        rule.onNodeWithText("深色模式").assertIsSelected()
+        rule.onNodeWithText("跟随系统").assertIsNotSelected()
+        assertEquals("dark", selected)
+        assertEquals(1, calls)
+    }
+
+    @Test fun accentSwatchesHaveAccessibleNamesAnd48DpTargets() {
+        var selected by mutableStateOf("#2A62E8")
+        rule.setContent { HetuAppTheme("light", false) { SettingsAccentSwatches(selected) { selected = it } } }
+        rule.onNodeWithContentDescription("强调色 #2A62E8").assertIsSelected()
+        val green = rule.onNodeWithContentDescription("强调色 #42CAA3")
+        green.assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp).performClick()
+        green.assertIsSelected()
+        assertEquals("#42CAA3", selected)
+    }
+
+    @Test fun mirrorPrefixRejectsMalformedHostsAndCredentialOrControlContent() {
+        listOf("https://", "https:///resource", "http://user:secret@example.com/", "https://mirror.example/#token", "https://mirror.example/\n", "https://mirror.example:70000/").forEach {
+            assertFalse("Rejected prefix: $it", settingsMirrorPrefixValid(it))
+        }
+        listOf("", "https://mirror.example/", "http://127.0.0.1:8080/", "https://mirror.example/?url=").forEach {
+            assertTrue("Valid prefix: $it", settingsMirrorPrefixValid(it))
+        }
     }
 }

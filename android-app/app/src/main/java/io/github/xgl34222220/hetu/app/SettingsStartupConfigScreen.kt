@@ -67,7 +67,7 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
             catch (error: Exception) { message = error.message ?: "导出失败" }
         }
     }
-    HxPage(title = "启动配置", subtitle = "河图生成的最终 Mihomo 运行副本", largeTitle = false, onBack = onBack) {
+    HxPage(title = "启动配置", subtitle = "河图生成的最终 Mihomo 运行副本", largeTitle = false, compactTitleFontSizeSp = 20f, onBack = onBack) {
         item(key = "actions") {
             SettingsSection {
                 SettingsGroup {
@@ -87,7 +87,7 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
         }
         item(key = "config") {
             SettingsSection {
-                Box(Modifier.fillMaxWidth().heightIn(min = 400.dp).clip(RoundedCornerShape(18.dp)).background(Hx.colors.surface).padding(16.dp)) {
+                Box(Modifier.fillMaxWidth().heightIn(min = 400.dp).clip(RoundedCornerShape(24.dp)).background(Hx.colors.surface).padding(16.dp)) {
                     SelectionContainer {
                         Text(if (busy && text.isBlank()) "正在读取启动配置…" else text.ifBlank { "暂无启动配置" },
                             color = Hx.colors.textMuted, fontFamily = FontFamily.Monospace, fontSize = 11.sp, lineHeight = 17.sp,

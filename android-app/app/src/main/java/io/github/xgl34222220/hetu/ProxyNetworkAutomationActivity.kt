@@ -387,8 +387,10 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
     HxPage(
         title = "网络匹配",
         largeTitle = false,
+        compactTitleFontSizeSp = 20f,
         subtitle = "按当前网络环境自动启停代理",
         onBack = onBack,
+        onRefresh = { requestWifiPermissions() },
         actions = {
             HxBarAction(Icons.Rounded.Refresh, "刷新当前网络", onClick = { requestWifiPermissions() })
             HxBarAction(Icons.Rounded.Check, "保存", onClick = ::save, enabled = dirty)

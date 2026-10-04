@@ -435,6 +435,7 @@ internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
     HxPage(
         title = selected?.name ?: "core.log",
         largeTitle = false,
+        compactTitleFontSizeSp = 20f,
         subtitle = if (selected == null) "查看运行日志与调试输出" else "${lines.size} 行 · ${selected.path.removePrefix(LOG_ROOT + "/")}",
         onBack = onBack,
         refreshing = loading && content.isNotEmpty() && !autoRefresh,
@@ -451,7 +452,7 @@ internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
         },
     ) {
         item(key = "controls") {
-            Column(Modifier.padding(horizontal = Hx.gutter).padding(bottom = 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.padding(horizontal = 14.dp).padding(bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (searching) HxLogSearchField(query, { query = it })
                 HxLogLevelFilter(
                     selected = level,
@@ -559,7 +560,7 @@ private fun HxLogLevelFilter(selected: String, onSelect: (String) -> Unit) {
     val haptics = rememberHetuHaptics()
     val options = listOf("all" to "全部", "error" to "错误", "warn" to "警告", "info" to "信息", "debug" to "调试")
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(c.surface)
+        Modifier.fillMaxWidth().clip(HomeContinuousShape(24.dp)).background(c.surface)
             .padding(8.dp).selectableGroup(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -592,7 +593,7 @@ private fun HxLogControls(
 ) {
     val c = Hx.colors
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(c.surface).padding(8.dp),
+        Modifier.fillMaxWidth().clip(HomeContinuousShape(24.dp)).background(c.surface).padding(8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(
@@ -694,22 +695,22 @@ private fun LazyItemScope.HxLogLine(line: String, first: Boolean, last: Boolean)
     val tint = when (level) { "error", "fatal" -> c.bad; "warn", "warning" -> c.warn; "debug" -> c.textFaint; else -> c.accent }
     Column(
         Modifier.animateItem(fadeInSpec = androidx.compose.animation.core.tween(HxMotion.Medium), placementSpec = HxMotion.glide(), fadeOutSpec = null)
-            .fillMaxWidth().padding(horizontal = Hx.gutter).padding(bottom = 8.dp)
-            .clip(RoundedCornerShape(18.dp)).background(c.surface)
+            .fillMaxWidth().padding(horizontal = 14.dp).padding(bottom = 12.dp)
+            .clip(HomeContinuousShape(24.dp)).background(c.surface)
             .hxCombinedClick(onLongClick = { hxCopy(context, "日志", line) }, onClick = { expanded = !expanded })
             .animateContentSize(androidx.compose.animation.core.tween(HxMotion.Medium, easing = HxMotion.Emphasized))
             .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (time.isNotBlank()) {
-                Text(time, fontSize = 13.sp, lineHeight = 17.sp, color = c.text, fontWeight = FontWeight.Medium)
+                Text(time, fontSize = 14.sp, lineHeight = 19.sp, color = c.text, fontWeight = FontWeight.Medium)
                 Spacer(Modifier.width(10.dp))
             }
-            Text(level.uppercase(), fontSize = 11.sp, lineHeight = 14.sp, color = tint,
-                modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(tint.copy(alpha = .1f)).padding(horizontal = 6.dp, vertical = 2.dp))
+            Text(level.uppercase(), fontSize = 13.sp, lineHeight = 17.sp, color = tint,
+                modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(tint.copy(alpha = .1f)).padding(horizontal = 10.dp, vertical = 2.dp))
         }
         Spacer(Modifier.height(7.dp))
-        Text(if (expanded) line else message, fontSize = 15.sp, lineHeight = 21.sp, color = c.text,
+        Text(if (expanded) line else message, fontSize = 16.sp, lineHeight = 23.sp, color = c.text,
             maxLines = if (expanded) Int.MAX_VALUE else 5, overflow = TextOverflow.Ellipsis)
     }
 }

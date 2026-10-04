@@ -44,17 +44,28 @@ private object SettingsReferenceIcons {
     val Gauge = line("Gauge", "M3.4 18a10 10 0 1 1 17.2 0Z", "m12 13 5-5", "M12 3v3", "m5 6 2 2", "M2 12h3")
     val Window = line("Window", "M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z", "M3 8h18")
     val CheckBox = line("CheckBox", "M6 3h12a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3Z", "m7 12 3 3 7-7")
+    val Routing = line("Routing", "M6 15a3 3 0 1 1 0 6a3 3 0 0 1 0-6Z", "M18 3a3 3 0 1 1 0 6a3 3 0 0 1 0-6Z", "M9 18h6a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6")
+    val Sun = line("Sun", "M17 12a5 5 0 1 1-10 0a5 5 0 1 1 10 0Z", "M12 2v2", "M12 20v2", "M2 12h2", "M20 12h2", "m4.9 4.9 1.4 1.4", "m17.7 17.7 1.4 1.4", "m4.9 19.1 1.4-1.4", "m17.7 6.3 1.4-1.4")
+    val Moon = line("Moon", "M21 13.1A9 9 0 0 1 10.9 3 9 9 0 1 0 21 13.1Z")
+    val SystemTheme = line("SystemTheme", "M12 2v2", "M2 12h2", "m4.9 4.9 1.4 1.4", "m17.7 6.3 1.4-1.4", "M16.1 8a6 6 0 0 0-8.2 8", "M9.5 19A7 7 0 0 0 21 12.8a7 7 0 0 1-8-7.7", "M3 21 21 3")
+    val Blur = line("Blur", "M13.5 12a1.5 1.5 0 1 1-3 0a1.5 1.5 0 1 1 3 0Z", "M12 2v3", "M12 19v3", "M2 12h3", "M19 12h3", "m4.9 4.9 2.2 2.2", "m16.9 16.9 2.2 2.2", "m4.9 19.1 2.2-2.2", "m16.9 7.1 2.2-2.2")
 }
 
 internal fun settingsLineIcon(icon: ImageVector): ImageVector = when (icon.name.substringAfterLast('.')) {
     "GridView", "Apps" -> SettingsReferenceIcons.Grid
     "RestartAlt" -> SettingsReferenceIcons.Power
+    "Layers" -> SettingsReferenceIcons.Layers
+    "Download" -> SettingsReferenceIcons.Download
     "CloudSync" -> SettingsReferenceIcons.CloudUp
     "Restore" -> SettingsReferenceIcons.CloudDown
     "Notifications" -> SettingsReferenceIcons.Bell
     "Link", "LinkOff" -> SettingsReferenceIcons.Link
     "Sync", "Refresh" -> SettingsReferenceIcons.Refresh
-    "BlurOn" -> SettingsReferenceIcons.Droplet
+    "BlurOn" -> SettingsReferenceIcons.Blur
+    "LightMode" -> SettingsReferenceIcons.Sun
+    "DarkMode" -> SettingsReferenceIcons.Moon
+    "AutoAwesome" -> SettingsReferenceIcons.SystemTheme
+    "AltRoute" -> SettingsReferenceIcons.Routing
     "SwapHoriz" -> SettingsReferenceIcons.Move
     "Route" -> SettingsReferenceIcons.Back
     "Dashboard" -> SettingsReferenceIcons.Gauge

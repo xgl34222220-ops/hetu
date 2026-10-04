@@ -97,12 +97,12 @@ internal fun WebToolPage(title: String, subtitle: String? = null, onBack: () -> 
     val c = Hx.colors
     val brush = Brush.verticalGradient(if (c.dark) listOf(c.canvas, c.canvas) else listOf(Color(0xFFECEEFB), Color(0xFFEEF0FC)))
     Column(Modifier.fillMaxSize().background(brush).statusBarsPadding().displayCutoutPadding().navigationBarsPadding().imePadding()) {
-        Box(Modifier.fillMaxWidth().height(if (subtitle == null) 66.dp else 82.dp)) {
+        Box(Modifier.fillMaxWidth().height(if (subtitle == null) 64.dp else 78.dp)) {
             IconButton(onBack, Modifier.align(Alignment.CenterStart).padding(start = 4.dp)) {
                 Icon(WebToolIcons.Back, "返回", tint = c.text, modifier = Modifier.size(24.dp))
             }
             Column(Modifier.align(Alignment.Center).padding(horizontal = 52.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(title, color = c.text, fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold,
+                Text(title, color = c.text, fontSize = 20.sp, lineHeight = 26.sp, fontWeight = FontWeight.Bold,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (!subtitle.isNullOrBlank()) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
                     if (subtitleIcon != null) { Icon(subtitleIcon, null, tint = c.textMuted, modifier = Modifier.size(12.dp)); Spacer(Modifier.width(5.dp)) }
@@ -117,7 +117,7 @@ internal fun WebToolPage(title: String, subtitle: String? = null, onBack: () -> 
 
 @Composable
 internal fun WebToolCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    Column(modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Hx.colors.surface), content = content)
+    Column(modifier.fillMaxWidth().clip(HomeContinuousShape(24.dp)).background(Hx.colors.surface), content = content)
 }
 
 @Composable

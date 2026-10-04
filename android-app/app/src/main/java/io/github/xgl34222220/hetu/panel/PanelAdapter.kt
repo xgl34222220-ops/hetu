@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import io.github.xgl34222220.hetu.DashboardProviderUi
+import io.github.xgl34222220.hetu.ConfiguredGroupIcon
 import io.github.xgl34222220.hetu.DashboardRuleSetUi
 import io.github.xgl34222220.hetu.ProxyComposeState
 import io.github.xgl34222220.hetu.ProxyConnectionUi
@@ -100,6 +101,7 @@ internal fun HetuPanelV2(
     var rules by remember { mutableStateOf<List<ProxyRuleUi>>(emptyList()) }
     var ruleSets by remember { mutableStateOf<List<DashboardRuleSetUi>>(emptyList()) }
     var logs by remember { mutableStateOf<List<RefLogEntry>>(emptyList()) }
+    var refreshing by remember { mutableStateOf(false) }
     val testing = remember { mutableStateMapOf<String, Boolean>() }
     val selectedLocal = remember { mutableStateMapOf<String, String>() }
     val subscriptionUpdates = remember { mutableStateMapOf<String, PanelUpdate>() }
@@ -145,7 +147,8 @@ internal fun HetuPanelV2(
         state = state, starting = starting, providers = providers, rules = rules, ruleSets = ruleSets, logs = logs,
         delays = delays, testing = testing, selectedLocal = selectedLocal,
         subscriptionUpdates = subscriptionUpdates, ruleSetUpdates = ruleSetUpdates, sampler = sampler,
-    )
+    ).copy(refreshing = refreshing)
+    val groupsByName = remember(state.groups) { state.groups.associateBy { it.name } }
 
     val actions = PanelActions(
         onStart = onStart,
@@ -226,6 +229,30 @@ internal fun HetuPanelV2(
         onSaveApi = { settings -> saveApi(prefs, settings); say("测速与 API 设置已保存") },
         onOpenPolicyIcons = { context.startActivity(Intent(context, ProxyPolicyIconsActivity::class.java)) },
         onCopy = { label, text -> copyToClipboard(context, label, text) },
+        onRefresh = {
+            if (!refreshing) {
+                refreshing = true
+                scope.launch {
+                    try {
+                        onRefreshState()
+                        if (state.running) when (tab) {
+                            PanelTab.Overview -> { providers = repo.providers(); rules = repo.rules() }
+                            PanelTab.Subscriptions -> providers = repo.providers()
+                            PanelTab.Rules -> rules = repo.rules()
+                            PanelTab.RuleSets -> ruleSets = repo.ruleSets()
+                            PanelTab.Logs -> logs = refParseLogs19(inspector.runtimeLog())
+                            PanelTab.Groups, PanelTab.Connections -> Unit
+                        }
+                    } catch (cancel: CancellationException) {
+                        throw cancel
+                    } catch (error: Exception) {
+                        say(error.message ?: "刷新失败")
+                    } finally {
+                        refreshing = false
+                    }
+                }
+            }
+        },
     )
 
     HetuHomeThemeFromPrefs(prefs) {
@@ -244,6 +271,7 @@ internal fun HetuPanelV2(
                 has = { it in icons },
                 draw = { packageName, m -> icons[packageName]?.let { AppIcon(it, m) } },
             ),
+            LocalPanelGroupIcon provides { group, m -> groupsByName[group.name]?.let { ConfiguredGroupIcon(it, m) } },
         ) {
             PanelRoute(
                 data = data,
@@ -564,6 +592,7 @@ private fun copyToClipboard(context: Context, label: String, text: String) {
 @Composable
 internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp) {
     val context = LocalContext.current
+    val haptics = rememberHetuHaptics()
     val selector = remember { context.getSharedPreferences("proxy_selector_preferences", Context.MODE_PRIVATE) }
     val initial = remember {
         val old = io.github.xgl34222220.hetu.PanelOptions11.read(vm.prefs)
@@ -573,7 +602,8 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
                 vm.prefs.getBoolean("proxySelectorDisconnectOnSelect", false)),
             layout = PanelGroupLayout(
                 when (old.sort) { "name" -> PanelNodeSort.Name; "delay", "latency" -> PanelNodeSort.Delay; else -> PanelNodeSort.Config },
-                old.descending, old.groupColumns, old.groupCompact, old.columns, old.compact, old.nameOverflow == "wrap"),
+                old.descending, old.groupColumns, old.groupCompact, old.columns,
+                if (vm.prefs.contains("proxySelectorDensity")) old.compact else false, old.nameOverflow == "wrap"),
             api = PanelApiSettings(api.customDelay, api.delayUrl, api.history, api.customApi, api.host, api.port, api.secret),
             rankMode = if (vm.prefs.getString("panelOverviewRankSort", "connections") == "traffic") PanelRankMode.Total else PanelRankMode.Connections,
             rankCount = vm.prefs.getInt("panelOverviewRankCount", 5),
@@ -616,7 +646,15 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
     }
     val data = buildPanelData(vm.state, vm.operation == io.github.xgl34222220.hetu.HxRunOp.Start,
         vm.providers, vm.rules, vm.ruleSets, vm.logEntries, vm.delays, vm.testingNodes,
-        emptyMap(), updates(vm.providerTasks), updates(vm.ruleSetTasks), sampler)
+        emptyMap(), updates(vm.providerTasks), updates(vm.ruleSetTasks), sampler).copy(
+        refreshing = when (tab) {
+            PanelTab.Rules -> vm.rulesLoading
+            PanelTab.RuleSets -> vm.ruleSetsLoading
+            PanelTab.Logs -> vm.logsLoading
+            else -> vm.refreshing
+        },
+    )
+    val groupsByName = remember(vm.state.groups) { vm.state.groups.associateBy { it.name } }
     val actions = PanelActions(
         onStart = vm::toggle, onSelectNode = vm::select, onTestNode = vm::testNode,
         onTestGroup = { name -> vm.state.groups.firstOrNull { it.name == name }?.let(vm::testGroup) },
@@ -631,12 +669,31 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
         },
         onOpenPolicyIcons = { context.startActivity(Intent(context, ProxyPolicyIconsActivity::class.java)) },
         onCopy = { label, text -> copyToClipboard(context, label, text) },
+        onRefresh = {
+            when (tab) {
+                PanelTab.Rules -> vm.loadRules()
+                PanelTab.RuleSets -> vm.loadRuleSets()
+                PanelTab.Logs -> vm.loadLogs()
+                else -> vm.pullRefresh()
+            }
+        },
     )
     val icons = vm.state.connections.mapNotNull { it.appIcon?.let { icon -> it.packageName to icon } }.toMap()
     HetuHomeThemeFromPrefs(vm.prefs) {
-        CompositionLocalProvider(LocalPanelAppIcons provides PanelAppIcons(
-            has = { it in icons }, draw = { name, m -> icons[name]?.let { AppIcon(it, m) } },
-        )) {
+        CompositionLocalProvider(
+            LocalPanelAppIcons provides PanelAppIcons(
+                has = { it in icons }, draw = { name, m -> icons[name]?.let { AppIcon(it, m) } },
+            ),
+            LocalPanelGroupIcon provides { group, m -> groupsByName[group.name]?.let { ConfiguredGroupIcon(it, m) } },
+            LocalHomeHaptics provides { kind ->
+                haptics.perform(when (kind) {
+                    HomeHaptic.Tap -> HetuHaptic.Tap
+                    HomeHaptic.Tick -> HetuHaptic.Tick
+                    HomeHaptic.Confirm -> HetuHaptic.Confirm
+                    HomeHaptic.Reject -> HetuHaptic.Reject
+                })
+            },
+        ) {
             PanelRoute(data, tab, { next -> vm.openPanel(when (next) {
                 PanelTab.Overview -> "overview"; PanelTab.Groups -> "proxies"; PanelTab.Subscriptions -> "providers"
                 PanelTab.Connections -> "conn"; PanelTab.Rules -> "rules"; PanelTab.RuleSets -> "sets"; PanelTab.Logs -> "logs"

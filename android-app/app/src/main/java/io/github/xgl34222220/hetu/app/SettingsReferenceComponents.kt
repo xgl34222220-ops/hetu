@@ -3,10 +3,15 @@ package io.github.xgl34222220.hetu
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.UnfoldMore
@@ -14,13 +19,19 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -28,19 +39,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.xgl34222220.hetu.ui.baiZeLineIcon
 import io.github.xgl34222220.hetu.ui.ht
+import io.github.xgl34222220.hetu.ui.HetuHaptic
+import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
 
 /** Settings-only dimensions, measured from the supplied 04 concept sheets.
  * These do not change the denser controls used by the proxy dashboard. */
 @Composable
 internal fun SettingsGroup(title: String? = null, content: @Composable ColumnScope.() -> Unit) {
     Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Hx.colors.surface)
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Hx.colors.surface)
             .padding(vertical = 4.dp),
     ) {
         if (title != null) Text(
-            title, color = Hx.colors.text, fontSize = 18.sp, lineHeight = 24.sp,
+            title, color = Hx.colors.text, fontSize = 20.sp, lineHeight = 26.sp,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 4.dp),
+            modifier = Modifier.semantics { heading() }.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 6.dp),
         )
         content()
     }
@@ -48,7 +61,7 @@ internal fun SettingsGroup(title: String? = null, content: @Composable ColumnSco
 
 @Composable
 internal fun SettingsSection(content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = 12.dp), content = content)
+    Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp).padding(bottom = 14.dp), content = content)
 }
 
 @Composable
@@ -65,13 +78,16 @@ internal fun SettingsRow(
     enabled: Boolean = true,
     onClick: (() -> Unit)? = null,
     compact: Boolean = false,
+    modifier: Modifier = Modifier,
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
     val c = Hx.colors
+    val source = remember { MutableInteractionSource() }
     Row(
-        Modifier.fillMaxWidth().hxAnchorSource()
-            .then(if (onClick != null) Modifier.clickable(enabled = enabled, onClick = onClick) else Modifier)
-            .heightIn(min = if (compact) 50.dp else if (subtitle.isNullOrBlank()) 68.dp else 76.dp)
+        modifier.fillMaxWidth().hxAnchorSource()
+            .then(if (onClick != null) Modifier.hxPressScale(source, .99f)
+                .clickable(interactionSource = source, indication = null, enabled = enabled, onClick = onClick) else Modifier)
+            .heightIn(min = if (compact) 54.dp else if (subtitle.isNullOrBlank()) 68.dp else 78.dp)
             .padding(horizontal = 16.dp, vertical = if (compact) 6.dp else 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -80,10 +96,10 @@ internal fun SettingsRow(
             Spacer(Modifier.width(24.dp))
         }
         Column(Modifier.weight(1f)) {
-            Text(title, fontSize = if (compact) 16.sp else 18.sp, lineHeight = if (compact) 21.sp else 23.sp,
+            Text(title, fontSize = 18.sp, lineHeight = 24.sp,
                 fontWeight = FontWeight.SemiBold, color = c.text.copy(alpha = if (enabled) 1f else .45f),
                 maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (!subtitle.isNullOrBlank()) Text(subtitle, fontSize = 13.sp, lineHeight = 16.sp,
+            if (!subtitle.isNullOrBlank()) Text(subtitle, fontSize = 14.sp, lineHeight = 18.sp,
                 color = c.textMuted.copy(alpha = if (enabled) 1f else .45f), maxLines = 3, overflow = TextOverflow.Ellipsis)
         }
         trailing()
@@ -124,9 +140,32 @@ internal fun SettingsSwitchRow(
     enabled: Boolean = true,
     compact: Boolean = false,
 ) {
-    SettingsRow(title, subtitle, icon, iconTint, enabled, onClick = { onChange(!checked) }, compact = compact) {
+    val source = remember { MutableInteractionSource() }
+    val haptics = rememberHetuHaptics()
+    SettingsRow(title, subtitle, icon, iconTint, enabled, compact = compact,
+        modifier = Modifier.hxPressScale(source, .99f).semantics(mergeDescendants = true) {}
+            .toggleable(value = checked, enabled = enabled, role = Role.Switch, interactionSource = source, indication = null) { on ->
+                haptics.perform(if (on) HetuHaptic.ToggleOn else HetuHaptic.ToggleOff)
+                onChange(on)
+            }) {
         Spacer(Modifier.width(8.dp))
-        HxSwitch(checked, onChange, enabled)
+        // The entire row, including the animated thumb, is one labeled switch.
+        SettingsToggleIndicator(checked, enabled)
+    }
+}
+
+@Composable
+private fun SettingsToggleIndicator(checked: Boolean, enabled: Boolean) {
+    val c = Hx.colors
+    val offset by animateDpAsState(if (checked) 25.dp else 3.dp, tween(HxMotion.Short), label = "settingsSwitchThumb")
+    val track by animateColorAsState(if (checked) c.accent else if (c.dark) c.surfaceMuted else Color(0xFFC8C9D9),
+        tween(HxMotion.Short), label = "settingsSwitchTrack")
+    val thumb by animateColorAsState(if (checked) c.onAccent else if (c.dark) c.textMuted else Color(0xFF858798),
+        tween(HxMotion.Short), label = "settingsSwitchThumbColor")
+    Box(Modifier.size(width = 50.dp, height = 48.dp).graphicsLayer { alpha = if (enabled) 1f else .4f },
+        contentAlignment = Alignment.CenterStart) {
+        Box(Modifier.fillMaxWidth().height(28.dp).clip(Hx.pillShape).background(track))
+        Box(Modifier.offset(x = offset).size(22.dp).clip(Hx.pillShape).background(thumb))
     }
 }
 
@@ -196,11 +235,12 @@ internal fun SettingsDialog(
 
 @Composable
 private fun SettingsDialogButton(label: String, primary: Boolean, onClick: () -> Unit, modifier: Modifier) {
-    Box(modifier.heightIn(min = 48.dp).clip(RoundedCornerShape(16.dp))
+    val source = remember { MutableInteractionSource() }
+    Box(modifier.heightIn(min = 48.dp).hxPressScale(source, .97f).clip(RoundedCornerShape(16.dp))
         .background(if (primary) {
             if (Hx.colors.accent == Color(0xFF0A62E8)) Color(0xFF004EE4) else Hx.colors.accent
         } else Hx.colors.accentSoft)
-        .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 12.dp), contentAlignment = Alignment.Center) {
+        .clickable(interactionSource = source, indication = null, onClick = onClick).padding(horizontal = 12.dp, vertical = 12.dp), contentAlignment = Alignment.Center) {
         Text(label, color = if (primary) Hx.colors.onAccent else Hx.colors.textMuted,
             fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold)
     }
@@ -208,11 +248,11 @@ private fun SettingsDialogButton(label: String, primary: Boolean, onClick: () ->
 
 @Composable
 internal fun SettingsMirrorDialog(initial: String, onSave: (String) -> Unit, onDismiss: () -> Unit) {
-    var value by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(initial) }
-    var error by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    var value by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(initial) }
+    var error by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     SettingsDialog(ht("加速下载"), onDismiss, ht("保存"), onConfirm = {
         val next = value.trim()
-        if (next.isNotBlank() && !next.startsWith("https://") && !next.startsWith("http://")) error = true
+        if (!settingsMirrorPrefixValid(next)) error = true
         else onSave(next)
     }) {
         Text(ht("镜像前缀"), color = Hx.colors.textMuted, fontSize = 13.sp)
@@ -221,4 +261,16 @@ internal fun SettingsMirrorDialog(initial: String, onSave: (String) -> Unit, onD
         if (error) Text(ht("请填写 http/https 地址"), color = Hx.colors.bad, fontSize = 12.sp,
             modifier = Modifier.padding(start = 4.dp, top = 5.dp))
     }
+}
+
+/** Blank disables the prefix; a configured prefix must identify an HTTP(S) host. */
+internal fun settingsMirrorPrefixValid(value: String): Boolean {
+    if (value.isBlank()) return true
+    if (value.any { it.isWhitespace() || it.isISOControl() }) return false
+    return runCatching {
+        val uri = java.net.URI(value)
+        (uri.scheme.equals("https", true) || uri.scheme.equals("http", true)) &&
+            !uri.host.isNullOrBlank() && uri.rawUserInfo == null && uri.rawFragment == null &&
+            (uri.port == -1 || uri.port in 1..65535)
+    }.getOrDefault(false)
 }

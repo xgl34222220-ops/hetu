@@ -503,7 +503,7 @@ internal fun AboutScreen(vm: HetuViewModel) {
     }
 
     val aboutList = androidx.compose.foundation.lazy.rememberLazyListState()
-    HxPage(title = ht("关于"), onBack = { nav.pop() }, listState = aboutList, largeTitle = false) {
+    HxPage(title = ht("关于"), onBack = { nav.pop() }, listState = aboutList, largeTitle = false, compactTitleFontSizeSp = 20f) {
         item(key = "brand") {
             val wash = androidx.compose.ui.graphics.Brush.verticalGradient(
                 listOf(c.accentSoft, androidx.compose.ui.graphics.lerp(c.accentSoft, Color(0xFFF7D9E8), if (c.dark) .15f else .55f), c.canvas),
@@ -530,8 +530,8 @@ internal fun AboutScreen(vm: HetuViewModel) {
                             .clip(RoundedCornerShape(26.dp)),
                     )
                     Spacer(Modifier.height(10.dp))
-                    Text("河图", style = MaterialTheme.typography.headlineMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = c.accent)
-                    Text("${BuildConfig.VERSION_NAME}（${BuildConfig.VERSION_CODE}）", style = MaterialTheme.typography.bodySmall.merge(HxNumberStyle), color = c.textMuted)
+                    Text("河图", fontSize = 32.sp, lineHeight = 40.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = c.accent)
+                    Text("${BuildConfig.VERSION_NAME}（${BuildConfig.VERSION_CODE}）", fontSize = 14.sp, lineHeight = 20.sp, color = c.textMuted)
                     Spacer(Modifier.height(8.dp))
                     Text(
                         "Root 透明代理与广告过滤，基于 Mihomo。",

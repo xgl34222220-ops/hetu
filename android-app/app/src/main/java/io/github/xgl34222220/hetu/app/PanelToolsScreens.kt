@@ -65,6 +65,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import io.github.xgl34222220.hetu.ui.HetuHaptic
 import io.github.xgl34222220.hetu.ui.ht
 import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
@@ -102,200 +103,29 @@ internal fun PanelScreen(vm: HetuViewModel, bottomPadding: Dp) {
 /* ------------------------------------------------------------------ */
 
 @Composable
-internal fun ToolsScreen(vm: HetuViewModel, bottomPadding: Dp) {
-    val context = LocalContext.current
+internal fun ToolsScreen(
+    vm: HetuViewModel,
+    bottomPadding: Dp,
+    onSubPageVisibleChanged: (Boolean) -> Unit = {},
+) {
     val nav = LocalNav.current
-    val stagger = rememberHxStagger()
-    var searching by remember { mutableStateOf(false) }
-    var toolQuery by remember { mutableStateOf("") }
-    fun open(type: Class<out android.app.Activity>) { context.startActivity(Intent(context, type)) }
-
-    HxPage(
-        title = ht("工具"),
-        scrollToTopSignal = vm.reselect,
-        bottomPadding = bottomPadding,
-        largeTitleStartPadding = 26.dp,
-        largeTitleTopPadding = 26.dp,
-        largeTitleFontSizeSp = 36f,
-        largeTitleBottomPadding = 18.dp,
-        canvasColor = Hx.colors.canvas,
-        actions = {
-            HxBarAction(
-                if (searching) Icons.Rounded.Close else Icons.Rounded.Search,
-                if (searching) ht("关闭搜索") else ht("搜索"),
-                onClick = {
-                    if (searching) toolQuery = ""
-                    searching = !searching
-                },
-            )
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    io.github.xgl34222220.hetu.tools.HetuToolsV2(
+        onLog = vm::toast,
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = bottomPadding + 24.dp),
+        onSubPageVisibleChanged = onSubPageVisibleChanged,
+        onConfigChanged = { scope.launch { vm.refreshNow() } },
+        onOpenDiagnosticsDetails = { nav.push(HxRoute.Diagnostics) },
+        onOpenConfigEditor = { nav.push(HxRoute.ConfigEditor) },
+        onOpenExternalEntry = { entry ->
+            when (entry) {
+                io.github.xgl34222220.hetu.tools.ToolsEntry.Files -> { nav.push(HxRoute.Files); true }
+                io.github.xgl34222220.hetu.tools.ToolsEntry.Logs -> { nav.push(HxRoute.Logs); true }
+                io.github.xgl34222220.hetu.tools.ToolsEntry.NetMatch -> { nav.push(HxRoute.NetMatch); true }
+                else -> false
+            }
         },
-    ) {
-        if (searching) {
-            item(key = "tool-search") {
-                Box(Modifier.padding(horizontal = 12.dp).padding(bottom = 10.dp)) {
-                    HxSearchField(toolQuery, { toolQuery = it }, ht("搜索工具"), autoFocus = true)
-                }
-            }
-            item(key = "tool-search-results") {
-                val q = toolQuery.trim()
-                val tools = listOf(
-                    Triple("文件管理", "查看与处理应用文件", "文件 导入 下载 编辑"),
-                    Triple("脚本", "运行与管理服务脚本", "服务 Hook shell"),
-                    Triple("日志文件", "查看与导出运行日志", "日志 调试"),
-                    Triple("应用管理", "代理与直连", "应用 网络 UID"),
-                    Triple("共享网络", "热点与代理", "网络 热点 共享"),
-                    Triple("网络匹配", "自动切换", "网络 Wi-Fi SSID BSSID"),
-                    Triple("绕过规则", "网段与接口", "网络 CIDR 接口"),
-                    Triple("配置管理", "导入与编辑配置文件", "配置 订阅 YAML"),
-                    Triple("Sub-Store", "订阅处理", "订阅 后端"),
-                    Triple("CNIP", "规则集管理", "中国 IP 直连"),
-                    Triple("核心管理", "下载与更新", "核心 Mihomo Xray sing-box"),
-                    Triple("广告过滤", "规则与屏蔽", "广告 DNS 白名单 黑名单"),
-                    Triple("诊断工具", "网络与环境", "网络 诊断 维护 恢复"),
-                    Triple("Web面板", "外部面板", "WebUI Zashboard"),
-                ).filter { q.isBlank() || it.first.contains(q, true) || it.second.contains(q, true) || it.third.contains(q, true) || ht(it.first).contains(q, true) || ht(it.second).contains(q, true) }
-                if (tools.isEmpty()) HxEmpty(Icons.Rounded.Search, ht("没有匹配的工具"), ht("试试工具名称或功能关键词"))
-                else tools.groupBy { if (it.first == "诊断工具") "diagnostics" else "tools" }.values.forEach { group ->
-                    ToolReferenceCard {
-                        group.forEach { (title, subtitle, _) ->
-                            val icon = when (title) {
-                                "文件管理" -> Icons.Rounded.Folder
-                                "脚本" -> Icons.Rounded.Terminal
-                                "日志文件" -> Icons.Rounded.Article
-                                "应用管理" -> Icons.Rounded.Apps
-                                "共享网络" -> Icons.Rounded.WifiTethering
-                                "网络匹配" -> Icons.Rounded.Wifi
-                                "绕过规则" -> Icons.Rounded.AltRoute
-                                "配置管理" -> Icons.Rounded.CloudDownload
-                                "Sub-Store" -> Icons.Rounded.CloudSync
-                                "CNIP" -> Icons.Rounded.Place
-                                "核心管理" -> Icons.Rounded.Memory
-                                "广告过滤" -> Icons.Rounded.Shield
-                                "诊断工具" -> Icons.Rounded.HealthAndSafety
-                                else -> Icons.Rounded.Web
-                            }
-                            ToolReferenceRow(title, subtitle, icon) {
-                                when (title) {
-                                    "文件管理" -> nav.push(HxRoute.Files)
-                                    "脚本" -> open(ProxyScriptsActivity::class.java)
-                                    "日志文件" -> nav.push(HxRoute.Logs)
-                                    "应用管理" -> nav.push(HxRoute.Apps)
-                                    "共享网络" -> nav.push(HxRoute.SharedNet)
-                                    "网络匹配" -> nav.push(HxRoute.NetMatch)
-                                    "绕过规则" -> nav.push(HxRoute.Bypass)
-                                    "配置管理" -> nav.push(HxRoute.Configs)
-                                    "Sub-Store" -> open(ProxySubStoreActivity::class.java)
-                                    "CNIP" -> nav.push(HxRoute.CnIp)
-                                    "核心管理" -> nav.push(HxRoute.Cores)
-                                    "广告过滤" -> nav.push(HxRoute.Adblock)
-                                    "诊断工具" -> nav.push(HxRoute.Diagnostics)
-                                    else -> open(ProxyWebPanelsActivity::class.java)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        } else item(key = "file-run") {
-            ToolReferenceCard(Modifier.hxEnter(stagger, 0)) {
-                ToolReferenceRow(
-                    "文件管理",
-                    "查看与处理应用文件",
-                    Icons.Rounded.Folder,
-                ) { nav.push(HxRoute.Files) }
-                ToolReferenceRow(
-                    "脚本",
-                    "运行与管理服务脚本",
-                    Icons.Rounded.Terminal,
-                ) { open(ProxyScriptsActivity::class.java) }
-            }
-        }
-
-        if (!searching) item(key = "logs") {
-            ToolReferenceCard(Modifier.hxEnter(stagger, 1)) {
-                ToolReferenceRow(
-                    "日志文件",
-                    "查看与导出运行日志",
-                    Icons.Rounded.Article,
-                ) { nav.push(HxRoute.Logs) }
-            }
-        }
-
-        if (!searching) item(key = "apps") {
-            ToolReferenceCard(Modifier.hxEnter(stagger, 2)) {
-                ToolReferenceRow(
-                    "应用管理",
-                    "管理应用代理与直连规则",
-                    Icons.Rounded.Apps,
-                ) { nav.push(HxRoute.Apps) }
-            }
-        }
-
-        if (!searching) item(key = "network") {
-            ToolReferenceCard(Modifier.hxEnter(stagger, 3)) {
-                ToolReferenceRow(
-                    "网络匹配",
-                    "设置网络匹配后要执行的操作",
-                    Icons.Rounded.Wifi,
-                ) { nav.push(HxRoute.NetMatch) }
-                ToolReferenceRow(
-                    "共享网络",
-                    "管理共享网络转发相关设置",
-                    Icons.Rounded.WifiTethering,
-                ) { nav.push(HxRoute.SharedNet) }
-                ToolReferenceRow(
-                    "绕过规则",
-                    "管理本地 CIDR 与接口规则",
-                    Icons.Rounded.AltRoute,
-                ) { nav.push(HxRoute.Bypass) }
-            }
-        }
-
-        if (!searching) item(key = "subscription") {
-            ToolReferenceCard(Modifier.hxEnter(stagger, 4)) {
-                ToolReferenceRow(
-                    "配置管理",
-                    "导入与编辑配置文件",
-                    Icons.Rounded.CloudDownload,
-                ) { nav.push(HxRoute.Configs) }
-                ToolReferenceRow(
-                    "Sub-Store",
-                    "订阅处理",
-                    Icons.Rounded.CloudSync,
-                ) { open(ProxySubStoreActivity::class.java) }
-                ToolReferenceRow(
-                    "CNIP",
-                    "规则集管理",
-                    Icons.Rounded.Place,
-                ) { nav.push(HxRoute.CnIp) }
-            }
-        }
-
-        if (!searching) item(key = "updates") {
-            ToolReferenceCard(Modifier.hxEnter(stagger, 5)) {
-                ToolReferenceRow(
-          "核心管理",
-          "下载与更新",
-          Icons.Rounded.Memory,
-                ) { nav.push(HxRoute.Cores) }
-                ToolReferenceRow(
-          "广告过滤",
-          "规则与屏蔽",
-          Icons.Rounded.Shield,
-                ) { nav.push(HxRoute.Adblock) }
-                ToolReferenceRow(
-          "诊断工具",
-          "网络与环境",
-          Icons.Rounded.HealthAndSafety,
-                ) { nav.push(HxRoute.Diagnostics) }
-                ToolReferenceRow(
-          "Web面板",
-          "外部面板",
-          Icons.Rounded.Web,
-                ) { open(ProxyWebPanelsActivity::class.java) }
-            }
-        }
-    }
+    )
 }
 
 /**

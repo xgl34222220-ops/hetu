@@ -201,5 +201,9 @@ internal fun HetuHomeTheme(
     content: @Composable () -> Unit,
 ) {
     val colors = homeColors(dark, customAccent ?: accent.color(dark), pureBlack)
-    CompositionLocalProvider(LocalHomeColors provides colors, content = content)
+    CompositionLocalProvider(
+        LocalHomeColors provides colors,
+        LocalHomeMotionEnabled provides homeMotionEnabled(),
+        content = content,
+    )
 }

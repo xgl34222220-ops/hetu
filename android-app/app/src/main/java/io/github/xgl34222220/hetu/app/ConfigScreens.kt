@@ -804,26 +804,26 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
             IconButton(onClick = ::leave, modifier = Modifier.align(Alignment.CenterStart)) {
                 Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回", tint = c.text)
             }
-            Text("编辑配置", style = MaterialTheme.typography.titleMedium, color = c.text, modifier = Modifier.align(Alignment.Center))
+            Text("编辑配置", style = MaterialTheme.typography.titleMedium.copy(fontSize = 20.sp, lineHeight = 26.sp), color = c.text, modifier = Modifier.align(Alignment.Center))
             IconButton(onClick = ::save, enabled = dirty && !saving && !validating,
                 modifier = Modifier.align(Alignment.CenterEnd)) {
                 if (saving) HxSpinner() else Icon(Icons.Rounded.Save, "保存", tint = if (dirty) c.accent else c.textFaint)
             }
         }
         Row(Modifier.fillMaxWidth().padding(horizontal = Hx.gutter).padding(top = 4.dp)
-            .clip(RoundedCornerShape(18.dp)).background(c.surface).padding(horizontal = 16.dp, vertical = 14.dp),
+            .clip(HomeContinuousShape(24.dp)).background(c.surface).padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Rounded.Description, null, tint = if (source == null) c.textFaint else c.text, modifier = Modifier.size(28.dp))
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
-                Text(source?.name ?: "读取配置", style = MaterialTheme.typography.titleMedium, color = c.text,
+                Text(source?.name ?: "读取配置", style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp, lineHeight = 24.sp), color = c.text,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(when { loading -> "正在读取当前配置"; loadFailure != null -> "读取配置失败，保存操作已禁用"; dirty -> "未保存 · 草稿仅保留在本页"; else -> "已保存 · 当前配置" },
-                    style = MaterialTheme.typography.bodySmall, color = if (dirty) c.warn else c.textMuted)
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp, lineHeight = 20.sp), color = if (dirty) c.warn else c.textMuted)
             }
         }
         Row(Modifier.fillMaxWidth().padding(horizontal = Hx.gutter, vertical = 10.dp)
-            .clip(RoundedCornerShape(18.dp)).background(c.surface), verticalAlignment = Alignment.CenterVertically) {
+            .clip(HomeContinuousShape(24.dp)).background(c.surface), verticalAlignment = Alignment.CenterVertically) {
             val enabled = source != null && !loading && !saving
             ConfigEditorAction(Icons.AutoMirrored.Rounded.Undo, "撤销", Modifier.weight(1f), enabled) { editor?.let { if (it.canUndo()) it.undo() } }
             ConfigEditorAction(Icons.AutoMirrored.Rounded.Redo, "重做", Modifier.weight(1f), enabled) { editor?.let { if (it.canRedo()) it.redo() } }
@@ -838,7 +838,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
                 actionLabel = "关闭提示", onAction = { problem = null })
         }
         Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = Hx.gutter)
-            .clip(RoundedCornerShape(18.dp)).background(c.surface)) {
+            .clip(HomeContinuousShape(24.dp)).background(c.surface)) {
             val initial = source
             when {
                 loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { HxSpinner(26.dp) }
@@ -881,7 +881,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
             }
         }
         Row(Modifier.fillMaxWidth().padding(horizontal = Hx.gutter, vertical = 8.dp)
-            .clip(RoundedCornerShape(18.dp)).background(c.surface)
+            .clip(HomeContinuousShape(24.dp)).background(c.surface)
             .horizontalScroll(rememberScrollState()).padding(7.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
             HxYamlSymbols.forEach { symbol ->
                 Box(Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(c.surfaceMuted)

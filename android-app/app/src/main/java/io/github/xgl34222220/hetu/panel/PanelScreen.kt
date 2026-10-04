@@ -34,6 +34,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.xgl34222220.hetu.home.HomeButton
@@ -44,6 +45,8 @@ import io.github.xgl34222220.hetu.home.HomeIconButton
 import io.github.xgl34222220.hetu.home.HomeIcons
 import io.github.xgl34222220.hetu.home.HomeModalSheet
 import io.github.xgl34222220.hetu.home.HomeMotion
+import io.github.xgl34222220.hetu.home.HomeRefreshBox
+import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
 import io.github.xgl34222220.hetu.home.HomeType
 import io.github.xgl34222220.hetu.home.LocalHomeColors
 import kotlinx.coroutines.launch
@@ -86,14 +89,24 @@ internal fun PanelScreen(
         derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > collapseAt }
     }
     val running = data.running
-    val rows = remember(data.groups, data.delays, data.globalMode, view) { if (running && view.tab == PanelTab.Groups) PanelLogic.groupRows(data, view) else emptyList() }
+    val configuration = LocalConfiguration.current
+    val effectiveLayout = PanelLogic.layoutForViewport(view.layout, configuration.screenWidthDp, LocalDensity.current.fontScale)
+    val displayView = view.copy(layout = effectiveLayout)
+    val motion = LocalHomeMotionEnabled.current
+    val rows = remember(data.groups, data.delays, data.globalMode, displayView, running) { if (running && view.tab == PanelTab.Groups) PanelLogic.groupRows(data, displayView) else emptyList() }
     val headerItems = panelHeaderItemCount(data, view)
     val closeOverlay = { onOverlay(null) }
     val menu: @Composable (PanelOverlay) -> Unit = { target ->
         if (popups) PanelDropdown(expanded = overlay == target, onDismiss = closeOverlay) { PanelMenuContent(target, view, onView, onOverlay) }
     }
 
-    Box(modifier.fillMaxSize().background(c.bg)) {
+    HomeRefreshBox(
+        refreshing = data.refreshing,
+        onRefresh = actions.onRefresh,
+        label = "刷新${view.tab.label}",
+        modifier = modifier.fillMaxSize().background(c.bg),
+        indicatorPadding = PaddingValues(top = statusTop + HomeDims.barHeight),
+    ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             state = listState,
@@ -120,13 +133,15 @@ internal fun PanelScreen(
             }
             when (view.tab) {
                 PanelTab.Groups -> panelGroupsTab(
-                    rows = rows, data = data, view = view,
+                    rows = rows, data = data, view = displayView,
                     onToggleGroup = { name ->
                         val next = view.toggleGroup(name)
                         onView(next)
                         if (name in next.expandedGroups) {
-                            val at = PanelLogic.groupRows(data, next).indexOfFirst { it is PanelGroupRow.Cards && it.groups.any { g -> g.name == name } }
-                            if (at >= 0) scope.launch { listState.animateScrollToItem(headerItems + at) }
+                            val at = PanelLogic.groupRows(data, next.copy(layout = effectiveLayout)).indexOfFirst { it is PanelGroupRow.Cards && it.groups.any { g -> g.name == name } }
+                            if (at >= 0) scope.launch {
+                                if (motion) listState.animateScrollToItem(headerItems + at) else listState.scrollToItem(headerItems + at)
+                            }
                         }
                     },
                     onSelectNode = actions.onSelectNode,
@@ -160,7 +175,9 @@ internal fun PanelScreen(
                 PanelFab(PanelIcons.LocateFixed, "定位当前节点", {
                     val now = data.groups.firstOrNull { it.name == openGroup }?.now
                     val at = rows.indexOfFirst { it is PanelGroupRow.Nodes && it.group.name == openGroup && it.nodes.any { n -> n.name == now } }
-                    if (at >= 0) scope.launch { listState.animateScrollToItem(headerItems + at) }
+                    if (at >= 0) scope.launch {
+                        if (motion) listState.animateScrollToItem(headerItems + at) else listState.scrollToItem(headerItems + at)
+                    }
                 })
                 PanelFab(PanelIcons.ChevronDown, "收起节点", { onView(view.toggleGroup(openGroup)) }, text = openGroup)
             }
@@ -196,7 +213,7 @@ private fun PanelActionBar(
 ) {
     val c = LocalHomeColors.current
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val barAlpha by animateFloatAsState(if (collapsed) 1f else 0f, tween(HomeMotion.SwitchMs), label = "panel-bar")
+    val barAlpha by animateFloatAsState(if (collapsed) 1f else 0f, tween(if (LocalHomeMotionEnabled.current) HomeMotion.SwitchMs else 0), label = "panel-bar")
     val tab = view.tab
     Box(Modifier.fillMaxWidth()) {
         if (barAlpha > 0f) Column(Modifier.fillMaxWidth().alpha(barAlpha).background(c.bg.copy(alpha = .94f))) {

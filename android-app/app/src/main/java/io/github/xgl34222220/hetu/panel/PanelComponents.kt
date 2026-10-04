@@ -77,6 +77,8 @@ import io.github.xgl34222220.hetu.home.HomeSpinner
 import io.github.xgl34222220.hetu.home.HomeType
 import io.github.xgl34222220.hetu.home.LocalHomeColors
 import io.github.xgl34222220.hetu.home.LocalHomeHaptics
+import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
+import io.github.xgl34222220.hetu.home.homeTap
 
 /* ------------------------------------------------------------------ */
 /*  Panel-only tokens (everything else comes from HomeTokens)           */
@@ -101,7 +103,7 @@ internal object PanelType {
     val tab = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium)
     val groupName = TextStyle(fontSize = 14.5.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold)
     val tiny = TextStyle(fontSize = 11.5.sp, lineHeight = 16.sp, fontFeatureSettings = Tnum)
-    val nodeName = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium)
+    val nodeName = TextStyle(fontSize = 15.sp, lineHeight = 21.sp, fontWeight = FontWeight.Medium)
     val cardTitle = TextStyle(fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold)
     val host = TextStyle(fontSize = 14.5.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium)
     val stat = TextStyle(fontSize = 22.sp, lineHeight = 30.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.22).sp, fontFeatureSettings = Tnum)
@@ -272,7 +274,7 @@ internal fun PanelChip(
 @Composable
 internal fun PanelSwitch(checked: Boolean, modifier: Modifier = Modifier) {
     val c = LocalHomeColors.current
-    val thumb by animateDpAsState(if (checked) 21.dp else 3.dp, tween(HomeMotion.SwitchMs, easing = HomeMotion.Emphasized), label = "panel-switch")
+    val thumb by animateDpAsState(if (checked) 21.dp else 3.dp, tween(if (LocalHomeMotionEnabled.current) HomeMotion.SwitchMs else 0, easing = HomeMotion.Emphasized), label = "panel-switch")
     Box(modifier.size(44.dp, 26.dp).background(if (checked) c.accent else c.line2, RoundedCornerShape(13.dp))) {
         Box(Modifier.offset(x = thumb, y = 3.dp).size(20.dp).background(Color.White, CircleShape))
     }
@@ -364,7 +366,9 @@ internal fun PanelDelayLabel(delay: PanelDelay?, modifier: Modifier = Modifier, 
         }
     }
     Row(
-        modifier.heightIn(min = 20.dp).let { if (onClick != null && delay != PanelDelay.Testing) it.clickable(onClickLabel = "测速", role = Role.Button) { haptics(HomeHaptic.Tap); onClick() } else it },
+        modifier.heightIn(min = if (onClick != null) 48.dp else 20.dp).let {
+            if (onClick != null && delay != PanelDelay.Testing) it.homeTap(onClickLabel = "测速", role = Role.Button) { haptics(HomeHaptic.Tap); onClick() } else it
+        },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
