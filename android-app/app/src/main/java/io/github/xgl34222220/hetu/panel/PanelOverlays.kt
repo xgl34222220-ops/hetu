@@ -60,7 +60,7 @@ internal fun ColumnScope.PanelMenuContent(
     when (overlay) {
         PanelOverlay.GroupFilterMenu -> {
             val d = view.display
-            fun set(next: PanelGroupDisplay) = onView(view.copy(display = next))
+            fun set(next: PanelGroupDisplay) = pick(view.copy(display = next))
             PanelMenuItem("显示隐藏策略", { set(d.copy(showHidden = !d.showHidden)) }, checked = d.showHidden)
             PanelMenuItem("根据模式显示 GLOBAL", { set(d.copy(globalByMode = !d.globalByMode)) }, checked = d.globalByMode)
             PanelMenuItem("按订阅分组节点", { set(d.copy(groupByProvider = !d.groupByProvider)) }, checked = d.groupByProvider)

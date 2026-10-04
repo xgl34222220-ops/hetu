@@ -169,7 +169,7 @@ internal enum class PanelLogLevel(val label: String) { Debug("DEBUG"), Info("INF
 
 internal data class PanelLogEntry(val id: Int, val level: PanelLogLevel, val time: String, val message: String) {
     /** More than two lines: the card is clamped and gets a 展开 / 收起 footer. */
-    val foldable: Boolean get() = message.length > 80 || message.count { it == '\n' } >= 2
+    val foldable: Boolean get() = message.length > 60 || message.count { it == '\n' } >= 2
 }
 
 /** Everything the panel renders that comes from the core. */

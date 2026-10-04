@@ -261,7 +261,7 @@
              onSelect = { index ->
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt
-@@ -0,0 +1,48 @@
+@@ -0,0 +1,49 @@
 +package io.github.xgl34222220.hetu
 +
 +import androidx.compose.runtime.Composable
@@ -287,10 +287,11 @@
 +            refreshing = vm.refreshing, testing = vm.siteTesting,
 +            uptimeSeconds = rt.elapsedSeconds, core = vm.state.core,
 +            mode = vm.state.mode, config = vm.state.config, message = vm.state.message,
-+            pendingSettings = vm.settingsPending(), delays = vm.siteDelays,
++            pendingSettings = vm.settingsRevision >= 0 && vm.settingsPending(), delays = vm.siteDelays,
 +            latencyTargets = ProxyLatencyTargets.load(vm.prefs).map { it.name },
 +            wan = rt.wanAddress, lan = rt.lanAddress, countryCode = rt.wanCountryCode,
-+            region = rt.wanRegion, isp = rt.wanIsp, asn = rt.wanAsn, lanInterface = rt.lanInterface,
++            region = rt.wanRegion.ifBlank { listOf(rt.wanCountry, rt.wanCity).filter { it.isNotBlank() }.distinct().joinToString(" · ") },
++            isp = rt.wanIsp, asn = rt.wanAsn, lanInterface = rt.lanInterface,
 +            up = vm.upRate, down = vm.downRate,
 +            used = tracked.sumOf { it.used }, total = tracked.sumOf { it.total },
 +            memory = rt.rssBytes.takeIf { it > 0 } ?: vm.state.memoryBytes,
@@ -5438,7 +5439,7 @@
 +
 +internal data class PanelLogEntry(val id: Int, val level: PanelLogLevel, val time: String, val message: String) {
 +    /** More than two lines: the card is clamped and gets a 展开 / 收起 footer. */
-+    val foldable: Boolean get() = message.length > 80 || message.count { it == '\n' } >= 2
++    val foldable: Boolean get() = message.length > 60 || message.count { it == '\n' } >= 2
 +}
 +
 +/** Everything the panel renders that comes from the core. */
@@ -5847,7 +5848,7 @@
 +    when (overlay) {
 +        PanelOverlay.GroupFilterMenu -> {
 +            val d = view.display
-+            fun set(next: PanelGroupDisplay) = onView(view.copy(display = next))
++            fun set(next: PanelGroupDisplay) = pick(view.copy(display = next))
 +            PanelMenuItem("显示隐藏策略", { set(d.copy(showHidden = !d.showHidden)) }, checked = d.showHidden)
 +            PanelMenuItem("根据模式显示 GLOBAL", { set(d.copy(globalByMode = !d.globalByMode)) }, checked = d.globalByMode)
 +            PanelMenuItem("按订阅分组节点", { set(d.copy(groupByProvider = !d.groupByProvider)) }, checked = d.groupByProvider)
