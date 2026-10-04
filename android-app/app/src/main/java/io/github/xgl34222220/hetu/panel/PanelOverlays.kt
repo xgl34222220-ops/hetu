@@ -231,6 +231,7 @@ private fun ApiSheet(saved: PanelApiSettings, onCancel: () -> Unit, onSave: (Pan
                         }
                     }
                     HomeTextField("密钥", draft.secret, { edit(draft.copy(secret = it)) }, monospace = true, placeholder = "未设置")
+                    FieldError(errors["secret"])
                 }
             }
         }

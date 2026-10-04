@@ -303,10 +303,10 @@ class ConceptStateCoverageTest {
         runningFixture()
         show { HetuRoot(vm) }
         expect("运行中"); capture("01-001-running")
-        click("运行中"); expect("规则"); capture("01-002-controls-expanded")
+        expect("重载"); expect("停止"); expect("重启"); expect("规则"); capture("01-002-controls-expanded")
         rule.runOnUiThread { ProxyRuntimeSettings.markDirty(vm.prefs, "proxyBaseMode"); vm.bumpSettings() }; frame()
-        expect("设置已修改，重启后生效"); click("运行中")
-        click("WAN"); capture("01-004-pending-lan")
+        expect("设置已修改，重启后生效")
+        click("LAN"); expect("192.168.1.12"); capture("01-004-pending-lan")
         click("网速"); expect("网速数据来源"); capture("01-005-speed-source")
         click("本地模式")
         assertEquals("local", vm.prefs.getString("homeSpeedSource", ""))
@@ -316,7 +316,7 @@ class ConceptStateCoverageTest {
     @Test fun homeStartAndFailure() {
         fixture("operation", HxRunOp.Start); fixture("operationText", "请稍候…")
         show { HetuRoot(vm) }
-        expect("正在启动"); expectDisabledActionLabel("启动"); capture("01-006-starting")
+        expect("正在启动"); expectDisabledActionLabel("启动中"); capture("01-006-starting")
         rule.runOnUiThread { fixture("operation", null); vm.startupError = "测试夹具：配置加载失败\n第 18 行：缩进无效" }; frame()
         expect("启动失败")
         rule.runOnUiThread { assertTrue("Copy label is visible text, not only an icon description", nativeNodes().any { n -> n.config.getOrNull(SemanticsProperties.Text)?.any { it.text == "复制" } == true }) }
@@ -344,9 +344,9 @@ class ConceptStateCoverageTest {
         fixture("state", vm.state.copy(groups = vm.state.groups.take(1)))
         vm.openPanel("proxies")
         show { HetuRoot(vm) }
-        expect("URLTest  6/8")
+        expect("URLTest · 6/8")
         click("搜索"); replace(0, "日本 01")
-        expect("URLTest  6/8")
+        expect("URLTest · 6/8")
         expect("香港 01")
         rule.runOnUiThread {
             assertEquals(8, vm.state.groups.first().nodes.size)
@@ -376,7 +376,7 @@ class ConceptStateCoverageTest {
             val selected = nativeNodes().first { "按配置" in labels(it) && it.config.getOrNull(SemanticsActions.GetTextLayoutResult)?.action != null }
             val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
             assertTrue(selected.config[SemanticsActions.GetTextLayoutResult].action!!.invoke(layouts))
-            assertEquals(androidx.compose.ui.graphics.Color.White, layouts.single().layoutInput.style.color)
+            assertEquals(androidx.compose.ui.graphics.Color(0xFF12161A), layouts.single().layoutInput.style.color)
         }
         click("1 列", 0); assertEquals(1, vm.prefs.getInt("proxySelectorGroupColumns", 2))
         click("2 列", 0); assertEquals(2, vm.prefs.getInt("proxySelectorGroupColumns", 1))
@@ -468,7 +468,7 @@ class ConceptStateCoverageTest {
         expect("api.example.com"); capture("02-006-connections")
         touch("连接排序"); capture("02-017-connection-sort"); click("主机")
         touch("连接筛选"); capture("02-021-connection-filter"); click("代理")
-        click("api.example.com"); expect("断开此连接"); expect("关闭详情"); capture("02-014-connection-detail"); click("关闭详情")
+        click("api.example.com"); expect("断开此连接"); expect("关闭"); capture("02-014-connection-detail"); click("关闭")
         touch("连接显示"); capture("02-018-connection-display"); click("断开全部连接")
         expect("断开全部连接？"); capture("02-015-disconnect-confirm"); click("取消")
         assertEquals(2, vm.state.connections.size)

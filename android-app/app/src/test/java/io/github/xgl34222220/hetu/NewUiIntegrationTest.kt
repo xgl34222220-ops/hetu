@@ -50,7 +50,7 @@ class NewUiIntegrationTest {
     }
     @Test fun resourceDetailHidesDockAndReturns() {
         root()
-        rule.onNodeWithContentDescription("查看资源占用").performScrollTo().performClick()
+        rule.onNodeWithText("资源占用").performScrollTo().performClick()
         rule.mainClock.advanceTimeBy(1000)
         rule.onNodeWithText("首页").assertDoesNotExist()
         rule.onNodeWithContentDescription("返回").performClick()
@@ -72,6 +72,9 @@ class NewUiIntegrationTest {
     @Test fun newLauncherKeepsToolsAndDiagnostics() {
         vm.tab = HxTab.Tools
         root()
-        rule.onNodeWithText("诊断工具").assertExists()
+        rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("诊断工具"))
+        rule.onNodeWithText("诊断工具").performClick()
+        rule.mainClock.advanceTimeBy(1000)
+        rule.onNodeWithText("网络事件记录").assertExists()
     }
 }

@@ -28,6 +28,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import io.github.xgl34222220.hetu.CompactHomeData
 import io.github.xgl34222220.hetu.HomeOperation
+import io.github.xgl34222220.hetu.HomeResourceSample
 import io.github.xgl34222220.hetu.ProxyGroupUi
 import io.github.xgl34222220.hetu.ProxyLatencyTarget
 import io.github.xgl34222220.hetu.ProxyLatencyTargets
@@ -85,6 +86,7 @@ internal fun HetuHomeV2(
     modifier: Modifier = Modifier,
     cpuAffinity: String? = null,
     currentCpu: Int? = null,
+    resourceSamples: List<HomeResourceSample>? = null,
     onDetailVisibleChange: (Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -97,7 +99,7 @@ internal fun HetuHomeV2(
     val localSpeed = rememberLocalSpeed(enabled = speedSource == HomeSpeedSource.Local)
     val status = homeStatusOf(data, startupError)
     val sampling = status is HomeStatus.Running || status is HomeStatus.PendingRestart
-    val history = rememberResourceHistory(sampling, data.cpu, data.memory)
+    val history = rememberResourceHistory(sampling && resourceSamples == null, data.cpu, data.memory)
 
     val state = data.toHomeUiState(
         status = status,
@@ -114,8 +116,8 @@ internal fun HetuHomeV2(
             cpuAffinity = cpuAffinity,
             currentCpu = currentCpu,
             connections = data.connections,
-            cpuHistory = history.first,
-            memoryHistoryMb = history.second,
+            cpuHistory = resourceSamples?.map { it.cpuPercent } ?: history.first,
+            memoryHistoryMb = resourceSamples?.map { it.memoryBytes?.div(1024f * 1024f) } ?: history.second,
         ),
     )
 

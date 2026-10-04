@@ -95,7 +95,7 @@ private fun TrendCard(title: String, value: String?, history: List<Float?>, colo
                 if (footnote != null) Text(footnote, Modifier.fillMaxWidth().padding(top = 8.dp), color = c.t3, style = HomeType.caption, textAlign = TextAlign.Center)
             } else {
                 Box(Modifier.fillMaxWidth().height(72.dp), contentAlignment = Alignment.Center) {
-                    Text("等待连续运行采样", color = c.t3, style = HomeType.rowSub)
+                    Text("等待连接进行采样", color = c.t3, style = HomeType.rowSub)
                 }
             }
         }

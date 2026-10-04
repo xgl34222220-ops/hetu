@@ -50,6 +50,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /*
@@ -328,6 +329,7 @@ private fun buildPanelData(
             },
             now = selectedLocal[g.name] ?: g.now,
             hidden = g.hidden,
+            availableCount = g.nodes.count { (delays[it.name] ?: it.lastDelay ?: -1L) > 0L },
         )
     }
     val nodeDelays = HashMap<String, PanelDelay>()
@@ -343,7 +345,7 @@ private fun buildPanelData(
         PanelConnection(
             id = c.id,
             host = host,
-            time = null,
+            time = c.startedAt.takeIf { it.isNotBlank() },
             network = c.network.substringBefore(" · ").uppercase(Locale.ROOT),
             inbound = c.inbound,
             kind = when {
@@ -563,7 +565,20 @@ private fun copyToClipboard(context: Context, label: String, text: String) {
 internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp) {
     val context = LocalContext.current
     val selector = remember { context.getSharedPreferences("proxy_selector_preferences", Context.MODE_PRIVATE) }
-    val initial = remember { loadView(vm.prefs, selector) }
+    val initial = remember {
+        val old = io.github.xgl34222220.hetu.PanelOptions11.read(vm.prefs)
+        val api = io.github.xgl34222220.hetu.PanelApiDraft11.read(vm.prefs)
+        loadView(vm.prefs, selector).copy(
+            display = PanelGroupDisplay(old.showHidden, old.globalByMode, old.providers, old.collapsePrevious,
+                vm.prefs.getBoolean("proxySelectorDisconnectOnSelect", false)),
+            layout = PanelGroupLayout(
+                when (old.sort) { "name" -> PanelNodeSort.Name; "delay", "latency" -> PanelNodeSort.Delay; else -> PanelNodeSort.Config },
+                old.descending, old.groupColumns, old.groupCompact, old.columns, old.compact, old.nameOverflow == "wrap"),
+            api = PanelApiSettings(api.customDelay, api.delayUrl, api.history, api.customApi, api.host, api.port, api.secret),
+            rankMode = if (vm.prefs.getString("panelOverviewRankSort", "connections") == "traffic") PanelRankMode.Total else PanelRankMode.Connections,
+            rankCount = vm.prefs.getInt("panelOverviewRankCount", 5),
+        )
+    }
     var view by remember { mutableStateOf(initial) }
     val sampler = remember { PanelTrafficSampler() }
     val tab = when (vm.panelSection) {
@@ -578,15 +593,23 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
     LaunchedEffect(tab, vm.state.running) {
         if (!vm.state.running) { sampler.reset(); return@LaunchedEffect }
         when (tab) {
-            PanelTab.Overview, PanelTab.Subscriptions -> vm.loadProviders()
-            PanelTab.Rules -> vm.loadRules()
-            PanelTab.RuleSets -> vm.loadRuleSets()
-            PanelTab.Logs -> vm.loadLogs()
+            PanelTab.Overview -> { vm.loadProviders(); if (vm.rules.isEmpty()) vm.loadRules() }
+            PanelTab.Subscriptions -> vm.loadProviders()
+            PanelTab.Rules -> if (vm.rules.isEmpty()) vm.loadRules()
+            PanelTab.RuleSets -> if (vm.ruleSets.isEmpty()) vm.loadRuleSets()
+            PanelTab.Logs -> {
+                vm.loadLogs()
+                while (true) { delay(3_000); vm.loadLogs(quiet = true) }
+            }
             else -> Unit
         }
     }
-    LaunchedEffect(vm.state.uploadTotal, vm.state.downloadTotal, vm.state.connections) {
-        if (vm.state.running) sampler.sample(SystemClock.elapsedRealtime(), vm.state.uploadTotal, vm.state.downloadTotal, vm.state.connections)
+    LaunchedEffect(vm.state.running) {
+        if (!vm.state.running) { sampler.reset(); return@LaunchedEffect }
+        while (true) {
+            sampler.sample(SystemClock.elapsedRealtime(), vm.state.uploadTotal, vm.state.downloadTotal, vm.state.connections)
+            delay(1_000)
+        }
     }
     fun updates(tasks: Map<String, io.github.xgl34222220.hetu.HxTask>) = tasks.mapValues { (_, t) ->
         if (t.running) PanelUpdate.Updating else if (t.ok == false) PanelUpdate.Failed(t.message) else PanelUpdate.Idle
@@ -601,7 +624,11 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
         onCloseConnection = vm::closeConnection, onCloseAllConnections = vm::closeAll,
         onRefreshRules = vm::loadRules, onUpdateRuleSet = vm::updateRuleSet,
         onUpdateAllRuleSets = vm::updateAllRuleSets, onRefreshLogs = { vm.loadLogs() },
-        onSaveApi = { saveApi(vm.prefs, it); vm.bumpSettings() },
+        onSaveApi = {
+            io.github.xgl34222220.hetu.PanelApiDraft11(it.customTestUrl, it.testUrl, it.history,
+                it.externalApi, it.host, it.port, it.secret).save(vm.prefs)
+            vm.bumpSettings()
+        },
         onOpenPolicyIcons = { context.startActivity(Intent(context, ProxyPolicyIconsActivity::class.java)) },
         onCopy = { label, text -> copyToClipboard(context, label, text) },
     )
@@ -615,6 +642,13 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
                 PanelTab.Connections -> "conn"; PanelTab.Rules -> "rules"; PanelTab.RuleSets -> "sets"; PanelTab.Logs -> "logs"
             }) }, actions, initialView = initial, onViewChange = { next ->
                 if (next.display != view.display || next.layout != view.layout) saveView(vm.prefs, selector, next)
+                val d = next.display; val l = next.layout
+                io.github.xgl34222220.hetu.PanelOptions11(d.showHidden, d.globalByMode, d.groupByProvider, d.collapsePrevious,
+                    when (l.sort) { PanelNodeSort.Config -> "config"; PanelNodeSort.Name -> "name"; PanelNodeSort.Delay -> "delay" },
+                    l.descending, l.nodeColumns, l.compactNodes, l.groupColumns, l.compactGroups, if (l.wrapNames) "wrap" else "clip").save(vm.prefs)
+                vm.prefs.edit().putBoolean("proxySelectorDisconnectOnSelect", d.disconnectOnSelect)
+                    .putString("panelOverviewRankSort", if (next.rankMode == PanelRankMode.Total) "traffic" else "connections")
+                    .putInt("panelOverviewRankCount", next.rankCount).apply()
                 view = next
             }, contentPadding = PaddingValues(bottom = bottom))
         }

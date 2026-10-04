@@ -63,9 +63,10 @@ internal data class PanelGroup(
     val nodes: List<PanelNode>,
     val now: String,
     val hidden: Boolean = false,
+    val availableCount: Int = nodes.size,
 ) {
     val isGlobal: Boolean get() = name == "GLOBAL"
-    val summary: String get() = "$type · ${nodes.size}/${nodes.size}"
+    val summary: String get() = "$type · $availableCount/${nodes.size}"
 }
 
 internal data class PanelOverviewSubscription(
@@ -168,7 +169,7 @@ internal enum class PanelLogLevel(val label: String) { Debug("DEBUG"), Info("INF
 
 internal data class PanelLogEntry(val id: Int, val level: PanelLogLevel, val time: String, val message: String) {
     /** More than two lines: the card is clamped and gets a 展开 / 收起 footer. */
-    val foldable: Boolean get() = message.count { it == '\n' } >= 2
+    val foldable: Boolean get() = message.length > 80 || message.count { it == '\n' } >= 2
 }
 
 /** Everything the panel renders that comes from the core. */
@@ -356,11 +357,12 @@ internal object PanelLogic {
     val rankCounts = listOf(5, 10, 15, 20, 30)
 
     fun visibleGroups(data: PanelData, view: PanelViewState): List<PanelGroup> {
-        val q = view.needle.lowercase(Locale.ROOT)
+        val terms = view.needle.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
         return data.groups.filter { g ->
             (!g.hidden || view.display.showHidden) &&
                 (!g.isGlobal || !view.display.globalByMode || data.globalMode) &&
-                (q.isEmpty() || g.name.lowercase(Locale.ROOT).contains(q) || g.now.lowercase(Locale.ROOT).contains(q))
+                (terms.isEmpty() || terms.all { g.name.contains(it, true) || g.now.contains(it, true) } ||
+                    g.nodes.any { n -> terms.all { n.name.contains(it, true) || n.protocol.contains(it, true) || n.provider.contains(it, true) } })
         }
     }
 
@@ -380,9 +382,13 @@ internal object PanelLogic {
         val rows = mutableListOf<PanelGroupRow>()
         visibleGroups(data, view).chunked(columns).forEach { chunk ->
             rows += PanelGroupRow.Cards(chunk)
-            chunk.filter { it.name in view.expandedGroups }.forEach { group ->
+            chunk.filter { it.name in view.expandedGroups || view.needle.isNotBlank() }.forEach { group ->
                 rows += PanelGroupRow.NodesHeader(group)
-                val nodes = sortedNodes(group, view.layout, data)
+                val terms = view.needle.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+                val headerMatches = terms.all { group.name.contains(it, true) || group.now.contains(it, true) }
+                val nodes = sortedNodes(group, view.layout, data).filter { n ->
+                    headerMatches || terms.all { n.name.contains(it, true) || n.protocol.contains(it, true) || n.provider.contains(it, true) }
+                }
                 val sections: List<Pair<String?, List<PanelNode>>> =
                     if (view.display.groupByProvider) nodes.groupBy { it.provider.ifBlank { "其他" } }.map { it.key to it.value }
                     else listOf(null to nodes)
@@ -448,12 +454,18 @@ internal object PanelLogic {
 
     /** Field → message for the 测速与 API sheet; empty when it can be saved. */
     fun validateApi(settings: PanelApiSettings): Map<String, String> = buildMap {
-        if (settings.customTestUrl && !isHttpUrl(settings.testUrl)) put("testUrl", "请填写 http/https 地址")
-        if (settings.externalApi) {
-            if (settings.host.isBlank() || settings.host.any { it.isWhitespace() }) put("host", "主机无效")
-            val port = settings.port.trim().toIntOrNull()
-            if (port == null || port !in 1..65535) put("port", "端口无效")
+        if (settings.customTestUrl) {
+            val u = runCatching { java.net.URI(settings.testUrl.trim()) }.getOrNull()
+            if (u == null || u.scheme?.lowercase(Locale.ROOT) !in setOf("http", "https") || u.host.isNullOrBlank() ||
+                u.rawUserInfo != null || settings.testUrl.length > 2048) put("testUrl", "测速 URL 必须是完整的 HTTP/HTTPS 地址，且不能包含账号密码")
         }
+        if (settings.externalApi) {
+            if (!settings.host.trim().matches(Regex("[A-Za-z0-9.-]{1,253}")) || settings.host.trim().startsWith('.') ||
+                settings.host.trim().endsWith('.')) put("host", "后端主机只填写 IPv4 或域名，不含协议和端口")
+            val port = settings.port.trim().toIntOrNull()
+            if (port == null || port !in 1024..65535) put("port", "端口范围为 1024–65535")
+        }
+        if ('\r' in settings.secret || '\n' in settings.secret) put("secret", "Secret 不能包含换行")
     }
 
     private fun isHttpUrl(raw: String): Boolean {

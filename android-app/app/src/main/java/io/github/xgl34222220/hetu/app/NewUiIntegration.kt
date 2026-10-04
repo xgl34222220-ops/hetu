@@ -42,5 +42,7 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
         onOpenConfigs = { nav.push(HxRoute.Configs) },
         onViewConfig = { nav.push(HxRoute.ConfigEditor) },
         onDismissStartupError = { vm.startupError = null }, onDetailVisibleChange = onDetail,
+        cpuAffinity = rt.cpuAffinity, currentCpu = rt.currentCpu.takeIf { it >= 0 },
+        resourceSamples = vm.resourceSamples.toList(),
     )
 }

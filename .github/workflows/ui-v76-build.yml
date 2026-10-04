@@ -170,7 +170,7 @@ jobs:
 
         head -3 out/apk-transfer/apk-metadata.txt
 
-        grep -q "versionCode=''2082'' versionName=''0.12.11-v20''" out/apk-transfer/apk-metadata.txt
+        grep -q "versionCode=''2082'' versionName=''0.12.12-v20-newui''" out/apk-transfer/apk-metadata.txt
 
         "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs "$APK" > out/apk-transfer/apk-signature.txt
 
@@ -306,6 +306,7 @@ jobs:
     - name: Run installed APK navigation and native WebView smoke
       env:
         HETU_EXPECTED_VERSION: '2082'
+        HETU_EXPECT_NEW_UI: '1'
       run: 'set -euo pipefail
 
         mkdir -p out/android-smoke

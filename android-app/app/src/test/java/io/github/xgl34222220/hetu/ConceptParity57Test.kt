@@ -49,12 +49,12 @@ class ConceptParity57Test {
     }
     @Test fun offlineHomeResourcesRemainReachableAndBackReturnsHome() {
         content { HetuRoot(vm) }
-        rule.onNodeWithText("资源占用").performClick()
+        rule.onNodeWithText("资源占用").performScrollTo().performClick()
         rule.onAllNodesWithText("等待连接进行采样").assertCountEquals(2)
         screenshot("resources-waiting")
         rule.onNodeWithContentDescription("返回").performClick()
-        rule.onNodeWithText("延迟").assertExists()
-        rule.onNodeWithContentDescription("本机直测。测量直连请求，未指定代理节点；结果不代表其他应用的代理路径").assertExists()
+        rule.onNodeWithText("本机直测").assertExists()
+        rule.onNodeWithText("由河图进程直接请求，未指定代理节点；结果不代表其他应用的代理路径。").assertExists()
         screenshot("home-offline")
     }
     @Test fun resourceChartsRetainMissingSampleGaps() {

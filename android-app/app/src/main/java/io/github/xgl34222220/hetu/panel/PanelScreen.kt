@@ -226,9 +226,9 @@ private fun PanelActionBar(
                     PanelTab.Overview -> anchored(PanelIcons.ArrowDownWideNarrow, "排行方式", PanelOverlay.RankModeMenu, c.t1)
                     PanelTab.Subscriptions -> HomeIconButton(HomeIcons.RefreshCw, "全部更新", actions.onUpdateAllSubscriptions)
                     PanelTab.Connections -> {
-                        anchored(PanelIcons.ListFilter, "筛选", PanelOverlay.ConnFilterMenu, if (view.connFilter != PanelConnFilter.All) c.accent else c.t1)
-                        anchored(PanelIcons.ArrowUpDown, "排序", PanelOverlay.ConnSortMenu, c.t1)
-                        anchored(PanelIcons.EllipsisVertical, "更多", PanelOverlay.ConnMoreMenu, c.t1)
+                        anchored(PanelIcons.ListFilter, "连接筛选", PanelOverlay.ConnFilterMenu, if (view.connFilter != PanelConnFilter.All) c.accent else c.t1)
+                        anchored(PanelIcons.ArrowUpDown, "连接排序", PanelOverlay.ConnSortMenu, c.t1)
+                        anchored(PanelIcons.EllipsisVertical, "连接显示", PanelOverlay.ConnMoreMenu, c.t1)
                     }
                     PanelTab.Rules -> HomeIconButton(HomeIcons.RefreshCw, "刷新", actions.onRefreshRules)
                     PanelTab.RuleSets -> HomeIconButton(PanelIcons.Download, "全部更新", actions.onUpdateAllRuleSets)

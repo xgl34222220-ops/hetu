@@ -261,7 +261,7 @@
              onSelect = { index ->
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt
-@@ -0,0 +1,46 @@
+@@ -0,0 +1,48 @@
 +package io.github.xgl34222220.hetu
 +
 +import androidx.compose.runtime.Composable
@@ -306,6 +306,8 @@
 +        onOpenConfigs = { nav.push(HxRoute.Configs) },
 +        onViewConfig = { nav.push(HxRoute.ConfigEditor) },
 +        onDismissStartupError = { vm.startupError = null }, onDetailVisibleChange = onDetail,
++        cpuAffinity = rt.cpuAffinity, currentCpu = rt.currentCpu.takeIf { it >= 0 },
++        resourceSamples = vm.resourceSamples.toList(),
 +    )
 +}
 --- /dev/null
@@ -445,7 +447,7 @@
 +}
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt
-@@ -0,0 +1,355 @@
+@@ -0,0 +1,357 @@
 +package io.github.xgl34222220.hetu.home
 +
 +import android.content.ClipData
@@ -476,6 +478,7 @@
 +import androidx.compose.ui.unit.Dp
 +import io.github.xgl34222220.hetu.CompactHomeData
 +import io.github.xgl34222220.hetu.HomeOperation
++import io.github.xgl34222220.hetu.HomeResourceSample
 +import io.github.xgl34222220.hetu.ProxyGroupUi
 +import io.github.xgl34222220.hetu.ProxyLatencyTarget
 +import io.github.xgl34222220.hetu.ProxyLatencyTargets
@@ -533,6 +536,7 @@
 +    modifier: Modifier = Modifier,
 +    cpuAffinity: String? = null,
 +    currentCpu: Int? = null,
++    resourceSamples: List<HomeResourceSample>? = null,
 +    onDetailVisibleChange: (Boolean) -> Unit = {},
 +) {
 +    val context = LocalContext.current
@@ -545,7 +549,7 @@
 +    val localSpeed = rememberLocalSpeed(enabled = speedSource == HomeSpeedSource.Local)
 +    val status = homeStatusOf(data, startupError)
 +    val sampling = status is HomeStatus.Running || status is HomeStatus.PendingRestart
-+    val history = rememberResourceHistory(sampling, data.cpu, data.memory)
++    val history = rememberResourceHistory(sampling && resourceSamples == null, data.cpu, data.memory)
 +
 +    val state = data.toHomeUiState(
 +        status = status,
@@ -562,8 +566,8 @@
 +            cpuAffinity = cpuAffinity,
 +            currentCpu = currentCpu,
 +            connections = data.connections,
-+            cpuHistory = history.first,
-+            memoryHistoryMb = history.second,
++            cpuHistory = resourceSamples?.map { it.cpuPercent } ?: history.first,
++            memoryHistoryMb = resourceSamples?.map { it.memoryBytes?.div(1024f * 1024f) } ?: history.second,
 +        ),
 +    )
 +
@@ -2033,7 +2037,7 @@
 +}
 +
 +/* ------------------------------------------------------------------ */
-+/*  Sample data for previews (mirrors the prototype’s 示例数据)          */
++/*  Isolated preview fixtures matching the prototype                    */
 +/* ------------------------------------------------------------------ */
 +
 +internal object HomeSamples {
@@ -2378,7 +2382,7 @@
 +                if (footnote != null) Text(footnote, Modifier.fillMaxWidth().padding(top = 8.dp), color = c.t3, style = HomeType.caption, textAlign = TextAlign.Center)
 +            } else {
 +                Box(Modifier.fillMaxWidth().height(72.dp), contentAlignment = Alignment.Center) {
-+                    Text("等待连续运行采样", color = c.t3, style = HomeType.rowSub)
++                    Text("等待连接进行采样", color = c.t3, style = HomeType.rowSub)
 +                }
 +            }
 +        }
@@ -3205,7 +3209,7 @@
 +}
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt
-@@ -0,0 +1,622 @@
+@@ -0,0 +1,656 @@
 +package io.github.xgl34222220.hetu.panel
 +
 +import android.content.ClipData
@@ -3258,6 +3262,7 @@
 +import kotlinx.coroutines.async
 +import kotlinx.coroutines.awaitAll
 +import kotlinx.coroutines.coroutineScope
++import kotlinx.coroutines.delay
 +import kotlinx.coroutines.launch
 +
 +/*
@@ -3536,6 +3541,7 @@
 +            },
 +            now = selectedLocal[g.name] ?: g.now,
 +            hidden = g.hidden,
++            availableCount = g.nodes.count { (delays[it.name] ?: it.lastDelay ?: -1L) > 0L },
 +        )
 +    }
 +    val nodeDelays = HashMap<String, PanelDelay>()
@@ -3551,7 +3557,7 @@
 +        PanelConnection(
 +            id = c.id,
 +            host = host,
-+            time = null,
++            time = c.startedAt.takeIf { it.isNotBlank() },
 +            network = c.network.substringBefore(" · ").uppercase(Locale.ROOT),
 +            inbound = c.inbound,
 +            kind = when {
@@ -3771,7 +3777,20 @@
 +internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp) {
 +    val context = LocalContext.current
 +    val selector = remember { context.getSharedPreferences("proxy_selector_preferences", Context.MODE_PRIVATE) }
-+    val initial = remember { loadView(vm.prefs, selector) }
++    val initial = remember {
++        val old = io.github.xgl34222220.hetu.PanelOptions11.read(vm.prefs)
++        val api = io.github.xgl34222220.hetu.PanelApiDraft11.read(vm.prefs)
++        loadView(vm.prefs, selector).copy(
++            display = PanelGroupDisplay(old.showHidden, old.globalByMode, old.providers, old.collapsePrevious,
++                vm.prefs.getBoolean("proxySelectorDisconnectOnSelect", false)),
++            layout = PanelGroupLayout(
++                when (old.sort) { "name" -> PanelNodeSort.Name; "delay", "latency" -> PanelNodeSort.Delay; else -> PanelNodeSort.Config },
++                old.descending, old.groupColumns, old.groupCompact, old.columns, old.compact, old.nameOverflow == "wrap"),
++            api = PanelApiSettings(api.customDelay, api.delayUrl, api.history, api.customApi, api.host, api.port, api.secret),
++            rankMode = if (vm.prefs.getString("panelOverviewRankSort", "connections") == "traffic") PanelRankMode.Total else PanelRankMode.Connections,
++            rankCount = vm.prefs.getInt("panelOverviewRankCount", 5),
++        )
++    }
 +    var view by remember { mutableStateOf(initial) }
 +    val sampler = remember { PanelTrafficSampler() }
 +    val tab = when (vm.panelSection) {
@@ -3786,15 +3805,23 @@
 +    LaunchedEffect(tab, vm.state.running) {
 +        if (!vm.state.running) { sampler.reset(); return@LaunchedEffect }
 +        when (tab) {
-+            PanelTab.Overview, PanelTab.Subscriptions -> vm.loadProviders()
-+            PanelTab.Rules -> vm.loadRules()
-+            PanelTab.RuleSets -> vm.loadRuleSets()
-+            PanelTab.Logs -> vm.loadLogs()
++            PanelTab.Overview -> { vm.loadProviders(); if (vm.rules.isEmpty()) vm.loadRules() }
++            PanelTab.Subscriptions -> vm.loadProviders()
++            PanelTab.Rules -> if (vm.rules.isEmpty()) vm.loadRules()
++            PanelTab.RuleSets -> if (vm.ruleSets.isEmpty()) vm.loadRuleSets()
++            PanelTab.Logs -> {
++                vm.loadLogs()
++                while (true) { delay(3_000); vm.loadLogs(quiet = true) }
++            }
 +            else -> Unit
 +        }
 +    }
-+    LaunchedEffect(vm.state.uploadTotal, vm.state.downloadTotal, vm.state.connections) {
-+        if (vm.state.running) sampler.sample(SystemClock.elapsedRealtime(), vm.state.uploadTotal, vm.state.downloadTotal, vm.state.connections)
++    LaunchedEffect(vm.state.running) {
++        if (!vm.state.running) { sampler.reset(); return@LaunchedEffect }
++        while (true) {
++            sampler.sample(SystemClock.elapsedRealtime(), vm.state.uploadTotal, vm.state.downloadTotal, vm.state.connections)
++            delay(1_000)
++        }
 +    }
 +    fun updates(tasks: Map<String, io.github.xgl34222220.hetu.HxTask>) = tasks.mapValues { (_, t) ->
 +        if (t.running) PanelUpdate.Updating else if (t.ok == false) PanelUpdate.Failed(t.message) else PanelUpdate.Idle
@@ -3809,7 +3836,11 @@
 +        onCloseConnection = vm::closeConnection, onCloseAllConnections = vm::closeAll,
 +        onRefreshRules = vm::loadRules, onUpdateRuleSet = vm::updateRuleSet,
 +        onUpdateAllRuleSets = vm::updateAllRuleSets, onRefreshLogs = { vm.loadLogs() },
-+        onSaveApi = { saveApi(vm.prefs, it); vm.bumpSettings() },
++        onSaveApi = {
++            io.github.xgl34222220.hetu.PanelApiDraft11(it.customTestUrl, it.testUrl, it.history,
++                it.externalApi, it.host, it.port, it.secret).save(vm.prefs)
++            vm.bumpSettings()
++        },
 +        onOpenPolicyIcons = { context.startActivity(Intent(context, ProxyPolicyIconsActivity::class.java)) },
 +        onCopy = { label, text -> copyToClipboard(context, label, text) },
 +    )
@@ -3823,6 +3854,13 @@
 +                PanelTab.Connections -> "conn"; PanelTab.Rules -> "rules"; PanelTab.RuleSets -> "sets"; PanelTab.Logs -> "logs"
 +            }) }, actions, initialView = initial, onViewChange = { next ->
 +                if (next.display != view.display || next.layout != view.layout) saveView(vm.prefs, selector, next)
++                val d = next.display; val l = next.layout
++                io.github.xgl34222220.hetu.PanelOptions11(d.showHidden, d.globalByMode, d.groupByProvider, d.collapsePrevious,
++                    when (l.sort) { PanelNodeSort.Config -> "config"; PanelNodeSort.Name -> "name"; PanelNodeSort.Delay -> "delay" },
++                    l.descending, l.nodeColumns, l.compactNodes, l.groupColumns, l.compactGroups, if (l.wrapNames) "wrap" else "clip").save(vm.prefs)
++                vm.prefs.edit().putBoolean("proxySelectorDisconnectOnSelect", d.disconnectOnSelect)
++                    .putString("panelOverviewRankSort", if (next.rankMode == PanelRankMode.Total) "traffic" else "connections")
++                    .putInt("panelOverviewRankCount", next.rankCount).apply()
 +                view = next
 +            }, contentPadding = PaddingValues(bottom = bottom))
 +        }
@@ -5228,7 +5266,7 @@
 +}
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt
-@@ -0,0 +1,503 @@
+@@ -0,0 +1,515 @@
 +package io.github.xgl34222220.hetu.panel
 +
 +import java.util.Locale
@@ -5294,9 +5332,10 @@
 +    val nodes: List<PanelNode>,
 +    val now: String,
 +    val hidden: Boolean = false,
++    val availableCount: Int = nodes.size,
 +) {
 +    val isGlobal: Boolean get() = name == "GLOBAL"
-+    val summary: String get() = "$type · ${nodes.size}/${nodes.size}"
++    val summary: String get() = "$type · $availableCount/${nodes.size}"
 +}
 +
 +internal data class PanelOverviewSubscription(
@@ -5399,7 +5438,7 @@
 +
 +internal data class PanelLogEntry(val id: Int, val level: PanelLogLevel, val time: String, val message: String) {
 +    /** More than two lines: the card is clamped and gets a 展开 / 收起 footer. */
-+    val foldable: Boolean get() = message.count { it == '\n' } >= 2
++    val foldable: Boolean get() = message.length > 80 || message.count { it == '\n' } >= 2
 +}
 +
 +/** Everything the panel renders that comes from the core. */
@@ -5587,11 +5626,12 @@
 +    val rankCounts = listOf(5, 10, 15, 20, 30)
 +
 +    fun visibleGroups(data: PanelData, view: PanelViewState): List<PanelGroup> {
-+        val q = view.needle.lowercase(Locale.ROOT)
++        val terms = view.needle.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
 +        return data.groups.filter { g ->
 +            (!g.hidden || view.display.showHidden) &&
 +                (!g.isGlobal || !view.display.globalByMode || data.globalMode) &&
-+                (q.isEmpty() || g.name.lowercase(Locale.ROOT).contains(q) || g.now.lowercase(Locale.ROOT).contains(q))
++                (terms.isEmpty() || terms.all { g.name.contains(it, true) || g.now.contains(it, true) } ||
++                    g.nodes.any { n -> terms.all { n.name.contains(it, true) || n.protocol.contains(it, true) || n.provider.contains(it, true) } })
 +        }
 +    }
 +
@@ -5611,9 +5651,13 @@
 +        val rows = mutableListOf<PanelGroupRow>()
 +        visibleGroups(data, view).chunked(columns).forEach { chunk ->
 +            rows += PanelGroupRow.Cards(chunk)
-+            chunk.filter { it.name in view.expandedGroups }.forEach { group ->
++            chunk.filter { it.name in view.expandedGroups || view.needle.isNotBlank() }.forEach { group ->
 +                rows += PanelGroupRow.NodesHeader(group)
-+                val nodes = sortedNodes(group, view.layout, data)
++                val terms = view.needle.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
++                val headerMatches = terms.all { group.name.contains(it, true) || group.now.contains(it, true) }
++                val nodes = sortedNodes(group, view.layout, data).filter { n ->
++                    headerMatches || terms.all { n.name.contains(it, true) || n.protocol.contains(it, true) || n.provider.contains(it, true) }
++                }
 +                val sections: List<Pair<String?, List<PanelNode>>> =
 +                    if (view.display.groupByProvider) nodes.groupBy { it.provider.ifBlank { "其他" } }.map { it.key to it.value }
 +                    else listOf(null to nodes)
@@ -5679,12 +5723,18 @@
 +
 +    /** Field → message for the 测速与 API sheet; empty when it can be saved. */
 +    fun validateApi(settings: PanelApiSettings): Map<String, String> = buildMap {
-+        if (settings.customTestUrl && !isHttpUrl(settings.testUrl)) put("testUrl", "请填写 http/https 地址")
-+        if (settings.externalApi) {
-+            if (settings.host.isBlank() || settings.host.any { it.isWhitespace() }) put("host", "主机无效")
-+            val port = settings.port.trim().toIntOrNull()
-+            if (port == null || port !in 1..65535) put("port", "端口无效")
++        if (settings.customTestUrl) {
++            val u = runCatching { java.net.URI(settings.testUrl.trim()) }.getOrNull()
++            if (u == null || u.scheme?.lowercase(Locale.ROOT) !in setOf("http", "https") || u.host.isNullOrBlank() ||
++                u.rawUserInfo != null || settings.testUrl.length > 2048) put("testUrl", "测速 URL 必须是完整的 HTTP/HTTPS 地址，且不能包含账号密码")
 +        }
++        if (settings.externalApi) {
++            if (!settings.host.trim().matches(Regex("[A-Za-z0-9.-]{1,253}")) || settings.host.trim().startsWith('.') ||
++                settings.host.trim().endsWith('.')) put("host", "后端主机只填写 IPv4 或域名，不含协议和端口")
++            val port = settings.port.trim().toIntOrNull()
++            if (port == null || port !in 1024..65535) put("port", "端口范围为 1024–65535")
++        }
++        if ('\r' in settings.secret || '\n' in settings.secret) put("secret", "Secret 不能包含换行")
 +    }
 +
 +    private fun isHttpUrl(raw: String): Boolean {
@@ -5734,7 +5784,7 @@
 +}
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelOverlays.kt
-@@ -0,0 +1,343 @@
+@@ -0,0 +1,344 @@
 +package io.github.xgl34222220.hetu.panel
 +
 +import androidx.compose.foundation.layout.Arrangement
@@ -5968,6 +6018,7 @@
 +                        }
 +                    }
 +                    HomeTextField("密钥", draft.secret, { edit(draft.copy(secret = it)) }, monospace = true, placeholder = "未设置")
++                    FieldError(errors["secret"])
 +                }
 +            }
 +        }
@@ -6446,7 +6497,7 @@
 +    val scrollToItem: Int = 0,
 +)
 +
-+/** Sample data mirroring the prototype's 示例数据, and the 29 states of «02 面板» (B01–B29). */
++/** Isolated preview fixtures for the 29 states of «02 面板» (B01–B29). */
 +internal object PanelSamples {
 +    private const val KB = 1024L
 +    private const val MB = 1024L * KB
@@ -6856,9 +6907,9 @@
 +                    PanelTab.Overview -> anchored(PanelIcons.ArrowDownWideNarrow, "排行方式", PanelOverlay.RankModeMenu, c.t1)
 +                    PanelTab.Subscriptions -> HomeIconButton(HomeIcons.RefreshCw, "全部更新", actions.onUpdateAllSubscriptions)
 +                    PanelTab.Connections -> {
-+                        anchored(PanelIcons.ListFilter, "筛选", PanelOverlay.ConnFilterMenu, if (view.connFilter != PanelConnFilter.All) c.accent else c.t1)
-+                        anchored(PanelIcons.ArrowUpDown, "排序", PanelOverlay.ConnSortMenu, c.t1)
-+                        anchored(PanelIcons.EllipsisVertical, "更多", PanelOverlay.ConnMoreMenu, c.t1)
++                        anchored(PanelIcons.ListFilter, "连接筛选", PanelOverlay.ConnFilterMenu, if (view.connFilter != PanelConnFilter.All) c.accent else c.t1)
++                        anchored(PanelIcons.ArrowUpDown, "连接排序", PanelOverlay.ConnSortMenu, c.t1)
++                        anchored(PanelIcons.EllipsisVertical, "连接显示", PanelOverlay.ConnMoreMenu, c.t1)
 +                    }
 +                    PanelTab.Rules -> HomeIconButton(HomeIcons.RefreshCw, "刷新", actions.onRefreshRules)
 +                    PanelTab.RuleSets -> HomeIconButton(PanelIcons.Download, "全部更新", actions.onUpdateAllRuleSets)
@@ -6927,9 +6978,82 @@
 +        }
 +    }
 +}
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptParity57Test.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptParity57Test.kt
+@@ -49,12 +49,12 @@
+     }
+     @Test fun offlineHomeResourcesRemainReachableAndBackReturnsHome() {
+         content { HetuRoot(vm) }
+-        rule.onNodeWithText("资源占用").performClick()
++        rule.onNodeWithText("资源占用").performScrollTo().performClick()
+         rule.onAllNodesWithText("等待连接进行采样").assertCountEquals(2)
+         screenshot("resources-waiting")
+         rule.onNodeWithContentDescription("返回").performClick()
+-        rule.onNodeWithText("延迟").assertExists()
+-        rule.onNodeWithContentDescription("本机直测。测量直连请求，未指定代理节点；结果不代表其他应用的代理路径").assertExists()
++        rule.onNodeWithText("本机直测").assertExists()
++        rule.onNodeWithText("由河图进程直接请求，未指定代理节点；结果不代表其他应用的代理路径。").assertExists()
+         screenshot("home-offline")
+     }
+     @Test fun resourceChartsRetainMissingSampleGaps() {
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptStateCoverageTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptStateCoverageTest.kt
+@@ -303,10 +303,10 @@
+         runningFixture()
+         show { HetuRoot(vm) }
+         expect("运行中"); capture("01-001-running")
+-        click("运行中"); expect("规则"); capture("01-002-controls-expanded")
++        expect("重载"); expect("停止"); expect("重启"); expect("规则"); capture("01-002-controls-expanded")
+         rule.runOnUiThread { ProxyRuntimeSettings.markDirty(vm.prefs, "proxyBaseMode"); vm.bumpSettings() }; frame()
+-        expect("设置已修改，重启后生效"); click("运行中")
+-        click("WAN"); capture("01-004-pending-lan")
++        expect("设置已修改，重启后生效")
++        click("LAN"); expect("192.168.1.12"); capture("01-004-pending-lan")
+         click("网速"); expect("网速数据来源"); capture("01-005-speed-source")
+         click("本地模式")
+         assertEquals("local", vm.prefs.getString("homeSpeedSource", ""))
+@@ -316,7 +316,7 @@
+     @Test fun homeStartAndFailure() {
+         fixture("operation", HxRunOp.Start); fixture("operationText", "请稍候…")
+         show { HetuRoot(vm) }
+-        expect("正在启动"); expectDisabledActionLabel("启动"); capture("01-006-starting")
++        expect("正在启动"); expectDisabledActionLabel("启动中"); capture("01-006-starting")
+         rule.runOnUiThread { fixture("operation", null); vm.startupError = "测试夹具：配置加载失败\n第 18 行：缩进无效" }; frame()
+         expect("启动失败")
+         rule.runOnUiThread { assertTrue("Copy label is visible text, not only an icon description", nativeNodes().any { n -> n.config.getOrNull(SemanticsProperties.Text)?.any { it.text == "复制" } == true }) }
+@@ -344,9 +344,9 @@
+         fixture("state", vm.state.copy(groups = vm.state.groups.take(1)))
+         vm.openPanel("proxies")
+         show { HetuRoot(vm) }
+-        expect("URLTest  6/8")
++        expect("URLTest · 6/8")
+         click("搜索"); replace(0, "日本 01")
+-        expect("URLTest  6/8")
++        expect("URLTest · 6/8")
+         expect("香港 01")
+         rule.runOnUiThread {
+             assertEquals(8, vm.state.groups.first().nodes.size)
+@@ -376,7 +376,7 @@
+             val selected = nativeNodes().first { "按配置" in labels(it) && it.config.getOrNull(SemanticsActions.GetTextLayoutResult)?.action != null }
+             val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+             assertTrue(selected.config[SemanticsActions.GetTextLayoutResult].action!!.invoke(layouts))
+-            assertEquals(androidx.compose.ui.graphics.Color.White, layouts.single().layoutInput.style.color)
++            assertEquals(androidx.compose.ui.graphics.Color(0xFF12161A), layouts.single().layoutInput.style.color)
+         }
+         click("1 列", 0); assertEquals(1, vm.prefs.getInt("proxySelectorGroupColumns", 2))
+         click("2 列", 0); assertEquals(2, vm.prefs.getInt("proxySelectorGroupColumns", 1))
+@@ -468,7 +468,7 @@
+         expect("api.example.com"); capture("02-006-connections")
+         touch("连接排序"); capture("02-017-connection-sort"); click("主机")
+         touch("连接筛选"); capture("02-021-connection-filter"); click("代理")
+-        click("api.example.com"); expect("断开此连接"); expect("关闭详情"); capture("02-014-connection-detail"); click("关闭详情")
++        click("api.example.com"); expect("断开此连接"); expect("关闭"); capture("02-014-connection-detail"); click("关闭")
+         touch("连接显示"); capture("02-018-connection-display"); click("断开全部连接")
+         expect("断开全部连接？"); capture("02-015-disconnect-confirm"); click("取消")
+         assertEquals(2, vm.state.connections.size)
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NewUiIntegrationTest.kt
-@@ -0,0 +1,77 @@
+@@ -0,0 +1,80 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
@@ -6982,7 +7106,7 @@
 +    }
 +    @Test fun resourceDetailHidesDockAndReturns() {
 +        root()
-+        rule.onNodeWithContentDescription("查看资源占用").performScrollTo().performClick()
++        rule.onNodeWithText("资源占用").performScrollTo().performClick()
 +        rule.mainClock.advanceTimeBy(1000)
 +        rule.onNodeWithText("首页").assertDoesNotExist()
 +        rule.onNodeWithContentDescription("返回").performClick()
@@ -7004,6 +7128,9 @@
 +    @Test fun newLauncherKeepsToolsAndDiagnostics() {
 +        vm.tab = HxTab.Tools
 +        root()
-+        rule.onNodeWithText("诊断工具").assertExists()
++        rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("诊断工具"))
++        rule.onNodeWithText("诊断工具").performClick()
++        rule.mainClock.advanceTimeBy(1000)
++        rule.onNodeWithText("网络事件记录").assertExists()
 +    }
 +}

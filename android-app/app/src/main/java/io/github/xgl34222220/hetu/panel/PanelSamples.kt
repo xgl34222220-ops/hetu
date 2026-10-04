@@ -11,7 +11,7 @@ internal data class PanelScene(
     val scrollToItem: Int = 0,
 )
 
-/** Sample data mirroring the prototype's 示例数据, and the 29 states of «02 面板» (B01–B29). */
+/** Isolated preview fixtures for the 29 states of «02 面板» (B01–B29). */
 internal object PanelSamples {
     private const val KB = 1024L
     private const val MB = 1024L * KB

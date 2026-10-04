@@ -325,10 +325,15 @@ def main():
   click('简体中文');expect('主题设置','00-language-selected')
   adb('shell','input','keyevent','4');time.sleep(2);click('首页',bottom=True)
   expect('河图','01-home-language-restored')
+ if os.environ.get('HETU_EXPECT_NEW_UI')=='1':
+  expect('本机直测','01-home-new-ui')
  if os.environ.get('HETU_EXPECT_PALETTE_CRASH')=='1':
   palette_scripts_cases(choices[0],apk,expect_crash=True)
   return
  click('面板',bottom=True);expect('代理未运行','02-panel-stopped')
+ if os.environ.get('HETU_EXPECT_NEW_UI')=='1':
+  expect('概览','02-panel-new-ui-overview')
+  expect('规则集','02-panel-new-ui-rulesets')
  click('工具',bottom=True);expect('文件管理','03-tools')
  click('脚本',scroll=True);expect('服务启动前','scripts-entry');expect('服务停止后','scripts-stop')
  expect('详情','scripts-root-error-details');click('详情');expect('复制诊断','scripts-root-error-expanded')
