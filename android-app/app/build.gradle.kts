@@ -28,6 +28,8 @@ android {
                 storePassword = "android"
                 keyAlias = "androiddebugkey"
                 keyPassword = "android"
+                isV1SigningEnabled = true
+                isV2SigningEnabled = true
             }
         }
     }
