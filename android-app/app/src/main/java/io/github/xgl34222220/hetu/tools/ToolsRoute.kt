@@ -24,14 +24,21 @@ import io.github.xgl34222220.hetu.home.HomeMotion
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
-/** Pages of the tools module covered by Part 1. Everything else leaves through `ToolsActions.onOpenEntry`. */
-internal enum class ToolsDestination { Root, Configs, Subscription, Import, Editor }
+/**
+ * Pages of the tools module. The first five are hosted here; the rest (pages 28–49) by
+ * `ToolsFeaturePage`. Entries without a page leave through `ToolsActions.onOpenEntry`.
+ */
+internal enum class ToolsDestination { Root, Configs, Subscription, Import, Editor, Apps, Cores, Bypass, Share, CnIp, Diag, Adblock }
 
 /**
  * Stateful host of the tools tab: in-module navigation, form and editor logic, dialogs,
  * sheets and the back key. All I/O goes through [actions]; nothing in here touches Android
  * or the existing sources, so the whole flow runs in a preview with the default no-op actions.
  *
+ * @param features host callbacks of pages 28–49; an entry whose loader is missing (or all of
+ *   them, when null) is handed to `ToolsActions.onOpenEntry` instead.
+ * @param appIcon draws an app's launcher icon in 应用管理; a letter tile is used when null.
+ * @param onDestinationChanged the page on top changed (the host keeps per-page flags with it).
  * @param pickedFile the document the user chose after `ToolsActions.onPickImportFile`.
  * @param contentPadding padding of the root list; its bottom must clear the floating dock.
  * @param onSubPageVisibleChanged true while a pushed page is on top, so the host can hide the dock.
@@ -43,6 +50,9 @@ internal fun ToolsRoute(
     pickedFile: ToolsPickedFile? = null,
     contentPadding: PaddingValues = PaddingValues(bottom = HomeDims.dockClearance),
     onSubPageVisibleChanged: (Boolean) -> Unit = {},
+    features: ToolsFeatureActions? = null,
+    appIcon: (@Composable (ToolsApp, Modifier) -> Unit)? = null,
+    onDestinationChanged: (ToolsDestination) -> Unit = {},
 ) {
     val act by rememberUpdatedState(actions)
     val scope = rememberCoroutineScope()
@@ -67,6 +77,8 @@ internal fun ToolsRoute(
 
     val notifySubPage by rememberUpdatedState(onSubPageVisibleChanged)
     LaunchedEffect(stack.size > 1) { notifySubPage(stack.size > 1) }
+    val notifyDestination by rememberUpdatedState(onDestinationChanged)
+    LaunchedEffect(top) { notifyDestination(top) }
 
     /* ------------------------------ 配置与订阅 ------------------------------ */
 
@@ -312,6 +324,7 @@ internal fun ToolsRoute(
             ToolsDestination.Configs -> if (configOverlay != null) configOverlay = null else pop()
             ToolsDestination.Subscription, ToolsDestination.Import -> leaveForm()
             ToolsDestination.Editor -> leaveEditor()
+            else -> pop()
         }
     }
 
@@ -334,9 +347,12 @@ internal fun ToolsRoute(
                 onToggleSearch = { root = root.copy(searching = !root.searching, query = "") },
                 onQueryChange = { root = root.copy(query = it) },
                 onOpen = { entry ->
+                    val feature = entry.featureDestination()
                     if (entry == ToolsEntry.Configs) {
                         refreshConfigs(showSpinner = configs.load !is ToolsLoad.Ready)
                         push(ToolsDestination.Configs)
+                    } else if (feature != null && features?.hosts(entry) == true) {
+                        push(feature)
                     } else {
                         act.onOpenEntry(entry)
                     }
@@ -396,6 +412,8 @@ internal fun ToolsRoute(
                 onDismissBanner = { editor = editor.copy(banner = null, errorLine = null) },
                 onReload = ::loadDocument,
             )
+
+            else -> if (features != null) ToolsFeaturePage(page, features, onBack = ::pop, appIcon = appIcon)
         }
     }
 

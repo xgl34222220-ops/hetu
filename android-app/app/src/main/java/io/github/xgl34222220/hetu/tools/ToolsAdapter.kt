@@ -54,8 +54,9 @@ import kotlinx.coroutines.withContext
 /**
  * Drop-in replacement for `RefTools(state, onLog)` in `ReferenceProxyActivity.kt`.
  *
- * 配置管理 opens inside the module (pages 4–25). The other thirteen entries start the
- * activities they start today; they move into the module with Part 2 and 03B.
+ * 配置管理 (pages 4–27) and the seven pages of Part 2 (应用管理, 核心管理, 绕过规则, 共享网络,
+ * CNIP, 诊断工具, 广告过滤: pages 28–49) open inside the module. The other six entries start
+ * the activities they start today; they move into the module with 03B.
  *
  * @param onLog receives the diagnostics text for 诊断工具, as `RefTools` does today.
  * @param onSubPageVisibleChanged true while a pushed page covers the tab: hide the dock.
@@ -77,6 +78,9 @@ internal fun HetuToolsV2(
     val haptics = rememberHetuHaptics()
     val log by rememberUpdatedState(onLog)
     val changed by rememberUpdatedState(onConfigChanged)
+    val features = rememberToolsFeatureHost(onChanged = onConfigChanged)
+    var destination by remember { mutableStateOf(ToolsDestination.Root) }
+    ToolsAdblockVisibilityFlag(visible = destination == ToolsDestination.Adblock)
 
     fun toast(text: String) = Toast.makeText(app, text, Toast.LENGTH_SHORT).show()
 
@@ -216,6 +220,9 @@ internal fun HetuToolsV2(
                 pickedFile = pickedFile,
                 contentPadding = contentPadding,
                 onSubPageVisibleChanged = onSubPageVisibleChanged,
+                features = features.actions,
+                appIcon = features.appIcon,
+                onDestinationChanged = { destination = it },
             )
         }
     }
