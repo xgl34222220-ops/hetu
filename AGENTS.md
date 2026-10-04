@@ -1,3 +1,7 @@
+## 当前续接：V20.79 恢复背压（CI 待核实）
+
+沿原分支 ed326756 / V20.78，不另开实现。512次实际排队方法的原创故障夹具复现旧队列512、新队列1；4096取消计时器旧保留4096、新0。复用原 coalescer，新增服务观察 session fence 与重建状态失效；13项Android回归，预计324单测及全部原门禁须当轮核实。Root151/core/service.d/签名/Manifest/原UI不变。保留上一轮证据；用户设备、KernelSU/长期Google微信/IPv6/TUN/eBPF未验证。日志存储边界与脱敏是下一批；禁止永久删除历史、扩权、合并主分支或正式发布部署。详见docs/V20.79_RECOVERY_BACKPRESSURE.md。
+
 ## 当前续接：V20.78 网络诊断（全量 CI 已核实通过）
 
 最终应用提交 `47609a6925eb411def74ea6781eaa77b88a6b7da`，定位脚本/CI 修正提交 `95b6e171f0f078a0477d200cdb4c391629b62234`，Actions `37163668343` 四个 job 全部 success。本轮实际 XML 311 tests / 0 failures/errors/skipped；6 项 host、60 项 shell、生产过滤 ENOENT 前后验证通过；lint 零 error（278 条 warning 保留），687 个配色构造引用零缺失，23 项运行载荷与固定签名通过。API35/36 各 52 项安装检查通过，各含 21 种配色组合的实际脚本页交互。五种 WebView 画面各自不同，去除状态/导航栏后仍不同；已人工核对连接列表与节点弹窗。Root mutation 为 0。APK 133347510 bytes，SHA256 `33c48db99d98c19b8e91bb44c5441e8c32250e083dc459d97c2403f19c697966`。完整证据见 `docs/ci/V20.78_RESULT.json` 和 `docs/V20.78_NETWORK_TRACES.md`。

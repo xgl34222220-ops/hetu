@@ -1,4 +1,4 @@
-name: Hetu V20.78 traceable network diagnostics
+name: Hetu V20.79 bounded network recovery
 permissions:
   contents: read
   actions: read
@@ -171,6 +171,22 @@ jobs:
         3a1215f4e9093ae2298803020d697da0c14c35ee5cf28f84f2a81608093783f9
 
         '
+    - name: Apply bounded network recovery and reproduce old backlog
+      run: 'set -euo pipefail
+
+        cp android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java "$RUNNER_TEMP/hetu-v2078-network-service.java"
+
+        echo ''631475861cb229880d05b0bfdc99abffe3bb69034c34801fd0f3a39f7d07d69f  updates/v2079-recovery-backpressure/runtime.patch'' | sha256sum -c -
+
+        git apply --check updates/v2079-recovery-backpressure/runtime.patch
+
+        git apply updates/v2079-recovery-backpressure/runtime.patch
+
+        grep -q ''versionCode = 2079'' android-app/app/build.gradle.kts
+
+        python3 tools/qa/test_network_recovery_stress.py --before "$RUNNER_TEMP/hetu-v2078-network-service.java" --output out/verification/network-recovery-stress.json
+
+        '
     - name: Regress observed nested WebView document topology without weakening surface guards
       run: 'set -euo pipefail
 
@@ -223,17 +239,17 @@ jobs:
     - name: Export effective V20.78 source
       run: 'set -euo pipefail
 
-        tar -czf /tmp/Hetu-V20.78-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+        tar -czf /tmp/Hetu-V20.79-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
 
-        sha256sum /tmp/Hetu-V20.78-effective-source.tar.gz
+        sha256sum /tmp/Hetu-V20.79-effective-source.tar.gz
 
         '
     - uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: error
-        name: Hetu-V20.78-effective-source
-        path: /tmp/Hetu-V20.78-effective-source.tar.gz
+        name: Hetu-V20.79-effective-source
+        path: /tmp/Hetu-V20.79-effective-source.tar.gz
     - name: Record resolved MaterialKolor ABI dependencies
       working-directory: android-app
       run: 'set -euo pipefail
@@ -261,21 +277,21 @@ jobs:
         \ --tests '*ConceptRemainingCoverageTest' --tests '*WanDetails61Test' --tests '*MainLanguageBindingTest' --tests '*PanelLayoutDefaultsTest' --tests\
         \ '*Runtime146ContractTest' --tests '*PanelModel11Test' --tests '*PanelActionSafetyTest' --tests '*ProxyLatencyRegressionTest' --tests '*DocumentPickerSafetyTest'\
         \ --tests '*AppCrashReportTest' --tests '*ProxyScriptSafetyTest' --tests '*RootAutostartTest' --tests '*CustomPaletteCompatibilityTest' --tests\
-        \ '*ProxyAdblockExportTest' --tests '*RootHealthUpgradeTest' --tests '*RootNetworkRecoveryTest' --tests '*ProxyNetworkJournalTest' --tests '*NetworkDiagnosticsTest'\
+        \ '*ProxyAdblockExportTest' --tests '*RootHealthUpgradeTest' --tests '*RootNetworkRecoveryTest' --tests '*ProxyNetworkJournalTest' --tests '*NetworkDiagnosticsTest' --tests '*NetworkRecoveryStressTest'\
         \ --stacktrace\n"
       working-directory: android-app
     - name: Android lint compatibility gate
       run: gradle --no-daemon --max-workers=1 -Dorg.gradle.jvmargs='-Xmx1500m -Dfile.encoding=UTF-8' :app:lintDebug --stacktrace
       working-directory: android-app
     - name: Consolidate native and browser state evidence
-      run: python3 tools/qa/consolidate_concept_coverage.py --repo . --expected-tests 311 --browser-evidence out/verification/webui-browser --browser-commit
+      run: python3 tools/qa/consolidate_concept_coverage.py --repo . --expected-tests 324 --browser-evidence out/verification/webui-browser --browser-commit
         "$GITHUB_SHA"
     - if: always()
       name: Upload concept UI verification evidence
       uses: actions/upload-artifact@v4
       with:
         if-no-files-found: warn
-        name: Hetu-V20.78-UI-verification
+        name: Hetu-V20.79-UI-verification
         path: 'android-app/app/build/test-results/testDebugUnitTest/
 
           android-app/app/build/reports/tests/testDebugUnitTest/
@@ -306,7 +322,7 @@ jobs:
 
         head -3 out/apk-transfer/apk-metadata.txt
 
-        grep -q "versionCode=''2078'' versionName=''0.12.8-v20''" out/apk-transfer/apk-metadata.txt
+        grep -q "versionCode=''2079'' versionName=''0.12.9-v20''" out/apk-transfer/apk-metadata.txt
 
         "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs "$APK" > out/apk-transfer/apk-signature.txt
 
@@ -333,7 +349,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         if-no-files-found: error
-        name: Hetu-V20.78-APK-manifest
+        name: Hetu-V20.79-APK-manifest
         path: 'out/apk-transfer/manifest.json
 
           out/apk-transfer/apk-metadata.txt
@@ -346,42 +362,42 @@ jobs:
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.78-APK-part00
+        name: Hetu-V20.79-APK-part00
         path: out/apk-transfer/part00.bin
     - name: Upload APK transport part 01
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.78-APK-part01
+        name: Hetu-V20.79-APK-part01
         path: out/apk-transfer/part01.bin
     - name: Upload APK transport part 02
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.78-APK-part02
+        name: Hetu-V20.79-APK-part02
         path: out/apk-transfer/part02.bin
     - name: Upload APK transport part 03
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.78-APK-part03
+        name: Hetu-V20.79-APK-part03
         path: out/apk-transfer/part03.bin
     - name: Upload APK transport part 04
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.78-APK-part04
+        name: Hetu-V20.79-APK-part04
         path: out/apk-transfer/part04.bin
     - name: Upload APK transport part 05
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.78-APK-part05
+        name: Hetu-V20.79-APK-part05
         path: out/apk-transfer/part05.bin
   android-ui-smoke:
     needs: build
@@ -441,7 +457,7 @@ jobs:
         '
     - name: Run installed APK navigation and native WebView smoke
       env:
-        HETU_EXPECTED_VERSION: '2078'
+        HETU_EXPECTED_VERSION: '2079'
       run: 'set -euo pipefail
 
         mkdir -p out/android-smoke
@@ -463,7 +479,7 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: Hetu-V20.78-Android-${{ matrix.api }}-smoke
+        name: Hetu-V20.79-Android-${{ matrix.api }}-smoke
         path: out/android-smoke/
         if-no-files-found: warn
     strategy:
@@ -590,6 +606,8 @@ jobs:
     - tools/qa/test_filter_export.py
     - updates/v2077-network-recovery/**
     - updates/v2078-network-traces/**
+    - updates/v2079-recovery-backpressure/**
+    - tools/qa/test_network_recovery_stress.py
     - .github/scripts/check_hetu_webview.cjs
     - .github/scripts/native_webview_bounds.py
     - .github/scripts/test_native_webview_bounds.py

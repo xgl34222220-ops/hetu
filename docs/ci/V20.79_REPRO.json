@@ -1,0 +1,26 @@
+{
+  "after": {
+    "cycles": 512,
+    "maxQueuedRecoveries": 1,
+    "drainedAttempts": 1,
+    "latestExecuted": 1,
+    "cancelledWantedExecuted": 0,
+    "eventDuringAttemptPreserved": true,
+    "cancelledTimersRetained": 0,
+    "sourceSha256": "0c277dbd0c59046187b1dc422789844c52d5a8599b2a76c2608dd9e1f1ebce9a",
+    "fixtureOnly": true,
+    "deviceOrNetworkAccess": false
+  },
+  "before": {
+    "cycles": 512,
+    "maxQueuedRecoveries": 512,
+    "drainedAttempts": 512,
+    "latestExecuted": 1,
+    "cancelledWantedExecuted": 0,
+    "eventDuringAttemptPreserved": true,
+    "cancelledTimersRetained": 4096,
+    "sourceSha256": "b50773343de46622658e65b48a3e00a96863d74033f561fd6bdab304402ae1cd",
+    "fixtureOnly": true,
+    "deviceOrNetworkAccess": false
+  }
+}
