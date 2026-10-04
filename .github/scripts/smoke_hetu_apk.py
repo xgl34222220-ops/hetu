@@ -10,6 +10,7 @@ PKG='io.github.xgl34222220.hetu'
 ADB=str(Path(os.environ['ANDROID_HOME'])/'platform-tools'/'adb')
 OUT=Path(os.environ.get('HETU_SMOKE_OUT','out/android-smoke')); OUT.mkdir(parents=True,exist_ok=True)
 from mock_webview_controller import controller_fixture
+from native_webview_bounds import webview_bounds
 checks=[]
 def adb(*args, timeout=90, check=True):
  try:
@@ -186,9 +187,7 @@ def web_click(port,label):
  target=web_command(port,'locate',label)
  assert target.get('located')==label,target
  root,_=ui()
- views=[n for n in root.iter('node') if n.get('class')=='android.webkit.WebView' and n.get('package')==PKG]
- assert len(views)==1,('Expected one actual WebView',len(views))
- x1,y1,x2,y2=map(int,re.findall(r'\d+',views[0].get('bounds','')))
+ (x1,y1,x2,y2),document_nodes=webview_bounds(root,PKG)
  width,height=target['viewportWidth'],target['viewportHeight']
  assert width>0 and height>0 and x2>x1 and y2>y1,target
  assert 0<target['x']<width and 0<target['y']<height,('Offscreen button',target)
@@ -196,7 +195,7 @@ def web_click(port,label):
  assert x1<x<x2 and y1<y<y2,('Tap outside WebView',x,y)
  proof=OUT/'native-webview-input.json'
  entries=json.loads(proof.read_text()) if proof.exists() else []
- entries.append({'label':label,'webview_bounds':[x1,y1,x2,y2],'viewport':[width,height],'tap':[x,y],'input':'native adb tap'})
+ entries.append({'label':label,'webview_bounds':[x1,y1,x2,y2],'document_nodes':document_nodes,'viewport':[width,height],'tap':[x,y],'input':'native adb tap'})
  proof.write_text(json.dumps(entries,ensure_ascii=False,indent=2))
  adb('shell','input','tap',str(x),str(y));time.sleep(2)
 

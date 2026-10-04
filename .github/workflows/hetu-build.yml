@@ -171,6 +171,12 @@ jobs:
         3a1215f4e9093ae2298803020d697da0c14c35ee5cf28f84f2a81608093783f9
 
         '
+    - name: Regress observed nested WebView document topology without weakening surface guards
+      run: 'set -euo pipefail
+
+        python3 .github/scripts/test_native_webview_bounds.py 2>&1 | tee out/verification/native-webview-bounds-tests.txt
+
+        '
     - name: Verify built-in WebUI behavior with controlled API fixtures
       run: 'node --check .github/scripts/check_hetu_webview.cjs
 
@@ -585,4 +591,7 @@ jobs:
     - updates/v2077-network-recovery/**
     - updates/v2078-network-traces/**
     - .github/scripts/check_hetu_webview.cjs
+    - .github/scripts/native_webview_bounds.py
+    - .github/scripts/test_native_webview_bounds.py
+    - .github/scripts/fixtures/**
   workflow_dispatch: null

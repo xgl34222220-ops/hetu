@@ -1,0 +1,56 @@
+{
+  "applicationCommit": "47609a6925eb411def74ea6781eaa77b88a6b7da",
+  "runId": 37162276140,
+  "overall": "failure",
+  "buildJob": 111317996487,
+  "build": "success",
+  "unitTests": {
+    "tests": 311,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "ProxyNetworkJournalTest": 11,
+    "NetworkDiagnosticsTest": 8,
+    "RootNetworkRecoveryTest": 13,
+    "RootHealthUpgradeTest": 7
+  },
+  "shellTests": 60,
+  "lint": "success",
+  "materialkolorConstructorReferences": 687,
+  "missingConstructors": 0,
+  "runtimePayloadsVerified": 23,
+  "apkSha256": "33c48db99d98c19b8e91bb44c5441e8c32250e083dc459d97c2403f19c697966",
+  "apkBytes": 133347510,
+  "android": {
+    "35": {
+      "jobId": 111319857026,
+      "result": "failure",
+      "reason": "nested-accessibility-document-counted-as-independent-WebView",
+      "artifactId": 11288373008
+    },
+    "36": {
+      "jobId": 111319857006,
+      "result": "failure",
+      "reason": "nested-accessibility-document-counted-as-independent-WebView"
+    }
+  },
+  "observedTopology": {
+    "nativeContainers": 1,
+    "accessibilityWebViewNodes": 2,
+    "bothBounds": [
+      0,
+      24,
+      394,
+      804
+    ]
+  },
+  "correction": "resolve unique top-level container; still reject independent multiple containers, invalid bounds or other package",
+  "hostRegressionTests": 6,
+  "hostTestsLocalPassed": true,
+  "fullRerunPending": true,
+  "applicationCodeChangedByCorrection": false,
+  "phoneOutageResolved": false,
+  "userDeviceAccessed": false,
+  "published": false,
+  "merged": false
+}
