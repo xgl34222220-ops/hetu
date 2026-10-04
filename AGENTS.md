@@ -1,6 +1,8 @@
-## 当前续接：V20.79 恢复背压（CI 待核实）
+## 当前续接：V20.79 恢复背压（全量 CI 已核实通过）
 
-沿原分支 ed326756 / V20.78，不另开实现。512次实际排队方法的原创故障夹具复现旧队列512、新队列1；4096取消计时器旧保留4096、新0。复用原 coalescer，新增服务观察 session fence 与重建状态失效；13项Android回归，预计324单测及全部原门禁须当轮核实。Root151/core/service.d/签名/Manifest/原UI不变。保留上一轮证据；用户设备、KernelSU/长期Google微信/IPv6/TUN/eBPF未验证。日志存储边界与脱敏是下一批；禁止永久删除历史、扩权、合并主分支或正式发布部署。详见docs/V20.79_RECOVERY_BACKPRESSURE.md。
+原分支 `test/v20.75-theme-compat`，应用 `82be531f`，Actions `37166956898` 四个job success。实际324单测无失败/错误/跳过，6host+60shell、生产过滤ENOENT、lint0error、687ABI/23载荷/固定签名通过；API35/36各52安装检查（各21配色），Root mutation0。积压夹具旧512→新1、取消计时器旧4096→新0，服务重建与迟到结果门禁13项通过。保留ed326756/37163668343上一轮及全部失败证据。详见docs/ci/V20.79_RESULT.json与docs/V20.79_RECOVERY_BACKPRESSURE.md。
+
+Root151/core/service.d/签名/Manifest/原UI方向不变。未知core在wanted+autoStart开启时继续有界间隔等待，最多一个重试；既已进入Root事务不强制取消。用户设备、KernelSU/OEM、长期Google微信/IPv6/TUN/eBPF未验证，不能宣称间歇断网解决。日志存储边界与脱敏为下一批；禁止永久删除历史、扩权、合并主分支或正式发布部署。
 
 ## 当前续接：V20.78 网络诊断（全量 CI 已核实通过）
 
