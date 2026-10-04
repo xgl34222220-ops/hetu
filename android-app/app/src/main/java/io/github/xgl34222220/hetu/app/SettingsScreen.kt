@@ -752,6 +752,7 @@ private fun HxAccentSwatches(vm: HetuViewModel) {
 @Composable
 internal fun SettingsAccentSwatches(selectedHex: String, onSelect: (String) -> Unit) {
     val c = Hx.colors
+    val accentLabel = ht("强调色")
     val swatches = listOf(
         "#2A62E8" to Color(0xFF0A62E8), "#42CAA3" to Color(0xFF42CAA3),
         "#36B9F3" to Color(0xFF36B9F3), "#6654FF" to Color(0xFF6654FF),
@@ -771,7 +772,7 @@ internal fun SettingsAccentSwatches(selectedHex: String, onSelect: (String) -> U
                         val selected = selectedHex.equals(hex, true)
                         val source = remember { MutableInteractionSource() }
                         Box(Modifier.size(48.dp).hxPressScale(source, .92f)
-                            .semantics { contentDescription = "${ht("强调色")} $hex" }
+                            .semantics { contentDescription = "$accentLabel $hex" }
                             .selectable(selected = selected, role = Role.RadioButton, interactionSource = source, indication = null) { onSelect(hex) },
                             contentAlignment = Alignment.Center) {
                             Box(Modifier.size(46.dp).clip(CircleShape).background(color), contentAlignment = Alignment.Center) {
