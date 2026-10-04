@@ -1307,10 +1307,10 @@ index 0000000..6a56d73
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ToastFeedbackTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ToastFeedbackTest.kt
 new file mode 100644
-index 0000000..cb97c71
+index 0000000..8947237
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ToastFeedbackTest.kt
-@@ -0,0 +1,114 @@
+@@ -0,0 +1,113 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
@@ -1320,7 +1320,6 @@ index 0000000..cb97c71
 +import androidx.compose.foundation.layout.fillMaxSize
 +import androidx.compose.ui.Modifier
 +import androidx.compose.ui.graphics.asAndroidBitmap
-+import androidx.compose.ui.test.assertExists
 +import androidx.compose.ui.test.captureToImage
 +import androidx.compose.ui.test.junit4.createAndroidComposeRule
 +import androidx.compose.ui.test.onNodeWithTag

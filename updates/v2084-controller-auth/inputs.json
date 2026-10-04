@@ -38,12 +38,12 @@
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerReadStateTest.kt": "6e59e8d83ed822a000efe2896cf76d7fcbb8b8ce5aa00fed3c1963a4fcbedaf0",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/LegacyControllerCredentialTest.kt": "1bba913d3184ed507b61b7cfdd64a9eb9cb0b9cd788ba3a89ab62b0ead384767",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelControllerErrorTest.kt": "01757ef4f531771e81231a693f18c57dc1c3f07ec84a1fa4b2d5618525cbe44b",
-    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ToastFeedbackTest.kt": "ae26843b462f915b7976f3f9f086303c8983313c84d6ee612490ecd6f5c68b3e"
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ToastFeedbackTest.kt": "83cd5d6d1128a4156a0b77fa27a0c2bd8cba0874947feb22fb44c38fe0df0859"
   },
   "runtimePayloadsUnchanged": true,
   "dependenciesUnchanged": true,
   "manifestAndPermissionsUnchanged": true,
   "unchangedOutsideAuthScope": true,
   "reproducedSourceMatchesCheckout": true,
-  "patchSha256": "18eea25566d10d66b756d25cb539c3211d339f7828efc4c45abe4faa26087d9c"
+  "patchSha256": "018e15fa6f2a6b62e5182d1908353c6db7a35d337d252d2445e44731a8c0542c"
 }
