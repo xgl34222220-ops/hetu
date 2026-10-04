@@ -1,3 +1,7 @@
+## 当前续接：V20.81 合法栈位置（CI待核实）
+
+V20.80完整四job/344单测/API35-36各56已核实后接续原分支；首轮编译失败和全部前轮证据保留。原创生产类夹具复现Kotlin短横线及init/clinit三类栈位置均被替换；改后捕获/读回保留，5类URI/凭据/新行/超长非法符号仍拒绝。新增4单测（预计348）及安装合成行的位置保留断言，全部原门禁重跑。复用预编译有界校验；Root151/23载荷/签名/Manifest/原UI/权限不变，无hook、不操作用户手机或安全网络设置、不永久删除用户数据、不合并主分支或正式发布部署。真机KernelSU/OEM、Google微信长期断连、长期IPv6/TUN/eBPF未验证，间歇断网未确认。见docs/V20.81_TRACE_SYMBOLS.md与docs/ci/V20.81_REPRO.json。
+
 ## 当前续接：V20.80 日志限额与脱敏（全量CI已核实通过）
 
 原应用b49c6d18，测试导入修正52ad5701，Actions37169862397四jobsuccess；首轮37169355897测试编译失败、单测未执行/安装skipped证据保留。实际344单测0fail/error/skipped、6host+60shell、过滤ENOENT、lint0error、687ABI/23载荷/固定签名通过；API35/36各56（各21配色），Root mutation0。CI3000写入旧501000→新8016≤8192预算/2952拒绝；故障200190→217字节，脱敏/截断/最新UUID/复制实际函数/超限旧段校验保留均通过。见docs/ci/V20.80_RESULT.json及docs/V20.80_JOURNAL_BOUNDS.md。

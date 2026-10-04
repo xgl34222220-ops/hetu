@@ -114,6 +114,7 @@ def install_network_event_fixture(full=False):
   return {'schema':1,'id':str(uuid.UUID(int=n)),'timeMs':1,'elapsedMs':1,'stage':'HEALTH_RESULT','epoch':7,'outcome':'DEGRADED','code':0,'faults':['watchdog-missing']}
  rows=[record(n) for n in range(1,102)]
  rows[-1].update(configuration='https://user:TOPSECRET@private.invalid/config',authorization='Bearer TOPSECRET',message='/data/private/config.yaml')
+ rows[-1]['causes']=[{'type':'java.lang.NoSuchMethodError','frames':['com.materialkolor.ktx.DynamicSchemeKt.toDynamicScheme-Iv8Zu3U:41']}]
  if full:
   # Legacy over-limit history is retained, rather than cleared by the new reader.
   rows=[dict(record(102),configuration='SYNTHETIC-PADDING-'+'x'*(2*1024*1024)),record(103)]
@@ -362,6 +363,7 @@ def main():
  click('网络事件记录',scroll=True);expect_eventually('viewTruncated=true','network-events-truncation-visible')
  raw=(OUT/'network-events-truncation-visible.xml').read_text()
  assert journal_fixture['latestId'] in raw,'Latest trace ID was omitted'
+ assert 'toDynamicScheme-Iv8Zu3U:41' in raw,'Legitimate Kotlin source location was redacted'
  assert 'TOPSECRET' not in raw and 'private.invalid' not in raw and '/data/private' not in raw,'Poisoned metadata reached report UI'
  click('复制');expect('网络事件记录','network-events-copy-action')
  # Installed copy input is sanitized above; real ClipboardManager contents are

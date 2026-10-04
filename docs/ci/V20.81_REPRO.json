@@ -1,0 +1,36 @@
+{
+  "after": {
+    "captured": [
+      "example.Worker.toDynamicScheme-Iv8Zu3U:41",
+      "example.Worker.<init>:41",
+      "example.Worker.<clinit>:41"
+    ],
+    "copied": [
+      "example.Worker.toDynamicScheme-Iv8Zu3U:41",
+      "example.Worker.<init>:41",
+      "example.Worker.<clinit>:41"
+    ],
+    "hostileSymbolsRejected": 5,
+    "privateMessageOrFileCopied": false,
+    "sourceSha256": "7286b492510377060d5cd32f2b575e264a4b86f6d51cee8a308dbf8abda45621",
+    "fixtureOnly": true,
+    "deviceOrNetworkAccess": false
+  },
+  "before": {
+    "captured": [
+      "redacted-frame",
+      "redacted-frame",
+      "redacted-frame"
+    ],
+    "copied": [
+      "redacted-frame",
+      "redacted-frame",
+      "redacted-frame"
+    ],
+    "hostileSymbolsRejected": 5,
+    "privateMessageOrFileCopied": false,
+    "sourceSha256": "83980b0576665cbcc8d0583758f4d911c3356aed7db8bf37e6ff0d2df2d87b51",
+    "fixtureOnly": true,
+    "deviceOrNetworkAccess": false
+  }
+}
