@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": "V20.83",
+  "applicationCommit": "7d082aca02345efb75a5d1e2b83fc6529232d455",
+  "ciRun": 37238394831,
+  "attempt": 1,
+  "conclusion": "failure",
+  "buildJob": {"id": 111542001292, "conclusion": "success"},
+  "historicalCrashJob": {"id": 111542001166, "conclusion": "success"},
+  "units": {"tests": 392, "failures": 0, "errors": 0, "skipped": 0, "xmlFiles": 42},
+  "lint": {"errors": 0, "fatal": 0, "warnings": 298},
+  "apk": {"bytes": 134721428, "sha256": "24f96438c1ebe1e648e23352e1191aa91ab472ee938cc62e1eba39dd2abe7c57"},
+  "installFailures": [
+    {"apiLevel": 35, "job": 111543713696, "artifact": 11316765771},
+    {"apiLevel": 36, "job": 111543713762, "artifact": 11317010476}
+  ],
+  "cause": "The updated scroll helper omitted the floating dock boundary previously protected by the fixed y742 guard. Actual Settings ScrollView bounds are [0,0][394,852], but all four native dock wrappers begin at y736. A physical click on the obscured About row instead selected Home; 05-about.xml shows the home page. Both APIs fail the retained 内置核心 assertion before journal/WebUI checks.",
+  "correction": "Identify the unique actual four-tab dock group and clip the usable viewport at its measured top. Preserve the 702px tool viewport, no-dock child pages, real scrolling/taps, seven attempts and every original functional assertion.",
+  "continuation": "The application and all Android tests/build inputs are unchanged. A separate guarded installation workflow may reuse the exact signed APK and successful build evidence from this run; it must pin source tree, run/attempt/jobs, artifact digests, APK bytes/hash, identity, signature, 392-test XML, lint, ABI and all 23 payloads, then execute both API installation flows with the corrected current test commit.",
+  "boundaries": ["This run remains failed.", "Do not claim the new installation-test commit rebuilt or reran 392 Android unit tests.", "Network-journal and native-WebView checks were not reached in this run."]
+}
