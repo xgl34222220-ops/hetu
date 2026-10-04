@@ -14,11 +14,12 @@ android {
     }
 
     defaultConfig {
-        applicationId = "io.github.xgl34222220.hetu"
+        // Preview branch only: standalone package so it installs alongside the real app.
+        applicationId = "io.github.xgl34222220.hetu.preview"
         minSdk = 26
         targetSdk = 35
         versionCode = 2008
-        versionName = "0.5.8-v20"
+        versionName = "0.5.8-v20-preview"
     }
 
     // Explicit CI debug identity. No private key is committed or exported.
