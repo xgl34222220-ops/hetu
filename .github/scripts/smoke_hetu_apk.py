@@ -11,6 +11,7 @@ ADB=str(Path(os.environ['ANDROID_HOME'])/'platform-tools'/'adb')
 OUT=Path(os.environ.get('HETU_SMOKE_OUT','out/android-smoke')); OUT.mkdir(parents=True,exist_ok=True)
 from mock_webview_controller import controller_fixture
 from native_webview_bounds import webview_bounds
+from native_scroll_bounds import scroll_bounds, scroll_gesture
 checks=[]
 def adb(*args, timeout=90, check=True):
  try:
@@ -60,14 +61,16 @@ def capture(name):
 def click(label,scroll=False,bottom=False):
  for attempt in range(7 if scroll else 1):
   root,_=ui();found=[n for n in root.iter('node') if n.get('text')==label or n.get('content-desc')==label]
+  viewport=scroll_bounds(root,PKG,allow_missing=True) if scroll else None
   if bottom: found.sort(key=lambda n: int(re.findall(r'\d+',n.get('bounds','[0,0][0,0]'))[1]),reverse=True)
   if found:
    x1,y1,x2,y2=map(int,re.findall(r'\d+',found[0].get('bounds','')))
    assert x2>x1 and y2>y1,(label,found[0].attrib)
-   if scroll and (y1 < 65 or y2 > 742):
-    adb('shell','input','swipe','196','710','196','260','400');time.sleep(1);continue
+   gesture=scroll_gesture(viewport,(x1,y1,x2,y2)) if scroll else None
+   if gesture is not None:
+    adb('shell','input','swipe',*(str(v) for v in gesture),'400');time.sleep(1);continue
    adb('shell','input','tap',str((x1+x2)//2),str((y1+y2)//2));time.sleep(2);return
-  if scroll: adb('shell','input','swipe','196','710','196','260','400');time.sleep(1)
+  if scroll: adb('shell','input','swipe',*(str(v) for v in scroll_gesture(viewport)),'400');time.sleep(1)
  raise AssertionError('UI label unavailable: '+label)
 
 def expect(label,name):
@@ -361,6 +364,8 @@ def main():
  adb('shell','input','keyevent','4');time.sleep(2)
  click('工具',bottom=True);click('诊断工具',scroll=True)
  expect('网络事件记录','network-events-entry')
+ # The concept detail delegates retained journal/session tools to the existing Hx page.
+ click('网络事件记录',scroll=True)
  click('网络事件记录',scroll=True);expect_eventually('尚无网络事件记录','network-events-without-root')
  expect('storageLimitBytes=2097152','network-events-storage-bound-visible')
  adb('shell','input','keyevent','4');time.sleep(2)
@@ -383,7 +388,8 @@ def main():
  click('修复运行记录',scroll=True);expect_eventually('无法取得 Root 权限','safe-session-repair-root-denial')
  adb('shell','input','keyevent','4');time.sleep(2)
  adb('shell','input','keyevent','4');time.sleep(2)
- click('工具',bottom=True);click('Web面板',scroll=True);expect('河图本地面板','06-web-panels')
+ adb('shell','input','keyevent','4');time.sleep(2)
+ click('工具',bottom=True);click('WebUI',scroll=True);expect('河图本地面板','06-web-panels')
  click('河图本地面板');time.sleep(3)
  with webview_cdp() as web_port:
   web_expect(web_port,'河图 WebUI','07-native-webview')

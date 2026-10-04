@@ -38,6 +38,10 @@ jobs:
       run: |
         set -euo pipefail
         python3 .github/scripts/test_ui_source_scope.py 2>&1 | tee out/verification/ui-source-scope-tests.txt
+    - name: Regress actual tool viewport gesture bounds
+      run: |
+        set -euo pipefail
+        python3 .github/scripts/test_native_scroll_bounds.py 2>&1 | tee out/verification/native-scroll-bounds-tests.txt
     - name: Regress observed nested WebView document topology without weakening surface guards
       run: 'set -euo pipefail
 
