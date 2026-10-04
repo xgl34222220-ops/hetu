@@ -33,7 +33,7 @@ jobs:
           set -euo pipefail
           SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort | tail -n 1)
           yes | "$SDKMANAGER" --licenses >/dev/null || true
-          "$SDKMANAGER" 'platforms;android-37' 'build-tools;37.0.0' 'platform-tools'
+          "$SDKMANAGER" 'platforms;android-37.0' 'build-tools;37.0.0' 'platform-tools'
 
       - uses: gradle/actions/setup-gradle@v4
         with:
