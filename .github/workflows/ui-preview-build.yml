@@ -8,6 +8,9 @@ on:
     branches: ['test/v20.49-ui-preview-apk']
   workflow_dispatch:
 
+env:
+  HETU_TEST_KEYSTORE: /home/runner/.android/hetu-ui10-debug.jks
+
 permissions:
   contents: read
   actions: read
@@ -27,6 +30,22 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+
+      # Same signing identity as the shipped test builds, so the APK installs
+      # over the current app without uninstalling (settings and configs kept).
+      - name: Restore signing identity
+        uses: actions/cache/restore@v4
+        with:
+          path: /home/runner/.android/hetu-ui10-debug.jks
+          key: hetu-ui10-debug-signing-v1
+          fail-on-cache-miss: true
+
+      - name: Verify signing identity
+        run: |
+          set -euo pipefail
+          test -s "$HETU_TEST_KEYSTORE"
+          keytool -exportcert -keystore "$HETU_TEST_KEYSTORE" -alias androiddebugkey -storepass android \
+            | openssl dgst -sha256 -r | cut -d ' ' -f1 | grep -qx '701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad'
 
       - name: Prepare Android SDK
         run: |

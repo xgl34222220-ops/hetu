@@ -25,16 +25,9 @@ internal fun StrategyFilterMenu(
     onChange: (PanelOptions11) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val anchor = remember { HxAnchor.take() }
-    if (anchor != null) {
-        HxAnchoredMenu(anchor, onDismiss) { _ ->
+    HxSheet(onDismiss = onDismiss, title = "策略筛选") {
+        Column(Modifier.padding(horizontal = 12.dp)) {
             StrategyFilterRows(options, onChange)
-        }
-    } else {
-        HxSheet(onDismiss = onDismiss, title = "策略筛选") {
-            Column(Modifier.padding(horizontal = 12.dp)) {
-                StrategyFilterRows(options, onChange)
-            }
         }
     }
 }
