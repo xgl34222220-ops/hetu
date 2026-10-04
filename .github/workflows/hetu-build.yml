@@ -1,4 +1,4 @@
-name: Hetu V20.79 bounded network recovery
+name: Hetu V20.80 bounded and sanitized network journal
 permissions:
   contents: read
   actions: read
@@ -118,8 +118,7 @@ jobs:
 
         cp android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockRules.java out/before-filter-export/ProxyAdblockRules.java
 
-        printf ''%s\n'' ''9ee6b1088c54bb8e5879c923cc6e2624181df07dca6c8ebc97c45cef6ded6a62  updates/v2076-session-filter/runtime.patch'' | sha256sum -c
-        -
+        printf ''%s\n'' ''9ee6b1088c54bb8e5879c923cc6e2624181df07dca6c8ebc97c45cef6ded6a62  updates/v2076-session-filter/runtime.patch'' | sha256sum -c -
 
         git apply --check updates/v2076-session-filter/runtime.patch
 
@@ -142,8 +141,7 @@ jobs:
     - name: Apply network epoch recovery and preserve Root/core payloads
       run: 'set -euo pipefail
 
-        printf ''%s\n'' ''a912fb4e7b2a3d4bcd611b9022348426f96d6dde1765638baa6d93c5315333f9  updates/v2077-network-recovery/runtime.patch'' | sha256sum -c
-        -
+        printf ''%s\n'' ''a912fb4e7b2a3d4bcd611b9022348426f96d6dde1765638baa6d93c5315333f9  updates/v2077-network-recovery/runtime.patch'' | sha256sum -c -
 
         git apply --check updates/v2077-network-recovery/runtime.patch
 
@@ -158,8 +156,7 @@ jobs:
     - name: Apply append-only network diagnostics and preserve runtime payloads
       run: 'set -euo pipefail
 
-        printf ''%s\n'' ''053077497c6e11be8cd7b35904101ce3b78de7ca3c5f61e6fa51c0c06a4fa6ab  updates/v2078-network-traces/runtime.patch'' | sha256sum -c
-        -
+        printf ''%s\n'' ''053077497c6e11be8cd7b35904101ce3b78de7ca3c5f61e6fa51c0c06a4fa6ab  updates/v2078-network-traces/runtime.patch'' | sha256sum -c -
 
         git apply --check updates/v2078-network-traces/runtime.patch
 
@@ -183,6 +180,24 @@ jobs:
         git apply updates/v2079-recovery-backpressure/runtime.patch
 
         grep -q ''versionCode = 2079'' android-app/app/build.gradle.kts
+
+        python3 tools/qa/test_network_recovery_stress.py --before "$RUNNER_TEMP/hetu-v2078-network-service.java" --output out/verification/network-recovery-stress.json
+
+        '
+    - name: Apply journal budget and reproduce old growth and disclosure
+      run: 'set -euo pipefail
+
+        cp android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkJournal.java "$RUNNER_TEMP/hetu-v2079-network-journal.java"
+
+        echo ''feed944d628c5ea795e0828bb9d8895c0d494b3f7ec102b41595425a27525297  updates/v2080-journal-bounds/runtime.patch'' | sha256sum -c -
+
+        git apply --check updates/v2080-journal-bounds/runtime.patch
+
+        git apply updates/v2080-journal-bounds/runtime.patch
+
+        grep -q ''versionCode = 2080'' android-app/app/build.gradle.kts
+
+        python3 tools/qa/test_network_journal_stress.py --before "$RUNNER_TEMP/hetu-v2079-network-journal.java" --output out/verification/network-journal-stress.json
 
         python3 tools/qa/test_network_recovery_stress.py --before "$RUNNER_TEMP/hetu-v2078-network-service.java" --output out/verification/network-recovery-stress.json
 
@@ -221,8 +236,8 @@ jobs:
         key: hetu-ui10-debug-signing-v1
         fail-on-cache-miss: true
     - name: Verify signing identity
-      run: "set -euo pipefail\ntest -s \"$HETU_TEST_KEYSTORE\"\nkeytool -exportcert -keystore \"$HETU_TEST_KEYSTORE\" -alias androiddebugkey -storepass\
-        \ android \\\n  | openssl dgst -sha256 -r | cut -d ' ' -f1 | grep -qx '701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad'\n"
+      run: "set -euo pipefail\ntest -s \"$HETU_TEST_KEYSTORE\"\nkeytool -exportcert -keystore \"$HETU_TEST_KEYSTORE\" -alias androiddebugkey -storepass android \\\
+        \n  | openssl dgst -sha256 -r | cut -d ' ' -f1 | grep -qx '701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad'\n"
     - name: Prepare Android SDK
       run: 'set -euo pipefail
 
@@ -236,26 +251,26 @@ jobs:
     - uses: gradle/actions/setup-gradle@v4
       with:
         gradle-version: 9.5.0
-    - name: Export effective V20.78 source
+    - name: Export effective V20.80 source
       run: 'set -euo pipefail
 
-        tar -czf /tmp/Hetu-V20.79-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+        tar -czf /tmp/Hetu-V20.80-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
 
-        sha256sum /tmp/Hetu-V20.79-effective-source.tar.gz
+        sha256sum /tmp/Hetu-V20.80-effective-source.tar.gz
 
         '
     - uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: error
-        name: Hetu-V20.79-effective-source
-        path: /tmp/Hetu-V20.79-effective-source.tar.gz
+        name: Hetu-V20.80-effective-source
+        path: /tmp/Hetu-V20.80-effective-source.tar.gz
     - name: Record resolved MaterialKolor ABI dependencies
       working-directory: android-app
       run: 'set -euo pipefail
 
-        gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=''-Xmx2g -Dfile.encoding=UTF-8'' :app:dependencyInsight --configuration debugRuntimeClasspath
-        --dependency com.materialkolor > ../out/verification/materialkolor-dependency-insight.txt
+        gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=''-Xmx2g -Dfile.encoding=UTF-8'' :app:dependencyInsight --configuration debugRuntimeClasspath --dependency
+        com.materialkolor > ../out/verification/materialkolor-dependency-insight.txt
 
         cat ../out/verification/materialkolor-dependency-insight.txt
 
@@ -270,28 +285,26 @@ jobs:
     - name: Verify packaged launcher and concept icon bytes
       run: python3 .github/scripts/verify_hetu_icons.py apk android-app/app/build/outputs/apk/debug/app-debug.apk
     - name: Runtime unit tests
-      run: "gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:testDebugUnitTest \\\n  --tests '*RuntimeYaml15Test'\
-        \ --tests '*RuntimeStartup15Test' --tests '*AdblockSnifferTest' \\\n  --tests '*ConceptParity57Test' --tests '*PanelConceptModelTest' --tests '*SettingsConceptParityTest'\
+      run: "gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:testDebugUnitTest \\\n  --tests '*RuntimeYaml15Test' --tests\
+        \ '*RuntimeStartup15Test' --tests '*AdblockSnifferTest' \\\n  --tests '*ConceptParity57Test' --tests '*PanelConceptModelTest' --tests '*SettingsConceptParityTest'\
         \ \\\n  --tests '*CoreManagerConcept57Test' --tests '*SettingsBackupParity57Test' --tests '*ToolsConceptParityTest' --tests '*NativeConceptScreenshotTest'\
-        \ --tests '*SettingsPickerParity58Test' --tests '*LargeTitleParity59Test' --tests '*BootStartup60Test' \\\n  --tests '*ConceptStateCoverageTest'\
-        \ --tests '*ConceptRemainingCoverageTest' --tests '*WanDetails61Test' --tests '*MainLanguageBindingTest' --tests '*PanelLayoutDefaultsTest' --tests\
-        \ '*Runtime146ContractTest' --tests '*PanelModel11Test' --tests '*PanelActionSafetyTest' --tests '*ProxyLatencyRegressionTest' --tests '*DocumentPickerSafetyTest'\
-        \ --tests '*AppCrashReportTest' --tests '*ProxyScriptSafetyTest' --tests '*RootAutostartTest' --tests '*CustomPaletteCompatibilityTest' --tests\
-        \ '*ProxyAdblockExportTest' --tests '*RootHealthUpgradeTest' --tests '*RootNetworkRecoveryTest' --tests '*ProxyNetworkJournalTest' --tests '*NetworkDiagnosticsTest' --tests '*NetworkRecoveryStressTest'\
-        \ --stacktrace\n"
+        \ --tests '*SettingsPickerParity58Test' --tests '*LargeTitleParity59Test' --tests '*BootStartup60Test' \\\n  --tests '*ConceptStateCoverageTest' --tests '*ConceptRemainingCoverageTest'\
+        \ --tests '*WanDetails61Test' --tests '*MainLanguageBindingTest' --tests '*PanelLayoutDefaultsTest' --tests '*Runtime146ContractTest' --tests '*PanelModel11Test'\
+        \ --tests '*PanelActionSafetyTest' --tests '*ProxyLatencyRegressionTest' --tests '*DocumentPickerSafetyTest' --tests '*AppCrashReportTest' --tests '*ProxyScriptSafetyTest'\
+        \ --tests '*RootAutostartTest' --tests '*CustomPaletteCompatibilityTest' --tests '*ProxyAdblockExportTest' --tests '*RootHealthUpgradeTest' --tests '*RootNetworkRecoveryTest'\
+        \ --tests '*ProxyNetworkJournalTest' --tests '*NetworkDiagnosticsTest' --tests '*NetworkRecoveryStressTest' --tests '*JournalReliabilityTest' --stacktrace\n"
       working-directory: android-app
     - name: Android lint compatibility gate
       run: gradle --no-daemon --max-workers=1 -Dorg.gradle.jvmargs='-Xmx1500m -Dfile.encoding=UTF-8' :app:lintDebug --stacktrace
       working-directory: android-app
     - name: Consolidate native and browser state evidence
-      run: python3 tools/qa/consolidate_concept_coverage.py --repo . --expected-tests 324 --browser-evidence out/verification/webui-browser --browser-commit
-        "$GITHUB_SHA"
+      run: python3 tools/qa/consolidate_concept_coverage.py --repo . --expected-tests 344 --browser-evidence out/verification/webui-browser --browser-commit "$GITHUB_SHA"
     - if: always()
       name: Upload concept UI verification evidence
       uses: actions/upload-artifact@v4
       with:
         if-no-files-found: warn
-        name: Hetu-V20.79-UI-verification
+        name: Hetu-V20.80-UI-verification
         path: 'android-app/app/build/test-results/testDebugUnitTest/
 
           android-app/app/build/reports/tests/testDebugUnitTest/
@@ -322,7 +335,7 @@ jobs:
 
         head -3 out/apk-transfer/apk-metadata.txt
 
-        grep -q "versionCode=''2079'' versionName=''0.12.9-v20''" out/apk-transfer/apk-metadata.txt
+        grep -q "versionCode=''2080'' versionName=''0.12.10-v20''" out/apk-transfer/apk-metadata.txt
 
         "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs "$APK" > out/apk-transfer/apk-signature.txt
 
@@ -349,7 +362,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         if-no-files-found: error
-        name: Hetu-V20.79-APK-manifest
+        name: Hetu-V20.80-APK-manifest
         path: 'out/apk-transfer/manifest.json
 
           out/apk-transfer/apk-metadata.txt
@@ -362,42 +375,42 @@ jobs:
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.79-APK-part00
+        name: Hetu-V20.80-APK-part00
         path: out/apk-transfer/part00.bin
     - name: Upload APK transport part 01
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.79-APK-part01
+        name: Hetu-V20.80-APK-part01
         path: out/apk-transfer/part01.bin
     - name: Upload APK transport part 02
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.79-APK-part02
+        name: Hetu-V20.80-APK-part02
         path: out/apk-transfer/part02.bin
     - name: Upload APK transport part 03
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.79-APK-part03
+        name: Hetu-V20.80-APK-part03
         path: out/apk-transfer/part03.bin
     - name: Upload APK transport part 04
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.79-APK-part04
+        name: Hetu-V20.80-APK-part04
         path: out/apk-transfer/part04.bin
     - name: Upload APK transport part 05
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.79-APK-part05
+        name: Hetu-V20.80-APK-part05
         path: out/apk-transfer/part05.bin
   android-ui-smoke:
     needs: build
@@ -457,7 +470,7 @@ jobs:
         '
     - name: Run installed APK navigation and native WebView smoke
       env:
-        HETU_EXPECTED_VERSION: '2079'
+        HETU_EXPECTED_VERSION: '2080'
       run: 'set -euo pipefail
 
         mkdir -p out/android-smoke
@@ -479,7 +492,7 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: Hetu-V20.79-Android-${{ matrix.api }}-smoke
+        name: Hetu-V20.80-Android-${{ matrix.api }}-smoke
         path: out/android-smoke/
         if-no-files-found: warn
     strategy:
@@ -612,4 +625,7 @@ jobs:
     - .github/scripts/native_webview_bounds.py
     - .github/scripts/test_native_webview_bounds.py
     - .github/scripts/fixtures/**
+    - updates/v2080-journal-bounds/**
+    - tools/qa/test_network_journal_stress.py
+    - tools/qa/fixtures/android-json/**
   workflow_dispatch: null

@@ -3,7 +3,7 @@
 Changes fixture display language and exercises denied Root setup in non-root AOSP.
 Never starts/stops a proxy, imports user data, or clears app data.
 """
-import hashlib, json, os, re, subprocess, time, xml.etree.ElementTree as ET
+import hashlib, json, os, re, subprocess, time, uuid, xml.etree.ElementTree as ET
 from pathlib import Path
 from contextlib import contextmanager
 PKG='io.github.xgl34222220.hetu'
@@ -102,6 +102,29 @@ def expect_eventually(label,name):
    expect(label,name);return
   time.sleep(2)
  raise AssertionError('Timed out waiting for accessibility label: '+label)
+
+def install_network_event_fixture(full=False):
+ # Only this job's fresh AOSP app sandbox; never overwrite a retained segment.
+ directory='no_backup/hetu-network-events'
+ name='events-00000000000000000002.jsonl' if full else 'events-00000000000000000001.jsonl'
+ target=directory+'/'+name
+ adb('shell','run-as',PKG,'mkdir','-p',directory)
+ adb('shell','run-as',PKG,'test','!','-e',target)
+ def record(n):
+  return {'schema':1,'id':str(uuid.UUID(int=n)),'timeMs':1,'elapsedMs':1,'stage':'HEALTH_RESULT','epoch':7,'outcome':'DEGRADED','code':0,'faults':['watchdog-missing']}
+ rows=[record(n) for n in range(1,102)]
+ rows[-1].update(configuration='https://user:TOPSECRET@private.invalid/config',authorization='Bearer TOPSECRET',message='/data/private/config.yaml')
+ if full:
+  # Legacy over-limit history is retained, rather than cleared by the new reader.
+  rows=[dict(record(102),configuration='SYNTHETIC-PADDING-'+'x'*(2*1024*1024)),record(103)]
+ source=OUT/name
+ source.write_text(''.join(json.dumps(r,separators=(',',':'))+'\n' for r in rows))
+ temporary='/data/local/tmp/hetu-'+name
+ adb('push',str(source),temporary)
+ adb('shell','run-as',PKG,'cp',temporary,target)
+ actual=adb('shell','run-as',PKG,'sha256sum',target).split()[0]
+ assert actual==hashlib.sha256(source.read_bytes()).hexdigest(),'Fixture transport changed journal bytes'
+ return {'path':target,'sha256':actual,'latestId':rows[-1]['id'],'syntheticOnly':True,'overwrites':False}
 
 def wait_for_home():
  # Software-emulated AOSP may present its own first-boot System UI ANR.
@@ -333,6 +356,21 @@ def main():
  click('工具',bottom=True);click('诊断工具',scroll=True)
  expect('网络事件记录','network-events-entry')
  click('网络事件记录',scroll=True);expect_eventually('尚无网络事件记录','network-events-without-root')
+ expect('storageLimitBytes=2097152','network-events-storage-bound-visible')
+ adb('shell','input','keyevent','4');time.sleep(2)
+ journal_fixture=install_network_event_fixture()
+ click('网络事件记录',scroll=True);expect_eventually('viewTruncated=true','network-events-truncation-visible')
+ raw=(OUT/'network-events-truncation-visible.xml').read_text()
+ assert journal_fixture['latestId'] in raw,'Latest trace ID was omitted'
+ assert 'TOPSECRET' not in raw and 'private.invalid' not in raw and '/data/private' not in raw,'Poisoned metadata reached report UI'
+ click('复制');expect('网络事件记录','network-events-copy-action')
+ # Installed copy input is sanitized above; real ClipboardManager contents are
+ # checked through hxCopy in Robolectric, without new emulator permissions.
+ adb('shell','input','keyevent','4');time.sleep(2)
+ full_fixture=install_network_event_fixture(full=True)
+ click('网络事件记录',scroll=True);expect_eventually('storagePaused=true','network-events-full-history-preserved')
+ assert adb('shell','run-as',PKG,'sha256sum',journal_fixture['path']).split()[0]==journal_fixture['sha256'],'Reading full history modified an earlier segment'
+ (OUT/'network-journal-fixture.json').write_text(json.dumps({'recent':journal_fixture,'overLimitLegacy':full_fixture,'rootMutationActions':0,'originalHistoryPreserved':True,'installedClipboardContentsRead':False,'clipboardContentsVerifiedBy':'JournalReliabilityTest actual hxCopy'},ensure_ascii=False,indent=2))
  adb('shell','input','keyevent','4');time.sleep(2)
  expect('修复运行记录','safe-session-repair-entry')
  click('修复运行记录',scroll=True);expect_eventually('无法取得 Root 权限','safe-session-repair-root-denial')
