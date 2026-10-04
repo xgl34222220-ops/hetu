@@ -79,7 +79,7 @@ internal fun PanelToolbar11(searchOpen: Boolean, options: PanelOptions11,
 private fun PanelToggleMenu11(title: String, tag: String, checked: Boolean, enabled: Boolean = true, click: () -> Unit) {
     DropdownMenuItem(text = { Text(title, fontSize = 13.sp) }, enabled = enabled,
         modifier = Modifier.testTag(tag).semantics { toggleableState = if (checked) androidx.compose.ui.state.ToggleableState.On else androidx.compose.ui.state.ToggleableState.Off },
-        trailingIcon = { if (checked) Icon(Icons.Rounded.Check, null, Modifier.size(18.dp), tint = Color(0xFF12806F)) }, onClick = click)
+        trailingIcon = { if (checked) Icon(Icons.Rounded.Check, null, Modifier.size(18.dp), tint = Color(0xFF2A62E8)) }, onClick = click)
 }
 
 @Composable
@@ -89,7 +89,7 @@ internal fun PanelTool11(icon: androidx.compose.ui.graphics.vector.ImageVector, 
     Box(Modifier.size(48.dp).testTag(tag).clip(CircleShape)
         .nativePress(enabled = enabled, label = description, onClick = onClick)
         .semantics { contentDescription = description }, contentAlignment = Alignment.Center) {
-        Icon(icon, null, Modifier.size(21.dp), tint = if (active) Color(0xFF12806F) else t.textSecondary)
+        Icon(icon, null, Modifier.size(21.dp), tint = if (active) Color(0xFF2A62E8) else t.textSecondary)
     }
 }
 
@@ -152,7 +152,7 @@ internal fun PanelApiSheet11(prefs: SharedPreferences, localPort: Int, onDismiss
                 onApply()
                 scope.launch { state.hide(); onDismiss() }
             }
-        }, shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF12806F)),
+        }, shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2A62E8)),
             modifier = Modifier.sheetReveal12(1).padding(horizontal = 20.dp, vertical = 14.dp).fillMaxWidth().heightIn(min = 52.dp).testTag("panel11-api-save")) {
             Text("保存并应用", fontWeight = FontWeight.Bold)
         }

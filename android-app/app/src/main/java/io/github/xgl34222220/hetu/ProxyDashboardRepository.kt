@@ -215,6 +215,45 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
         probe(node, probeSnapshot())
     }
 
+    /**
+     * Mihomo's /group/{name}/delay clears fixed selection on non-Selector groups
+     * (upstream ab405bad, hub/route/groups.go). Probe their leaves instead; never
+     * clear and reapply a pin, which could briefly reroute live traffic.
+     */
+    suspend fun groupDelay(group: ProxyGroupUi, targets: List<String>): Map<String, Long> = withContext(Dispatchers.IO) {
+        if (group.type.equals("Selector", ignoreCase = true)) return@withContext groupDelay(group.name)
+        val snapshot = probeSnapshot(force = true)
+        val results = LinkedHashMap<String, Long>()
+        for (chunk in targets.distinct().chunked(6)) {
+            val measured = coroutineScope {
+                chunk.map { node -> async {
+                    try { node to measuredProbe(node, snapshot) }
+                    catch (cancel: CancellationException) { throw cancel }
+                    catch (_: IOException) { node to null }
+                } }.awaitAll()
+            }
+            measured.forEach { (node, delay) -> if (delay != null) results[node] = delay }
+        }
+        results
+    }
+
+    /** Core-parallel group latency probe used by strategy-card delay taps. */
+    suspend fun groupDelay(group: String): Map<String, Long> = withContext(Dispatchers.IO) {
+        val raw = api.groupDelay(group)
+        buildMap {
+            val keys = raw.keys()
+            while (keys.hasNext()) {
+                val name = keys.next()
+                // JSONObject.optLong coerces malformed/missing values to a false timeout.
+                // The core contract is an integer measurement, including explicit 0 / -1.
+                when (val value = raw.opt(name)) {
+                    is Int -> put(name, value.toLong())
+                    is Long -> put(name, value)
+                }
+            }
+        }
+    }
+
     suspend fun ipv6Delay(node: String): Long = withContext(Dispatchers.IO) {
         val snapshot = probeSnapshot()
         val leaf = selectedProxyName(snapshot.proxies, node)

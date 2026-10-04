@@ -27,19 +27,32 @@ final class ProxyAdblockRules {
     }
 
     static synchronized Snapshot export(Context context) throws Exception {
-        File dir=new File(context.getCacheDir(),"hetu-dns-filter");
-        if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("无法创建河图 DNS 过滤规则目录");
-        File target=new File(dir,"hetu-adblock.txt");
-        File allowTarget=new File(dir,"hetu-adblock-allow.txt");
-        File meta=new File(dir,"hetu-adblock.meta");
-
         RuleStore rules=new RuleStore(context.getApplicationContext());
         rules.reload();
         RuleStore.ExportRules effective=RuleStore.currentExportRules();
-        String generation=effective.revision;
+        return exportSnapshot(context.getNoBackupFilesDir(),effective.revision,effective.domains,effective.allowDomains);
+    }
+
+    /** Immutable pairs survive cache eviction and cannot change during Root handoff. */
+    static synchronized Snapshot exportSnapshot(File stableRoot,String generation,Set<String> block,Set<String> exceptions) throws IOException {
+        return exportSnapshot(stableRoot,generation,block,exceptions,ProxyAdblockRules::writeProvider);
+    }
+    interface ProviderWriter { void write(List<String> domains,File target)throws IOException; }
+    static synchronized Snapshot exportSnapshot(File stableRoot,String generation,Set<String> block,Set<String> exceptions,ProviderWriter writer) throws IOException {
+        File dir=new File(stableRoot,"hetu-dns-filter");
+        if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("无法创建河图 DNS 过滤规则目录");
         String persisted=generation.isEmpty()?"":EXPORT_VERSION+generation;
+        File index=new File(dir,"current.meta");
+        Properties cached=new Properties();
+        if(index.isFile())try(FileInputStream in=new FileInputStream(index)){cached.load(in);}
+        catch(IOException ignored){cached.clear();}
+        String directory=cached.getProperty("directory","");
+        // Index data is local but still must not escape our export directory.
+        File previous=new File(dir,directory.matches("snapshot-[0-9a-f-]{36}")?directory:"invalid");
+        File target=new File(previous,"hetu-adblock.txt");
+        File allowTarget=new File(previous,"hetu-adblock-allow.txt");
+        File meta=new File(previous,"hetu-adblock.meta");
         if(!persisted.isEmpty()&&target.isFile()&&allowTarget.isFile()&&meta.isFile()){
-            Properties cached=new Properties();
             try(FileInputStream in=new FileInputStream(meta)){cached.load(in);}
             catch(Exception ignored){cached.clear();}
             if(persisted.equals(cached.getProperty("revision",""))&&RuntimeCompatibility14.cachedPairValid(cached,target,allowTarget)){
@@ -52,33 +65,48 @@ final class ProxyAdblockRules {
         }
 
         String revision=EXPORT_VERSION+generation;
-        ArrayList<String> domains=new ArrayList<>(effective.domains);
-        ArrayList<String> allow=new ArrayList<>(effective.allowDomains);
+        ArrayList<String> domains=new ArrayList<>(block);
+        ArrayList<String> allow=new ArrayList<>(exceptions);
         Collections.sort(domains);
         Collections.sort(allow);
-        if(domains.size()>1500000)throw new IOException("广告规则超过 150 万条安全上限");
-        // A failed second write must not leave an old cache index pointing at a
-        // partially replaced pair (including when the user rolls back a revision).
-        Files.deleteIfExists(meta.toPath());
-        writeProvider(domains,target);
-        writeProvider(allow,allowTarget);
-
+        if(domains.size()>1500000||allow.size()>1500000)throw new IOException("广告规则超过 150 万条安全上限");
+        String name="snapshot-"+UUID.randomUUID();
+        File stage=new File(dir,name+".new");
+        if(!stage.mkdir())throw new IOException("无法创建广告过滤导出事务");
+        target=new File(stage,"hetu-adblock.txt"); allowTarget=new File(stage,"hetu-adblock-allow.txt");
+        try {
+        writer.write(domains,target); writer.write(allow,allowTarget);
         Properties saved=new Properties();
+        saved.setProperty("directory",name);
         saved.setProperty("revision",revision);
         saved.setProperty("blockSha256",RuntimeCompatibility14.sha256(target));
         saved.setProperty("allowSha256",RuntimeCompatibility14.sha256(allowTarget));
         saved.setProperty("count",String.valueOf(domains.size()));
         saved.setProperty("allowCount",String.valueOf(allow.size()));
-        File metaTmp=new File(dir,"hetu-adblock.meta.new");
-        try(FileOutputStream out=new FileOutputStream(metaTmp,false)){
+        try(FileOutputStream out=new FileOutputStream(new File(stage,"hetu-adblock.meta"),false)){
             saved.store(out,null);out.getFD().sync();
         }
-        try{Files.move(metaTmp.toPath(),meta.toPath(),StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);}
-        catch(Exception atomic){if(!metaTmp.renameTo(meta)){metaTmp.delete();throw new IOException("无法保存广告规则缓存索引",atomic);}}
-        return new Snapshot(target,allowTarget,domains.size(),allow.size(),revision);
+        File published=new File(dir,name);
+        move(stage,published);
+        File metaTmp=new File(dir,"current.meta.new");
+        try(FileOutputStream out=new FileOutputStream(metaTmp,false)){saved.store(out,null);out.getFD().sync();}
+        move(metaTmp,index);
+        return new Snapshot(new File(published,target.getName()),new File(published,allowTarget.getName()),domains.size(),allow.size(),revision);
+        } finally {
+            // Only our unpublished transaction is disposable. Previously returned
+            // generations remain immutable, including during a failed refresh.
+            File[] abandoned=stage.listFiles();
+            if(abandoned!=null)for(File file:abandoned)file.delete();
+            stage.delete();
+        }
     }
 
-    private static void writeProvider(List<String> domains,File target)throws IOException{
+    private static void move(File source,File target)throws IOException{
+        try{Files.move(source.toPath(),target.toPath(),StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);}
+        catch(AtomicMoveNotSupportedException unsupported){Files.move(source.toPath(),target.toPath(),StandardCopyOption.REPLACE_EXISTING);}
+    }
+
+    static void writeProvider(List<String> domains,File target)throws IOException{
         File temp=new File(target.getParentFile(),target.getName()+".new");
         try(FileOutputStream raw=new FileOutputStream(temp,false);
             OutputStreamWriter writer=new OutputStreamWriter(raw,StandardCharsets.UTF_8);

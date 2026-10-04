@@ -1,7 +1,7 @@
-// concept parity pipeline sync
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("com.mikepenz.aboutlibraries.plugin.android")
 }
 
 android {
@@ -17,8 +17,8 @@ android {
         applicationId = "io.github.xgl34222220.hetu"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2008
-        versionName = "0.5.8-v20"
+        versionCode = 2082
+        versionName = "0.12.12-v20-newui"
     }
 
     // Explicit CI debug identity. No private key is committed or exported.
@@ -30,7 +30,6 @@ android {
                 keyAlias = "androiddebugkey"
                 keyPassword = "android"
             }
-            // Force both v1 (JAR) and v2 signatures: some devices refuse to install APKs with v2-only.
             isV1SigningEnabled = true
             isV2SigningEnabled = true
         }
@@ -87,7 +86,20 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     debugImplementation("androidx.compose.ui:ui-tooling")
-    implementation("com.materialkolor:material-kolor:2.0.0")
+    // Miuix 0.9.4 brings MCU 5.0.1. The old 2.0.0 theme calls constructors
+    // removed from that runtime; keep the theme and utilities on one ABI.
+    val materialKolorVersion = "5.0.1"
+    implementation("com.materialkolor:material-kolor:$materialKolorVersion") {
+        version { strictly(materialKolorVersion) }
+    }
+    constraints {
+        implementation("com.materialkolor:material-color-utilities:$materialKolorVersion") {
+            version { strictly(materialKolorVersion) }
+        }
+        implementation("com.materialkolor:material-color-utilities-android:$materialKolorVersion") {
+            version { strictly(materialKolorVersion) }
+        }
+    }
     implementation("dev.chrisbanes.haze:haze:1.6.10")
     implementation("dev.chrisbanes.haze:haze-materials:1.6.10")
     implementation("top.yukonga.miuix.kmp:miuix-ui-android:0.9.4")
@@ -95,6 +107,11 @@ dependencies {
     implementation("top.yukonga.miuix.kmp:miuix-icons-android:0.9.4")
     implementation("top.yukonga.miuix.kmp:miuix-blur-android:0.9.4")
     implementation("top.yukonga.miuix.kmp:miuix-squircle-android:0.9.4")
+    implementation("com.patrykandpatrick.vico:compose:3.3.1")
+    implementation("io.coil-kt.coil3:coil-compose:3.6.3")
+    implementation("io.coil-kt.coil3:coil-network-okhttp:3.6.3")
+    implementation("io.coil-kt.coil3:coil-svg:3.6.3")
+    implementation("com.mikepenz:aboutlibraries-compose-m3:15.2.0")
     implementation(platform("io.github.rosemoe:editor-bom:0.24.6"))
     implementation("io.github.rosemoe:editor")
 }

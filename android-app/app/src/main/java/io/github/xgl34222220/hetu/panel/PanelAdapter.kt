@@ -556,3 +556,67 @@ private fun copyToClipboard(context: Context, label: String, text: String) {
     // Android 13+ shows its own clipboard confirmation.
     if (Build.VERSION.SDK_INT < 33) Toast.makeText(context, "已复制$label", Toast.LENGTH_SHORT).show()
 }
+
+
+/** Launcher adapter: all mutations go through the V20.81 ViewModel safety gates. */
+@Composable
+internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp) {
+    val context = LocalContext.current
+    val selector = remember { context.getSharedPreferences("proxy_selector_preferences", Context.MODE_PRIVATE) }
+    val initial = remember { loadView(vm.prefs, selector) }
+    var view by remember { mutableStateOf(initial) }
+    val sampler = remember { PanelTrafficSampler() }
+    val tab = when (vm.panelSection) {
+        "overview" -> PanelTab.Overview
+        "providers" -> PanelTab.Subscriptions
+        "conn" -> PanelTab.Connections
+        "rules" -> PanelTab.Rules
+        "sets" -> PanelTab.RuleSets
+        "logs" -> PanelTab.Logs
+        else -> PanelTab.Groups
+    }
+    LaunchedEffect(tab, vm.state.running) {
+        if (!vm.state.running) { sampler.reset(); return@LaunchedEffect }
+        when (tab) {
+            PanelTab.Overview, PanelTab.Subscriptions -> vm.loadProviders()
+            PanelTab.Rules -> vm.loadRules()
+            PanelTab.RuleSets -> vm.loadRuleSets()
+            PanelTab.Logs -> vm.loadLogs()
+            else -> Unit
+        }
+    }
+    LaunchedEffect(vm.state.uploadTotal, vm.state.downloadTotal, vm.state.connections) {
+        if (vm.state.running) sampler.sample(SystemClock.elapsedRealtime(), vm.state.uploadTotal, vm.state.downloadTotal, vm.state.connections)
+    }
+    fun updates(tasks: Map<String, io.github.xgl34222220.hetu.HxTask>) = tasks.mapValues { (_, t) ->
+        if (t.running) PanelUpdate.Updating else if (t.ok == false) PanelUpdate.Failed(t.message) else PanelUpdate.Idle
+    }
+    val data = buildPanelData(vm.state, vm.operation == io.github.xgl34222220.hetu.HxRunOp.Start,
+        vm.providers, vm.rules, vm.ruleSets, vm.logEntries, vm.delays, vm.testingNodes,
+        emptyMap(), updates(vm.providerTasks), updates(vm.ruleSetTasks), sampler)
+    val actions = PanelActions(
+        onStart = vm::toggle, onSelectNode = vm::select, onTestNode = vm::testNode,
+        onTestGroup = { name -> vm.state.groups.firstOrNull { it.name == name }?.let(vm::testGroup) },
+        onUpdateSubscription = vm::updateProvider, onUpdateAllSubscriptions = vm::updateAllProviders,
+        onCloseConnection = vm::closeConnection, onCloseAllConnections = vm::closeAll,
+        onRefreshRules = vm::loadRules, onUpdateRuleSet = vm::updateRuleSet,
+        onUpdateAllRuleSets = vm::updateAllRuleSets, onRefreshLogs = { vm.loadLogs() },
+        onSaveApi = { saveApi(vm.prefs, it); vm.bumpSettings() },
+        onOpenPolicyIcons = { context.startActivity(Intent(context, ProxyPolicyIconsActivity::class.java)) },
+        onCopy = { label, text -> copyToClipboard(context, label, text) },
+    )
+    val icons = vm.state.connections.mapNotNull { it.appIcon?.let { icon -> it.packageName to icon } }.toMap()
+    HetuHomeThemeFromPrefs(vm.prefs) {
+        CompositionLocalProvider(LocalPanelAppIcons provides PanelAppIcons(
+            has = { it in icons }, draw = { name, m -> icons[name]?.let { AppIcon(it, m) } },
+        )) {
+            PanelRoute(data, tab, { next -> vm.openPanel(when (next) {
+                PanelTab.Overview -> "overview"; PanelTab.Groups -> "proxies"; PanelTab.Subscriptions -> "providers"
+                PanelTab.Connections -> "conn"; PanelTab.Rules -> "rules"; PanelTab.RuleSets -> "sets"; PanelTab.Logs -> "logs"
+            }) }, actions, initialView = initial, onViewChange = { next ->
+                if (next.display != view.display || next.layout != view.layout) saveView(vm.prefs, selector, next)
+                view = next
+            }, contentPadding = PaddingValues(bottom = bottom))
+        }
+    }
+}

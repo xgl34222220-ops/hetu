@@ -96,7 +96,7 @@ internal fun OverviewSubscriptions(providers: List<DashboardProviderUi>) {
                 if (provider.hasSubscriptionInfo && provider.total > 0) {
                     HetuReadOnlyProgress(provider.ratio)
                     Text("剩余 ${refBytes(provider.remaining)} / ${refBytes(provider.total)}", color = t.textSecondary, fontSize = 12.sp)
-                    if(provider.expire > 0) Text("到期 " + java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date(provider.expire * 1000)), color = t.textSecondary, fontSize = 11.sp)
+                    if(provider.expire > 0) Text("到期 " + java.text.SimpleDateFormat("yyyy-MM-dd", androidx.compose.ui.platform.LocalConfiguration.current.locales[0]).format(java.util.Date(provider.expire * 1000)), color = t.textSecondary, fontSize = 11.sp)
                 } else Text("订阅源未提供用量", color = t.textSecondary, fontSize = 12.sp)
             }
         }

@@ -44,11 +44,11 @@ internal fun Modifier.glassSurface(
     dark: Boolean
 ): Modifier = this
     .shadow(
-        elevation = 4.dp,
+        elevation = 2.dp,
         shape = shape,
         clip = false,
-        ambientColor = Color(0xFF1E3558).copy(alpha = if (dark) .10f else .055f),
-        spotColor = Color(0xFF1E3558).copy(alpha = if (dark) .16f else .085f)
+        ambientColor = Color(0xFF312B55).copy(alpha = if (dark) .08f else .028f),
+        spotColor = Color(0xFF312B55).copy(alpha = if (dark) .12f else .045f)
     )
     .shadow(
         elevation = 1.dp,
@@ -60,12 +60,12 @@ internal fun Modifier.glassSurface(
     .clip(shape)
     .background(
         Brush.verticalGradient(
-            0f to lerp(color, Color.White, if (dark) .045f else .32f),
-            .20f to color,
-            1f to lerp(color, if (dark) Color.Black else Color(0xFFCEDBED), .025f)
+            0f to lerp(color, Color.White, if (dark) .04f else .18f),
+            .24f to color,
+            1f to lerp(color, if (dark) Color.Black else Color(0xFFE2DDED), .018f)
         )
     )
-    .insetTopLight(if (dark) .055f else .22f)
+    .insetTopLight(if (dark) .05f else .13f)
 
 /** A six-dp internal reflection, clipped by the parent shape rather than drawn as a border. */
 private fun Modifier.insetTopLight(alpha: Float): Modifier = drawWithCache {

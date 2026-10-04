@@ -53,8 +53,7 @@ private data class RefFileItem(
 class ReferenceFileManagerActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        setContent { HetuTheme { ReferenceFileManagerScreen { finish() } } }
+        hxHost { vm -> FileManagerScreen(vm) { finish() } }
     }
 }
 
@@ -134,7 +133,7 @@ private fun ReferenceFileManagerScreen(onClose: () -> Unit) {
     val haptics = io.github.xgl34222220.hetu.ui.rememberHetuHaptics()
     val motion = io.github.xgl34222220.hetu.ui.LocalHetuMotionEnabled.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val page = if (dark) t.pageBackground else Color(0xFFF4F5F7)
+    val page = if (dark) t.pageBackground else Color(0xFFF2F0FB)
     androidx.activity.compose.BackHandler(enabled = path != REF_FILE_ROOT) { goBack() }
     Box(Modifier.fillMaxSize().background(page)) {
         androidx.compose.animation.AnimatedContent(
@@ -160,12 +159,12 @@ private fun ReferenceFileManagerScreen(onClose: () -> Unit) {
                 LazyColumn(
                     state = list,
                     modifier = Modifier.fillMaxSize().statusBarsPadding(),
-                    contentPadding = PaddingValues(start = 16.dp, top = 48.dp, end = 16.dp,
+                    contentPadding = PaddingValues(start = 12.dp, top = 44.dp, end = 12.dp,
                         bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 32.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     item(key = "title") {
-                        Text(folderTitle, color = t.textPrimary, fontSize = 32.sp, lineHeight = 38.sp,
+                        Text(folderTitle, color = t.textPrimary, fontSize = 28.sp, lineHeight = 34.sp,
                             fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 4.dp))
                     }
@@ -178,8 +177,8 @@ private fun ReferenceFileManagerScreen(onClose: () -> Unit) {
                     }
                     item(key = "group") {
                         Column(
-                            Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp))
-                                .background(if (dark) t.cardBackground else Color.White),
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
+                                .background(if (dark) t.cardBackground else t.cardBackground),
                         ) {
                             if (shownPath != path || items.isEmpty()) {
                                 Text(
@@ -192,7 +191,7 @@ private fun ReferenceFileManagerScreen(onClose: () -> Unit) {
                                 items.forEachIndexed { index, item ->
                                     val source = remember(item.path) { MutableInteractionSource() }
                                     Row(
-                                        Modifier.fillMaxWidth().heightIn(min = 56.dp)
+                                        Modifier.fillMaxWidth().heightIn(min = 52.dp)
                                             .hetuPressHighlight(source, (if (dark) Color.White else Color(0xFF12161A)).copy(alpha = .05f))
                                             .clickable(interactionSource = source, indication = null) {
                                                 haptics.perform(io.github.xgl34222220.hetu.ui.HetuHaptic.Tap)
@@ -202,14 +201,14 @@ private fun ReferenceFileManagerScreen(onClose: () -> Unit) {
                                                     previewText = "正在读取…"
                                                 }
                                             }
-                                            .padding(horizontal = 18.dp),
+                                            .padding(horizontal = 14.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
                                         Icon(if (item.directory) Icons.Outlined.Folder else Icons.Outlined.Description, null,
                                             tint = t.textPrimary.copy(alpha = .78f), modifier = Modifier.size(22.dp))
-                                        Spacer(Modifier.width(16.dp))
+                                        Spacer(Modifier.width(12.dp))
                                         Column(Modifier.weight(1f)) {
-                                            Text(item.name, color = t.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Medium,
+                                            Text(item.name, color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Medium,
                                                 maxLines = 1, overflow = TextOverflow.Ellipsis)
                                             if (!item.directory) Text(refFileSize(item.size), color = t.textSecondary, fontSize = 12.sp)
                                         }

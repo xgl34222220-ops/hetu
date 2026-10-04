@@ -2,6 +2,8 @@ package io.github.xgl34222220.hetu
 
 import android.app.Activity
 import android.os.Build
+import io.github.xgl34222220.hetu.ui.LocalHetuLanguage
+import io.github.xgl34222220.hetu.ui.rememberHetuLanguage
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.Spring
@@ -60,36 +62,36 @@ internal data class HxColors(
 )
 
 private val LightHx = HxColors(
-    canvas = Color(0xFFF6F7F9),
-    surface = Color(0xFFFFFFFF),
-    surfaceMuted = Color(0xFFF0F2F5),
-    line = Color(0xFFE6E9EE),
-    text = Color(0xFF12161A),
-    textMuted = Color(0xFF5D6670),
-    textFaint = Color(0xFF98A1AA),
-    accent = Color(0xFF12806F),
-    accentSoft = Color(0xFFDDF1EC),
+    canvas = Color(0xFFECEEFB),
+    surface = Color(0xFFF8F7FD),
+    surfaceMuted = Color(0xFFEEEFFA),
+    line = Color(0xFFDCE0EC),
+    text = Color(0xFF171A24),
+    textMuted = Color(0xFF5F6473),
+    textFaint = Color(0xFF989DAB),
+    accent = Color(0xFF0A62E8),
+    accentSoft = Color(0xFFDCE5FF),
     onAccent = Color(0xFFFFFFFF),
     good = Color(0xFF16A34A),
-    goodSoft = Color(0xFFDCF5E4),
+    goodSoft = Color(0xFFDDF5E5),
     warn = Color(0xFFD97706),
     warnSoft = Color(0xFFFCEFD9),
-    bad = Color(0xFFDC2626),
-    badSoft = Color(0xFFFCE4E4),
+    bad = Color(0xFFE0393E),
+    badSoft = Color(0xFFFDE6E6),
     dark = false,
 )
 
 private val DarkHx = HxColors(
-    canvas = Color(0xFF0D1012),
-    surface = Color(0xFF171B1E),
-    surfaceMuted = Color(0xFF20262A),
-    line = Color(0xFF283035),
-    text = Color(0xFFE9EDEF),
-    textMuted = Color(0xFF9BA5AC),
-    textFaint = Color(0xFF69737A),
-    accent = Color(0xFF5CCFBC),
-    accentSoft = Color(0xFF15403A),
-    onAccent = Color(0xFF00302A),
+    canvas = Color(0xFF0E0F13),
+    surface = Color(0xFF181A20),
+    surfaceMuted = Color(0xFF22252D),
+    line = Color(0xFF2A2E37),
+    text = Color(0xFFEBEDF2),
+    textMuted = Color(0xFF9CA2B0),
+    textFaint = Color(0xFF6A7080),
+    accent = Color(0xFF7EA6FF),
+    accentSoft = Color(0xFF1D2C52),
+    onAccent = Color(0xFF0A1633),
     good = Color(0xFF4ADE80),
     goodSoft = Color(0xFF123522),
     warn = Color(0xFFFBBF24),
@@ -106,13 +108,13 @@ internal object Hx {
         @Composable get() = LocalHx.current
 
     /** Spacing scale – every gap in the app is one of these. */
-    val gutter = 16.dp
-    val gap = 12.dp
-    val gapSmall = 8.dp
+    val gutter = 12.dp
+    val gap = 10.dp
+    val gapSmall = 7.dp
 
-    val cardShape = RoundedCornerShape(22.dp)
-    val rowShape = RoundedCornerShape(16.dp)
-    val chipShape = RoundedCornerShape(12.dp)
+    val cardShape = RoundedCornerShape(18.dp)
+    val rowShape = RoundedCornerShape(15.dp)
+    val chipShape = RoundedCornerShape(11.dp)
     val pillShape = RoundedCornerShape(50)
 }
 
@@ -124,10 +126,17 @@ internal object HxMotion {
     const val Short = 160
     const val Medium = 260
     const val Long = 360
+    const val Route = 420
 
     fun <T> enter(duration: Int = Medium): FiniteAnimationSpec<T> = tween(duration, easing = Emphasized)
     fun <T> exit(duration: Int = Short): FiniteAnimationSpec<T> = tween(duration, easing = Exit)
     fun <T> press(): FiniteAnimationSpec<T> = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
+
+    /** Settles with a hint of overshoot – selection indicators, check marks, badges. */
+    fun <T> pop(): FiniteAnimationSpec<T> = spring(dampingRatio = .62f, stiffness = Spring.StiffnessMediumLow)
+
+    /** Calm spring for anything that moves in space (indicators, sliding content). */
+    fun <T> glide(): FiniteAnimationSpec<T> = spring(dampingRatio = .86f, stiffness = 420f)
 }
 
 private val HxShapes = Shapes(
@@ -141,18 +150,18 @@ private val HxShapes = Shapes(
 private fun hxTypography(): Typography {
     val base = Typography()
     return base.copy(
-        displaySmall = base.displaySmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 34.sp, lineHeight = 40.sp),
-        headlineMedium = base.headlineMedium.copy(fontWeight = FontWeight.Bold, fontSize = 30.sp, lineHeight = 36.sp),
-        headlineSmall = base.headlineSmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 22.sp, lineHeight = 28.sp),
-        titleLarge = base.titleLarge.copy(fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 26.sp),
-        titleMedium = base.titleMedium.copy(fontWeight = FontWeight.SemiBold, fontSize = 16.sp, lineHeight = 22.sp),
-        titleSmall = base.titleSmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 14.sp, lineHeight = 20.sp),
-        bodyLarge = base.bodyLarge.copy(fontSize = 15.sp, lineHeight = 22.sp),
-        bodyMedium = base.bodyMedium.copy(fontSize = 14.sp, lineHeight = 20.sp),
-        bodySmall = base.bodySmall.copy(fontSize = 12.sp, lineHeight = 16.sp),
-        labelLarge = base.labelLarge.copy(fontWeight = FontWeight.SemiBold, fontSize = 14.sp),
-        labelMedium = base.labelMedium.copy(fontWeight = FontWeight.Medium, fontSize = 12.sp),
-        labelSmall = base.labelSmall.copy(fontWeight = FontWeight.Medium, fontSize = 11.sp),
+        displaySmall = base.displaySmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 30.sp, lineHeight = 36.sp),
+        headlineMedium = base.headlineMedium.copy(fontWeight = FontWeight.SemiBold, fontSize = 26.sp, lineHeight = 32.sp),
+        headlineSmall = base.headlineSmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 25.sp),
+        titleLarge = base.titleLarge.copy(fontWeight = FontWeight.SemiBold, fontSize = 18.sp, lineHeight = 23.sp),
+        titleMedium = base.titleMedium.copy(fontWeight = FontWeight.SemiBold, fontSize = 15.sp, lineHeight = 20.sp, letterSpacing = (-0.1).sp),
+        titleSmall = base.titleSmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp, lineHeight = 18.sp),
+        bodyLarge = base.bodyLarge.copy(fontSize = 14.sp, lineHeight = 19.sp),
+        bodyMedium = base.bodyMedium.copy(fontSize = 13.sp, lineHeight = 18.sp),
+        bodySmall = base.bodySmall.copy(fontSize = 11.5.sp, lineHeight = 15.5.sp),
+        labelLarge = base.labelLarge.copy(fontWeight = FontWeight.SemiBold, fontSize = 13.sp),
+        labelMedium = base.labelMedium.copy(fontWeight = FontWeight.Medium, fontSize = 11.5.sp),
+        labelSmall = base.labelSmall.copy(fontWeight = FontWeight.Medium, fontSize = 10.5.sp),
     )
 }
 
@@ -214,13 +223,17 @@ private fun schemeFrom(c: HxColors): ColorScheme = if (c.dark) darkColorScheme(
  * @param dynamic use the wallpaper accent (Android 12+) instead of jade.
  */
 @Composable
-internal fun HetuAppTheme(appearance: String, dynamic: Boolean, accentHex: String = "", content: @Composable () -> Unit) {
+internal fun HetuAppTheme(appearance: String, dynamic: Boolean, accentHex: String = "", pureBlack: Boolean = false, content: @Composable () -> Unit) {
     val dark = when (appearance) {
         "dark" -> true
         "light" -> false
         else -> isSystemInDarkTheme()
     }
-    val base = if (dark) DarkHx else LightHx
+    val base = when {
+        dark && pureBlack -> DarkHx.copy(canvas = Color(0xFF000000), surface = Color(0xFF111215), surfaceMuted = Color(0xFF1B1D22), line = Color(0xFF24272E))
+        dark -> DarkHx
+        else -> LightHx
+    }
     val context = LocalContext.current
     val colors = if (dynamic && Build.VERSION.SDK_INT >= 31) {
         val wall = if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
@@ -247,7 +260,8 @@ internal fun HetuAppTheme(appearance: String, dynamic: Boolean, accentHex: Strin
         }
     }
 
-    CompositionLocalProvider(LocalHx provides colors) {
+    val language = rememberHetuLanguage()
+    CompositionLocalProvider(LocalHx provides colors, LocalHetuLanguage provides language) {
         MaterialTheme(
             colorScheme = schemeFrom(colors),
             typography = hxTypography(),

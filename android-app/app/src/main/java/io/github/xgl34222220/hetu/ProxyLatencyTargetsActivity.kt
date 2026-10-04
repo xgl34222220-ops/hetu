@@ -11,6 +11,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -33,129 +34,84 @@ class ProxyLatencyTargetsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { HetuTheme { ProxyLatencyTargetsScreen { finish() } } }
+        setContent {
+            val prefs = remember { getSharedPreferences("hetu", Context.MODE_PRIVATE) }
+            HetuAppTheme(prefs.getString("hetuAppearance", "system").orEmpty(), prefs.getBoolean("hetuDynamicColor", false)) {
+                ProxyLatencyTargetsScreen { finish() }
+            }
+        }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ProxyLatencyTargetsScreen(onBack: () -> Unit) {
+internal fun ProxyLatencyTargetsScreen(onBack: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = remember { context.getSharedPreferences("hetu", Context.MODE_PRIVATE) }
-    val tokens = LocalHetuTokens.current
+    val c = Hx.colors
     var targets by remember { mutableStateOf(ProxyLatencyTargets.load(prefs)) }
     var message by remember { mutableStateOf("") }
     var error by remember { mutableStateOf(false) }
-
-    Scaffold(
-        modifier = Modifier.fillMaxSize().background(tokens.pageBackground),
-        containerColor = tokens.pageBackground,
-        topBar = {
-            Column(Modifier.statusBarsPadding().padding(horizontal = 8.dp)) {
-                HetuPageHeader("延迟目标", onBack, "首页测速与自动刷新使用这些地址")
-            }
-        },
-    ) { padding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            items(3) { index ->
-                val target = targets[index]
-                ElevatedCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(22.dp),
-                    colors = CardDefaults.elevatedCardColors(containerColor = tokens.cardBackground),
-                ) {
-                    Column(
-                        Modifier.fillMaxWidth().padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        Text("目标 ${index + 1}", fontSize = 13.sp, color = tokens.textSecondary, fontWeight = FontWeight.SemiBold)
-                        OutlinedTextField(
-                            value = target.name,
-                            onValueChange = { value ->
-                                val next = targets.toMutableList()
-                                next[index] = target.copy(name = value.take(40))
-                                targets = next
-                                message = ""
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            label = { Text("名称") },
-                            singleLine = true,
-                            shape = RoundedCornerShape(16.dp),
-                        )
-                        OutlinedTextField(
-                            value = target.url,
-                            onValueChange = { value ->
-                                val next = targets.toMutableList()
-                                next[index] = target.copy(url = value.take(400))
-                                targets = next
-                                message = ""
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            label = { Text("HTTP(S) 测速地址") },
-                            singleLine = true,
-                            shape = RoundedCornerShape(16.dp),
-                        )
+    HxPage(title = "本机直测目标", subtitle = "测量直连请求，未指定代理节点", onBack = onBack, largeTitle = false) {
+        items(3) { index ->
+            val target = targets[index]
+            HxSection {
+                HxCard(padding = PaddingValues(16.dp)) {
+                    Text("目标 ${index + 1}", fontSize = 13.sp, color = c.textMuted)
+                    Spacer(Modifier.height(12.dp))
+                    HomeTargetField("名称", target.name) { value ->
+                        targets = targets.toMutableList().also { it[index] = target.copy(name = value.take(40)) }
+                        message = ""
                     }
-                }
-            }
-            if (message.isNotBlank()) {
-                item {
-                    Text(
-                        message,
-                        color = if (error) MaterialTheme.colorScheme.error else tokens.success,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(horizontal = 4.dp),
-                    )
-                }
-            }
-            item {
-                Row(
-                    Modifier.fillMaxWidth().navigationBarsPadding(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    OutlinedButton(
-                        onClick = {
-                            ProxyLatencyTargets.reset(prefs)
-                            targets = ProxyLatencyTargets.defaults
-                            message = "已恢复默认测速目标"
-                            error = false
-                        },
-                        modifier = Modifier.weight(1f).heightIn(min = 50.dp),
-                        shape = RoundedCornerShape(18.dp),
-                    ) {
-                        Icon(Icons.Rounded.RestartAlt, contentDescription = null)
-                        Spacer(Modifier.width(7.dp))
-                        Text("恢复默认")
-                    }
-                    Button(
-                        onClick = {
-                            val failure = targets.firstNotNullOfOrNull(ProxyLatencyTargets::validate)
-                            if (failure != null) {
-                                message = failure
-                                error = true
-                            } else if (targets.map { it.name.trim().lowercase() }.distinct().size != targets.size) {
-                                message = "三个测速目标名称不能重复"
-                                error = true
-                            } else {
-                                ProxyLatencyTargets.save(prefs, targets)
-                                message = "测速目标已保存；返回首页后立即生效"
-                                error = false
-                            }
-                        },
-                        modifier = Modifier.weight(1f).heightIn(min = 50.dp),
-                        shape = RoundedCornerShape(18.dp),
-                    ) {
-                        Icon(Icons.Rounded.Save, contentDescription = null)
-                        Spacer(Modifier.width(7.dp))
-                        Text("保存")
+                    Spacer(Modifier.height(10.dp))
+                    HomeTargetField("HTTP(S) 测速地址", target.url) { value ->
+                        targets = targets.toMutableList().also { it[index] = target.copy(url = value.take(400)) }
+                        message = ""
                     }
                 }
             }
         }
+        if (message.isNotBlank()) item {
+            Text(message, color = if (error) c.bad else c.good, fontSize = 11.sp,
+                modifier = Modifier.padding(horizontal = Hx.gutter + 4.dp).padding(bottom = 7.dp))
+        }
+        item {
+            HxSection {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    HxButton("恢复默认", onClick = {
+                        ProxyLatencyTargets.reset(prefs)
+                        targets = ProxyLatencyTargets.defaults
+                        message = "已恢复默认测速目标"
+                        error = false
+                    }, modifier = Modifier.weight(1f), icon = Icons.Rounded.RestartAlt, filled = false, outlined = true)
+                    HxButton("保存", onClick = {
+                        val failure = targets.firstNotNullOfOrNull(ProxyLatencyTargets::validate)
+                        when {
+                            failure != null -> { message = failure; error = true }
+                            targets.map { it.name.trim().lowercase(java.util.Locale.ROOT) }.distinct().size != targets.size -> {
+                                message = "三个测速目标名称不能重复。"; error = true
+                            }
+                            else -> {
+                                ProxyLatencyTargets.save(prefs, targets)
+                                message = "测速目标已保存；返回首页后立即生效。"; error = false
+                            }
+                        }
+                    }, modifier = Modifier.weight(1f), icon = Icons.Rounded.Save)
+                }
+            }
+        }
     }
+}
+
+@Composable
+private fun HomeTargetField(label: String, value: String, onValueChange: (String) -> Unit) {
+    val c = Hx.colors
+    Text(label, color = c.textMuted, fontSize = 12.sp)
+    Spacer(Modifier.height(4.dp))
+    androidx.compose.foundation.text.BasicTextField(
+        value = value, onValueChange = onValueChange, singleLine = true,
+        textStyle = androidx.compose.ui.text.TextStyle(color = c.text, fontSize = 15.sp),
+        modifier = Modifier.fillMaxWidth().heightIn(min = 42.dp)
+            .then(Modifier.border(1.dp, c.line, RoundedCornerShape(9.dp)))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+    )
 }

@@ -220,7 +220,7 @@ internal fun LiquidPill(text: String, icon: ImageVector, onClick: () -> Unit, mo
     )
     val color = if (danger) Color(0xFFE11D48) else if (primary || compact) scheme.primary else Color(0xFF475569)
     val fill = if (danger) Color(0xFFFFF1F2) else if (dark) Color.White.copy(alpha = .06f)
-        else if (primary) Color(0xFFDDF1EC) else Color(0xFFF8FAFC)
+        else if (primary) Color(0xFFE3EAFD) else Color(0xFFF8FAFC)
     Box(modifier.heightIn(min = if (compact) 36.dp else 48.dp).graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (enabled) 1f else .45f }
         .clip(CircleShape).clickable(enabled = enabled, interactionSource = interaction, indication = null, role = Role.Button) {
             view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK); onClick()

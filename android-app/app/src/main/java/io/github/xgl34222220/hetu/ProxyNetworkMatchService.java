@@ -17,8 +17,25 @@ public final class ProxyNetworkMatchService extends Service {
     private ConnectivityManager cm;
     private ConnectivityManager.NetworkCallback cb;
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
-    private final ScheduledExecutorService metrics=Executors.newScheduledThreadPool(2);
-    private final ProxyNetworkHandover<Network> networkHandover=new ProxyNetworkHandover<>();
+    private final ScheduledThreadPoolExecutor metrics=createMetrics();
+    private static final Object SERVICE_SESSION_LOCK=new Object();
+    private final String networkSessionId=UUID.randomUUID().toString();
+    private final NetworkEpoch<Network> networkEvents=new NetworkEpoch<>();
+    private final ProxyNetworkState networkState=new ProxyNetworkState();
+    private ScheduledFuture<?> networkRefreshTask;
+    private NetworkEpoch.Snapshot<Network> pendingRecoveryRoute;
+    private String pendingRecoveryReason;
+    private final ProxyTaskCoalescer networkRecoveries=new ProxyTaskCoalescer(worker,this::recoverQueuedNetwork);
+    private ProxyNetworkJournal journal;
+    private final ExecutorService journalWorker=new ThreadPoolExecutor(1,1,0L,TimeUnit.MILLISECONDS,
+            new ArrayBlockingQueue<>(128));
+    private String lastHealthTraceSignature="";
+    private String lastHealthTraceId="";
+    private long lastHealthTraceAt;
+    private final java.util.concurrent.atomic.AtomicLong droppedJournalEvents=new java.util.concurrent.atomic.AtomicLong();
+    private static final Object JOURNAL_STATUS_LOCK=new Object();
+    interface EgressRequest { int code(String target,int port)throws Exception; }
+    private EgressRequest egressRequest=this::fetchEgressCode;
     private final ProxyTaskCoalescer evaluations=new ProxyTaskCoalescer(worker,this::evaluateNow);
     private volatile boolean destroyed;
     private long automaticStopGeneration;
@@ -30,7 +47,10 @@ public final class ProxyNetworkMatchService extends Service {
     @Override public void onCreate(){
         super.onCreate();
         prefs=getSharedPreferences("hetu",MODE_PRIVATE);
+        initializeNetworkSession();
         cm=(ConnectivityManager)getSystemService(CONNECTIVITY_SERVICE);
+        journal=new ProxyNetworkJournal(getApplicationContext());
+        droppedJournalEvents.set(Math.max(0L,prefs.getLong("proxyNetworkJournalDropped",0L)));
         bootRestores=new ProxyRestoreScheduler((task,delayMs)->metrics.schedule(()->{
             try{worker.execute(task);}catch(RejectedExecutionException stopped){}
         },delayMs,TimeUnit.MILLISECONDS),this::restoreWantedProxyAfterBoot);
@@ -41,8 +61,49 @@ public final class ProxyNetworkMatchService extends Service {
         metrics.scheduleWithFixedDelay(this::maintainProxyRuntime,7000L,12000L,TimeUnit.MILLISECONDS);
     }
 
+    private static ScheduledThreadPoolExecutor createMetrics(){
+        ScheduledThreadPoolExecutor executor=new ScheduledThreadPoolExecutor(2);
+        executor.setRemoveOnCancelPolicy(true);
+        executor.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
+        executor.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
+        return executor;
+    }
+
+    private void initializeNetworkSession(){
+        synchronized(SERVICE_SESSION_LOCK){
+            // Persisted observations describe the previous observer instance.
+            // Keep its journal; wait for fresh callback/health/probe evidence.
+            prefs.edit().putString("proxyNetworkSessionId",networkSessionId)
+                    .putLong("proxyNetworkEpoch",0L).putString("proxyPhysicalNetworkState","checking")
+                    .putString("proxyPolicyEgressState","unverified").putLong("proxyPolicyEgressCheckedAt",0L)
+                    .putBoolean("proxyRootEgressPending",prefs.getBoolean("proxyRootWanted",false))
+                    .putString("proxyNetworkIntegrity","unknown").putString("proxyNetworkFault","service-recreated")
+                    .putLong("proxyNetworkCheckedAt",0L)
+                    .remove("proxyNetworkHealthTraceId").remove("proxyPolicyEgressTraceId")
+                    .remove("proxyRootEgressVerifiedAt").apply();
+        }
+    }
+
+    private boolean publishServiceObservation(long ticket,Runnable action){
+        synchronized(SERVICE_SESSION_LOCK){
+            if(destroyed||!networkSessionId.equals(prefs.getString("proxyNetworkSessionId","")))return false;
+            return RootProxyManager.publishObservation(ticket,action);
+        }
+    }
+
     @Override public int onStartCommand(Intent i,int f,int id){
         String action=i==null?"":i.getAction();
+        if(RootAutostart.ACTION_RUNNING.equals(action)&&prefs.getBoolean("proxyRootAutoStart",false)){
+            // Validate native boot state on the worker before publishing recovery intent.
+            worker.execute(()->{
+                if(destroyed||!prefs.getBoolean("proxyRootAutoStart",false))return;
+                try{
+                    if(new RootProxyManager(getApplicationContext()).adoptBootRuntime())evaluate();
+                    else if(!prefs.getBoolean("networkMatchEnabled",false)&&!prefs.getBoolean("proxyRootWanted",false))stopSelf();
+                }catch(Exception error){prefs.edit().putString("proxyRootBootError","开机运行状态同步失败："+error.getClass().getSimpleName()).apply();}
+            });
+            return START_STICKY;
+        }
         if(!prefs.getBoolean("networkMatchEnabled",false)&&!prefs.getBoolean("proxyRootWanted",false)){
             stopSelf();return START_NOT_STICKY;
         }
@@ -60,23 +121,35 @@ public final class ProxyNetworkMatchService extends Service {
 
     private long restoreWantedProxyAfterBoot(){
         if(!prefs.getBoolean("proxyRootAutoStart",false)||!prefs.getBoolean("proxyRootWanted",false))return 0L;
-        if(coreAlive()){
+        // A persisted running flag belongs to the previous boot. Only a live
+        // process observation can confirm restore success; Root may be unready.
+        ProxyContinuity.ProcessState bootState=probeCoreState();
+        if(bootState==ProxyContinuity.ProcessState.UNKNOWN){
+            prefs.edit().putString("proxyRootBootError","等待 Root 运行状态可确认…").apply();
+            return Math.min(30000L,1000L+Math.min(++bootRestoreAttempts,29)*1000L);
+        }
+        if(bootState==ProxyContinuity.ProcessState.ALIVE){
             prefs.edit()
                     .putLong("proxyRootBootRestoreSuccessAt",System.currentTimeMillis())
                     .remove("proxyRootBootError")
                     .apply();
             return 0L;
         }
-        Network network=cm==null?null:cm.getActiveNetwork();
-        NetworkCapabilities caps=network==null||cm==null?null:cm.getNetworkCapabilities(network);
-        boolean internet=caps!=null&&caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
-        if(!internet){
+        if(RootAutostart.restoreInProgress(getApplicationContext())){
+            prefs.edit().putString("proxyRootBootError","Root 开机脚本正在等待或恢复…").apply();
+            return 5000L;
+        }
+        final NetworkEpoch.Snapshot<Network> route=networkEvents.snapshot();
+        if(route.network==null){
             prefs.edit().putString("proxyRootBootError","等待开机网络就绪…").apply();
-            return ++bootRestoreAttempts<=12?Math.min(5000L,750L+bootRestoreAttempts*350L):0L;
+            return Math.min(30000L,1000L+Math.min(++bootRestoreAttempts,29)*1000L);
         }
         try{
-            JSONObject result=new RootProxyManager(getApplicationContext()).startIfWanted(ProxyRuntimeProfile.load(prefs));
-            if(result.optBoolean("cancelled",false))return 0L;
+            JSONObject result=new RootProxyManager(getApplicationContext()).startIfWanted(ProxyRuntimeProfile.load(prefs),
+                    ()->!destroyed&&networkEvents.isCurrent(route));
+            if(result.optBoolean("cancelled",false))
+                return "control-busy".equals(result.optString("reason"))?1000L:
+                        "network-changed".equals(result.optString("reason"))?1000L:0L;
             if(result.optBoolean("ok",false)||result.optBoolean("running",false)){
                 bootRestoreAttempts=0;
                 prefs.edit()
@@ -93,17 +166,20 @@ public final class ProxyNetworkMatchService extends Service {
                     .putString("proxyRootBootError","Root 代理开机恢复失败："+detail)
                     .putLong("proxyRootBootRestoreAttemptAt",System.currentTimeMillis())
                     .apply();
-            return ++bootRestoreAttempts<=8?Math.min(8000L,1200L+bootRestoreAttempts*800L):0L;
+            return Math.min(30000L,2000L+Math.min(++bootRestoreAttempts,28)*1000L);
         }
     }
 
     @Override public void onDestroy(){
         destroyed=true;
         evaluations.close();
+        networkRecoveries.close();
         bootRestores.close();
+        synchronized(networkEvents){if(networkRefreshTask!=null)networkRefreshTask.cancel(false);pendingRecoveryRoute=null;networkEvents.reset();}
         if(cb!=null)try{cm.unregisterNetworkCallback(cb);}catch(Exception ignored){}
         worker.shutdownNow();
         metrics.shutdownNow();
+        journalWorker.shutdown(); // Drain accepted diagnostic records; preserve history.
         super.onDestroy();
     }
     @Override public android.os.IBinder onBind(Intent i){return null;}
@@ -111,51 +187,172 @@ public final class ProxyNetworkMatchService extends Service {
     private void register(){
         cb=new ConnectivityManager.NetworkCallback(){
             @Override public void onAvailable(Network n){
-                handleDefaultNetwork(n);
-                if(prefs.getBoolean("proxyRootAutoStart",false)&&prefs.getBoolean("proxyRootWanted",false)&&!prefs.getBoolean("proxyRootRuntimeRunning",false))
-                    scheduleBootRestore(250L);
-                evaluate();
+                networkChanged("available",()->{networkEvents.available(n);networkState.available(n);});
             }
-            @Override public void onLost(Network n){networkHandover.lost(n);evaluate();}
-            @Override public void onCapabilitiesChanged(Network n,NetworkCapabilities c){evaluate();}
+            @Override public void onLost(Network n){
+                networkChanged("lost",()->{networkEvents.lost(n);networkState.lost(n);});
+            }
+            @Override public void onCapabilitiesChanged(Network n,NetworkCapabilities c){
+                boolean physical=c.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN);
+                boolean internet=c.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+                boolean validated=c.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
+                boolean captive=c.hasCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL);
+                String signature=physical+"|"+internet+"|"+validated+"|"+captive+"|"
+                        +c.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)+"|"
+                        +c.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR);
+                networkChanged("capabilities",()->{
+                    networkState.capabilities(n,physical,internet,validated,captive);
+                    // Validation can itself need the proxy. Do not make it a
+                    // prerequisite; blocked/captive networks cannot auto-recover.
+                    networkEvents.capabilities(n,physical&&internet&&!captive,signature);
+                });
+            }
+            @Override public void onLinkPropertiesChanged(Network n,LinkProperties links){
+                networkChanged("links",()->networkEvents.links(n,
+                        links.getInterfaceName()==null?null:links.toString()));
+            }
+            @Override public void onBlockedStatusChanged(Network n,boolean blocked){
+                networkChanged("blocked",()->{networkEvents.blocked(n,blocked);networkState.blocked(n,blocked);});
+            }
         };
         try{cm.registerDefaultNetworkCallback(cb);}
         catch(Exception e){prefs.edit().putString("networkMatchLastEnvironment","监听失败："+e.getClass().getSimpleName()).apply();}
     }
 
-    private void handleDefaultNetwork(Network n){
-        final long generation=networkHandover.available(n);
-        if(generation==0L||!prefs.getBoolean("proxyRootWanted",false))return;
-        scheduleWorker(()->{
-            if(destroyed||!networkHandover.isCurrent(n,generation)||!prefs.getBoolean("proxyRootWanted",false))return;
-            Network active=cm.getActiveNetwork();
-            if(active==null||!active.equals(n))return;
-            long ticket=RootProxyManager.observationTicket();
-            // A new BEST network does not prove that the old one disconnected.
-            // Do not DELETE every connection merely because its start precedes a callback.
-            RootProxyManager.publishObservation(ticket,()->prefs.edit()
-                    .putLong("proxyLastNetworkObservationAt",System.currentTimeMillis())
-                    .putString("proxyLastNetworkObservationReason","default-changed-connections-preserved")
-                    .putBoolean("proxyRootEgressPending",true).apply());
+    private void networkChanged(String reason,Runnable update){
+        synchronized(networkEvents){
+            if(destroyed)return;
+            NetworkEpoch.Snapshot<Network> before=networkEvents.snapshot();
+            update.run();
+            final NetworkEpoch.Snapshot<Network> route=networkEvents.snapshot();
+            if(route==before)return;
             lastPolicyProbeAt=-90000L;
-            // Android/netd may rebuild policy-routing or firewall state during a
-            // Wi-Fi/cellular handover. Waiting for the 12s watchdog window leaves
-            // a visible "connected but no Internet" gap. Repair only Hetu-owned
-            // state in place; never restart Mihomo or flush its live connections.
-            repairLiveNetworkIntegrity();
-        },2500L);
+            prefs.edit().putLong("proxyNetworkEpoch",route.epoch)
+                    .putString("proxyPhysicalNetworkState",networkState.state().name().toLowerCase(Locale.ROOT))
+                    .putString("proxyLastNetworkCallback",reason)
+                    .putLong("proxyLastNetworkCallbackAt",System.currentTimeMillis())
+                    .putString("proxyPolicyEgressState","unverified")
+                    .putLong("proxyPolicyEgressCheckedAt",0L)
+                    .putBoolean("proxyRootEgressPending",prefs.getBoolean("proxyRootWanted",false)).apply();
+            recordEvent(ProxyNetworkJournal.Stage.NETWORK_CHANGE,route,
+                    ProxyNetworkJournal.outcome(networkState.state().name()),0,null,null);
+            if(networkRefreshTask!=null){networkRefreshTask.cancel(false);networkRefreshTask=null;}
+            pendingRecoveryRoute=null;
+            if(route.network!=null&&prefs.getBoolean("proxyRootWanted",false)){
+                if(prefs.getBoolean("proxyRootAutoStart",false))scheduleBootRestore(250L);
+                try{networkRefreshTask=metrics.schedule(()->queueNetworkRecovery(route,reason),
+                        2500L,TimeUnit.MILLISECONDS);}catch(RejectedExecutionException stopped){}
+            }
+        }
+        evaluate();
     }
 
-    private void repairLiveNetworkIntegrity(){
-        if(destroyed||!prefs.getBoolean("proxyRootWanted",false))return;
+    private void queueNetworkRecovery(NetworkEpoch.Snapshot<Network> route,String reason){
+        synchronized(networkEvents){
+            if(destroyed||route.network==null||!networkEvents.isCurrent(route)||!prefs.getBoolean("proxyRootWanted",false))return;
+            pendingRecoveryRoute=route;pendingRecoveryReason=reason;
+            // Reuse the existing coalescer: one queued task, plus a current task.
+            networkRecoveries.request();
+        }
+    }
+
+    private void recoverQueuedNetwork(){
+        final NetworkEpoch.Snapshot<Network> route;
+        final String reason;
+        synchronized(networkEvents){
+            route=pendingRecoveryRoute;reason=pendingRecoveryReason;pendingRecoveryRoute=null;
+        }
+        if(route!=null)recoverNetwork(route,reason);
+    }
+
+    private void recoverNetwork(NetworkEpoch.Snapshot<Network> route,String reason){
+        if(destroyed||route.network==null||!networkEvents.isCurrent(route)||!prefs.getBoolean("proxyRootWanted",false))return;
+        long ticket=RootProxyManager.observationTicket();
+        if(!publishNetworkObservation(route,ticket,()->prefs.edit()
+                .putLong("proxyLastNetworkObservationAt",System.currentTimeMillis())
+                .putString("proxyLastNetworkObservationReason",reason+"-changed-connections-preserved").apply()))return;
+        // Refresh only Hetu-owned state in place. A new default does not prove
+        // old connections failed, so preserve the core and all live connections.
+        repairLiveNetworkIntegrity(route);
+        if(networkEvents.isCurrent(route))probeEgressIfPending();
+    }
+
+    boolean publishNetworkObservation(NetworkEpoch.Snapshot<Network> route,long ticket,Runnable action){
+        synchronized(networkEvents){
+            if(destroyed||!prefs.getBoolean("proxyRootWanted",false))return false;
+            if(!networkEvents.isCurrent(route))return false;
+            return publishServiceObservation(ticket,action);
+        }
+    }
+
+    private String recordEvent(ProxyNetworkJournal.Stage stage,NetworkEpoch.Snapshot<Network> route,
+            ProxyNetworkJournal.Outcome outcome,int code,Throwable error,String parent){
+        ProxyNetworkJournal.Event event=ProxyNetworkJournal.capture(stage,route.epoch,outcome,code,error,parent);
+        enqueueEvent(event);
+        return event.id;
+    }
+
+    private void enqueueEvent(ProxyNetworkJournal.Event source){
+        ProxyNetworkJournal.Event event=ProxyNetworkJournal.inSession(source,networkSessionId);
+        try{journalWorker.execute(()->{
+            try{journal.append(event,()->{
+                synchronized(JOURNAL_STATUS_LOCK){prefs.edit().remove("proxyNetworkJournalError")
+                        .putString("proxyNetworkJournalLastWrittenId",event.id).apply();}
+            });}
+            catch(Exception unavailable){recordJournalDrop(event,unavailable.getClass().getSimpleName());}
+        });}catch(RejectedExecutionException fullOrStopped){
+            recordJournalDrop(event,journalWorker.isShutdown()?"writer-closed":"queue-full");
+        }
+    }
+
+    private void recordJournalDrop(ProxyNetworkJournal.Event event,String reason){
+        synchronized(JOURNAL_STATUS_LOCK){
+            // Old draining writers and callbacks must not regress the shared counter.
+            long prior=Math.max(Math.max(0L,prefs.getLong("proxyNetworkJournalDropped",0L)),droppedJournalEvents.get());
+            long next=prior==Long.MAX_VALUE?prior:prior+1;droppedJournalEvents.set(next);
+            prefs.edit().putLong("proxyNetworkJournalDropped",next).putString("proxyNetworkJournalError",reason)
+                    .putString("proxyNetworkJournalLastDroppedId",event.id).apply();
+        }
+    }
+
+    private synchronized String recordHealth(NetworkEpoch.Snapshot<Network> route,String integrity,String fault,Throwable error){
+        String signature=route.epoch+"|"+integrity+"|"+fault+"|"+(error==null?"":error.getClass().getName());
+        long now=SystemClock.elapsedRealtime();
+        // Record transitions and at most one repeated identical observation per minute.
+        if(signature.equals(lastHealthTraceSignature)&&now-lastHealthTraceAt<60000L)return lastHealthTraceId;
+        lastHealthTraceSignature=signature;lastHealthTraceAt=now;
+        ProxyNetworkJournal.Event event=ProxyNetworkJournal.captureHealth(route.epoch,
+                ProxyNetworkJournal.outcome(integrity),fault,error);
+        enqueueEvent(event);lastHealthTraceId=event.id;
+        return lastHealthTraceId;
+    }
+
+    private void staleResult(NetworkEpoch.Snapshot<Network> route,String parent){
+        recordEvent(ProxyNetworkJournal.Stage.STALE_RESULT,route,ProxyNetworkJournal.Outcome.DISCARDED,0,null,parent);
+    }
+
+    private void repairLiveNetworkIntegrity(NetworkEpoch.Snapshot<Network> route){
+        if(destroyed||!networkEvents.isCurrent(route)||!prefs.getBoolean("proxyRootWanted",false))return;
+        final long ticket=RootProxyManager.observationTicket();
+        if(ticket<0L)return;
+        String trace=recordEvent(ProxyNetworkJournal.Stage.RECOVERY_REQUEST,route,ProxyNetworkJournal.Outcome.REQUESTED,0,null,null);
         try{
-            RootBridge.rootShell(getApplicationContext(),
+            RootBridge.Result result=RootBridge.rootShell(getApplicationContext(),
                     "P=$(cat /data/adb/hetu/run/core.pid 2>/dev/null || true); "
-                            +"case \"$P\" in ''|*[!0-9]*) exit 0;; esac; "
-                            +"/data/adb/hetu/hetu-root.sh repair-network \"$P\" >/dev/null 2>&1 || true",
+                            +"case \"$P\" in ''|*[!0-9]*) exit 3;; esac; "
+                            +"/data/adb/hetu/hetu-root.sh repair-network \"$P\" >/dev/null 2>&1",
                     6000L);
-        }catch(Exception ignored){}
-        checkLiveNetworkIntegrity();
+            String id=recordEvent(ProxyNetworkJournal.Stage.REPAIR_RESULT,route,
+                    result.ok()?ProxyNetworkJournal.Outcome.ACKNOWLEDGED:ProxyNetworkJournal.Outcome.FAILED,result.code,null,trace);
+            if(!publishNetworkObservation(route,ticket,()->prefs.edit()
+                    .putInt("proxyNetworkRepairExit",result.code).putString("proxyNetworkRepairTraceId",id).apply()))staleResult(route,id);
+        }catch(Exception failure){
+            String id=recordEvent(ProxyNetworkJournal.Stage.REPAIR_RESULT,route,ProxyNetworkJournal.Outcome.FAILED,-1,failure,trace);
+            if(!publishNetworkObservation(route,ticket,()->prefs.edit()
+                    .putInt("proxyNetworkRepairExit",-1).putString("proxyNetworkRepairTraceId",id).apply()))staleResult(route,id);
+        }
+        // A successful shell invocation only acknowledges the request; health is checked independently.
+        if(networkEvents.isCurrent(route))checkLiveNetworkIntegrity();
     }
 
     private void scheduleWorker(Runnable task,long delayMs){
@@ -271,7 +468,7 @@ public final class ProxyNetworkMatchService extends Service {
             RootBridge.Result result=RootBridge.rootShell(getApplicationContext(),command,3500L);
             ProxyContinuity.ProcessState state=ProxyContinuity.processState(result.ok(),result.output);
             if(state!=ProxyContinuity.ProcessState.UNKNOWN){
-                if(!RootProxyManager.publishObservation(ticket,()->prefs.edit()
+                if(!publishServiceObservation(ticket,()->prefs.edit()
                         .putBoolean("proxyRootRuntimeRunning",state==ProxyContinuity.ProcessState.ALIVE).apply()))
                     return ProxyContinuity.ProcessState.UNKNOWN;
             }
@@ -294,8 +491,8 @@ public final class ProxyNetworkMatchService extends Service {
                 probeEgressIfPending();
                 return;
             }
-            Network network=cm==null?null:cm.getActiveNetwork();
-            if(network==null){
+            final NetworkEpoch.Snapshot<Network> route=networkEvents.snapshot();
+            if(route.network==null){
                 prefs.edit().putString("proxyAutoRecoveryError","等待网络恢复后重新启动代理").apply();
                 return;
             }
@@ -304,7 +501,8 @@ public final class ProxyNetworkMatchService extends Service {
             if(now-last<30000L)return;
             prefs.edit().putLong("proxyAutoRecoveryAttempt",now).apply();
             RootProxyManager root=new RootProxyManager(getApplicationContext());
-            JSONObject result=root.startIfWanted(ProxyRuntimeProfile.load(prefs));
+            JSONObject result=root.startIfWanted(ProxyRuntimeProfile.load(prefs),
+                    ()->!destroyed&&networkEvents.isCurrent(route));
             if(result.optBoolean("cancelled",false))return;
             if(result.optBoolean("running",false)||result.optBoolean("ok",false)){
                 prefs.edit()
@@ -323,21 +521,28 @@ public final class ProxyNetworkMatchService extends Service {
 
     private void checkLiveNetworkIntegrity(){
         if(destroyed||!prefs.getBoolean("proxyRootWanted",false))return;
+        final NetworkEpoch.Snapshot<Network> route=networkEvents.snapshot();
         final long ticket=RootProxyManager.observationTicket();
         if(ticket<0L)return;
         try{
             JSONObject health=new RootProxyManager(getApplicationContext()).networkHealth();
             String integrity=health.optString("networkIntegrity","unknown");
-            SharedPreferences.Editor editor=prefs.edit()
+            String id=recordHealth(route,integrity,health.optString("networkFault",""),null);
+            SharedPreferences.Editor editor=prefs.edit().putString("proxyNetworkHealthTraceId",id)
                     .putString("proxyNetworkIntegrity",integrity)
                     .putString("proxyNetworkFault",health.optString("networkFault",""))
                     .putLong("proxyNetworkCheckedAt",System.currentTimeMillis());
+            editor.remove("proxyNetworkHealthReadError");
             if("healthy".equals(integrity))editor.remove("proxyAutoRecoveryError");
             else if("degraded".equals(integrity))editor.putString("proxyAutoRecoveryError","核心存活，网络接管不完整："+health.optString("networkFault"));
             // Unknown/old-script observations are never treated as proof of failure.
-            RootProxyManager.publishObservation(ticket,editor::apply);
-        }catch(Exception ignored){
-            RootProxyManager.publishObservation(ticket,()->prefs.edit().putString("proxyNetworkIntegrity","unknown").apply());
+            if(!publishNetworkObservation(route,ticket,editor::apply))staleResult(route,id);
+        }catch(Exception failure){
+            String id=recordHealth(route,"unknown","health-read-failed",failure);
+            if(!publishNetworkObservation(route,ticket,()->prefs.edit()
+                    .putString("proxyNetworkIntegrity","unknown").putString("proxyNetworkFault","health-read-failed")
+                    .putLong("proxyNetworkCheckedAt",System.currentTimeMillis()).putString("proxyNetworkHealthTraceId",id)
+                    .putString("proxyNetworkHealthReadError",failure.getClass().getSimpleName()).apply()))staleResult(route,id);
         }
     }
 
@@ -345,33 +550,38 @@ public final class ProxyNetworkMatchService extends Service {
         if(destroyed||!prefs.getBoolean("proxyRootWanted",false))return;
         final long ticket=RootProxyManager.observationTicket();
         if(ticket<0L)return;
-        Network network=cm==null?null:cm.getActiveNetwork();
-        if(network==null)return;
-        long now=android.os.SystemClock.elapsedRealtime();
-        if(now-lastPolicyProbeAt<90000L)return;
-        lastPolicyProbeAt=now;
+        final NetworkEpoch.Snapshot<Network> route;
+        synchronized(networkEvents){
+            route=networkEvents.snapshot();
+            if(route.network==null)return;
+            long now=android.os.SystemClock.elapsedRealtime();
+            if(now-lastPolicyProbeAt<90000L)return;
+            lastPolicyProbeAt=now;
+        }
         int port=MihomoStartupConfig.egressProbePort(prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT));
-        String error=""; boolean success=false;
+        String error=""; boolean success=false; int responseCode=-1; Throwable probeFailure=null;
+        String request=recordEvent(ProxyNetworkJournal.Stage.EGRESS_REQUEST,route,ProxyNetworkJournal.Outcome.REQUESTED,0,null,null);
         // Explicit loopback proxy; no DIRECT fallback, node switch, connection flush
         // or core restart on a slow/blocked website. These requests obey current rules.
-        for(String target:new String[]{"https://www.gstatic.com/generate_204","https://cp.cloudflare.com/generate_204"}){
-            java.net.HttpURLConnection connection=null;
+        String[] targets={"https://www.gstatic.com/generate_204","https://cp.cloudflare.com/generate_204"};
+        for(int index=0;index<targets.length;index++){
+            if(destroyed||!networkEvents.isCurrent(route)||!prefs.getBoolean("proxyRootWanted",false)){staleResult(route,request);return;}
             try{
-                java.net.Proxy proxy=new java.net.Proxy(java.net.Proxy.Type.HTTP,new java.net.InetSocketAddress("127.0.0.1",port));
-                connection=(java.net.HttpURLConnection)new java.net.URL(target).openConnection(proxy);
-                connection.setConnectTimeout(2500); connection.setReadTimeout(2500);
-                connection.setInstanceFollowRedirects(false); connection.setUseCaches(false);
-                connection.setRequestProperty("Connection","close");
-                int code=connection.getResponseCode();
-                if(code==204){success=true;break;}
-                error="HTTP "+code;
-            }catch(Exception e){error=e.getClass().getSimpleName()+": "+String.valueOf(e.getMessage());}
-            finally{if(connection!=null)connection.disconnect();}
+                responseCode=egressRequest.code(targets[index],port);probeFailure=null;
+                success=responseCode==204;
+                if(!success)error="HTTP "+responseCode;
+            }catch(Exception e){probeFailure=e;responseCode=-1;error=e.getClass().getSimpleName();}
+            ProxyNetworkJournal.Event observation=ProxyNetworkJournal.captureEgress(route.epoch,
+                    index==0?ProxyNetworkJournal.Target.GOOGLE_204:ProxyNetworkJournal.Target.CLOUDFLARE_204,responseCode,probeFailure,request);
+            enqueueEvent(observation);
+            if(success)break;
         }
         // Discard results from a completed stop or a network handover.
-        if(destroyed||!prefs.getBoolean("proxyRootWanted",false)||!network.equals(cm.getActiveNetwork()))return;
-        if(error.length()>260)error=error.substring(0,260);
-        SharedPreferences.Editor edit=prefs.edit()
+        String id=recordEvent(ProxyNetworkJournal.Stage.EGRESS_RESULT,route,
+                success?ProxyNetworkJournal.Outcome.REACHABLE:ProxyNetworkJournal.Outcome.UNVERIFIED,responseCode,probeFailure,request);
+        if(destroyed||!prefs.getBoolean("proxyRootWanted",false)||!networkEvents.isCurrent(route)){staleResult(route,id);return;}
+        error=error+"（记录 "+id+"）";
+        SharedPreferences.Editor edit=prefs.edit().putString("proxyPolicyEgressTraceId",id)
                 .putString("proxyPolicyEgressState",success?"reachable":"unverified")
                 .putLong("proxyPolicyEgressCheckedAt",System.currentTimeMillis());
         if(success){
@@ -381,7 +591,18 @@ public final class ProxyNetworkMatchService extends Service {
             edit.putBoolean("proxyRootEgressPending",true).putString("proxyRootEgressProbeLastError",error)
                     .putString("proxyRootEgressWarning","按规则出口暂未验证通过；未重启核心、未改节点："+error);
         }
-        RootProxyManager.publishObservation(ticket,edit::apply);
+        if(!publishNetworkObservation(route,ticket,edit::apply))staleResult(route,id);
+    }
+
+    private int fetchEgressCode(String target,int port)throws Exception{
+        java.net.Proxy proxy=new java.net.Proxy(java.net.Proxy.Type.HTTP,new java.net.InetSocketAddress("127.0.0.1",port));
+        java.net.HttpURLConnection connection=(java.net.HttpURLConnection)new java.net.URL(target).openConnection(proxy);
+        try{
+            connection.setConnectTimeout(2500);connection.setReadTimeout(2500);
+            connection.setInstanceFollowRedirects(false);connection.setUseCaches(false);
+            connection.setRequestProperty("Connection","close");
+            return connection.getResponseCode();
+        }finally{connection.disconnect();}
     }
 
     private void updateAdblockMetrics(){

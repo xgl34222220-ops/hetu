@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu
 
+
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -77,9 +78,9 @@ internal fun Runtime146Features(onBack: () -> Unit) {
         }
         item { RefSectionLabel("服务与控制") }
         item { RefGroup {
-            RefToolRow(Icons.Rounded.Notifications, Color(0xFF12806F), "通知与快捷控制", "状态通知、快捷按钮与系统磁贴") { open(ProxyNotificationSettingsActivity::class.java) }
+            RefToolRow(Icons.Rounded.Notifications, Color(0xFF2A62E8), "通知与快捷控制", "状态通知、快捷按钮与系统磁贴") { open(ProxyNotificationSettingsActivity::class.java) }
             RefDivider()
-            RefToolRow(Icons.Rounded.Terminal, Color(0xFF12806F), "脚本", "脚本管理与启动、停止钩子") { open(ProxyScriptsActivity::class.java) }
+            RefToolRow(Icons.Rounded.Terminal, Color(0xFF2A62E8), "脚本", "脚本管理与启动、停止钩子") { open(ProxyScriptsActivity::class.java) }
             RefDivider()
             RefToolRow(Icons.Rounded.Article, Color(0xFF9333EA), "日志管理", "筛选、搜索、暂停和导出运行日志") { open(ProxyLogViewerActivity::class.java) }
             RefDivider()
@@ -87,17 +88,17 @@ internal fun Runtime146Features(onBack: () -> Unit) {
         } }
         item { RefSectionLabel("面板与订阅") }
         item { RefGroup {
-            RefToolRow(Icons.Rounded.Web, Color(0xFF12806F), "Web 面板", "管理本地与远程面板") { open(ProxyWebPanelsActivity::class.java) }
+            RefToolRow(Icons.Rounded.Web, Color(0xFF2A62E8), "Web 面板", "管理本地与远程面板") { open(ProxyWebPanelsActivity::class.java) }
             RefDivider()
             RefSwitchRow(Icons.Rounded.SwapHoriz, Color(0xFF0EA5E9), "切换节点后断开旧连接", "只关闭经过当前策略组的旧连接", disconnect) {
                 disconnect = it; prefs.edit().putBoolean("proxySelectorDisconnectOnSelect", it).apply()
             }
             RefDivider()
-            RefToolRow(Icons.Rounded.Speed, Color(0xFF12806F), "延迟目标", "自定义探测地址及超时") { open(ProxyLatencyTargetsActivity::class.java) }
+            RefToolRow(Icons.Rounded.Speed, Color(0xFF2A62E8), "延迟目标", "自定义探测地址及超时") { open(ProxyLatencyTargetsActivity::class.java) }
             RefDivider()
-            RefToolRow(Icons.Rounded.CloudSync, Color(0xFF12806F), "Sub-Store", "订阅处理与配置导入") { open(ProxySubStoreActivity::class.java) }
+            RefToolRow(Icons.Rounded.CloudSync, Color(0xFF2A62E8), "Sub-Store", "订阅处理与配置导入") { open(ProxySubStoreActivity::class.java) }
             RefDivider()
-            RefSwitchRow(Icons.Rounded.Dashboard, Color(0xFF12806F), "启动后进入面板", "保留当前底栏与页面布局", startPanel) {
+            RefSwitchRow(Icons.Rounded.Dashboard, Color(0xFF2A62E8), "启动后进入面板", "保留当前底栏与页面布局", startPanel) {
                 startPanel = it; prefs.edit().putBoolean("startOnPanel", it).apply()
             }
         } }
@@ -105,13 +106,13 @@ internal fun Runtime146Features(onBack: () -> Unit) {
         item { RefGroup {
             RefToolRow(Icons.Rounded.WifiTethering, Color(0xFF10B981), "接口与下游设备", "接口选择与 MAC 直连规则") { open(ProxySharedNetworkSettingsActivity::class.java) }
             RefDivider()
-            RefToolRow(Icons.Rounded.Download, Color(0xFF12806F), "下载镜像", if (mirrorEnabled) mirrorPrefix.ifBlank { "已开启，尚未填写前缀" } else "关闭") { mirrorDialog = true }
+            RefToolRow(Icons.Rounded.Download, Color(0xFF2A62E8), "下载镜像", if (mirrorEnabled) mirrorPrefix.ifBlank { "已开启，尚未填写前缀" } else "关闭") { mirrorDialog = true }
         } }
         item { RefSectionLabel("备份与恢复") }
         item { RefGroup {
-            RefToolRow(Icons.Rounded.UploadFile, Color(0xFF12806F), "导出备份", if (busy) "正在处理…" else "导出应用设置与配置库") { if (!busy) exporter.launch("Hetu-backup.json") }
+            RefToolRow(Icons.Rounded.UploadFile, Color(0xFF2A62E8), "导出备份", if (busy) "正在处理…" else "导出应用设置与配置库") { if (!busy) launchDocumentPicker({ message = it }) { exporter.launch("Hetu-backup.json") } }
             RefDivider()
-            RefToolRow(Icons.Rounded.Restore, Color(0xFF12806F), "恢复备份", "恢复前确认，不自动卸载或清除应用数据") { if (!busy) importer.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) }
+            RefToolRow(Icons.Rounded.Restore, Color(0xFF2A62E8), "恢复备份", "恢复前确认，不自动卸载或清除应用数据") { if (!busy) launchDocumentPicker({ message = it }) { importer.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) } }
             RefDivider()
             RefToolRow(Icons.Rounded.Info, Color(0xFF5D6670), "关于河图", "版本、开源许可与支持") { open(ProxyAboutActivity::class.java) }
         } }

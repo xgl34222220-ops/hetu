@@ -56,6 +56,8 @@ internal data class ProxyConnectionUi(
     val appName: String = "",
     val packageName: String = "",
     val appIcon: Bitmap? = null,
+    val startedAt: String = "",
+    val addressType: String = "",
 )
 
 internal data class ProxyRuleUi(
@@ -132,6 +134,8 @@ internal class ProxyComposeController(context: Context) {
             .replace(Regex("""/data/adb/hetu/\S+"""), "Root 运行组件")
             .take(180)
     }
+
+    suspend fun setAutoStart(enabled: Boolean): String = withContext(Dispatchers.IO) { root.setAutoStart(enabled) }
 
     suspend fun state(): ProxyComposeState = withContext(Dispatchers.IO) {
         val profile = ProxyRuntimeProfile.load(prefs)
@@ -251,6 +255,8 @@ internal class ProxyComposeController(context: Context) {
                 ).filter { it.isNotBlank() }.distinct().joinToString("；")
                 startupGrace && (status.optBoolean("healthProbeFailed", false) || !status.optBoolean("dataPlaneHealthy", false)) -> ""
                 status.optBoolean("healthProbeFailed", false) -> userSafeRuntimeMessage(status.optString("message", ""))
+                status.optBoolean("baselineRepairAvailable", false) ->
+                    "旧版运行记录需要校正，可在工具→诊断工具中修复运行记录；当前规则已核对"
                 !status.optBoolean("dataPlaneHealthy", false) ->
                     "核心仍在运行，但透明代理/DNS 数据面健康检查未完整通过"
                 else -> ""
@@ -340,6 +346,10 @@ internal class ProxyComposeController(context: Context) {
     suspend fun closeAll() = withContext(Dispatchers.IO) { api.closeAll() }
     suspend fun closeConnection(id: String) = withContext(Dispatchers.IO) { api.closeConnection(id) }
     suspend fun diagnostics(): String = withContext(Dispatchers.IO) { root.diagnostics() }
+    suspend fun networkEvents(): String = withContext(Dispatchers.IO) {
+        ProxyNetworkJournal(app).report(prefs)
+    }
+    suspend fun repairSessionRecord(): String = withContext(Dispatchers.IO) { root.repairSessionRecord().optString("message") }
     suspend fun startupConfig(): String = withContext(Dispatchers.IO) { root.prepare(ProxyRuntimeProfile.load(prefs)).startup }
 
     suspend fun rules(): List<ProxyRuleUi> = withContext(Dispatchers.IO) {
@@ -538,6 +548,8 @@ internal class ProxyComposeController(context: Context) {
             val fallbackUid = if (sourcePort > 0) socketUids["$protocol:$sourcePort"] ?: -1 else -1
             val appIdentity = resolveApp(meta, fallbackUid)
             out += ProxyConnectionUi(
+                startedAt = c.optString("start", ""),
+                addressType = meta?.optString("dnsMode", "").orEmpty(),
                 id = c.optString("id", i.toString()),
                 host = host,
                 rule = c.optString("rule", ""),

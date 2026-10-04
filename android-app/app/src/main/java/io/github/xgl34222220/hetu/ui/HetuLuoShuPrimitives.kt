@@ -43,9 +43,9 @@ import androidx.compose.ui.unit.sp
  * 4/8dp rhythm, and no decorative elevation where hierarchy can be expressed by tone instead.
  */
 object HetuLuoShuIconTokens {
-    val HeaderTouchTarget = 48.dp
-    val HeaderContainer = 44.dp
-    val HeaderGlyph = 21.dp
+    val HeaderTouchTarget = 44.dp
+    val HeaderContainer = 40.dp
+    val HeaderGlyph = 20.dp
     val DockGlyph = 22.dp
     val SectionGlyph = 18.dp
     val ToolGlyph = 20.dp
@@ -81,7 +81,7 @@ fun HetuLuoShuHeaderAction(
     icon: ImageVector,
     contentDescription: String,
     onClick: () -> Unit,
-    containerColor: Color = LocalHetuTokens.current.controlBackground,
+    containerColor: Color = Color.Transparent,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     loading: Boolean = false,
@@ -135,7 +135,7 @@ fun HetuLuoShuTopBar(
 ) {
     val tokens = LocalHetuTokens.current
     Row(
-        modifier = modifier.fillMaxWidth().statusBarsPadding().heightIn(min = 64.dp).padding(vertical = 8.dp),
+        modifier = modifier.fillMaxWidth().statusBarsPadding().heightIn(min = 52.dp).padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -143,9 +143,9 @@ fun HetuLuoShuTopBar(
             text = title,
             modifier = Modifier.weight(1f),
             color = tokens.textPrimary,
-            fontSize = 26.sp,
-            lineHeight = 34.sp,
-            fontWeight = FontWeight.Bold,
+            fontSize = 22.sp,
+            lineHeight = 28.sp,
+            fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -162,15 +162,15 @@ fun HetuLuoShuSurfaceCard(
     val tokens = LocalHetuTokens.current
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(18.dp),
         color = if (emphasized) tokens.selectionBackground else tokens.cardBackground,
         contentColor = tokens.textPrimary,
         tonalElevation = 0.dp,
-        shadowElevation = if (emphasized) 1.dp else 0.dp,
+        shadowElevation = 0.dp,
     ) {
         Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(15.dp),
+            verticalArrangement = Arrangement.spacedBy(9.dp),
             content = content,
         )
     }

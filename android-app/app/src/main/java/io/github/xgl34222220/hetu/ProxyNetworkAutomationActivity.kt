@@ -40,8 +40,7 @@ import java.util.TreeSet
 class ProxyNetworkAutomationActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        setContent { HetuTheme { ProxyNetworkAutomationPage(onBack = { finish() }) } }
+        hxHost { vm -> HxNetworkMatchScreen(vm) { finish() } }
     }
 }
 
@@ -64,7 +63,7 @@ private fun ProxyNetworkAutomationPage(onBack: () -> Unit) {
     val bssids = remember(revision) { TreeSet(prefs.getStringSet("networkMatchBssids", emptySet()).orEmpty()) }
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val pageBg = if (dark) t.pageBackground else Color(0xFFF4F5F7)
+    val pageBg = if (dark) t.pageBackground else Color(0xFFF2F0FB)
 
     fun refresh() { revision++ }
     fun service(action: String) {
@@ -97,7 +96,10 @@ private fun ProxyNetworkAutomationPage(onBack: () -> Unit) {
     fun requestWifiPermissions() {
         val needs = buildList {
             if (Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(Manifest.permission.NEARBY_WIFI_DEVICES) != PackageManager.PERMISSION_GRANTED) add(Manifest.permission.NEARBY_WIFI_DEVICES)
-            if (context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) add(Manifest.permission.ACCESS_FINE_LOCATION)
+            if (context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                add(Manifest.permission.ACCESS_COARSE_LOCATION)
+                add(Manifest.permission.ACCESS_FINE_LOCATION)
+            }
         }
         if (needs.isNotEmpty()) permissionLauncher.launch(needs.toTypedArray()) else evaluate()
     }
@@ -125,7 +127,7 @@ private fun ProxyNetworkAutomationPage(onBack: () -> Unit) {
         }
 
         item {
-            Surface(shape = RoundedCornerShape(24.dp), color = if (dark) t.elevatedCardBackground else Color.White, shadowElevation = if (dark) 0.dp else 1.dp) {
+            Surface(shape = RoundedCornerShape(18.dp), color = if (dark) t.elevatedCardBackground else t.cardBackground, shadowElevation = if (dark) 0.dp else 1.dp) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(42.dp).background(MaterialTheme.colorScheme.primary.copy(alpha = .10f), RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
@@ -137,7 +139,7 @@ private fun ProxyNetworkAutomationPage(onBack: () -> Unit) {
                             Text(environment, color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         }
                     }
-                    HorizontalDivider(color = if (dark) t.outline else Color(0xFFF4F5F7))
+                    HorizontalDivider(color = if (dark) t.outline else Color(0xFFF2F0FB))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text("自动网络匹配", color = t.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
@@ -216,11 +218,11 @@ private fun NetworkSectionLabel(text: String) = Text(text, color = Color(0xFF98A
 private fun NetworkGroup(content: @Composable ColumnScope.() -> Unit) {
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    Surface(shape = RoundedCornerShape(20.dp), color = if (dark) t.elevatedCardBackground else Color.White, shadowElevation = if (dark) 0.dp else 1.dp) { Column(Modifier.fillMaxWidth(), content = content) }
+    Surface(shape = RoundedCornerShape(18.dp), color = if (dark) t.elevatedCardBackground else t.cardBackground, shadowElevation = if (dark) 0.dp else 1.dp) { Column(Modifier.fillMaxWidth(), content = content) }
 }
 
 @Composable
-private fun NetworkDivider() = HorizontalDivider(Modifier.padding(start = 62.dp, end = 14.dp), color = if (MaterialTheme.colorScheme.background.luminance() < .5f) LocalHetuTokens.current.outline else Color(0xFFF4F5F7))
+private fun NetworkDivider() = HorizontalDivider(Modifier.padding(start = 62.dp, end = 14.dp), color = if (MaterialTheme.colorScheme.background.luminance() < .5f) LocalHetuTokens.current.outline else Color(0xFFF2F0FB))
 
 @Composable
 private fun NetworkIcon(icon: ImageVector, accent: Color) {
@@ -312,5 +314,172 @@ private fun NetworkSetEditor(state: NetworkEditor, onDismiss: () -> Unit, onSave
                 ) { Text("保存", fontWeight = FontWeight.Bold) }
             }
         }
+    }
+}
+
+
+/* ------------------------------------------------------------------ */
+/*  Hx network match                                                    */
+/* ------------------------------------------------------------------ */
+
+@Composable
+internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
+    val context = LocalContext.current
+    val prefs = vm.prefs
+    val scope = rememberCoroutineScope()
+    val c = Hx.colors
+    var revision by remember { mutableIntStateOf(0) }
+    var actionKey by remember { mutableStateOf<String?>(null) }
+    val enabled = remember(revision) { prefs.getBoolean("networkMatchEnabled", false) }
+    val mobile = remember(revision) { prefs.getBoolean("networkMatchMobile", false) }
+    val environment = remember(revision) { prefs.getString("networkMatchLastEnvironment", "尚未获取当前网络").orEmpty() }
+    val ssidOriginal = remember(revision) { prefs.getStringSet("networkMatchSsids", emptySet()).orEmpty().sorted() }
+    val bssidOriginal = remember(revision) { prefs.getStringSet("networkMatchBssids", emptySet()).orEmpty().sorted() }
+    val ssids = remember(ssidOriginal) { mutableStateListOf<HxEditEntry>().apply { ssidOriginal.forEach { add(HxEditEntry(it)) } } }
+    val bssids = remember(bssidOriginal) { mutableStateListOf<HxEditEntry>().apply { bssidOriginal.forEach { add(HxEditEntry(it)) } } }
+    fun values(list: List<HxEditEntry>) = list.map { it.text.trim() }.filter { it.isNotEmpty() }.sorted()
+    val dirty = values(ssids) != ssidOriginal || values(bssids) != bssidOriginal
+
+    fun refresh() { revision++ }
+    fun service(action: String) {
+        val intent = Intent(context, ProxyNetworkMatchService::class.java).setAction(action)
+        if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(intent) else context.startService(intent)
+    }
+    fun evaluate() {
+        prefs.edit().putBoolean("networkMatchForceEval", true).apply()
+        if (prefs.getBoolean("networkMatchEnabled", false)) service("EVAL")
+        scope.launch { delay(550); refresh() }
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        if (prefs.getBoolean("networkMatchEnabled", false)) service("START")
+        scope.launch { delay(450); refresh() }
+    }
+    fun requestWifiPermissions() {
+        val needs = buildList {
+            if (Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(Manifest.permission.NEARBY_WIFI_DEVICES) != PackageManager.PERMISSION_GRANTED) add(Manifest.permission.NEARBY_WIFI_DEVICES)
+            if (context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                add(Manifest.permission.ACCESS_COARSE_LOCATION)
+                add(Manifest.permission.ACCESS_FINE_LOCATION)
+            }
+        }
+        if (needs.isNotEmpty()) permissionLauncher.launch(needs.toTypedArray()) else evaluate()
+    }
+    fun actionLabel(key: String, def: String): String = when (prefs.getString(key, def)) {
+        "start" -> "启动代理"
+        "stop" -> "停止代理"
+        else -> "不操作"
+    }
+    fun save() {
+        val bad = values(bssids).firstOrNull { !it.matches(Regex("(?i)^[0-9a-f]{2}(?::[0-9a-f]{2}){5}$")) }
+        if (bad != null) {
+            vm.toast("BSSID 格式无效：$bad")
+            return
+        }
+        prefs.edit()
+            .putStringSet("networkMatchSsids", values(ssids).toSet())
+            .putStringSet("networkMatchBssids", values(bssids).map { it.uppercase() }.toSet())
+            .apply()
+        vm.toast("匹配条件已保存")
+        refresh()
+        evaluate()
+    }
+
+    HxPage(
+        title = "网络匹配",
+        largeTitle = false,
+        subtitle = "按当前网络环境自动启停代理",
+        onBack = onBack,
+        actions = {
+            HxBarAction(Icons.Rounded.Refresh, "刷新当前网络", onClick = { requestWifiPermissions() })
+            HxBarAction(Icons.Rounded.Check, "保存", onClick = ::save, enabled = dirty)
+        },
+    ) {
+        item(key = "env") {
+            SettingsSection {
+                HxCard(padding = PaddingValues(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(28.dp), contentAlignment = Alignment.Center) {
+                            Icon(
+                                if (environment.startsWith("Wi")) Icons.Rounded.Wifi else if (environment.contains("移动")) Icons.Rounded.SignalCellularAlt else Icons.Rounded.Public,
+                                null,
+                                tint = c.accent,
+                            )
+                        }
+                        Spacer(Modifier.width(24.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("当前环境", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = c.text)
+                            Text(environment, style = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp), color = c.textMuted, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
+            }
+        }
+        item(key = "master") {
+            SettingsSection {
+                SettingsGroup {
+                    SettingsSwitchRow("自动网络匹配", enabled, { value ->
+                        if (value) {
+                            prefs.edit().putBoolean("networkMatchEnabled", true).apply()
+                            service("START")
+                            refresh()
+                            requestWifiPermissions()
+                        } else {
+                            prefs.edit().putBoolean("networkMatchEnabled", false).apply()
+                            context.stopService(Intent(context, ProxyNetworkMatchService::class.java))
+                            refresh()
+                        }
+                    }, subtitle = if (enabled) "监听服务正在运行" else "关闭后不会自动启停代理", icon = Icons.Rounded.Sensors, iconTint = c.textMuted)
+                    SettingsDivider()
+                    SettingsSwitchRow("移动数据", mobile, {
+                        prefs.edit().putBoolean("networkMatchMobile", it).apply()
+                        refresh()
+                        evaluate()
+                    }, subtitle = "使用蜂窝网络时视为匹配", icon = Icons.Rounded.CellTower, iconTint = c.textMuted)
+                }
+            }
+        }
+        item(key = "actions") {
+            SettingsSection {
+                SettingsGroup(title = "自动动作") {
+                    SettingsNavRow("匹配成功", compact = true, icon = Icons.Rounded.PlayCircleOutline, iconTint = c.textMuted, value = actionLabel("networkMatchAction", "start"), dropdown = true) {
+                        actionKey = "networkMatchAction"
+                    }
+                    SettingsDivider()
+                    SettingsNavRow("条件失配", compact = true, icon = Icons.Rounded.StopCircle, iconTint = c.textMuted, value = actionLabel("networkUnmatchAction", "none"), dropdown = true) {
+                        actionKey = "networkUnmatchAction"
+                    }
+                }
+            }
+        }
+        item(key = "ssid") {
+            SettingsSection { HxEditableList("Wi‑Fi SSID（留空不限）", "SSID", "例如 Home-5G", ssids) }
+        }
+        item(key = "bssid") {
+            SettingsSection { HxEditableList("Wi‑Fi BSSID（留空不限）", "BSSID", "AA:BB:CC:DD:EE:FF", bssids) }
+        }
+        item(key = "note") {
+            HxBanner(
+                "部分 Android 版本读取 SSID / BSSID 需要附近设备或定位权限；权限不足时不会猜测 Wi‑Fi 名称。",
+                tone = HxTone.Neutral,
+                modifier = Modifier.padding(horizontal = Hx.gutter),
+            )
+        }
+    }
+
+    actionKey?.let { key ->
+        HxChoiceSheet(
+            title = if (key == "networkMatchAction") "匹配成功动作" else "失配动作",
+            referenceRadios = true,
+            trailingReferenceRadios = key == "networkUnmatchAction",
+            choices = listOf(HxChoice("none", "不操作"), HxChoice("start", "启动 Root 代理"), HxChoice("stop", "停止 Root 代理")),
+            selected = prefs.getString(key, if (key == "networkMatchAction") "start" else "none"),
+            onPick = { value ->
+                prefs.edit().putString(key, value).apply()
+                actionKey = null
+                refresh()
+                evaluate()
+            },
+            onDismiss = { actionKey = null },
+        )
     }
 }

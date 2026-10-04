@@ -67,6 +67,19 @@ final class ProxyConfigLibrary {
         if(e.name.equals(prefs.getString(key(e.core),"")))prefs.edit().remove(key(e.core)).apply();
         ensureBundled(e.core);
     }
+    Entry rename(Entry e,String requestedName)throws IOException{
+        if(e==null||!e.file.isFile())throw new IOException("配置不存在");
+        if(BUNDLED_NAME.equals(e.name))throw new IOException("内置配置不能重命名");
+        String n=safeName(requestedName);
+        if(!coreAccepts(e.core,n))throw new IOException(e.core.label+" 不支持该配置格式");
+        if(n.equals(e.name))return e;
+        File target=new File(e.file.getParentFile(),n);
+        if(target.exists())throw new IOException("同名配置已存在");
+        try{Files.move(e.file.toPath(),target.toPath(),StandardCopyOption.ATOMIC_MOVE);}
+        catch(Exception first){try{Files.move(e.file.toPath(),target.toPath());}catch(Exception second){throw new IOException("无法重命名配置");}}
+        if(e.name.equals(prefs.getString(key(e.core),"")))prefs.edit().putString(key(e.core),n).apply();
+        return new Entry(e.core,n,target);
+    }
 
     List<Subscription> subscriptions(Entry e)throws IOException{
         String[] lines=normalize(read(e)).split("\n",-1);Section s=providerSection(lines);ArrayList<Subscription> out=new ArrayList<>();if(s==null)return out;

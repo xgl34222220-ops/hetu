@@ -127,7 +127,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
     )
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val pageBg = if (dark) t.pageBackground else Color(0xFFF4F5F7)
+    val pageBg = if (dark) t.pageBackground else Color(0xFFF2F0FB)
     var revision by remember { mutableIntStateOf(0) }
     var busy by remember { mutableStateOf(false) }
     var updatingRules by remember { mutableStateOf(false) }
@@ -357,7 +357,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
         }
 
         item("master") {
-            Surface(shape = RoundedCornerShape(24.dp), color = if (dark) t.elevatedCardBackground else Color.White, shadowElevation = if (dark) 0.dp else 1.dp) {
+            Surface(shape = RoundedCornerShape(18.dp), color = if (dark) t.elevatedCardBackground else t.cardBackground, shadowElevation = if (dark) 0.dp else 1.dp) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(44.dp).background(MaterialTheme.colorScheme.primary.copy(alpha = .10f), RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
@@ -389,7 +389,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                             },
                         )
                     }
-                    HorizontalDivider(color = if (dark) t.outline else Color(0xFFF4F5F7))
+                    HorizontalDivider(color = if (dark) t.outline else Color(0xFFF2F0FB))
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         ChainMetric("有效规则", snapshot.rules.count.toString(), Modifier.weight(1f))
                         ChainMetric("规则源", snapshot.rules.sources.count { it.enabled }.toString(), Modifier.weight(1f))
@@ -416,8 +416,8 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                 else -> Color(0xFF5D6670)
             }
             Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = if (dark) t.elevatedCardBackground else Color.White,
+                shape = RoundedCornerShape(18.dp),
+                color = if (dark) t.elevatedCardBackground else t.cardBackground,
                 shadowElevation = if (dark) 0.dp else 2.dp,
             ) {
                 Column(Modifier.fillMaxWidth().padding(15.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -440,7 +440,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
                         }
                         TextButton(onClick = { if (!busy) revision++ }) { Text("重新检测", fontSize = 11.sp) }
                     }
-                    HorizontalDivider(color = if (dark) t.outline.copy(alpha = .35f) else Color(0xFFF4F5F7))
+                    HorizontalDivider(color = if (dark) t.outline.copy(alpha = .35f) else Color(0xFFF2F0FB))
                     ChainVerifyRow("本地规则库", snapshot.rules.count > 0, if (snapshot.rules.count > 0) "${snapshot.rules.count} 条有效规则" else "当前没有启用的拦截规则", allowNeutral = true)
                     ChainVerifyRow("启动配置注入", snapshot.startupInjected, if (snapshot.startupInjected) "hetu-adblock 已写入运行副本" else "当前启动副本没有广告 provider")
                     ChainVerifyRow("Mihomo 规则链", snapshot.controllerLoaded, if (snapshot.controllerLoaded) "Controller 已看到 REJECT 规则" else "当前 Controller 未看到广告规则")
@@ -479,7 +479,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
         }
 
         item("profile") {
-            Surface(shape = RoundedCornerShape(20.dp), color = if (dark) t.elevatedCardBackground else Color.White, shadowElevation = if (dark) 0.dp else 1.dp) {
+            Surface(shape = RoundedCornerShape(18.dp), color = if (dark) t.elevatedCardBackground else t.cardBackground, shadowElevation = if (dark) 0.dp else 1.dp) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Rounded.Tune, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(19.dp))
@@ -525,7 +525,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
         }
 
         item("fallback") {
-            Surface(shape = RoundedCornerShape(22.dp), color = if (dark) t.elevatedCardBackground else Color.White, shadowElevation = if (dark) 0.dp else 1.dp) {
+            Surface(shape = RoundedCornerShape(18.dp), color = if (dark) t.elevatedCardBackground else t.cardBackground, shadowElevation = if (dark) 0.dp else 1.dp) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(42.dp).background(MaterialTheme.colorScheme.secondary.copy(alpha = .10f), RoundedCornerShape(13.dp)), contentAlignment = Alignment.Center) {
@@ -550,7 +550,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
         }
 
         item("cname-protection") {
-            Surface(shape = RoundedCornerShape(20.dp), color = if (dark) t.elevatedCardBackground else Color.White, shadowElevation = if (dark) 0.dp else 1.dp) {
+            Surface(shape = RoundedCornerShape(18.dp), color = if (dark) t.elevatedCardBackground else t.cardBackground, shadowElevation = if (dark) 0.dp else 1.dp) {
                 Row(Modifier.fillMaxWidth().padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         Modifier.size(40.dp).background(MaterialTheme.colorScheme.primary.copy(alpha = .09f), RoundedCornerShape(12.dp)),
@@ -578,7 +578,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
         item("source-title") { ChainSectionLabel("规则源") }
         snapshot.rules.sources.forEach { source ->
             item("source-${source.id}") {
-                Surface(shape = RoundedCornerShape(18.dp), color = if (dark) t.elevatedCardBackground else Color.White, shadowElevation = if (dark) 0.dp else 1.dp) {
+                Surface(shape = RoundedCornerShape(18.dp), color = if (dark) t.elevatedCardBackground else t.cardBackground, shadowElevation = if (dark) 0.dp else 1.dp) {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(38.dp).background(MaterialTheme.colorScheme.primary.copy(alpha = .09f), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
                             Icon(Icons.Rounded.FilterAlt, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
@@ -612,7 +612,7 @@ private fun ProxyAdblockChainPage(onBack: () -> Unit) {
         }
 
         item("user-rules") {
-            Surface(shape = RoundedCornerShape(18.dp), color = if (dark) t.elevatedCardBackground else Color.White, shadowElevation = if (dark) 0.dp else 1.dp) {
+            Surface(shape = RoundedCornerShape(18.dp), color = if (dark) t.elevatedCardBackground else t.cardBackground, shadowElevation = if (dark) 0.dp else 1.dp) {
                 Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Rounded.Tune, null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(11.dp))
@@ -729,11 +729,11 @@ private fun ChainVerifyRow(label: String, ok: Boolean, detail: String, allowNeut
 private fun ChainMetric(label: String, value: String, modifier: Modifier = Modifier) {
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val accent = if (dark) Color(0xFF60A5FA) else Color(0xFF12806F)
+    val accent = if (dark) Color(0xFF60A5FA) else Color(0xFF2A62E8)
     Surface(
         modifier = modifier.height(70.dp),
         shape = RoundedCornerShape(16.dp),
-        color = if (dark) t.controlBackground.copy(alpha = .72f) else Color.White,
+        color = if (dark) t.controlBackground.copy(alpha = .72f) else t.cardBackground,
         tonalElevation = 0.dp,
         shadowElevation = if (dark) 0.dp else 3.dp,
     ) {

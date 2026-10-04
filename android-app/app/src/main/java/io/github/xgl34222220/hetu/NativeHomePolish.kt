@@ -228,7 +228,7 @@ internal fun NativeStatusHero(data: CompactHomeData, toggle: () -> Unit, reload:
                     .background(if (dark) Color.White.copy(alpha = .09f) else Color.White.copy(alpha = .95f))
                     .padding(4.dp).heightIn(min = 48.dp).testTag("home-control-pill"),
                     verticalAlignment = Alignment.CenterVertically) {
-                    val blue = if (dark) Color(0xFF8AB4FF) else Color(0xFF12806F)
+                    val blue = if (dark) Color(0xFF8AB4FF) else Color(0xFF2A62E8)
                     when (shown) {
                         HomePhase.Running -> {
                             PillAction("重载", "home-reload", blue, Modifier.weight(1f), !processing && phase == shown, motion, reload)
@@ -379,25 +379,25 @@ internal fun NativeDetailsSheet(title: String, onDismiss: () -> Unit, content: @
     val scope = rememberCoroutineScope()
     val t = LocalHetuTokens.current
     MotionModalSheet12(onDismissRequest = onDismiss, sheetState = sheet, sheetGesturesEnabled = true,
-        shape = SheetShape12(32.dp),
+        shape = SheetShape12(22.dp),
         containerColor = t.cardBackground, contentColor = t.textPrimary,
         scrimColor = Color(0xFF12161A).copy(alpha = .4f), tonalElevation = 0.dp,
         modifier = Modifier.testTag("native-details-sheet"),
-        dragHandle = { Box(Modifier.fillMaxWidth().height(48.dp).testTag("sheet-drag-handle")
+        dragHandle = { Box(Modifier.fillMaxWidth().height(38.dp).testTag("sheet-drag-handle")
             .semantics { contentDescription = "下拉关闭" }, contentAlignment = Alignment.Center) {
-            Box(Modifier.width(40.dp).height(6.dp).background(t.textSecondary.copy(alpha = .28f), CircleShape))
+            Box(Modifier.width(36.dp).height(5.dp).background(t.textSecondary.copy(alpha = .28f), CircleShape))
         } }) {
         Column(Modifier.sheetReveal12().fillMaxWidth().weight(1f, fill = false).verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text(title, Modifier.fillMaxWidth(), color = t.textPrimary, fontSize = 20.sp, lineHeight = 27.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+            .padding(horizontal = 14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Text(title, Modifier.fillMaxWidth(), color = t.textPrimary, fontSize = 16.5.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
             content()
             Spacer(Modifier.height(2.dp))
         }
         Button(onClick = { scope.launch { sheet.hide(); onDismiss() } },
-            modifier = Modifier.sheetReveal12(1).padding(horizontal = 24.dp, vertical = 16.dp).fillMaxWidth().heightIn(min = 52.dp)
-                .testTag("sheet-confirm"), shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF12806F), contentColor = Color.White)) {
-            Text("确定", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            modifier = Modifier.sheetReveal12(1).padding(horizontal = 14.dp, vertical = 12.dp).fillMaxWidth().heightIn(min = 44.dp)
+                .testTag("sheet-confirm"), shape = RoundedCornerShape(13.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2A62E8), contentColor = Color.White)) {
+            Text("确定", fontSize = 14.5.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }

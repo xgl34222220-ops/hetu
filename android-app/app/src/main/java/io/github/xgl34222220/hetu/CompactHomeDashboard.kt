@@ -126,7 +126,7 @@ private data class HomePalette(val page: Color, val card: Color, val text: Color
 private val LocalHomePalette = staticCompositionLocalOf {
     // V19.3: reference lavender canvas / translucent-white cards.
     HomePalette(Color(0xFFF4F5F7), Color(0xFFFFFFFF), Color(0xFF12161A), Color(0xFF5D6670),
-        Color(0xFFF2F1FA), Color(0xFF12806F), Color(0xFFEF4444), Color(0xFFEEF0F3))
+        Color(0xFFF2F1FA), Color(0xFF2A62E8), Color(0xFFEF4444), Color(0xFFEEF0F3))
 }
 private val LocalHomeMotion = staticCompositionLocalOf { false }
 

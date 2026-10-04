@@ -165,7 +165,7 @@ internal fun HomePullIndicator(state: HomePullState, motion: Boolean, modifier: 
         transition.animateFloat(0f, 360f, infiniteRepeatable(tween(800, easing = LinearEasing)), label = "pull-angle").value
     } else progress * 240f
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val color = if (dark) Color(0xFF93C5FD) else Color(0xFF12806F)
+    val color = if (dark) Color(0xFF93C5FD) else Color(0xFF2A62E8)
     val title = if (active) "正在同步状态…" else if (state.armed) "松开立即刷新" else "下拉同步状态"
     Box(modifier.fillMaxWidth().height(state.offsetDp.dp).clip(RectangleShape)
         .testTag("home-pull-indicator").semantics {

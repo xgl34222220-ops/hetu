@@ -184,14 +184,14 @@ internal fun Modifier.hetuTopBarBackdrop(): Modifier {
 
 @Composable
 fun HetuPageHeader(title: String, onBack: () -> Unit, subtitle: String = "", actions: @Composable RowScope.() -> Unit = {}) {
-    Row(Modifier.fillMaxWidth().heightIn(min = HetuPageMetrics.ToolbarHeight).padding(vertical = 8.dp),
+    Row(Modifier.fillMaxWidth().heightIn(min = HetuPageMetrics.ToolbarHeight).padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         HetuLuoShuHeaderAction(Icons.AutoMirrored.Rounded.ArrowBack, "返回", onBack,
             contentColor = LocalHetuTokens.current.textPrimary)
         Column(Modifier.weight(1f)) {
-            Text(ht(title), style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (subtitle.isNotBlank()) Text(ht(subtitle), style = MaterialTheme.typography.bodySmall,
-                color = LocalHetuTokens.current.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(ht(title), style = MaterialTheme.typography.titleLarge.copy(fontSize = 16.5.sp, lineHeight = 22.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (subtitle.isNotBlank()) Text(ht(subtitle), style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.5.sp, lineHeight = 14.sp),
+                color = LocalHetuTokens.current.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Row(verticalAlignment = Alignment.CenterVertically, content = actions)
     }

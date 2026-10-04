@@ -29,7 +29,20 @@ public final class BootReceiver extends BroadcastReceiver {
 
         boolean bootOrUnlock=Intent.ACTION_BOOT_COMPLETED.equals(action)||Intent.ACTION_USER_UNLOCKED.equals(action);
         if (!bootOrUnlock) return;
+        if(prefs.getBoolean("proxyRootAutoStart",false)&&prefs.getBoolean("proxyRootAutoStartInstalled",false)
+                &&!prefs.getBoolean("proxyRootWanted",false)){
+            // Native service.d can restore before credential storage unlock. This
+            // action adopts only a confirmed native start from this boot; it never
+            // turns a same-boot manual stop back into wanted=true.
+            try{
+                Intent sync=new Intent(context,ProxyNetworkMatchService.class).setAction(RootAutostart.ACTION_RUNNING);
+                if(android.os.Build.VERSION.SDK_INT>=26)context.startForegroundService(sync);else context.startService(sync);
+            }catch(Exception e){prefs.edit().putString("proxyRootBootError","开机状态同步未启动："+e.getClass().getSimpleName()).apply();}
+            return;
+        }
         if (prefs.getBoolean("proxyRootAutoStart", false) && prefs.getBoolean("proxyRootWanted", false)) {
+            // The previous boot's success must not be presented as this attempt.
+            prefs.edit().remove("proxyRootBootRestoreSuccessAt").apply();
             try {
                 Intent restore=new Intent(context,ProxyNetworkMatchService.class)
                         .setAction(ProxyNetworkMatchService.ACTION_BOOT_RESTORE);

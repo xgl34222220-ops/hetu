@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu
 
+
 import io.github.xgl34222220.hetu.ui.HetuPageHeader
 
 import io.github.xgl34222220.hetu.ui.ReferenceButton as Button
@@ -253,7 +254,7 @@ private fun ProxyPolicyIconsScreen(onBack: () -> Unit) {
                             OutlinedButton(
                                 onClick = {
                                     importName = name
-                                    imagePicker.launch(arrayOf("image/png", "image/jpeg", "image/webp", "image/svg+xml"))
+                                    launchDocumentPicker({ message = it }) { imagePicker.launch(arrayOf("image/png", "image/jpeg", "image/webp", "image/svg+xml")) }
                                 },
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(16.dp),

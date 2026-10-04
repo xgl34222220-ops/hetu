@@ -201,9 +201,9 @@ final class MihomoControllerClient {
                 String status=URLEncoder.encode(expectedRange,"UTF-8");
                 return request(
                     "GET",
-                    "/group/"+Uri.encode(group)+"/delay?timeout=10000&url="+test+"&expected="+status,
+                    "/group/"+Uri.encode(group)+"/delay?timeout=5000&url="+test+"&expected="+status,
                     null,
-                    15000
+                    7000
                 );
             }catch(Exception e){last=e;}
         }

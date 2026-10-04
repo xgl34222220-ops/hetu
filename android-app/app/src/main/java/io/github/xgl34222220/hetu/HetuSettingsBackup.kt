@@ -19,10 +19,12 @@ internal object HetuSettingsBackup {
         "liquidGlass",
         "floatingBottomBar",
         "showPanelTab",
+        "showPanelDock",
         "latencyAutoRefreshSeconds",
         "downloadMirrorEnabled",
         "downloadMirrorPrefix",
         "defaultPanelTab",
+        "defaultPanelSection",
         "startOnPanel",
         "appearance",
         "enableMonet",
@@ -164,11 +166,15 @@ internal object HetuSettingsBackup {
                 }
             }
         }
-        editor.apply()
-
+        val originalSelections = ProxyRuntimeProfile.Core.values().associate { core ->
+            core.id to prefs.getString("proxySelectedConfig.${core.id}", null)
+        }
+        val restoredNames = mutableMapOf<Pair<String, String>, String>()
+        var completed = false
         val library = ProxyConfigLibrary(app)
         val configs = root.optJSONArray("configs") ?: JSONArray()
         var restored = 0
+        try {
         for (i in 0 until configs.length()) {
             val item = configs.optJSONObject(i) ?: continue
             val coreId = item.optString("core")
@@ -179,13 +185,34 @@ internal object HetuSettingsBackup {
             if (bytes.isEmpty() || bytes.size > 4 * 1024 * 1024) continue
             val text = runCatching { bytes.toString(Charsets.UTF_8) }.getOrNull() ?: continue
             val existing = library.list(core).firstOrNull { it.name == name }
-            if (existing != null) {
-                library.write(existing, text)
-            } else {
-                library.importConfig(core, name, ByteArrayInputStream(bytes))
-            }
+            // Identical files are reused; conflicts go through the library's unique-name
+            // import path. A restore must never destroy an existing configuration.
+            val restoredName = if (existing != null && library.read(existing) == text) existing.name
+                else library.importConfig(core, name, ByteArrayInputStream(bytes)).name
+            restoredNames[core.id to name] = restoredName
             restored++
         }
+        // importConfig selects each imported file. Restore the backup's selected-file
+        // identity only after its copied name is known; unrelated selections stay put.
+        ProxyRuntimeProfile.Core.values().forEach { core ->
+            val key = "proxySelectedConfig.${core.id}"
+            val selected = settings.optJSONObject(key)?.takeIf { it.optString("t") == "s" }?.optString("v")
+            val remapped = selected?.let { restoredNames[core.id to it] }
+            val desired = remapped ?: originalSelections[core.id]
+            if (desired == null) editor.remove(key) else editor.putString(key, desired)
+        }
+        check(editor.commit()) { "无法保存恢复的设置" }
+        completed = true
         restored
+        } finally {
+            if (!completed) {
+                val rollbackSelection = prefs.edit()
+                originalSelections.forEach { (coreId, name) ->
+                    val key = "proxySelectedConfig.$coreId"
+                    if (name == null) rollbackSelection.remove(key) else rollbackSelection.putString(key, name)
+                }
+                rollbackSelection.commit()
+            }
+        }
     }
 }
