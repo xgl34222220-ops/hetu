@@ -1,0 +1,238 @@
+{
+  "schema": 1,
+  "version": "V20.83",
+  "branch": "test/v20.76-new-ui",
+  "compiledCandidateCommit": "a93a756d8578cf3afa60ee090405535ad097e49e",
+  "productionInputsLastChangedAt": "b39ed1e83be84b6e933f92858b8b3b4bbe21f323",
+  "identity": {
+    "package": "io.github.xgl34222220.hetu",
+    "versionCode": 2083,
+    "versionName": "0.12.13-v20-ui",
+    "rootRuntime": 151,
+    "certificateSha256": "701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad"
+  },
+  "changes": [
+    "Retain existing home/panel layouts; actual pull refresh, accessible refresh actions and reduced-motion-aware interaction feedback",
+    "Read configured strategy-group artwork through the existing repository in one and two columns; clear stale artwork",
+    "Roomier 92dp default expanded node cards, 48dp touch targets and automatic single-column large-font layout",
+    "Complete tool/configuration/diagnostic and settings routes against the provided concepts; preserve actual operations and editor return stack",
+    "Keep tool actions above the dock; preserve notification targets/drafts and configuration/core readback boundaries"
+  ],
+  "failedRunsRetained": [
+    37232745854,
+    37233387401,
+    37233955357,
+    37235588226,
+    37236752423,
+    37238394831
+  ],
+  "visualReview": {
+    "reviewedRun": 37236752423,
+    "ui83Captures": 8,
+    "correctedSettingsCaptures": 6,
+    "blockingClippingOrOcclusionObserved": false,
+    "sourceIdentityMustMatchFinalRun": true,
+    "identicalCapturesInBuildEvidenceRun": 14,
+    "byteDifferences": 0,
+    "latestBuildRun": 37240041766,
+    "blockingClippingOrOcclusionObservedInInstalledToolsSettingsAbout": false,
+    "installedNativeWebViewStatesManuallyReviewed": 5,
+    "pixelExactPass": false
+  },
+  "limitations": [
+    "173-state capture inventory does not establish pixel-exact parity.",
+    "Fresh AOSP fixture checks do not establish K80/OEM/KernelSU, real Root boot, long-term Google/WeChat connectivity or real GPU blur/frame-rate acceptance."
+  ],
+  "validationStatus": "verified_build_and_guarded_installation",
+  "installationTestCommit": "a93a756d8578cf3afa60ee090405535ad097e49e",
+  "buildEvidence": {
+    "ciRun": 37240041766,
+    "attempt": 1,
+    "head": "a93a756d8578cf3afa60ee090405535ad097e49e",
+    "overallRunStatusAtRecordTime": "in_progress",
+    "overallRunConclusion": null,
+    "boundary": "Build and historical crash jobs passed. Redundant installation jobs in this full run are still running; their outcome is not claimed. Complete API35/36 installation acceptance is independently established by the successful guarded workflow on this same source tree and exact APK.",
+    "buildJob": {
+      "id": 111546766975,
+      "conclusion": "success"
+    },
+    "historicalCrashJob": {
+      "id": 111546767044,
+      "conclusion": "success"
+    },
+    "units": {
+      "tests": 392,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xmlFiles": 42
+    },
+    "lint": {
+      "Error": 0,
+      "Fatal": 0,
+      "Warning": 298
+    },
+    "apk": {
+      "name": "Hetu-0.12.13-v20-ui.apk",
+      "bytes": 134721428,
+      "sha256": "24f96438c1ebe1e648e23352e1191aa91ab472ee938cc62e1eba39dd2abe7c57",
+      "sameBytesAsLocallyVerifiedTransfer": true,
+      "all23RuntimePayloadsVerified": true
+    },
+    "sourceProof": {
+      "baseCommit": "37e963d488a38900263e33cb8b2047f487bd6dcf",
+      "baseRun": 37171744564,
+      "archiveSha256": "6190b4fd4fcd011cae77e81cdd33b5270e557194c56bf88d0a824d74d811b730",
+      "integrationPatchSha256": "3f08f86d8413c9a905de1eae0c5347e8f7c5dd4032ee4a8e6181d439abda7002",
+      "baselineFiles": 307,
+      "changedOrAddedFiles": 31,
+      "checkoutMatchesGeneratedSource": true,
+      "historicPatchesAppliedToCheckout": false,
+      "presentationLayer": {
+        "baseCommit": "aa599a53856fb26b4d256ba345a496b2a178b3b8",
+        "baseRun": 37211142058,
+        "patchSha256": "a466e4fce0e2e4ec9564760a1089b250f24d90032b123faea90fcee4c241e514",
+        "changedOrAddedFiles": 68,
+        "protectedRuntimeUnchanged": true
+      }
+    },
+    "abi": {
+      "apkSha256": "24f96438c1ebe1e648e23352e1191aa91ab472ee938cc62e1eba39dd2abe7c57",
+      "dexCount": 12,
+      "constructorReferences": 687,
+      "missingConstructors": [],
+      "compatible": true,
+      "expectedIncompatibleBaseline": false
+    },
+    "nativeScrollHostTests": 13,
+    "visual": {
+      "reviewedCaptures": 14,
+      "byteDifferencesFromPreviouslyReviewedCaptures": 0
+    }
+  },
+  "installationEvidence": {
+    "ciRun": 37240041754,
+    "attempt": 1,
+    "head": "a93a756d8578cf3afa60ee090405535ad097e49e",
+    "conclusion": "success",
+    "fixedApplicationBuildRun": 37238394831,
+    "fixedApplicationCommit": "7d082aca02345efb75a5d1e2b83fc6529232d455",
+    "sameApkBytesAsCurrentBuild": true,
+    "api35": {
+      "job": 111546766773,
+      "conclusion": "success",
+      "artifact": 11316752707,
+      "passedChecks": 59,
+      "paletteChecks": 21,
+      "rootMutationActions": 0,
+      "fixtureOnly": true,
+      "nativeScrollHostTests": 13,
+      "proof": {
+        "applicationCommit": "7d082aca02345efb75a5d1e2b83fc6529232d455",
+        "installationTestCommit": "a93a756d8578cf3afa60ee090405535ad097e49e",
+        "androidAppTree": "2c698fb681f647e4c3a1d0050bf806a9f4cc5de2",
+        "buildRun": 37238394831,
+        "buildAttempt": 1,
+        "buildJob": 111542001292,
+        "apkArtifact": 11315943930,
+        "apkSha256": "24f96438c1ebe1e648e23352e1191aa91ab472ee938cc62e1eba39dd2abe7c57",
+        "apkBytes": 134721428,
+        "sourceCompilationUnchanged": true,
+        "reusedUnitTests": {
+          "tests": 392,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "runtimePayloadsVerified": 23,
+        "abiConstructors": 687,
+        "certificateSha256": "701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad",
+        "changedTestInfrastructure": [
+          ".github/scripts/fixtures/scroll-settings-dock-clearance.xml",
+          ".github/scripts/native_scroll_bounds.py",
+          ".github/scripts/test_native_scroll_bounds.py",
+          ".github/scripts/verify_ui83_reused_apk.py",
+          ".github/workflows/ui-v83-install-validation.yml",
+          "docs/ci/V20.83_SIXTH_FAILURE.json"
+        ],
+        "rootMutationActions": 0,
+        "boundary": "Build evidence belongs to the fixed application commit; this continuation executes current installation tests only."
+      },
+      "limitations": "Fresh AOSP emulator. Five populated native-WebView states use an isolated loopback fixture with deliberate HTTP503 switch rejection. No K80, real core, Root boot or actual network validation.",
+      "frameProof": {
+        "uniqueNativeWebViewFrames": 5,
+        "frameHashes": {
+          "reference-03B-040-native-overview.png": "b79efd63b6d45ec9e4f016ebc5b49fec388b81ca22cd340c200e21d39628dcfa",
+          "reference-03B-041-native-groups.png": "c67d410f2707294cdf2f47e20ab1a2ae893ae62ae4f0db6e6b25ffe8d4209a43",
+          "reference-03B-042-native-connections.png": "8417e137f318fded6b12153358649658353f5698256248489c546697f65925d8",
+          "reference-03B-043-native-node-dialog.png": "37068287465220888f3fabc552c48759ac99d34d5611fff28b238ba7fe1b5841",
+          "reference-03B-044-native-switch-failure.png": "b03b1c1aa81cbf1ca26f9f33f8c183bf24d4f2b1775ce9f4cc3e0c2d34772d29"
+        },
+        "actualFixturePutObserved": true
+      }
+    },
+    "api36": {
+      "job": 111546766922,
+      "conclusion": "success",
+      "artifact": 11317626917,
+      "passedChecks": 59,
+      "paletteChecks": 21,
+      "rootMutationActions": 0,
+      "fixtureOnly": true,
+      "nativeScrollHostTests": 13,
+      "proof": {
+        "applicationCommit": "7d082aca02345efb75a5d1e2b83fc6529232d455",
+        "installationTestCommit": "a93a756d8578cf3afa60ee090405535ad097e49e",
+        "androidAppTree": "2c698fb681f647e4c3a1d0050bf806a9f4cc5de2",
+        "buildRun": 37238394831,
+        "buildAttempt": 1,
+        "buildJob": 111542001292,
+        "apkArtifact": 11315943930,
+        "apkSha256": "24f96438c1ebe1e648e23352e1191aa91ab472ee938cc62e1eba39dd2abe7c57",
+        "apkBytes": 134721428,
+        "sourceCompilationUnchanged": true,
+        "reusedUnitTests": {
+          "tests": 392,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "runtimePayloadsVerified": 23,
+        "abiConstructors": 687,
+        "certificateSha256": "701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad",
+        "changedTestInfrastructure": [
+          ".github/scripts/fixtures/scroll-settings-dock-clearance.xml",
+          ".github/scripts/native_scroll_bounds.py",
+          ".github/scripts/test_native_scroll_bounds.py",
+          ".github/scripts/verify_ui83_reused_apk.py",
+          ".github/workflows/ui-v83-install-validation.yml",
+          "docs/ci/V20.83_SIXTH_FAILURE.json"
+        ],
+        "rootMutationActions": 0,
+        "boundary": "Build evidence belongs to the fixed application commit; this continuation executes current installation tests only."
+      },
+      "limitations": "Fresh AOSP emulator. Five populated native-WebView states use an isolated loopback fixture with deliberate HTTP503 switch rejection. No K80, real core, Root boot or actual network validation.",
+      "frameProof": {
+        "uniqueNativeWebViewFrames": 5,
+        "frameHashes": {
+          "reference-03B-040-native-overview.png": "362942f7b92c3211d5c00345ad06eedc1f2034273dc60bc516da704c90b5b895",
+          "reference-03B-041-native-groups.png": "8aa32eb7ed00a70abccdce1b4461c40036c3e645be6373b42f17c435d666a443",
+          "reference-03B-042-native-connections.png": "a6e3664cfe2ef51adb6a860273475daa274dec8359754167049f5c9052a13389",
+          "reference-03B-043-native-node-dialog.png": "3018c5e5f122a9582a9ef9679dd279c414e95102a49589974a796e5f8aa348ff",
+          "reference-03B-044-native-switch-failure.png": "9b10a668fa11e9fdb8ed7d9b33aba925b85b22b648bb3b9a7a628e9127dc3237"
+        },
+        "actualFixturePutObserved": true
+      }
+    },
+    "guards": [
+      "Exact Android source tree and allowlisted test-infrastructure-only diff",
+      "Pinned run/attempt, successful build and historical-crash jobs, artifact ZIP digests",
+      "APK bytes/hash, version/package and original certificate",
+      "42 JUnit XML files: 392 tests, no failures/errors/skips; lint zero Error/Fatal",
+      "687 ABI constructor references, zero missing; all 23 runtime payloads"
+    ]
+  },
+  "combinedVerified": true,
+  "recordedAtUtc": "2026-10-04T22:50:24.991Z",
+  "evidenceBoundary": "Current a93 source was freshly compiled and its 392 tests rerun in CI37240041766. The guarded installation continuation reuses the identical earlier compiled APK; it is not itself a rebuild. All six earlier failed runs remain failed and retain their original records."
+}

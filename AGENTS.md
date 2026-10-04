@@ -1,4 +1,14 @@
-## 当前续接：V20.81 合法栈位置（全量CI已核实通过）
+## 当前交付：V20.83 工具、设置与首页面板交互（构建及独立安装验收通过）
+
+继续原 `test/v20.76-new-ui`；实际编译提交 `a93a756d8578cf3afa60ee090405535ad097e49e`。首页/面板沿用已有 UI，仅补实际下拉刷新、动效、配置图标读取与节点展开尺寸；完成工具、配置、日志、诊断与设置页面，保留真实功能回调及编辑器返回状态。有效运行源码仍以 V20.81 `37e963d4` 为基底，UI 基底 `aa599a53`；生成源码与 checkout 一致，68 项 UI 输入补丁 SHA256 `a466e4fce0e2e4ec9564760a1089b250f24d90032b123faea90fcee4c241e514`，受保护运行源码不变。
+
+Actions `37240041766` 的 build `111546766975` 与旧 V20.74/API36 闪退复现 job `111546767044` 均 success；实际 42 XML / 392 tests / 0 failures/errors/skipped，lint 0 Error/Fatal、298 Warning，13 项实际滚动边界 host 回归、687 ABI 构造引用零缺失、23 载荷与固定签名通过。该 full run 的重复安装 job 在记录时仍运行，不能称其全量 success。独立固定 APK 安装续测 `37240041754` 已整体 success：API35 `111546766773`、API36 `111546766922` 各 59 项检查（各 21 配色）通过，原诊断/存储/历史/拒绝 Root/原生 WebView/HTTP503 断言保留，5 个原生 WebView 状态各不相同，Root mutation 0。续测严格固定原构建、源码树、两类 job、artifact ZIP 摘要及 APK；原应用编译 `7d082aca` 的相同 APK 又由当前 a93 原 workflow 独立重建并重跑 392 项，不把续测本身描述成重新编译。完整证据见 `docs/ci/V20.83_RESULT.json`。
+
+交付 `Hetu-0.12.13-v20-ui.apk`：134721428 bytes，SHA256 `24f96438c1ebe1e648e23352e1191aa91ab472ee938cc62e1eba39dd2abe7c57`；versionCode 2083，Root runtime 151，证书 SHA256 `701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad`。分块与完整 APK、23 项载荷逐项回读通过，14 张已审阅截图在后续构建中字节一致。全部六轮失败及修复记录保留于 `docs/ci/V20.83_*_FAILURE.json`，不覆盖失败结论。本记录之后的提交仅为文档，不作为已编译提交。
+
+原核心/native/service.d、Root、签名、Manifest/权限及依赖边界保持；无 hook，不合并主分支或正式发布，不操作用户设备/安全网络设置、不永久删除数据。截图清单不等于像素一比一验收；安装仅 AOSP 隔离夹具，K80/OEM/KernelSU、真机 Root 自启、长期 Google/微信网络、GPU 模糊与帧率仍未验证。
+
+## 此前续接：V20.81 合法栈位置（全量CI已核实通过）
 
 沿原test/v20.75-theme-compat，应用37e963d4 / Actions37171744564 attempt1四job全部success；实际348单测0fail/error/skipped，JournalReliability21执行，6host+60shell、过滤ENOENT、lint0error、687ABI/23载荷/固定签名通过；API35/36各56（各21配色），Root mutation0。符号夹具旧捕获/复制三处redacted，新保留Kotlin短横线及init/clinit，5类恶意符号仍拒绝；安装报告位置/UUID/脱敏/满额旧段保留通过。实际下载APK133353242 bytes，SHA2561319ef860d4aedcfcb4e57f029df0a45e285d67ad7dcd3415a7d8c0cb1dbe425，23载荷逐项回读匹配。详见docs/ci/V20.81_RESULT.json、docs/V20.81_TRACE_SYMBOLS.md。
 
