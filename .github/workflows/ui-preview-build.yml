@@ -62,6 +62,26 @@ jobs:
         working-directory: android-app
         run: gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:assembleDebug --stacktrace
 
+      - name: Verify APK signatures (v1+v2)
+        run: |
+          set -euo pipefail
+          APK=android-app/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          echo "--- v1 (JAR) signature files ---"
+          unzip -l "$APK" | grep -E 'META-INF/.*\.(SF|RSA)' || { echo 'MISSING v1 signature'; exit 1; }
+          echo "--- v2 (APK Signature Scheme) block ---"
+          python3 - "$APK" <<'EOF'
+          import struct, sys
+          p = sys.argv[1]
+          with open(p,'rb') as f:
+              data = f.read()
+          eocd = data.rfind(b'PK\x05\x06')
+          cd_offset = struct.unpack('<I', data[eocd+16:eocd+20])[0]
+          assert data[cd_offset-16:cd_offset] == b'APK Sig Block 42', 'MISSING v2 signing block'
+          print('v2 signing block present, size', len(data), 'bytes')
+          EOF
+          echo "SIGNATURES OK"
+
       - uses: actions/upload-artifact@v4
         with:
           name: hetu-ui-preview-apk

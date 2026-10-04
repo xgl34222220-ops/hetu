@@ -31,6 +31,10 @@ android {
                 keyAlias = "androiddebugkey"
                 keyPassword = "android"
             }
+            // Belt and suspenders: ensure both JAR (v1) and APK Signature Scheme v2
+            // signatures are emitted so the APK installs on every Android version.
+            isV1SigningEnabled = true
+            isV2SigningEnabled = true
         }
     }
 
