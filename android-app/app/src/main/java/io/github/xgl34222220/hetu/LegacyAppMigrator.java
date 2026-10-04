@@ -115,6 +115,13 @@ final class LegacyAppMigrator {
 
     private static boolean portableKey(String key) {
         if (key == null || key.isEmpty() || key.startsWith("proxySelectedConfig.")) return false;
+        // Local controller identity belongs to this installation and its deployed
+        // runtime. Importing the old app's secret breaks an already running core.
+        // User-entered proxyCustomApi* settings remain portable.
+        if (key.equals("proxyControllerSecret") || key.equals("proxyControllerPort")
+                || key.equals("proxyRootWanted") || key.equals("proxyRootHealthProbeElapsed")
+                || key.equals("proxyRootAppliedSettings") || key.equals("proxyRootTopologyFingerprint")
+                || key.equals("proxyRootValidatedFingerprint") || key.equals("proxyRootCapabilityFingerprint")) return false;
         String low = key.toLowerCase(Locale.ROOT);
         if (low.contains("runtime") || low.contains("session") || low.contains("error")
                 || low.contains("uilast") || low.contains("logoffset") || low.contains("counter")) return false;

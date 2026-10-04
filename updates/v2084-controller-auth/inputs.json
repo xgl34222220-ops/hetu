@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "baseCommit": "a93a756d8578cf3afa60ee090405535ad097e49e",
+  "baseRun": 37240041766,
+  "baseAndroidAppTree": "2c698fb681f647e4c3a1d0050bf806a9f4cc5de2",
+  "previousInputsSha256": "d5e3c4811f3b3ff579a6b12abb6543c4b4a0c8631fa29f461c711ca198a4b081",
+  "previousPatchSha256": "a466e4fce0e2e4ec9564760a1089b250f24d90032b123faea90fcee4c241e514",
+  "versionCode": 2084,
+  "versionName": "0.12.14-v20-auth",
+  "baselineUnitTests": 392,
+  "expectedUnitTests": 422,
+  "newTestClasses": [
+    "ToastFeedbackTest",
+    "ControllerAuthenticationTest",
+    "LegacyControllerCredentialTest",
+    "ControllerReadStateTest",
+    "PanelControllerErrorTest"
+  ],
+  "newTestCounts": {
+    "ToastFeedbackTest": 6,
+    "ControllerAuthenticationTest": 11,
+    "LegacyControllerCredentialTest": 3,
+    "ControllerReadStateTest": 6,
+    "PanelControllerErrorTest": 4
+  },
+  "changedOrAddedFiles": {
+    "android-app/app/build.gradle.kts": "ca90b1a305d918600ccd136327c561efe935f98d0cd16ac91961837caf20e4f2",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/LegacyAppMigrator.java": "d55cb6b054e8c31abb856b78e045704d1327a6cb17feabadf268090d12ae8cf4",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java": "3f9a74fabf14f624dbf20c274af01bfa9f4f61b78330bcfe373188ecf4e24a84",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt": "03c10f3b28d78677e1c96ecc9ae2dc191c2d29469ea8d9c5829a86be07ddd99e",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt": "39d8aaa0d9baa4323e82d74d72c77925f0a4c9d77cd57247f146d1bce24dfba8",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt": "55082ac3ec11586fbd368216f1b8f01129042015b0129c0fedd7efd5c9baae69",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt": "d5842629a9393a76923aee7612b5ca7be77a38ab9e903f56b5c2228efb9ac510",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt": "1ca08f6b12500b734e299605916150410c84c6e5f5ec6b5ef8a869e6133fe97d",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelOverlays.kt": "f068702e01fe4c3d41773de22d4f1a326aaede3843033e5c1cc5839118f63cd4",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt": "393bbe3130133cfb9d0757d7ba4ccbe7a6e0690ef8e82af4ae818c545ba7cd26",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerAuthenticationTest.kt": "3102f56bef1b548b81fc4f3b3afbbee6e6add701eeee755a4cb9ff71a037a098",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerReadStateTest.kt": "6e59e8d83ed822a000efe2896cf76d7fcbb8b8ce5aa00fed3c1963a4fcbedaf0",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/LegacyControllerCredentialTest.kt": "1bba913d3184ed507b61b7cfdd64a9eb9cb0b9cd788ba3a89ab62b0ead384767",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelControllerErrorTest.kt": "01757ef4f531771e81231a693f18c57dc1c3f07ec84a1fa4b2d5618525cbe44b",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ToastFeedbackTest.kt": "ae26843b462f915b7976f3f9f086303c8983313c84d6ee612490ecd6f5c68b3e"
+  },
+  "runtimePayloadsUnchanged": true,
+  "dependenciesUnchanged": true,
+  "manifestAndPermissionsUnchanged": true,
+  "unchangedOutsideAuthScope": true,
+  "reproducedSourceMatchesCheckout": true,
+  "patchSha256": "18eea25566d10d66b756d25cb539c3211d339f7828efc4c45abe4faa26087d9c"
+}

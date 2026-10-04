@@ -107,7 +107,9 @@ internal fun PanelSheetBody(
 ) {
     when (overlay) {
         PanelOverlay.LayoutSheet -> LayoutSheet(view, onView, onOverlay, actions.onOpenPolicyIcons)
-        PanelOverlay.ApiSheet -> ApiSheet(view.api, onCancel = { onOverlay(PanelOverlay.LayoutSheet) }) { saved ->
+        PanelOverlay.ApiSheet, PanelOverlay.ApiReadErrorSheet -> ApiSheet(view.api, onCancel = {
+            onOverlay(if (overlay == PanelOverlay.ApiReadErrorSheet) null else PanelOverlay.LayoutSheet)
+        }) { saved ->
             onView(view.copy(api = saved)); actions.onSaveApi(saved); onOverlay(null)
         }
         is PanelOverlay.NodeInfo -> NodeInfoSheet(overlay.node, data, onClose = { onOverlay(null) }, onTest = { actions.onTestNode(overlay.node) }, onCopy = { actions.onCopy("节点名称", overlay.node) })
@@ -218,7 +220,7 @@ private fun ApiSheet(saved: PanelApiSettings, onCancel: () -> Unit, onSave: (Pan
                 PanelSwitchRow("流量与连接历史", draft.history, { edit(draft.copy(history = it)) }, subtitle = "保存最近 24 小时排行所需的数据")
             }
             HomeCard(Modifier.fillMaxWidth(), background = c.bg) {
-                PanelSwitchRow("外部 Clash API", draft.externalApi, { edit(draft.copy(externalApi = it)) }, subtitle = if (draft.externalApi) "使用自定义控制器" else "内置 127.0.0.1:9090")
+                PanelSwitchRow("外部 Clash API", draft.externalApi, { edit(draft.copy(externalApi = it)) }, subtitle = if (draft.externalApi) "使用自定义控制器" else "使用河图本机核心")
                 if (draft.externalApi) Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Column(Modifier.weight(1f)) {

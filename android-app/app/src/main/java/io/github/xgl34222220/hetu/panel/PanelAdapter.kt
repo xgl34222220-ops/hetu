@@ -137,7 +137,8 @@ internal fun HetuPanelV2(
         }
     }
     LaunchedEffect(state.uploadTotal, state.downloadTotal, state.connections) {
-        if (state.running) sampler.sample(SystemClock.elapsedRealtime(), state.uploadTotal, state.downloadTotal, state.connections)
+        if (state.running && state.panelReady && !state.controllerReadFailed)
+            sampler.sample(SystemClock.elapsedRealtime(), state.uploadTotal, state.downloadTotal, state.connections)
     }
     // An optimistic selection is dropped as soon as the core reports the same node.
     LaunchedEffect(state.groups) { state.groups.forEach { g -> if (selectedLocal[g.name] == g.now) selectedLocal.remove(g.name) } }
@@ -342,6 +343,8 @@ private fun buildPanelData(
     sampler: PanelTrafficSampler,
 ): PanelData {
     if (!state.running) return PanelData(status = if (starting) PanelStatus.Starting else PanelStatus.NotRunning)
+    if (state.controllerReadFailed) return PanelData(status = PanelStatus.Running,
+        readError = state.controllerError.ifBlank { "控制接口读取失败，请重试或检查 API 设置" })
     val groupNames = state.groups.mapTo(HashSet()) { it.name }
     val groups = state.groups.map { g ->
         PanelGroup(
@@ -620,8 +623,9 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
         "logs" -> PanelTab.Logs
         else -> PanelTab.Groups
     }
-    LaunchedEffect(tab, vm.state.running) {
+    LaunchedEffect(tab, vm.state.running, vm.state.controllerReadFailed) {
         if (!vm.state.running) { sampler.reset(); return@LaunchedEffect }
+        if (vm.state.controllerReadFailed) return@LaunchedEffect
         when (tab) {
             PanelTab.Overview -> { vm.loadProviders(); if (vm.rules.isEmpty()) vm.loadRules() }
             PanelTab.Subscriptions -> vm.loadProviders()
@@ -637,7 +641,9 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
     LaunchedEffect(vm.state.running) {
         if (!vm.state.running) { sampler.reset(); return@LaunchedEffect }
         while (true) {
-            sampler.sample(SystemClock.elapsedRealtime(), vm.state.uploadTotal, vm.state.downloadTotal, vm.state.connections)
+            if (vm.state.panelReady && !vm.state.controllerReadFailed) {
+                sampler.sample(SystemClock.elapsedRealtime(), vm.state.uploadTotal, vm.state.downloadTotal, vm.state.connections)
+            }
             delay(1_000)
         }
     }
@@ -647,7 +653,7 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
     val data = buildPanelData(vm.state, vm.operation == io.github.xgl34222220.hetu.HxRunOp.Start,
         vm.providers, vm.rules, vm.ruleSets, vm.logEntries, vm.delays, vm.testingNodes,
         emptyMap(), updates(vm.providerTasks), updates(vm.ruleSetTasks), sampler).copy(
-        refreshing = when (tab) {
+        refreshing = if (vm.state.controllerReadFailed) vm.refreshing else when (tab) {
             PanelTab.Rules -> vm.rulesLoading
             PanelTab.RuleSets -> vm.ruleSetsLoading
             PanelTab.Logs -> vm.logsLoading
@@ -666,11 +672,12 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
             io.github.xgl34222220.hetu.PanelApiDraft11(it.customTestUrl, it.testUrl, it.history,
                 it.externalApi, it.host, it.port, it.secret).save(vm.prefs)
             vm.bumpSettings()
+            vm.pullRefresh()
         },
         onOpenPolicyIcons = { context.startActivity(Intent(context, ProxyPolicyIconsActivity::class.java)) },
         onCopy = { label, text -> copyToClipboard(context, label, text) },
         onRefresh = {
-            when (tab) {
+            if (vm.state.controllerReadFailed) vm.pullRefresh() else when (tab) {
                 PanelTab.Rules -> vm.loadRules()
                 PanelTab.RuleSets -> vm.loadRuleSets()
                 PanelTab.Logs -> vm.loadLogs()

@@ -191,6 +191,8 @@ internal data class PanelData(
     val logs: List<PanelLogEntry> = emptyList(),
     /** Owns the pull indicator; false only after the real read finishes or is cancelled. */
     val refreshing: Boolean = false,
+    /** A failed controller read is unavailable data, never an empty live snapshot. */
+    val readError: String = "",
 ) {
     val running: Boolean get() = status == PanelStatus.Running
 
@@ -302,6 +304,8 @@ internal sealed interface PanelOverlay {
     /* bottom sheets */
     data object LayoutSheet : PanelOverlay
     data object ApiSheet : PanelOverlay
+    /** Direct entry from a failed read; cancel returns to the panel, not the layout sheet. */
+    data object ApiReadErrorSheet : PanelOverlay
     data class NodeInfo(val node: String) : PanelOverlay
     data class ConnectionDetail(val id: String) : PanelOverlay
 
@@ -310,7 +314,7 @@ internal sealed interface PanelOverlay {
 
     val isMenu: Boolean get() = this is GroupFilterMenu || this is RankModeMenu || this is RankCountMenu ||
         this is ConnFilterMenu || this is ConnSortMenu || this is ConnMoreMenu || this is LogOrderMenu
-    val isSheet: Boolean get() = this is LayoutSheet || this is ApiSheet || this is NodeInfo || this is ConnectionDetail
+    val isSheet: Boolean get() = this is LayoutSheet || this is ApiSheet || this is ApiReadErrorSheet || this is NodeInfo || this is ConnectionDetail
 }
 
 /** Everything the panel asks its host to do. Defaults are no-ops so previews need nothing. */

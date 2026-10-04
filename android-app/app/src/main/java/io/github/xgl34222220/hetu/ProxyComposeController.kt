@@ -95,6 +95,8 @@ internal data class ProxyComposeState(
     val config: String = "尚未选择配置",
     val message: String = "",
     val panelReady: Boolean = false,
+    val controllerReadFailed: Boolean = false,
+    val controllerError: String = "",
     val groups: List<ProxyGroupUi> = emptyList(),
     val connections: List<ProxyConnectionUi> = emptyList(),
     val downloadTotal: Long = 0,
@@ -142,7 +144,8 @@ internal class ProxyComposeController(context: Context) {
         val selected = configs.selected(profile.core)
         val iconMap = try {
             if (selected == null) emptyMap() else parseGroupIcons(configs.read(selected))
-        } catch (_: Exception) { emptyMap() }
+        } catch (cancel: CancellationException) { throw cancel }
+        catch (_: Exception) { emptyMap() }
 
         val fastRunning = ProxyStatusBridge.rootProxyRunning(app)
         val nowElapsed = android.os.SystemClock.elapsedRealtime()
@@ -174,7 +177,8 @@ internal class ProxyComposeController(context: Context) {
                         .putBoolean("proxyRootDataPlaneHealthy", live.optBoolean("dataPlaneHealthy", false))
                         .apply()
                 }
-            } catch (error: Exception) {
+            } catch (cancel: CancellationException) { throw cancel }
+            catch (error: Exception) {
                 if (fastRunning) JSONObject()
                     .put("running", true)
                     .put("healthProbeFailed", true)
@@ -218,22 +222,43 @@ internal class ProxyComposeController(context: Context) {
         var up = 0L
         var memory = 0L
         var trafficMode = ""
+        var controllerReadFailed = false
+        var controllerError = ""
 
         if (running) {
-            try { trafficMode = api.configs().optString("mode", "") } catch (_: Exception) { }
             try {
-                groups = parseGroups(mergeProxySnapshots(api.proxies(), api.proxyProviders()), iconMap)
-                panelReady = true
-            } catch (_: Exception) { }
-            try {
+                val freshMode = api.configs().optString("mode", "")
+                val freshGroups = parseGroups(mergeProxySnapshots(api.proxies(), api.proxyProviders()), iconMap)
                 val rawConnections = api.connections()
+                val socketUids = if (needsSocketUidFallback(rawConnections)) readSocketUidMap() else emptyMap()
+                val freshConnections = parseConnections(rawConnections, socketUids)
+                // One complete controller snapshot. Partial reads cannot acknowledge a
+                // selection or publish the absent counters as a fresh zero measurement.
+                trafficMode = freshMode
+                groups = freshGroups
+                connections = freshConnections
                 down = rawConnections.optLong("downloadTotal", 0L)
                 up = rawConnections.optLong("uploadTotal", 0L)
                 memory = rawConnections.optLong("memory", 0L)
-                val socketUids = if (needsSocketUidFallback(rawConnections)) readSocketUidMap() else emptyMap()
-                connections = parseConnections(rawConnections, socketUids)
                 panelReady = true
-            } catch (_: Exception) { }
+            } catch (cancel: CancellationException) { throw cancel }
+            catch (error: Exception) {
+                controllerReadFailed = true
+                val requestWasCustom = (error as? MihomoControllerClient.ControllerHttpException)?.customApi
+                    ?: prefs.getBoolean("proxyCustomApiEnabled", false)
+                val target = if (requestWasCustom) "自定义控制接口" else "本机控制接口"
+                // Do not expose response bodies: they can contain a custom API secret
+                // even when that secret differs from the local controller credential.
+                controllerError = when (error) {
+                    is MihomoControllerClient.ControllerHttpException -> when (error.statusCode) {
+                        401 -> if (requestWasCustom) "$target 认证失败（HTTP 401），请检查 API 地址和 Secret 后刷新"
+                            else "$target 认证失败（HTTP 401），应用密钥与运行核心不一致；请在工具→诊断工具核对运行状态"
+                        403 -> "$target 拒绝访问（HTTP 403），请检查 API 设置后刷新"
+                        else -> "$target 读取失败（HTTP ${error.statusCode}），请稍后刷新"
+                    }
+                    else -> "$target 读取失败，请检查 API 设置后刷新"
+                }
+            }
         }
         ProxyComposeState(
             running = running,
@@ -262,6 +287,8 @@ internal class ProxyComposeController(context: Context) {
                 else -> ""
             },
             panelReady = panelReady,
+            controllerReadFailed = controllerReadFailed,
+            controllerError = controllerError,
             groups = groups,
             connections = connections,
             downloadTotal = down,

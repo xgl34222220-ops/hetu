@@ -128,6 +128,17 @@ internal fun PanelScreen(
                 }
                 return@LazyColumn
             }
+            if (data.readError.isNotBlank()) {
+                item(key = "panel-read-error") {
+                    PanelEmptyState(PanelIcons.CircleX, "无法读取面板", data.readError) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            HomeButton("重试", actions.onRefresh, loading = data.refreshing)
+                            HomeButton("API 设置", { onOverlay(PanelOverlay.ApiReadErrorSheet) }, kind = HomeButtonKind.Primary)
+                        }
+                    }
+                }
+                return@LazyColumn
+            }
             if (view.searching && view.tab.searchable) item(key = "panel-search") {
                 PanelSearchField(view.query, { onView(view.copy(query = it)) }, view.tab.searchHint.orEmpty(), Modifier.panelGutter().padding(bottom = 8.dp), autoFocus = popups)
             }
@@ -166,7 +177,7 @@ internal fun PanelScreen(
         PanelActionBar(data, view, overlay, actions, collapsed, onView, onOverlay, menu)
 
         // 策略: once a group is open, “定位当前节点” and a collapse pill float above the dock.
-        val openGroup = view.expandedGroups.lastOrNull()?.takeIf { running && view.tab == PanelTab.Groups }
+        val openGroup = view.expandedGroups.lastOrNull()?.takeIf { running && data.readError.isBlank() && view.tab == PanelTab.Groups }
         if (openGroup != null) {
             Column(
                 Modifier.align(Alignment.BottomEnd).padding(end = HomeDims.gutter, bottom = (bottomPad - 18.dp).coerceAtLeast(16.dp)),
@@ -227,7 +238,7 @@ private fun PanelActionBar(
                 Modifier.align(if (wide) Alignment.CenterStart else Alignment.Center).padding(horizontal = HomeDims.gutter).alpha(barAlpha),
                 color = c.t1, style = HomeType.barTitle,
             )
-            if (data.running) Row(Modifier.align(Alignment.CenterEnd).padding(end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (data.running && data.readError.isBlank()) Row(Modifier.align(Alignment.CenterEnd).padding(end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 val anchored: @Composable (ImageVector, String, PanelOverlay, Color) -> Unit = { icon, label, target, tint ->
                     Box {
                         HomeIconButton(icon, label, { onOverlay(if (overlay == target) null else target) }, tint = tint)

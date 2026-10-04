@@ -9,7 +9,7 @@ from contextlib import contextmanager
 PKG='io.github.xgl34222220.hetu'
 ADB=str(Path(os.environ['ANDROID_HOME'])/'platform-tools'/'adb')
 OUT=Path(os.environ.get('HETU_SMOKE_OUT','out/android-smoke')); OUT.mkdir(parents=True,exist_ok=True)
-from mock_webview_controller import controller_fixture
+from mock_webview_controller import controller_fixture, panel_controller_fixture, PANEL_AUTH_SECRET
 from native_webview_bounds import webview_bounds
 from native_scroll_bounds import scroll_bounds, scroll_gesture
 checks=[]
@@ -284,6 +284,208 @@ def palette_scripts_cases(component,apk,expect_crash=False):
   adb('shell','am','start','-W','-n',component,timeout=240)
   wait_for_home()
 
+def panel_fixture_target():
+ # Refuse preference injection outside the existing owned fresh AOSP job.
+ serial=adb('get-serialno').strip()
+ assert serial=='emulator-5554',('Not the owned fresh emulator',serial)
+ avd=adb('emu','avd','name').splitlines()
+ assert avd and avd[0].strip()=='hetu-smoke',('Unexpected AVD',avd)
+ assert adb('shell','getprop','ro.kernel.qemu').strip()=='1','Panel fixture requires an emulator'
+ assert adb('shell','id','-u').strip()=='2000','Panel fixture requires the non-root AOSP shell'
+ api=int(adb('shell','getprop','ro.build.version.sdk').strip())
+ assert api in (35,36),('Unexpected fixture API',api)
+ return {'serial':serial,'avd':'hetu-smoke','apiLevel':api,'nonRootShell':True}
+
+def panel_fixture_preferences(original,port):
+ root=ET.fromstring(original)
+ assert root.tag=='map','Expected existing SharedPreferences map'
+ changes={
+  'proxyRootRuntimeRunning':('boolean','true'),'proxyRootWanted':('boolean','true'),
+  'proxyUiLastRunning':('boolean','true'),'startOnPanel':('boolean','true'),
+  'defaultPanelSection':('string','overview'),'proxyRootAutoStart':('boolean','false'),
+  'networkMatchEnabled':('boolean','false'),'latencyAutoRefreshSeconds':('int','0'),
+  'proxyStatusNotificationEnabled':('boolean','false'),
+  'proxyCustomApiEnabled':('boolean','true'),'proxyCustomApiHost':('string','127.0.0.1'),
+  'proxyCustomApiPort':('int',str(port)),
+  'proxyCustomApiSecret':('string',PANEL_AUTH_SECRET),
+  'hetuCiSyntheticCachedRuntimeHint':('boolean','true'),
+ }
+ for key,(kind,value) in changes.items():
+  for node in list(root):
+   if node.get('name')==key:root.remove(node)
+  node=ET.SubElement(root,kind,{'name':key})
+  if kind=='string':node.text=value
+  else:node.set('value',value)
+ return ET.tostring(root,encoding='utf-8',xml_declaration=True)
+
+@contextmanager
+def panel_preferences_fixture(port,report):
+ original=adb('shell','run-as',PKG,'cat','shared_prefs/hetu.xml').encode()
+ replacement=panel_fixture_preferences(original,port) # Validate before force-stop/write.
+ report['originalPreferencesSha256']=hashlib.sha256(original).hexdigest()
+ report['syntheticCachedRuntimeHint']=True
+ try:
+  write_fixture_preferences(replacement)
+  yield
+ finally:
+  write_fixture_preferences(original)
+  restored=adb('shell','run-as',PKG,'cat','shared_prefs/hetu.xml').encode()
+  report['restoredPreferencesSha256']=hashlib.sha256(restored).hexdigest()
+  report['originalPreferencesRestored']=restored==original
+  assert report['originalPreferencesRestored'],'Panel fixture did not restore original preference bytes'
+
+def panel_labels(root):
+ return [value for node in root.iter('node') for key in ('text','content-desc') if (value:=node.get(key,''))]
+
+def assert_native_panel(root):
+ assert not any(node.get('class')=='android.webkit.WebView' for node in root.iter('node')),'Expected actual NativeCompose panel, not WebUI'
+
+def assert_panel_read_failure(root):
+ assert_native_panel(root)
+ labels=panel_labels(root)
+ assert '无法读取面板' in labels and any('HTTP 401' in label for label in labels),labels
+ assert not any(label in ('运行概况','当前连接') for label in labels),'Failed first controller read displayed an overview/counter'
+
+def panel_counter(root,label):
+ # Compose emits separate value/caption accessibility nodes. Pair them by their
+ # actual column positions, rather than accepting an unrelated12/18 elsewhere.
+ captions=[n for n in root.iter('node') if n.get('text')==label]
+ bounds=lambda n:tuple(map(int,re.findall(r'\d+',n.get('bounds',''))))
+ matches=[]
+ for caption in captions:
+  x1,y1,x2,y2=bounds(caption)
+  candidates=[]
+  for node in root.iter('node'):
+   value=node.get('text','')
+   if not re.fullmatch(r'\d+',value):continue
+   a,b,c,d=bounds(node)
+   if x1-4<=(a+c)/2<=x2+4 and 0<=y1-d<=80 and c>a and d>b:
+    candidates.append((y1-d,value))
+  if not candidates:continue # The strip also has a “策略” tab without a value.
+  nearest=min(gap for gap,_ in candidates)
+  values=[value for gap,value in candidates if gap==nearest]
+  assert len(values)==1,('Ambiguous native panel counter',label,values)
+  matches.append(int(values[0]))
+ assert len(matches)==1,('Expected one numeric native panel counter',label,matches)
+ return matches[0]
+
+def capture_panel_when(labels,name,counts=None):
+ deadline=time.monotonic()+120
+ last=[]
+ while time.monotonic()<deadline:
+  root,_=ui();last=panel_labels(root)
+  if all(any(label in value for value in last) for label in labels):
+   try:
+    assert_native_panel(root)
+    if counts is not None:
+     assert {label:panel_counter(root,label) for label in counts}==counts
+   except AssertionError:
+    time.sleep(1);continue
+   root=capture(name)
+   assert_native_panel(root)
+   if counts is not None:assert {label:panel_counter(root,label) for label in counts}==counts
+   return root
+  time.sleep(1)
+ raise AssertionError(('Native panel state did not become visible',name,labels,counts,last))
+
+def tap_panel_retry(root):
+ parents={child:parent for parent in root.iter() for child in parent}
+ matches=[n for n in root.iter('node') if n.get('text')=='重试' or n.get('content-desc')=='重试']
+ assert len(matches)==1,('Expected one real native retry control',len(matches))
+ node=matches[0]
+ while node.get('clickable')!='true' and node in parents:node=parents[node]
+ assert node.get('clickable')=='true' and node.get('enabled')=='true',node.attrib
+ x1,y1,x2,y2=map(int,re.findall(r'\d+',node.get('bounds','')))
+ assert x2>x1 and y2>y1,node.attrib
+ tapped=time.monotonic()
+ adb('shell','input','tap',str((x1+x2)//2),str((y1+y2)//2))
+ return {'timeMonotonic':tapped,'bounds':[x1,y1,x2,y2],'input':'native adb tap'}
+
+def panel_controller_auth_cases(component):
+ target=panel_fixture_target()
+ report={'result':'FAIL','fixtureOnly':True,'syntheticCachedRuntimeHint':True,
+  'rootMutationActions':0,'controllerHost':'127.0.0.1','target':target,
+  'rootHealthEvidence':False,'toast401Claimed':False,
+  'limitations':'Synthetic cached running hint in the owned fresh non-root AOSP sandbox. Loopback401/200 exercises NativeCompose error/recovery only; no real Root/core/network health evidence.'}
+ first_check=len(checks)
+ device_port=29184
+ reverse_before=adb('reverse','--list').splitlines()
+ assert not any(f'tcp:{device_port}' in line.split() for line in reverse_before),'Panel fixture would overwrite an existing adb reverse'
+ reverse_owned=False
+ preferences_entered=False
+ try:
+  with panel_controller_fixture() as (port,requests,mode):
+   try:
+    adb('reverse',f'tcp:{device_port}',f'tcp:{port}');reverse_owned=True
+    with panel_preferences_fixture(device_port,report):
+     preferences_entered=True
+     adb('shell','am','start','-W','-n',component,timeout=240)
+     # startOnPanel/defaultPanelSection are test-only display hints. No proxy
+     # start/restart action, boot broadcast, CDP mutation or API Save is sent.
+     root=capture_panel_when(['无法读取面板','HTTP 401'],'panel-controller-401-first-read')
+     assert_panel_read_failure(root)
+     assert any(r.get('method')=='GET' and r.get('status')==401 for r in requests),requests
+     services=adb('shell','dumpsys','activity','services',PKG)
+     (OUT/'panel-fixture-services.txt').write_text(services)
+     assert 'ServiceRecord' not in services or 'ProxyNetworkMatchService' not in services,'Synthetic Wanted unexpectedly started continuity service'
+     report['continuityServiceObserved']=False
+     checks.append({'name':'panel-controller-401-first-read','result':'passed','evidence':'actual NativeCompose UI/XML + loopback HTTP401'})
+     click('API 设置')
+     root=capture_panel_when(['测速与 API','外部 Clash API'],'panel-controller-401-api-settings')
+     assert 'WebUI' not in panel_labels(root)
+     checks.append({'name':'panel-controller-401-api-settings','result':'passed','evidence':'actual NativeCompose ApiSheet opened by native tap'})
+     adb('shell','input','keyevent','4');time.sleep(1)
+     root=capture_panel_when(['无法读取面板','HTTP 401'],'panel-controller-401-api-return')
+     assert_panel_read_failure(root)
+     denied_tap=tap_panel_retry(root)
+     report['retryWhile401']=denied_tap
+     root=capture_panel_when(['无法读取面板','HTTP 401'],'panel-controller-401-retry')
+     assert_panel_read_failure(root)
+     assert any(r.get('status')==401 and r.get('timeMonotonic',0)>=denied_tap['timeMonotonic'] for r in requests),'No actual HTTP401 request after native retry input'
+     checks.append({'name':'panel-controller-401-retry','result':'passed','evidence':'native retry input while fixture remained401; subsequent HTTP401 and explicit error UI'})
+     report['fixture200AtMonotonic']=time.monotonic();mode.set_status(200)
+     # Send retry using bounds from the just-captured real error state. A2s
+     # foreground poll may win this race; record timing and never claim that
+     # recovery itself proves which request was initiated by the retry.
+     report['retryAfterFixture200']=tap_panel_retry(root)
+     expected={'策略':12,'规则':3,'当前连接':18}
+     root=capture_panel_when(['运行概况'],'panel-controller-200-recovered',expected)
+     assert not any('无法读取面板' in label or 'HTTP 401' in label for label in panel_labels(root)),panel_labels(root)
+     required={'/configs','/proxies','/providers/proxies','/connections','/rules'}
+     succeeded={r['path'] for r in requests if r.get('status')==200 and r.get('valid_fixture_authorization') is True and r.get('timeMonotonic',0)>=report['fixture200AtMonotonic']}
+     assert required<=succeeded,('Recovery lacked complete real controller reads',succeeded)
+     assert all(r.get('valid_fixture_authorization') is True for r in requests if r.get('status')==200),'Controller fixture accepted an unauthenticated200 request'
+     report['actualBearerAuthorizationVerified']=True
+     report['observedNativeCounts']=expected
+     first_success=min(r['timeMonotonic'] for r in requests if r.get('status')==200)
+     report['first200AtMonotonic']=first_success
+     report['recoveryObservation']='poll completed before retry input' if first_success<report['retryAfterFixture200']['timeMonotonic'] else 'retry input preceded successful reads; foreground poll also remained active'
+     report['exclusiveRetryRecoveryClaimed']=False
+     checks.append({'name':'panel-controller-200-recovered','result':'passed','evidence':'actual NativeCompose12 strategies/3 rules/18 connections + complete loopback HTTP200 request log'})
+   except Exception:
+    try:capture('panel-controller-fixture-failure')
+    except Exception:pass
+    raise
+   finally:
+    (OUT/'panel-controller-fixture-requests.json').write_text(json.dumps(requests,ensure_ascii=False,indent=2))
+ finally:
+  try:
+   if reverse_owned:
+    adb('reverse','--remove',f'tcp:{device_port}')
+    reverse_after=adb('reverse','--list').splitlines()
+    report['adbReverseRestored']=sorted(reverse_after)==sorted(reverse_before)
+    assert report['adbReverseRestored'],'Panel fixture changed a retained adb reverse'
+   if preferences_entered:
+    adb('shell','am','start','-W','-n',component,timeout=240)
+    wait_for_home()
+  finally:
+   report['newChecks']=checks[first_check:]
+   (OUT/'panel-controller-auth-fixture.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
+ assert report.get('originalPreferencesRestored') and report.get('adbReverseRestored'),report
+ checks.append({'name':'panel-controller-fixture-cleanup','result':'passed','evidence':'original preference bytes and retained adb reverses restored; original launcher flow relaunched'})
+ report['newChecks']=checks[first_check:];report['result']='PASS'
+ (OUT/'panel-controller-auth-fixture.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
+
 def main():
  end=time.monotonic()+900
  while time.monotonic()<end:
@@ -416,12 +618,18 @@ def main():
    adb('reverse','--remove',f'tcp:{device_port}')
    (OUT/'native-webview-fixture-requests.json').write_text(json.dumps(requests,ensure_ascii=False,indent=2))
  palette_scripts_cases(choices[0],apk)
+ legacy_check_count=len(checks)
+ palette_check_count=sum(c['name'].startswith('custom-palette-') for c in checks)
+ # Older fixed-APK installation continuation keeps its original59 checks.
+ # The new candidate adds an independent NativeCompose authentication fixture.
+ if os.environ.get('HETU_EXPECT_NEW_UI')=='1' and int(os.environ.get('HETU_EXPECTED_VERSION','0'))>=2084:
+  panel_controller_auth_cases(choices[0])
  log=adb('logcat','-d','-v','brief',timeout=30);(OUT/'logcat.txt').write_text(log)
  assert not re.search(r'FATAL EXCEPTION[\s\S]{0,1000}Process: '+re.escape(PKG),log),'Application crash in logcat'
  assert not re.search(r'ANR in '+re.escape(PKG)+r'(?:\s|\(|:)',log),'Application ANR recorded during navigation'
  (OUT/'last-anr.txt').write_text(adb('shell','dumpsys','activity','lastanr',timeout=60,check=False))
  assert adb('shell','pidof',PKG,check=False).strip(),'App process exited after navigation'
- (OUT/'results.json').write_text(json.dumps({'checks':checks,'passed':len(checks),'fixtureOnly':True,'rootMutationActions':0,'rootSetupDenialAttempts':1,'apiLevel':int(adb('shell','getprop','ro.build.version.sdk').strip()),'limitations':'Fresh AOSP emulator. Five populated native-WebView states use an isolated loopback fixture with deliberate HTTP503 switch rejection. No K80, real core, Root boot or actual network validation.'},ensure_ascii=False,indent=2))
+ (OUT/'results.json').write_text(json.dumps({'checks':checks,'passed':len(checks),'legacyChecksPassed':legacy_check_count,'paletteCasesPassed':palette_check_count,'newPanelAuthChecks':checks[legacy_check_count:],'fixtureOnly':True,'rootMutationActions':0,'rootSetupDenialAttempts':1,'apiLevel':int(adb('shell','getprop','ro.build.version.sdk').strip()),'limitations':'Fresh AOSP emulator. Five populated native-WebView states use an isolated loopback fixture with deliberate HTTP503 switch rejection. New panel authentication checks, when enabled for2084+, use synthetic cached running hints and loopback401/200, never real Root/core/network health. No K80, real core, Root boot or actual network validation.'},ensure_ascii=False,indent=2))
 try:main()
 except Exception:
  (OUT/'failure-preferences.xml').write_text(adb('shell','run-as',PKG,'cat','shared_prefs/hetu.xml',check=False))

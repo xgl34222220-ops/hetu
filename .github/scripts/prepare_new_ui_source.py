@@ -14,10 +14,15 @@ import tarfile
 import tempfile
 
 from ui_source_scope import BASE_COMMIT, BASE_RUN, PREVIOUS_INPUTS_SHA256, validate_scope, validate_version_only
+from auth_source_scope import (validate_layer as validate_auth_layer,
+                               validate_version_only as validate_auth_version_only,
+                               PREVIOUS_INPUTS_SHA256 as AUTH_PREVIOUS_INPUTS_SHA256,
+                               PREVIOUS_PATCH_SHA256 as AUTH_PREVIOUS_PATCH_SHA256)
 
 ROOT = Path(__file__).resolve().parents[2]
 INPUTS = ROOT / 'updates/v2082-new-ui/inputs.json'
 LAYER_INPUTS = ROOT / 'updates/v2083-ui-polish/inputs.json'
+AUTH_INPUTS = ROOT / 'updates/v2084-controller-auth/inputs.json'
 
 def digest(p):
     return hashlib.sha256(p.read_bytes()).hexdigest()
@@ -86,6 +91,37 @@ def main():
             layer_report = {'baseCommit': layer['baseCommit'], 'baseRun': layer['baseRun'],
                             'patchSha256': layer['patchSha256'], 'changedOrAddedFiles': len(changes),
                             'protectedRuntimeUnchanged': True}
+        auth_report = None
+        if AUTH_INPUTS.exists():
+            auth = json.loads(AUTH_INPUTS.read_text())
+            validate_auth_layer(auth)
+            assert digest(LAYER_INPUTS) == AUTH_PREVIOUS_INPUTS_SHA256, 'Verified V20.83 inputs changed'
+            assert digest(LAYER_INPUTS.with_name('ui.patch')) == AUTH_PREVIOUS_PATCH_SHA256
+            # Establish the precise V20.83 input before the separate runtime layer.
+            for name, sha in final_files.items():
+                assert digest(work / name) == sha, 'Authentication baseline mismatch: ' + name
+            for source, name in [('MihomoControllerClient.java', 'v2083-controller-client.java'),
+                                 ('LegacyAppMigrator.java', 'v2083-legacy-migrator.java')]:
+                shutil.copyfile(work / ('android-app/app/src/main/java/io/github/xgl34222220/hetu/' + source), out / name)
+            runtime_patch = AUTH_INPUTS.with_name('runtime.patch')
+            assert digest(runtime_patch) == auth['patchSha256'], 'Authentication patch changed without input update'
+            previous_gradle = (work / 'android-app/app/build.gradle.kts').read_text()
+            apply(runtime_patch, work)
+            validate_auth_version_only(previous_gradle, (work / 'android-app/app/build.gradle.kts').read_text())
+            for name, sha in auth['changedOrAddedFiles'].items():
+                assert digest(work / name) == sha, 'Authentication source mismatch: ' + name
+                assert sha != final_files.get(name), 'Unchanged input recorded as an authentication delta: ' + name
+            final_files.update(auth['changedOrAddedFiles'])
+            auth_report = {'baseCommit': auth['baseCommit'], 'baseRun': auth['baseRun'],
+                           'baseAndroidAppTree': auth['baseAndroidAppTree'],
+                           'patchSha256': auth['patchSha256'],
+                           'changedOrAddedFiles': len(auth['changedOrAddedFiles']),
+                           'runtimePayloadsUnchanged': True, 'dependenciesUnchanged': True,
+                           'manifestAndPermissionsUnchanged': True,
+                           'unchangedOutsideAuthScope': True,
+                           'baselineUnitTests': auth['baselineUnitTests'],
+                           'expectedUnitTests': auth['expectedUnitTests'],
+                           'newTestCounts': auth['newTestCounts']}
         for name, sha in final_files.items():
             assert digest(work / name) == sha, 'Generated source input regressed: ' + name
             assert digest(ROOT / name) == sha, 'Checkout differs from generated source: ' + name
@@ -100,6 +136,8 @@ def main():
                   'checkoutMatchesGeneratedSource': True, 'historicPatchesAppliedToCheckout': False}
         if layer_report is not None:
             report['presentationLayer'] = layer_report
+        if auth_report is not None:
+            report['controllerAuthenticationLayer'] = auth_report
         (out / 'effective-source-proof.json').write_text(json.dumps(report, indent=2) + '\n')
         print(json.dumps(report))
 

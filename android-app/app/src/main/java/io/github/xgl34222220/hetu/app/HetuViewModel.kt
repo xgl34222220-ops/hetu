@@ -308,6 +308,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             // A later stop/config/state update owns the UI. The next fresh poll can still apply.
             if (superseded()) return null
             val now = SystemClock.elapsedRealtime()
+            val controllerSampleValid = next.panelReady && !next.controllerReadFailed
             val totalTx = TrafficStats.getTotalTxBytes()
             val totalRx = TrafficStats.getTotalRxBytes()
             if (next.running && lastLocalAt > 0L && now > lastLocalAt &&
@@ -328,7 +329,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             // Right after process start a recovering core may briefly look stopped.
             if (state.running && !next.running && prefs.getBoolean("proxyRootWanted", false) && now - coldStartAt < 2_500L) return null
 
-            if (next.panelReady && lastAt > 0L && now > lastAt && next.uploadTotal >= lastUp && next.downloadTotal >= lastDown) {
+            if (controllerSampleValid && lastAt > 0L && now > lastAt && next.uploadTotal >= lastUp && next.downloadTotal >= lastDown) {
                 val elapsed = now - lastAt
                 upRate = ((next.uploadTotal - lastUp) * 1000L / elapsed).coerceAtLeast(0L)
                 downRate = ((next.downloadTotal - lastDown) * 1000L / elapsed).coerceAtLeast(0L)
@@ -343,7 +344,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                 rateHistory.clear()
                 upHistory.clear()
             }
-            syncCoreLatencyResults(next.groups, delays, measuredAt, startedAt)
+            if (controllerSampleValid) syncCoreLatencyResults(next.groups, delays, measuredAt, startedAt)
 
             var sampleValid = next.running
             val sampled = if (next.running) {
@@ -375,7 +376,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                 providers = emptyList()
                 lastProviderRefreshAt = 0L
                 coreVersion = ""
-            } else {
+            } else if (!next.controllerReadFailed) {
                 if (providers.isEmpty() || now - lastProviderRefreshAt > 30_000L) {
                     val fresh = try { repo.providers() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { providers }
                     if (superseded()) return null
@@ -391,11 +392,13 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
             if (superseded()) return null
             state = if (next.running && !next.panelReady) {
-                next.copy(groups = state.groups, connections = state.connections)
+                next.copy(groups = state.groups, connections = state.connections,
+                    downloadTotal = state.downloadTotal, uploadTotal = state.uploadTotal,
+                    memoryBytes = state.memoryBytes, trafficMode = state.trafficMode)
             } else next
             expectedState = state
             if (next.running) startupError = null
-            if (next.panelReady) {
+            if (controllerSampleValid) {
                 lastAt = now
                 lastUp = next.uploadTotal
                 lastDown = next.downloadTotal

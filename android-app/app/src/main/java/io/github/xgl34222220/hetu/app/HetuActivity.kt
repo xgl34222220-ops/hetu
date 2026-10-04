@@ -17,6 +17,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.CancellationException
@@ -52,6 +53,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.PriorityHigh
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
@@ -535,10 +537,29 @@ internal fun ComponentActivity.hxHost(content: @Composable (HetuViewModel) -> Un
     }
 }
 
-private fun hxToastTone(message: String): HxTone = when {
-    listOf("失败", "错误", "无效", "无法", "异常", "未获得", "超时").any { message.contains(it) } -> HxTone.Bad
+// Status numbers only mean failure in an HTTP/controller-response context, never as item counts.
+private val hxToastHttpFailure = Regex(
+    """(?:(?:^|(?:请求返回|响应(?:状态码)?|服务器返回)\s*[:：]?\s*)HTTP(?:/\d+(?:\.\d+)?)?\s*[:：]?\s*|^(?:(?:Mihomo|Clash)\s*)?控制接口返回\s*)([45]\d{2})(?!\d)""",
+    RegexOption.IGNORE_CASE,
+)
+private val hxToastEnglishFailure = Regex(
+    """(?:^|[：:]\s*)(?:error|failed|failure|unauthorized|forbidden|denied|timeout|cannot|unable|unavailable)\b|\b(?:timed\s+out|connection\s+refused|network\s+is\s+unreachable)\b""",
+    RegexOption.IGNORE_CASE,
+)
+private val hxToastEnglishSuccess = Regex(
+    """^(?:saved|copied|updated|restored|enabled|disabled|disconnected|restarted|started|imported|exported)\b|\b(?:success(?:ful(?:ly)?)?|validation\s+passed|backup\s+completed)\b""",
+    RegexOption.IGNORE_CASE,
+)
+
+internal fun hxToastTone(message: String): HxTone = when {
+    hxToastHttpFailure.containsMatchIn(message) || hxToastEnglishFailure.containsMatchIn(message) ||
+        listOf("失败", "错误", "无效", "无法", "异常", "未获得", "超时", "拒绝").any { message.contains(it) } -> HxTone.Bad
     listOf("注意", "需要", "请先", "重启代理后").any { message.contains(it) } -> HxTone.Warn
-    else -> HxTone.Good
+    hxToastEnglishSuccess.containsMatchIn(message) ||
+        listOf("成功", "已保存", "已复制", "已更新", "已恢复", "已启用", "已开启", "已关闭", "已断开", "已重启",
+            "已导出", "已导入", "已备份", "已启动", "已停止", "已切换", "已热重载", "已热更新", "已安装", "已下载",
+            "已删除", "已重命名", "已创建", "已添加", "校验通过", "测速完成").any { message.contains(it) } -> HxTone.Good
+    else -> HxTone.Neutral
 }
 
 /** Floating top toast: tone icon, tap or flick up to dismiss. */
@@ -573,12 +594,13 @@ private fun HxToast(message: String, onDismiss: () -> Unit) {
         border = if (c.dark) androidx.compose.foundation.BorderStroke(0.5.dp, c.line) else null,
     ) {
         Row(Modifier.padding(start = 8.dp, end = 18.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(26.dp).clip(CircleShape).background(tone.bg()), contentAlignment = Alignment.Center) {
+            Box(Modifier.testTag("toast-status").size(26.dp).clip(CircleShape).background(tone.bg()), contentAlignment = Alignment.Center) {
                 Icon(
                     when (tone) {
                         HxTone.Bad -> Icons.Rounded.Close
                         HxTone.Warn -> Icons.Rounded.PriorityHigh
-                        else -> Icons.Rounded.Check
+                        HxTone.Good -> Icons.Rounded.Check
+                        else -> Icons.Rounded.Info
                     },
                     null,
                     tint = tone.fg(),
