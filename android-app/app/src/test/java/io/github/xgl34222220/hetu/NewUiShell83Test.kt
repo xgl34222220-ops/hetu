@@ -62,6 +62,10 @@ class NewUiShell83Test {
         rule.onNodeWithText("配置管理").performClick()
         settle()
         rule.onNodeWithText("首页").assertDoesNotExist()
+        // The library loads on Dispatchers.IO; virtual animation time cannot complete that read.
+        rule.waitUntil(10_000) {
+            rule.onAllNodesWithText("编辑当前 YAML").fetchSemanticsNodes().isNotEmpty()
+        }
         capture("tools-configurations")
         rule.onNodeWithText("编辑当前 YAML").performScrollTo().performClick()
         settle()

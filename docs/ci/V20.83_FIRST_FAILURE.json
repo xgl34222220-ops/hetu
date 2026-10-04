@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "version": "V20.83",
+  "branch": "test/v20.76-new-ui",
+  "applicationCommit": "c0c805f46acc6f3136518c7aa0f83ec2f61efc2c",
+  "ciRun": 37232745854,
+  "attempt": 1,
+  "conclusion": "failure",
+  "failedJob": 111525711543,
+  "failedStep": "Build APK",
+  "compilerErrors": [
+    "SettingsScreen.kt:774:66: @Composable invocations can only happen from the context of a @Composable function",
+    "HomeScreen.kt:408:26: Unresolved reference 'clickable'",
+    "HomeScreen.kt:433:57: Unresolved reference 'clickable'"
+  ],
+  "correctionCommit": "b7fe25d77195a45e63bc74a4aa327bc61cd509f4",
+  "correction": "Capture the translated accent label in composable scope and restore the foundation.clickable import. No test assertion or runtime input changed.",
+  "passedBeforeFailure": [
+    "Effective source reproduction and protected runtime input verification",
+    "Presentation scope: 5 cases",
+    "Root health, firewall and autostart: 60 isolated shell cases",
+    "Recovery backpressure, journal budget and legal symbol fixtures",
+    "Native WebView topology: 6 host cases",
+    "Controlled WebUI logic and 12 browser cases",
+    "Production filter exporter cache-eviction regression",
+    "Fixed signing identity and dependency resolution"
+  ],
+  "historicalCrashReproduction": {"job": 111525711670, "conclusion": "success"},
+  "notExecuted": [
+    "392 selected Android unit tests",
+    "Android lint",
+    "Candidate APK packaged runtime and ABI verification",
+    "Candidate APK API 35 and API 36 installation checks"
+  ],
+  "boundaries": [
+    "The failed run is retained and is not described as a successful delivery.",
+    "The correction requires a fresh complete CI run. Earlier results do not replace it."
+  ]
+}

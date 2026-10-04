@@ -227,7 +227,7 @@ class NewHomePanelInteractionTest {
         assertEquals(first.left, second.left)
         assertEquals(first.right, second.right)
         assertTrue(second.top >= first.bottom)
-        assertTrue(first.width >= 300.dp)
+        assertTrue(first.right - first.left >= 300.dp)
         val saved = PanelGroupLayout(groupColumns = 2, nodeColumns = 2)
         val adaptive = PanelLogic.layoutForViewport(saved, 393, 1.6f)
         assertEquals(1, adaptive.groupColumns)

@@ -9527,7 +9527,7 @@ index 775a0db..742fdd2 100644
  }
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/NewHomePanelInteractionTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NewHomePanelInteractionTest.kt
 new file mode 100644
-index 0000000..db0e645
+index 0000000..0a8c58c
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NewHomePanelInteractionTest.kt
 @@ -0,0 +1,252 @@
@@ -9760,7 +9760,7 @@ index 0000000..db0e645
 +        assertEquals(first.left, second.left)
 +        assertEquals(first.right, second.right)
 +        assertTrue(second.top >= first.bottom)
-+        assertTrue(first.width >= 300.dp)
++        assertTrue(first.right - first.left >= 300.dp)
 +        val saved = PanelGroupLayout(groupColumns = 2, nodeColumns = 2)
 +        val adaptive = PanelLogic.layoutForViewport(saved, 393, 1.6f)
 +        assertEquals(1, adaptive.groupColumns)
@@ -9785,10 +9785,10 @@ index 0000000..db0e645
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/NewUiShell83Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NewUiShell83Test.kt
 new file mode 100644
-index 0000000..6ce1e67
+index 0000000..83293d3
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NewUiShell83Test.kt
-@@ -0,0 +1,113 @@
+@@ -0,0 +1,117 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
@@ -9853,6 +9853,10 @@ index 0000000..6ce1e67
 +        rule.onNodeWithText("配置管理").performClick()
 +        settle()
 +        rule.onNodeWithText("首页").assertDoesNotExist()
++        // The library loads on Dispatchers.IO; virtual animation time cannot complete that read.
++        rule.waitUntil(10_000) {
++            rule.onAllNodesWithText("编辑当前 YAML").fetchSemanticsNodes().isNotEmpty()
++        }
 +        capture("tools-configurations")
 +        rule.onNodeWithText("编辑当前 YAML").performScrollTo().performClick()
 +        settle()
