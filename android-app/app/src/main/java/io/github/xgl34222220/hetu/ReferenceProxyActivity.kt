@@ -2,6 +2,9 @@ package io.github.xgl34222220.hetu
 
 import io.github.xgl34222220.hetu.ui.*
 import android.content.Intent
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
 import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.os.SystemClock
@@ -189,6 +192,8 @@ private fun RefProxyShell(resumeRevision: Int, requestedStartPage: String?, star
     var panelTab by rememberSaveable { mutableStateOf(RefPanelTab.Groups) }
     var panelSearchRequest by rememberSaveable { mutableIntStateOf(0) }
     var panelDetailVisible by rememberSaveable { mutableStateOf(false) }
+    var homeDetailVisible by rememberSaveable { mutableStateOf(false) }
+    var panelExpandGroup by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(startPageRevision) {
         when (requestedStartPage?.lowercase()) {
             "settings" -> page = RefProxyPage.Settings
@@ -662,26 +667,11 @@ private fun RefProxyShell(resumeRevision: Int, requestedStartPage: String?, star
                             try { refresh() } finally { homeRefreshing = false }
                         }
                     },
-                    onPullRefresh = {
-                        if (!homeRefreshing) scope.launch {
-                            homeRefreshing = true
-                            try {
-                                refreshHomeAll()
-                                if (message.isBlank()) message = "全部刷新完成"
-                            } finally {
-                                homeRefreshing = false
-                            }
-                        }
-                    },
                     onToggle = ::toggle,
                     onReload = ::reload,
                     onRestart = ::restart,
                     onDelay = ::measureSites,
                     diagnosticLoading = diagnosticLoading,
-                    onLog = { scope.launch {
-                        logTitle = "运行日志"
-                        logText = runCatching { inspector.runtimeLog() }.getOrElse { it.message ?: "日志读取失败" }
-                    } },
                     onConnections = {
                         panelTab = RefPanelTab.Connections
                         page = RefProxyPage.Panel
@@ -706,21 +696,28 @@ private fun RefProxyShell(resumeRevision: Int, requestedStartPage: String?, star
                         panelTab = RefPanelTab.Subscriptions
                         page = RefProxyPage.Panel
                     },
+                    startupError = startupError,
+                    onDismissStartupError = { startupError = null },
+                    onTrafficMode = { id -> scope.launch { runCatching { repo.setTrafficMode(id) }; refresh() } },
+                    onOpenNode = {
+                        panelExpandGroup = state.groups.firstOrNull()?.name
+                        panelTab = RefPanelTab.Groups
+                        page = RefProxyPage.Panel
+                    },
+                    onDetailVisibleChange = { homeDetailVisible = it },
                     )
                 }
-                RefProxyPage.Panel -> RefPanel(
+                RefProxyPage.Panel -> io.github.xgl34222220.hetu.panel.HetuPanelV2(
                     state = state,
                     repo = repo,
                     delays = delays,
                     selectedTab = panelTab,
                     onSelectedTabChange = { panelTab = it },
-                    searchRequest = panelSearchRequest,
-                    hazeState = haze,
-                    backdrop = liquidBackdrop.takeIf { liquid },
-                    glassEnabled = blurEnabled && liquidGlassEnabled,
                     onRefreshState = { refresh() },
-                    onOpenSettings = { page = RefProxyPage.Settings },
-                    onDetailVisibleChanged = { panelDetailVisible = it },
+                    onStart = ::toggle,
+                    starting = homeOperation == HomeOperation.Start,
+                    bottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 94.dp,
+                    expandGroup = panelExpandGroup,
                 )
                 RefProxyPage.Tools -> RefTools(state) { logTitle = "运行日志"; logText = it }
                 RefProxyPage.Settings -> RefSettings(state, operation, ::restart) { scope.launch { refresh() } }
@@ -729,7 +726,7 @@ private fun RefProxyShell(resumeRevision: Int, requestedStartPage: String?, star
                 }
             }
         }
-        if (!panelDetailVisible || page == RefProxyPage.Panel) {
+        if ((!panelDetailVisible || page == RefProxyPage.Panel) && !(homeDetailVisible && page == RefProxyPage.Home)) {
             HetuGlassDock(
                 items = dock,
                 selected = dockPages.indexOf(page).coerceAtLeast(0),
@@ -752,7 +749,7 @@ private fun RefProxyShell(resumeRevision: Int, requestedStartPage: String?, star
             onDismiss = { logText = null },
         )
     }
-    startupError?.let { text ->
+    if (page != RefProxyPage.Home) startupError?.let { text ->
         RefInfoBottomSheet(
             title = "启动失败",
             text = text,
@@ -792,21 +789,21 @@ private fun RefHome(
     onConnections: () -> Unit,
     onSettings: () -> Unit,
     onDiagnostics: () -> Unit,
+    startupError: String?,
+    onDismissStartupError: () -> Unit,
+    onTrafficMode: (String) -> Unit,
+    onOpenNode: () -> Unit,
+    onDetailVisibleChange: (Boolean) -> Unit,
 ) {
-    // compact-home-test92-ui1: presentation-only adapter
+    // hetu-new-ui: presentation-only adapter
     val context = LocalContext.current
     val tracked = providers.filter { it.hasSubscriptionInfo && it.total > 0L }
     val total = tracked.sumOf { it.total }.takeIf { it > 0L } ?: cachedSubscription.total
     val used = if (tracked.isNotEmpty()) tracked.sumOf { it.used } else cachedSubscription.used
-    var webUiOpen by remember { mutableStateOf(false) }
-    var coreSheet by remember { mutableStateOf(false) }
-    var coreVersion by remember { mutableStateOf("") }
     val versionRepo = remember { ProxyDashboardRepository(context) }
-    LaunchedEffect(coreSheet, state.running) {
-        if (coreSheet && state.running) coreVersion = versionRepo.coreVersion()
-    }
-    CompactHomeDashboard(
-        data = CompactHomeData(
+    var coreVersion by remember { mutableStateOf("") }
+    LaunchedEffect(state.running) { if (state.running) coreVersion = versionRepo.coreVersion() }
+    val homeData = CompactHomeData(
             running = state.running, busy = operation.isNotBlank() || action != null, operation = action, refreshing = refreshing,
             testing = testing, uptimeSeconds = runtime.elapsedSeconds,
             core = state.core, mode = state.mode, config = state.config,
@@ -817,32 +814,30 @@ private fun RefHome(
             memory = runtime.rssBytes.takeIf { it > 0L } ?: state.memoryBytes,
             cpu = cpuPercent, connections = if (state.panelReady) state.connections.size else cachedConnections,
             diagnosticLoading = diagnosticLoading,
-        ),
-        onRefresh = onRefresh, onPullRefresh = onPullRefresh, onToggle = onToggle, onReload = onReload, onRestart = onRestart,
-        onDelay = onDelay, onWebUi = { HetuWebPanels.openSelected(context) }, onLog = onLog,
-        onSubscription = onSubscription, onConnections = onConnections, onSettings = onSettings,
-        onDiagnostics = onDiagnostics,
-        onAdblock = { context.startActivity(Intent(context, ProxyAdblockChainActivity::class.java)) },
-        onCoreDetails = { coreSheet = true },
+        )
+    val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    io.github.xgl34222220.hetu.home.HetuHomeV2(
+        data = homeData,
+        groups = state.groups,
+        trafficMode = state.trafficMode,
+        startupError = startupError,
+        corePid = runtime.pid,
+        coreVersion = coreVersion,
+        bottomPadding = navBottom + 94.dp,
+        onToggle = onToggle,
+        onReload = onReload,
+        onRestart = onRestart,
+        onDelay = onDelay,
+        onRefresh = onRefresh,
+        onTrafficMode = onTrafficMode,
+        onOpenNode = onOpenNode,
+        onOpenSubscription = onSubscription,
+        onOpenBasicSettings = onSettings,
+        onOpenConfigs = { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) },
+        onViewConfig = { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) },
+        onDismissStartupError = onDismissStartupError,
+        onDetailVisibleChange = onDetailVisibleChange,
     )
-    if (webUiOpen) CompactHomeWebUiDialog { webUiOpen = false }
-    if (coreSheet) {
-        val rss = runtime.rssBytes.takeIf { it > 0L } ?: state.memoryBytes
-        CoreDetailsSheet19(
-            CoreDetails19(
-                pid = runtime.pid,
-                core = state.core,
-                version = coreVersion,
-                uptime = CompactHomeFormat.uptime(runtime.elapsedSeconds),
-                mode = state.mode,
-                config = state.config,
-                cpu = String.format(java.util.Locale.US, "%.1f%%", cpuPercent),
-                memory = if (rss > 0L) CompactHomeFormat.bytes(rss) else "—",
-                connections = (if (state.panelReady) state.connections.size else cachedConnections).toString(),
-                controller = "127.0.0.1:${state.controllerPort}",
-            ),
-        ) { coreSheet = false }
-    }
 }
 
 @Composable

@@ -30,6 +30,9 @@ android {
                 keyAlias = "androiddebugkey"
                 keyPassword = "android"
             }
+            // Force both v1 (JAR) and v2 signatures: some devices refuse to install APKs with v2-only.
+            isV1SigningEnabled = true
+            isV2SigningEnabled = true
         }
     }
 
