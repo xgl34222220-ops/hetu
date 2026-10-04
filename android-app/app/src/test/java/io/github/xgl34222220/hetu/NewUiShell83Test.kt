@@ -17,6 +17,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /** Current launcher routes, safe offline storage, and dock ownership; no Root/network mutation. */
+@OptIn(ExperimentalTestApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], qualifiers = "zh-rCN-w393dp-h852dp-mdpi", application = Application::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -50,6 +51,17 @@ class NewUiShell83Test {
         }
     }
 
+    private fun openHubEntry(label: String) {
+        val entry = rule.onNodeWithText(label).performScrollTo()
+        settle()
+        val entryBounds = entry.getUnclippedBoundsInRoot()
+        val dockBounds = rule.onNodeWithTag("hetu-dock", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        org.junit.Assert.assertTrue("Tool action must be fully above the dock: $entryBounds / $dockBounds",
+            entryBounds.bottom <= dockBounds.top)
+        entry.performClick()
+        settle()
+    }
+
     @Test fun toolsConfigurationOwnsDockAndBackReturnsToHub() {
         val app = ApplicationProvider.getApplicationContext<Application>()
         val core = ProxyRuntimeProfile.load(vm.prefs).core
@@ -58,8 +70,7 @@ class NewUiShell83Test {
         library.select(core, fixture.name)
         root(HxTab.Tools)
         capture("tools-hub")
-        rule.onNodeWithText("配置管理").performScrollTo().performClick()
-        settle()
+        openHubEntry("配置管理")
         rule.onNodeWithText("首页").assertDoesNotExist()
         // The library loads on Dispatchers.IO; virtual animation time cannot complete that read.
         rule.waitUntil(10_000) {
@@ -80,8 +91,7 @@ class NewUiShell83Test {
 
     @Test fun diagnosticDetailKeepsNetworkJournalAccessible() {
         root(HxTab.Tools)
-        rule.onNodeWithText("诊断工具").performScrollTo().performClick()
-        settle()
+        openHubEntry("诊断工具")
         rule.onNodeWithText("首页").assertDoesNotExist()
         rule.onNodeWithText("网络事件记录").assertExists()
         capture("tools-diagnostics")

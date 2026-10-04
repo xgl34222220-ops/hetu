@@ -8300,10 +8300,10 @@ index 0000000..7967521
 +private fun Throwable.reason(fallback: String): String = message?.takeIf { it.isNotBlank() } ?: fallback
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt
 new file mode 100644
-index 0000000..ff20830
+index 0000000..7a05ec8
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt
-@@ -0,0 +1,152 @@
+@@ -0,0 +1,153 @@
 +package io.github.xgl34222220.hetu.tools
 +
 +import io.github.xgl34222220.hetu.ui.ht
@@ -8402,9 +8402,10 @@ index 0000000..ff20830
 +        Column(
 +            Modifier
 +                .fillMaxSize()
++                // Keep bring-into-view and accessibility scrolling above the floating dock.
++                .padding(contentPadding)
 +                .verticalScroll(scroll)
 +                .windowInsetsPadding(WindowInsets.statusBars)
-+                .padding(contentPadding)
 +                .padding(start = HomeDims.gutter, end = HomeDims.gutter, top = 26.dp),
 +            verticalArrangement = Arrangement.spacedBy(HomeDims.gap),
 +        ) {
@@ -9095,7 +9096,7 @@ index 9bc0508..cde698c 100644
 
      @Test fun vocabularySupportsAllFourLanguagesWithoutTranslatingUnknownText() {
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
-index 64c9efb..7db03e7 100644
+index 64c9efb..61ff3c1 100644
 --- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
 @@ -4,6 +4,8 @@ import android.app.Application
@@ -9107,7 +9108,16 @@ index 64c9efb..7db03e7 100644
  import android.view.inspector.WindowInspector
  import androidx.activity.ComponentActivity
  import androidx.compose.runtime.Composable
-@@ -60,7 +62,9 @@ class NativeConceptScreenshotTest {
+@@ -14,6 +16,8 @@ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.unit.dp
+ import androidx.compose.ui.test.junit4.createAndroidComposeRule
+ import androidx.compose.ui.test.onAllNodesWithText
++import androidx.compose.ui.test.onAllNodesWithContentDescription
++import androidx.compose.ui.test.onNodeWithContentDescription
+ import androidx.compose.ui.test.onNodeWithText
+ import androidx.compose.ui.test.performClick
+ import androidx.compose.ui.test.performScrollTo
+@@ -60,7 +64,9 @@ class NativeConceptScreenshotTest {
 
      private fun snapshotAfter(name: String, content: @Composable () -> Unit, afterSet: () -> Unit) {
          rule.setContent { HetuAppTheme(appearance = "light", dynamic = false) {
@@ -9118,7 +9128,7 @@ index 64c9efb..7db03e7 100644
          } }
          rule.waitForIdle()
          rule.mainClock.advanceTimeBy(1000)
-@@ -84,6 +88,19 @@ class NativeConceptScreenshotTest {
+@@ -84,6 +90,19 @@ class NativeConceptScreenshotTest {
                  if (!drawn.add(root)) return@forEach
                  val location = IntArray(2)
                  root.getLocationOnScreen(location)
@@ -9138,26 +9148,29 @@ index 64c9efb..7db03e7 100644
                  canvas.save()
                  canvas.translate(location[0].toFloat(), location[1].toFloat())
                  root.draw(canvas)
-@@ -151,12 +168,22 @@ class NativeConceptScreenshotTest {
+@@ -151,12 +170,25 @@ class NativeConceptScreenshotTest {
      }
      @Test fun mihomoLicenseSheet() = snapshotAfter("settings-license-mihomo", { AboutScreen(vm) }) {
          rule.onNode(hasText("Mihomo") and hasClickAction()).performScrollTo().performClick()
 +        awaitLicenseSheet()
++        rule.onNode(hasText("GNU GENERAL PUBLIC LICENSE", substring = true)).assertExists()
      }
      @Test fun adguardLicenseSheet() = snapshotAfter("settings-license-adguard", { AboutScreen(vm) }) {
          rule.onNodeWithText("AdGuard DNS Filter").performScrollTo().performClick()
 +        awaitLicenseSheet()
++        rule.onNode(hasText("GNU GENERAL PUBLIC LICENSE", substring = true)).assertExists()
      }
      @Test fun lucideLicenseSheet() = snapshotAfter("settings-license-lucide", { AboutScreen(vm) }) {
          rule.onNodeWithText("Lucide Icons").performScrollTo().performClick()
 +        awaitLicenseSheet()
++        rule.onNode(hasText("Permission to use, copy, modify", substring = true)).assertExists()
 +    }
 +
 +    private fun awaitLicenseSheet() {
 +        rule.waitUntil(10_000) {
-+            rule.onAllNodesWithText("复制").fetchSemanticsNodes().isNotEmpty()
++            rule.onAllNodesWithContentDescription("复制").fetchSemanticsNodes().isNotEmpty()
 +        }
-+        rule.onNodeWithText("复制").assertExists()
++        rule.onNodeWithContentDescription("复制").assertExists()
      }
 
  }
@@ -9435,10 +9448,10 @@ index e28d0fc..1f994cc 100644
      }
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/NewUiShell83Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NewUiShell83Test.kt
 new file mode 100644
-index 0000000..d933823
+index 0000000..d580bc6
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NewUiShell83Test.kt
-@@ -0,0 +1,115 @@
+@@ -0,0 +1,125 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
@@ -9458,6 +9471,7 @@ index 0000000..d933823
 +import org.robolectric.annotation.GraphicsMode
 +
 +/** Current launcher routes, safe offline storage, and dock ownership; no Root/network mutation. */
++@OptIn(ExperimentalTestApi::class)
 +@RunWith(RobolectricTestRunner::class)
 +@Config(sdk = [35], qualifiers = "zh-rCN-w393dp-h852dp-mdpi", application = Application::class)
 +@GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -9491,6 +9505,17 @@ index 0000000..d933823
 +        }
 +    }
 +
++    private fun openHubEntry(label: String) {
++        val entry = rule.onNodeWithText(label).performScrollTo()
++        settle()
++        val entryBounds = entry.getUnclippedBoundsInRoot()
++        val dockBounds = rule.onNodeWithTag("hetu-dock", useUnmergedTree = true).getUnclippedBoundsInRoot()
++        org.junit.Assert.assertTrue("Tool action must be fully above the dock: $entryBounds / $dockBounds",
++            entryBounds.bottom <= dockBounds.top)
++        entry.performClick()
++        settle()
++    }
++
 +    @Test fun toolsConfigurationOwnsDockAndBackReturnsToHub() {
 +        val app = ApplicationProvider.getApplicationContext<Application>()
 +        val core = ProxyRuntimeProfile.load(vm.prefs).core
@@ -9499,8 +9524,7 @@ index 0000000..d933823
 +        library.select(core, fixture.name)
 +        root(HxTab.Tools)
 +        capture("tools-hub")
-+        rule.onNodeWithText("配置管理").performScrollTo().performClick()
-+        settle()
++        openHubEntry("配置管理")
 +        rule.onNodeWithText("首页").assertDoesNotExist()
 +        // The library loads on Dispatchers.IO; virtual animation time cannot complete that read.
 +        rule.waitUntil(10_000) {
@@ -9521,8 +9545,7 @@ index 0000000..d933823
 +
 +    @Test fun diagnosticDetailKeepsNetworkJournalAccessible() {
 +        root(HxTab.Tools)
-+        rule.onNodeWithText("诊断工具").performScrollTo().performClick()
-+        settle()
++        openHubEntry("诊断工具")
 +        rule.onNodeWithText("首页").assertDoesNotExist()
 +        rule.onNodeWithText("网络事件记录").assertExists()
 +        capture("tools-diagnostics")

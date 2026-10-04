@@ -16,6 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -169,21 +171,24 @@ class NativeConceptScreenshotTest {
     @Test fun mihomoLicenseSheet() = snapshotAfter("settings-license-mihomo", { AboutScreen(vm) }) {
         rule.onNode(hasText("Mihomo") and hasClickAction()).performScrollTo().performClick()
         awaitLicenseSheet()
+        rule.onNode(hasText("GNU GENERAL PUBLIC LICENSE", substring = true)).assertExists()
     }
     @Test fun adguardLicenseSheet() = snapshotAfter("settings-license-adguard", { AboutScreen(vm) }) {
         rule.onNodeWithText("AdGuard DNS Filter").performScrollTo().performClick()
         awaitLicenseSheet()
+        rule.onNode(hasText("GNU GENERAL PUBLIC LICENSE", substring = true)).assertExists()
     }
     @Test fun lucideLicenseSheet() = snapshotAfter("settings-license-lucide", { AboutScreen(vm) }) {
         rule.onNodeWithText("Lucide Icons").performScrollTo().performClick()
         awaitLicenseSheet()
+        rule.onNode(hasText("Permission to use, copy, modify", substring = true)).assertExists()
     }
 
     private fun awaitLicenseSheet() {
         rule.waitUntil(10_000) {
-            rule.onAllNodesWithText("复制").fetchSemanticsNodes().isNotEmpty()
+            rule.onAllNodesWithContentDescription("复制").fetchSemanticsNodes().isNotEmpty()
         }
-        rule.onNodeWithText("复制").assertExists()
+        rule.onNodeWithContentDescription("复制").assertExists()
     }
 
 }

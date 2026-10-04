@@ -96,9 +96,10 @@ internal fun ToolsScreen(
         Column(
             Modifier
                 .fillMaxSize()
+                // Keep bring-into-view and accessibility scrolling above the floating dock.
+                .padding(contentPadding)
                 .verticalScroll(scroll)
                 .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(contentPadding)
                 .padding(start = HomeDims.gutter, end = HomeDims.gutter, top = 26.dp),
             verticalArrangement = Arrangement.spacedBy(HomeDims.gap),
         ) {

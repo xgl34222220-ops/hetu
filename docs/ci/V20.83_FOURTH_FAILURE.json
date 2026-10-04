@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "version": "V20.83",
+  "branch": "test/v20.76-new-ui",
+  "applicationCommit": "f8e84de5a2857062c4426ae6807bf7523c8a4548",
+  "ciRun": 37235588226,
+  "attempt": 1,
+  "conclusion": "failure",
+  "units": {"tests": 392, "failures": 5, "errors": 0, "skipped": 0},
+  "failedCases": [
+    "NativeConceptScreenshotTest.lucideLicenseSheet",
+    "NativeConceptScreenshotTest.mihomoLicenseSheet",
+    "NativeConceptScreenshotTest.adguardLicenseSheet",
+    "NewUiIntegrationTest.newLauncherKeepsToolsAndDiagnostics",
+    "NewUiShell83Test.diagnosticDetailKeepsNetworkJournalAccessible"
+  ],
+  "causes": [
+    "The license wait looked for Text(复制), but the existing copy icon exposes the action through contentDescription. Three waits timed out.",
+    "Minimal bring-into-view scrolling placed the diagnostic entry inside the floating dock area; the real touch hit the current Tools dock tab. The scroll viewport included the dock clearance as internal content padding."
+  ],
+  "corrections": [
+    "Wait for the actual copy accessibility description and additionally assert the actual complete-license body's expected text before capture.",
+    "Apply the existing bottom clearance outside the tool hub scroll viewport. Initial content positions and maximum scrolling are preserved while bring-into-view keeps actions above the dock.",
+    "Retain real touch navigation and all route assertions; additionally assert tool entry bounds are fully above dock bounds before tapping."
+  ],
+  "passedRelevantChecks": [
+    "Language chooser, English/Russian/traditional Chinese tool labels, activity recreation and raw-content boundaries",
+    "All original tool/settings structural gates",
+    "Configuration editor return stack and dock ownership",
+    "All nine new home/panel interaction cases and twelve editor-history cases"
+  ],
+  "uiVerificationArtifact": 11315636628,
+  "notExecuted": ["Android lint", "Final APK certificate/version gate", "Candidate API 35 and API 36 installation checks"],
+  "boundaries": [
+    "The failed run remains failed; 387 passed cases are not full delivery acceptance.",
+    "The next candidate requires all 392 tests and the complete original remaining gates. No route assertion was removed."
+  ]
+}
