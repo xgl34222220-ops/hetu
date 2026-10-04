@@ -11,7 +11,7 @@ index 1720594..86cbc46 100644
 +        versionCode = 2083
 +        versionName = "0.12.13-v20-ui"
      }
- 
+
      // Explicit CI debug identity. No private key is committed or exported.
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt
 index 12cc8d9..3f7ba83 100644
@@ -39,7 +39,7 @@ index 12cc8d9..3f7ba83 100644
 @@ -48,7 +53,7 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
      fun putBool(key: String, value: Boolean) { prefs.edit().putBoolean(key, value).apply(); changed(key) }
      fun putString(key: String, value: String) { prefs.edit().putString(key, value).apply(); changed(key) }
- 
+
 -    HxPage(title = "高级代理配置", largeTitle = false, onBack = onBack) {
 +    HxPage(title = "高级代理配置", largeTitle = false, compactTitleFontSizeSp = 20f, onBack = onBack) {
          item {
@@ -75,7 +75,7 @@ index 12cc8d9..3f7ba83 100644
 -        fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 4.dp))
 +        fontWeight = FontWeight.Bold, modifier = Modifier.semantics { heading() }.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 6.dp))
  }
- 
+
  @Composable
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt
 index 5d73197..7c958c3 100644
@@ -182,7 +182,7 @@ index d902fed..2ee9a5c 100644
      val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
          if (uri == null || busy) return@rememberLauncherForActivityResult
 @@ -161,6 +162,9 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
- 
+
      val dark = MaterialTheme.colorScheme.background.luminance() < .5f
      val pageBg = if (dark) t.pageBackground else Color(0xFFECEEFB)
 +    io.github.xgl34222220.hetu.tools.ToolsPullRefresh(refreshing, {
@@ -192,7 +192,7 @@ index d902fed..2ee9a5c 100644
          modifier = Modifier.fillMaxSize().background(pageBg),
          contentPadding = PaddingValues(
 @@ -192,7 +196,7 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
- 
+
          item("hooks") {
              Surface(
 -                shape = RoundedCornerShape(20.dp),
@@ -212,7 +212,7 @@ index d902fed..2ee9a5c 100644
 @@ -295,6 +299,8 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
          }
      }
- 
+
 +    }
 +
      editor?.let { entry ->
@@ -238,13 +238,13 @@ index 62dcc0e..4d244bd 100644
                  if (!subtitle.isNullOrBlank()) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
                      if (subtitleIcon != null) { Icon(subtitleIcon, null, tint = c.textMuted, modifier = Modifier.size(12.dp)); Spacer(Modifier.width(5.dp)) }
 @@ -117,7 +117,7 @@ internal fun WebToolPage(title: String, subtitle: String? = null, onBack: () ->
- 
+
  @Composable
  internal fun WebToolCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
 -    Column(modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Hx.colors.surface), content = content)
 +    Column(modifier.fillMaxWidth().clip(HomeContinuousShape(24.dp)).background(Hx.colors.surface), content = content)
  }
- 
+
  @Composable
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ToolsConfigBridge.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ToolsConfigBridge.kt
 new file mode 100644
@@ -543,7 +543,7 @@ index 7be064e..c691a65 100644
  class HetuActivity : ComponentActivity() {
      private lateinit var vm: HetuViewModel
 +    private var requestedRoute by mutableStateOf<HxRoute?>(null)
- 
+
      override fun onCreate(savedInstanceState: Bundle?) {
          super.onCreate(savedInstanceState)
 @@ -134,7 +135,9 @@ class HetuActivity : ComponentActivity() {
@@ -559,7 +559,7 @@ index 7be064e..c691a65 100644
      }
 @@ -156,12 +159,20 @@ class HetuActivity : ComponentActivity() {
      }
- 
+
      private fun applyStartPage(intent: Intent?) {
 -        when (intent?.getStringExtra(EXTRA_START_PAGE)?.lowercase()) {
 +        val target = intent?.getStringExtra(EXTRA_START_PAGE)?.lowercase() ?: return
@@ -590,9 +590,9 @@ index 7be064e..c691a65 100644
 +        if (route != HxRoute.Main) push(route)
 +    }
  }
- 
+
  internal val LocalNav = staticCompositionLocalOf<HxNav> { error("HxNav not provided") }
- 
+
  @Composable
 -internal fun HetuRoot(vm: HetuViewModel) {
 +internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRouteConsumed: () -> Unit = {}) {
@@ -607,7 +607,7 @@ index 7be064e..c691a65 100644
 +        }
 +    }
      androidx.compose.runtime.SideEffect { AppCrashReport.screen("${vm.tab.name}/${nav.current.key}") }
- 
+
      // Predictive back: the page follows the finger (shrinks toward the swipe edge with
 @@ -397,6 +420,7 @@ private fun MainTabs(vm: HetuViewModel) {
      // Other root pages keep their existing scroll behavior; child routes own no dock.
@@ -663,7 +663,7 @@ index d77a122..088770f 100644
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
 @@ -503,7 +503,7 @@ internal fun AboutScreen(vm: HetuViewModel) {
      }
- 
+
      val aboutList = androidx.compose.foundation.lazy.rememberLazyListState()
 -    HxPage(title = ht("关于"), onBack = { nav.pop() }, listState = aboutList, largeTitle = false) {
 +    HxPage(title = ht("关于"), onBack = { nav.pop() }, listState = aboutList, largeTitle = false, compactTitleFontSizeSp = 20f) {
@@ -695,7 +695,7 @@ index bb5823f..45e1470 100644
  import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
 @@ -102,200 +103,29 @@ internal fun PanelScreen(vm: HetuViewModel, bottomPadding: Dp) {
  /* ------------------------------------------------------------------ */
- 
+
  @Composable
 -internal fun ToolsScreen(vm: HetuViewModel, bottomPadding: Dp) {
 -    val context = LocalContext.current
@@ -913,7 +913,7 @@ index bb5823f..45e1470 100644
 +        },
 +    )
  }
- 
+
  /**
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceComponents.kt
 index 8715902..206b829 100644
@@ -961,7 +961,7 @@ index 8715902..206b829 100644
  import io.github.xgl34222220.hetu.ui.ht
 +import io.github.xgl34222220.hetu.ui.HetuHaptic
 +import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
- 
+
  /** Settings-only dimensions, measured from the supplied 04 concept sheets.
   * These do not change the denser controls used by the proxy dashboard. */
  @Composable
@@ -981,13 +981,13 @@ index 8715902..206b829 100644
          content()
      }
 @@ -48,7 +61,7 @@ internal fun SettingsGroup(title: String? = null, content: @Composable ColumnSco
- 
+
  @Composable
  internal fun SettingsSection(content: @Composable ColumnScope.() -> Unit) {
 -    Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = 12.dp), content = content)
 +    Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp).padding(bottom = 14.dp), content = content)
  }
- 
+
  @Composable
 @@ -65,13 +78,16 @@ internal fun SettingsRow(
      enabled: Boolean = true,
@@ -1056,9 +1056,9 @@ index 8715902..206b829 100644
 +        Box(Modifier.offset(x = offset).size(22.dp).clip(Hx.pillShape).background(thumb))
      }
  }
- 
+
 @@ -196,11 +235,12 @@ internal fun SettingsDialog(
- 
+
  @Composable
  private fun SettingsDialogButton(label: String, primary: Boolean, onClick: () -> Unit, modifier: Modifier) {
 -    Box(modifier.heightIn(min = 48.dp).clip(RoundedCornerShape(16.dp))
@@ -1073,7 +1073,7 @@ index 8715902..206b829 100644
              fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold)
      }
 @@ -208,11 +248,11 @@ private fun SettingsDialogButton(label: String, primary: Boolean, onClick: () ->
- 
+
  @Composable
  internal fun SettingsMirrorDialog(initial: String, onSave: (String) -> Unit, onDismiss: () -> Unit) {
 -    var value by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(initial) }
@@ -1117,7 +1117,7 @@ index 224bf8f..b2614b5 100644
 +    val SystemTheme = line("SystemTheme", "M12 2v2", "M2 12h2", "m4.9 4.9 1.4 1.4", "m17.7 6.3 1.4-1.4", "M16.1 8a6 6 0 0 0-8.2 8", "M9.5 19A7 7 0 0 0 21 12.8a7 7 0 0 1-8-7.7", "M3 21 21 3")
 +    val Blur = line("Blur", "M13.5 12a1.5 1.5 0 1 1-3 0a1.5 1.5 0 1 1 3 0Z", "M12 2v3", "M12 19v3", "M2 12h3", "M19 12h3", "m4.9 4.9 2.2 2.2", "m16.9 16.9 2.2 2.2", "m4.9 19.1 2.2-2.2", "m16.9 7.1 2.2-2.2")
  }
- 
+
  internal fun settingsLineIcon(icon: ImageVector): ImageVector = when (icon.name.substringAfterLast('.')) {
      "GridView", "Apps" -> SettingsReferenceIcons.Grid
      "RestartAlt" -> SettingsReferenceIcons.Power
@@ -1297,7 +1297,7 @@ index fed0118..b06fbb2 100644
          }
 @@ -630,9 +628,36 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
      }
- 
+
      when (choice) {
 +        "config" -> HxSheet(title = "当前配置", onDismiss = { choice = null }) {
 +            androidx.compose.foundation.lazy.LazyColumn(Modifier.fillMaxWidth().heightIn(max = 480.dp)) {
@@ -1391,7 +1391,7 @@ index fed0118..b06fbb2 100644
 @@ -748,6 +786,39 @@ private fun HxAccentSwatches(vm: HetuViewModel) {
      }
  }
- 
+
 +@Composable
 +internal fun SettingsThemeModeChoices(selected: String, onSelect: (String) -> Unit) {
 +    val c = Hx.colors
@@ -1564,7 +1564,7 @@ index e20dfd6..b68a65b 100644
      var picker by remember { mutableStateOf<Pair<String, Int>?>(null) }
      val dirty = enabled != initialEnabled || titleTemplate != initialTitle || template != initialTemplate || refresh != initialRefresh || target != initialTarget ||
          actions.toList() != initialActions || labels.toList() != initialLabels
- 
+
      val targetOptions = listOf(
 -        "Home" to "首页", "Panel" to "面板", "Strategy" to "策略", "PanelSheet" to "面板浮窗",
 -        "StrategySheet" to "策略浮窗", "Tools" to "工具", "Settings" to "设置",
@@ -1626,14 +1626,14 @@ index 9e13faa..a97dbc0 100644
 -import io.github.xgl34222220.hetu.ui.LocalHetuMotionEnabled
  import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
  import kotlinx.coroutines.delay
- 
+
 @@ -92,7 +91,7 @@ internal fun HetuHomeV2(
      val context = LocalContext.current
      val prefs = remember(context) { context.getSharedPreferences("hetu", Context.MODE_PRIVATE) }
      val hetuHaptics = rememberHetuHaptics()
 -    val motion = LocalHetuMotionEnabled.current
 +    val motion = homeMotionEnabled()
- 
+
      var netSide by remember { mutableStateOf(if (prefs.getString(PrefNetSide, "wan") == "lan") HomeNetSide.Lan else HomeNetSide.Wan) }
      var speedSource by remember { mutableStateOf(HomeSpeedSource.fromId(prefs.getString(PrefSpeedSource, "api"))) }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt
@@ -1659,7 +1659,7 @@ index 9bf9c36..f740f9f 100644
          if (icon != null) Icon(icon, null, Modifier.size(12.dp), tint = tone.foreground())
          Text(text, color = tone.foreground(), style = HomeType.badge, maxLines = 1, overflow = TextOverflow.Ellipsis)
 @@ -192,8 +192,11 @@ internal fun HomeDelayText(delayMs: Long?, modifier: Modifier = Modifier, style:
- 
+
  @Composable
  internal fun HomeSpinner(modifier: Modifier = Modifier, size: Dp = 16.dp, color: Color = LocalHomeColors.current.accent, strokeWidth: Dp = 2.dp) {
 -    val transition = rememberInfiniteTransition(label = "home-spinner")
@@ -1841,7 +1841,7 @@ index d61615f..a586edd 100644
 @@ -68,7 +69,13 @@ internal fun HomeScreen(
      val collapsed by remember(scroll, collapseAt) { derivedStateOf { scroll.value > collapseAt } }
      val live = state.status.isLive
- 
+
 -    Box(modifier.fillMaxSize().background(c.bg)) {
 +    HomeRefreshBox(
 +        refreshing = state.ipRefreshing,
@@ -1855,7 +1855,7 @@ index d61615f..a586edd 100644
                  .fillMaxSize()
 @@ -110,7 +117,7 @@ internal fun HomeScreen(
          }
- 
+
          // Compact centred title that fades in once the large title has scrolled 40 dp.
 -        val barAlpha by animateFloatAsState(if (collapsed) 1f else 0f, tween(HomeMotion.SwitchMs), label = "home-bar")
 +        val barAlpha by animateFloatAsState(if (collapsed) 1f else 0f, tween(if (motion && LocalHomeMotionEnabled.current) HomeMotion.SwitchMs else 0), label = "home-bar")
@@ -1913,7 +1913,7 @@ index ea0995f..0fba55a 100644
 -    )
 +    ).copy(refreshing = refreshing)
 +    val groupsByName = remember(state.groups) { state.groups.associateBy { it.name } }
- 
+
      val actions = PanelActions(
          onStart = onStart,
 @@ -226,6 +229,30 @@ internal fun HetuPanelV2(
@@ -1945,7 +1945,7 @@ index ea0995f..0fba55a 100644
 +            }
 +        },
      )
- 
+
      HetuHomeThemeFromPrefs(prefs) {
 @@ -244,6 +271,7 @@ internal fun HetuPanelV2(
                  has = { it in icons },
@@ -2035,7 +2035,7 @@ index c6ce901..b366bd9 100644
  import io.github.xgl34222220.hetu.home.LocalHomeHaptics
 +import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
 +import io.github.xgl34222220.hetu.home.homeTap
- 
+
  /* ------------------------------------------------------------------ */
  /*  Panel-only tokens (everything else comes from HomeTokens)           */
 @@ -101,7 +103,7 @@ internal object PanelType {
@@ -2073,7 +2073,7 @@ index e0fb6c4..143244d 100644
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt
 @@ -1,10 +1,13 @@
  package io.github.xgl34222220.hetu.panel
- 
+
 +import androidx.compose.animation.animateColorAsState
 +import androidx.compose.animation.core.spring
 +import androidx.compose.animation.core.tween
@@ -2110,7 +2110,7 @@ index e0fb6c4..143244d 100644
 +import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
 +import io.github.xgl34222220.hetu.home.homeTap
 +import io.github.xgl34222220.hetu.ui.hetuPressScale
- 
+
  /**
   * 策略 tab as lazy-list rows. Group cards sit in rows of one or two; an expanded group's node
 @@ -71,33 +83,40 @@ internal fun LazyListScope.panelGroupsTab(
@@ -2210,7 +2210,7 @@ index e0fb6c4..143244d 100644
 @@ -155,15 +180,15 @@ private fun nodeOf(data: PanelData, name: String): PanelNode? {
      return null
  }
- 
+
 -/** 28 dp tile: the host's icon when provided, else a region code, else a glyph for the group type. */
 +/** The configured image supplied by the adapter takes precedence over name/type fallbacks. */
  @Composable
@@ -2288,19 +2288,19 @@ index adce5bf..59aacd2 100644
 +    val refreshing: Boolean = false,
  ) {
      val running: Boolean get() = status == PanelStatus.Running
- 
+
 @@ -329,6 +331,7 @@ internal class PanelActions(
      /** 排序与布局 › 策略图标. */
      val onOpenPolicyIcons: () -> Unit = {},
      val onCopy: (label: String, text: String) -> Unit = { _, _ -> },
 +    val onRefresh: () -> Unit = {},
  )
- 
+
  /* ------------------------------------------------------------------ */
 @@ -356,6 +359,17 @@ internal object PanelLogic {
      const val UnattributedApp = "未归属应用"
      val rankCounts = listOf(5, 10, 15, 20, 30)
- 
+
 +    /** Keep user column choices; use one column where font scaling would squeeze the cards. */
 +    fun layoutForViewport(layout: PanelGroupLayout, widthDp: Int, fontScale: Float): PanelGroupLayout {
 +        val scale = fontScale.takeIf { it.isFinite() && it > 0f } ?: 1f
@@ -2351,7 +2351,7 @@ index 77af36c..b6ec14d 100644
      val menu: @Composable (PanelOverlay) -> Unit = { target ->
          if (popups) PanelDropdown(expanded = overlay == target, onDismiss = closeOverlay) { PanelMenuContent(target, view, onView, onOverlay) }
      }
- 
+
 -    Box(modifier.fillMaxSize().background(c.bg)) {
 +    HomeRefreshBox(
 +        refreshing = data.refreshing,
@@ -2667,12 +2667,13 @@ index 0000000..800055c
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
 new file mode 100644
-index 0000000..1295495
+index 0000000..97cc0f0
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
-@@ -0,0 +1,322 @@
+@@ -0,0 +1,324 @@
 +package io.github.xgl34222220.hetu.tools
 +
++import io.github.xgl34222220.hetu.ui.ht
 +import androidx.compose.foundation.ScrollState
 +import androidx.compose.foundation.background
 +import androidx.compose.foundation.layout.Arrangement
@@ -2713,7 +2714,7 @@ index 0000000..1295495
 +import io.github.xgl34222220.hetu.tools.ToolsIconButton as HomeIconButton
 +import io.github.xgl34222220.hetu.home.HomeIcons
 +import io.github.xgl34222220.hetu.tools.ToolsSegmented as HomeSegmented
-+import io.github.xgl34222220.hetu.home.HomeSheetContent
++import io.github.xgl34222220.hetu.tools.ToolsSheetContent as HomeSheetContent
 +import io.github.xgl34222220.hetu.home.HomeTone
 +import io.github.xgl34222220.hetu.tools.ToolsTopBar as HomeTopBar
 +import io.github.xgl34222220.hetu.tools.ToolsTypography as HomeType
@@ -2783,8 +2784,8 @@ index 0000000..1295495
 +                    DomainCard("黑名单（额外拦截）", "添加黑名单", state.block, idle, onAdd = { onAddDomain(false) }, onRemove = { onRemoveDomain(it, false) })
 +                    HomeCard(Modifier.fillMaxWidth()) {
 +                        ToolsCardTitle("代理关闭时")
-+                        ToolsSwitchRow("独立 DNS 过滤", state.standaloneDns, onStandaloneDnsChange, icon = ToolsFeatureIcons.Globe, subtitle = "代理未运行时用本地 VPN 继续过滤广告", enabled = idle)
-+                        ToolsSwitchRow("CNAME 追踪防护", state.cnameProtection, onCnameChange, icon = ToolsFeatureIcons.Shield, subtitle = "拦截伪装成正常域名的追踪 CNAME", enabled = idle)
++                        ToolsSwitchRow("独立 DNS 过滤", state.standaloneDns, onStandaloneDnsChange, icon = ToolsFeatureIcons.Globe, subtitle = ht("代理未运行时用本地 VPN 继续过滤广告"), enabled = idle)
++                        ToolsSwitchRow("CNAME 追踪防护", state.cnameProtection, onCnameChange, icon = ToolsFeatureIcons.Shield, subtitle = ht("拦截伪装成正常域名的追踪 CNAME"), enabled = idle)
 +                    }
 +                }
 +            }
@@ -2818,8 +2819,8 @@ index 0000000..1295495
 +                Icon(look.icon, null, Modifier.size(28.dp), tint = look.tint)
 +            }
 +            Column(Modifier.weight(1f)) {
-+                Text(look.title, color = look.tint, style = HomeType.heroStatus, maxLines = 1, overflow = TextOverflow.Ellipsis)
-+                Text(look.text, color = c.t2, style = HomeType.rowSub)
++                Text(ht(look.title), color = look.tint, style = HomeType.heroStatus, maxLines = 1, overflow = TextOverflow.Ellipsis)
++                Text(ht(look.text), color = c.t2, style = HomeType.rowSub)
 +            }
 +            ToolsSwitch(state.enabled, onEnabledChange, enabled = idle, label = "广告过滤")
 +        }
@@ -2845,7 +2846,7 @@ index 0000000..1295495
 +private fun Metric(label: String, value: String, color: Color, modifier: Modifier) {
 +    val c = LocalHomeColors.current
 +    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-+        Text(label, color = c.t2, style = HomeType.caption, maxLines = 1)
++        Text(ht(label), color = c.t2, style = HomeType.caption, maxLines = 1)
 +        Text(value, Modifier.padding(top = 2.dp), color = color, style = HomeType.metric, maxLines = 1)
 +    }
 +}
@@ -2885,7 +2886,7 @@ index 0000000..1295495
 +            if (index > 0) HomeDivider(Modifier.padding(start = 52.dp, end = 16.dp))
 +            ToolsRow(
 +                AnnotatedString(domain), icon = ToolsFeatureIcons.Ban, iconTint = c.bad,
-+                subtitle = "点按可加入白名单", compact = true, onClick = { onPick(domain) }, trailing = { ToolsChevron() },
++                subtitle = ht("点按可加入白名单"), compact = true, onClick = { onPick(domain) }, trailing = { ToolsChevron() },
 +            )
 +        }
 +    }
@@ -2915,10 +2916,11 @@ index 0000000..1295495
 +        ToolsCardTitle("规则源") {
 +            HomeButton(if (state.updating) "更新中" else "立即更新", onUpdate, Modifier.padding(end = 10.dp), kind = HomeButtonKind.Primary, enabled = idle || state.updating, loading = state.updating)
 +        }
-+        if (state.sources.isEmpty()) Text("没有可用的规则源。", Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp), color = c.t2, style = HomeType.note)
++        if (state.sources.isEmpty()) Text(ht("没有可用的规则源。"), Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp), color = c.t2, style = HomeType.note)
 +        state.sources.forEach { source ->
 +            ToolsSwitchRow(
 +                source.name, source.enabled, { onSourceChange(source, it) },
++                rawContent = true,
 +                icon = if (source.id.contains("adguard", ignoreCase = true)) ToolsFeatureIcons.Shield else ToolsIcons.FileText,
 +                subtitle = "%,d 条 · ".format(source.count) + if (state.updating && source.enabled) "正在更新…" else source.meta,
 +                enabled = idle,
@@ -2934,7 +2936,7 @@ index 0000000..1295495
 +        ToolsCardTitle(title) { HomeIconButton(ToolsIcons.Plus, addLabel, onAdd, enabled = idle, tint = c.t1) }
 +        Box(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 14.dp)) {
 +            if (domains.isEmpty()) {
-+                Text("暂无", color = c.t3, style = HomeType.note)
++                Text(ht("暂无"), color = c.t3, style = HomeType.note)
 +            } else {
 +                ToolsWrap { domains.forEach { domain -> ToolsChip(domain, { onRemove(domain) }, enabled = idle) } }
 +            }
@@ -2951,10 +2953,10 @@ index 0000000..1295495
 +    val c = LocalHomeColors.current
 +    HomeSheetContent(title = "广告过滤说明", modifier = modifier, onClose = onClose) {
 +        Column(Modifier.padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-+            Text("应用流量会先经过应用直连与明确白名单，再匹配广告规则 REJECT，之后才进入普通配置分流与兜底。", color = c.t2, style = ToolsType.dialogText)
-+            Text("代理运行时，独立 DNS 过滤会自动暂停，避免两套过滤链同时接管。", color = c.t2, style = ToolsType.dialogText)
++            Text(ht("应用流量会先经过应用直连与明确白名单，再匹配广告规则 REJECT，之后才进入普通配置分流与兜底。"), color = c.t2, style = ToolsType.dialogText)
++            Text(ht("代理运行时，独立 DNS 过滤会自动暂停，避免两套过滤链同时接管。"), color = c.t2, style = ToolsType.dialogText)
 +            HomeCard(Modifier.fillMaxWidth(), background = c.bg) {
-+                Text("应用流量 → 直连应用 / 白名单 → 广告 RULE-SET → 地区 / 规则集分流 → 兜底", Modifier.padding(horizontal = 14.dp, vertical = 12.dp), color = c.t1, style = HomeType.mono)
++                Text(ht("应用流量 → 直连应用 / 白名单 → 广告 RULE-SET → 地区 / 规则集分流 → 兜底"), Modifier.padding(horizontal = 14.dp, vertical = 12.dp), color = c.t1, style = HomeType.mono)
 +            }
 +        }
 +    }
@@ -2990,17 +2992,18 @@ index 0000000..1295495
 +        onConfirm = onConfirm, onCancel = onCancel, modifier = modifier,
 +    ) {
 +        Text(overlay.domain, Modifier.fillMaxWidth(), color = c.t1, style = HomeType.mono, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
-+        Text("及其子域名将不再被拦截。", Modifier.fillMaxWidth().padding(top = 4.dp), color = c.t2, style = ToolsType.dialogText, textAlign = TextAlign.Center)
++        Text(ht("及其子域名将不再被拦截。"), Modifier.fillMaxWidth().padding(top = 4.dp), color = c.t2, style = ToolsType.dialogText, textAlign = TextAlign.Center)
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAppsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAppsScreen.kt
 new file mode 100644
-index 0000000..388855c
+index 0000000..6125191
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAppsScreen.kt
-@@ -0,0 +1,201 @@
+@@ -0,0 +1,202 @@
 +package io.github.xgl34222220.hetu.tools
 +
++import io.github.xgl34222220.hetu.ui.ht
 +import androidx.compose.foundation.background
 +import androidx.compose.foundation.clickable
 +import androidx.compose.foundation.layout.Arrangement
@@ -3111,7 +3114,7 @@ index 0000000..388855c
 +                }
 +                ToolsLoad.Ready -> if (rows.isEmpty()) {
 +                    val searching = state.searching && state.query.isNotBlank()
-+                    ToolsEmpty(ToolsIcons.Search, if (searching) "没有匹配的应用" else "没有可显示的应用", subtitle = if (searching) "尝试其他关键词" else "可在「更多」里显示系统应用")
++                    ToolsEmpty(ToolsIcons.Search, if (searching) "没有匹配的应用" else "没有可显示的应用", subtitle = ht(if (searching) "尝试其他关键词" else "可在「更多」里显示系统应用"))
 +                } else {
 +                    LazyColumn(
 +                        Modifier.fillMaxSize(),
@@ -3127,11 +3130,11 @@ index 0000000..388855c
 +        }
 +        if (ready) {
 +            ToolsFooterBar {
-+                Text("已选 ", color = c.t1, style = HomeType.bodySmall)
++                Text(ht("已选") + " ", color = c.t1, style = HomeType.bodySmall)
 +                Text(state.selectedCount.toString(), color = c.accent, style = HomeType.value.copy(fontFeatureSettings = "tnum"))
-+                Text(" 个", color = c.t1, style = HomeType.bodySmall)
-+                Text("  ·  ", color = c.t3, style = HomeType.bodySmall)
-+                Text(state.scope.tip, Modifier.weight(1f), color = c.t2, style = HomeType.caption, maxLines = 2, overflow = TextOverflow.Ellipsis)
++                Text(" " + ht("个"), color = c.t1, style = HomeType.bodySmall)
++                Text(ht("  ·  "), color = c.t3, style = HomeType.bodySmall)
++                Text(ht(state.scope.tip), Modifier.weight(1f), color = c.t2, style = HomeType.caption, maxLines = 2, overflow = TextOverflow.Ellipsis)
 +            }
 +        }
 +    }
@@ -3202,12 +3205,13 @@ index 0000000..388855c
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt
 new file mode 100644
-index 0000000..9455511
+index 0000000..e3bff78
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt
-@@ -0,0 +1,503 @@
+@@ -0,0 +1,506 @@
 +package io.github.xgl34222220.hetu.tools
 +
++import io.github.xgl34222220.hetu.ui.ht
 +import androidx.compose.foundation.background
 +import androidx.compose.foundation.border
 +import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -3340,7 +3344,7 @@ index 0000000..9455511
 +/** Secondary sentence under a top bar. */
 +@Composable
 +internal fun ToolsLead(text: String, modifier: Modifier = Modifier) {
-+    Text(text, modifier.padding(start = 4.dp, end = 4.dp, bottom = 12.dp), color = LocalHomeColors.current.t2, style = HomeType.note)
++    Text(ht(text), modifier.padding(start = 4.dp, end = 4.dp, bottom = 12.dp), color = LocalHomeColors.current.t2, style = HomeType.note)
 +}
 +
 +/** Tertiary footnote, optionally led by a 14 dp info glyph. */
@@ -3349,7 +3353,7 @@ index 0000000..9455511
 +    val c = LocalHomeColors.current
 +    Row(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
 +        if (icon != null) Icon(icon, null, Modifier.padding(top = 1.dp).size(14.dp), tint = c.t3)
-+        Text(text, color = c.t3, style = HomeType.caption)
++        Text(ht(text), color = c.t3, style = HomeType.caption)
 +    }
 +}
 +
@@ -3374,8 +3378,8 @@ index 0000000..9455511
 +    ) {
 +        Icon(icon, null, Modifier.size(26.dp), tint = c.t1)
 +        Column(Modifier.weight(1f)) {
-+            Text(title, color = c.t1, style = HomeType.section, maxLines = 1)
-+            if (caption != null) Text(caption, color = c.t3, style = HomeType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
++            Text(ht(title), color = c.t1, style = HomeType.section, maxLines = 1)
++            if (caption != null) Text(ht(caption), color = c.t3, style = HomeType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
 +        }
 +        if (trailing != null) trailing()
 +    }
@@ -3388,6 +3392,7 @@ index 0000000..9455511
 + * @param title an [AnnotatedString] so search hits can be tinted.
 + * @param selected paints the accent-soft fill used for the current config.
 + */
++/** Titles/subtitles here are raw by default; UI callers explicitly pass ht-resolved labels. */
 +@Composable
 +internal fun ToolsRow(
 +    title: AnnotatedString,
@@ -3477,10 +3482,10 @@ index 0000000..9455511
 +    val c = LocalHomeColors.current
 +    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
 +        if (readOnly) {
-+            Text(label, Modifier.padding(horizontal = 2.dp), color = c.t2, style = HomeType.section)
++            Text(ht(label), Modifier.padding(horizontal = 2.dp), color = c.t2, style = HomeType.section)
 +            Text(value, Modifier.padding(horizontal = 2.dp), color = c.t1, style = ToolsType.readOnlyValue, maxLines = 1, overflow = TextOverflow.Ellipsis)
 +        } else {
-+            HomeTextField(label, value, onValueChange, monospace = monospace, isError = error != null, keyboardType = keyboardType, placeholder = placeholder)
++            HomeTextField(ht(label), value, onValueChange, monospace = monospace, isError = error != null, keyboardType = keyboardType, placeholder = ht(placeholder))
 +        }
 +        if (error != null) {
 +            Row(Modifier.padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -3488,7 +3493,7 @@ index 0000000..9455511
 +                Text(error, color = c.bad, style = HomeType.caption)
 +            }
 +        }
-+        if (hint != null) Text(hint, Modifier.padding(horizontal = 2.dp), color = c.t3, style = HomeType.caption)
++        if (hint != null) Text(ht(hint), Modifier.padding(horizontal = 2.dp), color = c.t3, style = HomeType.caption)
 +    }
 +}
 +
@@ -3507,6 +3512,7 @@ index 0000000..9455511
 +    val focusManager = LocalFocusManager.current
 +    if (autoFocus) LaunchedEffect(Unit) { focus.requestFocus() }
 +    val style = HomeType.body.copy(color = c.t1)
++    val clearLabel = ht("清除")
 +    BasicTextField(
 +        value = value,
 +        onValueChange = onValueChange,
@@ -3524,12 +3530,12 @@ index 0000000..9455511
 +            ) {
 +                Icon(ToolsIcons.Search, null, Modifier.size(18.dp), tint = c.t3)
 +                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-+                    if (value.isEmpty()) Text(placeholder, color = c.t3, style = style.copy(color = c.t3), maxLines = 1)
++                    if (value.isEmpty()) Text(ht(placeholder), color = c.t3, style = style.copy(color = c.t3), maxLines = 1)
 +                    inner()
 +                }
 +                if (value.isNotEmpty()) {
 +                    Box(
-+                        Modifier.size(36.dp).clip(CircleShape).clickable(onClickLabel = "清除", role = Role.Button) { haptics(HomeHaptic.Tap); onValueChange("") },
++                        Modifier.size(36.dp).clip(CircleShape).clickable(onClickLabel = clearLabel, role = Role.Button) { haptics(HomeHaptic.Tap); onValueChange("") },
 +                        contentAlignment = Alignment.Center,
 +                    ) { Icon(HomeIcons.X, null, Modifier.size(16.dp), tint = c.t3) }
 +                }
@@ -3553,7 +3559,7 @@ index 0000000..9455511
 +    val c = LocalHomeColors.current
 +    Column(modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
 +        Icon(icon, null, Modifier.padding(bottom = 12.dp).size(32.dp), tint = c.t3)
-+        Text(title, color = c.t1, style = ToolsType.emptyTitle, textAlign = TextAlign.Center)
++        Text(ht(title), color = c.t1, style = ToolsType.emptyTitle, textAlign = TextAlign.Center)
 +        if (subtitle != null) Text(subtitle, Modifier.padding(top = 4.dp), color = c.t2, style = HomeType.note, textAlign = TextAlign.Center)
 +        if (action != null) Box(Modifier.padding(top = 16.dp)) { action() }
 +    }
@@ -3592,7 +3598,7 @@ index 0000000..9455511
 +        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
 +    ) {
 +        if (loading) HomeSpinner(size = 16.dp, color = content)
-+        Text(text, color = content, style = HomeType.button, maxLines = 1)
++        Text(ht(text), color = content, style = HomeType.button, maxLines = 1)
 +    }
 +}
 +
@@ -3631,8 +3637,8 @@ index 0000000..9455511
 +            .border(1.dp, c.line, ToolsDims.dialogShape)
 +            .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 16.dp),
 +    ) {
-+        Text(title, Modifier.fillMaxWidth(), color = c.t1, style = ToolsType.dialogTitle, textAlign = TextAlign.Center)
-+        if (text != null) Text(text, Modifier.fillMaxWidth().padding(top = 8.dp), color = c.t2, style = ToolsType.dialogText, textAlign = TextAlign.Center)
++        Text(ht(title), Modifier.fillMaxWidth(), color = c.t1, style = ToolsType.dialogTitle, textAlign = TextAlign.Center)
++        if (text != null) Text(ht(text), Modifier.fillMaxWidth().padding(top = 8.dp), color = c.t2, style = ToolsType.dialogText, textAlign = TextAlign.Center)
 +        if (content != null) Column(Modifier.fillMaxWidth().padding(top = 16.dp), content = content)
 +        Row(Modifier.fillMaxWidth().padding(top = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
 +            HomeButton(cancelLabel, onCancel, Modifier.weight(1f), enabled = !confirmLoading)
@@ -3689,7 +3695,7 @@ index 0000000..9455511
 +                horizontalArrangement = Arrangement.spacedBy(10.dp),
 +            ) {
 +                Icon(entry.icon, null, Modifier.size(17.dp), tint = if (entry.danger) c.bad else c.t2)
-+                Text(entry.label, color = tint, style = ToolsType.menuItem, maxLines = 1)
++                Text(ht(entry.label), color = tint, style = ToolsType.menuItem, maxLines = 1)
 +            }
 +        }
 +    }
@@ -3711,12 +3717,13 @@ index 0000000..9455511
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsConfigScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsConfigScreen.kt
 new file mode 100644
-index 0000000..16e3a86
+index 0000000..e9d3077
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsConfigScreen.kt
-@@ -0,0 +1,246 @@
+@@ -0,0 +1,247 @@
 +package io.github.xgl34222220.hetu.tools
 +
++import io.github.xgl34222220.hetu.ui.ht
 +import androidx.compose.foundation.layout.Box
 +import androidx.compose.foundation.layout.Spacer
 +import androidx.compose.foundation.layout.fillMaxWidth
@@ -3812,7 +3819,7 @@ index 0000000..16e3a86
 +            ToolsRow(
 +                title = AnnotatedString(config.name),
 +                icon = ToolsIcons.File,
-+                subtitle = config.caption,
++                subtitle = ht(config.caption),
 +                selected = config.current,
 +                enabled = !state.busy,
 +                endPadding = 4.dp,
@@ -3832,7 +3839,7 @@ index 0000000..16e3a86
 +        }
 +        HomeDivider()
 +        ToolsRow(
-+            title = AnnotatedString("编辑当前 YAML"),
++            title = AnnotatedString(ht("编辑当前 YAML")),
 +            icon = ToolsIcons.Pencil,
 +            titleColor = c.accent,
 +            iconTint = c.accent,
@@ -3859,7 +3866,7 @@ index 0000000..16e3a86
 +        if (state.subscriptions.isEmpty()) {
 +            HomeDivider()
 +            Text(
-+                "当前配置没有 proxy-providers。可以添加订阅，或直接编辑 YAML。",
++                ht("当前配置没有 proxy-providers。可以添加订阅，或直接编辑 YAML。"),
 +                Modifier.padding(horizontal = 16.dp, vertical = 14.dp), color = c.t2, style = HomeType.note,
 +            )
 +        }
@@ -3868,7 +3875,7 @@ index 0000000..16e3a86
 +            ToolsRow(
 +                title = AnnotatedString(item.name),
 +                icon = ToolsIcons.Link,
-+                subtitle = if (item.placeholder) "尚未填写订阅链接" else item.url,
++                subtitle = if (item.placeholder) ht("尚未填写订阅链接") else item.url,
 +                subtitleStyle = if (item.placeholder) HomeType.rowSub else ToolsType.url,
 +                subtitleColor = if (item.placeholder) c.warn else c.t3,
 +                enabled = !state.busy,
@@ -3963,12 +3970,13 @@ index 0000000..16e3a86
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt
 new file mode 100644
-index 0000000..9205175
+index 0000000..8ac0639
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt
-@@ -0,0 +1,122 @@
+@@ -0,0 +1,123 @@
 +package io.github.xgl34222220.hetu.tools
 +
++import io.github.xgl34222220.hetu.ui.ht
 +import androidx.compose.foundation.layout.Arrangement
 +import androidx.compose.foundation.layout.Column
 +import androidx.compose.foundation.layout.Row
@@ -4057,9 +4065,9 @@ index 0000000..9205175
 +                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
 +                        Text(core.name, Modifier.weight(1f, fill = false), color = c.t1, style = HomeType.rowTitle.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
 +                        when {
-+                            !core.runnable -> HomeBadge("仅下载管理")
-+                            core.updateAvailable -> HomeBadge("有更新", tone = HomeTone.Accent)
-+                            core.latest.isNotBlank() -> HomeBadge("已是最新", tone = HomeTone.Good)
++                            !core.runnable -> HomeBadge(ht("仅下载管理"))
++                            core.updateAvailable -> HomeBadge(ht("有更新"), tone = HomeTone.Accent)
++                            core.latest.isNotBlank() -> HomeBadge(ht("已是最新"), tone = HomeTone.Good)
 +                        }
 +                    }
 +                    Text(core.versionLine, color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -4091,12 +4099,13 @@ index 0000000..9205175
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt
 new file mode 100644
-index 0000000..62ea970
+index 0000000..7e58000
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt
-@@ -0,0 +1,239 @@
+@@ -0,0 +1,275 @@
 +package io.github.xgl34222220.hetu.tools
 +
++import io.github.xgl34222220.hetu.ui.ht
 +import androidx.compose.foundation.background
 +import androidx.compose.foundation.border
 +import androidx.compose.foundation.clickable
@@ -4205,10 +4214,11 @@ index 0000000..62ea970
 +    modifier: Modifier = Modifier,
 +    content: @Composable () -> Unit,
 +) {
++    val refreshLabel = ht("刷新")
 +    if (onRefresh == null) Box(modifier) { content() }
 +    else PullToRefreshBox(isRefreshing = refreshing, onRefresh = onRefresh,
 +        modifier = modifier.semantics {
-+            customActions = listOf(CustomAccessibilityAction("刷新") { if (!refreshing) onRefresh(); true })
++            customActions = listOf(CustomAccessibilityAction(refreshLabel) { if (!refreshing) onRefresh(); true })
 +        }) { content() }
 +}
 +
@@ -4222,9 +4232,10 @@ index 0000000..62ea970
 +) {
 +    val haptics = LocalHomeHaptics.current
 +    val source = remember { MutableInteractionSource() }
++    val localizedClickLabel = clickLabel?.let { ht(it) }
 +    val shaped = modifier.clip(ToolsDesignDims.cardShape).background(background)
 +    val interactive = if (onClick == null) shaped else shaped.hxPressScale(source, .985f)
-+        .clickable(interactionSource = source, indication = null, onClickLabel = clickLabel, role = Role.Button) {
++        .clickable(interactionSource = source, indication = null, onClickLabel = localizedClickLabel, role = Role.Button) {
 +            haptics(HomeHaptic.Tap); onClick()
 +        }
 +    Column(interactive, content = content)
@@ -4248,10 +4259,11 @@ index 0000000..62ea970
 +    val c = LocalHomeColors.current
 +    val haptics = LocalHomeHaptics.current
 +    val source = remember { MutableInteractionSource() }
++    val localizedLabel = ht(label)
 +    Box(modifier.size(48.dp).clip(ToolsDesignDims.controlShape).hxPressScale(source, .94f)
 +        .clickable(enabled = enabled && !loading, interactionSource = source, indication = null,
-+            onClickLabel = label, role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
-+        .semantics { contentDescription = label }, contentAlignment = Alignment.Center) {
++            onClickLabel = localizedLabel, role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
++        .semantics { contentDescription = localizedLabel }, contentAlignment = Alignment.Center) {
 +        if (loading) HomeSpinner(size = 18.dp, color = c.t2)
 +        else Icon(icon, null, Modifier.size(26.dp), tint = if (enabled) tint else c.t3)
 +    }
@@ -4285,7 +4297,7 @@ index 0000000..62ea970
 +        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
 +        if (loading) HomeSpinner(size = 18.dp, color = foreground)
 +        else if (icon != null) Icon(icon, null, Modifier.size(22.dp), tint = foreground)
-+        Text(text, color = foreground, style = ToolsTypography.button, maxLines = 1)
++        Text(ht(text), color = foreground, style = ToolsTypography.button, maxLines = 1)
 +    }
 +}
 +
@@ -4306,10 +4318,42 @@ index 0000000..62ea970
 +            actions()
 +        }
 +        Column(Modifier.align(Alignment.Center).padding(horizontal = 72.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-+            Text(title, color = c.t1, style = ToolsTypography.barTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
-+            if (subtitle != null) Text(subtitle, color = c.t3, style = ToolsTypography.barSubtitle,
++            Text(ht(title), color = c.t1, style = ToolsTypography.barTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
++            if (subtitle != null) Text(ht(subtitle), color = c.t3, style = ToolsTypography.barSubtitle,
 +                maxLines = 1, overflow = TextOverflow.Ellipsis)
 +        }
++    }
++}
++
++/** Only this frame's UI labels are localized; its caller owns verbatim document/report bodies. */
++@Composable
++internal fun ToolsSheetContent(
++    title: String,
++    modifier: Modifier = Modifier,
++    subtitle: String? = null,
++    onClose: (() -> Unit)? = null,
++    trailing: (@Composable RowScope.() -> Unit)? = null,
++    footer: (@Composable RowScope.() -> Unit)? = null,
++    body: @Composable ColumnScope.() -> Unit,
++) {
++    val c = LocalHomeColors.current
++    Column(modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.navigationBars)) {
++        Box(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp), contentAlignment = Alignment.Center) {
++            Box(Modifier.size(36.dp, 4.dp).background(c.line2, RoundedCornerShape(2.dp)))
++        }
++        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 8.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
++            Column(Modifier.weight(1f)) {
++                Text(ht(title), color = c.t1, style = ToolsTypography.sheetTitle)
++                if (subtitle != null) Text(ht(subtitle), Modifier.padding(top = 2.dp), color = c.t2, style = ToolsTypography.rowSub)
++            }
++            when {
++                trailing != null -> trailing()
++                onClose != null -> ToolsIconButton(HomeIcons.X, "关闭", onClose)
++            }
++        }
++        Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = if (footer == null) 24.dp else 16.dp), content = body)
++        if (footer != null) Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 20.dp),
++            horizontalArrangement = Arrangement.spacedBy(8.dp), content = footer)
 +    }
 +}
 +
@@ -4329,19 +4373,20 @@ index 0000000..62ea970
 +                .background(if (selected == key) c.accentSoft else Color.Transparent)
 +                .selectable(selected = selected == key, enabled = enabled, role = Role.Tab) { haptics(HomeHaptic.Tick); onSelect(key) }
 +                .padding(vertical = 9.dp), contentAlignment = Alignment.Center) {
-+                Text(label, color = if (selected == key) c.accent else c.t2, style = ToolsTypography.rowTitle, maxLines = 1)
++                Text(ht(label), color = if (selected == key) c.accent else c.t2, style = ToolsTypography.rowTitle, maxLines = 1)
 +            }
 +        }
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt
 new file mode 100644
-index 0000000..1f32afb
+index 0000000..556dff0
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt
-@@ -0,0 +1,147 @@
+@@ -0,0 +1,148 @@
 +package io.github.xgl34222220.hetu.tools
 +
++import io.github.xgl34222220.hetu.ui.ht
 +import androidx.compose.foundation.layout.Arrangement
 +import androidx.compose.foundation.layout.Box
 +import androidx.compose.foundation.layout.Column
@@ -4361,7 +4406,7 @@ index 0000000..1f32afb
 +import io.github.xgl34222220.hetu.tools.ToolsDesignDims as HomeDims
 +import io.github.xgl34222220.hetu.tools.ToolsHairline as HomeDivider
 +import io.github.xgl34222220.hetu.home.HomeIcons
-+import io.github.xgl34222220.hetu.home.HomeSheetContent
++import io.github.xgl34222220.hetu.tools.ToolsSheetContent as HomeSheetContent
 +import io.github.xgl34222220.hetu.home.HomeSpinner
 +import io.github.xgl34222220.hetu.home.HomeTone
 +import io.github.xgl34222220.hetu.tools.ToolsTypography as HomeType
@@ -4391,8 +4436,8 @@ index 0000000..1f32afb
 +            HomeCard(Modifier.fillMaxWidth()) {
 +                ToolsCardTitle("运行预检")
 +                ToolsRow(
-+                    AnnotatedString("开始预检"), icon = ToolsFeatureIcons.ShieldPlus, iconTint = c.t1,
-+                    subtitle = "验证 Root / TPROXY / UID / IPv6 / 绕过规则是否可用",
++                    AnnotatedString(ht("开始预检")), icon = ToolsFeatureIcons.ShieldPlus, iconTint = c.t1,
++                    subtitle = ht("验证 Root / TPROXY / UID / IPv6 / 绕过规则是否可用"),
 +                    enabled = !checking, onClick = onPreflight,
 +                    trailing = { if (checking) HomeSpinner(size = 16.dp, color = c.accent) else ToolsChevron() },
 +                )
@@ -4405,26 +4450,26 @@ index 0000000..1f32afb
 +            HomeCard(Modifier.fillMaxWidth()) {
 +                ToolsCardTitle("查看")
 +                ToolsRow(
-+                    AnnotatedString("启动配置"), icon = ToolsIcons.FileText, iconTint = c.t1,
-+                    subtitle = "最终生成的运行副本，不修改源配置", onClick = onStartupConfig, trailing = { ToolsChevron() },
++                    AnnotatedString(ht("启动配置")), icon = ToolsIcons.FileText, iconTint = c.t1,
++                    subtitle = ht("最终生成的运行副本，不修改源配置"), onClick = onStartupConfig, trailing = { ToolsChevron() },
 +                )
 +                HomeDivider(Modifier.padding(horizontal = 16.dp))
 +                ToolsRow(
-+                    AnnotatedString("消息与网络诊断"), icon = ToolsFeatureIcons.Router, iconTint = c.t1,
-+                    subtitle = "Google / 微信连接、分流与最近运行事件", onClick = onReport, trailing = { ToolsChevron() },
++                    AnnotatedString(ht("消息与网络诊断")), icon = ToolsFeatureIcons.Router, iconTint = c.t1,
++                    subtitle = ht("Google / 微信连接、分流与最近运行事件"), onClick = onReport, trailing = { ToolsChevron() },
 +                )
 +            }
 +            if (onOpenDiagnosticsDetails != null) HomeCard(Modifier.fillMaxWidth()) {
 +                ToolsCardTitle("运行记录")
-+                ToolsRow(AnnotatedString("网络事件记录"), icon = ToolsIcons.FileText,
-+                    subtitle = "事件与错误 ID、脱敏报告、运行记录修复与恢复诊断",
++                ToolsRow(AnnotatedString(ht("网络事件记录")), icon = ToolsIcons.FileText,
++                    subtitle = ht("事件与错误 ID、脱敏报告、运行记录修复与恢复诊断"),
 +                    onClick = onOpenDiagnosticsDetails, trailing = { ToolsChevron() })
 +            }
 +            HomeCard(Modifier.fillMaxWidth()) {
 +                ToolsCardTitle("紧急")
 +                ToolsRow(
-+                    AnnotatedString("恢复网络"), icon = ToolsFeatureIcons.Siren, iconTint = c.bad,
-+                    subtitle = "停止代理并回滚河图添加的 iptables / 路由规则", onClick = onRestore, trailing = { ToolsChevron() },
++                    AnnotatedString(ht("恢复网络")), icon = ToolsFeatureIcons.Siren, iconTint = c.bad,
++                    subtitle = ht("停止代理并回滚河图添加的 iptables / 路由规则"), onClick = onRestore, trailing = { ToolsChevron() },
 +                )
 +            }
 +        }
@@ -4468,7 +4513,7 @@ index 0000000..1f32afb
 +        when {
 +            content.loading -> ToolsLoading()
 +            content.error != null -> HomeBanner(content.error, HomeIcons.CircleAlert, tone = HomeTone.Bad)
-+            content.text.isBlank() -> Text("暂无内容。", Modifier.padding(horizontal = 4.dp, vertical = 8.dp), color = c.t2, style = HomeType.note)
++            content.text.isBlank() -> Text(ht("暂无内容。"), Modifier.padding(horizontal = 4.dp, vertical = 8.dp), color = c.t2, style = HomeType.note)
 +            else -> ToolsCodeBox(styled(content.text))
 +        }
 +    }
@@ -4489,12 +4534,13 @@ index 0000000..1f32afb
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt
 new file mode 100644
-index 0000000..3b95ae0
+index 0000000..2b98b46
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt
-@@ -0,0 +1,276 @@
+@@ -0,0 +1,277 @@
 +package io.github.xgl34222220.hetu.tools
 +
++import io.github.xgl34222220.hetu.ui.ht
 +import androidx.compose.foundation.background
 +import androidx.compose.foundation.clickable
 +import androidx.compose.foundation.layout.Arrangement
@@ -4535,7 +4581,7 @@ index 0000000..3b95ae0
 +import io.github.xgl34222220.hetu.home.HomeHaptic
 +import io.github.xgl34222220.hetu.tools.ToolsIconButton as HomeIconButton
 +import io.github.xgl34222220.hetu.home.HomeIcons
-+import io.github.xgl34222220.hetu.home.HomeSheetContent
++import io.github.xgl34222220.hetu.tools.ToolsSheetContent as HomeSheetContent
 +import io.github.xgl34222220.hetu.home.HomeSpinner
 +import io.github.xgl34222220.hetu.home.HomeTone
 +import io.github.xgl34222220.hetu.tools.ToolsTopBar as HomeTopBar
@@ -4589,7 +4635,7 @@ index 0000000..3b95ae0
 +            FileCard(state)
 +            ToolCard(state, usable, editor::undo, editor::redo, onOutline, onValidate)
 +            if (state.banner != null) {
-+                HomeBanner(state.banner, HomeIcons.CircleAlert, tone = HomeTone.Bad, actionLabel = "关闭提示", onAction = onDismissBanner)
++                HomeBanner(state.banner, HomeIcons.CircleAlert, tone = HomeTone.Bad, actionLabel = ht("关闭提示"), onAction = onDismissBanner)
 +            }
 +            HomeCard(Modifier.fillMaxWidth().weight(1f)) {
 +                when (val load = state.load) {
@@ -4620,7 +4666,7 @@ index 0000000..3b95ae0
 +            Icon(if (state.failed) ToolsIcons.FileWarning else ToolsIcons.FileText, null, Modifier.size(20.dp), tint = if (state.failed) c.t3 else c.t2)
 +            Column(Modifier.weight(1f)) {
 +                Text(state.title, color = c.t1, style = HomeType.rowTitle.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
-+                Text(state.caption, color = if (draft) c.warn else c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis)
++                Text(ht(state.caption), color = if (draft) c.warn else c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis)
 +            }
 +        }
 +    }
@@ -4685,9 +4731,9 @@ index 0000000..3b95ae0
 +internal fun ToolsOutlineSheetContent(items: List<ToolsOutlineItem>, onJump: (ToolsOutlineItem) -> Unit, onClose: () -> Unit, modifier: Modifier = Modifier) {
 +    val c = LocalHomeColors.current
 +    val haptics = LocalHomeHaptics.current
-+    HomeSheetContent(title = "语法大纲", modifier = modifier, subtitle = "点击跳转到对应区段", onClose = onClose) {
++    HomeSheetContent(title = "语法大纲", modifier = modifier, subtitle = ht("点击跳转到对应区段"), onClose = onClose) {
 +        if (items.isEmpty()) {
-+            Text("没有可识别的顶层字段。", Modifier.padding(horizontal = 4.dp, vertical = 8.dp), color = c.t2, style = HomeType.note)
++            Text(ht("没有可识别的顶层字段。"), Modifier.padding(horizontal = 4.dp, vertical = 8.dp), color = c.t2, style = HomeType.note)
 +        } else {
 +            HomeCard(Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
 +                Column(Modifier.verticalScroll(rememberScrollState())) {
@@ -5134,12 +5180,13 @@ index 0000000..62a9bf6
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt
 new file mode 100644
-index 0000000..b3cc02b
+index 0000000..a60a9d7
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt
-@@ -0,0 +1,457 @@
+@@ -0,0 +1,459 @@
 +package io.github.xgl34222220.hetu.tools
 +
++import io.github.xgl34222220.hetu.ui.ht
 +import androidx.compose.animation.core.animateFloatAsState
 +import androidx.compose.animation.core.tween
 +import androidx.compose.foundation.background
@@ -5231,8 +5278,8 @@ index 0000000..b3cc02b
 +    ) {
 +        HomeIconButton(HomeIcons.ChevronLeft, "返回", onBack)
 +        Column(Modifier.weight(1f).padding(horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-+            Text(title, color = c.t1, style = HomeType.barTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
-+            if (subtitle != null) Text(subtitle, color = c.t3, style = HomeType.barSubtitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
++            Text(ht(title), color = c.t1, style = HomeType.barTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
++            if (subtitle != null) Text(ht(subtitle), color = c.t3, style = HomeType.barSubtitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
 +        }
 +        actions()
 +    }
@@ -5261,7 +5308,7 @@ index 0000000..b3cc02b
 +        horizontalArrangement = Arrangement.spacedBy(4.dp),
 +    ) {
 +        if (loading) HomeSpinner(size = 16.dp, color = tint) else Icon(icon, null, Modifier.size(18.dp), tint = tint)
-+        Text(text, color = tint, style = HomeType.buttonSmall, maxLines = 1)
++        Text(ht(text), color = tint, style = HomeType.buttonSmall, maxLines = 1)
 +    }
 +}
 +
@@ -5308,7 +5355,7 @@ index 0000000..b3cc02b
 +        horizontalArrangement = Arrangement.spacedBy(12.dp),
 +    ) {
 +        Icon(HomeIcons.Info, null, Modifier.padding(top = 1.dp).size(18.dp), tint = c.accent)
-+        Text(text, Modifier.weight(1f), color = c.t1, style = HomeType.bodySmall)
++        Text(ht(text), Modifier.weight(1f), color = c.t1, style = HomeType.bodySmall)
 +    }
 +}
 +
@@ -5320,7 +5367,7 @@ index 0000000..b3cc02b
 +        modifier.fillMaxWidth().heightIn(min = HomeDims.touch).padding(start = 16.dp, end = if (trailing == null) 16.dp else 6.dp, top = 6.dp),
 +        verticalAlignment = Alignment.CenterVertically,
 +    ) {
-+        Text(text, Modifier.weight(1f), color = c.t1, style = HomeType.rowTitle.copy(fontWeight = FontWeight.SemiBold), maxLines = 1)
++        Text(ht(text), Modifier.weight(1f), color = c.t1, style = HomeType.rowTitle.copy(fontWeight = FontWeight.SemiBold), maxLines = 1)
 +        if (trailing != null) trailing()
 +    }
 +}
@@ -5336,14 +5383,15 @@ index 0000000..b3cc02b
 +    subtitle: String? = null,
 +    enabled: Boolean = true,
 +    monospaceSubtitle: Boolean = false,
++    rawContent: Boolean = false,
 +) {
 +    val c = LocalHomeColors.current
 +    ToolsRow(
-+        title = AnnotatedString(title),
++        title = AnnotatedString(if (rawContent) title else ht(title)),
 +        modifier = modifier.alpha(if (enabled) 1f else .5f),
 +        icon = icon,
 +        iconTint = c.t1,
-+        subtitle = subtitle,
++        subtitle = subtitle?.let { if (rawContent) it else ht(it) },
 +        subtitleStyle = if (monospaceSubtitle) ToolsType.url else HomeType.rowSub,
 +        enabled = enabled,
 +        onClick = { onCheckedChange(!checked) },
@@ -5406,7 +5454,7 @@ index 0000000..b3cc02b
 +                verticalAlignment = Alignment.CenterVertically,
 +            ) {
 +                Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
-+                    Text(label, color = c.t3, style = HomeType.caption)
++                    Text(ht(label), color = c.t3, style = HomeType.caption)
 +                    BasicTextField(
 +                        value = value,
 +                        onValueChange = { onChange(index, it) },
@@ -5418,7 +5466,7 @@ index 0000000..b3cc02b
 +                        cursorBrush = SolidColor(c.accent),
 +                        decorationBox = { inner ->
 +                            Box(contentAlignment = Alignment.CenterStart) {
-+                                if (value.isEmpty()) Text(placeholder, color = c.t3, style = style.copy(color = c.t3), maxLines = 1, overflow = TextOverflow.Ellipsis)
++                                if (value.isEmpty()) Text(ht(placeholder), color = c.t3, style = style.copy(color = c.t3), maxLines = 1, overflow = TextOverflow.Ellipsis)
 +                                inner()
 +                            }
 +                        },
@@ -5438,7 +5486,7 @@ index 0000000..b3cc02b
 +            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
 +        ) {
 +            Icon(ToolsIcons.Plus, null, Modifier.size(16.dp), tint = c.accent)
-+            Text("添加一项", color = c.accent, style = HomeType.buttonSmall)
++            Text(ht("添加一项"), color = c.accent, style = HomeType.buttonSmall)
 +        }
 +    }
 +}
@@ -5530,7 +5578,7 @@ index 0000000..b3cc02b
 +                verticalAlignment = Alignment.CenterVertically,
 +                horizontalArrangement = Arrangement.spacedBy(16.dp),
 +            ) {
-+                Text(option.label, Modifier.weight(1f), color = if (on) c.accent else c.t1, style = ToolsType.menuItem.copy(fontWeight = if (on) FontWeight.SemiBold else null), maxLines = 1)
++                Text(ht(option.label), Modifier.weight(1f), color = if (on) c.accent else c.t1, style = ToolsType.menuItem.copy(fontWeight = if (on) FontWeight.SemiBold else null), maxLines = 1)
 +                if (option.checked != null) Box(Modifier.size(16.dp)) { if (on) Icon(HomeIcons.Check, null, Modifier.size(16.dp), tint = c.accent) }
 +            }
 +        }
@@ -6170,253 +6218,6 @@ index 0000000..40111ed
 +        else -> false
 +    }
 +}
-diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeaturePreviews.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeaturePreviews.kt
-new file mode 100644
-index 0000000..63f3e42
---- /dev/null
-+++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeaturePreviews.kt
-@@ -0,0 +1,241 @@
-+package io.github.xgl34222220.hetu.tools
-+
-+import androidx.compose.foundation.background
-+import androidx.compose.foundation.layout.Box
-+import androidx.compose.foundation.layout.BoxScope
-+import androidx.compose.foundation.layout.fillMaxSize
-+import androidx.compose.foundation.layout.fillMaxWidth
-+import androidx.compose.foundation.layout.padding
-+import androidx.compose.foundation.rememberScrollState
-+import androidx.compose.runtime.Composable
-+import androidx.compose.runtime.remember
-+import androidx.compose.ui.Alignment
-+import androidx.compose.ui.Modifier
-+import androidx.compose.ui.draw.clip
-+import androidx.compose.ui.tooling.preview.Preview
-+import androidx.compose.ui.unit.dp
-+import io.github.xgl34222220.hetu.home.HetuHomeTheme
-+import io.github.xgl34222220.hetu.tools.ToolsDesignDims as HomeDims
-+import io.github.xgl34222220.hetu.home.LocalHomeColors
-+
-+/* ------------------------------------------------------------------ */
-+/*  One preview per concept page: C26–C49 = 03A 工具上册 第 26–49 页.    */
-+/*  Dialogs, sheets and menus are drawn in-place over a scrim, because  */
-+/*  window-based overlays do not render in static previews.             */
-+/* ------------------------------------------------------------------ */
-+
-+private const val W = 392
-+private const val H = 850
-+
-+@Composable
-+private fun Frame(dark: Boolean = false, content: @Composable BoxScope.() -> Unit) {
-+    HetuHomeTheme(dark = dark) {
-+        Box(Modifier.fillMaxSize().background(LocalHomeColors.current.bg), content = content)
-+    }
-+}
-+
-+@Composable
-+private fun BoxScope.Scrim() {
-+    Box(Modifier.matchParentSize().background(LocalHomeColors.current.scrim))
-+}
-+
-+@Composable
-+private fun BoxScope.DialogLayer(content: @Composable () -> Unit) {
-+    Scrim()
-+    Box(Modifier.align(Alignment.Center).padding(horizontal = 28.dp)) { content() }
-+}
-+
-+@Composable
-+private fun BoxScope.SheetLayer(content: @Composable () -> Unit) {
-+    Scrim()
-+    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().clip(HomeDims.sheetShape).background(LocalHomeColors.current.surface)) { content() }
-+}
-+
-+/** A bar menu, placed where the popup would hang: [end] is the distance from the right edge. */
-+@Composable
-+private fun BoxScope.MenuLayer(end: Int, content: @Composable () -> Unit) {
-+    Scrim()
-+    Box(Modifier.align(Alignment.TopEnd).padding(top = 52.dp, end = end.dp)) { content() }
-+}
-+
-+@Composable
-+private fun Apps(state: ToolsAppsState) {
-+    ToolsAppsScreen(
-+        state = state, menu = null, onBack = {}, onToggleSearch = {}, onQueryChange = {}, onScopeChange = {}, onToggleApp = {}, onSelectAll = {},
-+        onOpenMenu = {}, onDismissMenu = {}, onSortChange = {}, onToggleDescending = {}, onToggleSystem = {}, onClear = {}, onRefresh = {}, onRetry = {},
-+    )
-+}
-+
-+@Composable
-+private fun Cores(state: ToolsCoresState) {
-+    ToolsCoresScreen(state, onBack = {}, onCheck = {}, onPrimary = { _, _ -> }, onImport = {}, onRetry = {})
-+}
-+
-+@Composable
-+private fun Bypass(state: ToolsBypassState) {
-+    ToolsBypassScreen(state, onBack = {}, onSave = {}, onDraftChange = {}, onRetry = {})
-+}
-+
-+@Composable
-+private fun Diag() {
-+    ToolsDiagScreen(ToolsFeatureSamples.diag, onBack = {}, onPreflight = {}, onStartupConfig = {}, onReport = {}, onRestore = {})
-+}
-+
-+/** [scrolled] > 0 shows the lower half of the page (规则 section), as on concept page 44. */
-+@Composable
-+private fun Adblock(state: ToolsAdblockState = ToolsFeatureSamples.adblock, scrolled: Int = 0) {
-+    ToolsAdblockScreen(
-+        state = state, onBack = {}, onHelp = {}, onRefresh = {}, onEnabledChange = {}, onSwitchToRuleMode = null, onPickRecent = {}, onLevelChange = {},
-+        onUpdate = {}, onSourceChange = { _, _ -> }, onAddDomain = {}, onRemoveDomain = { _, _ -> }, onStandaloneDnsChange = {}, onCnameChange = {}, onRetry = {},
-+        scroll = rememberScrollState(initial = scrolled),
-+    )
-+}
-+
-+private const val RulesScroll = 100_000
-+
-+/* ------------------------------ 订阅 / 导入（沿用 Part 1 屏幕） ------------------------------ */
-+
-+@Preview(name = "C26 订阅 · 编辑", widthDp = W, heightDp = H)
-+@Composable
-+private fun C26EditSubscription() = Frame {
-+    ToolsSubscriptionScreen(ToolsSubscriptionForm.edit(ToolsSamples.subscriptions[0]), onNameChange = {}, onUrlChange = {}, onSave = {}, onBack = {})
-+}
-+
-+@Preview(name = "C27 导入配置 · 文件", widthDp = W, heightDp = H)
-+@Composable
-+private fun C27ImportFile() = Frame {
-+    ToolsImportScreen(
-+        ToolsImportForm(tab = ToolsImportTab.File), pickedFile = remember { ToolsPickedFile("旅行.yaml", "18 KB") },
-+        onTabChange = {}, onUrlChange = {}, onNameChange = {}, onPickFile = {}, onImport = {}, onBack = {},
-+    )
-+}
-+
-+/* ------------------------------ 应用管理 ------------------------------ */
-+
-+@Preview(name = "C28 应用管理 · 黑名单", widthDp = W, heightDp = H)
-+@Composable
-+private fun C28AppsBlacklist() = Frame { Apps(ToolsFeatureSamples.appsBlacklist) }
-+
-+@Preview(name = "C29 应用 · 排序菜单", widthDp = W, heightDp = H)
-+@Composable
-+private fun C29AppsSortMenu() = Frame {
-+    Apps(ToolsFeatureSamples.appsBlacklist)
-+    MenuLayer(end = 96) { ToolsAppSortMenuCard(ToolsFeatureSamples.appsBlacklist, onSortChange = {}, onToggleDescending = {}) }
-+}
-+
-+@Preview(name = "C30 应用 · 更多菜单", widthDp = W, heightDp = H)
-+@Composable
-+private fun C30AppsMoreMenu() = Frame {
-+    Apps(ToolsFeatureSamples.appsBlacklist)
-+    MenuLayer(end = 8) { ToolsAppMoreMenuCard(ToolsFeatureSamples.appsBlacklist, onToggleSystem = {}, onSelectAll = {}, onClear = {}, onRefresh = {}) }
-+}
-+
-+@Preview(name = "C31 应用管理 · 白名单", widthDp = W, heightDp = H)
-+@Composable
-+private fun C31AppsWhitelist() = Frame { Apps(ToolsFeatureSamples.appsWhitelist) }
-+
-+@Preview(name = "C32 应用管理 · 核心模式", widthDp = W, heightDp = H)
-+@Composable
-+private fun C32AppsCore() = Frame { Apps(ToolsFeatureSamples.appsCore) }
-+
-+@Preview(name = "C33 应用管理 · 搜索", widthDp = W, heightDp = H)
-+@Composable
-+private fun C33AppsSearch() = Frame { Apps(ToolsFeatureSamples.appsSearch) }
-+
-+/* ------------------------------ 核心管理 ------------------------------ */
-+
-+@Preview(name = "C34 核心管理", widthDp = W, heightDp = H)
-+@Composable
-+private fun C34Cores() = Frame { Cores(ToolsFeatureSamples.coresIdle) }
-+
-+@Preview(name = "C35 核心管理 · 下载中", widthDp = W, heightDp = H)
-+@Composable
-+private fun C35CoresDownloading() = Frame { Cores(ToolsFeatureSamples.coresDownloading) }
-+
-+/* ------------------------------ 绕过规则 / 共享网络 / CNIP ------------------------------ */
-+
-+@Preview(name = "C36 绕过规则", widthDp = W, heightDp = H)
-+@Composable
-+private fun C36Bypass() = Frame { Bypass(ToolsFeatureSamples.bypass) }
-+
-+@Preview(name = "C37 绕过规则 · 放弃修改", widthDp = W, heightDp = H)
-+@Composable
-+private fun C37BypassDiscard() = Frame {
-+    Bypass(ToolsFeatureSamples.bypassDirty)
-+    DialogLayer { ToolsDiscardChangesDialogCard(onConfirm = {}, onCancel = {}) }
-+}
-+
-+@Preview(name = "C38 共享网络", widthDp = W, heightDp = 980)
-+@Composable
-+private fun C38Share() = Frame {
-+    ToolsShareScreen(ToolsFeatureSamples.share, onBack = {}, onRefresh = {}, onSave = {}, onDraftChange = {}, onRetry = {})
-+}
-+
-+@Preview(name = "C39 CNIP 设置", widthDp = W, heightDp = H)
-+@Composable
-+private fun C39CnIp() = Frame { ToolsCnIpScreen(ToolsFeatureSamples.cnIp, onBack = {}, onEnabledChange = {}) }
-+
-+/* ------------------------------ 诊断与维护 ------------------------------ */
-+
-+@Preview(name = "C40 诊断与维护", widthDp = W, heightDp = H)
-+@Composable
-+private fun C40Diag() = Frame { Diag() }
-+
-+@Preview(name = "C41 诊断 · 启动配置浮层", widthDp = W, heightDp = H)
-+@Composable
-+private fun C41StartupConfig() = Frame {
-+    Diag()
-+    SheetLayer { ToolsStartupConfigSheetContent(ToolsDiagText(loading = false, text = ToolsFeatureSamples.startupConfig), onCopy = {}) }
-+}
-+
-+@Preview(name = "C42 诊断 · 恢复网络确认", widthDp = W, heightDp = H)
-+@Composable
-+private fun C42RestoreNetwork() = Frame {
-+    Diag()
-+    DialogLayer { ToolsRestoreNetworkDialogCard(onConfirm = {}, onCancel = {}) }
-+}
-+
-+@Preview(name = "C43 诊断 · 消息与网络", widthDp = W, heightDp = H)
-+@Composable
-+private fun C43Report() = Frame {
-+    Diag()
-+    SheetLayer { ToolsReportSheetContent(ToolsDiagText(loading = false, text = ToolsFeatureSamples.report), onCopy = {}) }
-+}
-+
-+/* ------------------------------ 广告过滤 ------------------------------ */
-+
-+@Preview(name = "C44 广告过滤 · 规则", widthDp = W, heightDp = H)
-+@Composable
-+private fun C44AdblockRules() = Frame { Adblock(scrolled = RulesScroll) }
-+
-+@Preview(name = "C45 广告过滤 · 状态", widthDp = W, heightDp = H)
-+@Composable
-+private fun C45AdblockStatus() = Frame { Adblock() }
-+
-+@Preview(name = "C46 广告过滤 · 说明", widthDp = W, heightDp = H)
-+@Composable
-+private fun C46AdblockHelp() = Frame {
-+    Adblock()
-+    SheetLayer { ToolsAdblockHelpSheetContent(onClose = {}) }
-+}
-+
-+@Preview(name = "C47 广告过滤 · 添加白名单", widthDp = W, heightDp = H)
-+@Composable
-+private fun C47AddAllow() = Frame {
-+    Adblock(scrolled = RulesScroll)
-+    DialogLayer { ToolsAddDomainDialogCard(ToolsAdOverlay.AddDomain(allow = true, draft = "example.com"), onDraftChange = {}, onConfirm = {}, onCancel = {}) }
-+}
-+
-+@Preview(name = "C48 广告过滤 · 添加黑名单", widthDp = W, heightDp = H)
-+@Composable
-+private fun C48AddBlock() = Frame {
-+    Adblock(scrolled = RulesScroll)
-+    DialogLayer { ToolsAddDomainDialogCard(ToolsAdOverlay.AddDomain(allow = false, draft = "ads.example.net"), onDraftChange = {}, onConfirm = {}, onCancel = {}) }
-+}
-+
-+@Preview(name = "C49 广告过滤 · 加入白名单确认", widthDp = W, heightDp = H)
-+@Composable
-+private fun C49ConfirmAllow() = Frame {
-+    Adblock()
-+    DialogLayer { ToolsConfirmAllowDialogCard(ToolsAdOverlay.ConfirmAllow("ads.example.com"), onConfirm = {}, onCancel = {}) }
-+}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureRoute.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureRoute.kt
 new file mode 100644
 index 0000000..96c02e4
@@ -6963,115 +6764,6 @@ index 0000000..96c02e4
 +        null -> Unit
 +    }
 +}
-diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureSamples.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureSamples.kt
-new file mode 100644
-index 0000000..8ba872c
---- /dev/null
-+++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureSamples.kt
-@@ -0,0 +1,103 @@
-+package io.github.xgl34222220.hetu.tools
-+
-+/** Sample data for the previews of pages 26–49; mirrors the 示例数据 of the concept pages. */
-+internal object ToolsFeatureSamples {
-+    val apps = listOf(
-+        ToolsApp("com.tencent.mm", "微信", "com.tencent.mm", 10142),
-+        ToolsApp("com.eg.android.AlipayGphone", "支付宝", "com.eg.android.AlipayGphone", 10158),
-+        ToolsApp("com.android.chrome", "Chrome", "com.android.chrome", 10112),
-+        ToolsApp("org.telegram.messenger", "Telegram", "org.telegram.messenger", 10201),
-+        ToolsApp("com.google.android.youtube", "YouTube", "com.google.android.youtube", 10135),
-+        ToolsApp("tv.danmaku.bili", "哔哩哔哩", "tv.danmaku.bili", 10206),
-+        ToolsApp("com.example.maps", "地图", "com.example.maps", 10220),
-+    )
-+
-+    val appsBlacklist = ToolsAppsState(
-+        ToolsLoad.Ready, apps, ToolsAppScope.Blacklist,
-+        blacklist = setOf("com.tencent.mm", "com.eg.android.AlipayGphone"),
-+        whitelist = setOf("org.telegram.messenger", "com.google.android.youtube"),
-+    )
-+    val appsWhitelist = appsBlacklist.copy(scope = ToolsAppScope.Whitelist)
-+    val appsCore = appsBlacklist.copy(scope = ToolsAppScope.Core)
-+    val appsSearch = appsBlacklist.copy(searching = true, query = "微信")
-+
-+    val cores = listOf(
-+        ToolsCore("mihomo", "Mihomo", installed = "内置版本", latest = "示例版本", updateAvailable = true, bundled = true),
-+        ToolsCore("xray", "Xray", installed = "未安装", runnable = false),
-+        ToolsCore("sing-box", "sing-box", installed = "未安装", runnable = false),
-+    )
-+    val coresIdle = ToolsCoresState(ToolsLoad.Ready, "Mihomo（示例）", cores)
-+    val coresDownloading = coresIdle.copy(busyId = "mihomo", progress = "正在下载 · 6.4 MB / 12.8 MB")
-+
-+    val bypassRules = ToolsBypassRules(listOf("10.0.0.0/8", "fd00::/8"), listOf("dummy0"))
-+    val bypass = ToolsBypassState(ToolsLoad.Ready, bypassRules, bypassRules)
-+    val bypassDirty = bypass.copy(draft = bypassRules.copy(cidrs = bypassRules.cidrs + "192.168.0.0/16"))
-+
-+    val shareSettings = ToolsShareSettings(enabled = true, directInterfaces = setOf("rndis0"), macs = listOf("02:00:00:00:00:02"))
-+    val share = ToolsShareState(
-+        ToolsLoad.Ready, shareSettings, shareSettings,
-+        interfaces = listOf(ToolsShareInterface("wlan1", "UP"), ToolsShareInterface("rndis0", "UP")),
-+        clients = listOf(
-+            ToolsShareClient("192.168.43.101", "02:00:00:00:00:01", "wlan1", "REACHABLE"),
-+            ToolsShareClient("192.168.43.102", "02:00:00:00:00:02", "wlan1", "STALE"),
-+        ),
-+    )
-+
-+    val cnIp = ToolsCnIpState(ToolsLoad.Ready, enabled = true)
-+
-+    val diag = ToolsDiagState(ToolsPreflight.Passed())
-+
-+    val startupConfig = """
-+        port: 7890
-+        allow-lan: true
-+        mode: rule
-+        log-level: info
-+        ipv6: true
-+        external-controller: 127.0.0.1:9090
-+        dns:
-+          enable: true
-+        rules:
-+          - GEOIP,CN,DIRECT
-+          - MATCH,节点选择
-+    """.trimIndent()
-+
-+    val report = """
-+        --- 版本与最近运行事件 ---
-+        time=2026-10-01 09:41
-+        app=示例版本
-+        expectedCore=mihomo
-+        proxyBaseMode=tproxy
-+        proxyRootRuntimeRunning=true
-+
-+        --- 最近启动耗时（毫秒） ---
-+        尚无启动记录
-+
-+        --- 源配置标识 ---
-+        bytes=2048
-+        sha256=示例摘要
-+
-+        --- Root 网络状态 ---
-+        无记录
-+    """.trimIndent()
-+
-+    val adblock = ToolsAdblockState(
-+        load = ToolsLoad.Ready,
-+        enabled = true,
-+        proxyRunning = true,
-+        ruleCount = 128420,
-+        hits = 36,
-+        allow = listOf("example.com", "example.org"),
-+        block = listOf("ads.example.net"),
-+        sources = listOf(
-+            ToolsAdSource("cn", "中文广告规则", 32480, "使用内置快照", enabled = true),
-+            ToolsAdSource("adguard-dns", "AdGuard DNS", 95940, "更新于 10 分钟前", enabled = true),
-+            ToolsAdSource("hagezi", "HaGeZi", 58200, "使用内置快照", enabled = false),
-+        ),
-+        level = ToolsAdLevel.Balanced,
-+        recent = listOf("ads.example.com", "tracker.example.org"),
-+        startupInjected = true,
-+        controllerLoaded = true,
-+        standaloneDns = false,
-+        cnameProtection = true,
-+    )
-+}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsIcons.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsIcons.kt
 new file mode 100644
 index 0000000..9b0a4af
@@ -7281,12 +6973,13 @@ index 0000000..9b0a4af
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsImportScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsImportScreen.kt
 new file mode 100644
-index 0000000..72bb1b3
+index 0000000..19c6bd6
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsImportScreen.kt
-@@ -0,0 +1,96 @@
+@@ -0,0 +1,97 @@
 +package io.github.xgl34222220.hetu.tools
 +
++import io.github.xgl34222220.hetu.ui.ht
 +import androidx.compose.foundation.layout.Arrangement
 +import androidx.compose.foundation.layout.Column
 +import androidx.compose.foundation.layout.Spacer
@@ -7351,14 +7044,14 @@ index 0000000..72bb1b3
 +                    ToolsField("配置名称（可选）", form.name, onNameChange, placeholder = "留空则使用链接中的文件名")
 +                } else {
 +                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-+                        Text("配置文件", Modifier.padding(horizontal = 2.dp), color = c.t2, style = HomeType.section)
++                        Text(ht("配置文件"), Modifier.padding(horizontal = 2.dp), color = c.t2, style = HomeType.section)
 +                        HomeCard(Modifier.fillMaxWidth(), background = c.bg) {
 +                            if (pickedFile != null) {
 +                                ToolsRow(AnnotatedString(pickedFile.name), icon = ToolsIcons.File, subtitle = pickedFile.detail.ifBlank { null })
 +                                HomeDivider()
 +                            }
 +                            ToolsRow(
-+                                AnnotatedString(if (pickedFile == null) "选择文件" else "重新选择文件"),
++                                AnnotatedString(ht(if (pickedFile == null) "选择文件" else "重新选择文件")),
 +                                icon = ToolsIcons.Folder, compact = true, enabled = !form.importing,
 +                                onClick = onPickFile, trailing = { ToolsChevron() },
 +                            )
@@ -7865,12 +7558,13 @@ index 0000000..60a38ad
 +)
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsNetworkScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsNetworkScreens.kt
 new file mode 100644
-index 0000000..939e043
+index 0000000..1860567
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsNetworkScreens.kt
-@@ -0,0 +1,225 @@
+@@ -0,0 +1,228 @@
 +package io.github.xgl34222220.hetu.tools
 +
++import io.github.xgl34222220.hetu.ui.ht
 +import androidx.compose.foundation.layout.Arrangement
 +import androidx.compose.foundation.layout.Column
 +import androidx.compose.foundation.layout.Spacer
@@ -7997,7 +7691,7 @@ index 0000000..939e043
 +        modifier = modifier.imePadding(),
 +        refreshing = state.refreshing,
 +        onRefresh = if (state.saving) null else onRefresh,
-+        subtitle = "热点、USB 与局域网转发流量",
++        subtitle = ht("热点、USB 与局域网转发流量"),
 +        actions = {
 +            HomeIconButton(HomeIcons.RefreshCw, "刷新", onRefresh, enabled = ready, loading = state.refreshing)
 +            HomeIconButton(HomeIcons.Check, "保存", onSave, enabled = state.dirty && editable, loading = state.saving, tint = if (state.dirty) c.accent else c.t3)
@@ -8011,14 +7705,14 @@ index 0000000..939e043
 +            ToolsLoad.Ready -> Column(verticalArrangement = Arrangement.spacedBy(HomeDims.gap)) {
 +                ToolsInfoCard("开启后河图接管共享 / 转发流量；接口与 MAC 直连在 Root 层生效，修改后重启代理。")
 +                HomeCard(Modifier.fillMaxWidth()) {
-+                    ToolsSwitchRow("启用共享网络", draft.enabled, { onDraftChange(draft.copy(enabled = it)) }, icon = ToolsIcons.Wifi, subtitle = "将共享流量纳入透明代理", enabled = editable)
++                    ToolsSwitchRow("启用共享网络", draft.enabled, { onDraftChange(draft.copy(enabled = it)) }, icon = ToolsIcons.Wifi, subtitle = ht("将共享流量纳入透明代理"), enabled = editable)
 +                }
 +                val lower = editable && draft.enabled
 +                Column(Modifier.alpha(if (draft.enabled) 1f else .5f), verticalArrangement = Arrangement.spacedBy(HomeDims.gap)) {
 +                    HomeCard(Modifier.fillMaxWidth()) {
 +                        ToolsCardTitle("共享网络接口")
 +                        if (state.interfaces.isEmpty()) {
-+                            Text(state.note.ifBlank { "没有检测到正在共享的接口。" }, Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp), color = c.t2, style = HomeType.note)
++                            Text(state.note.ifBlank { ht("没有检测到正在共享的接口。") }, Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp), color = c.t2, style = HomeType.note)
 +                        }
 +                        state.interfaces.forEachIndexed { index, item ->
 +                            if (index > 0) HomeDivider(Modifier.padding(horizontal = 16.dp))
@@ -8026,8 +7720,9 @@ index 0000000..939e043
 +                            ToolsSwitchRow(
 +                                item.name, direct,
 +                                { on -> onDraftChange(draft.copy(directInterfaces = if (on) draft.directInterfaces + item.name else draft.directInterfaces - item.name)) },
++                                rawContent = true,
 +                                icon = ToolsIcons.Link,
-+                                subtitle = (if (direct) "直连" else "接管") + if (item.state.isBlank()) "" else " · 状态 ${item.state}",
++                                subtitle = ht(if (direct) "直连" else "接管") + if (item.state.isBlank()) "" else " · ${ht("状态")} ${item.state}",
 +                                enabled = lower,
 +                            )
 +                        }
@@ -8035,7 +7730,7 @@ index 0000000..939e043
 +                    HomeCard(Modifier.fillMaxWidth()) {
 +                        ToolsCardTitle("下游设备")
 +                        if (state.clients.isEmpty()) {
-+                            Text("没有检测到下游设备。", Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp), color = c.t2, style = HomeType.note)
++                            Text(ht("没有检测到下游设备。"), Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp), color = c.t2, style = HomeType.note)
 +                        }
 +                        state.clients.forEachIndexed { index, client ->
 +                            if (index > 0) HomeDivider(Modifier.padding(horizontal = 16.dp))
@@ -8043,6 +7738,7 @@ index 0000000..939e043
 +                            ToolsSwitchRow(
 +                                client.ip, mac in macs,
 +                                { on -> onDraftChange(draft.copy(macs = if (on) draft.macs + mac else draft.macs.filter { it.trim().lowercase() != mac })) },
++                                rawContent = true,
 +                                icon = ToolsFeatureIcons.Laptop,
 +                                subtitle = listOf(client.mac, client.iface, client.state).filter { it.isNotBlank() }.joinToString(" · "),
 +                                monospaceSubtitle = true,
@@ -8085,279 +7781,14 @@ index 0000000..939e043
 +        HomeCard(Modifier.fillMaxWidth()) {
 +            ToolsSwitchRow(
 +                "绕过 CNIP", state.enabled, onEnabledChange,
-+                icon = ToolsFeatureIcons.Globe, subtitle = "命中国内 IPv4 / IPv6 网段时直接连接", enabled = state.load is ToolsLoad.Ready,
++                icon = ToolsFeatureIcons.Globe, subtitle = ht("命中国内 IPv4 / IPv6 网段时直接连接"), enabled = state.load is ToolsLoad.Ready,
 +            )
 +        }
 +        Spacer(Modifier.height(HomeDims.gap))
 +        HomeCard(Modifier.fillMaxWidth()) {
-+            ToolsRow(AnnotatedString("数据源"), icon = ToolsIcons.Database, iconTint = c.t1, subtitle = "内置离线快照 + Mihomo provider 运行时更新")
++            ToolsRow(AnnotatedString(ht("数据源")), icon = ToolsIcons.Database, iconTint = c.t1, subtitle = ht("内置离线快照 + Mihomo provider 运行时更新"))
 +        }
 +    }
-+}
-diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsPreviews.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsPreviews.kt
-new file mode 100644
-index 0000000..62b900c
---- /dev/null
-+++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsPreviews.kt
-@@ -0,0 +1,259 @@
-+package io.github.xgl34222220.hetu.tools
-+
-+import androidx.compose.foundation.background
-+import androidx.compose.foundation.layout.Box
-+import androidx.compose.foundation.layout.BoxScope
-+import androidx.compose.foundation.layout.fillMaxSize
-+import androidx.compose.foundation.layout.fillMaxWidth
-+import androidx.compose.foundation.layout.padding
-+import androidx.compose.foundation.rememberScrollState
-+import androidx.compose.runtime.Composable
-+import androidx.compose.runtime.remember
-+import androidx.compose.ui.Alignment
-+import androidx.compose.ui.Modifier
-+import androidx.compose.ui.draw.clip
-+import androidx.compose.ui.tooling.preview.Preview
-+import androidx.compose.ui.unit.dp
-+import io.github.xgl34222220.hetu.home.HetuHomeTheme
-+import io.github.xgl34222220.hetu.tools.ToolsDesignDims as HomeDims
-+import io.github.xgl34222220.hetu.home.LocalHomeColors
-+
-+/* ------------------------------------------------------------------ */
-+/*  One preview per concept page: C01–C25 = 03A 工具上册 第 1–25 页.     */
-+/*  Dialogs, sheets and menus are drawn in-place over a scrim, because  */
-+/*  window-based overlays do not render in static previews.             */
-+/* ------------------------------------------------------------------ */
-+
-+private const val W = 392
-+private const val H = 850
-+
-+@Composable
-+private fun Frame(dark: Boolean = false, content: @Composable BoxScope.() -> Unit) {
-+    HetuHomeTheme(dark = dark) {
-+        Box(Modifier.fillMaxSize().background(LocalHomeColors.current.bg), content = content)
-+    }
-+}
-+
-+@Composable
-+private fun BoxScope.Scrim() {
-+    Box(Modifier.matchParentSize().background(LocalHomeColors.current.scrim))
-+}
-+
-+@Composable
-+private fun BoxScope.DialogLayer(content: @Composable () -> Unit) {
-+    Scrim()
-+    Box(Modifier.align(Alignment.Center).padding(horizontal = 28.dp)) { content() }
-+}
-+
-+@Composable
-+private fun BoxScope.SheetLayer(content: @Composable () -> Unit) {
-+    Scrim()
-+    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().clip(HomeDims.sheetShape).background(LocalHomeColors.current.surface)) { content() }
-+}
-+
-+@Composable
-+private fun Root(state: ToolsRootState, scrolled: Int = 0) {
-+    ToolsScreen(state, onToggleSearch = {}, onQueryChange = {}, onOpen = {}, scroll = rememberScrollState(initial = scrolled))
-+}
-+
-+@Composable
-+private fun Configs(state: ToolsConfigState = ToolsSamples.configState) {
-+    ToolsConfigScreen(
-+        state = state, menuFor = null, onBack = {}, onImport = {}, onSelectConfig = {}, onOpenMenu = {}, onDismissMenu = {},
-+        onMenuItem = { _, _ -> }, onEditYaml = {}, onAddSubscription = {}, onEditSubscription = {}, onDeleteSubscription = {}, onRetry = {},
-+    )
-+}
-+
-+/** The row menu of the config at [index], placed where the popup would hang. */
-+@Composable
-+private fun BoxScope.ConfigMenu(index: Int) {
-+    Box(Modifier.align(Alignment.TopEnd).padding(top = 188.dp + 57.dp * index, end = 20.dp)) {
-+        ToolsConfigMenuCard(ToolsSamples.configs[index]) {}
-+    }
-+}
-+
-+@Composable
-+private fun Subscription(form: ToolsSubscriptionForm) {
-+    ToolsSubscriptionScreen(form, onNameChange = {}, onUrlChange = {}, onSave = {}, onBack = {})
-+}
-+
-+@Composable
-+private fun Import(form: ToolsImportForm) {
-+    ToolsImportScreen(form, pickedFile = null, onTabChange = {}, onUrlChange = {}, onNameChange = {}, onPickFile = {}, onImport = {}, onBack = {})
-+}
-+
-+@Composable
-+private fun Editor(state: ToolsEditorState = ToolsSamples.editorDraft, text: String = ToolsSamples.yaml) {
-+    val buffer = remember(text) { ToolsYamlEditorState(text) }
-+    ToolsEditorScreen(state, buffer, onBack = {}, onSave = {}, onOutline = {}, onValidate = {}, onDismissBanner = {}, onReload = {})
-+}
-+
-+/* ------------------------------ 工具 ------------------------------ */
-+
-+@Preview(name = "C01 工具 · 展开", widthDp = W, heightDp = H)
-+@Composable
-+private fun C01ToolsExpanded() = Frame { Root(ToolsRootState()) }
-+
-+@Preview(name = "C02 工具 · 折叠顶栏", widthDp = W, heightDp = 640)
-+@Composable
-+private fun C02ToolsCollapsed() = Frame { Root(ToolsRootState(), scrolled = 600) }
-+
-+@Preview(name = "C03 工具 · 搜索", widthDp = W, heightDp = H)
-+@Composable
-+private fun C03ToolsSearch() = Frame { Root(ToolsSamples.rootSearch) }
-+
-+/* ------------------------------ 配置与订阅 ------------------------------ */
-+
-+@Preview(name = "C04 配置与订阅 · 列表", widthDp = W, heightDp = H)
-+@Composable
-+private fun C04Configs() = Frame { Configs() }
-+
-+@Preview(name = "C05 添加订阅", widthDp = W, heightDp = H)
-+@Composable
-+private fun C05AddSubscription() = Frame { Subscription(ToolsSamples.addSubscription) }
-+
-+@Preview(name = "C06 配置菜单 · 当前配置", widthDp = W, heightDp = H)
-+@Composable
-+private fun C06MenuCurrent() = Frame { Configs(); ConfigMenu(0) }
-+
-+@Preview(name = "C07 配置菜单 · 其他配置", widthDp = W, heightDp = H)
-+@Composable
-+private fun C07MenuOther() = Frame { Configs(); ConfigMenu(1) }
-+
-+@Preview(name = "C08 配置菜单 · 内置模板", widthDp = W, heightDp = H)
-+@Composable
-+private fun C08MenuBundled() = Frame { Configs(); ConfigMenu(2) }
-+
-+@Preview(name = "C09 配置 · 重命名", widthDp = W, heightDp = H)
-+@Composable
-+private fun C09Rename() = Frame {
-+    Configs()
-+    DialogLayer { ToolsRenameConfigDialogCard(ToolsConfigOverlay.Rename("工作.yaml", "工作专用.yaml"), onDraftChange = {}, onConfirm = {}, onCancel = {}) }
-+}
-+
-+@Preview(name = "C10 配置 · 删除确认", widthDp = W, heightDp = H)
-+@Composable
-+private fun C10DeleteConfig() = Frame {
-+    Configs()
-+    DialogLayer { ToolsDeleteConfigDialogCard(ToolsConfigOverlay.DeleteConfig("日常.yaml", isCurrent = true), onConfirm = {}, onCancel = {}) }
-+}
-+
-+@Preview(name = "C11 订阅 · 删除确认", widthDp = W, heightDp = H)
-+@Composable
-+private fun C11DeleteSubscription() = Frame {
-+    Configs()
-+    DialogLayer { ToolsDeleteSubscriptionDialogCard(ToolsConfigOverlay.DeleteSubscription("日常.yaml", "主订阅"), onConfirm = {}, onCancel = {}) }
-+}
-+
-+@Preview(name = "C12 导入配置 · 放弃填写", widthDp = W, heightDp = H)
-+@Composable
-+private fun C12ImportDiscard() = Frame {
-+    Import(ToolsSamples.importLink)
-+    DialogLayer { ToolsDiscardFormDialogCard(onConfirm = {}, onCancel = {}) }
-+}
-+
-+/* ------------------------------ 配置编辑 ------------------------------ */
-+
-+@Preview(name = "C13 配置编辑 · 语法大纲", widthDp = W, heightDp = H)
-+@Composable
-+private fun C13Outline() = Frame {
-+    Editor()
-+    SheetLayer { ToolsOutlineSheetContent(ToolsYaml.outline(ToolsSamples.yaml), onJump = {}, onClose = {}) }
-+}
-+
-+@Preview(name = "C14 配置编辑 · 选择变更冲突", widthDp = W, heightDp = H)
-+@Composable
-+private fun C14SaveConflict() = Frame {
-+    Editor()
-+    SheetLayer { ToolsSaveConflictSheetContent("工作.yaml", onKeepDraft = {}, onReload = {}) }
-+}
-+
-+@Preview(name = "C15 配置编辑 · 校验失败", widthDp = W, heightDp = H)
-+@Composable
-+private fun C15Invalid() = Frame { Editor(ToolsSamples.editorInvalid, ToolsSamples.yamlInvalid) }
-+
-+@Preview(name = "C16 配置编辑 · 读取失败", widthDp = W, heightDp = H)
-+@Composable
-+private fun C16LoadFailed() = Frame { Editor(ToolsSamples.editorLoadFailed, "") }
-+
-+@Preview(name = "C17 配置编辑 · 文件外部修改", widthDp = W, heightDp = H)
-+@Composable
-+private fun C17SourceChanged() = Frame {
-+    Editor()
-+    SheetLayer { ToolsSourceChangedSheetContent(onKeepDraft = {}, onReload = {}) }
-+}
-+
-+@Preview(name = "C18 配置编辑 · 放弃并重新读取", widthDp = W, heightDp = H)
-+@Composable
-+private fun C18ConfirmReload() = Frame {
-+    Editor()
-+    DialogLayer { ToolsReloadDraftDialogCard(onConfirm = {}, onCancel = {}) }
-+}
-+
-+@Preview(name = "C19 配置编辑 · 放弃修改", widthDp = W, heightDp = H)
-+@Composable
-+private fun C19ConfirmDiscard() = Frame {
-+    Editor()
-+    DialogLayer { ToolsDiscardEditsDialogCard(onConfirm = {}, onCancel = {}) }
-+}
-+
-+/* ------------------------------ 表单校验 ------------------------------ */
-+
-+@Preview(name = "C20 导入配置 · 链接错误", widthDp = W, heightDp = H)
-+@Composable
-+private fun C20ImportUrlInvalid() = Frame { Import(ToolsSamples.importLinkInvalid) }
-+
-+@Preview(name = "C21 添加订阅 · 名称为空", widthDp = W, heightDp = H)
-+@Composable
-+private fun C21AddNameEmpty() = Frame { Subscription(ToolsSamples.addSubscriptionNameEmpty) }
-+
-+@Preview(name = "C22 添加订阅 · 链接错误", widthDp = W, heightDp = H)
-+@Composable
-+private fun C22AddUrlInvalid() = Frame { Subscription(ToolsSamples.addSubscriptionUrlInvalid) }
-+
-+@Preview(name = "C23 编辑订阅 · 链接错误", widthDp = W, heightDp = H)
-+@Composable
-+private fun C23EditUrlInvalid() = Frame { Subscription(ToolsSamples.editSubscriptionUrlInvalid) }
-+
-+@Preview(name = "C24 导入配置 · 链接", widthDp = W, heightDp = H)
-+@Composable
-+private fun C24ImportLink() = Frame { Import(ToolsSamples.importLink) }
-+
-+@Preview(name = "C25 配置编辑 · YAML", widthDp = W, heightDp = H)
-+@Composable
-+private fun C25Editor() = Frame { Editor() }
-+
-+/* ------------------------------ 补充 ------------------------------ */
-+
-+@Preview(name = "X1 工具 · 搜索无结果", widthDp = W, heightDp = H)
-+@Composable
-+private fun X1SearchEmpty() = Frame { Root(ToolsSamples.rootSearchEmpty) }
-+
-+@Preview(name = "X2 配置与订阅 · 无订阅", widthDp = W, heightDp = H)
-+@Composable
-+private fun X2NoSubscriptions() = Frame { Configs(ToolsSamples.configStateNoSubscriptions) }
-+
-+@Preview(name = "X3 配置与订阅 · 读取失败", widthDp = W, heightDp = H)
-+@Composable
-+private fun X3ConfigsFailed() = Frame { Configs(ToolsConfigState(ToolsLoad.Failed("配置库暂时无法读取"))) }
-+
-+@Preview(name = "X4 配置与订阅 · 深色", widthDp = W, heightDp = H)
-+@Composable
-+private fun X4ConfigsDark() = Frame(dark = true) { Configs() }
-+
-+@Preview(name = "X5 配置编辑 · 深色", widthDp = W, heightDp = H)
-+@Composable
-+private fun X5EditorDark() = Frame(dark = true) { Editor() }
-+
-+/** The whole flow on sample data: run it in interactive mode to walk pages 1–25. */
-+@Preview(name = "X6 交互流程（示例数据）", widthDp = W, heightDp = H)
-+@Composable
-+private fun X6Flow() = Frame {
-+    val actions = remember {
-+        ToolsActions(
-+            loadConfigs = { ToolsConfigSnapshot(ToolsSamples.configs, ToolsSamples.subscriptions) },
-+            readConfig = { ToolsConfigDocument("日常.yaml", ToolsSamples.yaml) },
-+        )
-+    }
-+    ToolsRoute(actions)
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsRoute.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsRoute.kt
 new file mode 100644
@@ -8867,85 +8298,15 @@ index 0000000..7967521
 +}
 +
 +private fun Throwable.reason(fallback: String): String = message?.takeIf { it.isNotBlank() } ?: fallback
-diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSamples.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSamples.kt
-new file mode 100644
-index 0000000..1821fc9
---- /dev/null
-+++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSamples.kt
-@@ -0,0 +1,65 @@
-+package io.github.xgl34222220.hetu.tools
-+
-+/** Sample data for previews; mirrors the 示例数据 of concept pages 1–25. */
-+internal object ToolsSamples {
-+    val configs = listOf(
-+        ToolsConfig("日常.yaml", current = true),
-+        ToolsConfig("工作.yaml"),
-+        ToolsConfig("默认.yaml", kind = ToolsConfigKind.Bundled),
-+    )
-+
-+    val subscriptions = listOf(
-+        ToolsSubscription("主订阅", "https://example.com/subscription"),
-+        ToolsSubscription("备用订阅", "https://example.org/subscription"),
-+    )
-+
-+    val configState = ToolsConfigState(ToolsLoad.Ready, configs, subscriptions)
-+    val configStateNoSubscriptions = configState.copy(subscriptions = emptyList())
-+
-+    val rootSearch = ToolsRootState(searching = true, query = "网络")
-+    val rootSearchEmpty = ToolsRootState(searching = true, query = "蓝牙")
-+
-+    val addSubscription = ToolsSubscriptionForm.add().copy(name = "旅行订阅", url = "https://example.com/subscription")
-+    val addSubscriptionNameEmpty = ToolsSubscriptionForm.add().copy(url = "https://example.com/subscription", nameError = "名称不能为空")
-+    val addSubscriptionUrlInvalid = ToolsSubscriptionForm.add().copy(name = "旅行订阅", url = "example.com/subscription", urlError = ToolsRules.UrlError)
-+    val editSubscriptionUrlInvalid = ToolsSubscriptionForm.edit(subscriptions[0]).copy(url = "example.com/subscription", urlError = ToolsRules.UrlError)
-+
-+    val importLink = ToolsImportForm(url = "https://example.com/config.yaml", name = "旅行.yaml")
-+    val importLinkInvalid = ToolsImportForm(url = "example.com/config.yaml", name = "旅行.yaml", urlError = ToolsRules.UrlError)
-+
-+    val yaml = """
-+        mixed-port: 7890
-+        allow-lan: true
-+        mode: rule
-+        log-level: info
-+        ipv6: true
-+
-+        dns:
-+          enable: true
-+          enhanced-mode: fake-ip
-+          nameserver:
-+            - 223.5.5.5
-+
-+        proxy-providers:
-+          main:
-+            type: http
-+            path: ./providers/main.yaml
-+            interval: 86400
-+
-+        proxy-groups:
-+          - name: 节点选择
-+            type: select
-+            use:
-+              - main
-+
-+        rules:
-+          - GEOIP,CN,DIRECT
-+          - MATCH,节点选择
-+    """.trimIndent() + "\n"
-+
-+    val yamlInvalid = yaml.replace("mixed-port: 7890", "mixed-port: invalid")
-+
-+    val editorDraft = ToolsEditorState(ToolsLoad.Ready, "日常.yaml", dirty = true, canUndo = true)
-+    val editorInvalid = editorDraft.copy(banner = "配置无效：mixed-port 必须为数字", errorLine = 1)
-+    val editorLoadFailed = ToolsEditorState(ToolsLoad.Failed("源文件暂时无法读取"), "日常.yaml")
-+}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt
 new file mode 100644
-index 0000000..c839585
+index 0000000..ff20830
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt
-@@ -0,0 +1,143 @@
+@@ -0,0 +1,152 @@
 +package io.github.xgl34222220.hetu.tools
 +
++import io.github.xgl34222220.hetu.ui.ht
 +import androidx.compose.animation.core.animateFloatAsState
 +import androidx.compose.animation.core.tween
 +import androidx.compose.foundation.ScrollState
@@ -9026,7 +8387,14 @@ index 0000000..c839585
 +    val c = LocalHomeColors.current
 +    val collapseAt = with(LocalDensity.current) { 40.dp.toPx() }
 +    val collapsed by remember(scroll, collapseAt) { derivedStateOf { scroll.value > collapseAt } }
-+    val results = state.results
++    val query = state.query.trim()
++    val results = if (state.searching && query.isNotEmpty()) state.groups.mapNotNull { group ->
++        val entries = group.entries.filter { entry ->
++            val localized = listOf(ht(entry.title), ht(entry.summary), ht(entry.brief))
++            ToolsCatalog.matches(entry, query) || localized.any { it.contains(query, ignoreCase = true) }
++        }
++        if (entries.isEmpty()) null else group.copy(entries = entries)
++    } else null
 +    val searchIcon = if (state.searching) HomeIcons.X else ToolsIcons.Search
 +    val searchLabel = if (state.searching) "关闭搜索" else "搜索"
 +
@@ -9041,14 +8409,14 @@ index 0000000..c839585
 +            verticalArrangement = Arrangement.spacedBy(HomeDims.gap),
 +        ) {
 +            Row(Modifier.fillMaxWidth().padding(start = 12.dp, bottom = 4.dp).height(HomeDims.touch), verticalAlignment = Alignment.CenterVertically) {
-+                Text("工具", Modifier.weight(1f), color = c.t1, style = HomeType.largeTitle)
++                Text(ht("工具"), Modifier.weight(1f), color = c.t1, style = HomeType.largeTitle)
 +                HomeIconButton(searchIcon, searchLabel, onToggleSearch, Modifier.padding(end = 0.dp))
 +            }
 +            if (state.searching) ToolsSearchField(state.query, onQueryChange, "搜索工具")
 +
 +            when {
 +                results == null -> state.groups.forEach { group -> ToolsGroup(group, query = "", brief = false, onOpen = onOpen) }
-+                results.isEmpty() -> ToolsEmpty(ToolsIcons.Search, "没有匹配的工具", subtitle = "尝试其他关键词")
++                results.isEmpty() -> ToolsEmpty(ToolsIcons.Search, "没有匹配的工具", subtitle = ht("尝试其他关键词"))
 +                else -> results.forEach { group -> ToolsGroup(group, query = state.query, brief = true, onOpen = onOpen) }
 +            }
 +        }
@@ -9058,7 +8426,7 @@ index 0000000..c839585
 +        if (barAlpha > 0f) {
 +            Column(Modifier.fillMaxWidth().alpha(barAlpha).background(c.bg.copy(alpha = .94f))) {
 +                Box(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars).height(HomeDims.barHeight)) {
-+                    Text("工具", Modifier.align(Alignment.Center), color = c.t1, style = HomeType.barTitle)
++                    Text(ht("工具"), Modifier.align(Alignment.Center), color = c.t1, style = HomeType.barTitle)
 +                    HomeIconButton(searchIcon, searchLabel, onToggleSearch, Modifier.align(Alignment.CenterEnd).padding(end = HomeDims.gutter))
 +                }
 +                HomeDivider()
@@ -9071,15 +8439,16 @@ index 0000000..c839585
 +private fun ToolsGroup(group: ToolsGroupSpec, query: String, brief: Boolean, onOpen: (ToolsEntry) -> Unit) {
 +    val c = LocalHomeColors.current
 +    if (group.title != null) {
-+        Text(group.title, Modifier.padding(start = 4.dp, end = 4.dp, top = 12.dp), color = c.t2, style = HomeType.section)
++        Text(ht(group.title), Modifier.padding(start = 4.dp, end = 4.dp, top = 12.dp), color = c.t2, style = HomeType.section)
 +    }
 +    HomeCard(Modifier.fillMaxWidth()) {
 +        group.entries.forEachIndexed { index, entry ->
 +            // Cards define the groups; the reference has no dividers between hub entries.
++            val title = ht(entry.title)
 +            ToolsRow(
-+                title = toolsHighlighted(entry.title, ToolsCatalog.highlight(entry.title, query)),
++                title = toolsHighlighted(title, ToolsCatalog.highlight(title, query)),
 +                icon = entry.icon(),
-+                subtitle = if (brief) entry.brief else entry.summary,
++                subtitle = ht(if (brief) entry.brief else entry.summary),
 +                onClick = { onOpen(entry) },
 +                modifier = Modifier.heightIn(min = 80.dp),
 +                trailing = { ToolsChevron() },
@@ -9508,6 +8877,185 @@ index 0000000..d109581
 +        }
 +    }
 +}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
+index d2dabcc..4c33cfd 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
+@@ -227,6 +227,134 @@ Web面板|Web panels|Web 面板|Веб-панели
+ 地区|Region|地區|Регион
+ 全局|Global|全域|Глобальный
+ 直连|Direct|直連|Напрямую
++管理应用代理与直连规则|Manage app proxy and direct rules|管理應用程式代理與直連規則|Правила прокси и прямого подключения приложений
++设置网络匹配后要执行的操作|Choose actions for network matches|設定網路符合條件後的動作|Действия при совпадении сети
++管理共享网络转发相关设置|Manage shared network forwarding|管理共用網路轉送設定|Настройки общей сети
++管理本地 CIDR 与接口规则|Manage local CIDR and interface rules|管理本機 CIDR 與介面規則|Локальные CIDR и правила интерфейсов
++尝试其他关键词|Try another keyword|嘗試其他關鍵字|Попробуйте другое ключевое слово
++关闭提示|Dismiss notice|關閉提示|Закрыть уведомление
++重新读取|Read again|重新讀取|Прочитать снова
++配置读取失败|Cannot read configurations|無法讀取設定|Не удалось прочитать конфигурации
++编辑当前 YAML|Edit current YAML|編輯目前 YAML|Изменить текущий YAML
++当前配置|Current configuration|目前設定|Текущая конфигурация
++本地配置|Local configuration|本機設定|Локальная конфигурация
++订阅管理|Subscription management|訂閱管理|Управление подписками
++添加订阅|Add subscription|新增訂閱|Добавить подписку
++编辑订阅|Edit subscription|編輯訂閱|Изменить подписку
++订阅名称|Subscription name|訂閱名稱|Название подписки
++订阅链接|Subscription URL|訂閱連結|URL подписки
++设为当前配置|Set as current configuration|設為目前設定|Выбрать конфигурацию
++导出配置|Export configuration|匯出設定|Экспорт конфигурации
++重命名配置|Rename configuration|重新命名設定|Переименовать конфигурацию
++删除配置|Delete configuration|刪除設定|Удалить конфигурацию
++删除配置？|Delete configuration?|刪除設定？|Удалить конфигурацию?
++删除订阅？|Delete subscription?|刪除訂閱？|Удалить подписку?
++放弃|Discard|捨棄|Отменить изменения
++放弃填写？|Discard this form?|捨棄填寫內容？|Отменить заполнение?
++导入配置|Import configuration|匯入設定|Импорт конфигурации
++从文件导入|Import from file|從檔案匯入|Импорт из файла
++从链接导入|Import from URL|從連結匯入|Импорт по URL
++配置链接|Configuration URL|設定連結|URL конфигурации
++配置文件|Configuration file|設定檔案|Файл конфигурации
++配置名称（可选）|Configuration name (optional)|設定名稱（選填）|Название конфигурации (необязательно)
++选择文件|Choose file|選擇檔案|Выбрать файл
++重新选择文件|Choose another file|重新選擇檔案|Выбрать другой файл
++黑名单|Blacklist|黑名單|Чёрный список
++白名单|Whitelist|白名單|Белый список
++核心|Core|核心|Ядро
++搜索应用或包名|Search app or package name|搜尋應用程式或套件名稱|Поиск приложения или пакета
++没有匹配的应用|No matching apps|沒有符合的應用程式|Приложения не найдены
++检查更新|Check for updates|檢查更新|Проверить обновления
++核心状态读取失败|Cannot read core status|無法讀取核心狀態|Не удалось получить состояние ядра
++仅下载管理|Download management only|僅供下載管理|Только управление загрузками
++有更新|Update available|有可用更新|Доступно обновление
++已是最新|Up to date|已是最新版本|Последняя версия
++处理中|Working|處理中|Обработка
++禁用接口|Disabled interfaces|停用介面|Отключённые интерфейсы
++添加一项|Add an item|新增一項|Добавить элемент
++共享网络接口|Shared network interfaces|共用網路介面|Интерфейсы общей сети
++下游设备|Connected devices|下游裝置|Подключённые устройства
++启用共享网络|Enable shared network|啟用共用網路|Включить общую сеть
++MAC 列表|MAC list|MAC 清單|Список MAC
++MAC 地址|MAC address|MAC 位址|MAC-адрес
++数据源|Data source|資料來源|Источник данных
++诊断与维护|Diagnostics and maintenance|診斷與維護|Диагностика и обслуживание
++运行预检|Runtime preflight|執行預檢|Предварительная проверка
++开始预检|Run preflight|開始預檢|Запустить проверку
++查看|Inspect|檢視|Просмотр
++消息与网络诊断|Messaging and network diagnostics|訊息與網路診斷|Диагностика сообщений и сети
++运行记录|Runtime records|執行紀錄|Записи выполнения
++网络事件记录|Network event records|網路事件紀錄|Журнал сетевых событий
++紧急|Emergency|緊急|Экстренные действия
++恢复网络|Restore network|恢復網路|Восстановить сеть
++恢复网络？|Restore network?|恢復網路？|Восстановить сеть?
++恢复|Restore|恢復|Восстановить
++广告过滤说明|Ad filtering help|廣告過濾說明|Справка по фильтрации рекламы
++说明|Help|說明|Справка
++重新检测|Check again|重新檢測|Проверить снова
++保护中|Protected|保護中|Защита активна
++运行链未确认|Runtime chain unverified|執行鏈尚未確認|Рабочая цепочка не подтверждена
++已开启|Enabled|已開啟|Включено
++已关闭|Disabled|已關閉|Выключено
++切到规则|Switch to rule mode|切換至規則模式|Переключить в режим правил
++运行链验证|Runtime chain verification|執行鏈驗證|Проверка рабочей цепочки
++最近拦截|Recent blocks|最近攔截|Последние блокировки
++拦截强度|Filtering level|攔截強度|Уровень фильтрации
++规则源|Rule sources|規則來源|Источники правил
++代理关闭时|When the proxy is stopped|代理關閉時|Когда прокси остановлен
++独立 DNS 过滤|Standalone DNS filtering|獨立 DNS 過濾|Отдельная фильтрация DNS
++CNAME 追踪防护|CNAME tracking protection|CNAME 追蹤防護|Защита от отслеживания CNAME
++语法大纲|YAML outline|語法大綱|Структура YAML
++撤销|Undo|復原|Отменить
++重做|Redo|重做|Повторить
++保留草稿|Keep draft|保留草稿|Сохранить черновик
++放弃修改？|Discard edits?|捨棄修改？|Отменить изменения?
++中国大陆 IP 直连|Direct connections to mainland China IPs|中國大陸 IP 直連|Прямое подключение к IP материкового Китая
++这些地址与接口在 Root 层直接放行，不进入 Mihomo。|These addresses and interfaces bypass Mihomo at the Root layer.|這些位址與介面在 Root 層直接放行，不進入 Mihomo。|Эти адреса и интерфейсы обходят Mihomo на уровне Root.
++接口名不能填写 lo。修改后重启代理生效。|The interface cannot be lo. Restart the proxy to apply changes.|介面名稱不能填寫 lo。修改後重新啟動代理生效。|Интерфейс не может быть lo. Перезапустите прокси для применения.
++热点、USB 与局域网转发流量|Hotspot, USB and LAN forwarded traffic|熱點、USB 與區域網路轉送流量|Пересылаемый трафик точки доступа, USB и LAN
++开启后河图接管共享 / 转发流量；接口与 MAC 直连在 Root 层生效，修改后重启代理。|Hetu handles shared and forwarded traffic. Interface and MAC bypass rules apply at the Root layer after restarting the proxy.|開啟後河圖接管共用與轉送流量；介面與 MAC 直連在 Root 層生效，修改後重新啟動代理。|Hetu обрабатывает общий и пересылаемый трафик. Правила обхода интерфейсов и MAC применяются после перезапуска прокси.
++将共享流量纳入透明代理|Route shared traffic through the transparent proxy|將共用流量納入透明代理|Направлять общий трафик через прозрачный прокси
++没有检测到正在共享的接口。|No active sharing interfaces detected.|未偵測到正在共用的介面。|Активные общие интерфейсы не обнаружены.
++没有检测到下游设备。|No connected devices detected.|未偵測到下游裝置。|Подключённые устройства не обнаружены.
++接管|Proxied|接管|Через прокси
++CNIP 设置|CNIP settings|CNIP 設定|Настройки CNIP
++中国大陆 IPv4 / IPv6 自动直连|Automatic direct routing for mainland China IPv4 / IPv6|中國大陸 IPv4 / IPv6 自動直連|Автоматический прямой маршрут для IPv4 / IPv6 материкового Китая
++CNIP 只补充 IP 级直连，不替代 YAML 中已有的域名规则。修改后重启代理生效。|CNIP adds direct IP routing while keeping the domain rules in YAML. Restart the proxy to apply changes.|CNIP 僅補充 IP 級直連，不取代 YAML 中已有的網域規則。修改後重新啟動代理生效。|CNIP добавляет прямые IP-маршруты, сохраняя правила доменов YAML. Перезапустите прокси для применения.
++命中国内 IPv4 / IPv6 网段时直接连接|Connect directly when matching mainland China IPv4 / IPv6 ranges|符合中國大陸 IPv4 / IPv6 網段時直接連線|Прямое подключение к диапазонам IPv4 / IPv6 материкового Китая
++内置离线快照 + Mihomo provider 运行时更新|Bundled offline snapshot + Mihomo provider runtime updates|內建離線快照 + Mihomo provider 執行時更新|Встроенный офлайн-снимок + обновления провайдера Mihomo
++点击跳转到对应区段|Tap to jump to a section|點按以跳至對應區段|Нажмите для перехода к разделу
++没有可识别的顶层字段。|No recognizable top-level fields.|沒有可識別的頂層欄位。|Распознаваемых полей верхнего уровня нет.
++管理源配置与当前配置中的订阅链接。|Manage source configurations and subscription URLs in the current configuration.|管理來源設定與目前設定中的訂閱連結。|Управление исходными конфигурациями и URL подписок текущей конфигурации.
++当前配置没有 proxy-providers。可以添加订阅，或直接编辑 YAML。|This configuration has no proxy-providers. Add a subscription or edit YAML.|目前設定沒有 proxy-providers。可以新增訂閱，或直接編輯 YAML。|В конфигурации нет proxy-providers. Добавьте подписку или измените YAML.
++当前配置的 proxy-providers。|proxy-providers in the current configuration.|目前設定的 proxy-providers。|proxy-providers текущей конфигурации.
++配置切换后，下次启动或重启代理时生效。|Configuration changes apply when the proxy next starts or restarts.|切換設定後，下次啟動或重新啟動代理時生效。|Изменения конфигурации применятся при следующем запуске или перезапуске прокси.
++本地配置 / 内置模板 · 需要填写订阅|Local configuration / bundled template · subscription required|本機設定 / 內建範本 · 需要填寫訂閱|Локальная конфигурация / встроенный шаблон · требуется подписка
++尚未填写订阅链接|Subscription URL not entered|尚未填寫訂閱連結|URL подписки не указан
++未保存 · 草稿仅保留在本页|Unsaved · draft kept on this page|未儲存 · 草稿僅保留於本頁|Не сохранено · черновик хранится на этой странице
++源配置 · 保存前自动校验|Source configuration · validated before saving|來源設定 · 儲存前自動驗證|Исходная конфигурация · проверка перед сохранением
++导入后设为当前配置。支持 UTF-8，最大 4 MiB。|Set as the current configuration after import. UTF-8, up to 4 MiB.|匯入後設為目前設定。支援 UTF-8，最大 4 MiB。|Выбрать текущей конфигурацией после импорта. UTF-8, до 4 МиБ.
++代理未运行时用本地 VPN 继续过滤广告|Keep filtering ads with a local VPN while the proxy is stopped|代理未執行時使用本機 VPN 繼續過濾廣告|Фильтровать рекламу через локальный VPN, когда прокси остановлен
++拦截伪装成正常域名的追踪 CNAME|Block tracking CNAMEs disguised as normal domains|封鎖偽裝成正常網域的追蹤 CNAME|Блокировать CNAME отслеживания, замаскированные под обычные домены
++点按可加入白名单|Tap to add to the allowlist|點按以加入白名單|Нажмите для добавления в белый список
++没有可用的规则源。|No rule sources available.|沒有可用的規則來源。|Источников правил нет.
++暂无|None yet|暫無|Пока нет
++应用流量会先经过应用直连与明确白名单，再匹配广告规则 REJECT，之后才进入普通配置分流与兜底。|Traffic checks direct apps and explicit allowlists first, then ad REJECT rules, followed by regular configuration routing and fallback.|應用程式流量先經過直連應用與明確白名單，再符合廣告 REJECT 規則，之後進入一般設定分流與預設規則。|Трафик сначала проверяет прямые приложения и белые списки, затем правила REJECT рекламы, обычные маршруты и резервное правило.
++代理运行时，独立 DNS 过滤会自动暂停，避免两套过滤链同时接管。|Standalone DNS filtering pauses automatically while the proxy is running.|代理執行時，獨立 DNS 過濾會自動暫停。|Отдельная фильтрация DNS автоматически приостанавливается при работающем прокси.
++应用流量 → 直连应用 / 白名单 → 广告 RULE-SET → 地区 / 规则集分流 → 兜底|App traffic → direct apps / allowlist → ad RULE-SET → region / rules → fallback|應用流量 → 直連應用 / 白名單 → 廣告 RULE-SET → 地區 / 規則集分流 → 預設規則|Трафик → прямые приложения / белый список → рекламный RULE-SET → регион / правила → резерв
++及其子域名将不再被拦截。|and its subdomains will no longer be blocked.|及其子網域將不再被封鎖。|и его поддомены больше не будут блокироваться.
++没有可显示的应用|No apps to display|沒有可顯示的應用程式|Нет приложений для отображения
++可在「更多」里显示系统应用|Show system apps from More|可於「更多」中顯示系統應用程式|Системные приложения можно показать через «Ещё»
++已选|Selected|已選|Выбрано
++个||個|шт.
++验证 Root / TPROXY / UID / IPv6 / 绕过规则是否可用|Check Root / TPROXY / UID / IPv6 / bypass rules|驗證 Root / TPROXY / UID / IPv6 / 繞過規則是否可用|Проверка Root / TPROXY / UID / IPv6 / правил обхода
++最终生成的运行副本，不修改源配置|Generated runtime copy; the source configuration stays unchanged|最終產生的執行副本，不修改來源設定|Созданная рабочая копия; исходная конфигурация не изменяется
++Google / 微信连接、分流与最近运行事件|Google / WeChat connections, routing and recent runtime events|Google / 微信連線、分流與最近執行事件|Соединения Google / WeChat, маршруты и недавние события
++事件与错误 ID、脱敏报告、运行记录修复与恢复诊断|Events and error IDs, redacted reports, runtime-record repair and recovery diagnostics|事件與錯誤 ID、去識別報告、執行紀錄修復與復原診斷|События и ошибки, обезличенные отчёты, исправление записей и диагностика восстановления
++停止代理并回滚河图添加的 iptables / 路由规则|Stop the proxy and roll back Hetu iptables / routing rules|停止代理並復原河圖新增的 iptables / 路由規則|Остановить прокси и откатить правила iptables / маршрутов Hetu
++预检、运行副本、诊断信息与紧急恢复|Preflight, runtime copies, diagnostics and emergency recovery|預檢、執行副本、診斷資訊與緊急復原|Проверка, рабочие копии, диагностика и экстренное восстановление
++暂无内容。|No content yet.|暫無內容。|Пока нет содержимого.
++核心按设备 ABI 从发布源直接拉取。内置核心未下载更新时使用 App 自带版本；标注「仅下载管理」的核心只做下载与版本管理。|Cores download from their release sources for the device ABI. Bundled cores use the app version until updated; download-only cores support download and version management.|核心依裝置 ABI 從發佈來源下載。內建核心未更新時使用 App 版本；僅供下載管理的核心只提供下載與版本管理。|Ядра загружаются из источников релизов для ABI устройства. Встроенные ядра используют версию приложения до обновления; остальные поддерживают только загрузку и версии.
+ """.trimIndent().lineSequence().map { it.split('|') }.associate { it[0] to it.drop(1) }
+
+ fun translateHetuText(source: String, language: String): String {
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/AutomationToolsConceptParityTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/AutomationToolsConceptParityTest.kt
+index d6e8867..2f06b34 100644
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/AutomationToolsConceptParityTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/AutomationToolsConceptParityTest.kt
+@@ -10,7 +10,8 @@ class AutomationToolsConceptParityTest {
+         File("src/main/java/io/github/xgl34222220/hetu/$path").readText()
+
+     @Test fun toolLandingAndConfigStatesAreReachable() {
+-        val landing = source("app/PanelToolsScreens.kt")
++        val landing = source("app/PanelToolsScreens.kt") + source("tools/ToolsScreen.kt") +
++            source("tools/ToolsModels.kt") + source("tools/ToolsRoute.kt")
+         val config = source("app/ConfigScreens.kt") + source("ProxySubscriptionActivity.kt")
+
+         listOf("工具", "搜索工具", "应用管理", "共享网络", "网络匹配", "绕过规则", "诊断").forEach {
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt
+index f3f4b13..e47d1d6 100644
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt
+@@ -103,7 +103,7 @@ class ConceptRemainingCoverageTest {
+     }
+     private fun show(content: @Composable () -> Unit) {
+         rule.runOnUiThread { rule.activity.setContent {
+-            HetuAppTheme("light", false) { CompositionLocalProvider(LocalNav provides HxNav()) {
++            HetuAppTheme("light", false) { CompositionLocalProvider(LocalNav provides HxNav(), LocalHxBlur provides vm.blurEnabled) {
+                 Box(Modifier.fillMaxSize()) { content() }
+             } }
+         } }
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptStateCoverageTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptStateCoverageTest.kt
+index edeb972..701c3bc 100644
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptStateCoverageTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptStateCoverageTest.kt
+@@ -94,7 +94,7 @@ class ConceptStateCoverageTest {
+     }
+     private fun show(content: @Composable () -> Unit) {
+         rule.runOnUiThread { rule.activity.setContent {
+-            HetuAppTheme("light", false) { CompositionLocalProvider(LocalNav provides HxNav()) {
++            HetuAppTheme("light", false) { CompositionLocalProvider(LocalNav provides HxNav(), LocalHxBlur provides vm.blurEnabled) {
+                 Box(Modifier.fillMaxSize()) { content() }
+             } }
+         } }
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/LargeTitleParity59Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/LargeTitleParity59Test.kt
 index 775a0db..742fdd2 100644
 --- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/LargeTitleParity59Test.kt
@@ -9524,6 +9072,94 @@ index 775a0db..742fdd2 100644
 +        assertTrue(toolsDesign.contains("fontSize = 36.sp"))
          assertTrue(settings.contains("largeTitleTopPadding = 26.dp"))
      }
+ }
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/MainLanguageBindingTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/MainLanguageBindingTest.kt
+index 9bc0508..cde698c 100644
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/MainLanguageBindingTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/MainLanguageBindingTest.kt
+@@ -161,6 +161,7 @@ class MainLanguageBindingTest {
+             // Config/group/node/file names can legitimately collide with any vocabulary entry.
+             SettingsRow("工具", subtitle = "首页")
+             HxRow("保存", subtitle = "语言")
++            io.github.xgl34222220.hetu.tools.ToolsRow(AnnotatedString("工具"), subtitle = "首页")
+             SettingsInput(userName, { userName = it })
+         } }
+         listOf("工具", "首页", "保存", "语言").forEach(::assertVisible)
+@@ -180,6 +181,8 @@ class MainLanguageBindingTest {
+         val yaml = "proxy-groups:\n  - name: 工具\n    proxies: [首页, 设置]\n"
+         show { HxTextSheet(title = "诊断", text = yaml, onDismiss = {}) }
+         assertVisible(yaml)
++        show { io.github.xgl34222220.hetu.tools.ToolsCodeBox(AnnotatedString(yaml)) }
++        assertVisible(yaml)
+     }
+
+     @Test fun vocabularySupportsAllFourLanguagesWithoutTranslatingUnknownText() {
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
+index 64c9efb..7db03e7 100644
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
+@@ -4,6 +4,8 @@ import android.app.Application
+ import android.graphics.Bitmap
+ import android.graphics.Canvas
+ import android.view.View
++import android.view.Gravity
++import android.view.WindowManager
+ import android.view.inspector.WindowInspector
+ import androidx.activity.ComponentActivity
+ import androidx.compose.runtime.Composable
+@@ -60,7 +62,9 @@ class NativeConceptScreenshotTest {
+
+     private fun snapshotAfter(name: String, content: @Composable () -> Unit, afterSet: () -> Unit) {
+         rule.setContent { HetuAppTheme(appearance = "light", dynamic = false) {
+-            CompositionLocalProvider(LocalNav provides HxNav()) { Box(Modifier.fillMaxSize()) { content() } }
++            CompositionLocalProvider(LocalNav provides HxNav(), LocalHxBlur provides vm.blurEnabled) {
++                Box(Modifier.fillMaxSize()) { content() }
++            }
+         } }
+         rule.waitForIdle()
+         rule.mainClock.advanceTimeBy(1000)
+@@ -84,6 +88,19 @@ class NativeConceptScreenshotTest {
+                 if (!drawn.add(root)) return@forEach
+                 val location = IntArray(2)
+                 root.getLocationOnScreen(location)
++                val params = root.layoutParams as? WindowManager.LayoutParams
++                // Match the real WM placement/dimming, as the full state capture does.
++                // Robolectric otherwise reports a separate dialog decor at (0, 0).
++                if (root !== decor && params != null) {
++                    val placed = android.graphics.Rect()
++                    Gravity.apply(params.gravity, root.width, root.height,
++                        android.graphics.Rect(0, 0, decor.width, decor.height), params.x, params.y, placed)
++                    location[0] = placed.left
++                    location[1] = placed.top
++                    if ((params.flags and WindowManager.LayoutParams.FLAG_DIM_BEHIND) != 0) {
++                        canvas.drawColor(android.graphics.Color.argb((params.dimAmount * 255).toInt(), 0, 0, 0))
++                    }
++                }
+                 canvas.save()
+                 canvas.translate(location[0].toFloat(), location[1].toFloat())
+                 root.draw(canvas)
+@@ -151,12 +168,22 @@ class NativeConceptScreenshotTest {
+     }
+     @Test fun mihomoLicenseSheet() = snapshotAfter("settings-license-mihomo", { AboutScreen(vm) }) {
+         rule.onNode(hasText("Mihomo") and hasClickAction()).performScrollTo().performClick()
++        awaitLicenseSheet()
+     }
+     @Test fun adguardLicenseSheet() = snapshotAfter("settings-license-adguard", { AboutScreen(vm) }) {
+         rule.onNodeWithText("AdGuard DNS Filter").performScrollTo().performClick()
++        awaitLicenseSheet()
+     }
+     @Test fun lucideLicenseSheet() = snapshotAfter("settings-license-lucide", { AboutScreen(vm) }) {
+         rule.onNodeWithText("Lucide Icons").performScrollTo().performClick()
++        awaitLicenseSheet()
++    }
++
++    private fun awaitLicenseSheet() {
++        rule.waitUntil(10_000) {
++            rule.onAllNodesWithText("复制").fetchSemanticsNodes().isNotEmpty()
++        }
++        rule.onNodeWithText("复制").assertExists()
+     }
+
  }
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/NewHomePanelInteractionTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NewHomePanelInteractionTest.kt
 new file mode 100644
@@ -9783,12 +9419,26 @@ index 0000000..0a8c58c
 +        rule.onNodeWithText("动效关闭").assertExists()
 +    }
 +}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/NewUiIntegrationTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NewUiIntegrationTest.kt
+index e28d0fc..1f994cc 100644
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/NewUiIntegrationTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NewUiIntegrationTest.kt
+@@ -72,8 +72,7 @@ class NewUiIntegrationTest {
+     @Test fun newLauncherKeepsToolsAndDiagnostics() {
+         vm.tab = HxTab.Tools
+         root()
+-        rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("诊断工具"))
+-        rule.onNodeWithText("诊断工具").performClick()
++        rule.onNodeWithText("诊断工具").performScrollTo().performClick()
+         rule.mainClock.advanceTimeBy(1000)
+         rule.onNodeWithText("网络事件记录").assertExists()
+     }
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/NewUiShell83Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NewUiShell83Test.kt
 new file mode 100644
-index 0000000..83293d3
+index 0000000..d933823
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NewUiShell83Test.kt
-@@ -0,0 +1,117 @@
+@@ -0,0 +1,115 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
@@ -9849,8 +9499,7 @@ index 0000000..83293d3
 +        library.select(core, fixture.name)
 +        root(HxTab.Tools)
 +        capture("tools-hub")
-+        rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("配置管理"))
-+        rule.onNodeWithText("配置管理").performClick()
++        rule.onNodeWithText("配置管理").performScrollTo().performClick()
 +        settle()
 +        rule.onNodeWithText("首页").assertDoesNotExist()
 +        // The library loads on Dispatchers.IO; virtual animation time cannot complete that read.
@@ -9872,8 +9521,7 @@ index 0000000..83293d3
 +
 +    @Test fun diagnosticDetailKeepsNetworkJournalAccessible() {
 +        root(HxTab.Tools)
-+        rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("诊断工具"))
-+        rule.onNodeWithText("诊断工具").performClick()
++        rule.onNodeWithText("诊断工具").performScrollTo().performClick()
 +        settle()
 +        rule.onNodeWithText("首页").assertDoesNotExist()
 +        rule.onNodeWithText("网络事件记录").assertExists()
@@ -10308,4 +9956,696 @@ index 0000000..6409612
 +        assertEquals(ToolsSaveResult.SourceChanged, sourceChanged)
 +        assertEquals("mode: direct\n", library.read(first))
 +    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsFeaturePreviews.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsFeaturePreviews.kt
+new file mode 100644
+index 0000000..63f3e42
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsFeaturePreviews.kt
+@@ -0,0 +1,241 @@
++package io.github.xgl34222220.hetu.tools
++
++import androidx.compose.foundation.background
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.BoxScope
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.rememberScrollState
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.remember
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.clip
++import androidx.compose.ui.tooling.preview.Preview
++import androidx.compose.ui.unit.dp
++import io.github.xgl34222220.hetu.home.HetuHomeTheme
++import io.github.xgl34222220.hetu.tools.ToolsDesignDims as HomeDims
++import io.github.xgl34222220.hetu.home.LocalHomeColors
++
++/* ------------------------------------------------------------------ */
++/*  One preview per concept page: C26–C49 = 03A 工具上册 第 26–49 页.    */
++/*  Dialogs, sheets and menus are drawn in-place over a scrim, because  */
++/*  window-based overlays do not render in static previews.             */
++/* ------------------------------------------------------------------ */
++
++private const val W = 392
++private const val H = 850
++
++@Composable
++private fun Frame(dark: Boolean = false, content: @Composable BoxScope.() -> Unit) {
++    HetuHomeTheme(dark = dark) {
++        Box(Modifier.fillMaxSize().background(LocalHomeColors.current.bg), content = content)
++    }
++}
++
++@Composable
++private fun BoxScope.Scrim() {
++    Box(Modifier.matchParentSize().background(LocalHomeColors.current.scrim))
++}
++
++@Composable
++private fun BoxScope.DialogLayer(content: @Composable () -> Unit) {
++    Scrim()
++    Box(Modifier.align(Alignment.Center).padding(horizontal = 28.dp)) { content() }
++}
++
++@Composable
++private fun BoxScope.SheetLayer(content: @Composable () -> Unit) {
++    Scrim()
++    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().clip(HomeDims.sheetShape).background(LocalHomeColors.current.surface)) { content() }
++}
++
++/** A bar menu, placed where the popup would hang: [end] is the distance from the right edge. */
++@Composable
++private fun BoxScope.MenuLayer(end: Int, content: @Composable () -> Unit) {
++    Scrim()
++    Box(Modifier.align(Alignment.TopEnd).padding(top = 52.dp, end = end.dp)) { content() }
++}
++
++@Composable
++private fun Apps(state: ToolsAppsState) {
++    ToolsAppsScreen(
++        state = state, menu = null, onBack = {}, onToggleSearch = {}, onQueryChange = {}, onScopeChange = {}, onToggleApp = {}, onSelectAll = {},
++        onOpenMenu = {}, onDismissMenu = {}, onSortChange = {}, onToggleDescending = {}, onToggleSystem = {}, onClear = {}, onRefresh = {}, onRetry = {},
++    )
++}
++
++@Composable
++private fun Cores(state: ToolsCoresState) {
++    ToolsCoresScreen(state, onBack = {}, onCheck = {}, onPrimary = { _, _ -> }, onImport = {}, onRetry = {})
++}
++
++@Composable
++private fun Bypass(state: ToolsBypassState) {
++    ToolsBypassScreen(state, onBack = {}, onSave = {}, onDraftChange = {}, onRetry = {})
++}
++
++@Composable
++private fun Diag() {
++    ToolsDiagScreen(ToolsFeatureSamples.diag, onBack = {}, onPreflight = {}, onStartupConfig = {}, onReport = {}, onRestore = {})
++}
++
++/** [scrolled] > 0 shows the lower half of the page (规则 section), as on concept page 44. */
++@Composable
++private fun Adblock(state: ToolsAdblockState = ToolsFeatureSamples.adblock, scrolled: Int = 0) {
++    ToolsAdblockScreen(
++        state = state, onBack = {}, onHelp = {}, onRefresh = {}, onEnabledChange = {}, onSwitchToRuleMode = null, onPickRecent = {}, onLevelChange = {},
++        onUpdate = {}, onSourceChange = { _, _ -> }, onAddDomain = {}, onRemoveDomain = { _, _ -> }, onStandaloneDnsChange = {}, onCnameChange = {}, onRetry = {},
++        scroll = rememberScrollState(initial = scrolled),
++    )
++}
++
++private const val RulesScroll = 100_000
++
++/* ------------------------------ 订阅 / 导入（沿用 Part 1 屏幕） ------------------------------ */
++
++@Preview(name = "C26 订阅 · 编辑", widthDp = W, heightDp = H)
++@Composable
++private fun C26EditSubscription() = Frame {
++    ToolsSubscriptionScreen(ToolsSubscriptionForm.edit(ToolsSamples.subscriptions[0]), onNameChange = {}, onUrlChange = {}, onSave = {}, onBack = {})
++}
++
++@Preview(name = "C27 导入配置 · 文件", widthDp = W, heightDp = H)
++@Composable
++private fun C27ImportFile() = Frame {
++    ToolsImportScreen(
++        ToolsImportForm(tab = ToolsImportTab.File), pickedFile = remember { ToolsPickedFile("旅行.yaml", "18 KB") },
++        onTabChange = {}, onUrlChange = {}, onNameChange = {}, onPickFile = {}, onImport = {}, onBack = {},
++    )
++}
++
++/* ------------------------------ 应用管理 ------------------------------ */
++
++@Preview(name = "C28 应用管理 · 黑名单", widthDp = W, heightDp = H)
++@Composable
++private fun C28AppsBlacklist() = Frame { Apps(ToolsFeatureSamples.appsBlacklist) }
++
++@Preview(name = "C29 应用 · 排序菜单", widthDp = W, heightDp = H)
++@Composable
++private fun C29AppsSortMenu() = Frame {
++    Apps(ToolsFeatureSamples.appsBlacklist)
++    MenuLayer(end = 96) { ToolsAppSortMenuCard(ToolsFeatureSamples.appsBlacklist, onSortChange = {}, onToggleDescending = {}) }
++}
++
++@Preview(name = "C30 应用 · 更多菜单", widthDp = W, heightDp = H)
++@Composable
++private fun C30AppsMoreMenu() = Frame {
++    Apps(ToolsFeatureSamples.appsBlacklist)
++    MenuLayer(end = 8) { ToolsAppMoreMenuCard(ToolsFeatureSamples.appsBlacklist, onToggleSystem = {}, onSelectAll = {}, onClear = {}, onRefresh = {}) }
++}
++
++@Preview(name = "C31 应用管理 · 白名单", widthDp = W, heightDp = H)
++@Composable
++private fun C31AppsWhitelist() = Frame { Apps(ToolsFeatureSamples.appsWhitelist) }
++
++@Preview(name = "C32 应用管理 · 核心模式", widthDp = W, heightDp = H)
++@Composable
++private fun C32AppsCore() = Frame { Apps(ToolsFeatureSamples.appsCore) }
++
++@Preview(name = "C33 应用管理 · 搜索", widthDp = W, heightDp = H)
++@Composable
++private fun C33AppsSearch() = Frame { Apps(ToolsFeatureSamples.appsSearch) }
++
++/* ------------------------------ 核心管理 ------------------------------ */
++
++@Preview(name = "C34 核心管理", widthDp = W, heightDp = H)
++@Composable
++private fun C34Cores() = Frame { Cores(ToolsFeatureSamples.coresIdle) }
++
++@Preview(name = "C35 核心管理 · 下载中", widthDp = W, heightDp = H)
++@Composable
++private fun C35CoresDownloading() = Frame { Cores(ToolsFeatureSamples.coresDownloading) }
++
++/* ------------------------------ 绕过规则 / 共享网络 / CNIP ------------------------------ */
++
++@Preview(name = "C36 绕过规则", widthDp = W, heightDp = H)
++@Composable
++private fun C36Bypass() = Frame { Bypass(ToolsFeatureSamples.bypass) }
++
++@Preview(name = "C37 绕过规则 · 放弃修改", widthDp = W, heightDp = H)
++@Composable
++private fun C37BypassDiscard() = Frame {
++    Bypass(ToolsFeatureSamples.bypassDirty)
++    DialogLayer { ToolsDiscardChangesDialogCard(onConfirm = {}, onCancel = {}) }
++}
++
++@Preview(name = "C38 共享网络", widthDp = W, heightDp = 980)
++@Composable
++private fun C38Share() = Frame {
++    ToolsShareScreen(ToolsFeatureSamples.share, onBack = {}, onRefresh = {}, onSave = {}, onDraftChange = {}, onRetry = {})
++}
++
++@Preview(name = "C39 CNIP 设置", widthDp = W, heightDp = H)
++@Composable
++private fun C39CnIp() = Frame { ToolsCnIpScreen(ToolsFeatureSamples.cnIp, onBack = {}, onEnabledChange = {}) }
++
++/* ------------------------------ 诊断与维护 ------------------------------ */
++
++@Preview(name = "C40 诊断与维护", widthDp = W, heightDp = H)
++@Composable
++private fun C40Diag() = Frame { Diag() }
++
++@Preview(name = "C41 诊断 · 启动配置浮层", widthDp = W, heightDp = H)
++@Composable
++private fun C41StartupConfig() = Frame {
++    Diag()
++    SheetLayer { ToolsStartupConfigSheetContent(ToolsDiagText(loading = false, text = ToolsFeatureSamples.startupConfig), onCopy = {}) }
++}
++
++@Preview(name = "C42 诊断 · 恢复网络确认", widthDp = W, heightDp = H)
++@Composable
++private fun C42RestoreNetwork() = Frame {
++    Diag()
++    DialogLayer { ToolsRestoreNetworkDialogCard(onConfirm = {}, onCancel = {}) }
++}
++
++@Preview(name = "C43 诊断 · 消息与网络", widthDp = W, heightDp = H)
++@Composable
++private fun C43Report() = Frame {
++    Diag()
++    SheetLayer { ToolsReportSheetContent(ToolsDiagText(loading = false, text = ToolsFeatureSamples.report), onCopy = {}) }
++}
++
++/* ------------------------------ 广告过滤 ------------------------------ */
++
++@Preview(name = "C44 广告过滤 · 规则", widthDp = W, heightDp = H)
++@Composable
++private fun C44AdblockRules() = Frame { Adblock(scrolled = RulesScroll) }
++
++@Preview(name = "C45 广告过滤 · 状态", widthDp = W, heightDp = H)
++@Composable
++private fun C45AdblockStatus() = Frame { Adblock() }
++
++@Preview(name = "C46 广告过滤 · 说明", widthDp = W, heightDp = H)
++@Composable
++private fun C46AdblockHelp() = Frame {
++    Adblock()
++    SheetLayer { ToolsAdblockHelpSheetContent(onClose = {}) }
++}
++
++@Preview(name = "C47 广告过滤 · 添加白名单", widthDp = W, heightDp = H)
++@Composable
++private fun C47AddAllow() = Frame {
++    Adblock(scrolled = RulesScroll)
++    DialogLayer { ToolsAddDomainDialogCard(ToolsAdOverlay.AddDomain(allow = true, draft = "example.com"), onDraftChange = {}, onConfirm = {}, onCancel = {}) }
++}
++
++@Preview(name = "C48 广告过滤 · 添加黑名单", widthDp = W, heightDp = H)
++@Composable
++private fun C48AddBlock() = Frame {
++    Adblock(scrolled = RulesScroll)
++    DialogLayer { ToolsAddDomainDialogCard(ToolsAdOverlay.AddDomain(allow = false, draft = "ads.example.net"), onDraftChange = {}, onConfirm = {}, onCancel = {}) }
++}
++
++@Preview(name = "C49 广告过滤 · 加入白名单确认", widthDp = W, heightDp = H)
++@Composable
++private fun C49ConfirmAllow() = Frame {
++    Adblock()
++    DialogLayer { ToolsConfirmAllowDialogCard(ToolsAdOverlay.ConfirmAllow("ads.example.com"), onConfirm = {}, onCancel = {}) }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsFeatureSamples.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsFeatureSamples.kt
+new file mode 100644
+index 0000000..8ba872c
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsFeatureSamples.kt
+@@ -0,0 +1,103 @@
++package io.github.xgl34222220.hetu.tools
++
++/** Sample data for the previews of pages 26–49; mirrors the 示例数据 of the concept pages. */
++internal object ToolsFeatureSamples {
++    val apps = listOf(
++        ToolsApp("com.tencent.mm", "微信", "com.tencent.mm", 10142),
++        ToolsApp("com.eg.android.AlipayGphone", "支付宝", "com.eg.android.AlipayGphone", 10158),
++        ToolsApp("com.android.chrome", "Chrome", "com.android.chrome", 10112),
++        ToolsApp("org.telegram.messenger", "Telegram", "org.telegram.messenger", 10201),
++        ToolsApp("com.google.android.youtube", "YouTube", "com.google.android.youtube", 10135),
++        ToolsApp("tv.danmaku.bili", "哔哩哔哩", "tv.danmaku.bili", 10206),
++        ToolsApp("com.example.maps", "地图", "com.example.maps", 10220),
++    )
++
++    val appsBlacklist = ToolsAppsState(
++        ToolsLoad.Ready, apps, ToolsAppScope.Blacklist,
++        blacklist = setOf("com.tencent.mm", "com.eg.android.AlipayGphone"),
++        whitelist = setOf("org.telegram.messenger", "com.google.android.youtube"),
++    )
++    val appsWhitelist = appsBlacklist.copy(scope = ToolsAppScope.Whitelist)
++    val appsCore = appsBlacklist.copy(scope = ToolsAppScope.Core)
++    val appsSearch = appsBlacklist.copy(searching = true, query = "微信")
++
++    val cores = listOf(
++        ToolsCore("mihomo", "Mihomo", installed = "内置版本", latest = "示例版本", updateAvailable = true, bundled = true),
++        ToolsCore("xray", "Xray", installed = "未安装", runnable = false),
++        ToolsCore("sing-box", "sing-box", installed = "未安装", runnable = false),
++    )
++    val coresIdle = ToolsCoresState(ToolsLoad.Ready, "Mihomo（示例）", cores)
++    val coresDownloading = coresIdle.copy(busyId = "mihomo", progress = "正在下载 · 6.4 MB / 12.8 MB")
++
++    val bypassRules = ToolsBypassRules(listOf("10.0.0.0/8", "fd00::/8"), listOf("dummy0"))
++    val bypass = ToolsBypassState(ToolsLoad.Ready, bypassRules, bypassRules)
++    val bypassDirty = bypass.copy(draft = bypassRules.copy(cidrs = bypassRules.cidrs + "192.168.0.0/16"))
++
++    val shareSettings = ToolsShareSettings(enabled = true, directInterfaces = setOf("rndis0"), macs = listOf("02:00:00:00:00:02"))
++    val share = ToolsShareState(
++        ToolsLoad.Ready, shareSettings, shareSettings,
++        interfaces = listOf(ToolsShareInterface("wlan1", "UP"), ToolsShareInterface("rndis0", "UP")),
++        clients = listOf(
++            ToolsShareClient("192.168.43.101", "02:00:00:00:00:01", "wlan1", "REACHABLE"),
++            ToolsShareClient("192.168.43.102", "02:00:00:00:00:02", "wlan1", "STALE"),
++        ),
++    )
++
++    val cnIp = ToolsCnIpState(ToolsLoad.Ready, enabled = true)
++
++    val diag = ToolsDiagState(ToolsPreflight.Passed())
++
++    val startupConfig = """
++        port: 7890
++        allow-lan: true
++        mode: rule
++        log-level: info
++        ipv6: true
++        external-controller: 127.0.0.1:9090
++        dns:
++          enable: true
++        rules:
++          - GEOIP,CN,DIRECT
++          - MATCH,节点选择
++    """.trimIndent()
++
++    val report = """
++        --- 版本与最近运行事件 ---
++        time=2026-10-01 09:41
++        app=示例版本
++        expectedCore=mihomo
++        proxyBaseMode=tproxy
++        proxyRootRuntimeRunning=true
++
++        --- 最近启动耗时（毫秒） ---
++        尚无启动记录
++
++        --- 源配置标识 ---
++        bytes=2048
++        sha256=示例摘要
++
++        --- Root 网络状态 ---
++        无记录
++    """.trimIndent()
++
++    val adblock = ToolsAdblockState(
++        load = ToolsLoad.Ready,
++        enabled = true,
++        proxyRunning = true,
++        ruleCount = 128420,
++        hits = 36,
++        allow = listOf("example.com", "example.org"),
++        block = listOf("ads.example.net"),
++        sources = listOf(
++            ToolsAdSource("cn", "中文广告规则", 32480, "使用内置快照", enabled = true),
++            ToolsAdSource("adguard-dns", "AdGuard DNS", 95940, "更新于 10 分钟前", enabled = true),
++            ToolsAdSource("hagezi", "HaGeZi", 58200, "使用内置快照", enabled = false),
++        ),
++        level = ToolsAdLevel.Balanced,
++        recent = listOf("ads.example.com", "tracker.example.org"),
++        startupInjected = true,
++        controllerLoaded = true,
++        standaloneDns = false,
++        cnameProtection = true,
++    )
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsPreviews.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsPreviews.kt
+new file mode 100644
+index 0000000..62b900c
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsPreviews.kt
+@@ -0,0 +1,259 @@
++package io.github.xgl34222220.hetu.tools
++
++import androidx.compose.foundation.background
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.BoxScope
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.rememberScrollState
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.remember
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.clip
++import androidx.compose.ui.tooling.preview.Preview
++import androidx.compose.ui.unit.dp
++import io.github.xgl34222220.hetu.home.HetuHomeTheme
++import io.github.xgl34222220.hetu.tools.ToolsDesignDims as HomeDims
++import io.github.xgl34222220.hetu.home.LocalHomeColors
++
++/* ------------------------------------------------------------------ */
++/*  One preview per concept page: C01–C25 = 03A 工具上册 第 1–25 页.     */
++/*  Dialogs, sheets and menus are drawn in-place over a scrim, because  */
++/*  window-based overlays do not render in static previews.             */
++/* ------------------------------------------------------------------ */
++
++private const val W = 392
++private const val H = 850
++
++@Composable
++private fun Frame(dark: Boolean = false, content: @Composable BoxScope.() -> Unit) {
++    HetuHomeTheme(dark = dark) {
++        Box(Modifier.fillMaxSize().background(LocalHomeColors.current.bg), content = content)
++    }
++}
++
++@Composable
++private fun BoxScope.Scrim() {
++    Box(Modifier.matchParentSize().background(LocalHomeColors.current.scrim))
++}
++
++@Composable
++private fun BoxScope.DialogLayer(content: @Composable () -> Unit) {
++    Scrim()
++    Box(Modifier.align(Alignment.Center).padding(horizontal = 28.dp)) { content() }
++}
++
++@Composable
++private fun BoxScope.SheetLayer(content: @Composable () -> Unit) {
++    Scrim()
++    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().clip(HomeDims.sheetShape).background(LocalHomeColors.current.surface)) { content() }
++}
++
++@Composable
++private fun Root(state: ToolsRootState, scrolled: Int = 0) {
++    ToolsScreen(state, onToggleSearch = {}, onQueryChange = {}, onOpen = {}, scroll = rememberScrollState(initial = scrolled))
++}
++
++@Composable
++private fun Configs(state: ToolsConfigState = ToolsSamples.configState) {
++    ToolsConfigScreen(
++        state = state, menuFor = null, onBack = {}, onImport = {}, onSelectConfig = {}, onOpenMenu = {}, onDismissMenu = {},
++        onMenuItem = { _, _ -> }, onEditYaml = {}, onAddSubscription = {}, onEditSubscription = {}, onDeleteSubscription = {}, onRetry = {},
++    )
++}
++
++/** The row menu of the config at [index], placed where the popup would hang. */
++@Composable
++private fun BoxScope.ConfigMenu(index: Int) {
++    Box(Modifier.align(Alignment.TopEnd).padding(top = 188.dp + 57.dp * index, end = 20.dp)) {
++        ToolsConfigMenuCard(ToolsSamples.configs[index]) {}
++    }
++}
++
++@Composable
++private fun Subscription(form: ToolsSubscriptionForm) {
++    ToolsSubscriptionScreen(form, onNameChange = {}, onUrlChange = {}, onSave = {}, onBack = {})
++}
++
++@Composable
++private fun Import(form: ToolsImportForm) {
++    ToolsImportScreen(form, pickedFile = null, onTabChange = {}, onUrlChange = {}, onNameChange = {}, onPickFile = {}, onImport = {}, onBack = {})
++}
++
++@Composable
++private fun Editor(state: ToolsEditorState = ToolsSamples.editorDraft, text: String = ToolsSamples.yaml) {
++    val buffer = remember(text) { ToolsYamlEditorState(text) }
++    ToolsEditorScreen(state, buffer, onBack = {}, onSave = {}, onOutline = {}, onValidate = {}, onDismissBanner = {}, onReload = {})
++}
++
++/* ------------------------------ 工具 ------------------------------ */
++
++@Preview(name = "C01 工具 · 展开", widthDp = W, heightDp = H)
++@Composable
++private fun C01ToolsExpanded() = Frame { Root(ToolsRootState()) }
++
++@Preview(name = "C02 工具 · 折叠顶栏", widthDp = W, heightDp = 640)
++@Composable
++private fun C02ToolsCollapsed() = Frame { Root(ToolsRootState(), scrolled = 600) }
++
++@Preview(name = "C03 工具 · 搜索", widthDp = W, heightDp = H)
++@Composable
++private fun C03ToolsSearch() = Frame { Root(ToolsSamples.rootSearch) }
++
++/* ------------------------------ 配置与订阅 ------------------------------ */
++
++@Preview(name = "C04 配置与订阅 · 列表", widthDp = W, heightDp = H)
++@Composable
++private fun C04Configs() = Frame { Configs() }
++
++@Preview(name = "C05 添加订阅", widthDp = W, heightDp = H)
++@Composable
++private fun C05AddSubscription() = Frame { Subscription(ToolsSamples.addSubscription) }
++
++@Preview(name = "C06 配置菜单 · 当前配置", widthDp = W, heightDp = H)
++@Composable
++private fun C06MenuCurrent() = Frame { Configs(); ConfigMenu(0) }
++
++@Preview(name = "C07 配置菜单 · 其他配置", widthDp = W, heightDp = H)
++@Composable
++private fun C07MenuOther() = Frame { Configs(); ConfigMenu(1) }
++
++@Preview(name = "C08 配置菜单 · 内置模板", widthDp = W, heightDp = H)
++@Composable
++private fun C08MenuBundled() = Frame { Configs(); ConfigMenu(2) }
++
++@Preview(name = "C09 配置 · 重命名", widthDp = W, heightDp = H)
++@Composable
++private fun C09Rename() = Frame {
++    Configs()
++    DialogLayer { ToolsRenameConfigDialogCard(ToolsConfigOverlay.Rename("工作.yaml", "工作专用.yaml"), onDraftChange = {}, onConfirm = {}, onCancel = {}) }
++}
++
++@Preview(name = "C10 配置 · 删除确认", widthDp = W, heightDp = H)
++@Composable
++private fun C10DeleteConfig() = Frame {
++    Configs()
++    DialogLayer { ToolsDeleteConfigDialogCard(ToolsConfigOverlay.DeleteConfig("日常.yaml", isCurrent = true), onConfirm = {}, onCancel = {}) }
++}
++
++@Preview(name = "C11 订阅 · 删除确认", widthDp = W, heightDp = H)
++@Composable
++private fun C11DeleteSubscription() = Frame {
++    Configs()
++    DialogLayer { ToolsDeleteSubscriptionDialogCard(ToolsConfigOverlay.DeleteSubscription("日常.yaml", "主订阅"), onConfirm = {}, onCancel = {}) }
++}
++
++@Preview(name = "C12 导入配置 · 放弃填写", widthDp = W, heightDp = H)
++@Composable
++private fun C12ImportDiscard() = Frame {
++    Import(ToolsSamples.importLink)
++    DialogLayer { ToolsDiscardFormDialogCard(onConfirm = {}, onCancel = {}) }
++}
++
++/* ------------------------------ 配置编辑 ------------------------------ */
++
++@Preview(name = "C13 配置编辑 · 语法大纲", widthDp = W, heightDp = H)
++@Composable
++private fun C13Outline() = Frame {
++    Editor()
++    SheetLayer { ToolsOutlineSheetContent(ToolsYaml.outline(ToolsSamples.yaml), onJump = {}, onClose = {}) }
++}
++
++@Preview(name = "C14 配置编辑 · 选择变更冲突", widthDp = W, heightDp = H)
++@Composable
++private fun C14SaveConflict() = Frame {
++    Editor()
++    SheetLayer { ToolsSaveConflictSheetContent("工作.yaml", onKeepDraft = {}, onReload = {}) }
++}
++
++@Preview(name = "C15 配置编辑 · 校验失败", widthDp = W, heightDp = H)
++@Composable
++private fun C15Invalid() = Frame { Editor(ToolsSamples.editorInvalid, ToolsSamples.yamlInvalid) }
++
++@Preview(name = "C16 配置编辑 · 读取失败", widthDp = W, heightDp = H)
++@Composable
++private fun C16LoadFailed() = Frame { Editor(ToolsSamples.editorLoadFailed, "") }
++
++@Preview(name = "C17 配置编辑 · 文件外部修改", widthDp = W, heightDp = H)
++@Composable
++private fun C17SourceChanged() = Frame {
++    Editor()
++    SheetLayer { ToolsSourceChangedSheetContent(onKeepDraft = {}, onReload = {}) }
++}
++
++@Preview(name = "C18 配置编辑 · 放弃并重新读取", widthDp = W, heightDp = H)
++@Composable
++private fun C18ConfirmReload() = Frame {
++    Editor()
++    DialogLayer { ToolsReloadDraftDialogCard(onConfirm = {}, onCancel = {}) }
++}
++
++@Preview(name = "C19 配置编辑 · 放弃修改", widthDp = W, heightDp = H)
++@Composable
++private fun C19ConfirmDiscard() = Frame {
++    Editor()
++    DialogLayer { ToolsDiscardEditsDialogCard(onConfirm = {}, onCancel = {}) }
++}
++
++/* ------------------------------ 表单校验 ------------------------------ */
++
++@Preview(name = "C20 导入配置 · 链接错误", widthDp = W, heightDp = H)
++@Composable
++private fun C20ImportUrlInvalid() = Frame { Import(ToolsSamples.importLinkInvalid) }
++
++@Preview(name = "C21 添加订阅 · 名称为空", widthDp = W, heightDp = H)
++@Composable
++private fun C21AddNameEmpty() = Frame { Subscription(ToolsSamples.addSubscriptionNameEmpty) }
++
++@Preview(name = "C22 添加订阅 · 链接错误", widthDp = W, heightDp = H)
++@Composable
++private fun C22AddUrlInvalid() = Frame { Subscription(ToolsSamples.addSubscriptionUrlInvalid) }
++
++@Preview(name = "C23 编辑订阅 · 链接错误", widthDp = W, heightDp = H)
++@Composable
++private fun C23EditUrlInvalid() = Frame { Subscription(ToolsSamples.editSubscriptionUrlInvalid) }
++
++@Preview(name = "C24 导入配置 · 链接", widthDp = W, heightDp = H)
++@Composable
++private fun C24ImportLink() = Frame { Import(ToolsSamples.importLink) }
++
++@Preview(name = "C25 配置编辑 · YAML", widthDp = W, heightDp = H)
++@Composable
++private fun C25Editor() = Frame { Editor() }
++
++/* ------------------------------ 补充 ------------------------------ */
++
++@Preview(name = "X1 工具 · 搜索无结果", widthDp = W, heightDp = H)
++@Composable
++private fun X1SearchEmpty() = Frame { Root(ToolsSamples.rootSearchEmpty) }
++
++@Preview(name = "X2 配置与订阅 · 无订阅", widthDp = W, heightDp = H)
++@Composable
++private fun X2NoSubscriptions() = Frame { Configs(ToolsSamples.configStateNoSubscriptions) }
++
++@Preview(name = "X3 配置与订阅 · 读取失败", widthDp = W, heightDp = H)
++@Composable
++private fun X3ConfigsFailed() = Frame { Configs(ToolsConfigState(ToolsLoad.Failed("配置库暂时无法读取"))) }
++
++@Preview(name = "X4 配置与订阅 · 深色", widthDp = W, heightDp = H)
++@Composable
++private fun X4ConfigsDark() = Frame(dark = true) { Configs() }
++
++@Preview(name = "X5 配置编辑 · 深色", widthDp = W, heightDp = H)
++@Composable
++private fun X5EditorDark() = Frame(dark = true) { Editor() }
++
++/** The whole flow on sample data: run it in interactive mode to walk pages 1–25. */
++@Preview(name = "X6 交互流程（示例数据）", widthDp = W, heightDp = H)
++@Composable
++private fun X6Flow() = Frame {
++    val actions = remember {
++        ToolsActions(
++            loadConfigs = { ToolsConfigSnapshot(ToolsSamples.configs, ToolsSamples.subscriptions) },
++            readConfig = { ToolsConfigDocument("日常.yaml", ToolsSamples.yaml) },
++        )
++    }
++    ToolsRoute(actions)
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsSamples.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsSamples.kt
+new file mode 100644
+index 0000000..1821fc9
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsSamples.kt
+@@ -0,0 +1,65 @@
++package io.github.xgl34222220.hetu.tools
++
++/** Sample data for previews; mirrors the 示例数据 of concept pages 1–25. */
++internal object ToolsSamples {
++    val configs = listOf(
++        ToolsConfig("日常.yaml", current = true),
++        ToolsConfig("工作.yaml"),
++        ToolsConfig("默认.yaml", kind = ToolsConfigKind.Bundled),
++    )
++
++    val subscriptions = listOf(
++        ToolsSubscription("主订阅", "https://example.com/subscription"),
++        ToolsSubscription("备用订阅", "https://example.org/subscription"),
++    )
++
++    val configState = ToolsConfigState(ToolsLoad.Ready, configs, subscriptions)
++    val configStateNoSubscriptions = configState.copy(subscriptions = emptyList())
++
++    val rootSearch = ToolsRootState(searching = true, query = "网络")
++    val rootSearchEmpty = ToolsRootState(searching = true, query = "蓝牙")
++
++    val addSubscription = ToolsSubscriptionForm.add().copy(name = "旅行订阅", url = "https://example.com/subscription")
++    val addSubscriptionNameEmpty = ToolsSubscriptionForm.add().copy(url = "https://example.com/subscription", nameError = "名称不能为空")
++    val addSubscriptionUrlInvalid = ToolsSubscriptionForm.add().copy(name = "旅行订阅", url = "example.com/subscription", urlError = ToolsRules.UrlError)
++    val editSubscriptionUrlInvalid = ToolsSubscriptionForm.edit(subscriptions[0]).copy(url = "example.com/subscription", urlError = ToolsRules.UrlError)
++
++    val importLink = ToolsImportForm(url = "https://example.com/config.yaml", name = "旅行.yaml")
++    val importLinkInvalid = ToolsImportForm(url = "example.com/config.yaml", name = "旅行.yaml", urlError = ToolsRules.UrlError)
++
++    val yaml = """
++        mixed-port: 7890
++        allow-lan: true
++        mode: rule
++        log-level: info
++        ipv6: true
++
++        dns:
++          enable: true
++          enhanced-mode: fake-ip
++          nameserver:
++            - 223.5.5.5
++
++        proxy-providers:
++          main:
++            type: http
++            path: ./providers/main.yaml
++            interval: 86400
++
++        proxy-groups:
++          - name: 节点选择
++            type: select
++            use:
++              - main
++
++        rules:
++          - GEOIP,CN,DIRECT
++          - MATCH,节点选择
++    """.trimIndent() + "\n"
++
++    val yamlInvalid = yaml.replace("mixed-port: 7890", "mixed-port: invalid")
++
++    val editorDraft = ToolsEditorState(ToolsLoad.Ready, "日常.yaml", dirty = true, canUndo = true)
++    val editorInvalid = editorDraft.copy(banner = "配置无效：mixed-port 必须为数字", errorLine = 1)
++    val editorLoadFailed = ToolsEditorState(ToolsLoad.Failed("源文件暂时无法读取"), "日常.yaml")
 +}

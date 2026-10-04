@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu.tools
 
+import io.github.xgl34222220.hetu.ui.ht
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -64,14 +65,14 @@ internal fun ToolsImportScreen(
                     ToolsField("配置名称（可选）", form.name, onNameChange, placeholder = "留空则使用链接中的文件名")
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("配置文件", Modifier.padding(horizontal = 2.dp), color = c.t2, style = HomeType.section)
+                        Text(ht("配置文件"), Modifier.padding(horizontal = 2.dp), color = c.t2, style = HomeType.section)
                         HomeCard(Modifier.fillMaxWidth(), background = c.bg) {
                             if (pickedFile != null) {
                                 ToolsRow(AnnotatedString(pickedFile.name), icon = ToolsIcons.File, subtitle = pickedFile.detail.ifBlank { null })
                                 HomeDivider()
                             }
                             ToolsRow(
-                                AnnotatedString(if (pickedFile == null) "选择文件" else "重新选择文件"),
+                                AnnotatedString(ht(if (pickedFile == null) "选择文件" else "重新选择文件")),
                                 icon = ToolsIcons.Folder, compact = true, enabled = !form.importing,
                                 onClick = onPickFile, trailing = { ToolsChevron() },
                             )

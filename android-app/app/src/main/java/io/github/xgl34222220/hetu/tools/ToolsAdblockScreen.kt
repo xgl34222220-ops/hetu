@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu.tools
 
+import io.github.xgl34222220.hetu.ui.ht
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -40,7 +41,7 @@ import io.github.xgl34222220.hetu.tools.ToolsHairline as HomeDivider
 import io.github.xgl34222220.hetu.tools.ToolsIconButton as HomeIconButton
 import io.github.xgl34222220.hetu.home.HomeIcons
 import io.github.xgl34222220.hetu.tools.ToolsSegmented as HomeSegmented
-import io.github.xgl34222220.hetu.home.HomeSheetContent
+import io.github.xgl34222220.hetu.tools.ToolsSheetContent as HomeSheetContent
 import io.github.xgl34222220.hetu.home.HomeTone
 import io.github.xgl34222220.hetu.tools.ToolsTopBar as HomeTopBar
 import io.github.xgl34222220.hetu.tools.ToolsTypography as HomeType
@@ -110,8 +111,8 @@ internal fun ToolsAdblockScreen(
                     DomainCard("黑名单（额外拦截）", "添加黑名单", state.block, idle, onAdd = { onAddDomain(false) }, onRemove = { onRemoveDomain(it, false) })
                     HomeCard(Modifier.fillMaxWidth()) {
                         ToolsCardTitle("代理关闭时")
-                        ToolsSwitchRow("独立 DNS 过滤", state.standaloneDns, onStandaloneDnsChange, icon = ToolsFeatureIcons.Globe, subtitle = "代理未运行时用本地 VPN 继续过滤广告", enabled = idle)
-                        ToolsSwitchRow("CNAME 追踪防护", state.cnameProtection, onCnameChange, icon = ToolsFeatureIcons.Shield, subtitle = "拦截伪装成正常域名的追踪 CNAME", enabled = idle)
+                        ToolsSwitchRow("独立 DNS 过滤", state.standaloneDns, onStandaloneDnsChange, icon = ToolsFeatureIcons.Globe, subtitle = ht("代理未运行时用本地 VPN 继续过滤广告"), enabled = idle)
+                        ToolsSwitchRow("CNAME 追踪防护", state.cnameProtection, onCnameChange, icon = ToolsFeatureIcons.Shield, subtitle = ht("拦截伪装成正常域名的追踪 CNAME"), enabled = idle)
                     }
                 }
             }
@@ -145,8 +146,8 @@ private fun StatusCard(state: ToolsAdblockState, idle: Boolean, onEnabledChange:
                 Icon(look.icon, null, Modifier.size(28.dp), tint = look.tint)
             }
             Column(Modifier.weight(1f)) {
-                Text(look.title, color = look.tint, style = HomeType.heroStatus, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(look.text, color = c.t2, style = HomeType.rowSub)
+                Text(ht(look.title), color = look.tint, style = HomeType.heroStatus, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(ht(look.text), color = c.t2, style = HomeType.rowSub)
             }
             ToolsSwitch(state.enabled, onEnabledChange, enabled = idle, label = "广告过滤")
         }
@@ -172,7 +173,7 @@ private fun StatusCard(state: ToolsAdblockState, idle: Boolean, onEnabledChange:
 private fun Metric(label: String, value: String, color: Color, modifier: Modifier) {
     val c = LocalHomeColors.current
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, color = c.t2, style = HomeType.caption, maxLines = 1)
+        Text(ht(label), color = c.t2, style = HomeType.caption, maxLines = 1)
         Text(value, Modifier.padding(top = 2.dp), color = color, style = HomeType.metric, maxLines = 1)
     }
 }
@@ -212,7 +213,7 @@ private fun RecentCard(recent: List<String>, onPick: (String) -> Unit) {
             if (index > 0) HomeDivider(Modifier.padding(start = 52.dp, end = 16.dp))
             ToolsRow(
                 AnnotatedString(domain), icon = ToolsFeatureIcons.Ban, iconTint = c.bad,
-                subtitle = "点按可加入白名单", compact = true, onClick = { onPick(domain) }, trailing = { ToolsChevron() },
+                subtitle = ht("点按可加入白名单"), compact = true, onClick = { onPick(domain) }, trailing = { ToolsChevron() },
             )
         }
     }
@@ -242,10 +243,11 @@ private fun SourcesCard(state: ToolsAdblockState, idle: Boolean, onUpdate: () ->
         ToolsCardTitle("规则源") {
             HomeButton(if (state.updating) "更新中" else "立即更新", onUpdate, Modifier.padding(end = 10.dp), kind = HomeButtonKind.Primary, enabled = idle || state.updating, loading = state.updating)
         }
-        if (state.sources.isEmpty()) Text("没有可用的规则源。", Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp), color = c.t2, style = HomeType.note)
+        if (state.sources.isEmpty()) Text(ht("没有可用的规则源。"), Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp), color = c.t2, style = HomeType.note)
         state.sources.forEach { source ->
             ToolsSwitchRow(
                 source.name, source.enabled, { onSourceChange(source, it) },
+                rawContent = true,
                 icon = if (source.id.contains("adguard", ignoreCase = true)) ToolsFeatureIcons.Shield else ToolsIcons.FileText,
                 subtitle = "%,d 条 · ".format(source.count) + if (state.updating && source.enabled) "正在更新…" else source.meta,
                 enabled = idle,
@@ -261,7 +263,7 @@ private fun DomainCard(title: String, addLabel: String, domains: List<String>, i
         ToolsCardTitle(title) { HomeIconButton(ToolsIcons.Plus, addLabel, onAdd, enabled = idle, tint = c.t1) }
         Box(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 14.dp)) {
             if (domains.isEmpty()) {
-                Text("暂无", color = c.t3, style = HomeType.note)
+                Text(ht("暂无"), color = c.t3, style = HomeType.note)
             } else {
                 ToolsWrap { domains.forEach { domain -> ToolsChip(domain, { onRemove(domain) }, enabled = idle) } }
             }
@@ -278,10 +280,10 @@ internal fun ToolsAdblockHelpSheetContent(onClose: () -> Unit, modifier: Modifie
     val c = LocalHomeColors.current
     HomeSheetContent(title = "广告过滤说明", modifier = modifier, onClose = onClose) {
         Column(Modifier.padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("应用流量会先经过应用直连与明确白名单，再匹配广告规则 REJECT，之后才进入普通配置分流与兜底。", color = c.t2, style = ToolsType.dialogText)
-            Text("代理运行时，独立 DNS 过滤会自动暂停，避免两套过滤链同时接管。", color = c.t2, style = ToolsType.dialogText)
+            Text(ht("应用流量会先经过应用直连与明确白名单，再匹配广告规则 REJECT，之后才进入普通配置分流与兜底。"), color = c.t2, style = ToolsType.dialogText)
+            Text(ht("代理运行时，独立 DNS 过滤会自动暂停，避免两套过滤链同时接管。"), color = c.t2, style = ToolsType.dialogText)
             HomeCard(Modifier.fillMaxWidth(), background = c.bg) {
-                Text("应用流量 → 直连应用 / 白名单 → 广告 RULE-SET → 地区 / 规则集分流 → 兜底", Modifier.padding(horizontal = 14.dp, vertical = 12.dp), color = c.t1, style = HomeType.mono)
+                Text(ht("应用流量 → 直连应用 / 白名单 → 广告 RULE-SET → 地区 / 规则集分流 → 兜底"), Modifier.padding(horizontal = 14.dp, vertical = 12.dp), color = c.t1, style = HomeType.mono)
             }
         }
     }
@@ -317,6 +319,6 @@ internal fun ToolsConfirmAllowDialogCard(overlay: ToolsAdOverlay.ConfirmAllow, o
         onConfirm = onConfirm, onCancel = onCancel, modifier = modifier,
     ) {
         Text(overlay.domain, Modifier.fillMaxWidth(), color = c.t1, style = HomeType.mono, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        Text("及其子域名将不再被拦截。", Modifier.fillMaxWidth().padding(top = 4.dp), color = c.t2, style = ToolsType.dialogText, textAlign = TextAlign.Center)
+        Text(ht("及其子域名将不再被拦截。"), Modifier.fillMaxWidth().padding(top = 4.dp), color = c.t2, style = ToolsType.dialogText, textAlign = TextAlign.Center)
     }
 }

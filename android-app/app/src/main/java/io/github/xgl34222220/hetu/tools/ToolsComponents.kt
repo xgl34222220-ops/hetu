@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu.tools
 
+import io.github.xgl34222220.hetu.ui.ht
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -132,7 +133,7 @@ internal fun ToolsPage(
 /** Secondary sentence under a top bar. */
 @Composable
 internal fun ToolsLead(text: String, modifier: Modifier = Modifier) {
-    Text(text, modifier.padding(start = 4.dp, end = 4.dp, bottom = 12.dp), color = LocalHomeColors.current.t2, style = HomeType.note)
+    Text(ht(text), modifier.padding(start = 4.dp, end = 4.dp, bottom = 12.dp), color = LocalHomeColors.current.t2, style = HomeType.note)
 }
 
 /** Tertiary footnote, optionally led by a 14 dp info glyph. */
@@ -141,7 +142,7 @@ internal fun ToolsNote(text: String, modifier: Modifier = Modifier, icon: ImageV
     val c = LocalHomeColors.current
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         if (icon != null) Icon(icon, null, Modifier.padding(top = 1.dp).size(14.dp), tint = c.t3)
-        Text(text, color = c.t3, style = HomeType.caption)
+        Text(ht(text), color = c.t3, style = HomeType.caption)
     }
 }
 
@@ -166,8 +167,8 @@ internal fun ToolsCardHeader(
     ) {
         Icon(icon, null, Modifier.size(26.dp), tint = c.t1)
         Column(Modifier.weight(1f)) {
-            Text(title, color = c.t1, style = HomeType.section, maxLines = 1)
-            if (caption != null) Text(caption, color = c.t3, style = HomeType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(ht(title), color = c.t1, style = HomeType.section, maxLines = 1)
+            if (caption != null) Text(ht(caption), color = c.t3, style = HomeType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (trailing != null) trailing()
     }
@@ -180,6 +181,7 @@ internal fun ToolsCardHeader(
  * @param title an [AnnotatedString] so search hits can be tinted.
  * @param selected paints the accent-soft fill used for the current config.
  */
+/** Titles/subtitles here are raw by default; UI callers explicitly pass ht-resolved labels. */
 @Composable
 internal fun ToolsRow(
     title: AnnotatedString,
@@ -269,10 +271,10 @@ internal fun ToolsField(
     val c = LocalHomeColors.current
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         if (readOnly) {
-            Text(label, Modifier.padding(horizontal = 2.dp), color = c.t2, style = HomeType.section)
+            Text(ht(label), Modifier.padding(horizontal = 2.dp), color = c.t2, style = HomeType.section)
             Text(value, Modifier.padding(horizontal = 2.dp), color = c.t1, style = ToolsType.readOnlyValue, maxLines = 1, overflow = TextOverflow.Ellipsis)
         } else {
-            HomeTextField(label, value, onValueChange, monospace = monospace, isError = error != null, keyboardType = keyboardType, placeholder = placeholder)
+            HomeTextField(ht(label), value, onValueChange, monospace = monospace, isError = error != null, keyboardType = keyboardType, placeholder = ht(placeholder))
         }
         if (error != null) {
             Row(Modifier.padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -280,7 +282,7 @@ internal fun ToolsField(
                 Text(error, color = c.bad, style = HomeType.caption)
             }
         }
-        if (hint != null) Text(hint, Modifier.padding(horizontal = 2.dp), color = c.t3, style = HomeType.caption)
+        if (hint != null) Text(ht(hint), Modifier.padding(horizontal = 2.dp), color = c.t3, style = HomeType.caption)
     }
 }
 
@@ -299,6 +301,7 @@ internal fun ToolsSearchField(
     val focusManager = LocalFocusManager.current
     if (autoFocus) LaunchedEffect(Unit) { focus.requestFocus() }
     val style = HomeType.body.copy(color = c.t1)
+    val clearLabel = ht("清除")
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
@@ -316,12 +319,12 @@ internal fun ToolsSearchField(
             ) {
                 Icon(ToolsIcons.Search, null, Modifier.size(18.dp), tint = c.t3)
                 Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                    if (value.isEmpty()) Text(placeholder, color = c.t3, style = style.copy(color = c.t3), maxLines = 1)
+                    if (value.isEmpty()) Text(ht(placeholder), color = c.t3, style = style.copy(color = c.t3), maxLines = 1)
                     inner()
                 }
                 if (value.isNotEmpty()) {
                     Box(
-                        Modifier.size(36.dp).clip(CircleShape).clickable(onClickLabel = "清除", role = Role.Button) { haptics(HomeHaptic.Tap); onValueChange("") },
+                        Modifier.size(36.dp).clip(CircleShape).clickable(onClickLabel = clearLabel, role = Role.Button) { haptics(HomeHaptic.Tap); onValueChange("") },
                         contentAlignment = Alignment.Center,
                     ) { Icon(HomeIcons.X, null, Modifier.size(16.dp), tint = c.t3) }
                 }
@@ -345,7 +348,7 @@ internal fun ToolsEmpty(
     val c = LocalHomeColors.current
     Column(modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Icon(icon, null, Modifier.padding(bottom = 12.dp).size(32.dp), tint = c.t3)
-        Text(title, color = c.t1, style = ToolsType.emptyTitle, textAlign = TextAlign.Center)
+        Text(ht(title), color = c.t1, style = ToolsType.emptyTitle, textAlign = TextAlign.Center)
         if (subtitle != null) Text(subtitle, Modifier.padding(top = 4.dp), color = c.t2, style = HomeType.note, textAlign = TextAlign.Center)
         if (action != null) Box(Modifier.padding(top = 16.dp)) { action() }
     }
@@ -384,7 +387,7 @@ internal fun ToolsDangerButton(
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
     ) {
         if (loading) HomeSpinner(size = 16.dp, color = content)
-        Text(text, color = content, style = HomeType.button, maxLines = 1)
+        Text(ht(text), color = content, style = HomeType.button, maxLines = 1)
     }
 }
 
@@ -423,8 +426,8 @@ internal fun ToolsDialogCard(
             .border(1.dp, c.line, ToolsDims.dialogShape)
             .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 16.dp),
     ) {
-        Text(title, Modifier.fillMaxWidth(), color = c.t1, style = ToolsType.dialogTitle, textAlign = TextAlign.Center)
-        if (text != null) Text(text, Modifier.fillMaxWidth().padding(top = 8.dp), color = c.t2, style = ToolsType.dialogText, textAlign = TextAlign.Center)
+        Text(ht(title), Modifier.fillMaxWidth(), color = c.t1, style = ToolsType.dialogTitle, textAlign = TextAlign.Center)
+        if (text != null) Text(ht(text), Modifier.fillMaxWidth().padding(top = 8.dp), color = c.t2, style = ToolsType.dialogText, textAlign = TextAlign.Center)
         if (content != null) Column(Modifier.fillMaxWidth().padding(top = 16.dp), content = content)
         Row(Modifier.fillMaxWidth().padding(top = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             HomeButton(cancelLabel, onCancel, Modifier.weight(1f), enabled = !confirmLoading)
@@ -481,7 +484,7 @@ internal fun ToolsMenuCard(entries: List<ToolsMenuEntry>, modifier: Modifier = M
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Icon(entry.icon, null, Modifier.size(17.dp), tint = if (entry.danger) c.bad else c.t2)
-                Text(entry.label, color = tint, style = ToolsType.menuItem, maxLines = 1)
+                Text(ht(entry.label), color = tint, style = ToolsType.menuItem, maxLines = 1)
             }
         }
     }

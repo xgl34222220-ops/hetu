@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu.tools
 
+import io.github.xgl34222220.hetu.ui.ht
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -110,7 +111,7 @@ internal fun ToolsAppsScreen(
                 }
                 ToolsLoad.Ready -> if (rows.isEmpty()) {
                     val searching = state.searching && state.query.isNotBlank()
-                    ToolsEmpty(ToolsIcons.Search, if (searching) "没有匹配的应用" else "没有可显示的应用", subtitle = if (searching) "尝试其他关键词" else "可在「更多」里显示系统应用")
+                    ToolsEmpty(ToolsIcons.Search, if (searching) "没有匹配的应用" else "没有可显示的应用", subtitle = ht(if (searching) "尝试其他关键词" else "可在「更多」里显示系统应用"))
                 } else {
                     LazyColumn(
                         Modifier.fillMaxSize(),
@@ -126,11 +127,11 @@ internal fun ToolsAppsScreen(
         }
         if (ready) {
             ToolsFooterBar {
-                Text("已选 ", color = c.t1, style = HomeType.bodySmall)
+                Text(ht("已选") + " ", color = c.t1, style = HomeType.bodySmall)
                 Text(state.selectedCount.toString(), color = c.accent, style = HomeType.value.copy(fontFeatureSettings = "tnum"))
-                Text(" 个", color = c.t1, style = HomeType.bodySmall)
-                Text("  ·  ", color = c.t3, style = HomeType.bodySmall)
-                Text(state.scope.tip, Modifier.weight(1f), color = c.t2, style = HomeType.caption, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(" " + ht("个"), color = c.t1, style = HomeType.bodySmall)
+                Text(ht("  ·  "), color = c.t3, style = HomeType.bodySmall)
+                Text(ht(state.scope.tip), Modifier.weight(1f), color = c.t2, style = HomeType.caption, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
     }

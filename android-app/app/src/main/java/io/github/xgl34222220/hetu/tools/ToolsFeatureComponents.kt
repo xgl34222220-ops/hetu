@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu.tools
 
+import io.github.xgl34222220.hetu.ui.ht
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -91,8 +92,8 @@ internal fun ToolsWideBar(
     ) {
         HomeIconButton(HomeIcons.ChevronLeft, "返回", onBack)
         Column(Modifier.weight(1f).padding(horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(title, color = c.t1, style = HomeType.barTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (subtitle != null) Text(subtitle, color = c.t3, style = HomeType.barSubtitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(ht(title), color = c.t1, style = HomeType.barTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (subtitle != null) Text(ht(subtitle), color = c.t3, style = HomeType.barSubtitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         actions()
     }
@@ -121,7 +122,7 @@ internal fun ToolsBarTextButton(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         if (loading) HomeSpinner(size = 16.dp, color = tint) else Icon(icon, null, Modifier.size(18.dp), tint = tint)
-        Text(text, color = tint, style = HomeType.buttonSmall, maxLines = 1)
+        Text(ht(text), color = tint, style = HomeType.buttonSmall, maxLines = 1)
     }
 }
 
@@ -168,7 +169,7 @@ internal fun ToolsInfoCard(text: String, modifier: Modifier = Modifier) {
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Icon(HomeIcons.Info, null, Modifier.padding(top = 1.dp).size(18.dp), tint = c.accent)
-        Text(text, Modifier.weight(1f), color = c.t1, style = HomeType.bodySmall)
+        Text(ht(text), Modifier.weight(1f), color = c.t1, style = HomeType.bodySmall)
     }
 }
 
@@ -180,7 +181,7 @@ internal fun ToolsCardTitle(text: String, modifier: Modifier = Modifier, trailin
         modifier.fillMaxWidth().heightIn(min = HomeDims.touch).padding(start = 16.dp, end = if (trailing == null) 16.dp else 6.dp, top = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(text, Modifier.weight(1f), color = c.t1, style = HomeType.rowTitle.copy(fontWeight = FontWeight.SemiBold), maxLines = 1)
+        Text(ht(text), Modifier.weight(1f), color = c.t1, style = HomeType.rowTitle.copy(fontWeight = FontWeight.SemiBold), maxLines = 1)
         if (trailing != null) trailing()
     }
 }
@@ -196,14 +197,15 @@ internal fun ToolsSwitchRow(
     subtitle: String? = null,
     enabled: Boolean = true,
     monospaceSubtitle: Boolean = false,
+    rawContent: Boolean = false,
 ) {
     val c = LocalHomeColors.current
     ToolsRow(
-        title = AnnotatedString(title),
+        title = AnnotatedString(if (rawContent) title else ht(title)),
         modifier = modifier.alpha(if (enabled) 1f else .5f),
         icon = icon,
         iconTint = c.t1,
-        subtitle = subtitle,
+        subtitle = subtitle?.let { if (rawContent) it else ht(it) },
         subtitleStyle = if (monospaceSubtitle) ToolsType.url else HomeType.rowSub,
         enabled = enabled,
         onClick = { onCheckedChange(!checked) },
@@ -266,7 +268,7 @@ internal fun ColumnScope.ToolsListEditor(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
-                    Text(label, color = c.t3, style = HomeType.caption)
+                    Text(ht(label), color = c.t3, style = HomeType.caption)
                     BasicTextField(
                         value = value,
                         onValueChange = { onChange(index, it) },
@@ -278,7 +280,7 @@ internal fun ColumnScope.ToolsListEditor(
                         cursorBrush = SolidColor(c.accent),
                         decorationBox = { inner ->
                             Box(contentAlignment = Alignment.CenterStart) {
-                                if (value.isEmpty()) Text(placeholder, color = c.t3, style = style.copy(color = c.t3), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                if (value.isEmpty()) Text(ht(placeholder), color = c.t3, style = style.copy(color = c.t3), maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 inner()
                             }
                         },
@@ -298,7 +300,7 @@ internal fun ColumnScope.ToolsListEditor(
             horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
         ) {
             Icon(ToolsIcons.Plus, null, Modifier.size(16.dp), tint = c.accent)
-            Text("添加一项", color = c.accent, style = HomeType.buttonSmall)
+            Text(ht("添加一项"), color = c.accent, style = HomeType.buttonSmall)
         }
     }
 }
@@ -390,7 +392,7 @@ internal fun ToolsOptionMenuCard(options: List<ToolsMenuOption>, modifier: Modif
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Text(option.label, Modifier.weight(1f), color = if (on) c.accent else c.t1, style = ToolsType.menuItem.copy(fontWeight = if (on) FontWeight.SemiBold else null), maxLines = 1)
+                Text(ht(option.label), Modifier.weight(1f), color = if (on) c.accent else c.t1, style = ToolsType.menuItem.copy(fontWeight = if (on) FontWeight.SemiBold else null), maxLines = 1)
                 if (option.checked != null) Box(Modifier.size(16.dp)) { if (on) Icon(HomeIcons.Check, null, Modifier.size(16.dp), tint = c.accent) }
             }
         }

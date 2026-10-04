@@ -58,8 +58,7 @@ class NewUiShell83Test {
         library.select(core, fixture.name)
         root(HxTab.Tools)
         capture("tools-hub")
-        rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("配置管理"))
-        rule.onNodeWithText("配置管理").performClick()
+        rule.onNodeWithText("配置管理").performScrollTo().performClick()
         settle()
         rule.onNodeWithText("首页").assertDoesNotExist()
         // The library loads on Dispatchers.IO; virtual animation time cannot complete that read.
@@ -81,8 +80,7 @@ class NewUiShell83Test {
 
     @Test fun diagnosticDetailKeepsNetworkJournalAccessible() {
         root(HxTab.Tools)
-        rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("诊断工具"))
-        rule.onNodeWithText("诊断工具").performClick()
+        rule.onNodeWithText("诊断工具").performScrollTo().performClick()
         settle()
         rule.onNodeWithText("首页").assertDoesNotExist()
         rule.onNodeWithText("网络事件记录").assertExists()

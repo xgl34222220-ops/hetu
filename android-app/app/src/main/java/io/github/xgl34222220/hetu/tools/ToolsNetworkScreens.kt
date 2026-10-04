@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu.tools
 
+import io.github.xgl34222220.hetu.ui.ht
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -126,7 +127,7 @@ internal fun ToolsShareScreen(
         modifier = modifier.imePadding(),
         refreshing = state.refreshing,
         onRefresh = if (state.saving) null else onRefresh,
-        subtitle = "热点、USB 与局域网转发流量",
+        subtitle = ht("热点、USB 与局域网转发流量"),
         actions = {
             HomeIconButton(HomeIcons.RefreshCw, "刷新", onRefresh, enabled = ready, loading = state.refreshing)
             HomeIconButton(HomeIcons.Check, "保存", onSave, enabled = state.dirty && editable, loading = state.saving, tint = if (state.dirty) c.accent else c.t3)
@@ -140,14 +141,14 @@ internal fun ToolsShareScreen(
             ToolsLoad.Ready -> Column(verticalArrangement = Arrangement.spacedBy(HomeDims.gap)) {
                 ToolsInfoCard("开启后河图接管共享 / 转发流量；接口与 MAC 直连在 Root 层生效，修改后重启代理。")
                 HomeCard(Modifier.fillMaxWidth()) {
-                    ToolsSwitchRow("启用共享网络", draft.enabled, { onDraftChange(draft.copy(enabled = it)) }, icon = ToolsIcons.Wifi, subtitle = "将共享流量纳入透明代理", enabled = editable)
+                    ToolsSwitchRow("启用共享网络", draft.enabled, { onDraftChange(draft.copy(enabled = it)) }, icon = ToolsIcons.Wifi, subtitle = ht("将共享流量纳入透明代理"), enabled = editable)
                 }
                 val lower = editable && draft.enabled
                 Column(Modifier.alpha(if (draft.enabled) 1f else .5f), verticalArrangement = Arrangement.spacedBy(HomeDims.gap)) {
                     HomeCard(Modifier.fillMaxWidth()) {
                         ToolsCardTitle("共享网络接口")
                         if (state.interfaces.isEmpty()) {
-                            Text(state.note.ifBlank { "没有检测到正在共享的接口。" }, Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp), color = c.t2, style = HomeType.note)
+                            Text(state.note.ifBlank { ht("没有检测到正在共享的接口。") }, Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp), color = c.t2, style = HomeType.note)
                         }
                         state.interfaces.forEachIndexed { index, item ->
                             if (index > 0) HomeDivider(Modifier.padding(horizontal = 16.dp))
@@ -155,8 +156,9 @@ internal fun ToolsShareScreen(
                             ToolsSwitchRow(
                                 item.name, direct,
                                 { on -> onDraftChange(draft.copy(directInterfaces = if (on) draft.directInterfaces + item.name else draft.directInterfaces - item.name)) },
+                                rawContent = true,
                                 icon = ToolsIcons.Link,
-                                subtitle = (if (direct) "直连" else "接管") + if (item.state.isBlank()) "" else " · 状态 ${item.state}",
+                                subtitle = ht(if (direct) "直连" else "接管") + if (item.state.isBlank()) "" else " · ${ht("状态")} ${item.state}",
                                 enabled = lower,
                             )
                         }
@@ -164,7 +166,7 @@ internal fun ToolsShareScreen(
                     HomeCard(Modifier.fillMaxWidth()) {
                         ToolsCardTitle("下游设备")
                         if (state.clients.isEmpty()) {
-                            Text("没有检测到下游设备。", Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp), color = c.t2, style = HomeType.note)
+                            Text(ht("没有检测到下游设备。"), Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp), color = c.t2, style = HomeType.note)
                         }
                         state.clients.forEachIndexed { index, client ->
                             if (index > 0) HomeDivider(Modifier.padding(horizontal = 16.dp))
@@ -172,6 +174,7 @@ internal fun ToolsShareScreen(
                             ToolsSwitchRow(
                                 client.ip, mac in macs,
                                 { on -> onDraftChange(draft.copy(macs = if (on) draft.macs + mac else draft.macs.filter { it.trim().lowercase() != mac })) },
+                                rawContent = true,
                                 icon = ToolsFeatureIcons.Laptop,
                                 subtitle = listOf(client.mac, client.iface, client.state).filter { it.isNotBlank() }.joinToString(" · "),
                                 monospaceSubtitle = true,
@@ -214,12 +217,12 @@ internal fun ToolsCnIpScreen(
         HomeCard(Modifier.fillMaxWidth()) {
             ToolsSwitchRow(
                 "绕过 CNIP", state.enabled, onEnabledChange,
-                icon = ToolsFeatureIcons.Globe, subtitle = "命中国内 IPv4 / IPv6 网段时直接连接", enabled = state.load is ToolsLoad.Ready,
+                icon = ToolsFeatureIcons.Globe, subtitle = ht("命中国内 IPv4 / IPv6 网段时直接连接"), enabled = state.load is ToolsLoad.Ready,
             )
         }
         Spacer(Modifier.height(HomeDims.gap))
         HomeCard(Modifier.fillMaxWidth()) {
-            ToolsRow(AnnotatedString("数据源"), icon = ToolsIcons.Database, iconTint = c.t1, subtitle = "内置离线快照 + Mihomo provider 运行时更新")
+            ToolsRow(AnnotatedString(ht("数据源")), icon = ToolsIcons.Database, iconTint = c.t1, subtitle = ht("内置离线快照 + Mihomo provider 运行时更新"))
         }
     }
 }

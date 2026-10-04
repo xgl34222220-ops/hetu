@@ -10,7 +10,8 @@ class AutomationToolsConceptParityTest {
         File("src/main/java/io/github/xgl34222220/hetu/$path").readText()
 
     @Test fun toolLandingAndConfigStatesAreReachable() {
-        val landing = source("app/PanelToolsScreens.kt")
+        val landing = source("app/PanelToolsScreens.kt") + source("tools/ToolsScreen.kt") +
+            source("tools/ToolsModels.kt") + source("tools/ToolsRoute.kt")
         val config = source("app/ConfigScreens.kt") + source("ProxySubscriptionActivity.kt")
 
         listOf("工具", "搜索工具", "应用管理", "共享网络", "网络匹配", "绕过规则", "诊断").forEach {

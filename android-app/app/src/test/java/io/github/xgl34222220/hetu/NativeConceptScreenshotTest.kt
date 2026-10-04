@@ -4,6 +4,8 @@ import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
+import android.view.Gravity
+import android.view.WindowManager
 import android.view.inspector.WindowInspector
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
@@ -60,7 +62,9 @@ class NativeConceptScreenshotTest {
 
     private fun snapshotAfter(name: String, content: @Composable () -> Unit, afterSet: () -> Unit) {
         rule.setContent { HetuAppTheme(appearance = "light", dynamic = false) {
-            CompositionLocalProvider(LocalNav provides HxNav()) { Box(Modifier.fillMaxSize()) { content() } }
+            CompositionLocalProvider(LocalNav provides HxNav(), LocalHxBlur provides vm.blurEnabled) {
+                Box(Modifier.fillMaxSize()) { content() }
+            }
         } }
         rule.waitForIdle()
         rule.mainClock.advanceTimeBy(1000)
@@ -84,6 +88,19 @@ class NativeConceptScreenshotTest {
                 if (!drawn.add(root)) return@forEach
                 val location = IntArray(2)
                 root.getLocationOnScreen(location)
+                val params = root.layoutParams as? WindowManager.LayoutParams
+                // Match the real WM placement/dimming, as the full state capture does.
+                // Robolectric otherwise reports a separate dialog decor at (0, 0).
+                if (root !== decor && params != null) {
+                    val placed = android.graphics.Rect()
+                    Gravity.apply(params.gravity, root.width, root.height,
+                        android.graphics.Rect(0, 0, decor.width, decor.height), params.x, params.y, placed)
+                    location[0] = placed.left
+                    location[1] = placed.top
+                    if ((params.flags and WindowManager.LayoutParams.FLAG_DIM_BEHIND) != 0) {
+                        canvas.drawColor(android.graphics.Color.argb((params.dimAmount * 255).toInt(), 0, 0, 0))
+                    }
+                }
                 canvas.save()
                 canvas.translate(location[0].toFloat(), location[1].toFloat())
                 root.draw(canvas)
@@ -151,12 +168,22 @@ class NativeConceptScreenshotTest {
     }
     @Test fun mihomoLicenseSheet() = snapshotAfter("settings-license-mihomo", { AboutScreen(vm) }) {
         rule.onNode(hasText("Mihomo") and hasClickAction()).performScrollTo().performClick()
+        awaitLicenseSheet()
     }
     @Test fun adguardLicenseSheet() = snapshotAfter("settings-license-adguard", { AboutScreen(vm) }) {
         rule.onNodeWithText("AdGuard DNS Filter").performScrollTo().performClick()
+        awaitLicenseSheet()
     }
     @Test fun lucideLicenseSheet() = snapshotAfter("settings-license-lucide", { AboutScreen(vm) }) {
         rule.onNodeWithText("Lucide Icons").performScrollTo().performClick()
+        awaitLicenseSheet()
+    }
+
+    private fun awaitLicenseSheet() {
+        rule.waitUntil(10_000) {
+            rule.onAllNodesWithText("复制").fetchSemanticsNodes().isNotEmpty()
+        }
+        rule.onNodeWithText("复制").assertExists()
     }
 
 }

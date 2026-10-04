@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu.tools
 
+import io.github.xgl34222220.hetu.ui.ht
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -88,9 +89,9 @@ private fun CoreCard(core: ToolsCore, busy: Boolean, enabled: Boolean, progress:
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(core.name, Modifier.weight(1f, fill = false), color = c.t1, style = HomeType.rowTitle.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         when {
-                            !core.runnable -> HomeBadge("仅下载管理")
-                            core.updateAvailable -> HomeBadge("有更新", tone = HomeTone.Accent)
-                            core.latest.isNotBlank() -> HomeBadge("已是最新", tone = HomeTone.Good)
+                            !core.runnable -> HomeBadge(ht("仅下载管理"))
+                            core.updateAvailable -> HomeBadge(ht("有更新"), tone = HomeTone.Accent)
+                            core.latest.isNotBlank() -> HomeBadge(ht("已是最新"), tone = HomeTone.Good)
                         }
                     }
                     Text(core.versionLine, color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis)

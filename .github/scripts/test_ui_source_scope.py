@@ -16,6 +16,7 @@ class PresentationScope(unittest.TestCase):
                         PACKAGE + 'ProxyScriptsActivity.kt',
                         PACKAGE + 'ProxySubStoreActivity.kt',
                         PACKAGE + 'ProxyNetworkAutomationActivity.kt',
+                        PACKAGE + 'ui/HetuLanguage.kt',
                         'android-app/app/src/test/java/example/Ui83Test.kt'])
 
     def test_runtime_assets_manifest_and_native_payload_cannot_enter_ui_patch(self):
@@ -40,8 +41,9 @@ class PresentationScope(unittest.TestCase):
                 validate_version_only(before, changed)
 
     def test_unlisted_root_package_bridge_is_rejected(self):
-        with self.assertRaises(AssertionError):
-            validate_scope([PACKAGE + 'NewRootBridge.kt'])
+        for path in ['NewRootBridge.kt', 'ui/NewRuntimeBridge.kt']:
+            with self.subTest(path=path), self.assertRaises(AssertionError):
+                validate_scope([PACKAGE + path])
 
 
 if __name__ == '__main__':

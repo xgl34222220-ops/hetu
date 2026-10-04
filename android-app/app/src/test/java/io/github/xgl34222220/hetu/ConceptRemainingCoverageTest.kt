@@ -103,7 +103,7 @@ class ConceptRemainingCoverageTest {
     }
     private fun show(content: @Composable () -> Unit) {
         rule.runOnUiThread { rule.activity.setContent {
-            HetuAppTheme("light", false) { CompositionLocalProvider(LocalNav provides HxNav()) {
+            HetuAppTheme("light", false) { CompositionLocalProvider(LocalNav provides HxNav(), LocalHxBlur provides vm.blurEnabled) {
                 Box(Modifier.fillMaxSize()) { content() }
             } }
         } }

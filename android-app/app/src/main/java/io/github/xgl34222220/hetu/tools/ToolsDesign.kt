@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu.tools
 
+import io.github.xgl34222220.hetu.ui.ht
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -108,10 +109,11 @@ internal fun ToolsPullRefresh(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
+    val refreshLabel = ht("刷新")
     if (onRefresh == null) Box(modifier) { content() }
     else PullToRefreshBox(isRefreshing = refreshing, onRefresh = onRefresh,
         modifier = modifier.semantics {
-            customActions = listOf(CustomAccessibilityAction("刷新") { if (!refreshing) onRefresh(); true })
+            customActions = listOf(CustomAccessibilityAction(refreshLabel) { if (!refreshing) onRefresh(); true })
         }) { content() }
 }
 
@@ -125,9 +127,10 @@ internal fun ToolsSurfaceCard(
 ) {
     val haptics = LocalHomeHaptics.current
     val source = remember { MutableInteractionSource() }
+    val localizedClickLabel = clickLabel?.let { ht(it) }
     val shaped = modifier.clip(ToolsDesignDims.cardShape).background(background)
     val interactive = if (onClick == null) shaped else shaped.hxPressScale(source, .985f)
-        .clickable(interactionSource = source, indication = null, onClickLabel = clickLabel, role = Role.Button) {
+        .clickable(interactionSource = source, indication = null, onClickLabel = localizedClickLabel, role = Role.Button) {
             haptics(HomeHaptic.Tap); onClick()
         }
     Column(interactive, content = content)
@@ -151,10 +154,11 @@ internal fun ToolsIconButton(
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
     val source = remember { MutableInteractionSource() }
+    val localizedLabel = ht(label)
     Box(modifier.size(48.dp).clip(ToolsDesignDims.controlShape).hxPressScale(source, .94f)
         .clickable(enabled = enabled && !loading, interactionSource = source, indication = null,
-            onClickLabel = label, role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
-        .semantics { contentDescription = label }, contentAlignment = Alignment.Center) {
+            onClickLabel = localizedLabel, role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
+        .semantics { contentDescription = localizedLabel }, contentAlignment = Alignment.Center) {
         if (loading) HomeSpinner(size = 18.dp, color = c.t2)
         else Icon(icon, null, Modifier.size(26.dp), tint = if (enabled) tint else c.t3)
     }
@@ -188,7 +192,7 @@ internal fun ToolsButton(
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
         if (loading) HomeSpinner(size = 18.dp, color = foreground)
         else if (icon != null) Icon(icon, null, Modifier.size(22.dp), tint = foreground)
-        Text(text, color = foreground, style = ToolsTypography.button, maxLines = 1)
+        Text(ht(text), color = foreground, style = ToolsTypography.button, maxLines = 1)
     }
 }
 
@@ -209,10 +213,42 @@ internal fun ToolsTopBar(
             actions()
         }
         Column(Modifier.align(Alignment.Center).padding(horizontal = 72.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(title, color = c.t1, style = ToolsTypography.barTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (subtitle != null) Text(subtitle, color = c.t3, style = ToolsTypography.barSubtitle,
+            Text(ht(title), color = c.t1, style = ToolsTypography.barTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (subtitle != null) Text(ht(subtitle), color = c.t3, style = ToolsTypography.barSubtitle,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
+    }
+}
+
+/** Only this frame's UI labels are localized; its caller owns verbatim document/report bodies. */
+@Composable
+internal fun ToolsSheetContent(
+    title: String,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    onClose: (() -> Unit)? = null,
+    trailing: (@Composable RowScope.() -> Unit)? = null,
+    footer: (@Composable RowScope.() -> Unit)? = null,
+    body: @Composable ColumnScope.() -> Unit,
+) {
+    val c = LocalHomeColors.current
+    Column(modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.navigationBars)) {
+        Box(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(36.dp, 4.dp).background(c.line2, RoundedCornerShape(2.dp)))
+        }
+        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 8.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(ht(title), color = c.t1, style = ToolsTypography.sheetTitle)
+                if (subtitle != null) Text(ht(subtitle), Modifier.padding(top = 2.dp), color = c.t2, style = ToolsTypography.rowSub)
+            }
+            when {
+                trailing != null -> trailing()
+                onClose != null -> ToolsIconButton(HomeIcons.X, "关闭", onClose)
+            }
+        }
+        Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = if (footer == null) 24.dp else 16.dp), content = body)
+        if (footer != null) Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp), content = footer)
     }
 }
 
@@ -232,7 +268,7 @@ internal fun <T> ToolsSegmented(
                 .background(if (selected == key) c.accentSoft else Color.Transparent)
                 .selectable(selected = selected == key, enabled = enabled, role = Role.Tab) { haptics(HomeHaptic.Tick); onSelect(key) }
                 .padding(vertical = 9.dp), contentAlignment = Alignment.Center) {
-                Text(label, color = if (selected == key) c.accent else c.t2, style = ToolsTypography.rowTitle, maxLines = 1)
+                Text(ht(label), color = if (selected == key) c.accent else c.t2, style = ToolsTypography.rowTitle, maxLines = 1)
             }
         }
     }

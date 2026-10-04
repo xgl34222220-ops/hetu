@@ -76,6 +76,10 @@ def main():
             shutil.copyfile(ROOT / name, target)
         git('add', '--intent-to-add', 'android-app', cwd=fixture)
         patch = git('diff', '--binary', '--', 'android-app', cwd=fixture)
+        # Git accepts an unprefixed blank context line in a unified diff. Avoid
+        # storing a space-only line in this checked-in patch artifact; actual
+        # source content and hunk counts are unchanged and verified below.
+        patch = b'\n'.join(b'' if line == b' ' else line for line in patch.split(b'\n'))
         assert patch, 'No V20.83 presentation changes to record'
         reproduced = fixture / 'reproduced'
         reproduced.mkdir()

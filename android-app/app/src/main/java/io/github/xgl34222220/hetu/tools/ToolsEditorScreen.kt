@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu.tools
 
+import io.github.xgl34222220.hetu.ui.ht
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -40,7 +41,7 @@ import io.github.xgl34222220.hetu.tools.ToolsHairline as HomeDivider
 import io.github.xgl34222220.hetu.home.HomeHaptic
 import io.github.xgl34222220.hetu.tools.ToolsIconButton as HomeIconButton
 import io.github.xgl34222220.hetu.home.HomeIcons
-import io.github.xgl34222220.hetu.home.HomeSheetContent
+import io.github.xgl34222220.hetu.tools.ToolsSheetContent as HomeSheetContent
 import io.github.xgl34222220.hetu.home.HomeSpinner
 import io.github.xgl34222220.hetu.home.HomeTone
 import io.github.xgl34222220.hetu.tools.ToolsTopBar as HomeTopBar
@@ -94,7 +95,7 @@ internal fun ToolsEditorScreen(
             FileCard(state)
             ToolCard(state, usable, editor::undo, editor::redo, onOutline, onValidate)
             if (state.banner != null) {
-                HomeBanner(state.banner, HomeIcons.CircleAlert, tone = HomeTone.Bad, actionLabel = "关闭提示", onAction = onDismissBanner)
+                HomeBanner(state.banner, HomeIcons.CircleAlert, tone = HomeTone.Bad, actionLabel = ht("关闭提示"), onAction = onDismissBanner)
             }
             HomeCard(Modifier.fillMaxWidth().weight(1f)) {
                 when (val load = state.load) {
@@ -125,7 +126,7 @@ private fun FileCard(state: ToolsEditorState) {
             Icon(if (state.failed) ToolsIcons.FileWarning else ToolsIcons.FileText, null, Modifier.size(20.dp), tint = if (state.failed) c.t3 else c.t2)
             Column(Modifier.weight(1f)) {
                 Text(state.title, color = c.t1, style = HomeType.rowTitle.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
-                Text(state.caption, color = if (draft) c.warn else c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(ht(state.caption), color = if (draft) c.warn else c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -190,9 +191,9 @@ private fun SymbolBar(enabled: Boolean, onInsert: (String) -> Unit) {
 internal fun ToolsOutlineSheetContent(items: List<ToolsOutlineItem>, onJump: (ToolsOutlineItem) -> Unit, onClose: () -> Unit, modifier: Modifier = Modifier) {
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
-    HomeSheetContent(title = "语法大纲", modifier = modifier, subtitle = "点击跳转到对应区段", onClose = onClose) {
+    HomeSheetContent(title = "语法大纲", modifier = modifier, subtitle = ht("点击跳转到对应区段"), onClose = onClose) {
         if (items.isEmpty()) {
-            Text("没有可识别的顶层字段。", Modifier.padding(horizontal = 4.dp, vertical = 8.dp), color = c.t2, style = HomeType.note)
+            Text(ht("没有可识别的顶层字段。"), Modifier.padding(horizontal = 4.dp, vertical = 8.dp), color = c.t2, style = HomeType.note)
         } else {
             HomeCard(Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
                 Column(Modifier.verticalScroll(rememberScrollState())) {

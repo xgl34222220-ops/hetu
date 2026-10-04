@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu.tools
 
+import io.github.xgl34222220.hetu.ui.ht
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -95,7 +96,7 @@ private fun ConfigCard(
             ToolsRow(
                 title = AnnotatedString(config.name),
                 icon = ToolsIcons.File,
-                subtitle = config.caption,
+                subtitle = ht(config.caption),
                 selected = config.current,
                 enabled = !state.busy,
                 endPadding = 4.dp,
@@ -115,7 +116,7 @@ private fun ConfigCard(
         }
         HomeDivider()
         ToolsRow(
-            title = AnnotatedString("编辑当前 YAML"),
+            title = AnnotatedString(ht("编辑当前 YAML")),
             icon = ToolsIcons.Pencil,
             titleColor = c.accent,
             iconTint = c.accent,
@@ -142,7 +143,7 @@ private fun SubscriptionCard(
         if (state.subscriptions.isEmpty()) {
             HomeDivider()
             Text(
-                "当前配置没有 proxy-providers。可以添加订阅，或直接编辑 YAML。",
+                ht("当前配置没有 proxy-providers。可以添加订阅，或直接编辑 YAML。"),
                 Modifier.padding(horizontal = 16.dp, vertical = 14.dp), color = c.t2, style = HomeType.note,
             )
         }
@@ -151,7 +152,7 @@ private fun SubscriptionCard(
             ToolsRow(
                 title = AnnotatedString(item.name),
                 icon = ToolsIcons.Link,
-                subtitle = if (item.placeholder) "尚未填写订阅链接" else item.url,
+                subtitle = if (item.placeholder) ht("尚未填写订阅链接") else item.url,
                 subtitleStyle = if (item.placeholder) HomeType.rowSub else ToolsType.url,
                 subtitleColor = if (item.placeholder) c.warn else c.t3,
                 enabled = !state.busy,

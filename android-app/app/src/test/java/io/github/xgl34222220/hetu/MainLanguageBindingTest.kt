@@ -161,6 +161,7 @@ class MainLanguageBindingTest {
             // Config/group/node/file names can legitimately collide with any vocabulary entry.
             SettingsRow("工具", subtitle = "首页")
             HxRow("保存", subtitle = "语言")
+            io.github.xgl34222220.hetu.tools.ToolsRow(AnnotatedString("工具"), subtitle = "首页")
             SettingsInput(userName, { userName = it })
         } }
         listOf("工具", "首页", "保存", "语言").forEach(::assertVisible)
@@ -179,6 +180,8 @@ class MainLanguageBindingTest {
         assertVisible("首页")
         val yaml = "proxy-groups:\n  - name: 工具\n    proxies: [首页, 设置]\n"
         show { HxTextSheet(title = "诊断", text = yaml, onDismiss = {}) }
+        assertVisible(yaml)
+        show { io.github.xgl34222220.hetu.tools.ToolsCodeBox(AnnotatedString(yaml)) }
         assertVisible(yaml)
     }
 

@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu.tools
 
+import io.github.xgl34222220.hetu.ui.ht
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ScrollState
@@ -80,7 +81,14 @@ internal fun ToolsScreen(
     val c = LocalHomeColors.current
     val collapseAt = with(LocalDensity.current) { 40.dp.toPx() }
     val collapsed by remember(scroll, collapseAt) { derivedStateOf { scroll.value > collapseAt } }
-    val results = state.results
+    val query = state.query.trim()
+    val results = if (state.searching && query.isNotEmpty()) state.groups.mapNotNull { group ->
+        val entries = group.entries.filter { entry ->
+            val localized = listOf(ht(entry.title), ht(entry.summary), ht(entry.brief))
+            ToolsCatalog.matches(entry, query) || localized.any { it.contains(query, ignoreCase = true) }
+        }
+        if (entries.isEmpty()) null else group.copy(entries = entries)
+    } else null
     val searchIcon = if (state.searching) HomeIcons.X else ToolsIcons.Search
     val searchLabel = if (state.searching) "关闭搜索" else "搜索"
 
@@ -95,14 +103,14 @@ internal fun ToolsScreen(
             verticalArrangement = Arrangement.spacedBy(HomeDims.gap),
         ) {
             Row(Modifier.fillMaxWidth().padding(start = 12.dp, bottom = 4.dp).height(HomeDims.touch), verticalAlignment = Alignment.CenterVertically) {
-                Text("工具", Modifier.weight(1f), color = c.t1, style = HomeType.largeTitle)
+                Text(ht("工具"), Modifier.weight(1f), color = c.t1, style = HomeType.largeTitle)
                 HomeIconButton(searchIcon, searchLabel, onToggleSearch, Modifier.padding(end = 0.dp))
             }
             if (state.searching) ToolsSearchField(state.query, onQueryChange, "搜索工具")
 
             when {
                 results == null -> state.groups.forEach { group -> ToolsGroup(group, query = "", brief = false, onOpen = onOpen) }
-                results.isEmpty() -> ToolsEmpty(ToolsIcons.Search, "没有匹配的工具", subtitle = "尝试其他关键词")
+                results.isEmpty() -> ToolsEmpty(ToolsIcons.Search, "没有匹配的工具", subtitle = ht("尝试其他关键词"))
                 else -> results.forEach { group -> ToolsGroup(group, query = state.query, brief = true, onOpen = onOpen) }
             }
         }
@@ -112,7 +120,7 @@ internal fun ToolsScreen(
         if (barAlpha > 0f) {
             Column(Modifier.fillMaxWidth().alpha(barAlpha).background(c.bg.copy(alpha = .94f))) {
                 Box(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars).height(HomeDims.barHeight)) {
-                    Text("工具", Modifier.align(Alignment.Center), color = c.t1, style = HomeType.barTitle)
+                    Text(ht("工具"), Modifier.align(Alignment.Center), color = c.t1, style = HomeType.barTitle)
                     HomeIconButton(searchIcon, searchLabel, onToggleSearch, Modifier.align(Alignment.CenterEnd).padding(end = HomeDims.gutter))
                 }
                 HomeDivider()
@@ -125,15 +133,16 @@ internal fun ToolsScreen(
 private fun ToolsGroup(group: ToolsGroupSpec, query: String, brief: Boolean, onOpen: (ToolsEntry) -> Unit) {
     val c = LocalHomeColors.current
     if (group.title != null) {
-        Text(group.title, Modifier.padding(start = 4.dp, end = 4.dp, top = 12.dp), color = c.t2, style = HomeType.section)
+        Text(ht(group.title), Modifier.padding(start = 4.dp, end = 4.dp, top = 12.dp), color = c.t2, style = HomeType.section)
     }
     HomeCard(Modifier.fillMaxWidth()) {
         group.entries.forEachIndexed { index, entry ->
             // Cards define the groups; the reference has no dividers between hub entries.
+            val title = ht(entry.title)
             ToolsRow(
-                title = toolsHighlighted(entry.title, ToolsCatalog.highlight(entry.title, query)),
+                title = toolsHighlighted(title, ToolsCatalog.highlight(title, query)),
                 icon = entry.icon(),
-                subtitle = if (brief) entry.brief else entry.summary,
+                subtitle = ht(if (brief) entry.brief else entry.summary),
                 onClick = { onOpen(entry) },
                 modifier = Modifier.heightIn(min = 80.dp),
                 trailing = { ToolsChevron() },

@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu.tools
 
+import io.github.xgl34222220.hetu.ui.ht
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,7 +20,7 @@ import io.github.xgl34222220.hetu.tools.ToolsSurfaceCard as HomeCard
 import io.github.xgl34222220.hetu.tools.ToolsDesignDims as HomeDims
 import io.github.xgl34222220.hetu.tools.ToolsHairline as HomeDivider
 import io.github.xgl34222220.hetu.home.HomeIcons
-import io.github.xgl34222220.hetu.home.HomeSheetContent
+import io.github.xgl34222220.hetu.tools.ToolsSheetContent as HomeSheetContent
 import io.github.xgl34222220.hetu.home.HomeSpinner
 import io.github.xgl34222220.hetu.home.HomeTone
 import io.github.xgl34222220.hetu.tools.ToolsTypography as HomeType
@@ -49,8 +50,8 @@ internal fun ToolsDiagScreen(
             HomeCard(Modifier.fillMaxWidth()) {
                 ToolsCardTitle("运行预检")
                 ToolsRow(
-                    AnnotatedString("开始预检"), icon = ToolsFeatureIcons.ShieldPlus, iconTint = c.t1,
-                    subtitle = "验证 Root / TPROXY / UID / IPv6 / 绕过规则是否可用",
+                    AnnotatedString(ht("开始预检")), icon = ToolsFeatureIcons.ShieldPlus, iconTint = c.t1,
+                    subtitle = ht("验证 Root / TPROXY / UID / IPv6 / 绕过规则是否可用"),
                     enabled = !checking, onClick = onPreflight,
                     trailing = { if (checking) HomeSpinner(size = 16.dp, color = c.accent) else ToolsChevron() },
                 )
@@ -63,26 +64,26 @@ internal fun ToolsDiagScreen(
             HomeCard(Modifier.fillMaxWidth()) {
                 ToolsCardTitle("查看")
                 ToolsRow(
-                    AnnotatedString("启动配置"), icon = ToolsIcons.FileText, iconTint = c.t1,
-                    subtitle = "最终生成的运行副本，不修改源配置", onClick = onStartupConfig, trailing = { ToolsChevron() },
+                    AnnotatedString(ht("启动配置")), icon = ToolsIcons.FileText, iconTint = c.t1,
+                    subtitle = ht("最终生成的运行副本，不修改源配置"), onClick = onStartupConfig, trailing = { ToolsChevron() },
                 )
                 HomeDivider(Modifier.padding(horizontal = 16.dp))
                 ToolsRow(
-                    AnnotatedString("消息与网络诊断"), icon = ToolsFeatureIcons.Router, iconTint = c.t1,
-                    subtitle = "Google / 微信连接、分流与最近运行事件", onClick = onReport, trailing = { ToolsChevron() },
+                    AnnotatedString(ht("消息与网络诊断")), icon = ToolsFeatureIcons.Router, iconTint = c.t1,
+                    subtitle = ht("Google / 微信连接、分流与最近运行事件"), onClick = onReport, trailing = { ToolsChevron() },
                 )
             }
             if (onOpenDiagnosticsDetails != null) HomeCard(Modifier.fillMaxWidth()) {
                 ToolsCardTitle("运行记录")
-                ToolsRow(AnnotatedString("网络事件记录"), icon = ToolsIcons.FileText,
-                    subtitle = "事件与错误 ID、脱敏报告、运行记录修复与恢复诊断",
+                ToolsRow(AnnotatedString(ht("网络事件记录")), icon = ToolsIcons.FileText,
+                    subtitle = ht("事件与错误 ID、脱敏报告、运行记录修复与恢复诊断"),
                     onClick = onOpenDiagnosticsDetails, trailing = { ToolsChevron() })
             }
             HomeCard(Modifier.fillMaxWidth()) {
                 ToolsCardTitle("紧急")
                 ToolsRow(
-                    AnnotatedString("恢复网络"), icon = ToolsFeatureIcons.Siren, iconTint = c.bad,
-                    subtitle = "停止代理并回滚河图添加的 iptables / 路由规则", onClick = onRestore, trailing = { ToolsChevron() },
+                    AnnotatedString(ht("恢复网络")), icon = ToolsFeatureIcons.Siren, iconTint = c.bad,
+                    subtitle = ht("停止代理并回滚河图添加的 iptables / 路由规则"), onClick = onRestore, trailing = { ToolsChevron() },
                 )
             }
         }
@@ -126,7 +127,7 @@ private fun DiagTextSheet(
         when {
             content.loading -> ToolsLoading()
             content.error != null -> HomeBanner(content.error, HomeIcons.CircleAlert, tone = HomeTone.Bad)
-            content.text.isBlank() -> Text("暂无内容。", Modifier.padding(horizontal = 4.dp, vertical = 8.dp), color = c.t2, style = HomeType.note)
+            content.text.isBlank() -> Text(ht("暂无内容。"), Modifier.padding(horizontal = 4.dp, vertical = 8.dp), color = c.t2, style = HomeType.note)
             else -> ToolsCodeBox(styled(content.text))
         }
     }

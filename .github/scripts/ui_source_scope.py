@@ -9,7 +9,7 @@ UI_FOLDERS = ('app/', 'home/', 'panel/', 'tools/', 'settings/')
 UI_BRIDGES = ('ToolsConfigBridge.kt', 'ToolsRuntimeBridge.kt',
               'ProxyAdvancedSettingsActivity.kt', 'ProxyLogViewerActivity.kt',
               'ProxyScriptsActivity.kt', 'ProxySubStoreActivity.kt',
-              'ProxyNetworkAutomationActivity.kt')
+              'ProxyNetworkAutomationActivity.kt', 'ui/HetuLanguage.kt')
 
 
 def allowed_change(name):
