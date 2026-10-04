@@ -247,7 +247,7 @@ internal object HomeFormat {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Sample data for previews (mirrors the prototype’s 示例数据)          */
+/*  Sample data for previews (mirrors the prototype’s sample data)          */
 /* ------------------------------------------------------------------ */
 
 internal object HomeSamples {
