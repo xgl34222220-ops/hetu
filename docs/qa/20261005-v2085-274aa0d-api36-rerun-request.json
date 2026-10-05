@@ -1,0 +1,43 @@
+{
+  "repository": "xgl34222220-ops/hetu",
+  "branch": "test/v20.76-new-ui",
+  "applicationCommit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+  "runId": 37366522056,
+  "previousAttempt": 2,
+  "previousStatus": "completed/failure",
+  "preservedTerminalEvidence": "docs/qa/20261005-v2085-274aa0d-attempt2-terminal-observed.json",
+  "preservedTerminalEvidenceSha256": "96e0a64b332b3ce52b09669ad954231f34b5952bf3d5f9ae81efe2a904b7bf18",
+  "action": "github_rerun_workflow_job",
+  "jobId": 111967310459,
+  "response": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "success": true
+    },
+    "isError": false
+  },
+  "newAttempt": 2,
+  "runStartedAtUtc": "2026-10-05T20:52:53Z",
+  "stateObservedImmediatelyAfterRequest": "queued",
+  "recoveryIsSingleApi36Job": true,
+  "sourceCodeChangedForRetry": false,
+  "safetyGatesOrTestExpectationsChangedForRetry": false,
+  "successfulBuildAndApi35RerunRequested": false,
+  "historicalBaselineRetryRequestedYet": false,
+  "ciCancelledByThisTask": false,
+  "installedApi36Acceptance": "pending fresh result; no old image/test reuse",
+  "realGooglePlayAuthenticationVerified": false,
+  "subsequentConfirmedAttempt": 3,
+  "newApi36JobId": 111972733304,
+  "retainedBuildAndApi35StepsAndTimesEqualAttempt2": true,
+  "latestRetainedBaselineJobId": 111972777979,
+  "lineageEvidence": "docs/qa/20261005-v2085-274aa0d-attempt3-initial-lineage.json",
+  "lineageEvidenceSha256": "6745acaefd6c1228b87173e4af3c70b0ebb91cf5ae42fbc719c98dcec7cc8b82",
+  "originalProducerBuildJobId": 111958672585,
+  "originalProducerApi35JobId": 111967310512
+}

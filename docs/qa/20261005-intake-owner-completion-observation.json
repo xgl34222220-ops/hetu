@@ -1,0 +1,992 @@
+{
+  "repository": "xgl34222220-ops/hetu",
+  "branch": "test/v20.76-new-ui",
+  "observedAtUtc": "2026-10-05T20:50:54Z",
+  "applicationCommit": "ec211b9ad81748dee30fec43f0a25849559e4623",
+  "runId": 37363630612,
+  "run": {
+    "id": 37363630612,
+    "name": "Hetu V20.85 PDF tools and settings continuation",
+    "node_id": "WFR_kwLOUYdLOs8AAAAIswvCFA",
+    "head_branch": "test/v20.76-new-ui",
+    "head_sha": "ec211b9ad81748dee30fec43f0a25849559e4623",
+    "path": ".github/workflows/ui-v76-build.yml",
+    "display_title": "Fetch pinned tools intake baseline for shallow CI checkout",
+    "run_number": 41,
+    "event": "push",
+    "status": "completed",
+    "conclusion": "success",
+    "workflow_id": 374587740,
+    "check_suite_id": 101205159122,
+    "check_suite_node_id": "CS_kwDOUYdLOs8AAAAXkEws0g",
+    "url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/runs/37363630612",
+    "html_url": "https://github.com/xgl34222220-ops/hetu/actions/runs/37363630612",
+    "pull_requests": [],
+    "created_at": "2026-10-05T19:28:35Z",
+    "updated_at": "2026-10-05T20:37:54Z",
+    "actor": {
+      "login": "xgl34222220-ops",
+      "id": 230343042,
+      "node_id": "U_kgDODbrBgg",
+      "avatar_url": "https://avatars.githubusercontent.com/u/230343042?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/xgl34222220-ops",
+      "html_url": "https://github.com/xgl34222220-ops",
+      "followers_url": "https://api.github.com/users/xgl34222220-ops/followers",
+      "following_url": "https://api.github.com/users/xgl34222220-ops/following{/other_user}",
+      "gists_url": "https://api.github.com/users/xgl34222220-ops/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/xgl34222220-ops/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/xgl34222220-ops/subscriptions",
+      "organizations_url": "https://api.github.com/users/xgl34222220-ops/orgs",
+      "repos_url": "https://api.github.com/users/xgl34222220-ops/repos",
+      "events_url": "https://api.github.com/users/xgl34222220-ops/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/xgl34222220-ops/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "run_attempt": 3,
+    "referenced_workflows": [],
+    "run_started_at": "2026-10-05T20:19:29Z",
+    "triggering_actor": {
+      "login": "xgl34222220-ops",
+      "id": 230343042,
+      "node_id": "U_kgDODbrBgg",
+      "avatar_url": "https://avatars.githubusercontent.com/u/230343042?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/xgl34222220-ops",
+      "html_url": "https://github.com/xgl34222220-ops",
+      "followers_url": "https://api.github.com/users/xgl34222220-ops/followers",
+      "following_url": "https://api.github.com/users/xgl34222220-ops/following{/other_user}",
+      "gists_url": "https://api.github.com/users/xgl34222220-ops/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/xgl34222220-ops/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/xgl34222220-ops/subscriptions",
+      "organizations_url": "https://api.github.com/users/xgl34222220-ops/orgs",
+      "repos_url": "https://api.github.com/users/xgl34222220-ops/repos",
+      "events_url": "https://api.github.com/users/xgl34222220-ops/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/xgl34222220-ops/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "jobs_url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/runs/37363630612/jobs",
+    "logs_url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/runs/37363630612/logs",
+    "check_suite_url": "https://api.github.com/repos/xgl34222220-ops/hetu/check-suites/101205159122",
+    "artifacts_url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/runs/37363630612/artifacts",
+    "cancel_url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/runs/37363630612/cancel",
+    "rerun_url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/runs/37363630612/rerun",
+    "previous_attempt_url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/runs/37363630612/attempts/2",
+    "workflow_url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/workflows/374587740",
+    "head_commit": {
+      "id": "ec211b9ad81748dee30fec43f0a25849559e4623",
+      "tree_id": "18b14460885e42d976ec7196b0cc0991c7549a3f",
+      "message": "Fetch pinned tools intake baseline for shallow CI checkout",
+      "timestamp": "2026-10-05T19:28:28Z",
+      "author": {
+        "name": "xgl34222220-ops",
+        "email": "xgl34222220@gmail.com"
+      },
+      "committer": {
+        "name": "xgl34222220-ops",
+        "email": "xgl34222220@gmail.com"
+      }
+    },
+    "repository": {
+      "id": 1367821114,
+      "node_id": "R_kgDOUYdLOg",
+      "name": "hetu",
+      "full_name": "xgl34222220-ops/hetu",
+      "private": false,
+      "owner": {
+        "login": "xgl34222220-ops",
+        "id": 230343042,
+        "node_id": "U_kgDODbrBgg",
+        "avatar_url": "https://avatars.githubusercontent.com/u/230343042?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/xgl34222220-ops",
+        "html_url": "https://github.com/xgl34222220-ops",
+        "followers_url": "https://api.github.com/users/xgl34222220-ops/followers",
+        "following_url": "https://api.github.com/users/xgl34222220-ops/following{/other_user}",
+        "gists_url": "https://api.github.com/users/xgl34222220-ops/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/xgl34222220-ops/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/xgl34222220-ops/subscriptions",
+        "organizations_url": "https://api.github.com/users/xgl34222220-ops/orgs",
+        "repos_url": "https://api.github.com/users/xgl34222220-ops/repos",
+        "events_url": "https://api.github.com/users/xgl34222220-ops/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/xgl34222220-ops/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "html_url": "https://github.com/xgl34222220-ops/hetu",
+      "description": null,
+      "fork": false,
+      "url": "https://api.github.com/repos/xgl34222220-ops/hetu",
+      "forks_url": "https://api.github.com/repos/xgl34222220-ops/hetu/forks",
+      "keys_url": "https://api.github.com/repos/xgl34222220-ops/hetu/keys{/key_id}",
+      "collaborators_url": "https://api.github.com/repos/xgl34222220-ops/hetu/collaborators{/collaborator}",
+      "teams_url": "https://api.github.com/repos/xgl34222220-ops/hetu/teams",
+      "hooks_url": "https://api.github.com/repos/xgl34222220-ops/hetu/hooks",
+      "issue_events_url": "https://api.github.com/repos/xgl34222220-ops/hetu/issues/events{/number}",
+      "events_url": "https://api.github.com/repos/xgl34222220-ops/hetu/events",
+      "assignees_url": "https://api.github.com/repos/xgl34222220-ops/hetu/assignees{/user}",
+      "branches_url": "https://api.github.com/repos/xgl34222220-ops/hetu/branches{/branch}",
+      "tags_url": "https://api.github.com/repos/xgl34222220-ops/hetu/tags",
+      "blobs_url": "https://api.github.com/repos/xgl34222220-ops/hetu/git/blobs{/sha}",
+      "git_tags_url": "https://api.github.com/repos/xgl34222220-ops/hetu/git/tags{/sha}",
+      "git_refs_url": "https://api.github.com/repos/xgl34222220-ops/hetu/git/refs{/sha}",
+      "trees_url": "https://api.github.com/repos/xgl34222220-ops/hetu/git/trees{/sha}",
+      "statuses_url": "https://api.github.com/repos/xgl34222220-ops/hetu/statuses/{sha}",
+      "languages_url": "https://api.github.com/repos/xgl34222220-ops/hetu/languages",
+      "stargazers_url": "https://api.github.com/repos/xgl34222220-ops/hetu/stargazers",
+      "contributors_url": "https://api.github.com/repos/xgl34222220-ops/hetu/contributors",
+      "subscribers_url": "https://api.github.com/repos/xgl34222220-ops/hetu/subscribers",
+      "subscription_url": "https://api.github.com/repos/xgl34222220-ops/hetu/subscription",
+      "commits_url": "https://api.github.com/repos/xgl34222220-ops/hetu/commits{/sha}",
+      "git_commits_url": "https://api.github.com/repos/xgl34222220-ops/hetu/git/commits{/sha}",
+      "comments_url": "https://api.github.com/repos/xgl34222220-ops/hetu/comments{/number}",
+      "issue_comment_url": "https://api.github.com/repos/xgl34222220-ops/hetu/issues/comments{/number}",
+      "contents_url": "https://api.github.com/repos/xgl34222220-ops/hetu/contents/{+path}",
+      "compare_url": "https://api.github.com/repos/xgl34222220-ops/hetu/compare/{base}...{head}",
+      "merges_url": "https://api.github.com/repos/xgl34222220-ops/hetu/merges",
+      "archive_url": "https://api.github.com/repos/xgl34222220-ops/hetu/{archive_format}{/ref}",
+      "downloads_url": "https://api.github.com/repos/xgl34222220-ops/hetu/downloads",
+      "issues_url": "https://api.github.com/repos/xgl34222220-ops/hetu/issues{/number}",
+      "pulls_url": "https://api.github.com/repos/xgl34222220-ops/hetu/pulls{/number}",
+      "milestones_url": "https://api.github.com/repos/xgl34222220-ops/hetu/milestones{/number}",
+      "notifications_url": "https://api.github.com/repos/xgl34222220-ops/hetu/notifications{?since,all,participating}",
+      "labels_url": "https://api.github.com/repos/xgl34222220-ops/hetu/labels{/name}",
+      "releases_url": "https://api.github.com/repos/xgl34222220-ops/hetu/releases{/id}",
+      "deployments_url": "https://api.github.com/repos/xgl34222220-ops/hetu/deployments"
+    },
+    "head_repository": {
+      "id": 1367821114,
+      "node_id": "R_kgDOUYdLOg",
+      "name": "hetu",
+      "full_name": "xgl34222220-ops/hetu",
+      "private": false,
+      "owner": {
+        "login": "xgl34222220-ops",
+        "id": 230343042,
+        "node_id": "U_kgDODbrBgg",
+        "avatar_url": "https://avatars.githubusercontent.com/u/230343042?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/xgl34222220-ops",
+        "html_url": "https://github.com/xgl34222220-ops",
+        "followers_url": "https://api.github.com/users/xgl34222220-ops/followers",
+        "following_url": "https://api.github.com/users/xgl34222220-ops/following{/other_user}",
+        "gists_url": "https://api.github.com/users/xgl34222220-ops/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/xgl34222220-ops/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/xgl34222220-ops/subscriptions",
+        "organizations_url": "https://api.github.com/users/xgl34222220-ops/orgs",
+        "repos_url": "https://api.github.com/users/xgl34222220-ops/repos",
+        "events_url": "https://api.github.com/users/xgl34222220-ops/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/xgl34222220-ops/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "html_url": "https://github.com/xgl34222220-ops/hetu",
+      "description": null,
+      "fork": false,
+      "url": "https://api.github.com/repos/xgl34222220-ops/hetu",
+      "forks_url": "https://api.github.com/repos/xgl34222220-ops/hetu/forks",
+      "keys_url": "https://api.github.com/repos/xgl34222220-ops/hetu/keys{/key_id}",
+      "collaborators_url": "https://api.github.com/repos/xgl34222220-ops/hetu/collaborators{/collaborator}",
+      "teams_url": "https://api.github.com/repos/xgl34222220-ops/hetu/teams",
+      "hooks_url": "https://api.github.com/repos/xgl34222220-ops/hetu/hooks",
+      "issue_events_url": "https://api.github.com/repos/xgl34222220-ops/hetu/issues/events{/number}",
+      "events_url": "https://api.github.com/repos/xgl34222220-ops/hetu/events",
+      "assignees_url": "https://api.github.com/repos/xgl34222220-ops/hetu/assignees{/user}",
+      "branches_url": "https://api.github.com/repos/xgl34222220-ops/hetu/branches{/branch}",
+      "tags_url": "https://api.github.com/repos/xgl34222220-ops/hetu/tags",
+      "blobs_url": "https://api.github.com/repos/xgl34222220-ops/hetu/git/blobs{/sha}",
+      "git_tags_url": "https://api.github.com/repos/xgl34222220-ops/hetu/git/tags{/sha}",
+      "git_refs_url": "https://api.github.com/repos/xgl34222220-ops/hetu/git/refs{/sha}",
+      "trees_url": "https://api.github.com/repos/xgl34222220-ops/hetu/git/trees{/sha}",
+      "statuses_url": "https://api.github.com/repos/xgl34222220-ops/hetu/statuses/{sha}",
+      "languages_url": "https://api.github.com/repos/xgl34222220-ops/hetu/languages",
+      "stargazers_url": "https://api.github.com/repos/xgl34222220-ops/hetu/stargazers",
+      "contributors_url": "https://api.github.com/repos/xgl34222220-ops/hetu/contributors",
+      "subscribers_url": "https://api.github.com/repos/xgl34222220-ops/hetu/subscribers",
+      "subscription_url": "https://api.github.com/repos/xgl34222220-ops/hetu/subscription",
+      "commits_url": "https://api.github.com/repos/xgl34222220-ops/hetu/commits{/sha}",
+      "git_commits_url": "https://api.github.com/repos/xgl34222220-ops/hetu/git/commits{/sha}",
+      "comments_url": "https://api.github.com/repos/xgl34222220-ops/hetu/comments{/number}",
+      "issue_comment_url": "https://api.github.com/repos/xgl34222220-ops/hetu/issues/comments{/number}",
+      "contents_url": "https://api.github.com/repos/xgl34222220-ops/hetu/contents/{+path}",
+      "compare_url": "https://api.github.com/repos/xgl34222220-ops/hetu/compare/{base}...{head}",
+      "merges_url": "https://api.github.com/repos/xgl34222220-ops/hetu/merges",
+      "archive_url": "https://api.github.com/repos/xgl34222220-ops/hetu/{archive_format}{/ref}",
+      "downloads_url": "https://api.github.com/repos/xgl34222220-ops/hetu/downloads",
+      "issues_url": "https://api.github.com/repos/xgl34222220-ops/hetu/issues{/number}",
+      "pulls_url": "https://api.github.com/repos/xgl34222220-ops/hetu/pulls{/number}",
+      "milestones_url": "https://api.github.com/repos/xgl34222220-ops/hetu/milestones{/number}",
+      "notifications_url": "https://api.github.com/repos/xgl34222220-ops/hetu/notifications{?since,all,participating}",
+      "labels_url": "https://api.github.com/repos/xgl34222220-ops/hetu/labels{/name}",
+      "releases_url": "https://api.github.com/repos/xgl34222220-ops/hetu/releases{/id}",
+      "deployments_url": "https://api.github.com/repos/xgl34222220-ops/hetu/deployments"
+    }
+  },
+  "jobs": {
+    "total_count": 4,
+    "jobs": [
+      {
+        "id": 111961160251,
+        "run_id": 37363630612,
+        "workflow_name": "Hetu V20.85 PDF tools and settings continuation",
+        "head_branch": "test/v20.76-new-ui",
+        "run_url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/runs/37363630612",
+        "run_attempt": 3,
+        "node_id": "CR_kwDOUYdLOs8AAAAaEWe6Ow",
+        "head_sha": "ec211b9ad81748dee30fec43f0a25849559e4623",
+        "url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/jobs/111961160251",
+        "html_url": "https://github.com/xgl34222220-ops/hetu/actions/runs/37363630612/job/111961160251",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-10-05T20:19:31Z",
+        "started_at": "2026-10-05T20:19:43Z",
+        "completed_at": "2026-10-05T20:32:34Z",
+        "name": "Installed APK on Android API 35",
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1,
+            "started_at": "2026-10-05T20:19:43Z",
+            "completed_at": "2026-10-05T20:19:44Z"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2,
+            "started_at": "2026-10-05T20:19:44Z",
+            "completed_at": "2026-10-05T20:19:47Z"
+          },
+          {
+            "name": "Run actions/setup-node@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3,
+            "started_at": "2026-10-05T20:19:47Z",
+            "completed_at": "2026-10-05T20:19:47Z"
+          },
+          {
+            "name": "Run actions/setup-java@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4,
+            "started_at": "2026-10-05T20:19:47Z",
+            "completed_at": "2026-10-05T20:19:48Z"
+          },
+          {
+            "name": "Run actions/download-artifact@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 5,
+            "started_at": "2026-10-05T20:19:48Z",
+            "completed_at": "2026-10-05T20:19:50Z"
+          },
+          {
+            "name": "Prepare official AOSP emulator",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 6,
+            "started_at": "2026-10-05T20:19:50Z",
+            "completed_at": "2026-10-05T20:20:17Z"
+          },
+          {
+            "name": "Run installed APK navigation and native WebView smoke",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 7,
+            "started_at": "2026-10-05T20:20:17Z",
+            "completed_at": "2026-10-05T20:32:31Z"
+          },
+          {
+            "name": "Upload Android smoke evidence",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 8,
+            "started_at": "2026-10-05T20:32:31Z",
+            "completed_at": "2026-10-05T20:32:32Z"
+          },
+          {
+            "name": "Post Run actions/setup-java@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 14,
+            "started_at": "2026-10-05T20:32:32Z",
+            "completed_at": "2026-10-05T20:32:32Z"
+          },
+          {
+            "name": "Post Run actions/setup-node@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 15,
+            "started_at": "2026-10-05T20:32:32Z",
+            "completed_at": "2026-10-05T20:32:33Z"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 16,
+            "started_at": "2026-10-05T20:32:33Z",
+            "completed_at": "2026-10-05T20:32:33Z"
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 17,
+            "started_at": "2026-10-05T20:32:33Z",
+            "completed_at": "2026-10-05T20:32:33Z"
+          }
+        ],
+        "check_run_url": "https://api.github.com/repos/xgl34222220-ops/hetu/check-runs/111961160251",
+        "labels": [
+          "ubuntu-latest"
+        ],
+        "runner_id": 1000033273,
+        "runner_name": "GitHub Actions 1000033273",
+        "runner_group_id": 0,
+        "runner_group_name": "GitHub Actions"
+      },
+      {
+        "id": 111961160306,
+        "run_id": 37363630612,
+        "workflow_name": "Hetu V20.85 PDF tools and settings continuation",
+        "head_branch": "test/v20.76-new-ui",
+        "run_url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/runs/37363630612",
+        "run_attempt": 3,
+        "node_id": "CR_kwDOUYdLOs8AAAAaEWe6cg",
+        "head_sha": "ec211b9ad81748dee30fec43f0a25849559e4623",
+        "url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/jobs/111961160306",
+        "html_url": "https://github.com/xgl34222220-ops/hetu/actions/runs/37363630612/job/111961160306",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-10-05T20:19:31Z",
+        "started_at": "2026-10-05T20:24:36Z",
+        "completed_at": "2026-10-05T20:37:53Z",
+        "name": "Installed APK on Android API 36",
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1,
+            "started_at": "2026-10-05T20:24:37Z",
+            "completed_at": "2026-10-05T20:24:39Z"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2,
+            "started_at": "2026-10-05T20:24:39Z",
+            "completed_at": "2026-10-05T20:24:41Z"
+          },
+          {
+            "name": "Run actions/setup-node@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3,
+            "started_at": "2026-10-05T20:24:41Z",
+            "completed_at": "2026-10-05T20:24:44Z"
+          },
+          {
+            "name": "Run actions/setup-java@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4,
+            "started_at": "2026-10-05T20:24:44Z",
+            "completed_at": "2026-10-05T20:24:44Z"
+          },
+          {
+            "name": "Run actions/download-artifact@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 5,
+            "started_at": "2026-10-05T20:24:44Z",
+            "completed_at": "2026-10-05T20:24:50Z"
+          },
+          {
+            "name": "Prepare official AOSP emulator",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 6,
+            "started_at": "2026-10-05T20:24:50Z",
+            "completed_at": "2026-10-05T20:25:21Z"
+          },
+          {
+            "name": "Run installed APK navigation and native WebView smoke",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 7,
+            "started_at": "2026-10-05T20:25:21Z",
+            "completed_at": "2026-10-05T20:37:46Z"
+          },
+          {
+            "name": "Upload Android smoke evidence",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 8,
+            "started_at": "2026-10-05T20:37:46Z",
+            "completed_at": "2026-10-05T20:37:49Z"
+          },
+          {
+            "name": "Post Run actions/setup-java@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 14,
+            "started_at": "2026-10-05T20:37:49Z",
+            "completed_at": "2026-10-05T20:37:49Z"
+          },
+          {
+            "name": "Post Run actions/setup-node@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 15,
+            "started_at": "2026-10-05T20:37:49Z",
+            "completed_at": "2026-10-05T20:37:49Z"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 16,
+            "started_at": "2026-10-05T20:37:49Z",
+            "completed_at": "2026-10-05T20:37:50Z"
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 17,
+            "started_at": "2026-10-05T20:37:50Z",
+            "completed_at": "2026-10-05T20:37:50Z"
+          }
+        ],
+        "check_run_url": "https://api.github.com/repos/xgl34222220-ops/hetu/check-runs/111961160306",
+        "labels": [
+          "ubuntu-latest"
+        ],
+        "runner_id": 1000033280,
+        "runner_name": "GitHub Actions 1000033280",
+        "runner_group_id": 0,
+        "runner_group_name": "GitHub Actions"
+      },
+      {
+        "id": 111961160400,
+        "run_id": 37363630612,
+        "workflow_name": "Hetu V20.85 PDF tools and settings continuation",
+        "head_branch": "test/v20.76-new-ui",
+        "run_url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/runs/37363630612",
+        "run_attempt": 3,
+        "node_id": "CR_kwDOUYdLOs8AAAAaEWe60A",
+        "head_sha": "ec211b9ad81748dee30fec43f0a25849559e4623",
+        "url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/jobs/111961160400",
+        "html_url": "https://github.com/xgl34222220-ops/hetu/actions/runs/37363630612/job/111961160400",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-10-05T20:19:31Z",
+        "started_at": "2026-10-05T19:29:05Z",
+        "completed_at": "2026-10-05T19:31:59Z",
+        "name": "Reproduce V20.74 custom palette crash on API 36 (36)",
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1,
+            "started_at": "2026-10-05T19:29:06Z",
+            "completed_at": "2026-10-05T19:29:08Z"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2,
+            "started_at": "2026-10-05T19:29:08Z",
+            "completed_at": "2026-10-05T19:29:10Z"
+          },
+          {
+            "name": "Run actions/setup-node@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3,
+            "started_at": "2026-10-05T19:29:10Z",
+            "completed_at": "2026-10-05T19:29:12Z"
+          },
+          {
+            "name": "Run actions/setup-java@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4,
+            "started_at": "2026-10-05T19:29:12Z",
+            "completed_at": "2026-10-05T19:29:12Z"
+          },
+          {
+            "name": "Download pinned historical V20.74 APK",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 5,
+            "started_at": "2026-10-05T19:29:12Z",
+            "completed_at": "2026-10-05T19:29:27Z"
+          },
+          {
+            "name": "Prepare official AOSP emulator",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 6,
+            "started_at": "2026-10-05T19:29:27Z",
+            "completed_at": "2026-10-05T19:29:55Z"
+          },
+          {
+            "name": "Run installed APK navigation and native WebView smoke",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 7,
+            "started_at": "2026-10-05T19:29:55Z",
+            "completed_at": "2026-10-05T19:31:54Z"
+          },
+          {
+            "name": "Upload Android smoke evidence",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 8,
+            "started_at": "2026-10-05T19:31:54Z",
+            "completed_at": "2026-10-05T19:31:56Z"
+          },
+          {
+            "name": "Post Run actions/setup-java@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 14,
+            "started_at": "2026-10-05T19:31:56Z",
+            "completed_at": "2026-10-05T19:31:56Z"
+          },
+          {
+            "name": "Post Run actions/setup-node@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 15,
+            "started_at": "2026-10-05T19:31:56Z",
+            "completed_at": "2026-10-05T19:31:56Z"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 16,
+            "started_at": "2026-10-05T19:31:56Z",
+            "completed_at": "2026-10-05T19:31:56Z"
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 17,
+            "started_at": "2026-10-05T19:31:56Z",
+            "completed_at": "2026-10-05T19:31:56Z"
+          }
+        ],
+        "check_run_url": "https://api.github.com/repos/xgl34222220-ops/hetu/check-runs/111961160400",
+        "labels": [
+          "ubuntu-latest"
+        ],
+        "runner_id": 1000033229,
+        "runner_name": "GitHub Actions 1000033229",
+        "runner_group_id": null,
+        "runner_group_name": "GitHub Actions"
+      },
+      {
+        "id": 111961161229,
+        "run_id": 37363630612,
+        "workflow_name": "Hetu V20.85 PDF tools and settings continuation",
+        "head_branch": "test/v20.76-new-ui",
+        "run_url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/runs/37363630612",
+        "run_attempt": 3,
+        "node_id": "CR_kwDOUYdLOs8AAAAaEWe-DQ",
+        "head_sha": "ec211b9ad81748dee30fec43f0a25849559e4623",
+        "url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/jobs/111961161229",
+        "html_url": "https://github.com/xgl34222220-ops/hetu/actions/runs/37363630612/job/111961161229",
+        "status": "completed",
+        "conclusion": "success",
+        "created_at": "2026-10-05T20:19:31Z",
+        "started_at": "2026-10-05T19:51:58Z",
+        "completed_at": "2026-10-05T20:03:36Z",
+        "name": "build",
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1,
+            "started_at": "2026-10-05T19:51:58Z",
+            "completed_at": "2026-10-05T19:52:01Z"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2,
+            "started_at": "2026-10-05T19:52:01Z",
+            "completed_at": "2026-10-05T19:52:03Z"
+          },
+          {
+            "name": "Run actions/setup-node@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3,
+            "started_at": "2026-10-05T19:52:03Z",
+            "completed_at": "2026-10-05T19:52:04Z"
+          },
+          {
+            "name": "Regenerate and verify integrated effective source",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4,
+            "started_at": "2026-10-05T19:52:04Z",
+            "completed_at": "2026-10-05T19:52:40Z"
+          },
+          {
+            "name": "Verify presentation patch cannot alter runtime or dependency inputs",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 5,
+            "started_at": "2026-10-05T19:52:40Z",
+            "completed_at": "2026-10-05T19:52:41Z"
+          },
+          {
+            "name": "Verify PDF layer preserves frozen UI and diagnostic boundaries",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 6,
+            "started_at": "2026-10-05T19:52:41Z",
+            "completed_at": "2026-10-05T19:52:41Z"
+          },
+          {
+            "name": "Verify uploaded tools intake source and additive test boundaries",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 7,
+            "started_at": "2026-10-05T19:52:41Z",
+            "completed_at": "2026-10-05T19:52:47Z"
+          },
+          {
+            "name": "Verify independent authentication source and test-evidence boundaries",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 8,
+            "started_at": "2026-10-05T19:52:47Z",
+            "completed_at": "2026-10-05T19:52:48Z"
+          },
+          {
+            "name": "Regress actual tool viewport gesture bounds",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 9,
+            "started_at": "2026-10-05T19:52:48Z",
+            "completed_at": "2026-10-05T19:52:48Z"
+          },
+          {
+            "name": "Regress isolated controller authentication installation fixtures",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 10,
+            "started_at": "2026-10-05T19:52:48Z",
+            "completed_at": "2026-10-05T19:52:50Z"
+          },
+          {
+            "name": "Regress observed nested WebView document topology without weakening surface guards",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 11,
+            "started_at": "2026-10-05T19:52:50Z",
+            "completed_at": "2026-10-05T19:52:50Z"
+          },
+          {
+            "name": "Verify built-in WebUI behavior with controlled API fixtures",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 12,
+            "started_at": "2026-10-05T19:52:50Z",
+            "completed_at": "2026-10-05T19:52:50Z"
+          },
+          {
+            "name": "Render built-in WebUI with isolated browser fixtures",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 13,
+            "started_at": "2026-10-05T19:52:50Z",
+            "completed_at": "2026-10-05T19:53:18Z"
+          },
+          {
+            "name": "Run actions/setup-java@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 14,
+            "started_at": "2026-10-05T19:53:18Z",
+            "completed_at": "2026-10-05T19:53:19Z"
+          },
+          {
+            "name": "Reproduce cache eviction on old production exporter and verify new exporter",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 15,
+            "started_at": "2026-10-05T19:53:19Z",
+            "completed_at": "2026-10-05T19:53:23Z"
+          },
+          {
+            "name": "Restore signing identity",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 16,
+            "started_at": "2026-10-05T19:53:23Z",
+            "completed_at": "2026-10-05T19:53:24Z"
+          },
+          {
+            "name": "Verify signing identity",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 17,
+            "started_at": "2026-10-05T19:53:24Z",
+            "completed_at": "2026-10-05T19:53:24Z"
+          },
+          {
+            "name": "Prepare Android SDK",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 18,
+            "started_at": "2026-10-05T19:53:24Z",
+            "completed_at": "2026-10-05T19:53:30Z"
+          },
+          {
+            "name": "Run gradle/actions/setup-gradle@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 19,
+            "started_at": "2026-10-05T19:53:30Z",
+            "completed_at": "2026-10-05T19:53:44Z"
+          },
+          {
+            "name": "Export effective V20.85 source",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 20,
+            "started_at": "2026-10-05T19:53:44Z",
+            "completed_at": "2026-10-05T19:53:55Z"
+          },
+          {
+            "name": "Run actions/upload-artifact@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 21,
+            "started_at": "2026-10-05T19:53:55Z",
+            "completed_at": "2026-10-05T19:53:57Z"
+          },
+          {
+            "name": "Record resolved MaterialKolor ABI dependencies",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 22,
+            "started_at": "2026-10-05T19:53:57Z",
+            "completed_at": "2026-10-05T19:54:22Z"
+          },
+          {
+            "name": "Build APK",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 23,
+            "started_at": "2026-10-05T19:54:22Z",
+            "completed_at": "2026-10-05T19:57:30Z"
+          },
+          {
+            "name": "Verify APK embeds the tested runtime",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 24,
+            "started_at": "2026-10-05T19:57:30Z",
+            "completed_at": "2026-10-05T19:57:32Z"
+          },
+          {
+            "name": "Verify packaged MaterialKolor constructors",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 25,
+            "started_at": "2026-10-05T19:57:32Z",
+            "completed_at": "2026-10-05T19:57:33Z"
+          },
+          {
+            "name": "Verify packaged launcher and concept icon bytes",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 26,
+            "started_at": "2026-10-05T19:57:33Z",
+            "completed_at": "2026-10-05T19:57:33Z"
+          },
+          {
+            "name": "Runtime unit tests",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 27,
+            "started_at": "2026-10-05T19:57:33Z",
+            "completed_at": "2026-10-05T19:59:45Z"
+          },
+          {
+            "name": "Android lint compatibility gate",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 28,
+            "started_at": "2026-10-05T19:59:45Z",
+            "completed_at": "2026-10-05T20:03:17Z"
+          },
+          {
+            "name": "Consolidate native and browser state evidence",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 29,
+            "started_at": "2026-10-05T20:03:17Z",
+            "completed_at": "2026-10-05T20:03:18Z"
+          },
+          {
+            "name": "Upload concept UI verification evidence",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 30,
+            "started_at": "2026-10-05T20:03:18Z",
+            "completed_at": "2026-10-05T20:03:20Z"
+          },
+          {
+            "name": "Verify APK",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 31,
+            "started_at": "2026-10-05T20:03:20Z",
+            "completed_at": "2026-10-05T20:03:21Z"
+          },
+          {
+            "name": "Run actions/upload-artifact@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 32,
+            "started_at": "2026-10-05T20:03:21Z",
+            "completed_at": "2026-10-05T20:03:23Z"
+          },
+          {
+            "name": "Upload APK transport manifest",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 33,
+            "started_at": "2026-10-05T20:03:23Z",
+            "completed_at": "2026-10-05T20:03:24Z"
+          },
+          {
+            "name": "Upload APK transport part 00",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 34,
+            "started_at": "2026-10-05T20:03:24Z",
+            "completed_at": "2026-10-05T20:03:25Z"
+          },
+          {
+            "name": "Upload APK transport part 01",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 35,
+            "started_at": "2026-10-05T20:03:25Z",
+            "completed_at": "2026-10-05T20:03:27Z"
+          },
+          {
+            "name": "Upload APK transport part 02",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 36,
+            "started_at": "2026-10-05T20:03:27Z",
+            "completed_at": "2026-10-05T20:03:28Z"
+          },
+          {
+            "name": "Upload APK transport part 03",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 37,
+            "started_at": "2026-10-05T20:03:28Z",
+            "completed_at": "2026-10-05T20:03:30Z"
+          },
+          {
+            "name": "Upload APK transport part 04",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 38,
+            "started_at": "2026-10-05T20:03:30Z",
+            "completed_at": "2026-10-05T20:03:31Z"
+          },
+          {
+            "name": "Upload APK transport part 05",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 39,
+            "started_at": "2026-10-05T20:03:31Z",
+            "completed_at": "2026-10-05T20:03:33Z"
+          },
+          {
+            "name": "Post Run gradle/actions/setup-gradle@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 75,
+            "started_at": "2026-10-05T20:03:33Z",
+            "completed_at": "2026-10-05T20:03:33Z"
+          },
+          {
+            "name": "Post Run actions/setup-java@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 76,
+            "started_at": "2026-10-05T20:03:33Z",
+            "completed_at": "2026-10-05T20:03:33Z"
+          },
+          {
+            "name": "Post Run actions/setup-node@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 77,
+            "started_at": "2026-10-05T20:03:33Z",
+            "completed_at": "2026-10-05T20:03:33Z"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 78,
+            "started_at": "2026-10-05T20:03:33Z",
+            "completed_at": "2026-10-05T20:03:33Z"
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 79,
+            "started_at": "2026-10-05T20:03:33Z",
+            "completed_at": "2026-10-05T20:03:33Z"
+          }
+        ],
+        "check_run_url": "https://api.github.com/repos/xgl34222220-ops/hetu/check-runs/111961161229",
+        "labels": [
+          "ubuntu-latest"
+        ],
+        "runner_id": 1000033243,
+        "runner_name": "GitHub Actions 1000033243",
+        "runner_group_id": null,
+        "runner_group_name": "GitHub Actions"
+      }
+    ]
+  },
+  "interpretation": "Owner's existing preserved tools-intake run completed/success attempt3; observed read-only for continuation coordination. This is not this task's 274aa0d build,487XML or installed acceptance, and no artifacts were reused for it.",
+  "mutationsByThisReadOnlyCoordination": [],
+  "currentApplicationStillRequiresOwnEvidence": "274aa0d2f80dad39884bd3d079a2e02c86a90abd/37366522056",
+  "archiveWrittenAtUtc": "2026-10-05T20:51:03.313988+00:00"
+}

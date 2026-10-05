@@ -23,7 +23,7 @@
   "HxMenusWholeFileFrozen": true,
   "homePanelSourceDiffFrom492": [],
   "hostChecksPassed": 61,
-  "candidateOwnBuildAndInstalledAcceptance": "pending; own487/51XML and dualAPI evidence required",
+  "candidateOwnBuildAndInstalledAcceptance": "Own build487/51XML,379effectiveinputs,100hostguards andAPI35 64/21passed; API36 singlejob retry queued and historicalbaseline canceled. Whole53 not yetPASS.",
   "completeEffectiveSourceVerifiedLocally": false,
   "unavailableUnchangedPayloads": [
     "mihomo arm64",
@@ -31,5 +31,21 @@
     "core arm64",
     "core x86_64"
   ],
-  "realDeviceGooglePlayFixVerified": false
+  "realDeviceGooglePlayFixVerified": false,
+  "completeEffectiveSourceVerifiedInOwnCI": true,
+  "ownCIEffectiveInputs": 379,
+  "ownBuildProof": "docs/qa/20261005-v2085-274aa0d-build-success.json",
+  "ownBuildProofSha256": "6d0e9b810de6b09ce18bc5c131b32cbd0a239f54eced5a0508723ab1a5670b63",
+  "allOriginalAndNewHostGuardsInOwnCI": 100,
+  "ownRawXMLRootProof": "docs/qa/20261005-v2085-274aa0d-root-xml-review.json",
+  "ownRawXMLRootProofSha256": "59937f3843a603fd44593f476c1b11ca571948aa9bd771b2b7d3c7b5897d8291",
+  "ownOriginalXMLSummary": {
+    "files": 51,
+    "tests": 487,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "ownApi35Proof": "docs/qa/20261005-v2085-274aa0d-root-api35-review.json",
+  "ownApi35ProofSha256": "3735a7fa43aa315940bf8984deae65c4a116fa7bfc621347f063dfbe1f22e563"
 }
