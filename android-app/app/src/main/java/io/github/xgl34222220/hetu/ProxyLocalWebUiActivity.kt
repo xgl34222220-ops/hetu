@@ -103,6 +103,11 @@ main{max-width:900px;margin:auto;padding:0 14px calc(20px + env(safe-area-inset-
 header{height:88px;position:relative;display:flex;align-items:center;justify-content:center;text-align:center;margin-bottom:5px}h1{font-size:22px;line-height:28px;margin:0;font-weight:750}header small{display:block;color:var(--muted);font-size:12.5px;line-height:18px}
 .back{position:absolute;left:-5px;top:22px;width:40px;height:44px;display:grid;place-items:center;color:var(--text);text-decoration:none}.back svg{width:23px;height:23px}
 .status{position:absolute;right:0;top:28px;display:flex;align-items:center;gap:4px;border:1px solid #b4dfd0;border-radius:999px;padding:4px 7px;color:#269f7b;background:#edf9f4;font-size:10px;line-height:15px;font-weight:650}.status .mark{border-radius:50%;background:currentColor;width:15px;height:15px;position:relative}.status .mark:after{content:'✓';position:absolute;inset:0;color:white;text-align:center;font-size:11px;line-height:15px}.status.error{color:var(--red);border-color:var(--red);background:var(--surface)}.status.error .mark:after{content:'!'}
+.endpoint{display:flex;align-items:center;justify-content:center;gap:4px}
+.status.in-proxies:not(.error),.status.in-connections:not(.error){position:static;border:0;background:none;padding:0;gap:0}
+.status.in-proxies:not(.error) #status-label,.status.in-connections:not(.error) #status-label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.status.in-proxies:not(.error) .mark{width:10px;height:10px}.status.in-proxies:not(.error) .mark:after{font-size:8px;line-height:10px}
+.status.in-connections:not(.error){order:-1}.status.in-connections:not(.error) .mark{width:7px;height:7px}.status.in-connections:not(.error) .mark:after{content:none}
 .tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin:0 1px 12px}.tabs button{border:1px solid #d1d7ee;border-radius:14px;padding:10px 8px;background:#e7eafb;color:var(--muted);font-size:15px;line-height:18px;font-weight:650}.tabs button.active{background:var(--surface);color:var(--text)}
 .card{background:var(--surface);border-radius:20px;margin-bottom:12px;overflow:hidden}.metric{display:flex;align-items:center;min-height:80px;padding:17px 18px;gap:26px}.glyph{width:26px;height:26px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .title{font-size:18px;line-height:24px;font-weight:700;overflow-wrap:anywhere}.sub{font-size:14px;line-height:19px;color:var(--muted);overflow-wrap:anywhere}.metric .sub{font-size:14.5px}.group{padding:18px}.group-head{display:flex;align-items:center;gap:26px}.node{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:12px}.pill{display:block;max-width:42%;min-width:96px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;padding:7px 12px;border-radius:999px;background:var(--soft);color:var(--blue);font-size:13px;line-height:18px;font-weight:650}
@@ -116,7 +121,7 @@ dialog{border:0;border-radius:22px;background:var(--surface);color:var(--text);w
 </head>
 <body>
 <main>
-<header><a class="back" href="about:hetu-back" aria-label="返回"><svg class="glyph" viewBox="0 0 24 24"><path d="m15 4-8 8 8 8"/></svg></a><div><h1>河图 WebUI</h1><small id="backend">127.0.0.1:__PORT__</small></div><div id="status" class="status" role="status"><span class="mark"></span><span id="status-label">连接中</span></div></header>
+<header><a class="back" href="about:hetu-back" aria-label="返回"><svg class="glyph" viewBox="0 0 24 24"><path d="m15 4-8 8 8 8"/></svg></a><div><h1>河图 WebUI</h1><div class="endpoint"><small id="backend">127.0.0.1:__PORT__</small><div id="status" class="status" role="status"><span class="mark"></span><span id="status-label">连接中</span></div></div></div></header>
 <nav class="tabs" aria-label="面板页面"><button data-tab="overview" class="active" aria-selected="true">概览</button><button data-tab="proxies" aria-selected="false">策略组</button><button data-tab="connections" aria-selected="false">连接</button></nav>
 <section id="content"><div class="card"><div class="empty">正在连接 Mihomo 控制器…</div></div></section>
 </main>
@@ -143,6 +148,8 @@ async function refresh(){
 function groups(){const p=(cache.proxies&&cache.proxies.proxies)||{};return Object.entries(p).filter(([,v])=>Array.isArray(v.all)&&v.all.length)}
 function metric(symbol,label,value){return '<div class="card metric">'+icon(symbol)+'<div><div class="title">'+label+'</div><div class="sub">'+esc(value)+'</div></div></div>'}
 function render(){
+ const statusView=document.getElementById("status");
+ statusView.classList.toggle("in-proxies",current==="proxies");statusView.classList.toggle("in-connections",current==="connections");
  const content=document.getElementById("content");
  if(!connected){content.innerHTML='<div class="card"><div class="empty error">'+(lastError?'控制器未连接：'+esc(lastError):'正在连接 Mihomo 控制器…')+(lastError?'<button class="retry" id="retry">重试</button>':'')+'</div></div>';const retry=document.getElementById("retry");if(retry)retry.onclick=refresh;return;}
  const c=cache.connections||{},gs=groups();

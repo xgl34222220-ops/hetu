@@ -15,6 +15,7 @@ import androidx.compose.material.icons.rounded.IosShare
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,6 +23,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.CancellationException
@@ -67,7 +70,12 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
             catch (error: Exception) { message = error.message ?: "导出失败" }
         }
     }
-    HxPage(flatCanvas = true, title = "启动配置", subtitle = "河图生成的最终 Mihomo 运行副本", largeTitle = false, compactTitleFontSizeSp = 20f, onBack = onBack) {
+    HxPage(flatCanvas = true, title = "启动配置", largeTitle = false, compactTitleFontSizeSp = 20f, onBack = onBack) {
+        item(key = "startup-subtitle") {
+            Text("河图生成的最终 Mihomo 运行副本", style = MaterialTheme.typography.bodySmall, color = Hx.colors.textMuted,
+                maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Hx.gutter).padding(top = 8.dp, bottom = 10.dp))
+        }
         item(key = "actions") {
             SettingsSection {
                 SettingsGroup {

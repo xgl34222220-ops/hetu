@@ -201,17 +201,22 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
     if (subPage == "backup") {
         HxPage(flatCanvas = true,
             title = ht("备份与恢复"),
-            subtitle = "管理配置与偏好数据",
             largeTitle = false,
             compactTitleFontSizeSp = 20f,
             onBack = { closeSubPage() },
         ) {
+            item(key = "backup-subtitle") {
+                Text("管理配置与偏好数据", style = MaterialTheme.typography.bodySmall, color = c.textMuted,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = Hx.gutter).padding(top = 8.dp, bottom = 10.dp))
+            }
             item(key = "create") {
                 SettingsSection {
                     SettingsGroup {
                         SettingsRow("创建备份", subtitle = "导出当前配置与偏好设置", icon = Icons.Rounded.CloudSync, iconTint = c.text)
                         Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
-                            HxButton("导出备份", onClick = { launchDocumentPicker(vm::toast) { exporter.launch("Hetu-backup.json") } }, modifier = Modifier.fillMaxWidth(), icon = Icons.Rounded.UploadFile)
+                            HxButton("导出备份", onClick = { launchDocumentPicker(vm::toast) { exporter.launch("Hetu-backup.json") } }, modifier = Modifier.fillMaxWidth())
                         }
                     }
                 }

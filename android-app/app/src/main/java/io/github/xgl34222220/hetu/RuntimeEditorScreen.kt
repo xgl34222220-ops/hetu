@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -286,15 +287,15 @@ internal fun RuntimeFileEditorScreen(path: String, model: RuntimeEditorModel, on
     }
     if (discard || jump) HxSheet(onDismiss = { discard = false; jump = false }) {
         Column(Modifier.fillMaxWidth().imePadding().padding(horizontal = 20.dp).padding(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text(if (discard) "放弃未保存修改？" else "跳转到行", color = t.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            if (discard) Text("当前修改尚未保存。", color = t.textSecondary)
+            Text(if (discard) "放弃未保存修改？" else "跳转到行", modifier = if (discard) Modifier.fillMaxWidth() else Modifier, textAlign = if (discard) TextAlign.Center else TextAlign.Start, color = t.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            if (discard) Text("当前修改尚未保存。", Modifier.fillMaxWidth(), textAlign = TextAlign.Center, color = t.textSecondary)
             else Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("行号", color = t.textSecondary, fontSize = 13.sp, modifier = Modifier.padding(horizontal = 4.dp))
                 LiquidGlassTextField(jumpLine, { jumpLine = it.filter(Char::isDigit).take(8) }, "", Modifier.fillMaxWidth(), supportingText = "共 ${editor?.text?.lineCount ?: 1} 行")
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(onClick = { discard = false; jump = false }, modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = Hx.colors.surfaceMuted, contentColor = Hx.colors.accent)) { Text("继续编辑") }
+                    shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = Hx.colors.surfaceMuted, contentColor = if (discard) Hx.colors.text else Hx.colors.accent)) { Text("继续编辑") }
                 Button(onClick = {
                     if (discard) { model.draft = null; discard = false; onBack() }
                     else { editor?.let { it.setSelection((jumpLine.toIntOrNull() ?: 1).coerceIn(1, it.text.lineCount) - 1, 0); it.ensureSelectionVisible() }; jump = false }
