@@ -11,6 +11,37 @@ from unittest.mock import Mock,patch
 spec=importlib.util.spec_from_file_location('runner',Path(__file__).with_name('run_hetu_emulator.py'))
 runner=importlib.util.module_from_spec(spec);spec.loader.exec_module(runner)
 
+class AvdProvisioningTests(unittest.TestCase):
+ def setUp(self):
+  self.temp=tempfile.TemporaryDirectory();self.config=Path(self.temp.name)/'hetu-smoke.avd/config.ini'
+  self.config.parent.mkdir();self.raw='avd.id=<build>\navd.name=<build>\ntag.id=default\nabi.type=x86_64\nimage.sysdir.1=system-images/android-35/default/x86_64/\n'
+  self.config.write_text(self.raw)
+ def tearDown(self):self.temp.cleanup()
+ def test_observed_sdk_placeholders_are_provisioned_without_changing_image(self):
+  runner.prepare_owned_avd_identity(self.config)
+  text=self.config.read_text();self.assertIn('AvdId=hetu-smoke\n',text);self.assertIn('avd.name=hetu-smoke\n',text)
+  self.assertIn('image.sysdir.1=system-images/android-35/default/x86_64/',text)
+ def test_existing_owned_identity_is_idempotent(self):
+  runner.prepare_owned_avd_identity(self.config);before=self.config.read_bytes()
+  runner.prepare_owned_avd_identity(self.config);self.assertEqual(before,self.config.read_bytes())
+ def test_foreign_identity_is_refused_without_write(self):
+  for key in ('AvdId','avd.id','avd.name'):
+   with self.subTest(key=key):
+    raw=self.raw.replace(key+'=<build>',key+'=retained-user-avd') if key!='AvdId' else self.raw+'AvdId=retained-user-avd\n'
+    self.config.write_text(raw)
+    with self.assertRaisesRegex(RuntimeError,'Foreign'):runner.prepare_owned_avd_identity(self.config)
+    self.assertEqual(raw,self.config.read_text())
+ def test_conflicting_duplicate_is_refused_without_write(self):
+  raw=self.raw+'avd.id=hetu-smoke\n';self.config.write_text(raw)
+  with self.assertRaisesRegex(RuntimeError,'Conflicting'):runner.prepare_owned_avd_identity(self.config)
+  self.assertEqual(raw,self.config.read_text())
+ def test_foreign_path_is_refused(self):
+  with self.assertRaisesRegex(RuntimeError,'path'):runner.prepare_owned_avd_identity(self.config.parent/'foreign.ini')
+ def test_non_aosp_is_refused_without_write(self):
+  raw=self.raw.replace('tag.id=default','tag.id=google_apis');self.config.write_text(raw)
+  with self.assertRaisesRegex(RuntimeError,'AOSP'):runner.prepare_owned_avd_identity(self.config)
+  self.assertEqual(raw,self.config.read_text())
+
 class OwnedEmulatorTests(unittest.TestCase):
  def setUp(self):
   self.temp=tempfile.TemporaryDirectory();self.root=Path(self.temp.name)

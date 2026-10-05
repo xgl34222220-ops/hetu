@@ -1,4 +1,4 @@
-# Capture exact owned AVD configuration before target verification; retain all gates.
+# Explicitly provision this fresh AVD identity; strict live target gates remain unchanged.
 name: Hetu V20.84 fixed APK installation continuation
 permissions:
   contents: read
@@ -120,6 +120,10 @@ jobs:
         hw.ramSize=2048
 
         EOF
+
+        cp "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini" out/android-smoke/owned-avd-config-sdk.ini
+
+        PYTHONPATH=.github/scripts python3 -c "import os; from pathlib import Path; from run_hetu_emulator import prepare_owned_avd_identity; prepare_owned_avd_identity(Path(os.environ[''ANDROID_AVD_HOME'']) / ''hetu-smoke.avd/config.ini'')"
 
         cp "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini" out/android-smoke/owned-avd-config-before-boot.ini
 

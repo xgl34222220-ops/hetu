@@ -13,6 +13,30 @@ import sys
 import uuid
 
 
+
+def prepare_owned_avd_identity(config):
+ """Set the name on this job's newly created AVD; never repair a foreign identity."""
+ config=Path(config)
+ if config.name!='config.ini' or config.parent.name!='hetu-smoke.avd':
+  raise RuntimeError('Unexpected disposable AVD config path')
+ raw=config.read_text();values={}
+ for line in raw.splitlines():
+  if '=' not in line or line.lstrip().startswith(('#',';')):continue
+  key,value=(part.strip() for part in line.split('=',1))
+  if key in values and values[key]!=value:raise RuntimeError('Conflicting AVD configuration')
+  values[key]=value
+ for key in ('AvdId','avd.id','avd.name'):
+  allowed={'hetu-smoke'} if key=='AvdId' else {'hetu-smoke','<build>'}
+  if key in values and values[key] not in allowed:
+   raise RuntimeError('Foreign AVD identity: '+key)
+ if values.get('tag.id')!='default' or values.get('abi.type')!='x86_64':
+  raise RuntimeError('Unexpected AOSP AVD configuration')
+ # SDK-generated <build> placeholders are not proof of identity. Provision the
+ # explicit name given to avdmanager, then retain the existing runtime verifier.
+ lines=[line for line in raw.splitlines() if line.split('=',1)[0].strip() not in ('AvdId','avd.id','avd.name')]
+ config.write_text('\n'.join(lines)+'\nAvdId=hetu-smoke\navd.id=hetu-smoke\navd.name=hetu-smoke\n')
+
+
 def process_identity(pid, proc_root=Path('/proc')):
  """Read only a live Linux process identity; start ticks prevent PID reuse."""
  pid=int(pid)
