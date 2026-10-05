@@ -107,7 +107,7 @@ public final class RootTproxyActivity extends Activity {
     private CompoundButton switchRow(LinearLayout parent,String icon,String label,String subtitle,boolean checked,java.util.function.Consumer<Boolean> listener){
         LinearLayout row=u.row();row.setMinimumHeight(u.dp(76));row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(0,u.dp(3),0,u.dp(3));
         row.addView(rowIcon(icon),new LinearLayout.LayoutParams(u.dp(30),u.dp(30)));
-        LinearLayout labels=u.col();labels.setPadding(u.dp(20),0,u.dp(8),0);labels.addView(u.text(label,18,u.text,true));labels.addView(settingsSubtitle(subtitle,11.5f));
+        LinearLayout labels=u.col();labels.setPadding(u.dp(20),0,u.dp(8),0);labels.addView(u.text(label,18,u.text,true));labels.addView(settingsSubtitle(subtitle,12.5f));
         row.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
         CompoundButton sw=new SettingsToggle(this);sw.setContentDescription(label);sw.setChecked(checked);sw.setOnCheckedChangeListener((button,value)->listener.accept(value));row.addView(sw,new LinearLayout.LayoutParams(u.dp(50),u.dp(48)));row.setOnClickListener(v->sw.toggle());parent.addView(row,new LinearLayout.LayoutParams(-1,-2));return sw;
     }
@@ -144,13 +144,13 @@ public final class RootTproxyActivity extends Activity {
         ProxyRuntimeProfile.Mode[] values={ProxyRuntimeProfile.Mode.TUN,ProxyRuntimeProfile.Mode.TPROXY,ProxyRuntimeProfile.Mode.EBPF,ProxyRuntimeProfile.Mode.REDIRECT,ProxyRuntimeProfile.Mode.ENHANCE};
         String[] labels=new String[values.length],descriptions={"Root 下的 TUN 虚拟网卡","推荐。TCP/UDP 全接管，性能最好","eBPF 重定向到 TUN","仅 TCP，兼容性最好","TCP 走 Redirect，UDP 走 TPROXY"};boolean[] enabled=new boolean[values.length];int selected=0;
         for(int i=0;i<values.length;i++){labels[i]=values[i].label;enabled[i]=ProxyRuntimeProfile.capability(profile().core,values[i]).available;if(values[i]==profile().mode)selected=i;}
-        showChoice(modeValue,labels,descriptions,enabled,selected,184,index->{prefs.edit().putString("proxyBaseMode",values[index].id).apply();changed("proxyBaseMode");refresh();});
+        showChoice(modeValue,labels,descriptions,enabled,selected,214,index->{prefs.edit().putString("proxyBaseMode",values[index].id).apply();changed("proxyBaseMode");refresh();});
     }
 
     private void chooseIpv6(){
         ProxyRuntimeProfile.Ipv6[] values=ProxyRuntimeProfile.Ipv6.values();String[] labels={"启用","不进核心","严格防泄漏","禁用系统 IPv6"};
         String[] descriptions={"IPv6 流量同样进入代理","IPv6 直连，不经过代理","仅用 IPv4，拦截 IPv6","关闭系统 IPv6 外联"};
-        showChoice(ipv6Value,labels,descriptions,new boolean[]{true,true,true,true},profile().ipv6.ordinal(),184,index->{prefs.edit().putString("proxyBaseIpv6",values[index].id).apply();changed("proxyBaseIpv6");refresh();});
+        showChoice(ipv6Value,labels,descriptions,new boolean[]{true,true,true,true},profile().ipv6.ordinal(),214,index->{prefs.edit().putString("proxyBaseIpv6",values[index].id).apply();changed("proxyBaseIpv6");refresh();});
     }
 
     private void showChoice(View anchor,String[] labels,String[] descriptions,boolean[] enabled,int selected,int widthDp,java.util.function.IntConsumer pick){

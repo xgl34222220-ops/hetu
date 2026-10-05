@@ -21,6 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -115,9 +116,9 @@ internal fun ToolsAdblockScreen(
                     DomainCard("白名单（永不拦截）", "添加白名单", state.allow, idle, onAdd = { onAddDomain(true) }, onRemove = { onRemoveDomain(it, true) })
                     DomainCard("黑名单（额外拦截）", "添加黑名单", state.block, idle, onAdd = { onAddDomain(false) }, onRemove = { onRemoveDomain(it, false) })
                     HomeCard(Modifier.fillMaxWidth()) {
-                        ToolsCardTitle("代理关闭时")
-                        ToolsSwitchRow("独立 DNS 过滤", state.standaloneDns, onStandaloneDnsChange, icon = ToolsFeatureIcons.Globe, subtitle = ht("代理未运行时用本地 VPN 继续过滤广告"), enabled = idle, subtitleStyle = HomeType.rowSub.copy(fontSize = 12.sp, lineHeight = 17.sp))
-                        ToolsSwitchRow("CNAME 追踪防护", state.cnameProtection, onCnameChange, icon = ToolsFeatureIcons.Shield, subtitle = ht("拦截伪装成正常域名的追踪 CNAME"), enabled = idle)
+                        ToolsCardTitle("代理关闭时", minHeight = 42.dp, topPadding = 0.dp)
+                        ToolsSwitchRow("独立 DNS 过滤", state.standaloneDns, onStandaloneDnsChange, icon = ToolsFeatureIcons.Globe, subtitle = ht("代理未运行时用本地 VPN 继续过滤广告"), enabled = idle, subtitleStyle = HomeType.rowSub.copy(fontSize = 12.sp, lineHeight = 17.sp), minHeight = 51.dp, verticalPadding = 5.dp)
+                        ToolsSwitchRow("CNAME 追踪防护", state.cnameProtection, onCnameChange, icon = ToolsFeatureIcons.Shield, subtitle = ht("拦截伪装成正常域名的追踪 CNAME"), enabled = idle, subtitleStyle = HomeType.rowSub.copy(fontSize = 12.sp, lineHeight = 17.sp), minHeight = 51.dp, verticalPadding = 5.dp)
                     }
                 }
             }
@@ -231,14 +232,18 @@ private fun RecentCard(recent: List<String>, onPick: (String) -> Unit) {
 private fun LevelCard(state: ToolsAdblockState, idle: Boolean, onLevelChange: (ToolsAdLevel) -> Unit) {
     val c = LocalHomeColors.current
     HomeCard(Modifier.fillMaxWidth()) {
-        ToolsCardTitle("拦截强度")
+        ToolsCardTitle("拦截强度", minHeight = 42.dp, topPadding = 0.dp)
         Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            HomeSegmented<ToolsAdLevel?>(
-                options = ToolsAdLevel.entries.map { it to it.label },
-                selected = state.level,
-                onSelect = { if (it != null) onLevelChange(it) },
-                enabled = idle,
-            )
+            CompositionLocalProvider(LocalHomeColors provides c.copy(surface = if (c.dark) c.sunken else Color(0xFFF1F1FB))) {
+                HomeSegmented<ToolsAdLevel?>(
+                    options = ToolsAdLevel.entries.map { it to it.label },
+                    selected = state.level,
+                    onSelect = { if (it != null) onLevelChange(it) },
+                    enabled = idle,
+                    referenceVisualInset = 3.5.dp,
+                    referenceOuterPadding = 2.dp,
+                )
+            }
             Text(state.note, color = c.t2, style = HomeType.note)
         }
     }
@@ -249,18 +254,20 @@ private fun SourcesCard(state: ToolsAdblockState, idle: Boolean, onUpdate: () ->
     val c = LocalHomeColors.current
     HomeCard(Modifier.fillMaxWidth()) {
         ToolsCardTitle("规则源") {
-            HomeButton(if (state.updating) "更新中" else "立即更新", onUpdate, Modifier.padding(end = 10.dp), kind = HomeButtonKind.Primary, enabled = idle || state.updating, loading = state.updating)
+            HomeButton(if (state.updating) "更新中" else "立即更新", onUpdate, Modifier.padding(end = 10.dp), kind = HomeButtonKind.Primary, enabled = idle || state.updating, loading = state.updating, visualHeight = 29.dp, visualCornerRadius = 7.dp, textStyle = HomeType.button.copy(fontSize = 12.sp, lineHeight = 18.sp), horizontalPadding = 12.dp)
         }
         if (state.sources.isEmpty()) Text(ht("没有可用的规则源。"), Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp), color = c.t2, style = HomeType.note)
         state.sources.forEach { source ->
             ToolsSwitchRow(
                 source.name, source.enabled, { onSourceChange(source, it) },
                 rawContent = true,
-                icon = if (source.id.contains("adguard", ignoreCase = true)) ToolsFeatureIcons.Shield else ToolsIcons.FileText,
+                icon = if (source.id.contains("adguard", ignoreCase = true)) ToolsFeatureIcons.Shield else ToolsIcons.AdblockDocumentPdf44,
                 subtitle = "%,d 条 · ".format(source.count) + if (state.updating && source.enabled) "正在更新…" else source.meta,
                 enabled = idle,
+                minHeight = 60.dp,
             )
         }
+        Box(Modifier.height(6.dp))
     }
 }
 
@@ -268,12 +275,12 @@ private fun SourcesCard(state: ToolsAdblockState, idle: Boolean, onUpdate: () ->
 private fun DomainCard(title: String, addLabel: String, domains: List<String>, idle: Boolean, onAdd: () -> Unit, onRemove: (String) -> Unit) {
     val c = LocalHomeColors.current
     HomeCard(Modifier.fillMaxWidth()) {
-        ToolsCardTitle(title) { HomeIconButton(ToolsIcons.Plus, addLabel, onAdd, enabled = idle, tint = c.t1) }
-        Box(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 14.dp)) {
+        ToolsCardTitle(title, topPadding = 0.dp) { HomeIconButton(ToolsIcons.Plus, addLabel, onAdd, enabled = idle, tint = c.t1) }
+        Box(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 10.dp)) {
             if (domains.isEmpty()) {
                 Text(ht("暂无"), color = c.t3, style = HomeType.note)
             } else {
-                ToolsWrap { domains.forEach { domain -> ToolsChip(domain, { onRemove(domain) }, enabled = idle) } }
+                ToolsWrap { domains.forEach { domain -> ToolsChip(domain, { onRemove(domain) }, enabled = idle, textStyle = HomeType.bodySmall.copy(fontWeight = FontWeight.SemiBold)) } }
             }
         }
     }
@@ -326,7 +333,7 @@ internal fun ToolsConfirmAllowDialogCard(overlay: ToolsAdOverlay.ConfirmAllow, o
         title = "加入白名单？", confirmLabel = "加入", confirmLoading = overlay.saving, neutralCancel = true,
         onConfirm = onConfirm, onCancel = onCancel, modifier = modifier,
     ) {
-        Text(overlay.domain, Modifier.fillMaxWidth(), color = c.t2, style = HomeType.mono.copy(fontFamily = FontFamily.Default), textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(overlay.domain, Modifier.fillMaxWidth(), color = c.t2, style = HomeType.mono.copy(fontFamily = FontFamily.Default, letterSpacing = .8.sp), textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
         Text(ht("及其子域名将不再被拦截。"), Modifier.fillMaxWidth().padding(top = 4.dp), color = c.t2, style = ToolsType.dialogText, textAlign = TextAlign.Center)
     }
 }

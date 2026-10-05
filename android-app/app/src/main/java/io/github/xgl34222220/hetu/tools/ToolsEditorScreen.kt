@@ -196,7 +196,7 @@ internal fun ToolsOutlineSheetContent(items: List<ToolsOutlineItem>, onJump: (To
     val sheetBackground = if (c.dark) Modifier.background(c.surface) else Modifier.background(
         Brush.verticalGradient(listOf(Color(0xFFF3F3FD), Color(0xFFEFF1FE))),
     )
-    HomeSheetContent(title = "语法大纲", modifier = modifier.then(sheetBackground), onClose = onClose) {
+    HomeSheetContent(title = "语法大纲", modifier = modifier.then(sheetBackground).padding(bottom = 22.dp), onClose = onClose, compactHeader = true) {
         if (items.isEmpty()) {
             Text(ht("没有可识别的顶层字段。"), Modifier.padding(horizontal = 4.dp, vertical = 8.dp), color = c.t2, style = HomeType.note)
         } else {

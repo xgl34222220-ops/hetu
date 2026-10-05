@@ -29,9 +29,13 @@ class PdfScope(unittest.TestCase):
             with self.assertRaises(AssertionError):validate_changes(gradle,newer,before,wrong)
     def test_native_settings_typography_cannot_change_root_callbacks(self):
         before='prefix 启动时将必要的设置参数覆写到运行配置\n    private TextView settingRow(u.text(subtitle,13,u.muted,false)\n    private CompoundButton switchRow(u.text(subtitle,13,u.muted,false)\n    private void plainAction(u.text(subtitle,13,u.muted,false)\nTextView current=u.text(value,13,u.muted,false); setChecked(checked); listener.accept(value); prefs.apply();'
+        mode_call='showChoice(modeValue,labels,descriptions,enabled,selected,184,index->'
+        ipv6_call='showChoice(ipv6Value,labels,descriptions,new boolean[]{true,true,true,true},profile().ipv6.ordinal(),184,index->'
+        before+=mode_call+ipv6_call+'showChoice(coreValue,labels,descriptions,enabled,selected,174,index->'
         after=before.replace('u.text(subtitle,13,u.muted,false)','settingsSubtitle(subtitle)').replace('TextView current=u.text(value,13,u.muted,false)','TextView current=settingsSubtitle(value)').replace('    private TextView settingRow(',NATIVE_SUBTITLE_HELPER+'    private TextView settingRow(',1)
-        after=after.replace('    private CompoundButton switchRow(settingsSubtitle(subtitle)','    private CompoundButton switchRow(settingsSubtitle(subtitle,11.5f)').replace('启动时将必要的设置参数覆写到运行配置','启动时将必要的河图参数覆写到运行配置')
+        after=after.replace('    private CompoundButton switchRow(settingsSubtitle(subtitle)','    private CompoundButton switchRow(settingsSubtitle(subtitle,12.5f)').replace('启动时将必要的设置参数覆写到运行配置','启动时将必要的河图参数覆写到运行配置')
+        after=after.replace(mode_call,mode_call.replace(',184,',',214,')).replace(ipv6_call,ipv6_call.replace(',184,',',214,'))
         validate_native_settings_typography(before,after)
-        for old,new in [('setChecked(checked)','setChecked(true)'),('listener.accept(value)','rootShell()'),('prefs.apply()','prefs.clear()')]:
+        for old,new in [('setChecked(checked)','setChecked(true)'),('listener.accept(value)','rootShell()'),('prefs.apply()','prefs.clear()'),(',174,index->',',214,index->')]:
             with self.assertRaises(AssertionError): validate_native_settings_typography(before,after.replace(old,new))
 if __name__=='__main__':unittest.main()

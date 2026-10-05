@@ -1,4 +1,16 @@
-## 当前接续：V20.85 实际PDF130页与认证证据
+## 当前接续：V20.85 939912 独立验收与未编译窄修正
+
+真实仓库 xgl34222220-ops/hetu / test/v20.76-new-ui 延续原实现，无重复分支或取消CI。最新已完整验证的应用提交为9399121212b68a5f6422170e00835095218c2f8e，Actions37330392252截至2026-10-05 15:36:52UTC为completed/success，构建、历史崩溃守护、API35安装、API36安装四job均success。实际49XML/479项零失败、错误、跳过；原422基线、新Google分类8和工具状态49继续执行。23载荷、687ABI零缺失、lint与固定签名通过。APK134804906字节，SHA256 e23997fa0af6f78e310983a05a9514b21749067090585caa9ad8d65c9cf9b0fb；本轮独立证据docs/qa/20261005-v2085-939912-installation-success.json的53项严格证据检查全部PASS，不替代7cf、270及以前成功/失败记录。
+
+API35/36各64=原59+认证5、21配色、Root mutation0。实际loopback控制器401→200、启用重试按钮先于fixture200、有效Bearer六路径通过，实际200请求各25/19条；原配置、adb reverse、runner/KVM和独立AVD资源恢复/清理均通过。foreground轮询仍存在，不能声称仅重试恢复。此验收证明AOSP隔离环境中的控制器认证与原生呈现，不证明Google Play帐号认证、真机Root/开机/网络或用户设备修复。
+
+939912新图再次按本次PDF03A49、03B48、0433逐页检查，设置33原图xref/嵌入图/渲染SHA与33新图全部实读。原生基本页实际入口RootTproxyActivity，不能挪用Compose修改结论；自启关闭与通知状态说明新图已单行，Mirror正常46px/错误约70px、错误标题19/24和非pill按钮已渲染。仍有客观几何/字距差异，像素1:1与130页完整功能验收没有全部通过。当前未提交、未编译的窄候选包括Mode/IPv6菜单214dp（Core174保留）、原生唯一自动覆写说明12.5/600（其余14/600保留）、Startup12/19仅tracking1.sp、Mirror仅正常状态标题top14/bottom16/按钮前22/后6，总高预计+12px，error/Restore/default逐字保留；许可仅referenceDocument正文外gutter10.5dp、完整GPL/ISC/Feather法律文与原最大高度不改；compact warning仅已开启referenceCompact的Bad/Warn绘制23dp实心Error图标，其余18dp，固定18dp占位和现有间距/行为保留。工具其他窄候选仍须其本批新提交、构建与新图证明，不能引用939912的479项提前标通过。
+
+本轮源修改已收口（source stopped），设置三源候选逐字反转等于939912，回调/配置/门禁不变，git diff --check通过；由根任务统一生成层、提交原测试分支并运行新验收。首页/panel布局、动效、核心、签名、权限与no-hook约束继续冻结。Google真实根因仍未知，缺故障当时Play/GMS认证HTTP/TLS、DNS答案及另一代理同刻分流/链路证据；不操作手机、退出帐号、清数据或改变网络安全设置。历史AVD、按钮禁用及断言失败证据与V20.83 a93交付保持。细节见docs/V20.85_PDF_CONTINUATION.md及本轮三份939912逐页复核JSON。
+
+工具上册本批三组证明已归档docs/qa/20261005-v2085-next-detail-candidate.json，九份呈现源source stopped；这不是新构建或新视觉验收通过。许可referenceDocument唯一留白分支的守卫已本地通过，根任务统一汇总设置及工具后续候选证据。
+
+## 此前接续：V20.85 7cf 实际PDF130页与认证证据
 
 原仓库 xgl34222220-ops/hetu / test/v20.76-new-ui，从492a9c继续；没有重复实现或取消CI。最新完整验证应用7cfdf426400026c06a997f09d3b7eb4defad852b /run37322190390四job success，14:36:11UTC完成；479/49XML零失败错误跳过，API35/36各64=59+5、21palette、Root0、loopback401→200/Bearer六路径和隔离资源清理通过。APK134797638 bytes/SHA6c076ff75c285cefcd0e0520923e9a8351bfb77257513d524e2cfbd21852f171。证据docs/qa/20261005-v2085-7cf-installation-success.json；270与此前失败和成功记录保留。
 

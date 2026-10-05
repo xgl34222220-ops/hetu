@@ -72,6 +72,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
@@ -93,6 +94,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Cancel
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.Error
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.AlertDialog
@@ -797,8 +799,10 @@ internal fun HxBanner(
             .animateContentSize(tween(HxMotion.Medium, easing = HxMotion.Emphasized))
             .heightIn(min = 46.dp).padding(horizontal = 12.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically) {
-            Icon(if (tone == HxTone.Bad || tone == HxTone.Warn) Icons.Rounded.ErrorOutline else Icons.Rounded.Info,
-                null, tint = tone.fg(), modifier = Modifier.size(18.dp))
+            Box(Modifier.size(18.dp), contentAlignment = Alignment.Center) {
+                Icon(if (tone == HxTone.Bad || tone == HxTone.Warn) Icons.Rounded.Error else Icons.Rounded.Info,
+                    null, tint = tone.fg(), modifier = Modifier.requiredSize(if (tone == HxTone.Bad || tone == HxTone.Warn) 23.dp else 18.dp))
+            }
             Spacer(Modifier.width(8.dp))
             Text(text, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 11.5.sp, lineHeight = 14.sp,
                 fontWeight = FontWeight.SemiBold), color = tone.fg(), modifier = Modifier.weight(1f))
@@ -1111,7 +1115,7 @@ internal fun HxTextSheet(title: String, text: String, onDismiss: () -> Unit, onR
             Modifier
                 .fillMaxWidth()
                 .heightIn(max = if (wrapLines) (LocalConfiguration.current.screenHeightDp * .49f).dp else 520.dp)
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = if (referenceDocument) 10.5.dp else 16.dp)
                 .clip(Hx.rowShape)
                 .background(c.surfaceMuted)
                 .verticalScroll(rememberScrollState())

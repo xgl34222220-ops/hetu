@@ -18,7 +18,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -29,6 +34,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.xgl34222220.hetu.HomeContinuousShape
@@ -175,6 +181,11 @@ internal fun ToolsButton(
     enabled: Boolean = true,
     loading: Boolean = false,
     neutral: Boolean = false,
+    spinnerSize: Dp = 18.dp,
+    visualHeight: Dp? = null,
+    textStyle: TextStyle? = null,
+    horizontalPadding: Dp? = null,
+    visualCornerRadius: Dp? = null,
 ) {
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
@@ -185,16 +196,32 @@ internal fun ToolsButton(
         HomeButtonKind.Soft -> if (neutral) c.sunken to c.t1 else c.accentSoft to c.accent
         HomeButtonKind.Ghost -> Color.Transparent to c.accent
     }
-    Row(modifier.heightIn(min = 48.dp).alpha(if (enabled) 1f else .45f)
+    val backgroundModifier = if (visualHeight == null) Modifier
         .clip(if (kind == HomeButtonKind.Primary) RoundedCornerShape(24.dp) else ToolsDesignDims.controlShape).background(fill)
         .then(if (kind == HomeButtonKind.Secondary) Modifier.border(.75.dp, c.line2, ToolsDesignDims.controlShape) else Modifier)
+    else Modifier
+        .drawBehind {
+            val height = visualHeight.toPx().coerceIn(0f, size.height)
+            val top = (size.height - height) / 2f
+            val radius = minOf((visualCornerRadius ?: if (kind == HomeButtonKind.Primary) 24.dp else 14.dp).toPx(), height / 2f, size.width / 2f)
+            drawRoundRect(fill, Offset(0f, top), Size(size.width, height), CornerRadius(radius, radius))
+            if (kind == HomeButtonKind.Secondary) {
+                val stroke = .75.dp.toPx()
+                val borderRadius = (radius - stroke / 2f).coerceAtLeast(0f)
+                drawRoundRect(c.line2, Offset(stroke / 2f, top + stroke / 2f),
+                    Size((size.width - stroke).coerceAtLeast(0f), (height - stroke).coerceAtLeast(0f)),
+                    CornerRadius(borderRadius, borderRadius), style = Stroke(stroke))
+            }
+        }
+    Row(modifier.heightIn(min = 48.dp).alpha(if (enabled) 1f else .45f)
+        .then(backgroundModifier)
         .hxPressScale(source, .97f).clickable(enabled = enabled && !loading, interactionSource = source, indication = null,
             role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
-        .padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically,
+        .padding(horizontal = horizontalPadding ?: 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
-        if (loading) HomeSpinner(size = 18.dp, color = foreground)
+        if (loading) HomeSpinner(size = spinnerSize, color = foreground)
         else if (icon != null) Icon(icon, null, Modifier.size(22.dp), tint = foreground)
-        Text(ht(text), color = foreground, style = ToolsTypography.button, maxLines = 1)
+        Text(ht(text), color = foreground, style = textStyle ?: ToolsTypography.button, maxLines = 1)
     }
 }
 
@@ -231,14 +258,16 @@ internal fun ToolsSheetContent(
     onClose: (() -> Unit)? = null,
     trailing: (@Composable RowScope.() -> Unit)? = null,
     footer: (@Composable RowScope.() -> Unit)? = null,
+    compactHeader: Boolean = false,
     body: @Composable ColumnScope.() -> Unit,
 ) {
     val c = LocalHomeColors.current
     Column(modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.navigationBars)) {
-        Box(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier.fillMaxWidth().padding(top = if (compactHeader) 0.dp else 8.dp, bottom = 4.dp), contentAlignment = Alignment.Center) {
             Box(Modifier.size(36.dp, 4.dp).background(c.line2, RoundedCornerShape(2.dp)))
         }
-        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 8.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp,
+            top = if (compactHeader) 0.dp else 8.dp, bottom = if (compactHeader) 0.dp else 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(ht(title), color = c.t1, style = ToolsTypography.sheetTitle)
                 if (subtitle != null) Text(ht(subtitle), Modifier.padding(top = 2.dp), color = c.t2, style = ToolsTypography.rowSub)
@@ -262,15 +291,30 @@ internal fun <T> ToolsSegmented(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     icons: Map<T, ImageVector> = emptyMap(),
+    referenceVisualInset: Dp? = null,
+    referenceOuterPadding: Dp? = null,
 ) {
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
-    Row(modifier.fillMaxWidth().clip(ToolsDesignDims.cardShape).background(c.surface).padding(8.dp).selectableGroup()) {
+    val outerModifier = if (referenceOuterPadding == null)
+        modifier.fillMaxWidth().clip(ToolsDesignDims.cardShape).background(c.surface).padding(8.dp).selectableGroup()
+    else modifier.fillMaxWidth().clip(ToolsDesignDims.cardShape).background(c.surface).padding(referenceOuterPadding).selectableGroup()
+    Row(outerModifier) {
         options.forEach { (key, label) ->
-            Box(Modifier.weight(1f).heightIn(min = 44.dp).clip(ToolsDesignDims.segmentShape)
+            val itemModifier = if (referenceVisualInset == null) Modifier.weight(1f).heightIn(min = 44.dp).clip(ToolsDesignDims.segmentShape)
                 .background(if (selected == key) c.accentSoft else Color.Transparent)
                 .selectable(selected = selected == key, enabled = enabled, role = Role.Tab) { haptics(HomeHaptic.Tick); onSelect(key) }
-                .padding(vertical = 9.dp), contentAlignment = Alignment.Center) {
+                .padding(vertical = 9.dp)
+            else {
+                val inset = referenceVisualInset.coerceIn(0.dp, 9.dp)
+                Modifier.weight(1f).heightIn(min = 44.dp)
+                    .selectable(selected = selected == key, enabled = enabled, role = Role.Tab) { haptics(HomeHaptic.Tick); onSelect(key) }
+                    .padding(vertical = inset)
+                    .clip(ToolsDesignDims.segmentShape)
+                    .background(if (selected == key) c.accentSoft else Color.Transparent)
+                    .padding(vertical = 9.dp - inset)
+            }
+            Box(itemModifier, contentAlignment = Alignment.Center) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     icons[key]?.let { Icon(it, null, Modifier.size(22.dp), tint = if (selected == key) c.accent else c.t1) }
                     Text(ht(label), color = if (selected == key) c.accent else c.t1, style = ToolsTypography.rowTitle, maxLines = 1)

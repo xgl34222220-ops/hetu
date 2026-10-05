@@ -132,7 +132,7 @@ private fun CoreCard(core: ToolsCore, busy: Boolean, enabled: Boolean, progress:
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 when {
                     busy -> CompositionLocalProvider(LocalHomeColors provides processingColors) {
-                        HomeButton("处理中", {}, Modifier.weight(1f), enabled = false, loading = true)
+                        HomeButton("处理中", {}, Modifier.weight(1f), enabled = false, loading = true, spinnerSize = 23.dp)
                     }
                     action != null -> CompositionLocalProvider(LocalHomeColors provides if (action == ToolsCoreAction.Download) softButtonColors else c) {
                         HomeButton(

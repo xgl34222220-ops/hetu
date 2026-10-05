@@ -217,6 +217,8 @@ internal fun ToolsRow(
     subtitleMaxLines: Int = 2,
     onClick: (() -> Unit)? = null,
     gap: Dp = 18.dp,
+    minHeight: Dp? = null,
+    verticalPadding: Dp? = null,
     trailing: (@Composable RowScope.() -> Unit)? = null,
 ) {
     val c = LocalHomeColors.current
@@ -226,8 +228,8 @@ internal fun ToolsRow(
     val interactive = if (onClick == null) base else base.hxPressScale(source, .985f).clickable(enabled = enabled, interactionSource = source, indication = null, role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
     Row(
         interactive
-            .heightIn(min = if (compact) HomeDims.rowMinHeightSmall else HomeDims.rowMinHeight)
-            .padding(start = 16.dp, end = endPadding, top = 8.dp, bottom = 8.dp),
+            .heightIn(min = minHeight ?: if (compact) HomeDims.rowMinHeightSmall else HomeDims.rowMinHeight)
+            .padding(start = 16.dp, end = endPadding, top = verticalPadding ?: 8.dp, bottom = verticalPadding ?: 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(gap),
     ) {
@@ -290,12 +292,16 @@ internal fun ToolsField(
     compact: Boolean = false,
     clearable: Boolean = false,
     errorAfterHint: Boolean = false,
+    readOnlyValueStyle: TextStyle? = null,
+    hintStyle: TextStyle? = null,
+    inputMinHeight: Dp? = null,
+    inputVerticalPadding: Dp? = null,
 ) {
     val c = LocalHomeColors.current
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (readOnly) {
             Text(ht(label), Modifier.padding(horizontal = 2.dp), color = c.t1, style = HomeType.label.copy(fontWeight = FontWeight.SemiBold))
-            Text(value, Modifier.padding(horizontal = 2.dp), color = c.t1, style = ToolsType.readOnlyValue, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(value, Modifier.padding(horizontal = 2.dp), color = c.t1, style = readOnlyValueStyle ?: ToolsType.readOnlyValue, maxLines = 1, overflow = TextOverflow.Ellipsis)
         } else {
             Text(ht(label), color = c.t1, style = if (compact) HomeType.caption else HomeType.label.copy(fontWeight = FontWeight.SemiBold))
             BasicTextField(
@@ -305,9 +311,9 @@ internal fun ToolsField(
                     fontFamily = if (monospace && keyboardType != KeyboardType.Uri) FontFamily.Monospace else FontFamily.Default),
                 keyboardOptions = KeyboardOptions(keyboardType = keyboardType), cursorBrush = SolidColor(c.accent),
                 decorationBox = { inner ->
-                    Box(Modifier.fillMaxWidth().heightIn(min = if (compact) 42.dp else 48.dp)
+                    Box(Modifier.fillMaxWidth().heightIn(min = inputMinHeight ?: if (compact) 42.dp else 48.dp)
                         .clip(HomeDims.controlShape).background(c.sunken)
-                        .padding(horizontal = 14.dp, vertical = 10.dp), contentAlignment = Alignment.CenterStart) {
+                        .padding(horizontal = 14.dp, vertical = inputVerticalPadding ?: 10.dp), contentAlignment = Alignment.CenterStart) {
                         if (value.isEmpty()) Text(ht(placeholder), color = c.t3, style = HomeType.body)
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Box(Modifier.weight(1f)) { inner() }
@@ -319,14 +325,14 @@ internal fun ToolsField(
                 },
             )
         }
-        if (errorAfterHint && hint != null) Text(ht(hint), Modifier.padding(horizontal = 2.dp), color = c.t3, style = HomeType.caption)
+        if (errorAfterHint && hint != null) Text(ht(hint), Modifier.padding(horizontal = 2.dp), color = c.t3, style = hintStyle ?: HomeType.caption)
         if (error != null) {
             Row(Modifier.padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 Icon(HomeIcons.CircleAlert, null, Modifier.size(13.dp), tint = c.bad)
                 Text(error, color = c.bad, style = HomeType.caption)
             }
         }
-        if (!errorAfterHint && hint != null) Text(ht(hint), Modifier.padding(horizontal = 2.dp), color = c.t3, style = HomeType.caption)
+        if (!errorAfterHint && hint != null) Text(ht(hint), Modifier.padding(horizontal = 2.dp), color = c.t3, style = hintStyle ?: HomeType.caption)
     }
 }
 

@@ -260,6 +260,7 @@ internal object ToolsEditorType {
     val code: TextStyle = HomeType.mono.copy(
         fontSize = 13.sp,
         lineHeight = 17.sp,
+        letterSpacing = (-0.35).sp,
         lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None),
     )
 }

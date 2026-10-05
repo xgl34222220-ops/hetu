@@ -1,6 +1,6 @@
 {
   "baselineCommit": "492a9c646f752ca5d20c5951486ad723985be73a",
-  "currentApplicationCommit": "93988af07d8f052e928a8db166daaeaeb053ef67",
+  "currentApplicationCommit": "9399121212b68a5f6422170e00835095218c2f8e",
   "sourceChangesInHomeAndPanel": [],
   "sharedChanges": "Exact opt-in only transform validated by pdf85_source_scope.validate_shared_page; flatCanvas=false/referenceDocument=false/maxVisibleChoices=null defaults preserve previous path",
   "comparison": {
@@ -29,49 +29,678 @@
   },
   "latestApplicationScreenshotComparison": {
     "fromCommit": "18909201b6168687cac4e1de5ece68db36938fda",
-    "toCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+    "toCommit": "9399121212b68a5f6422170e00835095218c2f8e",
     "fromUiArtifact": 11337935682,
-    "toUiArtifact": 11341183078,
+    "toUiArtifact": 11353804803,
     "matchedScreens": 43,
     "byteIdentical": 42,
+    "pixelIdentical": 42,
     "differences": [
       {
-        "image": "02-012-api-expanded.png",
-        "pixelBounds": [
-          278,
+        "name": "02-012-api-expanded.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/02-012-api-expanded.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/02-012-api-expanded.png",
+        "oldSha256": "ed4f44fd9144b23efd1a0906dd2e3b8a845b5b6c4d19d5df7c8c9ab903f58824",
+        "newSha256": "6a483db358b0aa0f08f4a3451b9b7caead3a66d8307bd1ac96fc0b62a84ceb0d",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": false,
+        "bbox": [
+          270,
           636,
-          308,
+          300,
           646
         ],
         "observedValues": [
           "47023",
-          "42041"
+          "58463"
         ],
-        "meaning": "Only actual ephemeral isolated fixture port differs; compared images opened visually; remaining pixels identical"
+        "meaning": "Only observed loopback fixture port glyph pixels differ; all pixels outside this actualbbox match. Both full images actually opened."
       }
     ],
-    "interpretation": "42/43 byte-identical; one actual fixture port value differs, no layout difference"
+    "interpretation": "Actual43 PNG hashes and RGB diff;42 identical and onlyfixture port47023→58463 in one10px-high bbox. Static images do not independently exercise animation."
   },
-  "latestReviewCommit": "7cfdf426400026c06a997f09d3b7eb4defad852b",
-  "latestReviewRun": 37322190390,
-  "latestComponentArtifact": 11351635003,
+  "latestReviewCommit": "9399121212b68a5f6422170e00835095218c2f8e",
+  "latestReviewRun": 37330392252,
+  "latestComponentArtifact": 11353804803,
   "latestPngComparison": {
+    "fromDirectory": "/workspace/scratch/3788973cf567/tmp/ui85-first",
+    "toDirectory": "/workspace/scratch/3788973cf567/tmp/ui85-939912",
     "total": 43,
     "byteIdentical": 42,
+    "pixelIdentical": 42,
     "differences": [
       {
         "name": "02-012-api-expanded.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/02-012-api-expanded.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/02-012-api-expanded.png",
+        "oldSha256": "ed4f44fd9144b23efd1a0906dd2e3b8a845b5b6c4d19d5df7c8c9ab903f58824",
+        "newSha256": "6a483db358b0aa0f08f4a3451b9b7caead3a66d8307bd1ac96fc0b62a84ceb0d",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": false,
         "bbox": [
-          278,
+          270,
           636,
-          308,
+          300,
           646
         ],
+        "observedValues": [
+          "47023",
+          "58463"
+        ],
+        "meaning": "Only observed loopback fixture port glyph pixels differ; all pixels outside this actualbbox match. Both full images actually opened."
+      }
+    ],
+    "files": [
+      {
+        "name": "01-001-running.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/01-001-running.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/01-001-running.png",
+        "oldSha256": "1b79b51869d7fd2e93b2dd43182621e632d261de2ca3736525c7d811b1424575",
+        "newSha256": "1b79b51869d7fd2e93b2dd43182621e632d261de2ca3736525c7d811b1424575",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "01-002-controls-expanded.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/01-002-controls-expanded.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/01-002-controls-expanded.png",
+        "oldSha256": "b2a821d3be11c1f37ce86364f90189673c671dbedbcf59d36ccfa1b662b8ad30",
+        "newSha256": "b2a821d3be11c1f37ce86364f90189673c671dbedbcf59d36ccfa1b662b8ad30",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "01-003-stopped.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/01-003-stopped.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/01-003-stopped.png",
+        "oldSha256": "b054a712c4ab2b40df04b164babda84548e1fd8b814a4604cdbfdef81ae7f084",
+        "newSha256": "b054a712c4ab2b40df04b164babda84548e1fd8b814a4604cdbfdef81ae7f084",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "01-004-pending-lan.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/01-004-pending-lan.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/01-004-pending-lan.png",
+        "oldSha256": "e79edb09ba0248d7c88ed18dac1c029b544b1c083771bf2da5cef8117f20ef4d",
+        "newSha256": "e79edb09ba0248d7c88ed18dac1c029b544b1c083771bf2da5cef8117f20ef4d",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "01-005-speed-source.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/01-005-speed-source.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/01-005-speed-source.png",
+        "oldSha256": "6ab0c402588a8fded4b840a8244ddb6d38b555ca84c045aab82e47fdff0b7f68",
+        "newSha256": "6ab0c402588a8fded4b840a8244ddb6d38b555ca84c045aab82e47fdff0b7f68",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "01-006-starting.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/01-006-starting.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/01-006-starting.png",
+        "oldSha256": "78d484738e8cef8247886691516f31f72c34b995b208db407db14d3c152c831b",
+        "newSha256": "78d484738e8cef8247886691516f31f72c34b995b208db407db14d3c152c831b",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "01-007-failed.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/01-007-failed.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/01-007-failed.png",
+        "oldSha256": "e80e9453466a36d652be1fd08914a3707ddc362deb886abe83725c8f811d2d34",
+        "newSha256": "e80e9453466a36d652be1fd08914a3707ddc362deb886abe83725c8f811d2d34",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "01-008-restarting.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/01-008-restarting.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/01-008-restarting.png",
+        "oldSha256": "237635e1b278928650db12d9e155dcc474c0a7cb3d3e20ee431127ca56dee16e",
+        "newSha256": "237635e1b278928650db12d9e155dcc474c0a7cb3d3e20ee431127ca56dee16e",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "01-009-public-ip-details.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/01-009-public-ip-details.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/01-009-public-ip-details.png",
+        "oldSha256": "4cecb92a242295383c83e3017eb9fc9d000dcc005e0a2ed03709773a81f8f393",
+        "newSha256": "4cecb92a242295383c83e3017eb9fc9d000dcc005e0a2ed03709773a81f8f393",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "01-010-lan-ip-details.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/01-010-lan-ip-details.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/01-010-lan-ip-details.png",
+        "oldSha256": "e1785b1f62ce7f04f634e182c1cf9b53af1527ac4091d06f60ea6f355370c082",
+        "newSha256": "e1785b1f62ce7f04f634e182c1cf9b53af1527ac4091d06f60ea6f355370c082",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "01-011-direct-targets-saved.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/01-011-direct-targets-saved.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/01-011-direct-targets-saved.png",
+        "oldSha256": "6e89b2d31c735c2c87f12aa5fdc331d476f9169a30f30a73d0532306fce58886",
+        "newSha256": "6e89b2d31c735c2c87f12aa5fdc331d476f9169a30f30a73d0532306fce58886",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "01-012-direct-targets-invalid.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/01-012-direct-targets-invalid.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/01-012-direct-targets-invalid.png",
+        "oldSha256": "376ee1a7def47f43f1b346c9f465f985578f8b34de54eb3ae0b287b3e0d151a3",
+        "newSha256": "376ee1a7def47f43f1b346c9f465f985578f8b34de54eb3ae0b287b3e0d151a3",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "01-013-resource-gaps.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/01-013-resource-gaps.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/01-013-resource-gaps.png",
+        "oldSha256": "d68cef74b37e849a9dd83763c9c944288349b5476e22d29fc91c2a06a5950116",
+        "newSha256": "d68cef74b37e849a9dd83763c9c944288349b5476e22d29fc91c2a06a5950116",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "01-014-resource-waiting.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/01-014-resource-waiting.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/01-014-resource-waiting.png",
+        "oldSha256": "8f3811c6aa74108c63bec5f7753fc6b935f41a8dee9329d82988aa7a890b5888",
+        "newSha256": "8f3811c6aa74108c63bec5f7753fc6b935f41a8dee9329d82988aa7a890b5888",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "02-001-strategies.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/02-001-strategies.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/02-001-strategies.png",
+        "oldSha256": "4932931a1877a6c4367b4c5d6431dec0084de0b7f636416a7f89401cffb43a99",
+        "newSha256": "4932931a1877a6c4367b4c5d6431dec0084de0b7f636416a7f89401cffb43a99",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "02-002-expanded.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/02-002-expanded.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/02-002-expanded.png",
+        "oldSha256": "9ac3c91ae823ab26d2c9ee7d28ecfbe619680e0691eacaf45767ea41c805f87f",
+        "newSha256": "9ac3c91ae823ab26d2c9ee7d28ecfbe619680e0691eacaf45767ea41c805f87f",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "02-003-overview.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/02-003-overview.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/02-003-overview.png",
+        "oldSha256": "241fb91e8fe7daf212018e76abf0328d4bacf3dfe4bd6651bca1a055983cc358",
+        "newSha256": "241fb91e8fe7daf212018e76abf0328d4bacf3dfe4bd6651bca1a055983cc358",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "02-004-overview-scrolled.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/02-004-overview-scrolled.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/02-004-overview-scrolled.png",
+        "oldSha256": "1f877ff4b5d3c5fc29a26ed5a57e14ad5c4d865f0904c5bc3b56040098f8e185",
+        "newSha256": "1f877ff4b5d3c5fc29a26ed5a57e14ad5c4d865f0904c5bc3b56040098f8e185",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "02-005-providers.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/02-005-providers.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/02-005-providers.png",
+        "oldSha256": "1566e8dc5c8b60639e39391f610d40170cfb6342cf7a1c62f490c8ff7db5ece7",
+        "newSha256": "1566e8dc5c8b60639e39391f610d40170cfb6342cf7a1c62f490c8ff7db5ece7",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "02-006-connections.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/02-006-connections.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/02-006-connections.png",
+        "oldSha256": "05132df78c0af1038a150c74e890ea33bc032ab1422686d22ee973f3801463af",
+        "newSha256": "05132df78c0af1038a150c74e890ea33bc032ab1422686d22ee973f3801463af",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "02-007-rules.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/02-007-rules.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/02-007-rules.png",
+        "oldSha256": "7b6bd71b11c1d173edfe0f9f63ffbc8bfd9d85de37081806fd44e0f3d27832ac",
+        "newSha256": "7b6bd71b11c1d173edfe0f9f63ffbc8bfd9d85de37081806fd44e0f3d27832ac",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "02-008-rulesets.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/02-008-rulesets.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/02-008-rulesets.png",
+        "oldSha256": "0d23addc5b20b5c5e26162d3ca895e5c14803efa5e6041c81c12d33ad38583a8",
+        "newSha256": "0d23addc5b20b5c5e26162d3ca895e5c14803efa5e6041c81c12d33ad38583a8",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "02-009-panel-logs.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/02-009-panel-logs.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/02-009-panel-logs.png",
+        "oldSha256": "94a68c7a328ca6a369ddbdd987b41d9af11b57f2ac5a6b1ed0ecb6f17079d149",
+        "newSha256": "94a68c7a328ca6a369ddbdd987b41d9af11b57f2ac5a6b1ed0ecb6f17079d149",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "02-010-filter.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/02-010-filter.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/02-010-filter.png",
+        "oldSha256": "82782adede92408f6cfc80574536899f1dd409512915d8d0509062a25aafa47f",
+        "newSha256": "82782adede92408f6cfc80574536899f1dd409512915d8d0509062a25aafa47f",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "02-011-layout.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/02-011-layout.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/02-011-layout.png",
+        "oldSha256": "5c4d0c71c247fe786cdaed5c003db967d4dfcdd7a26f5d3ecb9c858923eb64e5",
+        "newSha256": "5c4d0c71c247fe786cdaed5c003db967d4dfcdd7a26f5d3ecb9c858923eb64e5",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "02-012-api-expanded.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/02-012-api-expanded.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/02-012-api-expanded.png",
         "oldSha256": "ed4f44fd9144b23efd1a0906dd2e3b8a845b5b6c4d19d5df7c8c9ab903f58824",
-        "newSha256": "62ebb55f94da5713b90a8f5743553a6d1f2aa8fd71fa4d6bfe1198f17f51bdf7",
-        "meaning": "Isolated fixture ephemeral loopback port pixels only; no layout or motion source changes"
+        "newSha256": "6a483db358b0aa0f08f4a3451b9b7caead3a66d8307bd1ac96fc0b62a84ceb0d",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": false,
+        "bbox": [
+          270,
+          636,
+          300,
+          646
+        ]
+      },
+      {
+        "name": "02-013-node-info.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/02-013-node-info.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/02-013-node-info.png",
+        "oldSha256": "a3189b291c48573983b1ebd58ca53a403c69e9ecf26eef8d1f3ed5cae88df853",
+        "newSha256": "a3189b291c48573983b1ebd58ca53a403c69e9ecf26eef8d1f3ed5cae88df853",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "02-014-connection-detail.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/02-014-connection-detail.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/02-014-connection-detail.png",
+        "oldSha256": "999d62efe8abb8882aab4179481fcedf486730cf709823ae435fad148405cd78",
+        "newSha256": "999d62efe8abb8882aab4179481fcedf486730cf709823ae435fad148405cd78",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "02-015-disconnect-confirm.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/02-015-disconnect-confirm.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/02-015-disconnect-confirm.png",
+        "oldSha256": "a8079a930148d3f0014656c3ed4603c6251f840ad032c1f21b05bbed2b405982",
+        "newSha256": "a8079a930148d3f0014656c3ed4603c6251f840ad032c1f21b05bbed2b405982",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "02-016-rank-count.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/02-016-rank-count.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/02-016-rank-count.png",
+        "oldSha256": "940fb1093254e7c510300fd3b72095efa7b41ecc0521646a349b018445035483",
+        "newSha256": "940fb1093254e7c510300fd3b72095efa7b41ecc0521646a349b018445035483",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "02-017-connection-sort.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/02-017-connection-sort.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/02-017-connection-sort.png",
+        "oldSha256": "f7609bca90f3ad8fd5f0fe5406ac2e62bb838e723c6efa282f1d0164fddf519e",
+        "newSha256": "f7609bca90f3ad8fd5f0fe5406ac2e62bb838e723c6efa282f1d0164fddf519e",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "02-018-connection-display.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/02-018-connection-display.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/02-018-connection-display.png",
+        "oldSha256": "9bb5aa38e4a89589edd023a55be8bd940e81d08b17e15a7901270fa7f323034f",
+        "newSha256": "9bb5aa38e4a89589edd023a55be8bd940e81d08b17e15a7901270fa7f323034f",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "02-019-search.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/02-019-search.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/02-019-search.png",
+        "oldSha256": "d2a62e6949d63c0b83dee81b9e6a3f1f09c6e6dad58ea64e3dbb773349638f57",
+        "newSha256": "d2a62e6949d63c0b83dee81b9e6a3f1f09c6e6dad58ea64e3dbb773349638f57",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "02-020-rank-order.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/02-020-rank-order.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/02-020-rank-order.png",
+        "oldSha256": "d56c9600e5ff86b4f527d05072c38c8af5c2f408d774b3b8cbdcf810086fe1c1",
+        "newSha256": "d56c9600e5ff86b4f527d05072c38c8af5c2f408d774b3b8cbdcf810086fe1c1",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "02-021-connection-filter.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/02-021-connection-filter.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/02-021-connection-filter.png",
+        "oldSha256": "ee0ebf7283051d2ca35eadb0fda3b462fe7563e5676f6d2b621c5d78625c4a28",
+        "newSha256": "ee0ebf7283051d2ca35eadb0fda3b462fe7563e5676f6d2b621c5d78625c4a28",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "02-022-provider-failed.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/02-022-provider-failed.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/02-022-provider-failed.png",
+        "oldSha256": "9920d41870b8115e07c49e310ea3f1b73f5dd5984de6f1e3ae96258a43e649e7",
+        "newSha256": "9920d41870b8115e07c49e310ea3f1b73f5dd5984de6f1e3ae96258a43e649e7",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "02-022-provider-updating.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/02-022-provider-updating.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/02-022-provider-updating.png",
+        "oldSha256": "6044804d3981028e333dccf42e7ff5756961425dc6d534c494920e2048fc32fd",
+        "newSha256": "6044804d3981028e333dccf42e7ff5756961425dc6d534c494920e2048fc32fd",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "02-023-rules-empty.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/02-023-rules-empty.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/02-023-rules-empty.png",
+        "oldSha256": "4620548c82b98939f138449112add78af2fefe098243de4a7f716ec1fe5a0dc2",
+        "newSha256": "4620548c82b98939f138449112add78af2fefe098243de4a7f716ec1fe5a0dc2",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "02-024-grouped-search.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/02-024-grouped-search.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/02-024-grouped-search.png",
+        "oldSha256": "90853434f61d649eead2279974db4e25927a698ff1972da06d462ea6d9e6726b",
+        "newSha256": "90853434f61d649eead2279974db4e25927a698ff1972da06d462ea6d9e6726b",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "02-025-ruleset-statuses.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/02-025-ruleset-statuses.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/02-025-ruleset-statuses.png",
+        "oldSha256": "0e9ff464ad47a00571ac45ca635438ca077b1865325791503cbc4d15a77dd211",
+        "newSha256": "0e9ff464ad47a00571ac45ca635438ca077b1865325791503cbc4d15a77dd211",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "02-026-panel-log-search-expanded.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/02-026-panel-log-search-expanded.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/02-026-panel-log-search-expanded.png",
+        "oldSha256": "d6e20619adcb3d9c11ddfdfd2a653410a1e6b2a396e24471e6d88df883f0aacb",
+        "newSha256": "d6e20619adcb3d9c11ddfdfd2a653410a1e6b2a396e24471e6d88df883f0aacb",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "02-027-api-default.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/02-027-api-default.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/02-027-api-default.png",
+        "oldSha256": "2cc2951657dadd3d7c12c172ab23877e652bc29c01011d389ccdc5735819235c",
+        "newSha256": "2cc2951657dadd3d7c12c172ab23877e652bc29c01011d389ccdc5735819235c",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
+      },
+      {
+        "name": "02-028-node-statuses.png",
+        "oldPath": "/workspace/scratch/3788973cf567/tmp/ui85-first/02-028-node-statuses.png",
+        "newPath": "/workspace/scratch/3788973cf567/tmp/ui85-939912/02-028-node-statuses.png",
+        "oldSha256": "3240655a457a5f0c6eb6fe8c894a3e0f437621f18e4711ca842f8f7f8998d76d",
+        "newSha256": "3240655a457a5f0c6eb6fe8c894a3e0f437621f18e4711ca842f8f7f8998d76d",
+        "dimensions": [
+          393,
+          852
+        ],
+        "byteIdentical": true,
+        "bbox": null
       }
     ]
   },
-  "latestNativeAndRootUiCandidate": "Shared opt-in source whole-file transforms and 333 frozen hashes must independently pass new commit; 7cf images do not validate uncommitted code."
+  "latestNativeAndRootUiCandidate": "Next local presentation candidates must independently pass a new commit and freshCI/captures.939912 screenshots and source guard are scoped only to939912.",
+  "reviewHistory": [
+    {
+      "latestReviewCommit": "7cfdf426400026c06a997f09d3b7eb4defad852b",
+      "latestReviewRun": 37322190390,
+      "latestComponentArtifact": 11351635003,
+      "latestPngComparison": {
+        "total": 43,
+        "byteIdentical": 42,
+        "differences": [
+          {
+            "name": "02-012-api-expanded.png",
+            "bbox": [
+              278,
+              636,
+              308,
+              646
+            ],
+            "oldSha256": "ed4f44fd9144b23efd1a0906dd2e3b8a845b5b6c4d19d5df7c8c9ab903f58824",
+            "newSha256": "62ebb55f94da5713b90a8f5743553a6d1f2aa8fd71fa4d6bfe1198f17f51bdf7",
+            "meaning": "Isolated fixture ephemeral loopback port pixels only; no layout or motion source changes"
+          }
+        ]
+      }
+    }
+  ],
+  "latestSourceScopeGuard": {
+    "applicationCommit": "9399121212b68a5f6422170e00835095218c2f8e",
+    "runId": 37330392252,
+    "buildJobId": 111831686529,
+    "pdfReferenceLayer": {
+      "patchSha256": "16c6d5371e00a7db0f3284592d1c0da85c44e4608b6bf75ab3ba080ad2d6085b",
+      "frozenInputs": 333,
+      "homeAndPanelUnchanged": true,
+      "runtimePayloadsUnchanged": true,
+      "manifestDependenciesAndSigningUnchanged": true,
+      "expectedUnitTests": 479
+    },
+    "completeJobLogSha256": "c0f2b3fa20e76801ef3d243d81fefae79d901205600ad45dc5a865d797369cea"
+  }
 }

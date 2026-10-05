@@ -1,0 +1,9 @@
+{
+  "source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt",
+  "baseApplicationCommit": "9399121212b68a5f6422170e00835095218c2f8e",
+  "candidateSha256": "e803b8df90a1de70212e66847d988bb33831723f35bdfa38c2037eaaac1ee999",
+  "exactPresentationReverseMatchesBase": true,
+  "reference": "PDF03B01 warning glyph and mode warning text agree",
+  "change": "Display known global/direct warning glyph and stop protecting halo; preserve effective calculation, actual history counters, preferences, IO, callbacks and Root policy",
+  "freshVerification": "next candidate not yet compiled/rendered; 939912 tests cannot verify these edits"
+}

@@ -179,10 +179,10 @@ internal fun ToolsInfoCard(text: String, modifier: Modifier = Modifier) {
 
 /** Title line inside a card (“运行预检”, “规则源”…), optionally with something on the right. */
 @Composable
-internal fun ToolsCardTitle(text: String, modifier: Modifier = Modifier, trailing: (@Composable RowScope.() -> Unit)? = null) {
+internal fun ToolsCardTitle(text: String, modifier: Modifier = Modifier, minHeight: Dp? = null, topPadding: Dp? = null, trailing: (@Composable RowScope.() -> Unit)? = null) {
     val c = LocalHomeColors.current
     Row(
-        modifier.fillMaxWidth().heightIn(min = HomeDims.touch).padding(start = 16.dp, end = if (trailing == null) 16.dp else 6.dp, top = 6.dp),
+        modifier.fillMaxWidth().heightIn(min = minHeight ?: HomeDims.touch).padding(start = 16.dp, end = if (trailing == null) 16.dp else 6.dp, top = topPadding ?: 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(ht(text), Modifier.weight(1f), color = c.t1, style = HomeType.rowTitle.copy(fontWeight = FontWeight.SemiBold), maxLines = 1)
@@ -203,6 +203,8 @@ internal fun ToolsSwitchRow(
     monospaceSubtitle: Boolean = false,
     rawContent: Boolean = false,
     subtitleStyle: TextStyle? = null,
+    minHeight: Dp? = null,
+    verticalPadding: Dp? = null,
 ) {
     val c = LocalHomeColors.current
     ToolsRow(
@@ -213,6 +215,8 @@ internal fun ToolsSwitchRow(
         subtitle = subtitle?.let { if (rawContent) it else ht(it) },
         subtitleStyle = subtitleStyle ?: (if (monospaceSubtitle) ToolsType.url else HomeType.rowSub),
         enabled = enabled,
+        minHeight = minHeight,
+        verticalPadding = verticalPadding,
         onClick = { onCheckedChange(!checked) },
         trailing = { ToolsSwitch(checked, null) },
     )
@@ -347,14 +351,14 @@ internal fun ToolsWrap(modifier: Modifier = Modifier, spacing: Dp = 8.dp, conten
 
 /** Domain chip with a remove button. */
 @Composable
-internal fun ToolsChip(text: String, onRemove: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
+internal fun ToolsChip(text: String, onRemove: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, textStyle: TextStyle? = null) {
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
     Row(
         modifier.height(32.dp).clip(CircleShape).background(c.sunken).padding(start = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(text, Modifier.widthIn(max = 220.dp), color = c.t1, style = HomeType.mono, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(text, Modifier.widthIn(max = 220.dp), color = c.t1, style = textStyle ?: HomeType.mono, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Box(
             Modifier.size(32.dp).clip(CircleShape).clickable(enabled = enabled, onClickLabel = "移除 $text", role = Role.Button) { haptics(HomeHaptic.Tap); onRemove() },
             contentAlignment = Alignment.Center,

@@ -245,18 +245,21 @@ internal fun SettingsDialog(
     pillButtons: Boolean = false,
     titleFontSizeSp: Float? = null,
     titleLineHeightSp: Float? = null,
+    referenceMirrorNormalSpacing: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     HxReferenceDialog(onDismiss = onDismiss) {
             Text(title, color = Hx.colors.text, fontSize = (titleFontSizeSp ?: 24f).sp, lineHeight = (titleLineHeightSp ?: 30f).sp,
                 fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 20.dp))
+                modifier = Modifier.fillMaxWidth().padding(top = if (referenceMirrorNormalSpacing) 14.dp else 8.dp,
+                    bottom = if (referenceMirrorNormalSpacing) 16.dp else 20.dp))
             content()
-            Spacer(Modifier.height(18.dp))
+            Spacer(Modifier.height(if (referenceMirrorNormalSpacing) 22.dp else 18.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 SettingsDialogButton(ht("取消"), false, onDismiss, Modifier.weight(1f), pillButtons)
                 SettingsDialogButton(confirmLabel, true, onConfirm, Modifier.weight(1f), pillButtons)
             }
+            if (referenceMirrorNormalSpacing) Spacer(Modifier.height(6.dp))
     }
 }
 
@@ -282,7 +285,7 @@ internal fun SettingsMirrorDialog(initial: String, onSave: (String) -> Unit, onD
         if (!settingsMirrorPrefixValid(next)) error = true
         else onSave(next)
     }, pillButtons = !error, titleFontSizeSp = if (error) 19f else null,
-        titleLineHeightSp = if (error) 24f else null) {
+        titleLineHeightSp = if (error) 24f else null, referenceMirrorNormalSpacing = !error) {
         if (!error) {
             Text(ht("镜像前缀"), color = Hx.colors.textMuted, fontSize = 13.sp)
             Spacer(Modifier.height(6.dp))

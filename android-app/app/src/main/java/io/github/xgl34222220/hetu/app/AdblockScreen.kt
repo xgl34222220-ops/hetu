@@ -172,6 +172,7 @@ internal fun AdblockScreen(vm: HetuViewModel) {
     val lastError = if (revision >= 0) prefs.getString("proxyAdblockLastError", "").orEmpty() else ""
     val effective = running && enabled && prefs.getBoolean("proxyAdblockLastEffective", false) && lastError.isBlank()
     val actualMode = vm.state.trafficMode.lowercase()
+    val wrongMode = running && enabled && actualMode in listOf("global", "direct")
     val snapshot = rules
 
     HxPage(flatCanvas = true, referenceTopBar = true,
@@ -190,12 +191,12 @@ internal fun AdblockScreen(vm: HetuViewModel) {
         item(key = "master") {
             HxSection {
                 HxCard {
-                    val tint by animateColorAsState(if (running && enabled && actualMode in listOf("global", "direct")) c.warn else if (effective) c.good else if (enabled) c.warn else c.textFaint, tween(HxMotion.Medium), label = "shield")
+                    val tint by animateColorAsState(if (wrongMode) c.warn else if (effective) c.good else if (enabled) c.warn else c.textFaint, tween(HxMotion.Medium), label = "shield")
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         // While actively protecting, a soft ring breathes around the shield.
                         val breathing = rememberInfiniteTransition(label = "shieldBreath")
                         val breath by breathing.animateFloat(0f, 1f, infiniteRepeatable(tween(2200), RepeatMode.Reverse), label = "shieldBreathValue")
-                        val haloStrength by animateFloatAsState(if (effective) 1f else 0f, tween(HxMotion.Long), label = "shieldHalo")
+                        val haloStrength by animateFloatAsState(if (effective && !wrongMode) 1f else 0f, tween(HxMotion.Long), label = "shieldHalo")
                         Box(Modifier.size(76.dp), contentAlignment = Alignment.Center) {
                             Box(
                                 Modifier
@@ -210,8 +211,9 @@ internal fun AdblockScreen(vm: HetuViewModel) {
                                     .background(tint.copy(alpha = .18f)),
                             )
                             Box(Modifier.size(76.dp).clip(CircleShape).background(tint.copy(alpha = .14f)), contentAlignment = Alignment.Center) {
-                                val statusIcon = if (effective) ToolsIcons.AdblockProtectingPdf45
-                                    else if (running && enabled && (actualMode in listOf("global", "direct") || lastError.isNotBlank())) ToolsIcons.AdblockWrongModePdf03B01
+                                val statusIcon = if (wrongMode) ToolsIcons.AdblockWrongModePdf03B01
+                                    else if (effective) ToolsIcons.AdblockProtectingPdf45
+                                    else if (running && enabled && lastError.isNotBlank()) ToolsIcons.AdblockWrongModePdf03B01
                                     else Icons.Rounded.Shield
                                 Icon(statusIcon, null, tint = tint, modifier = Modifier.size(44.dp))
                             }

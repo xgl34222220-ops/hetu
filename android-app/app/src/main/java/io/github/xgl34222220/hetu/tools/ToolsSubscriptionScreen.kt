@@ -6,8 +6,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.github.xgl34222220.hetu.tools.ToolsButton as HomeButton
 import io.github.xgl34222220.hetu.home.HomeButtonKind
 import io.github.xgl34222220.hetu.tools.ToolsSurfaceCard as HomeCard
@@ -40,15 +42,19 @@ internal fun ToolsSubscriptionScreen(
         HomeCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(HomeDims.cardPadding), verticalArrangement = Arrangement.spacedBy(24.dp)) {
                 if (adding) {
-                    ToolsField("订阅名称", form.name, onNameChange, placeholder = "例如 主订阅", error = form.nameError)
+                    ToolsField("订阅名称", form.name, onNameChange, placeholder = "例如 主订阅", error = form.nameError,
+                        inputMinHeight = 43.dp, inputVerticalPadding = 9.5.dp)
                 } else {
-                    ToolsField("订阅名称", form.name, {}, readOnly = true, hint = "名称用于策略组引用，可在 YAML 编辑器中统一修改。")
+                    ToolsField("订阅名称", form.name, {}, readOnly = true, hint = "名称用于策略组引用，可在 YAML 编辑器中统一修改。",
+                        readOnlyValueStyle = ToolsType.readOnlyValue.copy(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold),
+                        hintStyle = ToolsTypography.caption.copy(fontSize = 12.sp, lineHeight = 17.sp))
                 }
                 ToolsField(
                     "订阅链接", form.url, onUrlChange,
                     placeholder = "https://", monospace = true, keyboardType = KeyboardType.Uri,
                     error = form.urlError, hint = "保存到当前配置，运行时会尝试应用。",
                     errorAfterHint = adding,
+                    inputMinHeight = 43.dp, inputVerticalPadding = 9.5.dp,
                 )
                 Column(Modifier.padding(top = if (adding && form.urlError != null) 7.dp else 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     HomeButton("保存", onSave, Modifier.fillMaxWidth(), kind = HomeButtonKind.Primary, icon = HomeIcons.Save, loading = form.saving)
